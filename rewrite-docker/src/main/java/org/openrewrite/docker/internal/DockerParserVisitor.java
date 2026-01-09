@@ -21,9 +21,9 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
-import org.openrewrite.docker.internal.grammar.DockerfileLexer;
-import org.openrewrite.docker.internal.grammar.DockerfileParser;
-import org.openrewrite.docker.internal.grammar.DockerfileParserBaseVisitor;
+import org.openrewrite.docker.internal.grammar.DockerLexer;
+import org.openrewrite.docker.internal.grammar.DockerParser;
+import org.openrewrite.docker.internal.grammar.DockerParserBaseVisitor;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -40,7 +40,7 @@ import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
-public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
+public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     private final Path path;
     private final String source;
     private final Charset charset;
@@ -61,13 +61,13 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker.File visitDockerfile(DockerfileParser.DockerfileContext ctx) {
+    public Docker.File visitDockerfile(DockerParser.DockerfileContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         // Parse global ARG instructions (before first FROM)
         List<Docker.Arg> globalArgs = new ArrayList<>();
         if (ctx.globalArgs() != null) {
-            for (DockerfileParser.ArgInstructionContext argCtx : ctx.globalArgs().argInstruction()) {
+            for (DockerParser.ArgInstructionContext argCtx : ctx.globalArgs().argInstruction()) {
                 Docker.Arg arg = (Docker.Arg) visit(argCtx);
                 if (arg != null) {
                     globalArgs.add(arg);
@@ -77,7 +77,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
 
         // Parse build stages
         List<Docker.Stage> stages = new ArrayList<>();
-        for (DockerfileParser.StageContext stageCtx : ctx.stage()) {
+        for (DockerParser.StageContext stageCtx : ctx.stage()) {
             Docker.Stage stage = visitStage(stageCtx);
             if (stage != null) {
                 stages.add(stage);
@@ -100,7 +100,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker.Stage visitStage(DockerfileParser.StageContext ctx) {
+    public Docker.Stage visitStage(DockerParser.StageContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         // Parse the FROM instruction that starts this stage
@@ -108,7 +108,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
 
         // Parse stage instructions
         List<Docker.Instruction> instructions = new ArrayList<>();
-        for (DockerfileParser.StageInstructionContext instructionCtx : ctx.stageInstruction()) {
+        for (DockerParser.StageInstructionContext instructionCtx : ctx.stageInstruction()) {
             Docker.Instruction instruction = (Docker.Instruction) visit(instructionCtx);
             if (instruction != null) {
                 instructions.add(instruction);
@@ -125,7 +125,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitFromInstruction(DockerfileParser.FromInstructionContext ctx) {
+    public Docker visitFromInstruction(DockerParser.FromInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         // Extract and skip the FROM keyword
@@ -145,7 +145,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         return new Docker.From(randomId(), prefix, Markers.EMPTY, fromKeyword, flags, imageName, tag, digest, as);
     }
 
-    private Docker.From.As visitFromAs(DockerfileParser.FromInstructionContext ctx) {
+    private Docker.From.As visitFromAs(DockerParser.FromInstructionContext ctx) {
         Space asPrefix = prefix(ctx.AS().getSymbol());
         String asKeyword = ctx.AS().getText();
         skip(ctx.AS().getSymbol());
@@ -158,7 +158,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         );
     }
 
-    private Docker.@Nullable Argument[] parseImageName(DockerfileParser.ImageNameContext ctx) {
+    private Docker.@Nullable Argument[] parseImageName(DockerParser.ImageNameContext ctx) {
         Space prefix = prefix(ctx);
 
         // Parse the text and split out environment variables
@@ -245,7 +245,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         return new Docker.@Nullable Argument[]{imageName, tag, digest};
     }
 
-    private List<Docker.ArgumentContent> parseText(DockerfileParser.@Nullable TextContext textCtx) {
+    private List<Docker.ArgumentContent> parseText(DockerParser.@Nullable TextContext textCtx) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
 
         if (textCtx == null) {
@@ -276,11 +276,11 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         boolean foundComment = false;
         for (int i = textCtx.getChildCount() - 1; i >= 0; i--) {
             ParseTree child = textCtx.getChild(i);
-            if (child instanceof DockerfileParser.TextElementContext) {
-                DockerfileParser.TextElementContext textElement = (DockerfileParser.TextElementContext) child;
+            if (child instanceof DockerParser.TextElementContext) {
+                DockerParser.TextElementContext textElement = (DockerParser.TextElementContext) child;
                 if (textElement.getChildCount() > 0 && textElement.getChild(0) instanceof TerminalNode) {
                     TerminalNode terminal = (TerminalNode) textElement.getChild(0);
-                    if (terminal.getSymbol().getType() == DockerfileLexer.COMMENT) {
+                    if (terminal.getSymbol().getType() == DockerLexer.COMMENT) {
                         foundComment = true;
                         break;
                     }
@@ -291,17 +291,17 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         for (int i = 0; i < textCtx.getChildCount(); i++) {
             ParseTree child = textCtx.getChild(i);
 
-            if (child instanceof DockerfileParser.TextElementContext) {
-                DockerfileParser.TextElementContext textElement = (DockerfileParser.TextElementContext) child;
+            if (child instanceof DockerParser.TextElementContext) {
+                DockerParser.TextElementContext textElement = (DockerParser.TextElementContext) child;
                 if (textElement.getChildCount() > 0 && textElement.getChild(0) instanceof TerminalNode) {
                     TerminalNode terminal = (TerminalNode) textElement.getChild(0);
                     Token token = terminal.getSymbol();
                     String tokenText = token.getText();
 
-                    if (token.getType() == DockerfileLexer.COMMENT) {
+                    if (token.getType() == DockerLexer.COMMENT) {
                         // COMMENT tokens are ignored - they will be part of next element's prefix
                         break; // Stop processing tokens once we hit a comment
-                    } else if (token.getType() == DockerfileLexer.DOUBLE_QUOTED_STRING) {
+                    } else if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
                         Space elementPrefix = prefix(token);
                         skip(token);
                         String value = tokenText.substring(1, tokenText.length() - 1);
@@ -312,7 +312,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
                                 value,
                                 Docker.QuotedString.QuoteStyle.DOUBLE
                         ));
-                    } else if (token.getType() == DockerfileLexer.SINGLE_QUOTED_STRING) {
+                    } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
                         Space elementPrefix = prefix(token);
                         skip(token);
                         String value = tokenText.substring(1, tokenText.length() - 1);
@@ -323,7 +323,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
                                 value,
                                 Docker.QuotedString.QuoteStyle.SINGLE
                         ));
-                    } else if (token.getType() == DockerfileLexer.ENV_VAR) {
+                    } else if (token.getType() == DockerLexer.ENV_VAR) {
                         Space elementPrefix = prefix(token);
                         skip(token);
                         boolean braced = tokenText.startsWith("${");
@@ -354,7 +354,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitRunInstruction(DockerfileParser.RunInstructionContext ctx) {
+    public Docker visitRunInstruction(DockerParser.RunInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         // Extract and skip the RUN keyword
@@ -373,7 +373,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitAddInstruction(DockerfileParser.AddInstructionContext ctx) {
+    public Docker visitAddInstruction(DockerParser.AddInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         // Extract and skip the ADD keyword
@@ -393,7 +393,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
             // No separate destination to parse
         } else if (ctx.sourceList() != null) {
             sources = new ArrayList<>();
-            for (DockerfileParser.SourceContext sourceCtx : ctx.sourceList().source()) {
+            for (DockerParser.SourceContext sourceCtx : ctx.sourceList().source()) {
                 sources.add(visitArgument(sourceCtx.path()));
             }
             // For sourceList, destination is separate
@@ -409,7 +409,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitCopyInstruction(DockerfileParser.CopyInstructionContext ctx) {
+    public Docker visitCopyInstruction(DockerParser.CopyInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         // Extract and skip the COPY keyword
@@ -429,7 +429,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
             // No separate destination to parse
         } else if (ctx.sourceList() != null) {
             sources = new ArrayList<>();
-            for (DockerfileParser.SourceContext sourceCtx : ctx.sourceList().source()) {
+            for (DockerParser.SourceContext sourceCtx : ctx.sourceList().source()) {
                 sources.add(visitArgument(sourceCtx.path()));
             }
             // For sourceList, destination is separate
@@ -445,7 +445,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitArgInstruction(DockerfileParser.ArgInstructionContext ctx) {
+    public Docker visitArgInstruction(DockerParser.ArgInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         // Extract and skip the ARG keyword
@@ -469,7 +469,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitEnvInstruction(DockerfileParser.EnvInstructionContext ctx) {
+    public Docker visitEnvInstruction(DockerParser.EnvInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         // Extract and skip the ENV keyword
@@ -478,7 +478,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
 
         // Parse env pairs
         List<Docker.Env.EnvPair> pairs = new ArrayList<>();
-        for (DockerfileParser.EnvPairContext pairCtx : ctx.envPairs().envPair()) {
+        for (DockerParser.EnvPairContext pairCtx : ctx.envPairs().envPair()) {
             Space pairPrefix = prefix(pairCtx.getStart());
             Docker.Argument key = visitArgument(pairCtx.envKey());
 
@@ -507,7 +507,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitLabelInstruction(DockerfileParser.LabelInstructionContext ctx) {
+    public Docker visitLabelInstruction(DockerParser.LabelInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         // Extract and skip the LABEL keyword
@@ -516,7 +516,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
 
         // Parse label pairs
         List<Docker.Label.LabelPair> pairs = new ArrayList<>();
-        for (DockerfileParser.LabelPairContext pairCtx : ctx.labelPairs().labelPair()) {
+        for (DockerParser.LabelPairContext pairCtx : ctx.labelPairs().labelPair()) {
             Space pairPrefix = prefix(pairCtx.getStart());
             Docker.Argument key = visitLabelKeyOrValue(pairCtx.labelKey());
 
@@ -548,12 +548,12 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
                 Token token = terminal.getSymbol();
                 String text = token.getText();
 
-                if (token.getType() == DockerfileLexer.DOUBLE_QUOTED_STRING) {
+                if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
                     // Remove quotes
                     String value = text.substring(1, text.length() - 1);
                     contents.add(new Docker.QuotedString(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.QuotedString.QuoteStyle.DOUBLE));
                     skip(token);
-                } else if (token.getType() == DockerfileLexer.SINGLE_QUOTED_STRING) {
+                } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
                     // Remove quotes
                     String value = text.substring(1, text.length() - 1);
                     contents.add(new Docker.QuotedString(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.QuotedString.QuoteStyle.SINGLE));
@@ -570,7 +570,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitCmdInstruction(DockerfileParser.CmdInstructionContext ctx) {
+    public Docker visitCmdInstruction(DockerParser.CmdInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         String cmdKeyword = ctx.CMD().getText();
@@ -587,7 +587,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitEntrypointInstruction(DockerfileParser.EntrypointInstructionContext ctx) {
+    public Docker visitEntrypointInstruction(DockerParser.EntrypointInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         String entrypointKeyword = ctx.ENTRYPOINT().getText();
@@ -604,7 +604,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitExposeInstruction(DockerfileParser.ExposeInstructionContext ctx) {
+    public Docker visitExposeInstruction(DockerParser.ExposeInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         // Extract and skip the EXPOSE keyword
@@ -613,7 +613,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
 
         // Parse port list
         List<Docker.Argument> ports = new ArrayList<>();
-        for (DockerfileParser.PortContext portCtx : ctx.portList().port()) {
+        for (DockerParser.PortContext portCtx : ctx.portList().port()) {
             ports.add(convertPort(portCtx));
         }
 
@@ -625,7 +625,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         return new Docker.Expose(randomId(), prefix, Markers.EMPTY, exposeKeyword, ports);
     }
 
-    private Docker.Argument convertPort(DockerfileParser.PortContext ctx) {
+    private Docker.Argument convertPort(DockerParser.PortContext ctx) {
         Space prefix = prefix(ctx.getStart());
         Token token = ctx.UNQUOTED_TEXT().getSymbol();
         String text = token.getText();
@@ -637,7 +637,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitVolumeInstruction(DockerfileParser.VolumeInstructionContext ctx) {
+    public Docker visitVolumeInstruction(DockerParser.VolumeInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         // Extract and skip the VOLUME keyword
@@ -652,7 +652,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
             values = visitJsonArrayForVolume(ctx.jsonArray());
         } else {
             // Parse path list (space-separated paths)
-            for (DockerfileParser.VolumePathContext pathCtx : ctx.pathList().volumePath()) {
+            for (DockerParser.VolumePathContext pathCtx : ctx.pathList().volumePath()) {
                 Space pathPrefix = prefix(pathCtx.getStart());
                 Token token;
                 String text;
@@ -692,15 +692,15 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         return new Docker.Volume(randomId(), prefix, Markers.EMPTY, volumeKeyword, jsonForm, values);
     }
 
-    private List<Docker.Argument> visitJsonArrayForVolume(DockerfileParser.JsonArrayContext ctx) {
+    private List<Docker.Argument> visitJsonArrayForVolume(DockerParser.JsonArrayContext ctx) {
         // Capture whitespace before opening bracket and store it as prefix of first argument
         Space bracketPrefix = prefix(ctx.LBRACKET().getSymbol());
         skip(ctx.LBRACKET().getSymbol());
 
         List<Docker.Argument> arguments = new ArrayList<>();
         if (ctx.jsonArrayElements() != null) {
-            DockerfileParser.JsonArrayElementsContext elementsCtx = ctx.jsonArrayElements();
-            List<DockerfileParser.JsonStringContext> jsonStrings = elementsCtx.jsonString();
+            DockerParser.JsonArrayElementsContext elementsCtx = ctx.jsonArrayElements();
+            List<DockerParser.JsonStringContext> jsonStrings = elementsCtx.jsonString();
 
             for (int i = 0; i < jsonStrings.size(); i++) {
                 Docker.Argument arg = convertJsonString(jsonStrings.get(i));
@@ -718,7 +718,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
                     for (int j = 0; j < elementsCtx.getChildCount(); j++) {
                         if (elementsCtx.getChild(j) instanceof TerminalNode) {
                             TerminalNode terminal = (TerminalNode) elementsCtx.getChild(j);
-                            if (terminal.getSymbol().getType() == DockerfileLexer.JSON_COMMA &&
+                            if (terminal.getSymbol().getType() == DockerLexer.JSON_COMMA &&
                                     terminal.getSymbol().getStartIndex() > jsonStrings.get(i).getStop().getStopIndex() &&
                                     terminal.getSymbol().getStartIndex() < jsonStrings.get(i + 1).getStart().getStartIndex()) {
                                 skip(terminal.getSymbol());
@@ -736,7 +736,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         return arguments;
     }
 
-    private Docker.Argument convertJsonString(DockerfileParser.JsonStringContext ctx) {
+    private Docker.Argument convertJsonString(DockerParser.JsonStringContext ctx) {
         Space prefix = prefix(ctx.getStart());
         Token token = ctx.JSON_STRING().getSymbol();
         String text = token.getText();
@@ -755,7 +755,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitShellInstruction(DockerfileParser.ShellInstructionContext ctx) {
+    public Docker visitShellInstruction(DockerParser.ShellInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         // Extract and skip the SHELL keyword
@@ -773,15 +773,15 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         return new Docker.Shell(randomId(), prefix, Markers.EMPTY, shellKeyword, arguments);
     }
 
-    private List<Docker.Argument> visitJsonArrayForShell(DockerfileParser.JsonArrayContext ctx) {
+    private List<Docker.Argument> visitJsonArrayForShell(DockerParser.JsonArrayContext ctx) {
         // Capture whitespace before opening bracket and store it as prefix of first argument
         Space bracketPrefix = prefix(ctx.LBRACKET().getSymbol());
         skip(ctx.LBRACKET().getSymbol());
 
         List<Docker.Argument> arguments = new ArrayList<>();
         if (ctx.jsonArrayElements() != null) {
-            DockerfileParser.JsonArrayElementsContext elementsCtx = ctx.jsonArrayElements();
-            List<DockerfileParser.JsonStringContext> jsonStrings = elementsCtx.jsonString();
+            DockerParser.JsonArrayElementsContext elementsCtx = ctx.jsonArrayElements();
+            List<DockerParser.JsonStringContext> jsonStrings = elementsCtx.jsonString();
 
             for (int i = 0; i < jsonStrings.size(); i++) {
                 Docker.Argument arg = convertJsonString(jsonStrings.get(i));
@@ -797,7 +797,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
                     for (int j = 0; j < elementsCtx.getChildCount(); j++) {
                         if (elementsCtx.getChild(j) instanceof TerminalNode) {
                             TerminalNode terminal = (TerminalNode) elementsCtx.getChild(j);
-                            if (terminal.getSymbol().getType() == DockerfileLexer.JSON_COMMA &&
+                            if (terminal.getSymbol().getType() == DockerLexer.JSON_COMMA &&
                                     terminal.getSymbol().getStartIndex() > jsonStrings.get(i).getStop().getStopIndex() &&
                                     terminal.getSymbol().getStartIndex() < jsonStrings.get(i + 1).getStart().getStartIndex()) {
                                 skip(terminal.getSymbol());
@@ -816,7 +816,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitWorkdirInstruction(DockerfileParser.WorkdirInstructionContext ctx) {
+    public Docker visitWorkdirInstruction(DockerParser.WorkdirInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         String workdirKeyword = ctx.WORKDIR().getText();
@@ -833,7 +833,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitUserInstruction(DockerfileParser.UserInstructionContext ctx) {
+    public Docker visitUserInstruction(DockerParser.UserInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         String userKeyword = ctx.USER().getText();
@@ -852,7 +852,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         return new Docker.User(randomId(), prefix, Markers.EMPTY, userKeyword, user, group);
     }
 
-    private Docker.@Nullable Argument[] parseUserSpec(DockerfileParser.UserSpecContext ctx) {
+    private Docker.@Nullable Argument[] parseUserSpec(DockerParser.UserSpecContext ctx) {
         Space prefix = prefix(ctx);
 
         // Parse the text
@@ -909,7 +909,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitStopsignalInstruction(DockerfileParser.StopsignalInstructionContext ctx) {
+    public Docker visitStopsignalInstruction(DockerParser.StopsignalInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         String stopsignalKeyword = ctx.STOPSIGNAL().getText();
@@ -926,7 +926,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitOnbuildInstruction(DockerfileParser.OnbuildInstructionContext ctx) {
+    public Docker visitOnbuildInstruction(DockerParser.OnbuildInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         String onbuildKeyword = ctx.ONBUILD().getText();
@@ -944,7 +944,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitHealthcheckInstruction(DockerfileParser.HealthcheckInstructionContext ctx) {
+    public Docker visitHealthcheckInstruction(DockerParser.HealthcheckInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         String healthcheckKeyword = ctx.HEALTHCHECK().getText();
@@ -994,7 +994,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
     }
 
     @Override
-    public Docker visitMaintainerInstruction(DockerfileParser.MaintainerInstructionContext ctx) {
+    public Docker visitMaintainerInstruction(DockerParser.MaintainerInstructionContext ctx) {
         Space prefix = prefix(ctx.getStart());
 
         String maintainerKeyword = ctx.MAINTAINER().getText();
@@ -1010,7 +1010,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         return new Docker.Maintainer(randomId(), prefix, Markers.EMPTY, maintainerKeyword, text);
     }
 
-    private Docker.CommandLine visitCommandLine(DockerfileParser.RunInstructionContext ctx) {
+    private Docker.CommandLine visitCommandLine(DockerParser.RunInstructionContext ctx) {
         Docker.CommandForm form;
         if (ctx.execForm() != null) {
             form = visitExecFormContext(ctx.execForm());
@@ -1031,7 +1031,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         );
     }
 
-    private Docker.CommandLine visitCommandLineForCmd(DockerfileParser.CmdInstructionContext ctx) {
+    private Docker.CommandLine visitCommandLineForCmd(DockerParser.CmdInstructionContext ctx) {
         Docker.CommandForm form;
         if (ctx.execForm() != null) {
             form = visitExecFormContext(ctx.execForm());
@@ -1049,7 +1049,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         );
     }
 
-    private Docker.CommandLine visitCommandLineForEntrypoint(DockerfileParser.EntrypointInstructionContext ctx) {
+    private Docker.CommandLine visitCommandLineForEntrypoint(DockerParser.EntrypointInstructionContext ctx) {
         Docker.CommandForm form;
         if (ctx.execForm() != null) {
             form = visitExecFormContext(ctx.execForm());
@@ -1067,9 +1067,9 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         );
     }
 
-    private List<Docker.Flag> convertFlags(DockerfileParser.FlagsContext ctx) {
+    private List<Docker.Flag> convertFlags(DockerParser.FlagsContext ctx) {
         List<Docker.Flag> flags = new ArrayList<>();
-        for (DockerfileParser.FlagContext flagCtx : ctx.flag()) {
+        for (DockerParser.FlagContext flagCtx : ctx.flag()) {
             Space flagPrefix = prefix(flagCtx.getStart());
             skip(flagCtx.DASH_DASH().getSymbol());
 
@@ -1087,7 +1087,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         return flags;
     }
 
-    private Docker.ShellForm visitShellFormContext(DockerfileParser.ShellFormContext ctx) {
+    private Docker.ShellForm visitShellFormContext(DockerParser.ShellFormContext ctx) {
         return convert(ctx, (c, prefix) ->
                 new Docker.ShellForm(
                         randomId(),
@@ -1098,15 +1098,15 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         );
     }
 
-    private Docker.ExecForm visitExecFormContext(DockerfileParser.ExecFormContext ctx) {
+    private Docker.ExecForm visitExecFormContext(DockerParser.ExecFormContext ctx) {
         return convert(ctx, (c, prefix) -> {
             List<Docker.Argument> args = new ArrayList<>();
-            DockerfileParser.JsonArrayContext jsonArray = c.jsonArray();
+            DockerParser.JsonArrayContext jsonArray = c.jsonArray();
 
             skip(jsonArray.LBRACKET().getSymbol());
 
             if (jsonArray.jsonArrayElements() != null) {
-                for (DockerfileParser.JsonStringContext jsonStr : jsonArray.jsonArrayElements().jsonString()) {
+                for (DockerParser.JsonStringContext jsonStr : jsonArray.jsonArrayElements().jsonString()) {
                     Space argPrefix = prefix(jsonStr.getStart());
                     String value = jsonStr.JSON_STRING().getText();
                     // Remove surrounding quotes
@@ -1137,7 +1137,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
         });
     }
 
-    private Docker.HeredocForm visitHeredocContext(DockerfileParser.HeredocContext ctx) {
+    private Docker.HeredocForm visitHeredocContext(DockerParser.HeredocContext ctx) {
         return convert(ctx, (c, prefix) -> {
             // Get opening marker (<<EOF or <<-EOF)
             String opening = c.HEREDOC_START().getText();
@@ -1161,7 +1161,7 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
 
             // Process heredocContent which is ( NEWLINE | text )*
             if (c.heredocContent() != null) {
-                DockerfileParser.HeredocContentContext contentCtx = c.heredocContent();
+                DockerParser.HeredocContentContext contentCtx = c.heredocContent();
                 StringBuilder currentLine = new StringBuilder();
 
                 for (int i = 0; i < contentCtx.getChildCount(); i++) {
@@ -1169,16 +1169,16 @@ public class DockerParserVisitor extends DockerfileParserBaseVisitor<Docker> {
 
                     if (child instanceof TerminalNode) {
                         TerminalNode tn = (TerminalNode) child;
-                        if (tn.getSymbol().getType() == DockerfileLexer.NEWLINE) {
+                        if (tn.getSymbol().getType() == DockerLexer.NEWLINE) {
                             // Newline - end current line and start new one
                             currentLine.append(tn.getText());
                             skip(tn.getSymbol());
                             contentLines.add(currentLine.toString());
                             currentLine = new StringBuilder();
                         }
-                    } else if (child instanceof DockerfileParser.TextContext) {
+                    } else if (child instanceof DockerParser.TextContext) {
                         // Text content - append to current line
-                        DockerfileParser.TextContext textCtx = (DockerfileParser.TextContext) child;
+                        DockerParser.TextContext textCtx = (DockerParser.TextContext) child;
                         String textContent = textCtx.getText();
                         currentLine.append(textContent);
                         // Skip all tokens in the text

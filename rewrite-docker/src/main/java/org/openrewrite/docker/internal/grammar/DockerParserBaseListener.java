@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /home/tim/Documents/workspace/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
+// Generated from /home/tim/Documents/workspace/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerParser.g4 by ANTLR 4.13.2
 package org.openrewrite.docker.internal.grammar;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -21,780 +21,780 @@ import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 /**
- * This class provides an empty implementation of {@link DockerfileParserListener},
+ * This class provides an empty implementation of {@link DockerParserListener},
  * which can be extended to create a listener which only needs to handle a subset
  * of the available methods.
  */
 @SuppressWarnings("CheckReturnValue")
-public class DockerfileParserBaseListener implements DockerfileParserListener {
+public class DockerParserBaseListener implements DockerParserListener {
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterDockerfile(DockerfileParser.DockerfileContext ctx) { }
+	@Override public void enterDockerfile(DockerParser.DockerfileContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitDockerfile(DockerfileParser.DockerfileContext ctx) { }
+	@Override public void exitDockerfile(DockerParser.DockerfileContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterParserDirective(DockerfileParser.ParserDirectiveContext ctx) { }
+	@Override public void enterParserDirective(DockerParser.ParserDirectiveContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitParserDirective(DockerfileParser.ParserDirectiveContext ctx) { }
+	@Override public void exitParserDirective(DockerParser.ParserDirectiveContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterGlobalArgs(DockerfileParser.GlobalArgsContext ctx) { }
+	@Override public void enterGlobalArgs(DockerParser.GlobalArgsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitGlobalArgs(DockerfileParser.GlobalArgsContext ctx) { }
+	@Override public void exitGlobalArgs(DockerParser.GlobalArgsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterStage(DockerfileParser.StageContext ctx) { }
+	@Override public void enterStage(DockerParser.StageContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitStage(DockerfileParser.StageContext ctx) { }
+	@Override public void exitStage(DockerParser.StageContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterStageInstruction(DockerfileParser.StageInstructionContext ctx) { }
+	@Override public void enterStageInstruction(DockerParser.StageInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitStageInstruction(DockerfileParser.StageInstructionContext ctx) { }
+	@Override public void exitStageInstruction(DockerParser.StageInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterInstruction(DockerfileParser.InstructionContext ctx) { }
+	@Override public void enterInstruction(DockerParser.InstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitInstruction(DockerfileParser.InstructionContext ctx) { }
+	@Override public void exitInstruction(DockerParser.InstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterFromInstruction(DockerfileParser.FromInstructionContext ctx) { }
+	@Override public void enterFromInstruction(DockerParser.FromInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitFromInstruction(DockerfileParser.FromInstructionContext ctx) { }
+	@Override public void exitFromInstruction(DockerParser.FromInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterRunInstruction(DockerfileParser.RunInstructionContext ctx) { }
+	@Override public void enterRunInstruction(DockerParser.RunInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitRunInstruction(DockerfileParser.RunInstructionContext ctx) { }
+	@Override public void exitRunInstruction(DockerParser.RunInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterCmdInstruction(DockerfileParser.CmdInstructionContext ctx) { }
+	@Override public void enterCmdInstruction(DockerParser.CmdInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitCmdInstruction(DockerfileParser.CmdInstructionContext ctx) { }
+	@Override public void exitCmdInstruction(DockerParser.CmdInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterLabelInstruction(DockerfileParser.LabelInstructionContext ctx) { }
+	@Override public void enterLabelInstruction(DockerParser.LabelInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitLabelInstruction(DockerfileParser.LabelInstructionContext ctx) { }
+	@Override public void exitLabelInstruction(DockerParser.LabelInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterExposeInstruction(DockerfileParser.ExposeInstructionContext ctx) { }
+	@Override public void enterExposeInstruction(DockerParser.ExposeInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitExposeInstruction(DockerfileParser.ExposeInstructionContext ctx) { }
+	@Override public void exitExposeInstruction(DockerParser.ExposeInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterEnvInstruction(DockerfileParser.EnvInstructionContext ctx) { }
+	@Override public void enterEnvInstruction(DockerParser.EnvInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitEnvInstruction(DockerfileParser.EnvInstructionContext ctx) { }
+	@Override public void exitEnvInstruction(DockerParser.EnvInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterAddInstruction(DockerfileParser.AddInstructionContext ctx) { }
+	@Override public void enterAddInstruction(DockerParser.AddInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitAddInstruction(DockerfileParser.AddInstructionContext ctx) { }
+	@Override public void exitAddInstruction(DockerParser.AddInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterCopyInstruction(DockerfileParser.CopyInstructionContext ctx) { }
+	@Override public void enterCopyInstruction(DockerParser.CopyInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitCopyInstruction(DockerfileParser.CopyInstructionContext ctx) { }
+	@Override public void exitCopyInstruction(DockerParser.CopyInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterEntrypointInstruction(DockerfileParser.EntrypointInstructionContext ctx) { }
+	@Override public void enterEntrypointInstruction(DockerParser.EntrypointInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitEntrypointInstruction(DockerfileParser.EntrypointInstructionContext ctx) { }
+	@Override public void exitEntrypointInstruction(DockerParser.EntrypointInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterVolumeInstruction(DockerfileParser.VolumeInstructionContext ctx) { }
+	@Override public void enterVolumeInstruction(DockerParser.VolumeInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitVolumeInstruction(DockerfileParser.VolumeInstructionContext ctx) { }
+	@Override public void exitVolumeInstruction(DockerParser.VolumeInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterUserInstruction(DockerfileParser.UserInstructionContext ctx) { }
+	@Override public void enterUserInstruction(DockerParser.UserInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitUserInstruction(DockerfileParser.UserInstructionContext ctx) { }
+	@Override public void exitUserInstruction(DockerParser.UserInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterWorkdirInstruction(DockerfileParser.WorkdirInstructionContext ctx) { }
+	@Override public void enterWorkdirInstruction(DockerParser.WorkdirInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitWorkdirInstruction(DockerfileParser.WorkdirInstructionContext ctx) { }
+	@Override public void exitWorkdirInstruction(DockerParser.WorkdirInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterArgInstruction(DockerfileParser.ArgInstructionContext ctx) { }
+	@Override public void enterArgInstruction(DockerParser.ArgInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitArgInstruction(DockerfileParser.ArgInstructionContext ctx) { }
+	@Override public void exitArgInstruction(DockerParser.ArgInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterOnbuildInstruction(DockerfileParser.OnbuildInstructionContext ctx) { }
+	@Override public void enterOnbuildInstruction(DockerParser.OnbuildInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitOnbuildInstruction(DockerfileParser.OnbuildInstructionContext ctx) { }
+	@Override public void exitOnbuildInstruction(DockerParser.OnbuildInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterStopsignalInstruction(DockerfileParser.StopsignalInstructionContext ctx) { }
+	@Override public void enterStopsignalInstruction(DockerParser.StopsignalInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitStopsignalInstruction(DockerfileParser.StopsignalInstructionContext ctx) { }
+	@Override public void exitStopsignalInstruction(DockerParser.StopsignalInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterHealthcheckInstruction(DockerfileParser.HealthcheckInstructionContext ctx) { }
+	@Override public void enterHealthcheckInstruction(DockerParser.HealthcheckInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitHealthcheckInstruction(DockerfileParser.HealthcheckInstructionContext ctx) { }
+	@Override public void exitHealthcheckInstruction(DockerParser.HealthcheckInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterShellInstruction(DockerfileParser.ShellInstructionContext ctx) { }
+	@Override public void enterShellInstruction(DockerParser.ShellInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitShellInstruction(DockerfileParser.ShellInstructionContext ctx) { }
+	@Override public void exitShellInstruction(DockerParser.ShellInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterMaintainerInstruction(DockerfileParser.MaintainerInstructionContext ctx) { }
+	@Override public void enterMaintainerInstruction(DockerParser.MaintainerInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitMaintainerInstruction(DockerfileParser.MaintainerInstructionContext ctx) { }
+	@Override public void exitMaintainerInstruction(DockerParser.MaintainerInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterFlags(DockerfileParser.FlagsContext ctx) { }
+	@Override public void enterFlags(DockerParser.FlagsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitFlags(DockerfileParser.FlagsContext ctx) { }
+	@Override public void exitFlags(DockerParser.FlagsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterFlag(DockerfileParser.FlagContext ctx) { }
+	@Override public void enterFlag(DockerParser.FlagContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitFlag(DockerfileParser.FlagContext ctx) { }
+	@Override public void exitFlag(DockerParser.FlagContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterFlagName(DockerfileParser.FlagNameContext ctx) { }
+	@Override public void enterFlagName(DockerParser.FlagNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitFlagName(DockerfileParser.FlagNameContext ctx) { }
+	@Override public void exitFlagName(DockerParser.FlagNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterFlagValue(DockerfileParser.FlagValueContext ctx) { }
+	@Override public void enterFlagValue(DockerParser.FlagValueContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitFlagValue(DockerfileParser.FlagValueContext ctx) { }
+	@Override public void exitFlagValue(DockerParser.FlagValueContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterFlagValueElement(DockerfileParser.FlagValueElementContext ctx) { }
+	@Override public void enterFlagValueElement(DockerParser.FlagValueElementContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitFlagValueElement(DockerfileParser.FlagValueElementContext ctx) { }
+	@Override public void exitFlagValueElement(DockerParser.FlagValueElementContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterExecForm(DockerfileParser.ExecFormContext ctx) { }
+	@Override public void enterExecForm(DockerParser.ExecFormContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitExecForm(DockerfileParser.ExecFormContext ctx) { }
+	@Override public void exitExecForm(DockerParser.ExecFormContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterShellForm(DockerfileParser.ShellFormContext ctx) { }
+	@Override public void enterShellForm(DockerParser.ShellFormContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitShellForm(DockerfileParser.ShellFormContext ctx) { }
+	@Override public void exitShellForm(DockerParser.ShellFormContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterHeredoc(DockerfileParser.HeredocContext ctx) { }
+	@Override public void enterHeredoc(DockerParser.HeredocContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitHeredoc(DockerfileParser.HeredocContext ctx) { }
+	@Override public void exitHeredoc(DockerParser.HeredocContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterHeredocContent(DockerfileParser.HeredocContentContext ctx) { }
+	@Override public void enterHeredocContent(DockerParser.HeredocContentContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitHeredocContent(DockerfileParser.HeredocContentContext ctx) { }
+	@Override public void exitHeredocContent(DockerParser.HeredocContentContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterHeredocEnd(DockerfileParser.HeredocEndContext ctx) { }
+	@Override public void enterHeredocEnd(DockerParser.HeredocEndContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitHeredocEnd(DockerfileParser.HeredocEndContext ctx) { }
+	@Override public void exitHeredocEnd(DockerParser.HeredocEndContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterJsonArray(DockerfileParser.JsonArrayContext ctx) { }
+	@Override public void enterJsonArray(DockerParser.JsonArrayContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitJsonArray(DockerfileParser.JsonArrayContext ctx) { }
+	@Override public void exitJsonArray(DockerParser.JsonArrayContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterJsonArrayElements(DockerfileParser.JsonArrayElementsContext ctx) { }
+	@Override public void enterJsonArrayElements(DockerParser.JsonArrayElementsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitJsonArrayElements(DockerfileParser.JsonArrayElementsContext ctx) { }
+	@Override public void exitJsonArrayElements(DockerParser.JsonArrayElementsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterJsonString(DockerfileParser.JsonStringContext ctx) { }
+	@Override public void enterJsonString(DockerParser.JsonStringContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitJsonString(DockerfileParser.JsonStringContext ctx) { }
+	@Override public void exitJsonString(DockerParser.JsonStringContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterImageName(DockerfileParser.ImageNameContext ctx) { }
+	@Override public void enterImageName(DockerParser.ImageNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitImageName(DockerfileParser.ImageNameContext ctx) { }
+	@Override public void exitImageName(DockerParser.ImageNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterStageName(DockerfileParser.StageNameContext ctx) { }
+	@Override public void enterStageName(DockerParser.StageNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitStageName(DockerfileParser.StageNameContext ctx) { }
+	@Override public void exitStageName(DockerParser.StageNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterLabelPairs(DockerfileParser.LabelPairsContext ctx) { }
+	@Override public void enterLabelPairs(DockerParser.LabelPairsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitLabelPairs(DockerfileParser.LabelPairsContext ctx) { }
+	@Override public void exitLabelPairs(DockerParser.LabelPairsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterLabelPair(DockerfileParser.LabelPairContext ctx) { }
+	@Override public void enterLabelPair(DockerParser.LabelPairContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitLabelPair(DockerfileParser.LabelPairContext ctx) { }
+	@Override public void exitLabelPair(DockerParser.LabelPairContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterLabelKey(DockerfileParser.LabelKeyContext ctx) { }
+	@Override public void enterLabelKey(DockerParser.LabelKeyContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitLabelKey(DockerfileParser.LabelKeyContext ctx) { }
+	@Override public void exitLabelKey(DockerParser.LabelKeyContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterLabelValue(DockerfileParser.LabelValueContext ctx) { }
+	@Override public void enterLabelValue(DockerParser.LabelValueContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitLabelValue(DockerfileParser.LabelValueContext ctx) { }
+	@Override public void exitLabelValue(DockerParser.LabelValueContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterPortList(DockerfileParser.PortListContext ctx) { }
+	@Override public void enterPortList(DockerParser.PortListContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitPortList(DockerfileParser.PortListContext ctx) { }
+	@Override public void exitPortList(DockerParser.PortListContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterPort(DockerfileParser.PortContext ctx) { }
+	@Override public void enterPort(DockerParser.PortContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitPort(DockerfileParser.PortContext ctx) { }
+	@Override public void exitPort(DockerParser.PortContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterEnvPairs(DockerfileParser.EnvPairsContext ctx) { }
+	@Override public void enterEnvPairs(DockerParser.EnvPairsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitEnvPairs(DockerfileParser.EnvPairsContext ctx) { }
+	@Override public void exitEnvPairs(DockerParser.EnvPairsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterEnvPair(DockerfileParser.EnvPairContext ctx) { }
+	@Override public void enterEnvPair(DockerParser.EnvPairContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitEnvPair(DockerfileParser.EnvPairContext ctx) { }
+	@Override public void exitEnvPair(DockerParser.EnvPairContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterEnvKey(DockerfileParser.EnvKeyContext ctx) { }
+	@Override public void enterEnvKey(DockerParser.EnvKeyContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitEnvKey(DockerfileParser.EnvKeyContext ctx) { }
+	@Override public void exitEnvKey(DockerParser.EnvKeyContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterEnvValueEquals(DockerfileParser.EnvValueEqualsContext ctx) { }
+	@Override public void enterEnvValueEquals(DockerParser.EnvValueEqualsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitEnvValueEquals(DockerfileParser.EnvValueEqualsContext ctx) { }
+	@Override public void exitEnvValueEquals(DockerParser.EnvValueEqualsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterEnvValueSpace(DockerfileParser.EnvValueSpaceContext ctx) { }
+	@Override public void enterEnvValueSpace(DockerParser.EnvValueSpaceContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitEnvValueSpace(DockerfileParser.EnvValueSpaceContext ctx) { }
+	@Override public void exitEnvValueSpace(DockerParser.EnvValueSpaceContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterEnvTextEquals(DockerfileParser.EnvTextEqualsContext ctx) { }
+	@Override public void enterEnvTextEquals(DockerParser.EnvTextEqualsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitEnvTextEquals(DockerfileParser.EnvTextEqualsContext ctx) { }
+	@Override public void exitEnvTextEquals(DockerParser.EnvTextEqualsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterEnvTextElementEquals(DockerfileParser.EnvTextElementEqualsContext ctx) { }
+	@Override public void enterEnvTextElementEquals(DockerParser.EnvTextElementEqualsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitEnvTextElementEquals(DockerfileParser.EnvTextElementEqualsContext ctx) { }
+	@Override public void exitEnvTextElementEquals(DockerParser.EnvTextElementEqualsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterSourceList(DockerfileParser.SourceListContext ctx) { }
+	@Override public void enterSourceList(DockerParser.SourceListContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitSourceList(DockerfileParser.SourceListContext ctx) { }
+	@Override public void exitSourceList(DockerParser.SourceListContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterSource(DockerfileParser.SourceContext ctx) { }
+	@Override public void enterSource(DockerParser.SourceContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitSource(DockerfileParser.SourceContext ctx) { }
+	@Override public void exitSource(DockerParser.SourceContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterDestination(DockerfileParser.DestinationContext ctx) { }
+	@Override public void enterDestination(DockerParser.DestinationContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitDestination(DockerfileParser.DestinationContext ctx) { }
+	@Override public void exitDestination(DockerParser.DestinationContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterPath(DockerfileParser.PathContext ctx) { }
+	@Override public void enterPath(DockerParser.PathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitPath(DockerfileParser.PathContext ctx) { }
+	@Override public void exitPath(DockerParser.PathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterPathList(DockerfileParser.PathListContext ctx) { }
+	@Override public void enterPathList(DockerParser.PathListContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitPathList(DockerfileParser.PathListContext ctx) { }
+	@Override public void exitPathList(DockerParser.PathListContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterVolumePath(DockerfileParser.VolumePathContext ctx) { }
+	@Override public void enterVolumePath(DockerParser.VolumePathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitVolumePath(DockerfileParser.VolumePathContext ctx) { }
+	@Override public void exitVolumePath(DockerParser.VolumePathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterUserSpec(DockerfileParser.UserSpecContext ctx) { }
+	@Override public void enterUserSpec(DockerParser.UserSpecContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitUserSpec(DockerfileParser.UserSpecContext ctx) { }
+	@Override public void exitUserSpec(DockerParser.UserSpecContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterArgName(DockerfileParser.ArgNameContext ctx) { }
+	@Override public void enterArgName(DockerParser.ArgNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitArgName(DockerfileParser.ArgNameContext ctx) { }
+	@Override public void exitArgName(DockerParser.ArgNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterArgValue(DockerfileParser.ArgValueContext ctx) { }
+	@Override public void enterArgValue(DockerParser.ArgValueContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitArgValue(DockerfileParser.ArgValueContext ctx) { }
+	@Override public void exitArgValue(DockerParser.ArgValueContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterSignal(DockerfileParser.SignalContext ctx) { }
+	@Override public void enterSignal(DockerParser.SignalContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitSignal(DockerfileParser.SignalContext ctx) { }
+	@Override public void exitSignal(DockerParser.SignalContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterText(DockerfileParser.TextContext ctx) { }
+	@Override public void enterText(DockerParser.TextContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitText(DockerfileParser.TextContext ctx) { }
+	@Override public void exitText(DockerParser.TextContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterTextElement(DockerfileParser.TextElementContext ctx) { }
+	@Override public void enterTextElement(DockerParser.TextElementContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitTextElement(DockerfileParser.TextElementContext ctx) { }
+	@Override public void exitTextElement(DockerParser.TextElementContext ctx) { }
 
 	/**
 	 * {@inheritDoc}

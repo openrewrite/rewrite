@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /home/tim/Documents/workspace/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
+// Generated from /home/tim/Documents/workspace/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerParser.g4 by ANTLR 4.13.2
 package org.openrewrite.docker.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -25,7 +25,7 @@ import java.util.Iterator;
 import java.util.ArrayList;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
-public class DockerfileParser extends Parser {
+public class DockerParser extends Parser {
 	static { RuntimeMetaData.checkVersion("4.13.2", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
@@ -137,7 +137,7 @@ public class DockerfileParser extends Parser {
 	}
 
 	@Override
-	public String getGrammarFileName() { return "DockerfileParser.g4"; }
+	public String getGrammarFileName() { return "DockerParser.g4"; }
 
 	@Override
 	public String[] getRuleNames() { return ruleNames; }
@@ -148,7 +148,7 @@ public class DockerfileParser extends Parser {
 	@Override
 	public ATN getATN() { return _ATN; }
 
-	public DockerfileParser(TokenStream input) {
+	public DockerParser(TokenStream input) {
 		super(input);
 		_interp = new ParserATNSimulator(this,_ATN,_decisionToDFA,_sharedContextCache);
 	}
@@ -158,7 +158,7 @@ public class DockerfileParser extends Parser {
 		public GlobalArgsContext globalArgs() {
 			return getRuleContext(GlobalArgsContext.class,0);
 		}
-		public TerminalNode EOF() { return getToken(DockerfileParser.EOF, 0); }
+		public TerminalNode EOF() { return getToken(DockerParser.EOF, 0); }
 		public List<ParserDirectiveContext> parserDirective() {
 			return getRuleContexts(ParserDirectiveContext.class);
 		}
@@ -177,15 +177,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_dockerfile; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterDockerfile(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterDockerfile(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitDockerfile(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitDockerfile(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitDockerfile(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitDockerfile(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -244,22 +244,22 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class ParserDirectiveContext extends ParserRuleContext {
-		public TerminalNode PARSER_DIRECTIVE() { return getToken(DockerfileParser.PARSER_DIRECTIVE, 0); }
+		public TerminalNode PARSER_DIRECTIVE() { return getToken(DockerParser.PARSER_DIRECTIVE, 0); }
 		public ParserDirectiveContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_parserDirective; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterParserDirective(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterParserDirective(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitParserDirective(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitParserDirective(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitParserDirective(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitParserDirective(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -299,15 +299,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_globalArgs; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterGlobalArgs(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterGlobalArgs(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitGlobalArgs(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitGlobalArgs(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitGlobalArgs(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitGlobalArgs(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -363,15 +363,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_stage; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterStage(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterStage(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitStage(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitStage(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitStage(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitStage(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -471,15 +471,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_stageInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterStageInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterStageInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitStageInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitStageInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitStageInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitStageInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -639,15 +639,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_instruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -706,14 +706,14 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class FromInstructionContext extends ParserRuleContext {
-		public TerminalNode FROM() { return getToken(DockerfileParser.FROM, 0); }
+		public TerminalNode FROM() { return getToken(DockerParser.FROM, 0); }
 		public ImageNameContext imageName() {
 			return getRuleContext(ImageNameContext.class,0);
 		}
 		public FlagsContext flags() {
 			return getRuleContext(FlagsContext.class,0);
 		}
-		public TerminalNode AS() { return getToken(DockerfileParser.AS, 0); }
+		public TerminalNode AS() { return getToken(DockerParser.AS, 0); }
 		public StageNameContext stageName() {
 			return getRuleContext(StageNameContext.class,0);
 		}
@@ -723,15 +723,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_fromInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterFromInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterFromInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitFromInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitFromInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitFromInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitFromInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -784,7 +784,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class RunInstructionContext extends ParserRuleContext {
-		public TerminalNode RUN() { return getToken(DockerfileParser.RUN, 0); }
+		public TerminalNode RUN() { return getToken(DockerParser.RUN, 0); }
 		public ExecFormContext execForm() {
 			return getRuleContext(ExecFormContext.class,0);
 		}
@@ -803,15 +803,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_runInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterRunInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterRunInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitRunInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitRunInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitRunInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitRunInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -878,7 +878,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class CmdInstructionContext extends ParserRuleContext {
-		public TerminalNode CMD() { return getToken(DockerfileParser.CMD, 0); }
+		public TerminalNode CMD() { return getToken(DockerParser.CMD, 0); }
 		public ExecFormContext execForm() {
 			return getRuleContext(ExecFormContext.class,0);
 		}
@@ -891,15 +891,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_cmdInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterCmdInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterCmdInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitCmdInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitCmdInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitCmdInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitCmdInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -950,7 +950,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class LabelInstructionContext extends ParserRuleContext {
-		public TerminalNode LABEL() { return getToken(DockerfileParser.LABEL, 0); }
+		public TerminalNode LABEL() { return getToken(DockerParser.LABEL, 0); }
 		public LabelPairsContext labelPairs() {
 			return getRuleContext(LabelPairsContext.class,0);
 		}
@@ -960,15 +960,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_labelInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterLabelInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterLabelInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitLabelInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitLabelInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitLabelInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitLabelInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -998,7 +998,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class ExposeInstructionContext extends ParserRuleContext {
-		public TerminalNode EXPOSE() { return getToken(DockerfileParser.EXPOSE, 0); }
+		public TerminalNode EXPOSE() { return getToken(DockerParser.EXPOSE, 0); }
 		public PortListContext portList() {
 			return getRuleContext(PortListContext.class,0);
 		}
@@ -1008,15 +1008,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_exposeInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterExposeInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterExposeInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitExposeInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitExposeInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitExposeInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitExposeInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1046,7 +1046,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class EnvInstructionContext extends ParserRuleContext {
-		public TerminalNode ENV() { return getToken(DockerfileParser.ENV, 0); }
+		public TerminalNode ENV() { return getToken(DockerParser.ENV, 0); }
 		public EnvPairsContext envPairs() {
 			return getRuleContext(EnvPairsContext.class,0);
 		}
@@ -1056,15 +1056,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_envInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterEnvInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterEnvInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitEnvInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitEnvInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitEnvInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitEnvInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1094,7 +1094,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class AddInstructionContext extends ParserRuleContext {
-		public TerminalNode ADD() { return getToken(DockerfileParser.ADD, 0); }
+		public TerminalNode ADD() { return getToken(DockerParser.ADD, 0); }
 		public HeredocContext heredoc() {
 			return getRuleContext(HeredocContext.class,0);
 		}
@@ -1113,15 +1113,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_addInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterAddInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterAddInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitAddInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitAddInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitAddInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitAddInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1184,7 +1184,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class CopyInstructionContext extends ParserRuleContext {
-		public TerminalNode COPY() { return getToken(DockerfileParser.COPY, 0); }
+		public TerminalNode COPY() { return getToken(DockerParser.COPY, 0); }
 		public HeredocContext heredoc() {
 			return getRuleContext(HeredocContext.class,0);
 		}
@@ -1203,15 +1203,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_copyInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterCopyInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterCopyInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitCopyInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitCopyInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitCopyInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitCopyInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1274,7 +1274,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class EntrypointInstructionContext extends ParserRuleContext {
-		public TerminalNode ENTRYPOINT() { return getToken(DockerfileParser.ENTRYPOINT, 0); }
+		public TerminalNode ENTRYPOINT() { return getToken(DockerParser.ENTRYPOINT, 0); }
 		public ExecFormContext execForm() {
 			return getRuleContext(ExecFormContext.class,0);
 		}
@@ -1287,15 +1287,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_entrypointInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterEntrypointInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterEntrypointInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitEntrypointInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitEntrypointInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitEntrypointInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitEntrypointInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1346,7 +1346,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class VolumeInstructionContext extends ParserRuleContext {
-		public TerminalNode VOLUME() { return getToken(DockerfileParser.VOLUME, 0); }
+		public TerminalNode VOLUME() { return getToken(DockerParser.VOLUME, 0); }
 		public JsonArrayContext jsonArray() {
 			return getRuleContext(JsonArrayContext.class,0);
 		}
@@ -1359,15 +1359,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_volumeInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterVolumeInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterVolumeInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitVolumeInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitVolumeInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitVolumeInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitVolumeInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1415,7 +1415,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class UserInstructionContext extends ParserRuleContext {
-		public TerminalNode USER() { return getToken(DockerfileParser.USER, 0); }
+		public TerminalNode USER() { return getToken(DockerParser.USER, 0); }
 		public UserSpecContext userSpec() {
 			return getRuleContext(UserSpecContext.class,0);
 		}
@@ -1425,15 +1425,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_userInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterUserInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterUserInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitUserInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitUserInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitUserInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitUserInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1463,7 +1463,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class WorkdirInstructionContext extends ParserRuleContext {
-		public TerminalNode WORKDIR() { return getToken(DockerfileParser.WORKDIR, 0); }
+		public TerminalNode WORKDIR() { return getToken(DockerParser.WORKDIR, 0); }
 		public PathContext path() {
 			return getRuleContext(PathContext.class,0);
 		}
@@ -1473,15 +1473,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_workdirInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterWorkdirInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterWorkdirInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitWorkdirInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitWorkdirInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitWorkdirInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitWorkdirInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1511,11 +1511,11 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class ArgInstructionContext extends ParserRuleContext {
-		public TerminalNode ARG() { return getToken(DockerfileParser.ARG, 0); }
+		public TerminalNode ARG() { return getToken(DockerParser.ARG, 0); }
 		public ArgNameContext argName() {
 			return getRuleContext(ArgNameContext.class,0);
 		}
-		public TerminalNode EQUALS() { return getToken(DockerfileParser.EQUALS, 0); }
+		public TerminalNode EQUALS() { return getToken(DockerParser.EQUALS, 0); }
 		public ArgValueContext argValue() {
 			return getRuleContext(ArgValueContext.class,0);
 		}
@@ -1525,15 +1525,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_argInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterArgInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterArgInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitArgInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitArgInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitArgInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitArgInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1576,7 +1576,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class OnbuildInstructionContext extends ParserRuleContext {
-		public TerminalNode ONBUILD() { return getToken(DockerfileParser.ONBUILD, 0); }
+		public TerminalNode ONBUILD() { return getToken(DockerParser.ONBUILD, 0); }
 		public InstructionContext instruction() {
 			return getRuleContext(InstructionContext.class,0);
 		}
@@ -1586,15 +1586,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_onbuildInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterOnbuildInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterOnbuildInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitOnbuildInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitOnbuildInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitOnbuildInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitOnbuildInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1624,7 +1624,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class StopsignalInstructionContext extends ParserRuleContext {
-		public TerminalNode STOPSIGNAL() { return getToken(DockerfileParser.STOPSIGNAL, 0); }
+		public TerminalNode STOPSIGNAL() { return getToken(DockerParser.STOPSIGNAL, 0); }
 		public SignalContext signal() {
 			return getRuleContext(SignalContext.class,0);
 		}
@@ -1634,15 +1634,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_stopsignalInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterStopsignalInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterStopsignalInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitStopsignalInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitStopsignalInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitStopsignalInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitStopsignalInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1672,8 +1672,8 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class HealthcheckInstructionContext extends ParserRuleContext {
-		public TerminalNode HEALTHCHECK() { return getToken(DockerfileParser.HEALTHCHECK, 0); }
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerfileParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode HEALTHCHECK() { return getToken(DockerParser.HEALTHCHECK, 0); }
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
 		public CmdInstructionContext cmdInstruction() {
 			return getRuleContext(CmdInstructionContext.class,0);
 		}
@@ -1686,15 +1686,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_healthcheckInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterHealthcheckInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterHealthcheckInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitHealthcheckInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitHealthcheckInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitHealthcheckInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitHealthcheckInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1752,7 +1752,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class ShellInstructionContext extends ParserRuleContext {
-		public TerminalNode SHELL() { return getToken(DockerfileParser.SHELL, 0); }
+		public TerminalNode SHELL() { return getToken(DockerParser.SHELL, 0); }
 		public JsonArrayContext jsonArray() {
 			return getRuleContext(JsonArrayContext.class,0);
 		}
@@ -1762,15 +1762,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_shellInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterShellInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterShellInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitShellInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitShellInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitShellInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitShellInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1800,7 +1800,7 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class MaintainerInstructionContext extends ParserRuleContext {
-		public TerminalNode MAINTAINER() { return getToken(DockerfileParser.MAINTAINER, 0); }
+		public TerminalNode MAINTAINER() { return getToken(DockerParser.MAINTAINER, 0); }
 		public TextContext text() {
 			return getRuleContext(TextContext.class,0);
 		}
@@ -1810,15 +1810,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_maintainerInstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterMaintainerInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterMaintainerInstruction(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitMaintainerInstruction(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitMaintainerInstruction(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitMaintainerInstruction(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitMaintainerInstruction(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1860,15 +1860,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_flags; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterFlags(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterFlags(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitFlags(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitFlags(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitFlags(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitFlags(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1915,11 +1915,11 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class FlagContext extends ParserRuleContext {
-		public TerminalNode DASH_DASH() { return getToken(DockerfileParser.DASH_DASH, 0); }
+		public TerminalNode DASH_DASH() { return getToken(DockerParser.DASH_DASH, 0); }
 		public FlagNameContext flagName() {
 			return getRuleContext(FlagNameContext.class,0);
 		}
-		public TerminalNode EQUALS() { return getToken(DockerfileParser.EQUALS, 0); }
+		public TerminalNode EQUALS() { return getToken(DockerParser.EQUALS, 0); }
 		public FlagValueContext flagValue() {
 			return getRuleContext(FlagValueContext.class,0);
 		}
@@ -1929,15 +1929,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_flag; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterFlag(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterFlag(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitFlag(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitFlag(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitFlag(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitFlag(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1979,24 +1979,24 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class FlagNameContext extends ParserRuleContext {
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerfileParser.UNQUOTED_TEXT, 0); }
-		public TerminalNode FROM() { return getToken(DockerfileParser.FROM, 0); }
-		public TerminalNode AS() { return getToken(DockerfileParser.AS, 0); }
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode FROM() { return getToken(DockerParser.FROM, 0); }
+		public TerminalNode AS() { return getToken(DockerParser.AS, 0); }
 		public FlagNameContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_flagName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterFlagName(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterFlagName(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitFlagName(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitFlagName(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitFlagName(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitFlagName(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2045,15 +2045,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_flagValue; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterFlagValue(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterFlagValue(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitFlagValue(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitFlagValue(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitFlagValue(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitFlagValue(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2100,25 +2100,25 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class FlagValueElementContext extends ParserRuleContext {
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerfileParser.UNQUOTED_TEXT, 0); }
-		public TerminalNode EQUALS() { return getToken(DockerfileParser.EQUALS, 0); }
-		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerfileParser.DOUBLE_QUOTED_STRING, 0); }
-		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerfileParser.SINGLE_QUOTED_STRING, 0); }
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode EQUALS() { return getToken(DockerParser.EQUALS, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
 		public FlagValueElementContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_flagValueElement; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterFlagValueElement(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterFlagValueElement(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitFlagValueElement(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitFlagValueElement(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitFlagValueElement(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitFlagValueElement(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2164,15 +2164,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_execForm; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterExecForm(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterExecForm(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitExecForm(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitExecForm(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitExecForm(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitExecForm(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2209,15 +2209,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_shellForm; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterShellForm(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterShellForm(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitShellForm(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitShellForm(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitShellForm(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitShellForm(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2245,8 +2245,8 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class HeredocContext extends ParserRuleContext {
-		public TerminalNode HEREDOC_START() { return getToken(DockerfileParser.HEREDOC_START, 0); }
-		public TerminalNode NEWLINE() { return getToken(DockerfileParser.NEWLINE, 0); }
+		public TerminalNode HEREDOC_START() { return getToken(DockerParser.HEREDOC_START, 0); }
+		public TerminalNode NEWLINE() { return getToken(DockerParser.NEWLINE, 0); }
 		public HeredocContentContext heredocContent() {
 			return getRuleContext(HeredocContentContext.class,0);
 		}
@@ -2262,15 +2262,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_heredoc; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterHeredoc(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterHeredoc(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitHeredoc(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitHeredoc(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitHeredoc(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitHeredoc(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2315,9 +2315,9 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class HeredocContentContext extends ParserRuleContext {
-		public List<TerminalNode> NEWLINE() { return getTokens(DockerfileParser.NEWLINE); }
+		public List<TerminalNode> NEWLINE() { return getTokens(DockerParser.NEWLINE); }
 		public TerminalNode NEWLINE(int i) {
-			return getToken(DockerfileParser.NEWLINE, i);
+			return getToken(DockerParser.NEWLINE, i);
 		}
 		public List<TextContext> text() {
 			return getRuleContexts(TextContext.class);
@@ -2331,15 +2331,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_heredocContent; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterHeredocContent(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterHeredocContent(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitHeredocContent(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitHeredocContent(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitHeredocContent(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitHeredocContent(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2401,22 +2401,22 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class HeredocEndContext extends ParserRuleContext {
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerfileParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
 		public HeredocEndContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_heredocEnd; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterHeredocEnd(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterHeredocEnd(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitHeredocEnd(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitHeredocEnd(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitHeredocEnd(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitHeredocEnd(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2444,8 +2444,8 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class JsonArrayContext extends ParserRuleContext {
-		public TerminalNode LBRACKET() { return getToken(DockerfileParser.LBRACKET, 0); }
-		public TerminalNode JSON_RBRACKET() { return getToken(DockerfileParser.JSON_RBRACKET, 0); }
+		public TerminalNode LBRACKET() { return getToken(DockerParser.LBRACKET, 0); }
+		public TerminalNode JSON_RBRACKET() { return getToken(DockerParser.JSON_RBRACKET, 0); }
 		public JsonArrayElementsContext jsonArrayElements() {
 			return getRuleContext(JsonArrayElementsContext.class,0);
 		}
@@ -2455,15 +2455,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_jsonArray; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterJsonArray(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterJsonArray(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitJsonArray(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitJsonArray(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitJsonArray(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitJsonArray(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2510,9 +2510,9 @@ public class DockerfileParser extends Parser {
 		public JsonStringContext jsonString(int i) {
 			return getRuleContext(JsonStringContext.class,i);
 		}
-		public List<TerminalNode> JSON_COMMA() { return getTokens(DockerfileParser.JSON_COMMA); }
+		public List<TerminalNode> JSON_COMMA() { return getTokens(DockerParser.JSON_COMMA); }
 		public TerminalNode JSON_COMMA(int i) {
-			return getToken(DockerfileParser.JSON_COMMA, i);
+			return getToken(DockerParser.JSON_COMMA, i);
 		}
 		public JsonArrayElementsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2520,15 +2520,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_jsonArrayElements; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterJsonArrayElements(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterJsonArrayElements(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitJsonArrayElements(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitJsonArrayElements(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitJsonArrayElements(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitJsonArrayElements(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2573,22 +2573,22 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class JsonStringContext extends ParserRuleContext {
-		public TerminalNode JSON_STRING() { return getToken(DockerfileParser.JSON_STRING, 0); }
+		public TerminalNode JSON_STRING() { return getToken(DockerParser.JSON_STRING, 0); }
 		public JsonStringContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_jsonString; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterJsonString(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterJsonString(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitJsonString(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitJsonString(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitJsonString(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitJsonString(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2625,15 +2625,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_imageName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterImageName(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterImageName(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitImageName(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitImageName(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitImageName(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitImageName(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2661,22 +2661,22 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class StageNameContext extends ParserRuleContext {
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerfileParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
 		public StageNameContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_stageName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterStageName(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterStageName(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitStageName(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitStageName(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitStageName(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitStageName(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2716,15 +2716,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_labelPairs; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterLabelPairs(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterLabelPairs(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitLabelPairs(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitLabelPairs(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitLabelPairs(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitLabelPairs(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2768,7 +2768,7 @@ public class DockerfileParser extends Parser {
 		public LabelKeyContext labelKey() {
 			return getRuleContext(LabelKeyContext.class,0);
 		}
-		public TerminalNode EQUALS() { return getToken(DockerfileParser.EQUALS, 0); }
+		public TerminalNode EQUALS() { return getToken(DockerParser.EQUALS, 0); }
 		public LabelValueContext labelValue() {
 			return getRuleContext(LabelValueContext.class,0);
 		}
@@ -2778,15 +2778,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_labelPair; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterLabelPair(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterLabelPair(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitLabelPair(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitLabelPair(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitLabelPair(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitLabelPair(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2818,24 +2818,24 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class LabelKeyContext extends ParserRuleContext {
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerfileParser.UNQUOTED_TEXT, 0); }
-		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerfileParser.DOUBLE_QUOTED_STRING, 0); }
-		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerfileParser.SINGLE_QUOTED_STRING, 0); }
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
 		public LabelKeyContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_labelKey; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterLabelKey(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterLabelKey(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitLabelKey(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitLabelKey(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitLabelKey(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitLabelKey(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2872,24 +2872,24 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class LabelValueContext extends ParserRuleContext {
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerfileParser.UNQUOTED_TEXT, 0); }
-		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerfileParser.DOUBLE_QUOTED_STRING, 0); }
-		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerfileParser.SINGLE_QUOTED_STRING, 0); }
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
 		public LabelValueContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_labelValue; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterLabelValue(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterLabelValue(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitLabelValue(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitLabelValue(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitLabelValue(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitLabelValue(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2938,15 +2938,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_portList; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterPortList(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterPortList(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitPortList(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitPortList(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitPortList(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitPortList(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -2987,22 +2987,22 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class PortContext extends ParserRuleContext {
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerfileParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
 		public PortContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_port; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterPort(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterPort(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitPort(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitPort(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitPort(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitPort(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3042,15 +3042,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_envPairs; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterEnvPairs(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterEnvPairs(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitEnvPairs(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitEnvPairs(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitEnvPairs(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitEnvPairs(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3094,7 +3094,7 @@ public class DockerfileParser extends Parser {
 		public EnvKeyContext envKey() {
 			return getRuleContext(EnvKeyContext.class,0);
 		}
-		public TerminalNode EQUALS() { return getToken(DockerfileParser.EQUALS, 0); }
+		public TerminalNode EQUALS() { return getToken(DockerParser.EQUALS, 0); }
 		public EnvValueEqualsContext envValueEquals() {
 			return getRuleContext(EnvValueEqualsContext.class,0);
 		}
@@ -3107,15 +3107,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_envPair; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterEnvPair(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterEnvPair(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitEnvPair(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitEnvPair(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitEnvPair(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitEnvPair(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3162,22 +3162,22 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class EnvKeyContext extends ParserRuleContext {
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerfileParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
 		public EnvKeyContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_envKey; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterEnvKey(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterEnvKey(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitEnvKey(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitEnvKey(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitEnvKey(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitEnvKey(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3214,15 +3214,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_envValueEquals; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterEnvValueEquals(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterEnvValueEquals(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitEnvValueEquals(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitEnvValueEquals(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitEnvValueEquals(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitEnvValueEquals(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3259,15 +3259,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_envValueSpace; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterEnvValueSpace(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterEnvValueSpace(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitEnvValueSpace(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitEnvValueSpace(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitEnvValueSpace(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitEnvValueSpace(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3307,15 +3307,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_envTextEquals; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterEnvTextEquals(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterEnvTextEquals(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitEnvTextEquals(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitEnvTextEquals(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitEnvTextEquals(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitEnvTextEquals(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3362,25 +3362,25 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class EnvTextElementEqualsContext extends ParserRuleContext {
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerfileParser.UNQUOTED_TEXT, 0); }
-		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerfileParser.DOUBLE_QUOTED_STRING, 0); }
-		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerfileParser.SINGLE_QUOTED_STRING, 0); }
-		public TerminalNode ENV_VAR() { return getToken(DockerfileParser.ENV_VAR, 0); }
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
+		public TerminalNode ENV_VAR() { return getToken(DockerParser.ENV_VAR, 0); }
 		public EnvTextElementEqualsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_envTextElementEquals; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterEnvTextElementEquals(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterEnvTextElementEquals(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitEnvTextElementEquals(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitEnvTextElementEquals(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitEnvTextElementEquals(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitEnvTextElementEquals(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3429,15 +3429,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_sourceList; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterSourceList(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterSourceList(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitSourceList(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitSourceList(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitSourceList(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitSourceList(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3493,15 +3493,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_source; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterSource(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterSource(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitSource(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitSource(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitSource(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitSource(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3538,15 +3538,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_destination; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterDestination(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterDestination(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitDestination(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitDestination(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitDestination(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitDestination(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3583,15 +3583,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_path; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterPath(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterPath(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitPath(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitPath(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitPath(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitPath(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3631,15 +3631,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_pathList; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterPathList(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterPathList(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitPathList(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitPathList(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitPathList(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitPathList(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3680,24 +3680,24 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class VolumePathContext extends ParserRuleContext {
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerfileParser.UNQUOTED_TEXT, 0); }
-		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerfileParser.DOUBLE_QUOTED_STRING, 0); }
-		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerfileParser.SINGLE_QUOTED_STRING, 0); }
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
 		public VolumePathContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_volumePath; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterVolumePath(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterVolumePath(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitVolumePath(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitVolumePath(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitVolumePath(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitVolumePath(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3743,15 +3743,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_userSpec; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterUserSpec(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterUserSpec(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitUserSpec(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitUserSpec(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitUserSpec(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitUserSpec(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3779,22 +3779,22 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class ArgNameContext extends ParserRuleContext {
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerfileParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
 		public ArgNameContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_argName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterArgName(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterArgName(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitArgName(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitArgName(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitArgName(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitArgName(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3831,15 +3831,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_argValue; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterArgValue(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterArgValue(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitArgValue(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitArgValue(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitArgValue(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitArgValue(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3867,22 +3867,22 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class SignalContext extends ParserRuleContext {
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerfileParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
 		public SignalContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_signal; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterSignal(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterSignal(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitSignal(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitSignal(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitSignal(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitSignal(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3922,15 +3922,15 @@ public class DockerfileParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_text; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterText(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterText(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitText(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitText(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitText(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitText(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -3977,27 +3977,27 @@ public class DockerfileParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class TextElementContext extends ParserRuleContext {
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerfileParser.UNQUOTED_TEXT, 0); }
-		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerfileParser.DOUBLE_QUOTED_STRING, 0); }
-		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerfileParser.SINGLE_QUOTED_STRING, 0); }
-		public TerminalNode ENV_VAR() { return getToken(DockerfileParser.ENV_VAR, 0); }
-		public TerminalNode EQUALS() { return getToken(DockerfileParser.EQUALS, 0); }
-		public TerminalNode DASH_DASH() { return getToken(DockerfileParser.DASH_DASH, 0); }
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
+		public TerminalNode ENV_VAR() { return getToken(DockerParser.ENV_VAR, 0); }
+		public TerminalNode EQUALS() { return getToken(DockerParser.EQUALS, 0); }
+		public TerminalNode DASH_DASH() { return getToken(DockerParser.DASH_DASH, 0); }
 		public TextElementContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_textElement; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).enterTextElement(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterTextElement(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerfileParserListener ) ((DockerfileParserListener)listener).exitTextElement(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitTextElement(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerfileParserVisitor ) return ((DockerfileParserVisitor<? extends T>)visitor).visitTextElement(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitTextElement(this);
 			else return visitor.visitChildren(this);
 		}
 	}

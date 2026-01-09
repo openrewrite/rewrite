@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /home/tim/Documents/workspace/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerfileParser.g4 by ANTLR 4.13.2
+// Generated from /home/tim/Documents/workspace/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerParser.g4 by ANTLR 4.13.2
 package org.openrewrite.docker.internal.grammar;
 import org.antlr.v4.runtime.tree.AbstractParseTreeVisitor;
 
 /**
- * This class provides an empty implementation of {@link DockerfileParserVisitor},
+ * This class provides an empty implementation of {@link DockerParserVisitor},
  * which can be extended to create a visitor which only needs to handle a subset
  * of the available methods.
  *
@@ -26,453 +26,453 @@ import org.antlr.v4.runtime.tree.AbstractParseTreeVisitor;
  * operations with no return type.
  */
 @SuppressWarnings("CheckReturnValue")
-public class DockerfileParserBaseVisitor<T> extends AbstractParseTreeVisitor<T> implements DockerfileParserVisitor<T> {
+public class DockerParserBaseVisitor<T> extends AbstractParseTreeVisitor<T> implements DockerParserVisitor<T> {
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitDockerfile(DockerfileParser.DockerfileContext ctx) { return visitChildren(ctx); }
+	@Override public T visitDockerfile(DockerParser.DockerfileContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitParserDirective(DockerfileParser.ParserDirectiveContext ctx) { return visitChildren(ctx); }
+	@Override public T visitParserDirective(DockerParser.ParserDirectiveContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitGlobalArgs(DockerfileParser.GlobalArgsContext ctx) { return visitChildren(ctx); }
+	@Override public T visitGlobalArgs(DockerParser.GlobalArgsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitStage(DockerfileParser.StageContext ctx) { return visitChildren(ctx); }
+	@Override public T visitStage(DockerParser.StageContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitStageInstruction(DockerfileParser.StageInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitStageInstruction(DockerParser.StageInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitInstruction(DockerfileParser.InstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitInstruction(DockerParser.InstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitFromInstruction(DockerfileParser.FromInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitFromInstruction(DockerParser.FromInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitRunInstruction(DockerfileParser.RunInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitRunInstruction(DockerParser.RunInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitCmdInstruction(DockerfileParser.CmdInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitCmdInstruction(DockerParser.CmdInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitLabelInstruction(DockerfileParser.LabelInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitLabelInstruction(DockerParser.LabelInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitExposeInstruction(DockerfileParser.ExposeInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitExposeInstruction(DockerParser.ExposeInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnvInstruction(DockerfileParser.EnvInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitEnvInstruction(DockerParser.EnvInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitAddInstruction(DockerfileParser.AddInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitAddInstruction(DockerParser.AddInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitCopyInstruction(DockerfileParser.CopyInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitCopyInstruction(DockerParser.CopyInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEntrypointInstruction(DockerfileParser.EntrypointInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitEntrypointInstruction(DockerParser.EntrypointInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitVolumeInstruction(DockerfileParser.VolumeInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitVolumeInstruction(DockerParser.VolumeInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitUserInstruction(DockerfileParser.UserInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitUserInstruction(DockerParser.UserInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitWorkdirInstruction(DockerfileParser.WorkdirInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitWorkdirInstruction(DockerParser.WorkdirInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitArgInstruction(DockerfileParser.ArgInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitArgInstruction(DockerParser.ArgInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitOnbuildInstruction(DockerfileParser.OnbuildInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitOnbuildInstruction(DockerParser.OnbuildInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitStopsignalInstruction(DockerfileParser.StopsignalInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitStopsignalInstruction(DockerParser.StopsignalInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitHealthcheckInstruction(DockerfileParser.HealthcheckInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitHealthcheckInstruction(DockerParser.HealthcheckInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitShellInstruction(DockerfileParser.ShellInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitShellInstruction(DockerParser.ShellInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitMaintainerInstruction(DockerfileParser.MaintainerInstructionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitMaintainerInstruction(DockerParser.MaintainerInstructionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitFlags(DockerfileParser.FlagsContext ctx) { return visitChildren(ctx); }
+	@Override public T visitFlags(DockerParser.FlagsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitFlag(DockerfileParser.FlagContext ctx) { return visitChildren(ctx); }
+	@Override public T visitFlag(DockerParser.FlagContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitFlagName(DockerfileParser.FlagNameContext ctx) { return visitChildren(ctx); }
+	@Override public T visitFlagName(DockerParser.FlagNameContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitFlagValue(DockerfileParser.FlagValueContext ctx) { return visitChildren(ctx); }
+	@Override public T visitFlagValue(DockerParser.FlagValueContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitFlagValueElement(DockerfileParser.FlagValueElementContext ctx) { return visitChildren(ctx); }
+	@Override public T visitFlagValueElement(DockerParser.FlagValueElementContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitExecForm(DockerfileParser.ExecFormContext ctx) { return visitChildren(ctx); }
+	@Override public T visitExecForm(DockerParser.ExecFormContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitShellForm(DockerfileParser.ShellFormContext ctx) { return visitChildren(ctx); }
+	@Override public T visitShellForm(DockerParser.ShellFormContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitHeredoc(DockerfileParser.HeredocContext ctx) { return visitChildren(ctx); }
+	@Override public T visitHeredoc(DockerParser.HeredocContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitHeredocContent(DockerfileParser.HeredocContentContext ctx) { return visitChildren(ctx); }
+	@Override public T visitHeredocContent(DockerParser.HeredocContentContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitHeredocEnd(DockerfileParser.HeredocEndContext ctx) { return visitChildren(ctx); }
+	@Override public T visitHeredocEnd(DockerParser.HeredocEndContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitJsonArray(DockerfileParser.JsonArrayContext ctx) { return visitChildren(ctx); }
+	@Override public T visitJsonArray(DockerParser.JsonArrayContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitJsonArrayElements(DockerfileParser.JsonArrayElementsContext ctx) { return visitChildren(ctx); }
+	@Override public T visitJsonArrayElements(DockerParser.JsonArrayElementsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitJsonString(DockerfileParser.JsonStringContext ctx) { return visitChildren(ctx); }
+	@Override public T visitJsonString(DockerParser.JsonStringContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitImageName(DockerfileParser.ImageNameContext ctx) { return visitChildren(ctx); }
+	@Override public T visitImageName(DockerParser.ImageNameContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitStageName(DockerfileParser.StageNameContext ctx) { return visitChildren(ctx); }
+	@Override public T visitStageName(DockerParser.StageNameContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitLabelPairs(DockerfileParser.LabelPairsContext ctx) { return visitChildren(ctx); }
+	@Override public T visitLabelPairs(DockerParser.LabelPairsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitLabelPair(DockerfileParser.LabelPairContext ctx) { return visitChildren(ctx); }
+	@Override public T visitLabelPair(DockerParser.LabelPairContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitLabelKey(DockerfileParser.LabelKeyContext ctx) { return visitChildren(ctx); }
+	@Override public T visitLabelKey(DockerParser.LabelKeyContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitLabelValue(DockerfileParser.LabelValueContext ctx) { return visitChildren(ctx); }
+	@Override public T visitLabelValue(DockerParser.LabelValueContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitPortList(DockerfileParser.PortListContext ctx) { return visitChildren(ctx); }
+	@Override public T visitPortList(DockerParser.PortListContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitPort(DockerfileParser.PortContext ctx) { return visitChildren(ctx); }
+	@Override public T visitPort(DockerParser.PortContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnvPairs(DockerfileParser.EnvPairsContext ctx) { return visitChildren(ctx); }
+	@Override public T visitEnvPairs(DockerParser.EnvPairsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnvPair(DockerfileParser.EnvPairContext ctx) { return visitChildren(ctx); }
+	@Override public T visitEnvPair(DockerParser.EnvPairContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnvKey(DockerfileParser.EnvKeyContext ctx) { return visitChildren(ctx); }
+	@Override public T visitEnvKey(DockerParser.EnvKeyContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnvValueEquals(DockerfileParser.EnvValueEqualsContext ctx) { return visitChildren(ctx); }
+	@Override public T visitEnvValueEquals(DockerParser.EnvValueEqualsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnvValueSpace(DockerfileParser.EnvValueSpaceContext ctx) { return visitChildren(ctx); }
+	@Override public T visitEnvValueSpace(DockerParser.EnvValueSpaceContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnvTextEquals(DockerfileParser.EnvTextEqualsContext ctx) { return visitChildren(ctx); }
+	@Override public T visitEnvTextEquals(DockerParser.EnvTextEqualsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnvTextElementEquals(DockerfileParser.EnvTextElementEqualsContext ctx) { return visitChildren(ctx); }
+	@Override public T visitEnvTextElementEquals(DockerParser.EnvTextElementEqualsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitSourceList(DockerfileParser.SourceListContext ctx) { return visitChildren(ctx); }
+	@Override public T visitSourceList(DockerParser.SourceListContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitSource(DockerfileParser.SourceContext ctx) { return visitChildren(ctx); }
+	@Override public T visitSource(DockerParser.SourceContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitDestination(DockerfileParser.DestinationContext ctx) { return visitChildren(ctx); }
+	@Override public T visitDestination(DockerParser.DestinationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitPath(DockerfileParser.PathContext ctx) { return visitChildren(ctx); }
+	@Override public T visitPath(DockerParser.PathContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitPathList(DockerfileParser.PathListContext ctx) { return visitChildren(ctx); }
+	@Override public T visitPathList(DockerParser.PathListContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitVolumePath(DockerfileParser.VolumePathContext ctx) { return visitChildren(ctx); }
+	@Override public T visitVolumePath(DockerParser.VolumePathContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitUserSpec(DockerfileParser.UserSpecContext ctx) { return visitChildren(ctx); }
+	@Override public T visitUserSpec(DockerParser.UserSpecContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitArgName(DockerfileParser.ArgNameContext ctx) { return visitChildren(ctx); }
+	@Override public T visitArgName(DockerParser.ArgNameContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitArgValue(DockerfileParser.ArgValueContext ctx) { return visitChildren(ctx); }
+	@Override public T visitArgValue(DockerParser.ArgValueContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitSignal(DockerfileParser.SignalContext ctx) { return visitChildren(ctx); }
+	@Override public T visitSignal(DockerParser.SignalContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitText(DockerfileParser.TextContext ctx) { return visitChildren(ctx); }
+	@Override public T visitText(DockerParser.TextContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitTextElement(DockerfileParser.TextElementContext ctx) { return visitChildren(ctx); }
+	@Override public T visitTextElement(DockerParser.TextElementContext ctx) { return visitChildren(ctx); }
 }

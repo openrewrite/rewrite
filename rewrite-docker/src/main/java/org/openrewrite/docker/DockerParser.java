@@ -23,7 +23,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.docker.internal.DockerParserVisitor;
-import org.openrewrite.docker.internal.grammar.DockerfileLexer;
+import org.openrewrite.docker.internal.grammar.DockerLexer;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
@@ -43,12 +43,12 @@ public class DockerParser implements Parser {
         return acceptedInputs(sourceFiles).map(input -> {
             parsingListener.startedParsing(input);
             try (InputStream sourceStream = input.getSource(ctx)) {
-                DockerfileLexer lexer = new DockerfileLexer(CharStreams.fromStream(sourceStream));
+                DockerLexer lexer = new DockerLexer(CharStreams.fromStream(sourceStream));
                 lexer.removeErrorListeners();
                 lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
-                org.openrewrite.docker.internal.grammar.DockerfileParser parser =
-                    new org.openrewrite.docker.internal.grammar.DockerfileParser(new CommonTokenStream(lexer));
+                org.openrewrite.docker.internal.grammar.DockerParser parser =
+                    new org.openrewrite.docker.internal.grammar.DockerParser(new CommonTokenStream(lexer));
                 parser.removeErrorListeners();
                 parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
