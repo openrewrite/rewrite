@@ -2594,6 +2594,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 deepPrefix(importDirective),
                 Markers.EMPTY,
                 rpStatic,
+                null,
                 (J.FieldAccess) reference,
                 // Aliases contain Kotlin `Name` and do not resolve to a type. The aliases type is the import directive, so we set the type to match the import.
                 alias != null ? padLeft(prefix(alias), createIdentifier(requireNonNull(alias.getNameIdentifier()), jt)) : null
