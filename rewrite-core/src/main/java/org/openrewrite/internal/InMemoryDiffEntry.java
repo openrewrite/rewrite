@@ -235,45 +235,7 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
         this.repo.close();
     }
 
-    /**
-     * Compute a diff from pre-computed byte arrays.
-     * This allows callers to control when printAll() is called on source files,
-     * enabling optimizations like printing all variants of 'before' first, then all variants of 'after'.
-     */
-    @Incubating(since = "8.71.1")
-    public static String getDiff(
-            @Nullable Path oldPath,
-            @Nullable Path newPath,
-            @Nullable Path relativeTo,
-            byte[] oldContent,
-            byte[] newContent,
-            Set<Recipe> recipesThatMadeChanges,
-            FileMode oldMode,
-            FileMode newMode,
-            boolean ignoreAllWhitespace,
-            boolean binaryPatch
-    ) {
-        try (InMemoryDiffEntry entry = new InMemoryDiffEntry(
-                oldPath,
-                newPath,
-                relativeTo,
-                oldContent,
-                newContent,
-                recipesThatMadeChanges,
-                oldMode,
-                newMode,
-                binaryPatch
-        )) {
-            return entry.getDiff(ignoreAllWhitespace);
-        }
-    }
-
-    /**
-     * Print a source file to bytes using the specified marker printer.
-     * Returns an empty byte array if the source file is null or a Quark.
-     */
-    @Incubating(since = "8.71.1")
-    public static byte[] printAllAsBytes(@Nullable SourceFile sourceFile, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter) {
+    private static byte[] printAllAsBytes(@Nullable SourceFile sourceFile, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter) {
         if (sourceFile == null || sourceFile instanceof Quark) {
             return new byte[0];
         }
@@ -284,21 +246,6 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
 
         Charset charset = sourceFile.getCharset() == null ? StandardCharsets.UTF_8 : sourceFile.getCharset();
         return sourceFile.printAll(out).getBytes(charset);
-    }
-
-    /**
-     * Determine the file mode for a source file.
-     * Returns MISSING if null, otherwise checks GitTreeEntry marker first, then fileAttributes.
-     */
-    @Incubating(since = "8.71.1")
-    public static FileMode getFileMode(@Nullable SourceFile sourceFile) {
-        if (sourceFile == null) {
-            return FileMode.MISSING;
-        }
-        return sourceFile.getMarkers().findFirst(GitTreeEntry.class)
-                .map(entry -> FileMode.fromBits(entry.getFileMode()))
-                .orElseGet(() -> sourceFile.getFileAttributes() != null && sourceFile.getFileAttributes().isExecutable() ?
-                        FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE);
     }
 
     @Value
