@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -1831,4 +1832,41 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
+    @Test
+    void inheritedTypesUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("com.before", "com.after", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package com.before;
+                  
+                  public class A { }
+                  """
+              )
+            ),
+          java(
+            //language=java
+            """
+              package app;
+              
+              import com.before.A;
+              
+              class X extends A { }
+              """,
+            """
+              package app;
+              
+              import com.after.A;
+              
+              class X extends A { }
+              """,
+            spec -> spec.afterRecipe(cu ->
+              assertThat(FindTypes.find(cu, "app.X"))
+                .singleElement()
+                .extracting(NameTree::getType)
+                .matches(type-> TypeUtils.isAssignableTo("com.after.A", type), "Assignable to updated type")
+            )
+          )
+        );
+    }
 }
