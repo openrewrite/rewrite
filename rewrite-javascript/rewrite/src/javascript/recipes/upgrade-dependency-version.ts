@@ -177,7 +177,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
 
                 // Capture JSON lock file content (package-lock.json, bun.lock)
                 if (LOCK_FILE_NAMES.includes(basename)) {
-                    acc.originalLockFiles.set(doc.sourcePath, await TreePrinters.print(doc));
+                    acc.originalLockFiles.set(doc.sourcePath, TreePrinters.print(doc));
                     return doc;
                 }
 
@@ -237,7 +237,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
 
                 acc.projectsToUpdate.set(doc.sourcePath, {
                     packageJsonPath: doc.sourcePath,
-                    originalPackageJson: await TreePrinters.print(doc),
+                    originalPackageJson: TreePrinters.print(doc),
                     dependencyScope: foundScope,
                     currentVersion,
                     newVersion: recipe.newVersion,
@@ -252,7 +252,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
             private async handleYamlDocument(docs: Yaml.Documents, _ctx: ExecutionContext): Promise<Yaml.Documents | undefined> {
                 const basename = path.basename(docs.sourcePath);
                 if (LOCK_FILE_NAMES.includes(basename)) {
-                    acc.originalLockFiles.set(docs.sourcePath, await TreePrinters.print(docs));
+                    acc.originalLockFiles.set(docs.sourcePath, TreePrinters.print(docs));
                 }
                 return docs;
             }
@@ -260,7 +260,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
             private async handlePlainTextDocument(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
                 const basename = path.basename(text.sourcePath);
                 if (LOCK_FILE_NAMES.includes(basename)) {
-                    acc.originalLockFiles.set(text.sourcePath, await TreePrinters.print(text));
+                    acc.originalLockFiles.set(text.sourcePath, TreePrinters.print(text));
                 }
                 return text;
             }

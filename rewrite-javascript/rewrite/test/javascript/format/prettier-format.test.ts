@@ -261,7 +261,7 @@ describe('Prettier eof handling', () => {
         expect(formatted.eof.whitespace).toBe('\n');
 
         // Verify the printed output reflects this
-        const formattedPrinted = await TreePrinters.print(formatted);
+        const formattedPrinted = TreePrinters.print(formatted);
         expect(formattedPrinted).toBe('const x = 1;\n');
     });
 
@@ -284,7 +284,7 @@ describe('Prettier eof handling', () => {
         expect(formatted.eof.whitespace).toBe('\n');
 
         // Verify we don't get double newline in output
-        const formattedPrinted = await TreePrinters.print(formatted);
+        const formattedPrinted = TreePrinters.print(formatted);
         expect(formattedPrinted).toBe('const x = 1;\n');
         expect(formattedPrinted.endsWith('\n\n')).toBe(false);
     });

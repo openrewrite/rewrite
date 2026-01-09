@@ -257,7 +257,7 @@ describe('visiting YAML', () => {
         };
 
         const visitor = new YamlVisitor<number>();
-        const result = await visitor.isAcceptable(documents);
+        const result = visitor.isAcceptable(documents);
         expect(result).toBe(true);
     });
 });

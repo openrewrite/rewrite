@@ -171,7 +171,7 @@ describe('template dependencies integration', () => {
         `;
 
         // Create workspace for parsing the test code (so it has type attribution)
-        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
+        const workspaceDir = DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
 
         const parser = new JavaScriptParser({relativeTo: workspaceDir});
         const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
@@ -225,7 +225,7 @@ describe('template dependencies integration', () => {
         `;
 
         // Create workspace for parsing the test code
-        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
+        const workspaceDir = DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
 
         const parser = new JavaScriptParser({relativeTo: workspaceDir});
         const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
@@ -268,7 +268,7 @@ describe('template dependencies integration', () => {
         `;
 
         // Create workspace for parsing the test code
-        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
+        const workspaceDir = DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
 
         const parser = new JavaScriptParser({relativeTo: workspaceDir});
         const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});

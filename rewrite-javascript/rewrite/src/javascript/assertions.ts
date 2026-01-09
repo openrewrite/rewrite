@@ -101,7 +101,7 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
                 )
                 : undefined;
 
-            const cachedWorkspace = await DependencyWorkspace.getOrCreateWorkspace({
+            const cachedWorkspace = DependencyWorkspace.getOrCreateWorkspace({
                 packageJsonContent: packageJsonSpec.before!,
                 packageLockContent: packageLockSpec?.before ?? undefined,
                 workspacePackages
@@ -181,7 +181,7 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
                 const filePath = path.join(relativeTo, fileName);
                 for await (const sf of tempParser.parse({text: spec.before, sourcePath: filePath})) {
                     if (sf.kind === JS.Kind.CompilationUnit) {
-                        await detector.sample(sf as JS.CompilationUnit);
+                        detector.sample(sf as JS.CompilationUnit);
                     }
                 }
             }

@@ -15,9 +15,8 @@
  */
 import {JavaScriptParser} from "../../src/javascript";
 import {JavaScriptPrinter} from "../../src/javascript/print";
-import {MarkerPrinter, PrintOutputCapture} from "../../src/print";
+import {MarkerPrinter, PrintOutputCapture, Tree} from "../../src";
 import {J} from "../../src/java";
-import {Tree} from "../../src/tree";
 
 function prettifyKind(kind: string): string {
     const match = kind.match(/\.([A-Z]+)\$(.+)$/);
@@ -95,13 +94,6 @@ class TreeStructurePrintOutputCapture extends PrintOutputCapture {
         }
         return this;
     }
-
-    /**
-     * Get the tree structure as a formatted string
-     */
-    getTreeStructure(): string {
-        return this.rootNodes.map(node => node.toString()).join('\n');
-    }
 }
 
 /**
@@ -112,11 +104,11 @@ class TreeCapturingJavaScriptPrinter extends JavaScriptPrinter {
         if (p instanceof TreeStructurePrintOutputCapture) {
             p.startNode(j);
         }
-        await super['beforeSyntax'](j, p);
+        super['beforeSyntax'](j, p);
     }
 
     protected override async afterSyntax(j: J, p: PrintOutputCapture): Promise<void> {
-        await super['afterSyntax'](j, p);
+        super['afterSyntax'](j, p);
         if (p instanceof TreeStructurePrintOutputCapture) {
             p.endNode();
         }
@@ -179,12 +171,12 @@ describe('whitespace should be attached to the outermost element', () => {
     ])('%s', async (sourceCode) => {
         // given
         const parser = new JavaScriptParser();
-        const cu = await (await parser.parse({text: sourceCode, sourcePath: 'test.ts'}).next()).value;
+        const cu = parser.parseOne({text: sourceCode, sourcePath: 'test.ts'});
         const capture = new TreeStructurePrintOutputCapture(MarkerPrinter.SANITIZED);
         const printer = new TreeCapturingJavaScriptPrinter();
 
         // when
-        await printer.visit(cu, capture);
+        printer.visit(cu, capture);
 
         // then
         const violations = findWhitespaceViolations(capture.rootNodes);

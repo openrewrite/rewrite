@@ -23,7 +23,7 @@ describe('Autodetect', () => {
         const detector = Autodetect.detector();
         for (let i = 0; i < sources.length; i++) {
             for await (const cu of parser.parse({text: dedent(sources[i]), sourcePath: `test${i}.ts`})) {
-                await detector.sample(cu);
+                detector.sample(cu);
             }
         }
         return detector.build();

@@ -16,9 +16,9 @@
 
 import {Option, ScanningRecipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
-import {AsyncTreeVisitor} from "../../visitor";
+import {AsyncTreeVisitor, TreeVisitor} from "../../visitor";
 import {Tree} from "../../tree";
-import {detectIndent, getMemberKeyName, isJson, isObject, Json, AsyncJsonVisitor, rightPadded, space} from "../../json";
+import {AsyncJsonVisitor, detectIndent, getMemberKeyName, isJson, isObject, Json, rightPadded, space} from "../../json";
 import {isDocuments, isYaml, Yaml} from "../../yaml";
 import {isPlainText, PlainText} from "../../text";
 import {
@@ -118,12 +118,12 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
         return this.scope ?? 'dependencies';
     }
 
-    async scanner(acc: Accumulator): Promise<AsyncTreeVisitor<any, ExecutionContext>> {
+    async scanner(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
         const recipe = this;
         const LOCK_FILE_NAMES = getAllLockFileNames();
 
-        return new class extends AsyncTreeVisitor<Tree, ExecutionContext> {
-            protected async accept(tree: Tree, ctx: ExecutionContext): Promise<Tree | undefined> {
+        return new class extends TreeVisitor<Tree, ExecutionContext> {
+            protected accept(tree: Tree, ctx: ExecutionContext): Tree | undefined {
                 // Handle JSON documents (package.json and JSON lock files)
                 if (isJson(tree) && tree.kind === Json.Kind.Document) {
                     return this.handleJsonDocument(tree as Json.Document, ctx);
@@ -142,12 +142,12 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
                 return tree;
             }
 
-            private async handleJsonDocument(doc: Json.Document, _ctx: ExecutionContext): Promise<Json | undefined> {
+            private handleJsonDocument(doc: Json.Document, _ctx: ExecutionContext): Json | undefined {
                 const basename = path.basename(doc.sourcePath);
 
                 // Capture JSON lock file content (package-lock.json, bun.lock)
                 if (LOCK_FILE_NAMES.includes(basename)) {
-                    acc.originalLockFiles.set(doc.sourcePath, await TreePrinters.print(doc));
+                    acc.originalLockFiles.set(doc.sourcePath, TreePrinters.print(doc));
                     return doc;
                 }
 
@@ -183,7 +183,7 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
 
                 acc.projectsToUpdate.set(doc.sourcePath, {
                     packageJsonPath: doc.sourcePath,
-                    originalPackageJson: await TreePrinters.print(doc),
+                    originalPackageJson: TreePrinters.print(doc),
                     dependencyScope: recipe.getTargetScope(),
                     newVersion: recipe.version,
                     packageManager: pm,
@@ -193,18 +193,18 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
                 return doc;
             }
 
-            private async handleYamlDocument(docs: Yaml.Documents, _ctx: ExecutionContext): Promise<Yaml.Documents | undefined> {
+            private handleYamlDocument(docs: Yaml.Documents, _ctx: ExecutionContext): Yaml.Documents | undefined {
                 const basename = path.basename(docs.sourcePath);
                 if (LOCK_FILE_NAMES.includes(basename)) {
-                    acc.originalLockFiles.set(docs.sourcePath, await TreePrinters.print(docs));
+                    acc.originalLockFiles.set(docs.sourcePath, TreePrinters.print(docs));
                 }
                 return docs;
             }
 
-            private async handlePlainTextDocument(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+            private handlePlainTextDocument(text: PlainText, _ctx: ExecutionContext): PlainText | undefined {
                 const basename = path.basename(text.sourcePath);
                 if (LOCK_FILE_NAMES.includes(basename)) {
-                    acc.originalLockFiles.set(text.sourcePath, await TreePrinters.print(text));
+                    acc.originalLockFiles.set(text.sourcePath, TreePrinters.print(text));
                 }
                 return text;
             }

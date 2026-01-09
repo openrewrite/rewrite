@@ -40,7 +40,7 @@ describe('WhitespaceReconciler', () => {
         const result = reconciler.reconcile(original, formatted);
 
         // Print and verify
-        const printed = await print(result as JS.CompilationUnit);
+        const printed = print(result as JS.CompilationUnit);
         expect(printed).toBe('const x = 1');
 
         // Verify original types are preserved
@@ -60,7 +60,7 @@ describe('WhitespaceReconciler', () => {
         const result = reconciler.reconcile(original, formatted);
 
         // Should return original unchanged
-        const printed = await print(result as JS.CompilationUnit);
+        const printed = print(result as JS.CompilationUnit);
         expect(printed).toBe('const x = 1');
     });
 
@@ -81,8 +81,8 @@ describe('WhitespaceReconciler', () => {
         const withoutTypes = parseOnly('const x: number = 1');
 
         // Both should parse and print the same
-        const printed1 = await print(withTypes);
-        const printed2 = await print(withoutTypes);
+        const printed1 = print(withTypes);
+        const printed2 = print(withoutTypes);
         expect(printed1).toBe(printed2);
     });
 
@@ -96,7 +96,7 @@ describe('WhitespaceReconciler', () => {
         const reconciler = new WhitespaceReconciler();
         const result = reconciler.reconcile(original, formatted);
 
-        const printed = await print(result as JS.CompilationUnit);
+        const printed = print(result as JS.CompilationUnit);
         expect(printed).toContain('\n');
         expect(printed).toContain('return 1');
     });
@@ -108,7 +108,7 @@ describe('WhitespaceReconciler', () => {
         const reconciler = new WhitespaceReconciler();
         const result = reconciler.reconcile(original, formatted);
 
-        const printed = await print(result as JS.CompilationUnit);
+        const printed = print(result as JS.CompilationUnit);
         expect(printed).toBe('const x = 1 + 2');
     });
 });
@@ -129,7 +129,7 @@ describe('prettierFormat', () => {
             semi: true
         });
 
-        const printed = await print(result);
+        const printed = print(result);
         // Prettier should add spaces around operators
         expect(printed).toContain('x = 1 + 2');
     });
@@ -142,7 +142,7 @@ describe('prettierFormat', () => {
             semi: true
         });
 
-        const printed = await print(result);
+        const printed = print(result);
         expect(printed).toContain('const fn');
         expect(printed).toContain('return');
     });

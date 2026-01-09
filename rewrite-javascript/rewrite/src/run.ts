@@ -31,8 +31,8 @@ export class Result {
         return createTwoFilesPatch(
             this.before?.sourcePath ?? "",
             this.after?.sourcePath ?? "",
-            this.before ? await TreePrinters.print(this.before) : "",
-            this.after ? await TreePrinters.print(this.after) : "",
+            this.before ? TreePrinters.print(this.before) : "",
+            this.after ? TreePrinters.print(this.after) : "",
             "",
             "",
             {context: 3}

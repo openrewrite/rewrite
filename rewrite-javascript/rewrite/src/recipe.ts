@@ -183,7 +183,7 @@ export abstract class ScanningRecipe<P> extends Recipe {
             }
 
             async visit<R extends Tree>(tree: Tree, ctx: ExecutionContext, parent?: Cursor): Promise<R | undefined> {
-                const d = await this.delegateForCtx(ctx, parent)!;
+                const d = (await this.delegateForCtx(ctx, parent))!;
                 return d.visit(tree, ctx, parent);
             }
 

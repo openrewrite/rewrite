@@ -94,9 +94,9 @@ export class RecipeSpec {
         for (const kind in specsByKind) {
             const specs = specsByKind[kind];
             const parsed = await this.parse(specs);
-            await this.expectNoParseFailures(parsed);
-            await this.expectWhitespaceNotToContainNonwhitespaceCharacters(parsed);
-            this.checkParsePrintIdempotence && await this.expectParsePrintIdempotence(parsed);
+            this.expectNoParseFailures(parsed);
+            this.expectWhitespaceNotToContainNonwhitespaceCharacters(parsed);
+            this.checkParsePrintIdempotence && this.expectParsePrintIdempotence(parsed);
             allParsed.push(...parsed);
         }
 
@@ -112,7 +112,7 @@ export class RecipeSpec {
         // }
     }
 
-    private async expectNoParseFailures(parsed: [SourceSpec<any>, SourceFile][]) {
+    private expectNoParseFailures(parsed: [SourceSpec<any>, SourceFile][]) {
         for (const [_, sourceFile] of parsed) {
             if (sourceFile.kind === ParseErrorKind) {
                 throw new Error("Parsed source contains a ParseError: " +
@@ -121,10 +121,10 @@ export class RecipeSpec {
         }
     }
 
-    private async expectParsePrintIdempotence(parsed: [SourceSpec<any>, SourceFile][]) {
+    private expectParsePrintIdempotence(parsed: [SourceSpec<any>, SourceFile][]) {
         for (const [spec, sourceFile] of parsed) {
             const beforeSource = dedent(spec.before!);
-            expect(await TreePrinters.print(sourceFile)).toEqual(beforeSource);
+            expect(TreePrinters.print(sourceFile)).toEqual(beforeSource);
         }
     }
 
@@ -142,7 +142,7 @@ export class RecipeSpec {
 
             if (!spec.after) {
                 if (after) {
-                    expect(await TreePrinters.print(after)).toEqual(dedent(spec.before!));
+                    expect(TreePrinters.print(after)).toEqual(dedent(spec.before!));
                     // TODO: Consider throwing an error, as there should typically have been no change to the LST
                     // fail("Expected after to be undefined.");
                 }
@@ -173,8 +173,8 @@ export class RecipeSpec {
             throw new Error('Expected for recipe to have produced a change for file:\n' + trimIndent(spec.before))
         }
         expect(after).toBeDefined();
-        await new ValidateWhitespaceVisitor().visit(after!, this.executionContext);
-        const actualAfter = await TreePrinters.print(after!);
+        new ValidateWhitespaceVisitor().visit(after!, this.executionContext);
+        const actualAfter = TreePrinters.print(after!);
         const afterSource = typeof spec.after === "function" ?
             (spec.after as (actual: string) => string)(actualAfter) : spec.after as string;
         expect(actualAfter).toEqual(afterSource);
@@ -217,10 +217,10 @@ export class RecipeSpec {
         });
     }
 
-    private async expectWhitespaceNotToContainNonwhitespaceCharacters(parsed: [SourceSpec<any>, SourceFile][]) {
+    private expectWhitespaceNotToContainNonwhitespaceCharacters(parsed: [SourceSpec<any>, SourceFile][]) {
         const validator = new ValidateWhitespaceVisitor();
         for (const [_, sourceFile] of parsed) {
-            await validator.visit(sourceFile, this.executionContext);
+            validator.visit(sourceFile, this.executionContext);
         }
     }
 }
