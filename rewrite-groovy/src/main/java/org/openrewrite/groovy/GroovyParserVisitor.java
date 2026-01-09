@@ -1990,26 +1990,44 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMethodPointerExpression(MethodPointerExpression ref) {
+            Space fmt = whitespace();
+            Expression expression = visit(ref.getExpression());
+            Space opPrefix = whitespace();
+            String operation = source.substring(cursor, cursor + 2);
+            skip(operation);
             String referenceName = null;
             if (ref.getMethodName() instanceof ConstantExpression) {
                 referenceName = ((ConstantExpression) ref.getMethodName()).getValue().toString();
             }
 
-            queue.add(new J.MemberReference(randomId(),
-                    whitespace(),
-                    Markers.EMPTY,
-                    padRight(visit(ref.getExpression()), sourceBefore("::")),
-                    null, // not supported by Groovy
-                    padLeft(whitespace(), new J.Identifier(randomId(),
-                            sourceBefore(referenceName),
-                            Markers.EMPTY,
-                            emptyList(),
-                            referenceName,
-                            null, null)),
-                    typeMapping.type(ref.getType()),
-                    null, // not enough information in the AST
-                    null  // not enough information in the AST
-            ));
+            if (operation.equals(".&")) {
+                queue.add(new G.MethodPointer(randomId(), fmt, Markers.EMPTY,
+                        padRight(expression, opPrefix),
+                        padLeft(whitespace(), new J.Identifier(randomId(),
+                                sourceBefore(referenceName),
+                                Markers.EMPTY,
+                                emptyList(),
+                                referenceName,
+                                null, null)),
+                        typeMapping.type(ref.getType())
+                ));
+            } else {
+                queue.add(new J.MemberReference(randomId(),
+                        fmt,
+                        Markers.EMPTY,
+                        padRight(expression, opPrefix),
+                        null, // not supported by Groovy
+                        padLeft(whitespace(), new J.Identifier(randomId(),
+                                sourceBefore(referenceName),
+                                Markers.EMPTY,
+                                emptyList(),
+                                referenceName,
+                                null, null)),
+                        typeMapping.type(ref.getType()),
+                        null, // not enough information in the AST
+                        null  // not enough information in the AST
+                ));
+            }
         }
 
         @Override

@@ -28,6 +28,24 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class GroovyParserTest implements RewriteTest {
 
     @Test
+    void dotAmpersand() {
+        rewriteRun(
+          groovy(
+            """
+            class Validator {
+                void validate(Closure logger) {
+                    logger("Something went wrong")
+                }
+            }
+        
+            def v = new Validator()
+            v.validate(System.err.&println)
+            """
+          )
+        );
+    }
+
+    @Test
     void groovyPackageDefinition() {
         rewriteRun(
           groovy(

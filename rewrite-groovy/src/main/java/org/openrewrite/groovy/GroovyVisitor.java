@@ -161,6 +161,21 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         return r.withType(visitType(r.getType(), p));
     }
 
+    public J visitMethodPointer(G.MethodPointer methodPointer, P p) {
+        G.MethodPointer m = methodPointer;
+        m = m.withPrefix(visitSpace(m.getPrefix(), GSpace.Location.METHOD_POINTER, p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(m, p);
+        if (!(temp instanceof G.MethodPointer)) {
+            return temp;
+        } else {
+            m = (G.MethodPointer) temp;
+        }
+        m = m.getPadding().withExpression(visitRightPadded(m.getPadding().getExpression(), GRightPadded.Location.METHOD_POINTER_EXPRESSION, p));
+        m = m.getPadding().withMethodName(visitLeftPadded(m.getPadding().getMethodName(), GLeftPadded.Location.METHOD_POINTER_METHOD_NAME, p));
+        return m.withType(visitType(m.getType(), p));
+    }
+
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, GRightPadded.Location loc, P p) {
         return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
     }

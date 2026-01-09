@@ -21,10 +21,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.groovy.internal.Delimiter;
 import org.openrewrite.groovy.marker.*;
-import org.openrewrite.groovy.tree.G;
-import org.openrewrite.groovy.tree.GContainer;
-import org.openrewrite.groovy.tree.GRightPadded;
-import org.openrewrite.groovy.tree.GSpace;
+import org.openrewrite.groovy.tree.*;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.CompactConstructor;
 import org.openrewrite.java.tree.*;
@@ -130,6 +127,16 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         visitContainer("[", mapLiteral.getPadding().getElements(), GContainer.Location.MAP_LITERAL_ELEMENTS, ",", "]", p);
         afterSyntax(mapLiteral, p);
         return mapLiteral;
+    }
+
+    @Override
+    public J visitMethodPointer(G.MethodPointer methodPointer, PrintOutputCapture<P> p) {
+        beforeSyntax(methodPointer, GSpace.Location.METHOD_POINTER, p);
+        visitRightPadded(methodPointer.getPadding().getExpression(), GRightPadded.Location.METHOD_POINTER_EXPRESSION, p);
+        p.append(".&");
+        visitLeftPadded(methodPointer.getPadding().getMethodName(), GLeftPadded.Location.METHOD_POINTER_METHOD_NAME, p);
+        afterSyntax(methodPointer, p);
+        return methodPointer;
     }
 
     @Override

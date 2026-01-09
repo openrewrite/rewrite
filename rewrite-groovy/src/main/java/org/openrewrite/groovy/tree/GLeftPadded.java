@@ -19,6 +19,7 @@ public class GLeftPadded {
     public enum Location {
         UNARY_OPERATOR(GSpace.Location.UNARY_OPERATOR),
         BINARY_OPERATOR(GSpace.Location.BINARY_OPERATOR),
+        METHOD_POINTER_METHOD_NAME(GSpace.Location.METHOD_POINTER_METHOD_NAME),
         RANGE_INCLUSION(GSpace.Location.RANGE_INCLUSION);
 
         private final GSpace.Location beforeLocation;

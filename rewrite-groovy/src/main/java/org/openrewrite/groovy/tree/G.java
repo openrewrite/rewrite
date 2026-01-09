@@ -1025,4 +1025,99 @@ public interface G extends J {
             }
         }
     }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class MethodPointer implements G, Expression, TypedTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JRightPadded<Expression> expression;
+
+        public Expression getExpression() {
+            return expression.getElement();
+        }
+
+        public MethodPointer withExpression(Expression expression) {
+            return getPadding().withExpression(JRightPadded.withElement(this.expression, expression));
+        }
+
+        JLeftPadded<J.Identifier> methodName;
+
+        public J.Identifier getMethodName() {
+            return methodName.getElement();
+        }
+
+        public MethodPointer withMethodName(J.Identifier methodName) {
+            return getPadding().withMethodName(JLeftPadded.withElement(this.methodName, methodName));
+        }
+
+        @With
+        @Nullable
+        @Getter
+        JavaType type;
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return v.visitMethodPointer(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MethodPointer t;
+
+            public JRightPadded<Expression> getExpression() {
+                return t.expression;
+            }
+
+            public MethodPointer withExpression(JRightPadded<Expression> expression) {
+                return t.expression == expression ? t : new MethodPointer(t.id, t.prefix, t.markers, expression, t.methodName, t.type);
+            }
+
+            public JLeftPadded<J.Identifier> getMethodName() {
+                return t.methodName;
+            }
+
+            public MethodPointer withMethodName(JLeftPadded<J.Identifier> methodName) {
+                return t.methodName == methodName ? t : new MethodPointer(t.id, t.prefix, t.markers, t.expression, methodName, t.type);
+            }
+        }
+    }
 }
