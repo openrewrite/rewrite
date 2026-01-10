@@ -15,6 +15,7 @@
  */
 package org.openrewrite.docker.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -67,7 +68,7 @@ class HealthcheckTest implements RewriteTest {
             """
               FROM golang:1.21 AS builder
               RUN go build -o app .
-
+              
               FROM alpine:3.18
               HEALTHCHECK CMD curl -f http://localhost/ || exit 1
               COPY --from=builder /app /app
@@ -78,6 +79,108 @@ class HealthcheckTest implements RewriteTest {
                 Docker.Stage finalStage = doc.getStages().get(1);
                 assertThat(finalStage.getInstructions().getFirst()).isInstanceOf(Docker.Healthcheck.class);
                 assertThat(finalStage.getInstructions().getLast()).isInstanceOf(Docker.Copy.class);
+            })
+          )
+        );
+    }
+
+    @Test
+    void healthcheckWithIntervalFlag() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              HEALTHCHECK --interval=30s CMD curl -f http://localhost/ || exit 1
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(healthcheck.isNone()).isFalse();
+                assertThat(healthcheck.getFlags()).hasSize(1);
+                var flag = healthcheck.getFlags().getFirst();
+                assertThat(flag.getName()).isEqualTo("interval");
+                assertThat(flag.getValue()).isNotNull();
+                assertThat(flag.getValue().getContents()).isNotEmpty();
+                assertThat(((Docker.Literal) flag.getValue().getContents().getFirst()).getText()).isEqualTo("30s");
+            })
+          )
+        );
+    }
+
+    @Test
+    void healthcheckWithTimeoutFlag() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              HEALTHCHECK --timeout=3s CMD curl -f http://localhost/ || exit 1
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(healthcheck.isNone()).isFalse();
+                assertThat(healthcheck.getFlags()).hasSize(1);
+                assertThat(healthcheck.getFlags().getFirst().getName()).isEqualTo("timeout");
+            })
+          )
+        );
+    }
+
+    @Test
+    void healthcheckWithAllFlags() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --start-interval=1s --retries=3 CMD curl -f http://localhost/ || exit 1
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(healthcheck.isNone()).isFalse();
+                assertThat(healthcheck.getFlags()).hasSize(5);
+                assertThat(healthcheck.getFlags().get(0).getName()).isEqualTo("interval");
+                assertThat(healthcheck.getFlags().get(1).getName()).isEqualTo("timeout");
+                assertThat(healthcheck.getFlags().get(2).getName()).isEqualTo("start-period");
+                assertThat(healthcheck.getFlags().get(3).getName()).isEqualTo("start-interval");
+                assertThat(healthcheck.getFlags().get(4).getName()).isEqualTo("retries");
+                var command = (Docker.ShellForm) healthcheck.getCmd().getCommand();
+                assertThat(command.getArgument().getText()).isEqualTo("curl -f http://localhost/ || exit 1");
+            })
+          )
+        );
+    }
+
+    @Disabled
+    @Test
+    void healthcheckWithLineContinuation() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              HEALTHCHECK --interval=5m --timeout=3s \\
+                CMD curl -f http://localhost/ || exit 1
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
+                var command = (Docker.ShellForm) healthcheck.getCmd().getCommand();
+                assertThat(command.getArgument().getText()).isEqualTo("curl -f http://localhost/ || exit 1");
+            })
+          )
+        );
+    }
+
+    @Test
+    void healthcheckWithExecForm() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              HEALTHCHECK --interval=30s CMD ["curl", "-f", "http://localhost/"]
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(healthcheck.getCmd()).isNotNull();
+                assertThat(healthcheck.getCmd().getCommand()).isInstanceOf(Docker.ExecForm.class);
+                var execForm = (Docker.ExecForm) healthcheck.getCmd().getCommand();
+                assertThat(execForm.getArguments()).hasSize(3);
             })
           )
         );
