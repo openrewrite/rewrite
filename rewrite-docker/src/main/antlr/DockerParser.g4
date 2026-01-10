@@ -161,7 +161,7 @@ heredoc
     ;
 
 heredocContent
-    : ( NEWLINE | text )*
+    : ( NEWLINE | HEREDOC_CONTENT )*
     ;
 
 heredocEnd

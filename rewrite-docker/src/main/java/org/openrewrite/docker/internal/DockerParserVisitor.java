@@ -255,7 +255,22 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         // Get the actual text from source (including HIDDEN channel whitespace)
         int startIndex = textCtx.getStart().getStartIndex();
         int stopIndex = textCtx.getStop().getStopIndex();
-        String fullText = source.substring(source.offsetByCodePoints(0, startIndex), source.offsetByCodePoints(0, stopIndex + 1));
+
+        // Defensive check: ensure stopIndex >= startIndex
+        if (stopIndex < startIndex) {
+            // This can happen with certain edge cases; return empty contents
+            return contents;
+        }
+
+        int startCharIndex = source.offsetByCodePoints(0, startIndex);
+        int stopCharIndex = source.offsetByCodePoints(0, stopIndex + 1);
+
+        // Another defensive check after offset calculation
+        if (stopCharIndex < startCharIndex) {
+            return contents;
+        }
+
+        String fullText = source.substring(startCharIndex, stopCharIndex);
 
         boolean hasQuotedString = fullText.contains("\"") || fullText.contains("'");
         boolean hasEnvironmentVariable = fullText.contains("$");
@@ -1274,7 +1289,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 skip(c.NEWLINE().getSymbol());
             }
 
-            // Process heredocContent which is ( NEWLINE | text )*
+            // Process heredocContent which is ( NEWLINE | HEREDOC_CONTENT )*
             if (c.heredocContent() != null) {
                 DockerParser.HeredocContentContext contentCtx = c.heredocContent();
                 StringBuilder currentLine = new StringBuilder();
@@ -1290,17 +1305,10 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                             skip(tn.getSymbol());
                             contentLines.add(currentLine.toString());
                             currentLine = new StringBuilder();
-                        }
-                    } else if (child instanceof DockerParser.TextContext) {
-                        // Text content - append to current line
-                        DockerParser.TextContext textCtx = (DockerParser.TextContext) child;
-                        String textContent = textCtx.getText();
-                        currentLine.append(textContent);
-                        // Skip all tokens in the text
-                        for (int j = 0; j < textCtx.getChildCount(); j++) {
-                            if (textCtx.getChild(j) instanceof TerminalNode) {
-                                skip(((TerminalNode) textCtx.getChild(j)).getSymbol());
-                            }
+                        } else if (tn.getSymbol().getType() == DockerLexer.HEREDOC_CONTENT) {
+                            // Heredoc content line
+                            currentLine.append(tn.getText());
+                            skip(tn.getSymbol());
                         }
                     }
                 }
@@ -1328,7 +1336,20 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             // Read from source to include HIDDEN channel tokens (whitespace, comments)
             int startIndex = c.getStart().getStartIndex();
             int stopIndex = c.getStop().getStopIndex();
-            String fullText = source.substring(source.offsetByCodePoints(0, startIndex), source.offsetByCodePoints(0, stopIndex + 1));
+
+            // Defensive check for invalid ranges
+            if (stopIndex < startIndex) {
+                return new Docker.Argument(randomId(), prefix, Markers.EMPTY, emptyList());
+            }
+
+            int startCharIndex = source.offsetByCodePoints(0, startIndex);
+            int stopCharIndex = source.offsetByCodePoints(0, stopIndex + 1);
+
+            if (stopCharIndex < startCharIndex) {
+                return new Docker.Argument(randomId(), prefix, Markers.EMPTY, emptyList());
+            }
+
+            String fullText = source.substring(startCharIndex, stopCharIndex);
 
             Docker.PlainText plainText = new Docker.PlainText(
                     randomId(),

@@ -17,7 +17,6 @@ package org.openrewrite.docker;
 
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.ParseExceptionResult;

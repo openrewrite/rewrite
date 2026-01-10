@@ -60,8 +60,9 @@ EQUALS     : '=';
 DASH_DASH  : '--';
 
 // Unquoted text fragment (to be used in UNQUOTED_TEXT)
-// This matches text that doesn't start with --
-fragment UNQUOTED_CHAR : ~[ \t\r\n\\"'$[\]=];
+// This matches text that doesn't start with -- or <<
+// Note: < is excluded to allow HEREDOC_START (<<) to match
+fragment UNQUOTED_CHAR : ~[ \t\r\n\\"'$[\]=<];
 fragment ESCAPED_CHAR : '\\' .;
 
 // String literals
@@ -83,10 +84,13 @@ ENV_VAR : '$' '{' [A-Z_][A-Z0-9_]* ( ':-' | ':+' | ':' )? ~[}]* '}' | '$' [A-Z_]
 // This should be after more specific tokens
 // Note: comma is NOT excluded here - it's only special in JSON arrays
 // We structure this to not match text starting with -- (so DASH_DASH can match first)
+// Also exclude < from starting char to allow HEREDOC_START (<<) to match
 UNQUOTED_TEXT
-    : ~[- \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*   // Start with non-hyphen, non-space
-    | '-' ~[- \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Single hyphen followed by non-hyphen, non-space
+    : ~[-< \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*   // Start with non-hyphen, non-<, non-space
+    | '-' ~[- \t\r\n\\"'$[\]=<] ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Single hyphen followed by non-hyphen, non-space
     | '-'  // Just a hyphen by itself
+    | '<' ~[< \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Single < followed by non-<
+    | '<'  // Just a < by itself
     ;
 
 // Whitespace - HIDDEN in main mode
@@ -130,6 +134,10 @@ HPIdentifier : [A-Z_][A-Z0-9_]* {
     heredocIdentifier.push(getText());
 } -> type(UNQUOTED_TEXT);
 
+// Any other text on the heredoc line (destination paths, etc.)
+// This must come after HPIdentifier to ensure the identifier is captured first
+HP_UNQUOTED_TEXT : ~[ \t\r\n]+ -> type(UNQUOTED_TEXT);
+
 // ----------------------------------------------------------------------------------------------
 // HEREDOC mode - for parsing heredoc content
 // ----------------------------------------------------------------------------------------------
@@ -137,7 +145,8 @@ mode HEREDOC;
 
 H_NEWLINE : '\n' -> type(NEWLINE);
 
-HTemplateLiteral : ~[\n]+
+// Match heredoc content lines - emit as HEREDOC_CONTENT unless it's the ending identifier
+HEREDOC_CONTENT : ~[\n]+
 {
   if(!heredocIdentifier.isEmpty() && getText().equals(heredocIdentifier.peek())) {
       setType(UNQUOTED_TEXT);
