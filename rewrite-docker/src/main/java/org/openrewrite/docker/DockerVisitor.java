@@ -67,7 +67,7 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         Docker.From.As a = as;
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
-        return a.withName((Docker.Argument) visit(a.getName(), p));
+        return a.withName((Docker.Literal) visit(a.getName(), p));
     }
 
     public Docker visitRun(Docker.Run run, P p) {

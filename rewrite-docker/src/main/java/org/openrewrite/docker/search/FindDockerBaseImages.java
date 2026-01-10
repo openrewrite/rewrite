@@ -133,7 +133,7 @@ public class FindDockerBaseImages extends Recipe {
                 if (from.getAs() == null) {
                     return null;
                 }
-                return extractText(from.getAs().getName());
+                return from.getAs().getName().getText();
             }
         };
     }

@@ -119,7 +119,7 @@ public class AddOrUpdateLabel extends Recipe {
 
             private @Nullable String getStageName(Docker.Stage stage) {
                 if (stage.getFrom().getAs() != null) {
-                    return extractText(stage.getFrom().getAs().getName());
+                    return stage.getFrom().getAs().getName().getText();
                 }
                 return null;
             }

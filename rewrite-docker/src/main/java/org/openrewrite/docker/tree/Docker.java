@@ -194,7 +194,7 @@ public interface Docker extends Tree {
             Space prefix;
             Markers markers;
             String keyword;
-            Argument name;
+            Literal name;
         }
     }
 

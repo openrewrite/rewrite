@@ -70,7 +70,7 @@ public class FindExposedPorts extends Recipe {
                 String stageName = null;
                 Docker.Stage stage = getCursor().firstEnclosing(Docker.Stage.class);
                 if (stage != null && stage.getFrom().getAs() != null) {
-                    stageName = extractText(stage.getFrom().getAs().getName());
+                    stageName = stage.getFrom().getAs().getName().getText();
                 }
 
                 List<String> matchedPorts = new ArrayList<>();

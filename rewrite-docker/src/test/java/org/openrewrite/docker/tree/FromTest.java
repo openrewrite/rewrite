@@ -74,7 +74,7 @@ class FromTest implements RewriteTest {
                 assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
                 assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("20.04");
                 assertThat(from.getAs()).isNotNull();
-                assertThat(((Docker.Literal) from.getAs().getName().getContents().getFirst()).getText()).isEqualTo("base");
+                assertThat(from.getAs().getName().getText()).isEqualTo("base");
             })
           )
         );

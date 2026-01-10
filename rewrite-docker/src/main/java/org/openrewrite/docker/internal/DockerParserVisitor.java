@@ -149,12 +149,24 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         Space asPrefix = prefix(ctx.AS().getSymbol());
         String asKeyword = ctx.AS().getText();
         skip(ctx.AS().getSymbol());
+
+        // Stage name is always a simple identifier
+        Space namePrefix = prefix(ctx.stageName().getStart());
+        skip(ctx.stageName().getStop());
+        Docker.Literal name = new Docker.Literal(
+                randomId(),
+                namePrefix,
+                Markers.EMPTY,
+                ctx.stageName().getText(),
+                null
+        );
+
         return new Docker.From.As(
                 randomId(),
                 asPrefix,
                 Markers.EMPTY,
                 asKeyword,
-                visitArgument(ctx.stageName())
+                name
         );
     }
 
