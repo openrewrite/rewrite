@@ -539,17 +539,18 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         List<Docker.Label.LabelPair> pairs = new ArrayList<>();
         for (DockerParser.LabelPairContext pairCtx : ctx.labelPairs().labelPair()) {
             Space pairPrefix = prefix(pairCtx.getStart());
-            Docker.Argument key = visitLabelKeyOrValue(pairCtx.labelKey());
-
             boolean hasEquals = pairCtx.EQUALS() != null;
+            Docker.Argument key;
             Docker.Argument value;
 
             if (hasEquals) {
-                // New format: LABEL key=value
+                // New format: LABEL key=value (key can be keyword via labelKeyWithKeyword)
+                key = visitLabelKeyOrValue(pairCtx.labelKeyWithKeyword());
                 skip(pairCtx.EQUALS().getSymbol());
                 value = visitLabelKeyOrValue(pairCtx.labelValue());
             } else {
-                // Old format: LABEL key value (rest of line, can contain keywords)
+                // Old format: LABEL key value (key via labelKey, no instruction keywords)
+                key = visitLabelKeyOrValue(pairCtx.labelKey());
                 value = parseLabelOldValue(pairCtx.labelOldValue());
             }
 

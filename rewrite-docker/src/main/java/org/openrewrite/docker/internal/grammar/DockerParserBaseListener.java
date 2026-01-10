@@ -560,6 +560,18 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterLabelKeyWithKeyword(DockerParser.LabelKeyWithKeywordContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitLabelKeyWithKeyword(DockerParser.LabelKeyWithKeywordContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterLabelKey(DockerParser.LabelKeyContext ctx) { }
 	/**
 	 * {@inheritDoc}

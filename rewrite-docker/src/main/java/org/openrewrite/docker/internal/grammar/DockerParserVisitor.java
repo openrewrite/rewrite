@@ -290,6 +290,12 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitLabelPair(DockerParser.LabelPairContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link DockerParser#labelKeyWithKeyword}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitLabelKeyWithKeyword(DockerParser.LabelKeyWithKeywordContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link DockerParser#labelKey}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

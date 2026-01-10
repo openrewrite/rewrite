@@ -217,14 +217,20 @@ labelPairs
     ;
 
 labelPair
-    : labelKey EQUALS labelValue    // New format: key=value
-    | labelKey labelOldValue        // Old format: key value (rest of line, can contain keywords)
+    : labelKeyWithKeyword EQUALS labelValue    // New format: key=value (allows keyword keys like RUN)
+    | labelKey labelOldValue                   // Old format: key value (no instruction keyword keys)
     ;
 
+// Label key that allows all keywords (safe because EQUALS follows)
+labelKeyWithKeyword
+    : UNQUOTED_TEXT | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING
+    | MAINTAINER | FROM | RUN | CMD | LABEL | EXPOSE | ENV | ADD | COPY | ENTRYPOINT
+    | VOLUME | USER | WORKDIR | ARG | ONBUILD | STOPSIGNAL | HEALTHCHECK | SHELL | AS
+    ;
+
+// Label key for old format (only allows MAINTAINER, not instruction-starting keywords)
 labelKey
     : UNQUOTED_TEXT | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING
-    // Allow MAINTAINER as a label key (e.g., LABEL maintainer "name")
-    // Note: other instruction keywords are NOT allowed here to avoid consuming the next instruction
     | MAINTAINER
     ;
 

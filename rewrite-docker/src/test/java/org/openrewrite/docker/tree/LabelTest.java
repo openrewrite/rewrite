@@ -131,4 +131,18 @@ class LabelTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void labelRunKeyword() {
+        // LABEL with 'RUN' as key (instruction keyword used as label key with equals)
+        rewriteRun(
+          docker(
+            """
+              FROM centos:7
+              LABEL RUN='/usr/bin/docker run -d --name myapp ${IMAGE}'
+              RUN yum install -y curl
+              """
+          )
+        );
+    }
 }
