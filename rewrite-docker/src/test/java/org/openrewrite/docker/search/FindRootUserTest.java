@@ -21,6 +21,8 @@ import org.openrewrite.docker.Assertions;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.docker.Assertions.docker;
+
 class FindRootUserTest implements RewriteTest {
 
     @Override
@@ -32,7 +34,7 @@ class FindRootUserTest implements RewriteTest {
     @Test
     void detectMissingUser() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               RUN apt-get update
@@ -48,7 +50,7 @@ class FindRootUserTest implements RewriteTest {
     @Test
     void detectExplicitRoot() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               USER root
@@ -66,7 +68,7 @@ class FindRootUserTest implements RewriteTest {
     @Test
     void detectUserZero() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               USER 0
@@ -84,7 +86,7 @@ class FindRootUserTest implements RewriteTest {
     @Test
     void nonRootUserIsOk() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               USER appuser
@@ -97,7 +99,7 @@ class FindRootUserTest implements RewriteTest {
     @Test
     void multiStageOnlyChecksFinalStage() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM golang:1.21 AS builder
               RUN go build -o app .
@@ -113,7 +115,7 @@ class FindRootUserTest implements RewriteTest {
     @Test
     void multiStageDetectsMissingUserInFinalStage() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM golang:1.21 AS builder
               USER builder
@@ -138,7 +140,7 @@ class FindRootUserTest implements RewriteTest {
     void disableMissingUserCheck() {
         rewriteRun(
           spec -> spec.recipe(new FindRootUser(false)),
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               RUN apt-get update
@@ -151,7 +153,7 @@ class FindRootUserTest implements RewriteTest {
     void disableMissingUserCheckStillFindsExplicitRoot() {
         rewriteRun(
           spec -> spec.recipe(new FindRootUser(false)),
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               USER root

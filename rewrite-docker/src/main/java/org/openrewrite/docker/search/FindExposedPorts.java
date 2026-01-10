@@ -105,9 +105,9 @@ public class FindExposedPorts extends Recipe {
 
                     exposedPorts.insertRow(ctx, new DockerExposedPorts.Row(
                             sourceFile,
+                            stageName,
                             port,
                             protocol,
-                            stageName,
                             isRange
                     ));
                 }

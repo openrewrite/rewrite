@@ -36,8 +36,8 @@ class FindDockerBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,imageName,tag,digest,platform,stageName
-              Dockerfile,ubuntu,22.04,,,
+              sourceFile,stageName,imageName,tag,digest,platform
+              Dockerfile,,ubuntu,22.04,,
               """
           ),
           Assertions.docker(
@@ -60,8 +60,8 @@ class FindDockerBaseImagesTest implements RewriteTest {
             .dataTableAsCsv(DockerBaseImages.class.getName(),
               //language=csv
               """
-                sourceFile,imageName,tag,digest,platform,stageName
-                Dockerfile,ubuntu,22.04,,,
+                sourceFile,stageName,imageName,tag,digest,platform
+                Dockerfile,,ubuntu,22.04,,
                 """
             ),
           Assertions.docker(
@@ -96,8 +96,8 @@ class FindDockerBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,imageName,tag,digest,platform,stageName
-              Dockerfile,ubuntu,,sha256:abc123,,
+              sourceFile,stageName,imageName,tag,digest,platform
+              Dockerfile,,ubuntu,,sha256:abc123,
               """
           ),
           Assertions.docker(
@@ -119,8 +119,8 @@ class FindDockerBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,imageName,tag,digest,platform,stageName
-              Dockerfile,ubuntu,22.04,,linux/amd64,
+              sourceFile,stageName,imageName,tag,digest,platform
+              Dockerfile,,ubuntu,22.04,,linux/amd64
               """
           ),
           Assertions.docker(
@@ -142,8 +142,8 @@ class FindDockerBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,imageName,tag,digest,platform,stageName
-              Dockerfile,golang,1.21,,,builder
+              sourceFile,stageName,imageName,tag,digest,platform
+              Dockerfile,builder,golang,1.21,,
               """
           ),
           Assertions.docker(
@@ -165,9 +165,9 @@ class FindDockerBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,imageName,tag,digest,platform,stageName
-              Dockerfile,golang,1.21,,,builder
-              Dockerfile,alpine,latest,,,
+              sourceFile,stageName,imageName,tag,digest,platform
+              Dockerfile,builder,golang,1.21,,
+              Dockerfile,,alpine,latest,,
               """
           ),
           Assertions.docker(
@@ -196,8 +196,8 @@ class FindDockerBaseImagesTest implements RewriteTest {
             .dataTableAsCsv(DockerBaseImages.class.getName(),
               //language=csv
               """
-                sourceFile,imageName,tag,digest,platform,stageName
-                Dockerfile,alpine,latest,,,
+                sourceFile,stageName,imageName,tag,digest,platform
+                Dockerfile,,alpine,latest,,
                 """
             ),
           Assertions.docker(
@@ -225,8 +225,8 @@ class FindDockerBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,imageName,tag,digest,platform,stageName
-              Dockerfile,ubuntu,22.04,,linux/arm64,base
+              sourceFile,stageName,imageName,tag,digest,platform
+              Dockerfile,base,ubuntu,22.04,,linux/arm64
               """
           ),
           Assertions.docker(
@@ -248,8 +248,8 @@ class FindDockerBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,imageName,tag,digest,platform,stageName
-              Dockerfile,ubuntu,,,,
+              sourceFile,stageName,imageName,tag,digest,platform
+              Dockerfile,,ubuntu,,,
               """
           ),
           Assertions.docker(

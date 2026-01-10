@@ -21,6 +21,8 @@ import org.openrewrite.docker.Assertions;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.docker.Assertions.docker;
+
 class FindUnpinnedBaseImagesTest implements RewriteTest {
 
     @Override
@@ -32,7 +34,7 @@ class FindUnpinnedBaseImagesTest implements RewriteTest {
     @Test
     void detectLatestTag() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:latest
               RUN apt-get update
@@ -48,7 +50,7 @@ class FindUnpinnedBaseImagesTest implements RewriteTest {
     @Test
     void detectNoTag() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu
               RUN apt-get update
@@ -64,7 +66,7 @@ class FindUnpinnedBaseImagesTest implements RewriteTest {
     @Test
     void pinnedDigestIsOk() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu@sha256:abc123def456
               RUN apt-get update
@@ -76,7 +78,7 @@ class FindUnpinnedBaseImagesTest implements RewriteTest {
     @Test
     void pinnedTagIsOk() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               RUN apt-get update
@@ -88,7 +90,7 @@ class FindUnpinnedBaseImagesTest implements RewriteTest {
     @Test
     void scratchImageIsOk() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM scratch
               COPY app /app
@@ -101,7 +103,7 @@ class FindUnpinnedBaseImagesTest implements RewriteTest {
     @Test
     void multiStageMarksAllUnpinned() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM golang AS builder
               RUN go build -o app .
@@ -123,7 +125,7 @@ class FindUnpinnedBaseImagesTest implements RewriteTest {
     @Test
     void multiStageWithMixedPinning() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM golang:1.21 AS builder
               RUN go build -o app .

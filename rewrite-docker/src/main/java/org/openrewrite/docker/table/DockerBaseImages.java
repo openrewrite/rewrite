@@ -35,6 +35,11 @@ public class DockerBaseImages extends DataTable<DockerBaseImages.Row> {
                 description = "The Dockerfile containing the base image.")
         String sourceFile;
 
+        @Column(displayName = "Stage name",
+                description = "The build stage name (from AS clause), if specified.")
+        @Nullable
+        String stageName;
+
         @Column(displayName = "Image name",
                 description = "The name of the base image (without tag or digest).")
         String imageName;
@@ -53,10 +58,5 @@ public class DockerBaseImages extends DataTable<DockerBaseImages.Row> {
                 description = "The platform flag value, if specified.")
         @Nullable
         String platform;
-
-        @Column(displayName = "Stage name",
-                description = "The build stage name (from AS clause), if specified.")
-        @Nullable
-        String stageName;
     }
 }

@@ -35,6 +35,11 @@ public class DockerExposedPorts extends DataTable<DockerExposedPorts.Row> {
                 description = "The Dockerfile containing the EXPOSE instruction.")
         String sourceFile;
 
+        @Column(displayName = "Stage name",
+                description = "The build stage name if the EXPOSE is in a named stage.")
+        @Nullable
+        String stageName;
+
         @Column(displayName = "Port",
                 description = "The port number or range (e.g., '80' or '8000-8100').")
         String port;
@@ -43,11 +48,6 @@ public class DockerExposedPorts extends DataTable<DockerExposedPorts.Row> {
                 description = "The protocol if specified (tcp or udp), null if not specified.")
         @Nullable
         String protocol;
-
-        @Column(displayName = "Stage name",
-                description = "The build stage name if the EXPOSE is in a named stage.")
-        @Nullable
-        String stageName;
 
         @Column(displayName = "Is range",
                 description = "True if the port specification is a range (e.g., 8000-8100).")

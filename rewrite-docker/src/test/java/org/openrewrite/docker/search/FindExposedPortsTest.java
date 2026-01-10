@@ -22,6 +22,8 @@ import org.openrewrite.docker.table.DockerExposedPorts;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.docker.Assertions.docker;
+
 class FindExposedPortsTest implements RewriteTest {
 
     @Override
@@ -35,11 +37,11 @@ class FindExposedPortsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.dataTableAsCsv(DockerExposedPorts.class.getName(),
             """
-              sourceFile,port,protocol,stageName,range
-              Dockerfile,80,,,false
+              sourceFile,stageName,port,protocol,range
+              Dockerfile,,80,,false
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM nginx:latest
               EXPOSE 80
@@ -57,12 +59,12 @@ class FindExposedPortsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.dataTableAsCsv(DockerExposedPorts.class.getName(),
             """
-              sourceFile,port,protocol,stageName,range
-              Dockerfile,80,,,false
-              Dockerfile,443,,,false
+              sourceFile,stageName,port,protocol,range
+              Dockerfile,,80,,false
+              Dockerfile,,443,,false
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM nginx:latest
               EXPOSE 80 443
@@ -80,12 +82,12 @@ class FindExposedPortsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.dataTableAsCsv(DockerExposedPorts.class.getName(),
             """
-              sourceFile,port,protocol,stageName,range
-              Dockerfile,53,udp,,false
-              Dockerfile,53,tcp,,false
+              sourceFile,stageName,port,protocol,range
+              Dockerfile,,53,udp,false
+              Dockerfile,,53,tcp,false
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               EXPOSE 53/udp 53/tcp
@@ -103,11 +105,11 @@ class FindExposedPortsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.dataTableAsCsv(DockerExposedPorts.class.getName(),
             """
-              sourceFile,port,protocol,stageName,range
-              Dockerfile,8000-8100,,,true
+              sourceFile,stageName,port,protocol,range
+              Dockerfile,,8000-8100,,true
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               EXPOSE 8000-8100
@@ -125,11 +127,11 @@ class FindExposedPortsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.dataTableAsCsv(DockerExposedPorts.class.getName(),
             """
-              sourceFile,port,protocol,stageName,range
-              Dockerfile,8080,,app,false
+              sourceFile,stageName,port,protocol,range
+              Dockerfile,app,8080,,false
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM golang:1.21 AS builder
               RUN go build -o app .
@@ -156,12 +158,12 @@ class FindExposedPortsTest implements RewriteTest {
           spec -> spec.recipe(new FindExposedPorts("80*"))
             .dataTableAsCsv(DockerExposedPorts.class.getName(),
               """
-                sourceFile,port,protocol,stageName,range
-                Dockerfile,80,,,false
-                Dockerfile,8080,,,false
+                sourceFile,stageName,port,protocol,range
+                Dockerfile,,80,,false
+                Dockerfile,,8080,,false
                 """
             ),
-          Assertions.docker(
+          docker(
             """
               FROM nginx:latest
               EXPOSE 80 443 8080
@@ -180,11 +182,11 @@ class FindExposedPortsTest implements RewriteTest {
           spec -> spec.recipe(new FindExposedPorts("*/udp"))
             .dataTableAsCsv(DockerExposedPorts.class.getName(),
               """
-                sourceFile,port,protocol,stageName,range
-                Dockerfile,53,udp,,false
+                sourceFile,stageName,port,protocol,range
+                Dockerfile,,53,udp,false
                 """
             ),
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               EXPOSE 53/udp 53/tcp
@@ -201,7 +203,7 @@ class FindExposedPortsTest implements RewriteTest {
     void noMatchWithPattern() {
         rewriteRun(
           spec -> spec.recipe(new FindExposedPorts("9999")),
-          Assertions.docker(
+          docker(
             """
               FROM nginx:latest
               EXPOSE 80 443
@@ -215,12 +217,12 @@ class FindExposedPortsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.dataTableAsCsv(DockerExposedPorts.class.getName(),
             """
-              sourceFile,port,protocol,stageName,range
-              Dockerfile,80,,,false
-              Dockerfile,443,,,false
+              sourceFile,stageName,port,protocol,range
+              Dockerfile,,80,,false
+              Dockerfile,,443,,false
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM nginx:latest
               EXPOSE 80

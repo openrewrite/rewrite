@@ -77,11 +77,11 @@ public class FindDockerBaseImages extends Recipe {
                 // Insert row into data table
                 dockerBaseImages.insertRow(ctx, new DockerBaseImages.Row(
                         getCursor().firstEnclosingOrThrow(Docker.File.class).getSourcePath().toString(),
+                        stageName,
                         imageName,
                         tag,
                         digest,
-                        platform,
-                        stageName
+                        platform
                 ));
 
                 // Build message with image reference

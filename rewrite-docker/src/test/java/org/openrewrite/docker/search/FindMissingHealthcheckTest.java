@@ -21,6 +21,8 @@ import org.openrewrite.docker.Assertions;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.docker.Assertions.docker;
+
 class FindMissingHealthcheckTest implements RewriteTest {
 
     @Override
@@ -32,7 +34,7 @@ class FindMissingHealthcheckTest implements RewriteTest {
     @Test
     void detectMissingHealthcheck() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM alpine:3.18
               CMD ["./app"]
@@ -48,7 +50,7 @@ class FindMissingHealthcheckTest implements RewriteTest {
     @Test
     void healthcheckPresent() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM alpine:3.18
               HEALTHCHECK CMD curl -f http://localhost/ || exit 1
@@ -61,7 +63,7 @@ class FindMissingHealthcheckTest implements RewriteTest {
     @Test
     void healthcheckNonePresent() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM alpine:3.18
               HEALTHCHECK NONE
@@ -74,7 +76,7 @@ class FindMissingHealthcheckTest implements RewriteTest {
     @Test
     void multiStageOnlyChecksFinalStage() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM golang:1.21 AS builder
               RUN go build -o app .
@@ -90,7 +92,7 @@ class FindMissingHealthcheckTest implements RewriteTest {
     @Test
     void multiStageDetectsMissingHealthcheckInFinalStage() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM golang:1.21 AS builder
               HEALTHCHECK CMD go test
@@ -114,7 +116,7 @@ class FindMissingHealthcheckTest implements RewriteTest {
     @Test
     void singleStageWithHealthcheck() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM nginx:1.25
               COPY nginx.conf /etc/nginx/nginx.conf
