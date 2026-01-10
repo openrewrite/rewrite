@@ -512,7 +512,17 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         List<Docker.Env.EnvPair> pairs = new ArrayList<>();
         for (DockerParser.EnvPairContext pairCtx : ctx.envPairs().envPair()) {
             Space pairPrefix = prefix(pairCtx.getStart());
-            Docker.Argument key = visitArgument(pairCtx.envKey());
+
+            // ENV key is always a simple identifier
+            Space keyPrefix = prefix(pairCtx.envKey().getStart());
+            skip(pairCtx.envKey().getStop());
+            Docker.Literal key = new Docker.Literal(
+                    randomId(),
+                    keyPrefix,
+                    Markers.EMPTY,
+                    pairCtx.envKey().getText(),
+                    null
+            );
 
             boolean hasEquals = pairCtx.EQUALS() != null;
             if (hasEquals) {

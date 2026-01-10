@@ -138,7 +138,7 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         Docker.Env.EnvPair ep = pair;
         ep = ep.withPrefix(visitSpace(ep.getPrefix(), p));
         ep = ep.withMarkers(visitMarkers(ep.getMarkers(), p));
-        ep = ep.withKey((Docker.Argument) visit(ep.getKey(), p));
+        ep = ep.withKey((Docker.Literal) visit(ep.getKey(), p));
         return ep.withValue((Docker.Argument) visit(ep.getValue(), p));
     }
 

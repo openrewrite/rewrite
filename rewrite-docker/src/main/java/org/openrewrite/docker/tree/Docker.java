@@ -365,7 +365,7 @@ public interface Docker extends Tree {
 
             Space prefix;
             Markers markers;
-            Argument key;
+            Literal key;
             boolean hasEquals;  // true for KEY=value, false for KEY value (old format)
             Argument value;
         }
