@@ -654,9 +654,9 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                         contents.add(new Docker.Literal(randomId(), elementPrefix, Markers.EMPTY, value, Docker.Literal.QuoteStyle.SINGLE));
                     } else if (token.getType() == DockerLexer.ENV_VAR) {
                         boolean braced = text.startsWith("${");
-                        String varName = braced
-                                ? text.substring(2, text.indexOf('}'))
-                                : text.substring(1);
+                        String varName = braced ?
+                                text.substring(2, text.indexOf('}')) :
+                                text.substring(1);
                         contents.add(new Docker.EnvironmentVariable(randomId(), elementPrefix, Markers.EMPTY, varName, braced));
                     } else {
                         // Plain text - includes UNQUOTED_TEXT, EQUALS, DASH_DASH, and instruction keywords

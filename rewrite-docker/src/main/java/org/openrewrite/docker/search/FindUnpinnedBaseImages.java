@@ -68,9 +68,9 @@ public class FindUnpinnedBaseImages extends Recipe {
 
                 // Check for latest tag or no tag (and no digest)
                 if (digest == null && (tag == null || "latest".equals(tag))) {
-                    String message = tag == null
-                            ? "Uses implicit 'latest' tag"
-                            : "Uses 'latest' tag";
+                    String message = tag == null ?
+                            "Uses implicit 'latest' tag" :
+                            "Uses 'latest' tag";
                     return SearchResult.found(f, message);
                 }
 
