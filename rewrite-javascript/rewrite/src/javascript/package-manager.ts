@@ -550,6 +550,31 @@ export interface BaseProjectUpdateInfo {
 }
 
 /**
+ * Conditionally runs a package manager install if the project hasn't been processed yet.
+ * Marks the project as processed regardless of success/failure to prevent duplicate attempts.
+ *
+ * This is useful for async visitors that need to run installs lazily during tree traversal.
+ * For sync visitors, prefer running all installs upfront in editorWithData().
+ *
+ * @param sourcePath The source path (package.json path) being processed
+ * @param acc The recipe accumulator
+ * @param runInstall Function that performs the actual install (recipe-specific)
+ * @returns The failure message if install failed, undefined otherwise
+ */
+export async function runInstallIfNeeded<T>(
+    sourcePath: string,
+    acc: DependencyRecipeAccumulator<T>,
+    runInstall: () => Promise<void>
+): Promise<string | undefined> {
+    if (!acc.processedProjects.has(sourcePath)) {
+        acc.processedProjects.add(sourcePath);
+        await runInstall();
+        return acc.failedProjects.get(sourcePath);
+    }
+    return undefined;
+}
+
+/**
  * Stores the result of a package manager install into the accumulator.
  * This handles the common pattern of storing updated lock files and tracking failures.
  *
