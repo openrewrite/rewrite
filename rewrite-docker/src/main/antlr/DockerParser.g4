@@ -193,7 +193,8 @@ labelPairs
     ;
 
 labelPair
-    : labelKey EQUALS labelValue
+    : labelKey EQUALS labelValue    // New format: key=value
+    | labelKey labelOldValue        // Old format: key value (rest of line, can contain keywords)
     ;
 
 labelKey
@@ -202,6 +203,24 @@ labelKey
 
 labelValue
     : UNQUOTED_TEXT | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING
+    ;
+
+// Value in old-style LABEL (can contain instruction keywords like "run")
+labelOldValue
+    : labelOldValueElement+
+    ;
+
+labelOldValueElement
+    : UNQUOTED_TEXT
+    | DOUBLE_QUOTED_STRING
+    | SINGLE_QUOTED_STRING
+    | ENV_VAR
+    | EQUALS
+    | DASH_DASH
+    // Old-style LABEL values can contain instruction keywords
+    | FROM | RUN | CMD | LABEL | EXPOSE | ENV | ADD | COPY | ENTRYPOINT
+    | VOLUME | USER | WORKDIR | ARG | ONBUILD | STOPSIGNAL | HEALTHCHECK | SHELL | MAINTAINER
+    | AS
     ;
 
 portList

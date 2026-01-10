@@ -187,7 +187,9 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
         for (Docker.Label.LabelPair pair : label.getPairs()) {
             visitSpace(pair.getPrefix(), p);
             visit(pair.getKey(), p);
-            p.append("=");
+            if (pair.isHasEquals()) {
+                p.append("=");
+            }
             visit(pair.getValue(), p);
         }
         afterSyntax(label, p);
@@ -228,24 +230,19 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
         beforeSyntax(volume, p);
         p.append(volume.getKeyword());
         if (volume.isJsonForm()) {
-            // Print space and opening bracket
-            if (!volume.getValues().isEmpty()) {
-                visitSpace(volume.getValues().get(0).getPrefix(), p);
-            }
-            p.append("[");
+            // Print the space before [ and the bracket
+            // Note: we assume a single space before [ for now (TODO: capture this properly)
+            p.append(" [");
             for (int i = 0; i < volume.getValues().size(); i++) {
                 Docker.Argument arg = volume.getValues().get(i);
-                // For first element, we already printed its prefix above
-                // For subsequent elements, print comma then prefix
-                if (i > 0) {
+                // Print the argument with its prefix (includes space after [ or after ,)
+                visit(arg, p);
+                // Print comma after this element if not last
+                if (i < volume.getValues().size() - 1) {
                     p.append(",");
-                    visitSpace(arg.getPrefix(), p);
-                }
-                // Visit the argument content without its prefix
-                for (Docker.ArgumentContent content : arg.getContents()) {
-                    visit(content, p);
                 }
             }
+            visitSpace(volume.getClosingBracketPrefix(), p);
             p.append("]");
         } else {
             for (Docker.Argument value : volume.getValues()) {
@@ -260,24 +257,19 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
     public Docker visitShell(Docker.Shell shell, PrintOutputCapture<P> p) {
         beforeSyntax(shell, p);
         p.append(shell.getKeyword());
-        // Print space and opening bracket
-        if (!shell.getArguments().isEmpty()) {
-            visitSpace(shell.getArguments().get(0).getPrefix(), p);
-        }
-        p.append("[");
+        // Print the space before [ and the bracket
+        // Note: we assume a single space before [ for now (TODO: capture this properly)
+        p.append(" [");
         for (int i = 0; i < shell.getArguments().size(); i++) {
             Docker.Argument arg = shell.getArguments().get(i);
-            // For first element, we already printed its prefix above
-            // For subsequent elements, print comma then prefix
-            if (i > 0) {
+            // Print the argument with its prefix (includes space after [ or after ,)
+            visit(arg, p);
+            // Print comma after this element if not last
+            if (i < shell.getArguments().size() - 1) {
                 p.append(",");
-                visitSpace(arg.getPrefix(), p);
-            }
-            // Visit the argument content without its prefix
-            for (Docker.ArgumentContent content : arg.getContents()) {
-                visit(content, p);
             }
         }
+        visitSpace(shell.getClosingBracketPrefix(), p);
         p.append("]");
         afterSyntax(shell, p);
         return shell;

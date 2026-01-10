@@ -391,7 +391,7 @@ public interface Docker extends Tree {
             Space prefix;
             Markers markers;
             Argument key;
-            // LABEL always uses equals sign
+            boolean hasEquals;  // true for key=value, false for old format "key value"
             Argument value;
         }
     }
@@ -483,6 +483,11 @@ public interface Docker extends Tree {
         boolean jsonForm;  // true for ["path1", "path2"], false for path1 path2
         List<Argument> values;
 
+        /**
+         * Whitespace before the closing bracket in JSON form (to preserve " ]" vs "]")
+         */
+        Space closingBracketPrefix;
+
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitVolume(this, p);
@@ -505,6 +510,11 @@ public interface Docker extends Tree {
         String keyword;
 
         List<Argument> arguments;  // JSON array elements
+
+        /**
+         * Whitespace before the closing bracket (to preserve " ]" vs "]")
+         */
+        Space closingBracketPrefix;
 
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {

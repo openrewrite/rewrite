@@ -453,6 +453,26 @@ public interface DockerParserListener extends ParseTreeListener {
 	 */
 	void exitLabelValue(DockerParser.LabelValueContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link DockerParser#labelOldValue}.
+	 * @param ctx the parse tree
+	 */
+	void enterLabelOldValue(DockerParser.LabelOldValueContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#labelOldValue}.
+	 * @param ctx the parse tree
+	 */
+	void exitLabelOldValue(DockerParser.LabelOldValueContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerParser#labelOldValueElement}.
+	 * @param ctx the parse tree
+	 */
+	void enterLabelOldValueElement(DockerParser.LabelOldValueElementContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#labelOldValueElement}.
+	 * @param ctx the parse tree
+	 */
+	void exitLabelOldValueElement(DockerParser.LabelOldValueElementContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link DockerParser#portList}.
 	 * @param ctx the parse tree
 	 */

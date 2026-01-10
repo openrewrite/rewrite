@@ -239,6 +239,7 @@ public class AddOrUpdateLabel extends Recipe {
                         prefix,
                         Markers.EMPTY,
                         createArgument(labelKey, null),
+                        true,  // hasEquals - use modern format with equals sign
                         createArgument(labelValue, null)
                 );
             }

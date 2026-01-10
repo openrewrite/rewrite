@@ -520,12 +520,19 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             Space pairPrefix = prefix(pairCtx.getStart());
             Docker.Argument key = visitLabelKeyOrValue(pairCtx.labelKey());
 
-            // LABEL always has equals
-            skip(pairCtx.EQUALS().getSymbol());
+            boolean hasEquals = pairCtx.EQUALS() != null;
+            Docker.Argument value;
 
-            Docker.Argument value = visitLabelKeyOrValue(pairCtx.labelValue());
+            if (hasEquals) {
+                // New format: LABEL key=value
+                skip(pairCtx.EQUALS().getSymbol());
+                value = visitLabelKeyOrValue(pairCtx.labelValue());
+            } else {
+                // Old format: LABEL key value (rest of line, can contain keywords)
+                value = parseLabelOldValue(pairCtx.labelOldValue());
+            }
 
-            pairs.add(new Docker.Label.LabelPair(randomId(), pairPrefix, Markers.EMPTY, key, value));
+            pairs.add(new Docker.Label.LabelPair(randomId(), pairPrefix, Markers.EMPTY, key, hasEquals, value));
         }
 
         // Advance cursor to end of instruction
@@ -566,6 +573,44 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             }
         }
 
+        return new Docker.Argument(randomId(), prefix, Markers.EMPTY, contents);
+    }
+
+    private Docker.Argument parseLabelOldValue(DockerParser.LabelOldValueContext ctx) {
+        Space prefix = prefix(ctx.getStart());
+        List<Docker.ArgumentContent> contents = new ArrayList<>();
+
+        for (DockerParser.LabelOldValueElementContext elemCtx : ctx.labelOldValueElement()) {
+            if (elemCtx.getChildCount() > 0) {
+                ParseTree child = elemCtx.getChild(0);
+                if (child instanceof TerminalNode) {
+                    TerminalNode terminal = (TerminalNode) child;
+                    Token token = terminal.getSymbol();
+                    String text = token.getText();
+                    Space elementPrefix = prefix(token);
+                    skip(token);
+
+                    if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
+                        String value = text.substring(1, text.length() - 1);
+                        contents.add(new Docker.QuotedString(randomId(), elementPrefix, Markers.EMPTY, value, Docker.QuotedString.QuoteStyle.DOUBLE));
+                    } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
+                        String value = text.substring(1, text.length() - 1);
+                        contents.add(new Docker.QuotedString(randomId(), elementPrefix, Markers.EMPTY, value, Docker.QuotedString.QuoteStyle.SINGLE));
+                    } else if (token.getType() == DockerLexer.ENV_VAR) {
+                        boolean braced = text.startsWith("${");
+                        String varName = braced
+                                ? text.substring(2, text.indexOf('}'))
+                                : text.substring(1);
+                        contents.add(new Docker.EnvironmentVariable(randomId(), elementPrefix, Markers.EMPTY, varName, braced));
+                    } else {
+                        // Plain text - includes UNQUOTED_TEXT, EQUALS, DASH_DASH, and instruction keywords
+                        contents.add(new Docker.PlainText(randomId(), elementPrefix, Markers.EMPTY, text));
+                    }
+                }
+            }
+        }
+
+        advanceCursor(ctx.getStop().getStopIndex() + 1);
         return new Docker.Argument(randomId(), prefix, Markers.EMPTY, contents);
     }
 
@@ -646,11 +691,14 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         boolean jsonForm = ctx.jsonArray() != null;
         List<Docker.Argument> values = new ArrayList<>();
+        Space closingBracketPrefix = Space.EMPTY;
 
-        if (jsonForm) {
+        if (jsonForm && ctx.jsonArray() != null && ctx.jsonArray().LBRACKET() != null) {
             // Parse JSON array
-            values = visitJsonArrayForVolume(ctx.jsonArray());
-        } else {
+            JsonArrayParseResult result = visitJsonArrayForVolume(ctx.jsonArray());
+            values = result.arguments;
+            closingBracketPrefix = result.closingBracketPrefix;
+        } else if (ctx.pathList() != null) {
             // Parse path list (space-separated paths)
             for (DockerParser.VolumePathContext pathCtx : ctx.pathList().volumePath()) {
                 Space pathPrefix = prefix(pathCtx.getStart());
@@ -689,12 +737,11 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
-        return new Docker.Volume(randomId(), prefix, Markers.EMPTY, volumeKeyword, jsonForm, values);
+        return new Docker.Volume(randomId(), prefix, Markers.EMPTY, volumeKeyword, jsonForm, values, closingBracketPrefix);
     }
 
-    private List<Docker.Argument> visitJsonArrayForVolume(DockerParser.JsonArrayContext ctx) {
-        // Capture whitespace before opening bracket and store it as prefix of first argument
-        Space bracketPrefix = prefix(ctx.LBRACKET().getSymbol());
+    private JsonArrayParseResult visitJsonArrayForVolume(DockerParser.JsonArrayContext ctx) {
+        // Skip the opening bracket - the space after VOLUME is handled by instruction prefix
         skip(ctx.LBRACKET().getSymbol());
 
         List<Docker.Argument> arguments = new ArrayList<>();
@@ -703,11 +750,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             List<DockerParser.JsonStringContext> jsonStrings = elementsCtx.jsonString();
 
             for (int i = 0; i < jsonStrings.size(); i++) {
+                // convertJsonString captures the prefix correctly (space after [ or after ,)
                 Docker.Argument arg = convertJsonString(jsonStrings.get(i));
-                // Add bracket prefix to first argument
-                if (i == 0 && !bracketPrefix.getWhitespace().isEmpty()) {
-                    arg = arg.withPrefix(bracketPrefix);
-                }
                 arguments.add(arg);
 
                 // Skip comma after this element if it's not the last one
@@ -730,10 +774,11 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             }
         }
 
-        // Skip the closing bracket
+        // Capture whitespace before closing bracket to preserve " ]" vs "]"
+        Space closingBracketPrefix = prefix(ctx.JSON_RBRACKET().getSymbol());
         skip(ctx.JSON_RBRACKET().getSymbol());
 
-        return arguments;
+        return new JsonArrayParseResult(arguments, closingBracketPrefix);
     }
 
     private Docker.Argument convertJsonString(DockerParser.JsonStringContext ctx) {
@@ -762,20 +807,24 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         String shellKeyword = ctx.SHELL().getText();
         skip(ctx.SHELL().getSymbol());
 
-        // Parse JSON array
-        List<Docker.Argument> arguments = visitJsonArrayForShell(ctx.jsonArray());
+        // Parse JSON array (may be null or malformed in some edge cases)
+        JsonArrayParseResult result;
+        if (ctx.jsonArray() != null && ctx.jsonArray().LBRACKET() != null) {
+            result = visitJsonArrayForShell(ctx.jsonArray());
+        } else {
+            result = new JsonArrayParseResult(emptyList(), Space.EMPTY);
+        }
 
         // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
-        return new Docker.Shell(randomId(), prefix, Markers.EMPTY, shellKeyword, arguments);
+        return new Docker.Shell(randomId(), prefix, Markers.EMPTY, shellKeyword, result.arguments, result.closingBracketPrefix);
     }
 
-    private List<Docker.Argument> visitJsonArrayForShell(DockerParser.JsonArrayContext ctx) {
-        // Capture whitespace before opening bracket and store it as prefix of first argument
-        Space bracketPrefix = prefix(ctx.LBRACKET().getSymbol());
+    private JsonArrayParseResult visitJsonArrayForShell(DockerParser.JsonArrayContext ctx) {
+        // Skip the opening bracket - the space after SHELL is handled by instruction prefix
         skip(ctx.LBRACKET().getSymbol());
 
         List<Docker.Argument> arguments = new ArrayList<>();
@@ -784,11 +833,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             List<DockerParser.JsonStringContext> jsonStrings = elementsCtx.jsonString();
 
             for (int i = 0; i < jsonStrings.size(); i++) {
+                // convertJsonString captures the prefix correctly (space after [ or after ,)
                 Docker.Argument arg = convertJsonString(jsonStrings.get(i));
-                // Add bracket prefix to first argument
-                if (i == 0 && !bracketPrefix.getWhitespace().isEmpty()) {
-                    arg = arg.withPrefix(bracketPrefix);
-                }
                 arguments.add(arg);
 
                 // Skip comma after this element if it's not the last one
@@ -809,10 +855,11 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             }
         }
 
-        // Skip the closing bracket
+        // Capture whitespace before closing bracket to preserve " ]" vs "]"
+        Space closingBracketPrefix = prefix(ctx.JSON_RBRACKET().getSymbol());
         skip(ctx.JSON_RBRACKET().getSymbol());
 
-        return arguments;
+        return new JsonArrayParseResult(arguments, closingBracketPrefix);
     }
 
     @Override
@@ -1262,5 +1309,18 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
         return t;
+    }
+
+    /**
+     * Helper class to hold both the arguments and closing bracket prefix when parsing JSON arrays.
+     */
+    private static class JsonArrayParseResult {
+        final List<Docker.Argument> arguments;
+        final Space closingBracketPrefix;
+
+        JsonArrayParseResult(List<Docker.Argument> arguments, Space closingBracketPrefix) {
+            this.arguments = arguments;
+            this.closingBracketPrefix = closingBracketPrefix;
+        }
     }
 }
