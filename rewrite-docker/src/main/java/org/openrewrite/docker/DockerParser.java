@@ -31,8 +31,9 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.InputStream;
 import java.nio.file.Path;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
+
+import static java.lang.String.format;
 
 public class DockerParser implements Parser {
     @Override
@@ -94,8 +95,9 @@ public class DockerParser implements Parser {
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
-            throw new DockerParsingException(sourcePath,
-                    String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e);
+            ctx.getOnError().accept(new DockerParsingException(sourcePath, format(
+                    "Syntax error in %s at line %d:%d %s.",
+                    sourcePath, line, charPositionInLine, msg), e));
         }
     }
 

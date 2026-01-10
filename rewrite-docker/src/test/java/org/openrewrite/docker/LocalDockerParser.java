@@ -16,8 +16,8 @@
 package org.openrewrite.docker;
 
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Parser;
 import org.openrewrite.ParseExceptionResult;
+import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.tree.ParseError;
 
@@ -29,8 +29,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static java.util.stream.Collectors.toList;
 
 public class LocalDockerParser {
 
@@ -55,42 +56,45 @@ public class LocalDockerParser {
         }
 
         List<Parser.Input> inputs = dockerFiles.stream()
-                .map(Parser.Input::fromFile)
-                .collect(Collectors.toList());
-
-        // Errors are captured as ParseError instances, no need to print stack traces
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {});
+          .map(Parser.Input::fromFile)
+          .collect(toList());
 
         List<SourceFile> parsedFiles = new ArrayList<>();
-        Map<Path, String> failedFiles = new LinkedHashMap<>();
-
+        Map<Path, String> parsedErrors = new LinkedHashMap<>();
+        List<Throwable> throwables = new ArrayList<>();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(throwables::add);
         parser.parseInputs(inputs, dir, ctx).forEach(sourceFile -> {
             if (sourceFile instanceof ParseError parseError) {
                 String errorMsg = parseError.getMarkers()
-                        .findFirst(ParseExceptionResult.class)
-                        .map(ex -> {
-                            // Extract just the first line of the message (the actual error)
-                            String msg = ex.getMessage();
-                            int newlineIdx = msg.indexOf('\n');
-                            return newlineIdx > 0 ? msg.substring(0, newlineIdx) : msg;
-                        })
-                        .orElse("Unknown error");
-                failedFiles.put(parseError.getSourcePath(), errorMsg);
+                  .findFirst(ParseExceptionResult.class)
+                  .map(ex -> {
+                      // Extract just the first line of the message (the actual error)
+                      String msg = ex.getMessage();
+                      int newlineIdx = msg.indexOf('\n');
+                      return newlineIdx > 0 ? msg.substring(0, newlineIdx) : msg;
+                  })
+                  .orElse("Unknown error");
+                parsedErrors.put(parseError.getSourcePath(), errorMsg);
             } else {
                 parsedFiles.add(sourceFile);
             }
         });
+        for (Throwable error : throwables) {
+            if (error instanceof DockerParsingException dockerEx) {
+                parsedErrors.put(dockerEx.getPath(), dockerEx.getMessage());
+            }
+        }
 
-        printSummary(parsedFiles, failedFiles);
+        printSummary(parsedFiles, parsedErrors);
     }
 
     private static List<Path> findDockerFiles(Path dir, DockerParser parser) {
         try (Stream<Path> paths = Files.walk(dir)) {
             return paths
-                    .filter(Files::isRegularFile)
-                    .filter(parser::accept)
-                    .sorted()
-                    .collect(Collectors.toList());
+              .filter(Files::isRegularFile)
+              .filter(parser::accept)
+              .sorted()
+              .collect(toList());
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to walk directory: " + dir, e);
         }
@@ -102,14 +106,11 @@ public class LocalDockerParser {
         System.out.println();
 
         if (!failedFiles.isEmpty()) {
-            System.out.println("FAILED FILES:");
-            System.out.println("-".repeat(60));
-
             // Group failures by error message
             Map<String, List<Path>> errorGroups = new LinkedHashMap<>();
             for (Map.Entry<Path, String> entry : failedFiles.entrySet()) {
                 errorGroups.computeIfAbsent(entry.getValue(), k -> new ArrayList<>())
-                        .add(entry.getKey());
+                  .add(entry.getKey());
             }
 
             for (Map.Entry<String, List<Path>> group : errorGroups.entrySet()) {
