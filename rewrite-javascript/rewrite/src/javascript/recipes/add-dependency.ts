@@ -37,8 +37,7 @@ import {
     getAllLockFileNames,
     getLockFileName,
     parseLockFileContent,
-    runInstallIfNeeded,
-    runInstallInTempDir,
+    runInstallInTempDirAsync,
     storeInstallResult,
     updateNodeResolutionMarker
 } from "../package-manager";
@@ -214,9 +213,19 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
     async editorWithData(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
         const recipe = this;
 
+        // Run all package manager installs BEFORE returning the visitor
+        // This keeps async I/O out of the visitor, making it pure tree transformation
+        for (const [sourcePath, updateInfo] of acc.projectsToUpdate) {
+            if (!acc.processedProjects.has(sourcePath)) {
+                await this.runPackageManagerInstall(acc, updateInfo);
+                acc.processedProjects.add(sourcePath);
+            }
+        }
+
         // Create JSON visitor that handles both package.json and JSON lock files
+        // This visitor is now pure - no I/O, just AST transformation using pre-computed data
         const jsonEditor = new class extends JsonVisitor<ExecutionContext> {
-            protected visitDocument(doc: Json.Document, ctx: ExecutionContext): Json | undefined {
+            protected visitDocument(doc: Json.Document, _ctx: ExecutionContext): Json | undefined {
                 const sourcePath = doc.sourcePath;
 
                 // Handle package.json files
@@ -226,10 +235,8 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
                         return doc; // This package.json doesn't need updating
                     }
 
-                    // Run package manager install if needed, check for failure
-                    const failureMessage = runInstallIfNeeded(sourcePath, acc, () =>
-                        recipe.runPackageManagerInstall(acc, updateInfo, ctx)
-                    );
+                    // Check for failure from the pre-computed install
+                    const failureMessage = acc.failedProjects.get(sourcePath);
                     if (failureMessage) {
                         return markupWarn(
                             doc,
@@ -276,12 +283,12 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
     /**
      * Runs the package manager in a temporary directory to update the lock file.
      * All file contents are provided from in-memory sources (SourceFiles), not read from disk.
+     * This is called from editorWithData() before returning the visitor.
      */
-    private runPackageManagerInstall(
+    private async runPackageManagerInstall(
         acc: Accumulator,
-        updateInfo: ProjectUpdateInfo,
-        _ctx: ExecutionContext
-    ): void {
+        updateInfo: ProjectUpdateInfo
+    ): Promise<void> {
         // Create modified package.json with the new dependency
         const modifiedPackageJson = this.createModifiedPackageJson(
             updateInfo.originalPackageJson,
@@ -298,7 +305,7 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
         // Look up the original lock file content from captured SourceFiles
         const originalLockFileContent = acc.originalLockFiles.get(lockFilePath);
 
-        const result = runInstallInTempDir(
+        const result = await runInstallInTempDirAsync(
             updateInfo.packageManager,
             modifiedPackageJson,
             {

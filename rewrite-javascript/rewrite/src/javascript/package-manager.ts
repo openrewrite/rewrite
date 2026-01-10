@@ -30,9 +30,10 @@ import {TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
 import {getPlatformCommand} from "../shell-utils";
 import * as fs from "fs";
+import * as fsp from "fs/promises";
 import * as path from "path";
 import * as os from "os";
-import {spawnSync} from "child_process";
+import {spawn, spawnSync} from "child_process";
 import * as YAML from "yaml";
 
 /**
@@ -270,6 +271,79 @@ function runInstall(pm: PackageManager, options: InstallOptions): PackageManager
 }
 
 /**
+ * Runs the package manager install command asynchronously.
+ */
+async function runInstallAsync(pm: PackageManager, options: InstallOptions): Promise<PackageManagerResult> {
+    const config = PACKAGE_MANAGER_CONFIGS[pm];
+    const command = options.lockOnly ? config.installLockOnlyCommand : config.installCommand;
+    const [cmd, ...args] = command;
+
+    return new Promise((resolve) => {
+        const child = spawn(getPlatformCommand(cmd), args, {
+            cwd: options.cwd,
+            stdio: ['pipe', 'pipe', 'pipe'],
+            env: options.env ? {...process.env, ...options.env} : process.env,
+        });
+
+        let stdout = '';
+        let stderr = '';
+        let timedOut = false;
+
+        const timeout = options.timeout ?? 120000;
+        const timer = setTimeout(() => {
+            timedOut = true;
+            child.kill('SIGTERM');
+        }, timeout);
+
+        child.stdout?.on('data', (data) => {
+            stdout += data.toString();
+        });
+
+        child.stderr?.on('data', (data) => {
+            stderr += data.toString();
+        });
+
+        child.on('error', (error) => {
+            clearTimeout(timer);
+            resolve({
+                success: false,
+                error: error.message,
+                stderr,
+            });
+        });
+
+        child.on('close', (code) => {
+            clearTimeout(timer);
+
+            if (timedOut) {
+                resolve({
+                    success: false,
+                    error: `Command timed out after ${timeout}ms`,
+                    stderr,
+                });
+                return;
+            }
+
+            if (code !== 0) {
+                resolve({
+                    success: false,
+                    stdout,
+                    stderr,
+                    error: `Command exited with code ${code}`,
+                });
+                return;
+            }
+
+            resolve({
+                success: true,
+                stdout,
+                stderr,
+            });
+        });
+    });
+}
+
+/**
  * Runs a package manager list command to get dependency information.
  *
  * @param pm The package manager to use
@@ -483,27 +557,6 @@ export function storeInstallResult<T extends BaseProjectUpdateInfo>(
 }
 
 /**
- * Runs the package manager install for a project if it hasn't been processed yet.
- * Updates the accumulator's processedProjects set after running.
- *
- * @param sourcePath The source path (package.json path) being processed
- * @param acc The recipe accumulator
- * @param runInstall Function that performs the actual install (recipe-specific)
- * @returns The failure message if install failed, undefined otherwise
- */
-export function runInstallIfNeeded<T>(
-    sourcePath: string,
-    acc: DependencyRecipeAccumulator<T>,
-    runInstall: () => void
-): string | undefined {
-    if (!acc.processedProjects.has(sourcePath)) {
-        runInstall();
-        acc.processedProjects.add(sourcePath);
-    }
-    return acc.failedProjects.get(sourcePath);
-}
-
-/**
  * Updates the NodeResolutionResult marker on a JSON document after a package manager operation.
  * This recreates the marker based on the updated package.json and lock file content.
  *
@@ -706,6 +759,100 @@ function runInstallInTempDirCore(
 }
 
 /**
+ * Async internal implementation for running package manager install in a temporary directory.
+ * Supports both simple projects and workspaces.
+ */
+async function runInstallInTempDirCoreAsync(
+    pm: PackageManager,
+    rootPackageJson: string,
+    options: WorkspaceTempInstallOptions = {}
+): Promise<TempInstallResult> {
+    const {
+        timeout = 120000,
+        lockOnly = true,
+        originalLockFileContent,
+        configFiles: configFileContents,
+        workspacePackages
+    } = options;
+    const lockFileName = getLockFileName(pm);
+    const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'openrewrite-pm-'));
+
+    try {
+        // Write root package.json to temp directory
+        await fsp.writeFile(path.join(tempDir, 'package.json'), rootPackageJson);
+
+        // Write workspace package.json files (creating subdirectories as needed)
+        if (workspacePackages) {
+            for (const [relativePath, content] of Object.entries(workspacePackages)) {
+                const fullPath = path.join(tempDir, relativePath);
+                await fsp.mkdir(path.dirname(fullPath), {recursive: true});
+                await fsp.writeFile(fullPath, content);
+            }
+        }
+
+        // Write lock file if provided
+        if (originalLockFileContent !== undefined) {
+            await fsp.writeFile(path.join(tempDir, lockFileName), originalLockFileContent);
+        }
+
+        // Write config files if provided
+        if (configFileContents) {
+            for (const [configFile, content] of Object.entries(configFileContents)) {
+                await fsp.writeFile(path.join(tempDir, configFile), content);
+            }
+        }
+
+        // Run package manager install
+        const result = await runInstallAsync(pm, {
+            cwd: tempDir,
+            lockOnly,
+            timeout
+        });
+
+        if (!result.success) {
+            // Combine error message with stderr for more useful diagnostics
+            const errorParts: string[] = [];
+            if (result.error) {
+                errorParts.push(result.error);
+            }
+            if (result.stderr) {
+                // Trim and limit stderr to avoid excessively long error messages
+                const stderr = result.stderr.trim();
+                if (stderr) {
+                    errorParts.push(stderr.length > 2000 ? stderr.slice(0, 2000) + '...' : stderr);
+                }
+            }
+            return {
+                success: false,
+                error: errorParts.length > 0 ? errorParts.join('\n\n') : 'Unknown error'
+            };
+        }
+
+        // Read back the updated lock file
+        const updatedLockPath = path.join(tempDir, lockFileName);
+        let lockFileContent: string | undefined;
+        try {
+            lockFileContent = await fsp.readFile(updatedLockPath, 'utf-8');
+        } catch {
+            // Lock file doesn't exist
+        }
+
+        return {
+            success: true,
+            lockFileContent
+        };
+
+    } finally {
+        // Cleanup temp directory
+        try {
+            await fsp.rm(tempDir, {recursive: true, force: true});
+        } catch {
+            // Ignore cleanup errors
+        }
+    }
+}
+
+/**
  * Runs package manager install in a temporary directory.
  *
  * This function:
@@ -754,6 +901,46 @@ export function runWorkspaceInstallInTempDir(
     options: WorkspaceTempInstallOptions = {}
 ): TempInstallResult {
     return runInstallInTempDirCore(pm, rootPackageJson, options);
+}
+
+/**
+ * Runs package manager install in a temporary directory asynchronously.
+ *
+ * This is the async version of runInstallInTempDir. It uses async spawn and
+ * fs.promises for non-blocking I/O. Use this in async recipe editor() methods
+ * to avoid blocking the event loop.
+ *
+ * @param pm The package manager to use
+ * @param modifiedPackageJson The modified package.json content to use
+ * @param options Optional settings for timeout, lock-only mode, and file contents
+ * @returns Promise resolving to result containing success status and lock file content or error
+ */
+export async function runInstallInTempDirAsync(
+    pm: PackageManager,
+    modifiedPackageJson: string,
+    options: TempInstallOptions = {}
+): Promise<TempInstallResult> {
+    return runInstallInTempDirCoreAsync(pm, modifiedPackageJson, options);
+}
+
+/**
+ * Runs package manager install in a temporary directory with workspace support asynchronously.
+ *
+ * This is the async version of runWorkspaceInstallInTempDir. It uses async spawn and
+ * fs.promises for non-blocking I/O. Use this in async recipe editor() methods
+ * to avoid blocking the event loop.
+ *
+ * @param pm The package manager to use
+ * @param rootPackageJson The root package.json content (should contain "workspaces" field)
+ * @param options Optional settings including workspace packages, timeout, lock-only mode, and file contents
+ * @returns Promise resolving to result containing success status and lock file content or error
+ */
+export async function runWorkspaceInstallInTempDirAsync(
+    pm: PackageManager,
+    rootPackageJson: string,
+    options: WorkspaceTempInstallOptions = {}
+): Promise<TempInstallResult> {
+    return runInstallInTempDirCoreAsync(pm, rootPackageJson, options);
 }
 
 /**
