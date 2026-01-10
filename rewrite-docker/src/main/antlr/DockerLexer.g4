@@ -86,6 +86,14 @@ fragment HEX_DIGIT : [0-9A-F];
 // Environment variable reference
 ENV_VAR : '$' '{' [A-Z_][A-Z0-9_]* ( ':-' | ':+' | ':' )? ~[}]* '}' | '$' [A-Z_][A-Z0-9_]*;
 
+// Command substitution $(command) or $((arithmetic))
+// Handles nested parentheses by counting them
+COMMAND_SUBST : '$(' ( COMMAND_SUBST | ~[()] | '(' COMMAND_SUBST_INNER* ')' )* ')';
+fragment COMMAND_SUBST_INNER : COMMAND_SUBST | ~[()];
+
+// Backtick command substitution `command`
+BACKTICK_SUBST : '`' ~[`]* '`';
+
 // Unquoted text (arguments, file paths, etc.)
 // This should be after more specific tokens
 // Note: comma is NOT excluded here - it's only special in JSON arrays

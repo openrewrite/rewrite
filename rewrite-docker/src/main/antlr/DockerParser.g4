@@ -146,6 +146,7 @@ flagValue
 
 flagValueElement
     : UNQUOTED_TEXT | EQUALS | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING | ENV_VAR
+    | COMMAND_SUBST | BACKTICK_SUBST
     ;
 
 execForm
@@ -166,6 +167,8 @@ shellFormTextElement
     | DOUBLE_QUOTED_STRING
     | SINGLE_QUOTED_STRING
     | ENV_VAR
+    | COMMAND_SUBST      // Allow $(command) in shell commands
+    | BACKTICK_SUBST     // Allow `command` in shell commands
     | EQUALS
     | DASH_DASH
     | LBRACKET   // Allow [ in shell commands (e.g., if [ -f file ])
@@ -248,6 +251,8 @@ labelOldValueElement
     | DOUBLE_QUOTED_STRING
     | SINGLE_QUOTED_STRING
     | ENV_VAR
+    | COMMAND_SUBST
+    | BACKTICK_SUBST
     | EQUALS
     | DASH_DASH
     | LBRACKET
@@ -266,6 +271,8 @@ portList
 port
     : UNQUOTED_TEXT
     | ENV_VAR  // Allow environment variables (e.g., EXPOSE ${PORT})
+    | COMMAND_SUBST   // Allow $(command)
+    | BACKTICK_SUBST  // Allow `command`
     ;
 
 envPairs
@@ -304,6 +311,8 @@ envTextElementEquals
     | DOUBLE_QUOTED_STRING
     | SINGLE_QUOTED_STRING
     | ENV_VAR
+    | COMMAND_SUBST
+    | BACKTICK_SUBST
     // NOTE: EQUALS is explicitly NOT included to allow multiple KEY=value pairs
     ;
 
@@ -332,6 +341,8 @@ volumePath
     | DOUBLE_QUOTED_STRING
     | SINGLE_QUOTED_STRING
     | ENV_VAR  // Allow environment variables (e.g., VOLUME ${DATA_DIR})
+    | COMMAND_SUBST   // Allow $(command)
+    | BACKTICK_SUBST  // Allow `command`
     ;
 
 userSpec
@@ -359,6 +370,8 @@ textElement
     | DOUBLE_QUOTED_STRING
     | SINGLE_QUOTED_STRING
     | ENV_VAR
+    | COMMAND_SUBST   // Allow $(command) in text
+    | BACKTICK_SUBST  // Allow `command` in text
     | EQUALS     // Allow = in shell form text (e.g., ENV_VAR=value in RUN commands)
     | DASH_DASH  // Allow -- in shell form text (e.g., --option in shell commands)
     | LBRACKET   // Allow [ in text (e.g., shell test expressions)

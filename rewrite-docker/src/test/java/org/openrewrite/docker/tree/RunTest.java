@@ -280,4 +280,43 @@ class RunTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void runWithCommandSubstitution() {
+        // Test $(command) command substitution
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              RUN export GNUPGHOME="$(mktemp -d)" && echo "Using $GNUPGHOME"
+              """
+          )
+        );
+    }
+
+    @Test
+    void runWithNestedCommandSubstitution() {
+        // Test nested command substitution
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              RUN make -j$(getconf _NPROCESSORS_ONLN)
+              """
+          )
+        );
+    }
+
+    @Test
+    void runWithBacktickSubstitution() {
+        // Test backtick command substitution
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              RUN echo "Current date: `date`"
+              """
+          )
+        );
+    }
 }
