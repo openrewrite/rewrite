@@ -34,7 +34,11 @@ class ExposeTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Expose expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(expose.getPorts()).hasSize(1);
-                assertThat(((Docker.PlainText) expose.getPorts().getFirst().getContents().getFirst()).getText()).isEqualTo("8080");
+                Docker.Port port = expose.getPorts().getFirst();
+                assertThat(port.getText()).isEqualTo("8080");
+                assertThat(port.getStart()).isEqualTo(8080);
+                assertThat(port.getEnd()).isNull();
+                assertThat(port.getProtocol()).isEqualTo(Docker.Port.Protocol.TCP);
             })
           )
         );
@@ -51,8 +55,10 @@ class ExposeTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Expose expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(expose.getPorts()).hasSize(2);
-                assertThat(((Docker.PlainText) expose.getPorts().get(0).getContents().getFirst()).getText()).isEqualTo("8080");
-                assertThat(((Docker.PlainText) expose.getPorts().get(1).getContents().getFirst()).getText()).isEqualTo("8443");
+                assertThat(expose.getPorts().get(0).getText()).isEqualTo("8080");
+                assertThat(expose.getPorts().get(0).getStart()).isEqualTo(8080);
+                assertThat(expose.getPorts().get(1).getText()).isEqualTo("8443");
+                assertThat(expose.getPorts().get(1).getStart()).isEqualTo(8443);
             })
           )
         );
@@ -67,7 +73,83 @@ class ExposeTest implements RewriteTest {
               FROM ubuntu:20.04
               ENV PORT=8080
               EXPOSE ${PORT}
-              """
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Expose expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Port port = expose.getPorts().getFirst();
+                assertThat(port.getText()).isEqualTo("${PORT}");
+                assertThat(port.isVariable()).isTrue();
+                assertThat(port.getStart()).isNull();
+                assertThat(port.getEnd()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void exposeWithProtocol() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              EXPOSE 8080/tcp 53/udp
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Expose expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(expose.getPorts()).hasSize(2);
+
+                Docker.Port tcpPort = expose.getPorts().get(0);
+                assertThat(tcpPort.getText()).isEqualTo("8080/tcp");
+                assertThat(tcpPort.getStart()).isEqualTo(8080);
+                assertThat(tcpPort.getProtocol()).isEqualTo(Docker.Port.Protocol.TCP);
+
+                Docker.Port udpPort = expose.getPorts().get(1);
+                assertThat(udpPort.getText()).isEqualTo("53/udp");
+                assertThat(udpPort.getStart()).isEqualTo(53);
+                assertThat(udpPort.getProtocol()).isEqualTo(Docker.Port.Protocol.UDP);
+            })
+          )
+        );
+    }
+
+    @Test
+    void exposePortRange() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              EXPOSE 8000-9000
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Expose expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Port port = expose.getPorts().getFirst();
+                assertThat(port.getText()).isEqualTo("8000-9000");
+                assertThat(port.getStart()).isEqualTo(8000);
+                assertThat(port.getEnd()).isEqualTo(9000);
+                assertThat(port.isRange()).isTrue();
+                assertThat(port.getProtocol()).isEqualTo(Docker.Port.Protocol.TCP);
+            })
+          )
+        );
+    }
+
+    @Test
+    void exposePortRangeWithProtocol() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              EXPOSE 8000-9000/udp
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Expose expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Port port = expose.getPorts().getFirst();
+                assertThat(port.getText()).isEqualTo("8000-9000/udp");
+                assertThat(port.getStart()).isEqualTo(8000);
+                assertThat(port.getEnd()).isEqualTo(9000);
+                assertThat(port.isRange()).isTrue();
+                assertThat(port.getProtocol()).isEqualTo(Docker.Port.Protocol.UDP);
+            })
           )
         );
     }

@@ -96,6 +96,11 @@ public class DockerIsoVisitor<P> extends DockerVisitor<P> {
     }
 
     @Override
+    public Docker.Port visitPort(Docker.Port port, P p) {
+        return (Docker.Port) super.visitPort(port, p);
+    }
+
+    @Override
     public Docker.Volume visitVolume(Docker.Volume volume, P p) {
         return (Docker.Volume) super.visitVolume(volume, p);
     }

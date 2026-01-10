@@ -222,11 +222,19 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
     public Docker visitExpose(Docker.Expose expose, PrintOutputCapture<P> p) {
         beforeSyntax(expose, p);
         p.append(expose.getKeyword());
-        for (Docker.Argument port : expose.getPorts()) {
+        for (Docker.Port port : expose.getPorts()) {
             visit(port, p);
         }
         afterSyntax(expose, p);
         return expose;
+    }
+
+    @Override
+    public Docker visitPort(Docker.Port port, PrintOutputCapture<P> p) {
+        beforeSyntax(port, p);
+        p.append(port.getText());
+        afterSyntax(port, p);
+        return port;
     }
 
     @Override

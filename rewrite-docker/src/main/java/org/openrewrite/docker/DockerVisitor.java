@@ -175,7 +175,13 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         Docker.Expose e = expose;
         e = e.withPrefix(visitSpace(e.getPrefix(), p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
-        return e.withPorts(ListUtils.map(e.getPorts(), port -> (Docker.Argument) visit(port, p)));
+        return e.withPorts(ListUtils.map(e.getPorts(), port -> (Docker.Port) visit(port, p)));
+    }
+
+    public Docker visitPort(Docker.Port port, P p) {
+        Docker.Port pt = port;
+        pt = pt.withPrefix(visitSpace(pt.getPrefix(), p));
+        return pt.withMarkers(visitMarkers(pt.getMarkers(), p));
     }
 
     public Docker visitVolume(Docker.Volume volume, P p) {

@@ -469,11 +469,72 @@ public interface Docker extends Tree {
 
         String keyword;
 
-        List<Argument> ports;
+        List<Port> ports;
 
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitExpose(this, p);
+        }
+    }
+
+    /**
+     * A port specification in an EXPOSE instruction.
+     * Supports formats: 80, 80/tcp, 80/udp, 8000-9000, 8000-9000/tcp, ${PORT}
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Port implements Docker {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        /**
+         * The raw port specification text (for lossless printing and env vars)
+         */
+        String text;
+
+        /**
+         * The starting port number, or null if the port is an environment variable
+         */
+        @Nullable
+        Integer start;
+
+        /**
+         * The ending port number for ranges (e.g., 8000-9000), or null if not a range
+         */
+        @Nullable
+        Integer end;
+
+        /**
+         * The protocol (TCP or UDP). Defaults to TCP if not specified.
+         */
+        Protocol protocol;
+
+        public enum Protocol {
+            TCP, UDP
+        }
+
+        @Override
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
+            return v.visitPort(this, p);
+        }
+
+        /**
+         * Returns true if this port specification contains environment variables
+         * and the actual port number is not known at parse time.
+         */
+        public boolean isVariable() {
+            return start == null;
+        }
+
+        /**
+         * Returns true if this is a port range (e.g., 8000-9000)
+         */
+        public boolean isRange() {
+            return end != null;
         }
     }
 

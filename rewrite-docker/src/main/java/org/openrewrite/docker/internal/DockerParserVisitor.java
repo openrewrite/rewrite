@@ -679,7 +679,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         skip(ctx.EXPOSE().getSymbol());
 
         // Parse port list
-        List<Docker.Argument> ports = new ArrayList<>();
+        List<Docker.Port> ports = new ArrayList<>();
         for (DockerParser.PortContext portCtx : ctx.portList().port()) {
             ports.add(convertPort(portCtx));
         }
@@ -692,23 +692,69 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return new Docker.Expose(randomId(), prefix, Markers.EMPTY, exposeKeyword, ports);
     }
 
-    private Docker.Argument convertPort(DockerParser.PortContext ctx) {
+    private Docker.Port convertPort(DockerParser.PortContext ctx) {
         Space prefix = prefix(ctx.getStart());
-        List<Docker.ArgumentContent> contents = new ArrayList<>();
+        String text;
 
         if (ctx.UNQUOTED_TEXT() != null) {
             Token token = ctx.UNQUOTED_TEXT().getSymbol();
-            String text = token.getText();
+            text = token.getText();
             skip(token);
-            contents.add(new Docker.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, text));
         } else if (ctx.ENV_VAR() != null) {
             Token token = ctx.ENV_VAR().getSymbol();
-            String text = token.getText();
+            text = token.getText();
             skip(token);
-            contents.add(createEnvVar(text));
+        } else {
+            // Handle other token types (COMMAND_SUBST, BACKTICK_SUBST, SPECIAL_VAR, AS)
+            text = ctx.getText();
+            if (ctx.getStop() != null) {
+                advanceCursor(ctx.getStop().getStopIndex() + 1);
+            }
         }
 
-        return new Docker.Argument(randomId(), prefix, Markers.EMPTY, contents);
+        return parsePort(prefix, text);
+    }
+
+    /**
+     * Parses a port specification into a structured Port object.
+     * Supports formats: 80, 80/tcp, 80/udp, 8000-9000, 8000-9000/tcp, ${PORT}
+     */
+    private Docker.Port parsePort(Space prefix, String text) {
+        Integer start = null;
+        Integer end = null;
+        Docker.Port.Protocol protocol = Docker.Port.Protocol.TCP;
+
+        String portPart = text;
+
+        // Check for protocol suffix
+        int slashIndex = text.lastIndexOf('/');
+        if (slashIndex > 0) {
+            String protocolStr = text.substring(slashIndex + 1).toLowerCase();
+            if ("udp".equals(protocolStr)) {
+                protocol = Docker.Port.Protocol.UDP;
+            }
+            portPart = text.substring(0, slashIndex);
+        }
+
+        // Check for range (e.g., 8000-9000)
+        int dashIndex = portPart.indexOf('-');
+        if (dashIndex > 0) {
+            try {
+                start = Integer.parseInt(portPart.substring(0, dashIndex));
+                end = Integer.parseInt(portPart.substring(dashIndex + 1));
+            } catch (NumberFormatException e) {
+                // Contains variable or unparseable - leave start/end null
+            }
+        } else {
+            // Single port
+            try {
+                start = Integer.parseInt(portPart);
+            } catch (NumberFormatException e) {
+                // Contains variable or unparseable - leave start null
+            }
+        }
+
+        return new Docker.Port(randomId(), prefix, Markers.EMPTY, text, start, end, protocol);
     }
 
     @Override

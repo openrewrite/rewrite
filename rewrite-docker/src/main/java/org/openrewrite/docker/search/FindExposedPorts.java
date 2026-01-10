@@ -75,26 +75,8 @@ public class FindExposedPorts extends Recipe {
 
                 List<String> matchedPorts = new ArrayList<>();
 
-                for (Docker.Argument portArg : e.getPorts()) {
-                    String portSpec = extractText(portArg);
-                    if (portSpec == null) {
-                        continue; // Contains environment variables
-                    }
-
-                    // Parse port and protocol
-                    String port;
-                    String protocol = null;
-
-                    int slashIndex = portSpec.indexOf('/');
-                    if (slashIndex > 0) {
-                        port = portSpec.substring(0, slashIndex);
-                        protocol = portSpec.substring(slashIndex + 1).toLowerCase();
-                    } else {
-                        port = portSpec;
-                    }
-
-                    // Handle port ranges like 8000-8100
-                    boolean isRange = port.contains("-");
+                for (Docker.Port port : e.getPorts()) {
+                    String portSpec = port.getText();
 
                     // Check if port matches pattern
                     if (portPattern != null && !StringUtils.matchesGlob(portSpec, portPattern)) {
@@ -103,12 +85,28 @@ public class FindExposedPorts extends Recipe {
 
                     matchedPorts.add(portSpec);
 
+                    // Get port number(s) as string for the data table
+                    String portNumber;
+                    if (port.isVariable()) {
+                        portNumber = portSpec; // Contains variable, use raw text
+                    } else if (port.isRange()) {
+                        portNumber = port.getStart() + "-" + port.getEnd();
+                    } else {
+                        portNumber = String.valueOf(port.getStart());
+                    }
+
+                    // Only report protocol if explicitly specified in the port text
+                    String protocol = null;
+                    if (portSpec.contains("/")) {
+                        protocol = port.getProtocol() == Docker.Port.Protocol.UDP ? "udp" : "tcp";
+                    }
+
                     exposedPorts.insertRow(ctx, new DockerExposedPorts.Row(
                             sourceFile,
                             stageName,
-                            port,
+                            portNumber,
                             protocol,
-                            isRange
+                            port.isRange()
                     ));
                 }
 
