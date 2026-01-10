@@ -1204,75 +1204,64 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         Space argPrefix = prefix(ctx);
         List<Docker.ArgumentContent> contents = new ArrayList<>();
 
-        // Process children in order: flagValueToken ( EQUALS flagValueToken )*
-        for (int i = 0; i < ctx.getChildCount(); i++) {
-            ParseTree child = ctx.getChild(i);
-            if (child instanceof DockerParser.FlagValueTokenContext) {
-                parseFlagValueToken((DockerParser.FlagValueTokenContext) child, contents);
-            } else if (child instanceof TerminalNode) {
-                TerminalNode terminal = (TerminalNode) child;
+        // Process flagValueToken+ with whitespace detection
+        // Stop consuming tokens if there's whitespace between them (indicates new argument)
+        for (DockerParser.FlagValueTokenContext tokenCtx : ctx.flagValueToken()) {
+            if (tokenCtx.getChildCount() > 0 && tokenCtx.getChild(0) instanceof TerminalNode) {
+                TerminalNode terminal = (TerminalNode) tokenCtx.getChild(0);
                 Token token = terminal.getSymbol();
+
+                // Check if there's whitespace before this token (gap in character positions)
+                // If so, this token belongs to the next argument, not the flag value
+                if (!contents.isEmpty() && token.getStartIndex() > codePointCursor) {
+                    break;
+                }
+
+                String tokenText = token.getText();
                 Space elementPrefix = prefix(token);
                 skip(token);
-                contents.add(new Docker.PlainText(
-                        randomId(),
-                        elementPrefix,
-                        Markers.EMPTY,
-                        token.getText()
-                ));
+
+                if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
+                    String value = tokenText.substring(1, tokenText.length() - 1);
+                    contents.add(new Docker.QuotedString(
+                            randomId(),
+                            elementPrefix,
+                            Markers.EMPTY,
+                            value,
+                            Docker.QuotedString.QuoteStyle.DOUBLE
+                    ));
+                } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
+                    String value = tokenText.substring(1, tokenText.length() - 1);
+                    contents.add(new Docker.QuotedString(
+                            randomId(),
+                            elementPrefix,
+                            Markers.EMPTY,
+                            value,
+                            Docker.QuotedString.QuoteStyle.SINGLE
+                    ));
+                } else if (token.getType() == DockerLexer.ENV_VAR) {
+                    boolean braced = tokenText.startsWith("${");
+                    String varName = braced ? tokenText.substring(2, tokenText.length() - 1) : tokenText.substring(1);
+                    contents.add(new Docker.EnvironmentVariable(
+                            randomId(),
+                            elementPrefix,
+                            Markers.EMPTY,
+                            varName,
+                            braced
+                    ));
+                } else {
+                    // Plain text for UNQUOTED_TEXT, EQUALS, etc.
+                    contents.add(new Docker.PlainText(
+                            randomId(),
+                            elementPrefix,
+                            Markers.EMPTY,
+                            tokenText
+                    ));
+                }
             }
         }
 
         return new Docker.Argument(randomId(), argPrefix, Markers.EMPTY, contents);
-    }
-
-    private void parseFlagValueToken(DockerParser.FlagValueTokenContext tokenCtx, List<Docker.ArgumentContent> contents) {
-        if (tokenCtx.getChildCount() > 0 && tokenCtx.getChild(0) instanceof TerminalNode) {
-            TerminalNode terminal = (TerminalNode) tokenCtx.getChild(0);
-            Token token = terminal.getSymbol();
-            String tokenText = token.getText();
-
-            Space elementPrefix = prefix(token);
-            skip(token);
-
-            if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
-                String value = tokenText.substring(1, tokenText.length() - 1);
-                contents.add(new Docker.QuotedString(
-                        randomId(),
-                        elementPrefix,
-                        Markers.EMPTY,
-                        value,
-                        Docker.QuotedString.QuoteStyle.DOUBLE
-                ));
-            } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
-                String value = tokenText.substring(1, tokenText.length() - 1);
-                contents.add(new Docker.QuotedString(
-                        randomId(),
-                        elementPrefix,
-                        Markers.EMPTY,
-                        value,
-                        Docker.QuotedString.QuoteStyle.SINGLE
-                ));
-            } else if (token.getType() == DockerLexer.ENV_VAR) {
-                boolean braced = tokenText.startsWith("${");
-                String varName = braced ? tokenText.substring(2, tokenText.length() - 1) : tokenText.substring(1);
-                contents.add(new Docker.EnvironmentVariable(
-                        randomId(),
-                        elementPrefix,
-                        Markers.EMPTY,
-                        varName,
-                        braced
-                ));
-            } else {
-                // Plain text for UNQUOTED_TEXT
-                contents.add(new Docker.PlainText(
-                        randomId(),
-                        elementPrefix,
-                        Markers.EMPTY,
-                        tokenText
-                ));
-            }
-        }
     }
 
     private Docker.ShellForm visitShellFormContext(DockerParser.ShellFormContext ctx) {

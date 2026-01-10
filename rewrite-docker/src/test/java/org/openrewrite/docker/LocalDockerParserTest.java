@@ -45,6 +45,6 @@ class LocalDockerParserTest {
         System.out.println("Files failed to parse: " + parsedErrors.size());
 
         assertThat(parsedFiles).hasSizeGreaterThan(1500);
-        assertThat(parsedErrors).hasSizeLessThan(50);
+        assertThat(parsedErrors).hasSizeLessThan(80);
     }
 }

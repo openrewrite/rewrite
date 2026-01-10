@@ -147,12 +147,14 @@ flagName
     ;
 
 // Flag value parsing: allows patterns like "value" or "type=cache,target=/path"
-// The key insight is that multi-token values use EQUALS as separator, not spaces
+// Multi-token values are allowed (e.g., "moby-build-$TARGETPLATFORM")
+// The visitor handles whitespace detection to stop at argument boundaries
+// Note: AS is NOT included to allow FROM --flag=value image AS alias parsing
 flagValue
-    : flagValueToken ( EQUALS flagValueToken )*
+    : flagValueToken+
     ;
 
-// Single token in a flag value - no spaces allowed between consecutive tokens
+// Token types allowed in flag values
 flagValueToken
     : UNQUOTED_TEXT
     | DOUBLE_QUOTED_STRING
@@ -161,6 +163,7 @@ flagValueToken
     | COMMAND_SUBST
     | BACKTICK_SUBST
     | SPECIAL_VAR
+    | EQUALS
     ;
 
 execForm
