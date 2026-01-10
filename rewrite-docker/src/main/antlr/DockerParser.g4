@@ -168,6 +168,9 @@ shellFormTextElement
     | ENV_VAR
     | EQUALS
     | DASH_DASH
+    | LBRACKET   // Allow [ in shell commands (e.g., if [ -f file ])
+    | RBRACKET   // Allow ] in shell commands
+    | COMMA      // Allow , in shell commands
     | shellSafeKeyword  // Allow certain keywords in shell commands (e.g., RUN useradd --shell /bin/false)
     ;
 
@@ -190,15 +193,15 @@ heredocEnd
     ;
 
 jsonArray
-    : LBRACKET jsonArrayElements? JSON_RBRACKET
+    : LBRACKET jsonArrayElements? RBRACKET
     ;
 
 jsonArrayElements
-    : jsonString ( JSON_COMMA jsonString )*
+    : jsonString ( COMMA jsonString )*
     ;
 
 jsonString
-    : JSON_STRING
+    : DOUBLE_QUOTED_STRING
     ;
 
 imageName
@@ -238,6 +241,9 @@ labelOldValueElement
     | ENV_VAR
     | EQUALS
     | DASH_DASH
+    | LBRACKET
+    | RBRACKET
+    | COMMA
     // Old-style LABEL values can contain instruction keywords
     | FROM | RUN | CMD | LABEL | EXPOSE | ENV | ADD | COPY | ENTRYPOINT
     | VOLUME | USER | WORKDIR | ARG | ONBUILD | STOPSIGNAL | HEALTHCHECK | SHELL | MAINTAINER
@@ -344,7 +350,10 @@ textElement
     | DOUBLE_QUOTED_STRING
     | SINGLE_QUOTED_STRING
     | ENV_VAR
-    | EQUALS  // Allow = in shell form text (e.g., ENV_VAR=value in RUN commands)
+    | EQUALS     // Allow = in shell form text (e.g., ENV_VAR=value in RUN commands)
     | DASH_DASH  // Allow -- in shell form text (e.g., --option in shell commands)
+    | LBRACKET   // Allow [ in text (e.g., shell test expressions)
+    | RBRACKET   // Allow ] in text
+    | COMMA      // Allow , in text
     ;
 

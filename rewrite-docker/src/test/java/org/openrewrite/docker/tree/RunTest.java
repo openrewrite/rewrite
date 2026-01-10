@@ -228,4 +228,43 @@ class RunTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void runWithShellTestBrackets() {
+        // Test shell test expressions with [ and ] brackets
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN if [ ! -f /app/config.txt ]; then echo "File not found"; fi
+              """
+          )
+        );
+    }
+
+    @Test
+    void runWithComplexShellTest() {
+        // Test complex shell expressions with brackets and multiple conditions
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN [ -f packages.txt ] && xargs apt-get install -y < packages.txt || echo "No packages"
+              """
+          )
+        );
+    }
+
+    @Test
+    void runWithFindExec() {
+        // Test find -exec with escaped semicolon \;
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN find / -perm /6000 -type f -exec chmod a-s {} \\; || true
+              """
+          )
+        );
+    }
 }

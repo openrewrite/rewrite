@@ -54,9 +54,10 @@ HEREDOC_START : '<<' '-'? {
 // Line continuation - HIDDEN in main mode
 LINE_CONTINUATION : '\\' [ \t]* NEWLINE_CHAR -> channel(HIDDEN);
 
-// JSON array delimiters (for exec form)
-LBRACKET : '[' -> pushMode(JSON_MODE);
+// JSON array delimiters (for exec form) - no mode switching, handled in parser
+LBRACKET : '[';
 RBRACKET : ']';
+COMMA    : ',';
 
 // Assignment and flags
 EQUALS     : '=';
@@ -94,6 +95,7 @@ UNQUOTED_TEXT
     | '-'  // Just a hyphen by itself
     | '<' ~[< \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Single < followed by non-<
     | '<'  // Just a < by itself
+    | ESCAPED_CHAR ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Start with escaped char (e.g., \; in find -exec)
     ;
 
 // Whitespace - HIDDEN in main mode
@@ -105,23 +107,6 @@ fragment WS_CHAR : [ \t];
 NEWLINE : NEWLINE_CHAR+ -> channel(HIDDEN);
 
 fragment NEWLINE_CHAR : [\r\n];
-
-// ----------------------------------------------------------------------------------------------
-// JSON mode - for parsing JSON arrays in exec form
-// ----------------------------------------------------------------------------------------------
-mode JSON_MODE;
-
-// Comma separator in JSON arrays
-JSON_COMMA : ',' ;
-
-// Closing bracket - exit JSON mode
-JSON_RBRACKET : ']' -> popMode;
-
-// JSON strings (only double-quoted allowed in JSON)
-JSON_STRING : '"' ( ESCAPE_SEQUENCE | ~["\\\r\n] )* '"';
-
-// Whitespace in JSON arrays
-JSON_WS : WS_CHAR+ -> channel(HIDDEN);
 
 // ----------------------------------------------------------------------------------------------
 // HEREDOC_PREAMBLE mode - for parsing the heredoc identifier and optional flags

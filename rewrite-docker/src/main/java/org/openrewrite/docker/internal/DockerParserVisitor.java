@@ -791,14 +791,14 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 arguments.add(arg);
 
                 // Skip comma after this element if it's not the last one
-                // The grammar is: jsonString ( JSON_WS? JSON_COMMA JSON_WS? jsonString )*
-                // So we need to skip the JSON_COMMA tokens
+                // The grammar is: jsonString ( COMMA jsonString )*
+                // So we need to skip the COMMA tokens
                 if (i < jsonStrings.size() - 1) {
-                    // Find and skip the JSON_COMMA token between this element and the next
+                    // Find and skip the COMMA token between this element and the next
                     for (int j = 0; j < elementsCtx.getChildCount(); j++) {
                         if (elementsCtx.getChild(j) instanceof TerminalNode) {
                             TerminalNode terminal = (TerminalNode) elementsCtx.getChild(j);
-                            if (terminal.getSymbol().getType() == DockerLexer.JSON_COMMA &&
+                            if (terminal.getSymbol().getType() == DockerLexer.COMMA &&
                                     terminal.getSymbol().getStartIndex() > jsonStrings.get(i).getStop().getStopIndex() &&
                                     terminal.getSymbol().getStartIndex() < jsonStrings.get(i + 1).getStart().getStartIndex()) {
                                 skip(terminal.getSymbol());
@@ -811,15 +811,15 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         }
 
         // Capture whitespace before closing bracket to preserve " ]" vs "]"
-        Space closingBracketPrefix = prefix(ctx.JSON_RBRACKET().getSymbol());
-        skip(ctx.JSON_RBRACKET().getSymbol());
+        Space closingBracketPrefix = prefix(ctx.RBRACKET().getSymbol());
+        skip(ctx.RBRACKET().getSymbol());
 
         return new JsonArrayParseResult(arguments, closingBracketPrefix);
     }
 
     private Docker.Argument convertJsonString(DockerParser.JsonStringContext ctx) {
         Space prefix = prefix(ctx.getStart());
-        Token token = ctx.JSON_STRING().getSymbol();
+        Token token = ctx.DOUBLE_QUOTED_STRING().getSymbol();
         String text = token.getText();
 
         // Remove quotes
@@ -875,11 +875,11 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
                 // Skip comma after this element if it's not the last one
                 if (i < jsonStrings.size() - 1) {
-                    // Find and skip the JSON_COMMA token between this element and the next
+                    // Find and skip the COMMA token between this element and the next
                     for (int j = 0; j < elementsCtx.getChildCount(); j++) {
                         if (elementsCtx.getChild(j) instanceof TerminalNode) {
                             TerminalNode terminal = (TerminalNode) elementsCtx.getChild(j);
-                            if (terminal.getSymbol().getType() == DockerLexer.JSON_COMMA &&
+                            if (terminal.getSymbol().getType() == DockerLexer.COMMA &&
                                     terminal.getSymbol().getStartIndex() > jsonStrings.get(i).getStop().getStopIndex() &&
                                     terminal.getSymbol().getStartIndex() < jsonStrings.get(i + 1).getStart().getStartIndex()) {
                                 skip(terminal.getSymbol());
@@ -892,8 +892,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         }
 
         // Capture whitespace before closing bracket to preserve " ]" vs "]"
-        Space closingBracketPrefix = prefix(ctx.JSON_RBRACKET().getSymbol());
-        skip(ctx.JSON_RBRACKET().getSymbol());
+        Space closingBracketPrefix = prefix(ctx.RBRACKET().getSymbol());
+        skip(ctx.RBRACKET().getSymbol());
 
         return new JsonArrayParseResult(arguments, closingBracketPrefix);
     }
@@ -1270,12 +1270,12 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         if (jsonArray.jsonArrayElements() != null) {
             for (DockerParser.JsonStringContext jsonStr : jsonArray.jsonArrayElements().jsonString()) {
                 Space argPrefix = prefix(jsonStr.getStart());
-                String value = jsonStr.JSON_STRING().getText();
+                String value = jsonStr.DOUBLE_QUOTED_STRING().getText();
                 // Remove surrounding quotes
                 if (value.startsWith("\"") && value.endsWith("\"")) {
                     value = value.substring(1, value.length() - 1);
                 }
-                advanceCursor(jsonStr.JSON_STRING().getSymbol().getStopIndex() + 1);
+                advanceCursor(jsonStr.DOUBLE_QUOTED_STRING().getSymbol().getStopIndex() + 1);
 
                 Docker.QuotedString qs = new Docker.QuotedString(
                         randomId(),
@@ -1294,8 +1294,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         }
 
         // Capture whitespace before closing bracket to preserve " ]" vs "]"
-        Space closingBracketPrefix = prefix(jsonArray.JSON_RBRACKET().getSymbol());
-        skip(jsonArray.JSON_RBRACKET().getSymbol());
+        Space closingBracketPrefix = prefix(jsonArray.RBRACKET().getSymbol());
+        skip(jsonArray.RBRACKET().getSymbol());
 
         return new Docker.ExecForm(randomId(), prefix, Markers.EMPTY, args, closingBracketPrefix);
     }

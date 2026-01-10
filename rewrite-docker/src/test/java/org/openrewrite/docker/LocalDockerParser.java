@@ -58,7 +58,8 @@ public class LocalDockerParser {
                 .map(Parser.Input::fromFile)
                 .collect(Collectors.toList());
 
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+        // Errors are captured as ParseError instances, no need to print stack traces
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {});
 
         List<SourceFile> parsedFiles = new ArrayList<>();
         Map<Path, String> failedFiles = new LinkedHashMap<>();
@@ -67,7 +68,12 @@ public class LocalDockerParser {
             if (sourceFile instanceof ParseError parseError) {
                 String errorMsg = parseError.getMarkers()
                         .findFirst(ParseExceptionResult.class)
-                        .map(ex -> ex.getExceptionType() + ": " + ex.getMessage())
+                        .map(ex -> {
+                            // Extract just the first line of the message (the actual error)
+                            String msg = ex.getMessage();
+                            int newlineIdx = msg.indexOf('\n');
+                            return newlineIdx > 0 ? msg.substring(0, newlineIdx) : msg;
+                        })
                         .orElse("Unknown error");
                 failedFiles.put(parseError.getSourcePath(), errorMsg);
             } else {
