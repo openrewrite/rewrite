@@ -24,10 +24,17 @@ const OPTIONS_KEY = "__recipe_options__";
 export type Minutes = number;
 
 /**
- * Union type for recipe visitors. Recipes can return either async or sync visitors.
- * Sync visitors provide better performance by avoiding Promise overhead.
+ * Interface for recipe visitors. Recipes can return either sync or async visitors.
+ * TreeVisitor and AsyncTreeVisitor both satisfy this interface.
+ *
+ * Uses `any` for the visit return type to accommodate both sync visitors (returning T)
+ * and async visitors (returning Promise<T>), while allowing generic type parameters
+ * on the visit method in implementations.
  */
-export type RecipeVisitor<T extends Tree> = TreeVisitor<T, ExecutionContext> | AsyncTreeVisitor<T, ExecutionContext>;
+export interface RecipeVisitor {
+    visit(tree: Tree, ctx: ExecutionContext, parent?: Cursor): any;
+    isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): boolean | Promise<boolean>;
+}
 
 export abstract class Recipe {
     constructor(options?: {}) {
@@ -122,7 +129,7 @@ export abstract class Recipe {
      *
      * @returns A visitor that performs the recipe's transformation
      */
-    async editor(): Promise<RecipeVisitor<any>> {
+    async editor(): Promise<RecipeVisitor> {
         return noopVisitor()
     }
 
@@ -170,12 +177,12 @@ export abstract class ScanningRecipe<P> extends Recipe {
 
     abstract initialValue(ctx: ExecutionContext): P
 
-    async editor(): Promise<RecipeVisitor<any>> {
+    async editor(): Promise<RecipeVisitor> {
         const editorWithContext = (cursor: Cursor, ctx: ExecutionContext) =>
             this.editorWithData(this.accumulator(cursor, ctx));
 
         return new class extends AsyncTreeVisitor<any, ExecutionContext> {
-            private delegate?: RecipeVisitor<any>
+            private delegate?: RecipeVisitor
 
             async isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): Promise<boolean> {
                 const d = await this.delegateForCtx(ctx);
@@ -196,7 +203,7 @@ export abstract class ScanningRecipe<P> extends Recipe {
         }
     }
 
-    async editorWithData(_acc: P): Promise<RecipeVisitor<any>> {
+    async editorWithData(_acc: P): Promise<RecipeVisitor> {
         return noopVisitor();
     }
 
@@ -204,7 +211,7 @@ export abstract class ScanningRecipe<P> extends Recipe {
         return [];
     }
 
-    async scanner(_acc: P): Promise<RecipeVisitor<any>> {
+    async scanner(_acc: P): Promise<RecipeVisitor> {
         return noopVisitor();
     }
 }

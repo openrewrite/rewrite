@@ -30,12 +30,15 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         this.delegate = new JavaScriptDelegateSender(this);
     }
 
-    override visit<R extends J>(tree: Tree, p: RpcSendQueue, parent?: Cursor): R | undefined {
-        if (isJavaScript(tree)) {
-            return super.visit(tree, p, parent);
+    // Override visit() to skip cursor handling for performance
+    override visit<R extends J>(tree: Tree | undefined, p: RpcSendQueue, _parent?: Cursor): R | undefined {
+        if (!tree) return undefined;
+        let result = this.preVisit(tree as JS, p);
+        if (!result) return undefined;
+        if (isJavaScript(result)) {
+            return this.accept(result, p) as R | undefined;
         }
-
-        return this.delegate.visit(tree, p, parent);
+        return this.delegate.visit(result, p) as R | undefined;
     }
 
     override preVisit(j: JS, q: RpcSendQueue): J | undefined {
@@ -557,172 +560,50 @@ class JavaScriptDelegateSender extends JavaSender {
     }
 }
 
-class JavaScriptReceiver extends JavaReceiver {
-    public override visit<T extends J>(j: T | undefined, q: RpcReceiveQueue): T | undefined {
-        if (!j) return undefined;
+class JavaScriptDelegateReceiver extends JavaReceiver {
+    private javascriptReceiver: JavaScriptReceiver;
 
-        // If it's a JavaScript node, dispatch to JS-specific handlers
-        if (isJavaScript(j)) {
-            let result = this.preVisit(j as JS, q);
-            if (result === undefined) return undefined;
-
-            result = this.visitJavaScriptNode(result as JS, q);
-            return result as T | undefined;
-        }
-
-        // Otherwise delegate to Java visitor
-        return super.visit(j, q);
+    constructor(javascriptReceiver: JavaScriptReceiver) {
+        super();
+        this.javascriptReceiver = javascriptReceiver;
     }
 
-    // Helper to visit JS nodes - calls specific visitor method based on kind
-    protected visitJavaScriptNode(js: JS, q: RpcReceiveQueue): J | undefined {
-        switch (js.kind) {
-            case JS.Kind.CompilationUnit:
-                return this.visitJsCompilationUnit(js as JS.CompilationUnit, q);
-            case JS.Kind.Alias:
-                return this.visitAlias(js as JS.Alias, q);
-            case JS.Kind.ArrowFunction:
-                return this.visitArrowFunction(js as JS.ArrowFunction, q);
-            case JS.Kind.As:
-                return this.visitAs(js as JS.As, q);
-            case JS.Kind.AssignmentOperation:
-                return this.visitAssignmentOperationExtensions(js as JS.AssignmentOperation, q);
-            case JS.Kind.Await:
-                return this.visitAwait(js as JS.Await, q);
-            case JS.Kind.Binary:
-                return this.visitBinaryExtensions(js as JS.Binary, q);
-            case JS.Kind.BindingElement:
-                return this.visitBindingElement(js as JS.BindingElement, q);
-            case JS.Kind.ComputedPropertyMethodDeclaration:
-                return this.visitComputedPropertyMethodDeclaration(js as JS.ComputedPropertyMethodDeclaration, q);
-            case JS.Kind.ComputedPropertyName:
-                return this.visitComputedPropertyName(js as JS.ComputedPropertyName, q);
-            case JS.Kind.ConditionalType:
-                return this.visitConditionalType(js as JS.ConditionalType, q);
-            case JS.Kind.Delete:
-                return this.visitDelete(js as JS.Delete, q);
-            case JS.Kind.Export:
-            case JS.Kind.ExportDeclaration:
-                return this.visitExportDeclaration(js as JS.ExportDeclaration, q);
-            case JS.Kind.ExportAssignment:
-                return this.visitExportAssignment(js as JS.ExportAssignment, q);
-            case JS.Kind.ExportSpecifier:
-                return this.visitExportSpecifier(js as JS.ExportSpecifier, q);
-            case JS.Kind.ExpressionStatement:
-                return this.visitExpressionStatement(js as JS.ExpressionStatement, q);
-            case JS.Kind.ExpressionWithTypeArguments:
-                return this.visitExpressionWithTypeArguments(js as JS.ExpressionWithTypeArguments, q);
-            case JS.Kind.ForInLoop:
-                return this.visitForInLoop(js as JS.ForInLoop, q);
-            case JS.Kind.ForOfLoop:
-                return this.visitForOfLoop(js as JS.ForOfLoop, q);
-            case JS.Kind.FunctionCall:
-                return this.visitFunctionCall(js as JS.FunctionCall, q);
-            case JS.Kind.FunctionType:
-                return this.visitFunctionType(js as JS.FunctionType, q);
-            case JS.Kind.Import:
-                return this.visitImportDeclaration(js as JS.Import, q);
-            case JS.Kind.ImportAttribute:
-                return this.visitImportAttribute(js as JS.ImportAttribute, q);
-            case JS.Kind.ImportAttributes:
-                return this.visitImportAttributes(js as JS.ImportAttributes, q);
-            case JS.Kind.ImportClause:
-                return this.visitImportClause(js as JS.ImportClause, q);
-            case JS.Kind.ImportSpecifier:
-                return this.visitImportSpecifier(js as JS.ImportSpecifier, q);
-            case JS.Kind.ImportType:
-                return this.visitImportType(js as JS.ImportType, q);
-            case JS.Kind.ImportTypeAttributes:
-                return this.visitImportTypeAttributes(js as JS.ImportTypeAttributes, q);
-            case JS.Kind.IndexedAccessType:
-                return this.visitIndexedAccessType(js as JS.IndexedAccessType, q);
-            case JS.Kind.IndexedAccessTypeIndexType:
-                return this.visitIndexedAccessTypeIndexType(js as JS.IndexedAccessType.IndexType, q);
-            case JS.Kind.IndexSignatureDeclaration:
-                return this.visitIndexSignatureDeclaration(js as JS.IndexSignatureDeclaration, q);
-            case JS.Kind.InferType:
-                return this.visitInferType(js as JS.InferType, q);
-            case JS.Kind.Intersection:
-                return this.visitIntersection(js as JS.Intersection, q);
-            case JS.Kind.JsxAttribute:
-                return this.visitJsxAttribute(js as JSX.Attribute, q);
-            case JS.Kind.JsxEmbeddedExpression:
-                return this.visitJsxEmbeddedExpression(js as JSX.EmbeddedExpression, q);
-            case JS.Kind.JsxNamespacedName:
-                return this.visitJsxNamespacedName(js as JSX.NamespacedName, q);
-            case JS.Kind.JsxSpreadAttribute:
-                return this.visitJsxSpreadAttribute(js as JSX.SpreadAttribute, q);
-            case JS.Kind.JsxTag:
-                return this.visitJsxTag(js as JSX.Tag, q);
-            case JS.Kind.LiteralType:
-                return this.visitLiteralType(js as JS.LiteralType, q);
-            case JS.Kind.MappedType:
-                return this.visitMappedType(js as JS.MappedType, q);
-            case JS.Kind.MappedTypeKeysRemapping:
-                return this.visitMappedTypeKeysRemapping(js as JS.MappedType.KeysRemapping, q);
-            case JS.Kind.MappedTypeParameter:
-                return this.visitMappedTypeParameter(js as JS.MappedType.Parameter, q);
-            case JS.Kind.NamedExports:
-                return this.visitNamedExports(js as JS.NamedExports, q);
-            case JS.Kind.NamedImports:
-                return this.visitNamedImports(js as JS.NamedImports, q);
-            case JS.Kind.NamespaceDeclaration:
-                return this.visitNamespaceDeclaration(js as JS.NamespaceDeclaration, q);
-            case JS.Kind.ObjectBindingPattern:
-                return this.visitObjectBindingPattern(js as JS.ObjectBindingPattern, q);
-            case JS.Kind.PropertyAssignment:
-                return this.visitPropertyAssignment(js as JS.PropertyAssignment, q);
-            case JS.Kind.SatisfiesExpression:
-                return this.visitSatisfiesExpression(js as JS.SatisfiesExpression, q);
-            case JS.Kind.ScopedVariableDeclarations:
-                return this.visitScopedVariableDeclarations(js as JS.ScopedVariableDeclarations, q);
-            case JS.Kind.Shebang:
-                return this.visitShebang(js as JS.Shebang, q);
-            case JS.Kind.Spread:
-                return this.visitSpread(js as JS.Spread, q);
-            case JS.Kind.StatementExpression:
-                return this.visitStatementExpression(js as JS.StatementExpression, q);
-            case JS.Kind.TaggedTemplateExpression:
-                return this.visitTaggedTemplateExpression(js as JS.TaggedTemplateExpression, q);
-            case JS.Kind.TemplateExpression:
-                return this.visitTemplateExpression(js as JS.TemplateExpression, q);
-            case JS.Kind.TemplateExpressionSpan:
-                return this.visitTemplateExpressionSpan(js as JS.TemplateExpression.Span, q);
-            case JS.Kind.Tuple:
-                return this.visitTuple(js as JS.Tuple, q);
-            case JS.Kind.TypeDeclaration:
-                return this.visitTypeDeclaration(js as JS.TypeDeclaration, q);
-            case JS.Kind.TypeInfo:
-                return this.visitTypeInfo(js as JS.TypeInfo, q);
-            case JS.Kind.TypeLiteral:
-                return this.visitTypeLiteral(js as JS.TypeLiteral, q);
-            case JS.Kind.TypeOf:
-                return this.visitTypeOf(js as JS.TypeOf, q);
-            case JS.Kind.TypeOperator:
-                return this.visitTypeOperator(js as JS.TypeOperator, q);
-            case JS.Kind.TypePredicate:
-                return this.visitTypePredicate(js as JS.TypePredicate, q);
-            case JS.Kind.TypeQuery:
-                return this.visitTypeQuery(js as JS.TypeQuery, q);
-            case JS.Kind.TypeTreeExpression:
-                return this.visitTypeTreeExpression(js as JS.TypeTreeExpression, q);
-            case JS.Kind.Union:
-                return this.visitUnion(js as JS.Union, q);
-            case JS.Kind.Void:
-                return this.visitVoid(js as JS.Void, q);
-            case JS.Kind.WithStatement:
-                return this.visitWithStatement(js as JS.WithStatement, q);
-            case JS.Kind.ArrayBindingPattern:
-                return this.visitArrayBindingPattern(js as JS.ArrayBindingPattern, q);
-            default:
-                // Unknown JS kind - return as-is
-                return js;
+    override visit<R extends J>(tree: Tree | undefined, q: RpcReceiveQueue, _parent?: Cursor): R | undefined {
+        if (!tree) return undefined;
+
+        // Delegate to JavaScript receiver if this is a JavaScript element
+        if (isJavaScript(tree)) {
+            return this.javascriptReceiver.visit(tree, q) as R | undefined;
         }
+
+        // Otherwise handle as a Java element
+        return super.visit(tree as J, q) as R | undefined;
+    }
+}
+
+class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
+    private readonly _delegate: JavaScriptDelegateReceiver;
+
+    constructor() {
+        super();
+        this._delegate = new JavaScriptDelegateReceiver(this);
     }
 
-    // Helper method - same as visit but asserts the result is defined
-    protected visitDefined<T extends J>(j: T, q: RpcReceiveQueue): T {
-        return this.visit(j, q)!;
+    // Override visit() to skip cursor handling for performance
+    public override visit<R extends J>(tree: Tree | undefined, q: RpcReceiveQueue, _parent?: Cursor): R | undefined {
+        if (!tree) return undefined;
+
+        const j = tree as J;
+        let result = this.preVisit(j as JS, q);
+        if (result === undefined) return undefined;
+
+        // If it's a JavaScript node, use accept() for dispatch
+        if (isJavaScript(result)) {
+            return this.accept(result as JS, q) as R | undefined;
+        }
+
+        // Otherwise delegate to Java receiver
+        return this._delegate.visit(result, q) as R | undefined;
     }
 
     protected preVisit(j: JS, q: RpcReceiveQueue): J | undefined {
@@ -1342,7 +1223,26 @@ class JavaScriptReceiver extends JavaReceiver {
         return updateIfChanged(exportSpecifier, updates);
     }
 
-    // Inherited from JavaReceiver: visitRightPadded, visitLeftPadded, visitContainer, visitSpace, visitType
+    // Delegate helper methods to JavaReceiver
+    public override visitSpace(space: J.Space, q: RpcReceiveQueue): J.Space {
+        return this._delegate.visitSpace(space, q);
+    }
+
+    public visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): J.LeftPadded<T> {
+        return this._delegate.visitLeftPadded(left, q);
+    }
+
+    public visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcReceiveQueue): J.RightPadded<T> {
+        return this._delegate.visitRightPadded(right, q);
+    }
+
+    public visitContainer<T extends J>(container: J.Container<T>, q: RpcReceiveQueue): J.Container<T> {
+        return this._delegate.visitContainer(container, q);
+    }
+
+    protected override visitType(javaType: Type | undefined, q: RpcReceiveQueue): Type | undefined {
+        return this._delegate.visitType(javaType, q);
+    }
 }
 
 // Register codecs for JavaScript

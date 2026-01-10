@@ -46,11 +46,11 @@ export class RpcRecipe extends ScanningRecipe<number> {
         return 0
     }
 
-    async editorWithData(_acc: number): Promise<RecipeVisitor<any>> {
+    async editorWithData(_acc: number): Promise<RecipeVisitor> {
         return this.editVisitor ? new RpcVisitor(this.rpc, this.editVisitor) : noopVisitor();
     }
 
-    async scanner(_acc: number): Promise<RecipeVisitor<any>> {
+    async scanner(_acc: number): Promise<RecipeVisitor> {
         return this.scanVisitor ? new RpcVisitor(this.rpc, this.scanVisitor) : noopVisitor();
     }
 

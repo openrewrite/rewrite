@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-import {Cursor, ExecutionContext, produceAsync} from "../../src";
+import {Cursor, ExecutionContext} from "../../src";
 import {emptySpace, Expression, J, rightPadded} from "../../src/java";
 import {
-    AsyncJavaScriptVisitor,
     autoFormat,
     JavaScriptVisitor,
     JS,
@@ -25,6 +24,7 @@ import {
     template,
     typescript
 } from "../../src/javascript";
+import {create as produce} from "mutative";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 
 describe('JavaScript visitor formatting', () => {
@@ -33,21 +33,21 @@ describe('JavaScript visitor formatting', () => {
         ['autoFormat', false]
     ])('%s formats code after modification', async (formatMethod: string) => {
         // given
-        class AddArgumentVisitor extends AsyncJavaScriptVisitor<ExecutionContext> {
-            protected override async visitMethodInvocation(
+        class AddArgumentVisitor extends JavaScriptVisitor<ExecutionContext> {
+            protected override visitMethodInvocation(
                 method: J.MethodInvocation,
                 ctx: ExecutionContext
-            ): Promise<J | undefined> {
-                const original = await super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
-                const altered = await produceAsync(original, async draft => {
-                    const newArg = await template`\`extra\``.apply(original, this.cursor) as Expression;
-                
+            ): J | undefined {
+                const original = super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
+                const altered = produce(original, draft => {
+                    const newArg = template`\`extra\``.apply(original, this.cursor) as Expression;
+
                     draft.arguments.elements = [
                         ...draft.arguments.elements,
                         rightPadded(newArg, emptySpace)
                     ];
                 });
-            
+
                 if (formatMethod == 'maybeAutoFormat') {
                     return maybeAutoFormat(original, altered!, ctx);
                 } else {

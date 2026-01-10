@@ -43,6 +43,7 @@ export function produceSync<Base extends Objectish>(
 const stopAfterPreVisit = Symbol.for("STOP_AFTER_PRE_VISIT")
 
 export abstract class TreeVisitor<T extends Tree, P> {
+    readonly async = false as const;
     protected cursor: Cursor = rootCursor();
     private visitCount: number = 0;
     public afterVisit: TreeVisitor<any, P>[] = [];
@@ -167,6 +168,7 @@ export abstract class TreeVisitor<T extends Tree, P> {
 }
 
 export abstract class AsyncTreeVisitor<T extends Tree, P> {
+    readonly async = true as const;
     protected cursor: Cursor = rootCursor();
     private visitCount: number = 0;
     public afterVisit: (TreeVisitor<any, P> | AsyncTreeVisitor<any, P>)[] = [];

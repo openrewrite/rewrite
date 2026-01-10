@@ -22,18 +22,18 @@ import {
     PackageManager
 } from "./node-resolution-result";
 import {replaceMarkerByKind} from "../markers";
-import {AsyncJsonVisitor, Json, JsonParser} from "../json";
+import {Json, JsonParser, JsonVisitor} from "../json";
 import {isDocuments, Yaml, YamlParser, YamlVisitor} from "../yaml";
 import {PlainTextParser} from "../text";
 import {SourceFile} from "../tree";
-import {AsyncTreeVisitor} from "../visitor";
+import {TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
 import {getPlatformCommand} from "../shell-utils";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import * as os from "os";
-import {spawnSync} from "child_process";
+import {spawn, spawnSync} from "child_process";
 import * as YAML from "yaml";
 
 /**
@@ -271,6 +271,79 @@ function runInstall(pm: PackageManager, options: InstallOptions): PackageManager
 }
 
 /**
+ * Runs the package manager install command asynchronously.
+ */
+async function runInstallAsync(pm: PackageManager, options: InstallOptions): Promise<PackageManagerResult> {
+    const config = PACKAGE_MANAGER_CONFIGS[pm];
+    const command = options.lockOnly ? config.installLockOnlyCommand : config.installCommand;
+    const [cmd, ...args] = command;
+
+    return new Promise((resolve) => {
+        const child = spawn(getPlatformCommand(cmd), args, {
+            cwd: options.cwd,
+            stdio: ['pipe', 'pipe', 'pipe'],
+            env: options.env ? {...process.env, ...options.env} : process.env,
+        });
+
+        let stdout = '';
+        let stderr = '';
+        let timedOut = false;
+
+        const timeout = options.timeout ?? 120000;
+        const timer = setTimeout(() => {
+            timedOut = true;
+            child.kill('SIGTERM');
+        }, timeout);
+
+        child.stdout?.on('data', (data) => {
+            stdout += data.toString();
+        });
+
+        child.stderr?.on('data', (data) => {
+            stderr += data.toString();
+        });
+
+        child.on('error', (error) => {
+            clearTimeout(timer);
+            resolve({
+                success: false,
+                error: error.message,
+                stderr,
+            });
+        });
+
+        child.on('close', (code) => {
+            clearTimeout(timer);
+
+            if (timedOut) {
+                resolve({
+                    success: false,
+                    error: `Command timed out after ${timeout}ms`,
+                    stderr,
+                });
+                return;
+            }
+
+            if (code !== 0) {
+                resolve({
+                    success: false,
+                    stdout,
+                    stderr,
+                    error: `Command exited with code ${code}`,
+                });
+                return;
+            }
+
+            resolve({
+                success: true,
+                stdout,
+                stderr,
+            });
+        });
+    });
+}
+
+/**
  * Runs a package manager list command to get dependency information.
  *
  * @param pm The package manager to use
@@ -333,19 +406,40 @@ export interface DependencyRecipeAccumulator<T> {
 
     /** Track projects where npm install failed: packageJsonPath -> error message */
     failedProjects: Map<string, string>;
+
+    /**
+     * Ensures the preparation step (e.g., running package manager installs) is executed
+     * exactly once, regardless of how many times editorWithData() is called.
+     *
+     * @param prepareProject Function to run for each project that needs updating
+     */
+    ensurePrepared(prepareProject: (sourcePath: string, updateInfo: T) => Promise<void>): Promise<void>;
 }
 
 /**
  * Creates a new empty accumulator for dependency recipes.
  */
 export function createDependencyRecipeAccumulator<T>(): DependencyRecipeAccumulator<T> {
-    return {
+    let prepared = false;
+
+    const acc: DependencyRecipeAccumulator<T> = {
         projectsToUpdate: new Map(),
         updatedLockFiles: new Map(),
         updatedPackageJsons: new Map(),
         processedProjects: new Set(),
-        failedProjects: new Map()
+        failedProjects: new Map(),
+
+        async ensurePrepared(prepareProject: (sourcePath: string, updateInfo: T) => Promise<void>): Promise<void> {
+            if (!prepared) {
+                for (const [sourcePath, updateInfo] of acc.projectsToUpdate) {
+                    await prepareProject(sourcePath, updateInfo);
+                }
+                prepared = true;
+            }
+        }
     };
+
+    return acc;
 }
 
 /**
@@ -484,27 +578,6 @@ export function storeInstallResult<T extends BaseProjectUpdateInfo>(
 }
 
 /**
- * Runs the package manager install for a project if it hasn't been processed yet.
- * Updates the accumulator's processedProjects set after running.
- *
- * @param sourcePath The source path (package.json path) being processed
- * @param acc The recipe accumulator
- * @param runInstall Function that performs the actual install (recipe-specific)
- * @returns The failure message if install failed, undefined otherwise
- */
-export async function runInstallIfNeeded<T>(
-    sourcePath: string,
-    acc: DependencyRecipeAccumulator<T>,
-    runInstall: () => Promise<void>
-): Promise<string | undefined> {
-    if (!acc.processedProjects.has(sourcePath)) {
-        await runInstall();
-        acc.processedProjects.add(sourcePath);
-    }
-    return acc.failedProjects.get(sourcePath);
-}
-
-/**
  * Updates the NodeResolutionResult marker on a JSON document after a package manager operation.
  * This recreates the marker based on the updated package.json and lock file content.
  *
@@ -513,11 +586,11 @@ export async function runInstallIfNeeded<T>(
  * @param acc The recipe accumulator containing updated content
  * @returns The document with the updated marker, or unchanged if no existing marker
  */
-export async function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo>(
+export function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo>(
     doc: Json.Document,
     updateInfo: T & { originalPackageJson: string },
     acc: DependencyRecipeAccumulator<T>
-): Promise<Json.Document> {
+): Json.Document {
     const existingMarker = findNodeResolutionResult(doc);
     if (!existingMarker) {
         return doc;
@@ -618,7 +691,99 @@ export interface WorkspaceTempInstallOptions extends TempInstallOptions {
  * Internal implementation for running package manager install in a temporary directory.
  * Supports both simple projects and workspaces.
  */
-async function runInstallInTempDirCore(
+function runInstallInTempDirCore(
+    pm: PackageManager,
+    rootPackageJson: string,
+    options: WorkspaceTempInstallOptions = {}
+): TempInstallResult {
+    const {
+        timeout = 120000,
+        lockOnly = true,
+        originalLockFileContent,
+        configFiles: configFileContents,
+        workspacePackages
+    } = options;
+    const lockFileName = getLockFileName(pm);
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openrewrite-pm-'));
+
+    try {
+        // Write root package.json to temp directory
+        fs.writeFileSync(path.join(tempDir, 'package.json'), rootPackageJson);
+
+        // Write workspace package.json files (creating subdirectories as needed)
+        if (workspacePackages) {
+            for (const [relativePath, content] of Object.entries(workspacePackages)) {
+                const fullPath = path.join(tempDir, relativePath);
+                fs.mkdirSync(path.dirname(fullPath), {recursive: true});
+                fs.writeFileSync(fullPath, content);
+            }
+        }
+
+        // Write lock file if provided
+        if (originalLockFileContent !== undefined) {
+            fs.writeFileSync(path.join(tempDir, lockFileName), originalLockFileContent);
+        }
+
+        // Write config files if provided
+        if (configFileContents) {
+            for (const [configFile, content] of Object.entries(configFileContents)) {
+                fs.writeFileSync(path.join(tempDir, configFile), content);
+            }
+        }
+
+        // Run package manager install
+        const result = runInstall(pm, {
+            cwd: tempDir,
+            lockOnly,
+            timeout
+        });
+
+        if (!result.success) {
+            // Combine error message with stderr for more useful diagnostics
+            const errorParts: string[] = [];
+            if (result.error) {
+                errorParts.push(result.error);
+            }
+            if (result.stderr) {
+                // Trim and limit stderr to avoid excessively long error messages
+                const stderr = result.stderr.trim();
+                if (stderr) {
+                    errorParts.push(stderr.length > 2000 ? stderr.slice(0, 2000) + '...' : stderr);
+                }
+            }
+            return {
+                success: false,
+                error: errorParts.length > 0 ? errorParts.join('\n\n') : 'Unknown error'
+            };
+        }
+
+        // Read back the updated lock file
+        const updatedLockPath = path.join(tempDir, lockFileName);
+        let lockFileContent: string | undefined;
+        if (fs.existsSync(updatedLockPath)) {
+            lockFileContent = fs.readFileSync(updatedLockPath, 'utf-8');
+        }
+
+        return {
+            success: true,
+            lockFileContent
+        };
+
+    } finally {
+        // Cleanup temp directory
+        try {
+            fs.rmSync(tempDir, {recursive: true, force: true});
+        } catch {
+            // Ignore cleanup errors
+        }
+    }
+}
+
+/**
+ * Async internal implementation for running package manager install in a temporary directory.
+ * Supports both simple projects and workspaces.
+ */
+async function runInstallInTempDirCoreAsync(
     pm: PackageManager,
     rootPackageJson: string,
     options: WorkspaceTempInstallOptions = {}
@@ -659,7 +824,7 @@ async function runInstallInTempDirCore(
         }
 
         // Run package manager install
-        const result = runInstall(pm, {
+        const result = await runInstallAsync(pm, {
             cwd: tempDir,
             lockOnly,
             timeout
@@ -687,8 +852,10 @@ async function runInstallInTempDirCore(
         // Read back the updated lock file
         const updatedLockPath = path.join(tempDir, lockFileName);
         let lockFileContent: string | undefined;
-        if (fs.existsSync(updatedLockPath)) {
+        try {
             lockFileContent = await fsp.readFile(updatedLockPath, 'utf-8');
+        } catch {
+            // Lock file doesn't exist
         }
 
         return {
@@ -723,11 +890,11 @@ async function runInstallInTempDirCore(
  * @param options Optional settings for timeout, lock-only mode, and file contents
  * @returns Result containing success status and lock file content or error
  */
-export async function runInstallInTempDir(
+export function runInstallInTempDir(
     pm: PackageManager,
     modifiedPackageJson: string,
     options: TempInstallOptions = {}
-): Promise<TempInstallResult> {
+): TempInstallResult {
     return runInstallInTempDirCore(pm, modifiedPackageJson, options);
 }
 
@@ -749,12 +916,52 @@ export async function runInstallInTempDir(
  * @param options Optional settings including workspace packages, timeout, lock-only mode, and file contents
  * @returns Result containing success status and lock file content or error
  */
-export async function runWorkspaceInstallInTempDir(
+export function runWorkspaceInstallInTempDir(
+    pm: PackageManager,
+    rootPackageJson: string,
+    options: WorkspaceTempInstallOptions = {}
+): TempInstallResult {
+    return runInstallInTempDirCore(pm, rootPackageJson, options);
+}
+
+/**
+ * Runs package manager install in a temporary directory asynchronously.
+ *
+ * This is the async version of runInstallInTempDir. It uses async spawn and
+ * fs.promises for non-blocking I/O. Use this in async recipe editor() methods
+ * to avoid blocking the event loop.
+ *
+ * @param pm The package manager to use
+ * @param modifiedPackageJson The modified package.json content to use
+ * @param options Optional settings for timeout, lock-only mode, and file contents
+ * @returns Promise resolving to result containing success status and lock file content or error
+ */
+export async function runInstallInTempDirAsync(
+    pm: PackageManager,
+    modifiedPackageJson: string,
+    options: TempInstallOptions = {}
+): Promise<TempInstallResult> {
+    return runInstallInTempDirCoreAsync(pm, modifiedPackageJson, options);
+}
+
+/**
+ * Runs package manager install in a temporary directory with workspace support asynchronously.
+ *
+ * This is the async version of runWorkspaceInstallInTempDir. It uses async spawn and
+ * fs.promises for non-blocking I/O. Use this in async recipe editor() methods
+ * to avoid blocking the event loop.
+ *
+ * @param pm The package manager to use
+ * @param rootPackageJson The root package.json content (should contain "workspaces" field)
+ * @param options Optional settings including workspace packages, timeout, lock-only mode, and file contents
+ * @returns Promise resolving to result containing success status and lock file content or error
+ */
+export async function runWorkspaceInstallInTempDirAsync(
     pm: PackageManager,
     rootPackageJson: string,
     options: WorkspaceTempInstallOptions = {}
 ): Promise<TempInstallResult> {
-    return runInstallInTempDirCore(pm, rootPackageJson, options);
+    return runInstallInTempDirCoreAsync(pm, rootPackageJson, options);
 }
 
 /**
@@ -795,17 +1002,17 @@ export function createYamlLockFileVisitor<T>(
  * @returns A TreeVisitor that handles both JSON and YAML files
  */
 export function createLockFileEditor<T>(
-    jsonEditor: AsyncJsonVisitor<ExecutionContext>,
+    jsonEditor: JsonVisitor<ExecutionContext>,
     acc: DependencyRecipeAccumulator<T>
-): AsyncTreeVisitor<any, ExecutionContext> {
+): TreeVisitor<any, ExecutionContext> {
     const yamlEditor = createYamlLockFileVisitor(acc);
 
-    return new class extends AsyncTreeVisitor<any, ExecutionContext> {
-        async visit(tree: any, ctx: ExecutionContext): Promise<any> {
+    return new class extends TreeVisitor<any, ExecutionContext> {
+        visit<R>(tree: any, ctx: ExecutionContext): R {
             if (isDocuments(tree)) {
-                return yamlEditor.visit(tree, ctx);
+                return yamlEditor.visit(tree, ctx) as R;
             } else if (tree && tree.kind === Json.Kind.Document) {
-                return jsonEditor.visit(tree, ctx);
+                return jsonEditor.visit(tree, ctx) as R;
             }
             return tree;
         }

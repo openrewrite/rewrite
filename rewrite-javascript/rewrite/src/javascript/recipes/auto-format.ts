@@ -36,7 +36,7 @@ export class AutoFormat extends Recipe {
     readonly displayName = "Auto-format JavaScript/TypeScript code";
     readonly description = "Format JavaScript and TypeScript code using formatting rules auto-detected from the project's existing code style.";
 
-    async editor(): Promise<RecipeVisitor<any>> {
+    async editor(): Promise<RecipeVisitor> {
         // AutoformatVisitor looks up styles from source file markers
         return new AutoformatVisitor();
     }

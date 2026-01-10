@@ -19,9 +19,9 @@ import {Recipe, RecipeVisitor} from "./recipe";
 import {ExecutionContext} from "./execution";
 
 export async function check<T extends Tree>(
-    checkCondition: Recipe | Promise<Recipe> | RecipeVisitor<T> | Promise<RecipeVisitor<T>> | boolean,
-    v: RecipeVisitor<T> | Promise<RecipeVisitor<T>>
-): Promise<RecipeVisitor<T>> {
+    checkCondition: Recipe | Promise<Recipe> | RecipeVisitor | Promise<RecipeVisitor> | boolean,
+    v: RecipeVisitor | Promise<RecipeVisitor>
+): Promise<RecipeVisitor> {
     const resolvedCheck = await checkCondition;
     const resolvedV = await v;
 
@@ -33,8 +33,8 @@ export async function check<T extends Tree>(
 
 export class Check<T extends Tree> extends AsyncTreeVisitor<T, ExecutionContext> {
     constructor(
-        readonly check: RecipeVisitor<T> | Recipe,
-        readonly v: RecipeVisitor<T>
+        readonly check: RecipeVisitor | Recipe,
+        readonly v: RecipeVisitor
     ) {
         super();
     }
@@ -49,8 +49,8 @@ export class Check<T extends Tree> extends AsyncTreeVisitor<T, ExecutionContext>
         // not be able to do its work because it may assume we are starting from the root level
         if (!isSourceFile(tree)) {
             return parent !== undefined
-                ? await this.v.visit<R>(tree, ctx, parent)
-                : await this.v.visit<R>(tree, ctx);
+                ? await this.v.visit(tree, ctx, parent)
+                : await this.v.visit(tree, ctx);
         }
 
         const checkResult = parent !== undefined
@@ -60,14 +60,14 @@ export class Check<T extends Tree> extends AsyncTreeVisitor<T, ExecutionContext>
         // If check visitor modified the tree (returned something different), run the main visitor
         if (checkResult !== (tree as unknown as T)) {
             return parent !== undefined
-                ? await this.v.visit<R>(tree, ctx, parent)
-                : await this.v.visit<R>(tree, ctx);
+                ? await this.v.visit(tree, ctx, parent)
+                : await this.v.visit(tree, ctx);
         }
 
         return tree as unknown as R;
     }
 
-    private async checkVisitor(): Promise<RecipeVisitor<any>> {
+    private async checkVisitor(): Promise<RecipeVisitor> {
         return this.check instanceof Recipe ? this.check.editor() : this.check;
     }
 }
