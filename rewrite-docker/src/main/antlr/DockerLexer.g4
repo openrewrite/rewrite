@@ -86,6 +86,9 @@ fragment HEX_DIGIT : [0-9A-F];
 // Environment variable reference
 ENV_VAR : '$' '{' [A-Z_][A-Z0-9_]* ( ':-' | ':+' | ':' )? ~[}]* '}' | '$' [A-Z_][A-Z0-9_]*;
 
+// Special shell variables ($!, $$, $?, $#, $@, $*, $0-$9)
+SPECIAL_VAR : '$' [!$?#@*0-9];
+
 // Command substitution $(command) or $((arithmetic))
 // Handles nested parentheses by counting them
 COMMAND_SUBST : '$(' ( COMMAND_SUBST | ~[()] | '(' COMMAND_SUBST_INNER* ')' )* ')';

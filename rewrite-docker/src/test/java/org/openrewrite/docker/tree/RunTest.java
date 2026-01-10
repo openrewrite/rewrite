@@ -319,4 +319,17 @@ class RunTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void runWithSpecialShellVariables() {
+        // Test special shell variables like $!, $$, $?
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              RUN myapp & pidsave=$!; sleep 10; kill $pidsave || true
+              """
+          )
+        );
+    }
 }
