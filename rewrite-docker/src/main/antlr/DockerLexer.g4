@@ -71,7 +71,9 @@ fragment ESCAPED_CHAR : '\\' .;
 
 // String literals
 DOUBLE_QUOTED_STRING : '"' ( ESCAPE_SEQUENCE | ~["\\\r\n] )* '"';
-SINGLE_QUOTED_STRING : '\'' ( ESCAPE_SEQUENCE | ~['\\\r\n] )* '\'';
+// Single-quoted strings in shell are literal - no escape processing
+// Allow any character except single quote and newlines
+SINGLE_QUOTED_STRING : '\'' ~['\r\n]* '\'';
 
 fragment ESCAPE_SEQUENCE
     : '\\' [nrt"'\\$]

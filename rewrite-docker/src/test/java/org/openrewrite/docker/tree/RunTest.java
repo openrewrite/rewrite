@@ -267,4 +267,17 @@ class RunTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void runWithSingleQuotedRegex() {
+        // Test single-quoted strings with regex special characters (backslash, parens, pipe)
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN regex='^\\(root\\|app\\):' && grep $regex /etc/passwd
+              """
+          )
+        );
+    }
 }
