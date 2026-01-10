@@ -16,7 +16,6 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.docker.Assertions;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.docker.Assertions.docker;

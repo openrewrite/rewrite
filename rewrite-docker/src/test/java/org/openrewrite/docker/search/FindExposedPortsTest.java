@@ -17,7 +17,6 @@ package org.openrewrite.docker.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.docker.Assertions;
 import org.openrewrite.docker.table.DockerExposedPorts;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
