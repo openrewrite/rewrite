@@ -172,4 +172,60 @@ class RunTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void runWithChownFlag() {
+        // Test chown -R with space before next argument
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              RUN chown -R user:user /home
+              """
+          )
+        );
+    }
+
+    @Test
+    void runWithGitClone() {
+        // Test git clone with URL
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              RUN git clone https://github.com/example/repo.git
+              """
+          )
+        );
+    }
+
+    @Test
+    void runWithShellKeyword() {
+        // Test useradd with --shell flag (shell is a Docker keyword)
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN useradd --shell /bin/false user
+              """
+          )
+        );
+    }
+
+    @Test
+    void runWithLineContinuationAndShellKeyword() {
+        // Test useradd with --shell flag across line continuations
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN useradd --no-log-init \\
+                  --uid=1654 \\
+                  --shell /bin/false \\
+                  --create-home \\
+                  app
+              """
+          )
+        );
+    }
 }

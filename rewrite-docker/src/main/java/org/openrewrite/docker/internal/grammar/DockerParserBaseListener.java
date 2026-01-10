@@ -404,6 +404,42 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterShellFormText(DockerParser.ShellFormTextContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitShellFormText(DockerParser.ShellFormTextContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterShellFormTextElement(DockerParser.ShellFormTextElementContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitShellFormTextElement(DockerParser.ShellFormTextElementContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterShellSafeKeyword(DockerParser.ShellSafeKeywordContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitShellSafeKeyword(DockerParser.ShellSafeKeywordContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterHeredoc(DockerParser.HeredocContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -627,6 +663,18 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitEnvKey(DockerParser.EnvKeyContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterEnvSafeKeyword(DockerParser.EnvSafeKeywordContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitEnvSafeKeyword(DockerParser.EnvSafeKeywordContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

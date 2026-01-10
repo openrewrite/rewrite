@@ -333,6 +333,36 @@ public interface DockerParserListener extends ParseTreeListener {
 	 */
 	void exitShellForm(DockerParser.ShellFormContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link DockerParser#shellFormText}.
+	 * @param ctx the parse tree
+	 */
+	void enterShellFormText(DockerParser.ShellFormTextContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#shellFormText}.
+	 * @param ctx the parse tree
+	 */
+	void exitShellFormText(DockerParser.ShellFormTextContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerParser#shellFormTextElement}.
+	 * @param ctx the parse tree
+	 */
+	void enterShellFormTextElement(DockerParser.ShellFormTextElementContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#shellFormTextElement}.
+	 * @param ctx the parse tree
+	 */
+	void exitShellFormTextElement(DockerParser.ShellFormTextElementContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerParser#shellSafeKeyword}.
+	 * @param ctx the parse tree
+	 */
+	void enterShellSafeKeyword(DockerParser.ShellSafeKeywordContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#shellSafeKeyword}.
+	 * @param ctx the parse tree
+	 */
+	void exitShellSafeKeyword(DockerParser.ShellSafeKeywordContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link DockerParser#heredoc}.
 	 * @param ctx the parse tree
 	 */
@@ -522,6 +552,16 @@ public interface DockerParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitEnvKey(DockerParser.EnvKeyContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerParser#envSafeKeyword}.
+	 * @param ctx the parse tree
+	 */
+	void enterEnvSafeKeyword(DockerParser.EnvSafeKeywordContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#envSafeKeyword}.
+	 * @param ctx the parse tree
+	 */
+	void exitEnvSafeKeyword(DockerParser.EnvSafeKeywordContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerParser#envValueEquals}.
 	 * @param ctx the parse tree

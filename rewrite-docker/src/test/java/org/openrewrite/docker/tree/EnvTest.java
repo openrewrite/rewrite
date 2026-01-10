@@ -84,4 +84,17 @@ class EnvTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void envWithKeywordName() {
+        // Test ENV where key is a Docker keyword (like SHELL)
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV SHELL /usr/bin/zsh
+              """
+          )
+        );
+    }
 }

@@ -1227,7 +1227,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                         randomId(),
                         prefix,
                         Markers.EMPTY,
-                        singletonList(visitArgument(c.text()))
+                        singletonList(visitArgument(c.shellFormText()))
                 )
         );
     }

@@ -55,4 +55,29 @@ class HealthcheckTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multiStageWithHealthcheckFollowedByCopy() {
+        // Test that HEALTHCHECK is correctly parsed when followed by COPY --from
+        rewriteRun(
+          docker(
+            """
+              FROM golang:1.21 AS builder
+              RUN go build -o app .
+
+              FROM alpine:3.18
+              HEALTHCHECK CMD curl -f http://localhost/ || exit 1
+              COPY --from=builder /app /app
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                assertThat(doc.getStages()).hasSize(2);
+                // Final stage should have HEALTHCHECK as first instruction and COPY as second
+                Docker.Stage finalStage = doc.getStages().get(1);
+                assertThat(finalStage.getInstructions()).hasSize(2);
+                assertThat(finalStage.getInstructions().get(0)).isInstanceOf(Docker.Healthcheck.class);
+                assertThat(finalStage.getInstructions().get(1)).isInstanceOf(Docker.Copy.class);
+            })
+          )
+        );
+    }
 }

@@ -212,6 +212,24 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitShellForm(DockerParser.ShellFormContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link DockerParser#shellFormText}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitShellFormText(DockerParser.ShellFormTextContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link DockerParser#shellFormTextElement}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitShellFormTextElement(DockerParser.ShellFormTextElementContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link DockerParser#shellSafeKeyword}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitShellSafeKeyword(DockerParser.ShellSafeKeywordContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link DockerParser#heredoc}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -325,6 +343,12 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitEnvKey(DockerParser.EnvKeyContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link DockerParser#envSafeKeyword}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitEnvSafeKeyword(DockerParser.EnvSafeKeywordContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#envValueEquals}.
 	 * @param ctx the parse tree

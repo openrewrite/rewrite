@@ -153,7 +153,28 @@ execForm
     ;
 
 shellForm
-    : text
+    : shellFormText
+    ;
+
+// Text that can contain keywords (used in shell form where --shell, --user etc. are valid)
+shellFormText
+    : shellFormTextElement+
+    ;
+
+shellFormTextElement
+    : UNQUOTED_TEXT
+    | DOUBLE_QUOTED_STRING
+    | SINGLE_QUOTED_STRING
+    | ENV_VAR
+    | EQUALS
+    | DASH_DASH
+    | shellSafeKeyword  // Allow certain keywords in shell commands (e.g., RUN useradd --shell /bin/false)
+    ;
+
+// Keywords that can safely appear in shell form text
+// Only non-instruction-starting keywords: SHELL (--shell flag), USER (--user flag), AS (--as flag)
+shellSafeKeyword
+    : SHELL | USER | AS
     ;
 
 heredoc
@@ -242,6 +263,12 @@ envPair
 
 envKey
     : UNQUOTED_TEXT
+    | envSafeKeyword  // Allow certain keywords as env keys (e.g., ENV SHELL /bin/bash)
+    ;
+
+// Keywords that are safe to use as ENV variable names (not instruction-starting keywords)
+envSafeKeyword
+    : SHELL | USER | AS
     ;
 
 envValueEquals
