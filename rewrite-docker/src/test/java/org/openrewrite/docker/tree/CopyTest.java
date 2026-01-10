@@ -34,7 +34,7 @@ class CopyTest implements RewriteTest {
               COPY app.jar /app/
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Copy copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(copy.getSources()).hasSize(1);
                 assertThat(((Docker.Literal) copy.getSources().getFirst().getContents().getFirst()).getText()).isEqualTo("app.jar");
                 assertThat(((Docker.Literal) copy.getDestination().getContents().getFirst()).getText()).isEqualTo("/app/");
@@ -54,12 +54,16 @@ class CopyTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 List<Docker.Instruction> instructions = doc.getStages().getFirst().getInstructions();
-                Docker.Copy copy1 = (Docker.Copy) instructions.getFirst();
+                var copy1 = (Docker.Copy) instructions.getFirst();
                 assertThat(copy1.getFlags()).hasSize(1);
                 assertThat(copy1.getFlags().getFirst().getName()).isEqualTo("chown");
                 assertThat(((Docker.Literal) copy1.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("app:app");
+                var source = (Docker.Literal) copy1.getSources().getFirst().getContents().getFirst();
+                assertThat(source.getText()).isEqualTo("app.jar");
+                var destination = (Docker.Literal) copy1.getDestination().getContents().getFirst();
+                assertThat(destination.getText()).isEqualTo("/app/");
 
-                Docker.Copy copy2 = (Docker.Copy) instructions.get(1);
+                var copy2 = (Docker.Copy) instructions.getLast();
                 assertThat(copy2.getFlags()).hasSize(1);
                 assertThat(copy2.getFlags().getFirst().getName()).isEqualTo("from");
                 assertThat(((Docker.Literal) copy2.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("builder");
