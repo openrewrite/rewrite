@@ -33,8 +33,8 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
             }));
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, method) || method;
+                override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
+                    return rule.tryOn(this.cursor, method) || method;
                 }
             });
 
@@ -71,8 +71,8 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
             }));
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return rule.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -94,8 +94,8 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
             }));
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, method) || method;
+                override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
+                    return rule.tryOn(this.cursor, method) || method;
                 }
             });
 
@@ -135,9 +135,9 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
             }));
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitIdentifier(ident: J.Identifier, p: any): Promise<J | undefined> {
+                override visitIdentifier(ident: J.Identifier, p: any): J | undefined {
                     if (ident.simpleName === 'x') {
-                        return await rule.tryOn(this.cursor, ident) || ident;
+                        return rule.tryOn(this.cursor, ident) || ident;
                     }
                     return ident;
                 }
@@ -162,20 +162,19 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
             );
         });
 
-        test('supports async preMatch predicate', async () => {
+        test('preMatch predicate returning true allows transformation', () => {
             const rule = rewrite(() => ({
                 before: pattern`${_('x')} + ${_('y')}`,
                 after: template`${_('y')} + ${_('x')}`,
-                preMatch: async () => {
-                    // Simulate async operation
-                    await Promise.resolve();
+                preMatch: () => {
+                    // Predicate returns true - allow transformation
                     return true;
                 }
             }));
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return rule.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -199,8 +198,8 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
             }));
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return rule.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -227,8 +226,8 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
             }));
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return rule.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -238,20 +237,19 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
             );
         });
 
-        test('supports async postMatch predicate', async () => {
+        test('postMatch predicate returning true allows transformation', () => {
             const rule = rewrite(() => ({
                 before: pattern`${_('x')} + ${_('y')}`,
                 after: template`${_('y')} + ${_('x')}`,
-                postMatch: async () => {
-                    // Simulate async operation
-                    await Promise.resolve();
+                postMatch: () => {
+                    // Predicate returns true - allow transformation
                     return true;
                 }
             }));
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return rule.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -280,8 +278,8 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
             }));
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, method) || method;
+                override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
+                    return rule.tryOn(this.cursor, method) || method;
                 }
             });
 
@@ -329,8 +327,8 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
             }));
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, method) || method;
+                override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
+                    return rule.tryOn(this.cursor, method) || method;
                 }
             });
 
@@ -384,8 +382,8 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
             const combined = rule1.andThen(rule2);
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await combined.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return combined.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -440,8 +438,8 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
             const combined = specificRule.orElse(generalRule);
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    return await combined.tryOn(this.cursor, method) || method;
+                override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
+                    return combined.tryOn(this.cursor, method) || method;
                 }
             });
 

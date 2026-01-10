@@ -21,15 +21,19 @@ import {emptyMarkers} from "../markers";
 export class PlainTextParser extends Parser {
     async *parse(...sourcePaths: ParserInput[]): AsyncGenerator<PlainText> {
         for (const sourcePath of sourcePaths) {
-            yield {
-                kind: PlainText.Kind.PlainText,
-                id: randomId(),
-                markers: emptyMarkers,
-                sourcePath: this.relativePath(sourcePath),
-                text: readSourceSync(sourcePath),
-                snippets: []
-            };
+            yield this.parseOne(sourcePath);
         }
+    }
+
+    override parseOne(input: ParserInput): PlainText {
+        return {
+            kind: PlainText.Kind.PlainText,
+            id: randomId(),
+            markers: emptyMarkers,
+            sourcePath: this.relativePath(input),
+            text: readSourceSync(input),
+            snippets: []
+        };
     }
 }
 

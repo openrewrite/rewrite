@@ -40,7 +40,7 @@ describe('Pattern Debugging', () => {
         const pat = pattern`console.log(${x})`;
         const node = await parseExpression('console.log(42)');
 
-        const attempt = await pat.matchWithExplanation(node, undefined!);
+        const attempt = pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(true);
         expect(attempt.result).toBeDefined();
@@ -53,7 +53,7 @@ describe('Pattern Debugging', () => {
         const pat = pattern`42`;
         const node = await parseExpression('"string"');
 
-        const attempt = await pat.matchWithExplanation(node, undefined!);
+        const attempt = pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(false);
         expect(attempt.result).toBeUndefined();
@@ -73,7 +73,7 @@ describe('Pattern Debugging', () => {
         const pat = pattern`${value}`;
         const node = await parseExpression('42');
 
-        const result = await pat.matchWithExplanation(node, undefined!);
+        const result = pat.matchWithExplanation(node, undefined!);
 
         expect(result.matched).toBe(false);
         expect(result.explanation).toBeDefined();
@@ -88,7 +88,7 @@ describe('Pattern Debugging', () => {
         const pat = pattern`${value}`;
         const node = await parseExpression('42');
 
-        const result = await pat.matchWithExplanation(node, undefined!);
+        const result = pat.matchWithExplanation(node, undefined!);
 
         expect(result.matched).toBe(true);
         expect(result.debugLog).toBeDefined();
@@ -108,7 +108,7 @@ describe('Pattern Debugging', () => {
         const pat = pattern`x + 42`;
         const node = await parseExpression('x + "wrong"');
 
-        const attempt = await pat.matchWithExplanation(node, undefined!);
+        const attempt = pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();
@@ -128,7 +128,7 @@ describe('Pattern Debugging', () => {
         const pat = pattern`[1, 2, 3]`;
         const node = await parseExpression('[1, 2, "wrong"]');
 
-        const attempt = await pat.matchWithExplanation(node, undefined!);
+        const attempt = pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();
@@ -156,7 +156,7 @@ describe('Pattern Debugging', () => {
 
         // Try with 1 argument (should fail)
         const node = await parseExpression('console.log(42)');
-        const attempt = await pat.matchWithExplanation(node, undefined!);
+        const attempt = pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(false);
 
@@ -181,7 +181,7 @@ describe('Pattern Debugging', () => {
         const pat = pattern`foo({a: 1, b: {c: 2}})`;
         const node = await parseExpression('foo({a: 1, b: {c: "wrong"}})');
 
-        const attempt = await pat.matchWithExplanation(node, undefined!);
+        const attempt = pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();
@@ -227,7 +227,7 @@ describe('Pattern Debugging', () => {
         const pat = pattern`console.log(42)`;
         const node = await parseExpression('console.log(42)');
 
-        const result = await pat.matchWithExplanation(node, undefined!, {
+        const result = pat.matchWithExplanation(node, undefined!, {
             enabled: true,
             logComparison: false,
             logConstraints: false
@@ -256,7 +256,7 @@ describe('Pattern Debugging', () => {
         const cu = (await gen.next()).value as JS.CompilationUnit;
         const statement = cu.statements[0].element;
 
-        const attempt = await pat.matchWithExplanation(statement, undefined!);
+        const attempt = pat.matchWithExplanation(statement, undefined!);
 
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();
@@ -280,7 +280,7 @@ describe('Pattern Debugging', () => {
         const pat = pattern`console.log(42)`;
         const node = await parseExpression('console.error(42)');
 
-        const attempt = await pat.matchWithExplanation(node, undefined!);
+        const attempt = pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();

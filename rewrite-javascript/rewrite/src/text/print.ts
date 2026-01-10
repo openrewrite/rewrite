@@ -22,26 +22,26 @@ import {Markers} from "../markers";
 class PlainTextPrinter extends PlainTextVisitor<PrintOutputCapture> {
     private static readonly TEXT_MARKER_WRAPPER = (out: string): string => `~~${out}${out ? "~~" : ""}>`;
 
-    async visitText(text: PlainText, p: PrintOutputCapture): Promise<PlainText | undefined> {
-        await this.visitMarkableText(text.markers, text.text, p);
+    override visitText(text: PlainText, p: PrintOutputCapture): PlainText | undefined {
+        this.visitMarkableText(text.markers, text.text, p);
         for (const snippet of text.snippets) {
             this.cursor = new Cursor(snippet, this.cursor);
-            await this.visitSnippet(snippet, p);
+            this.visitSnippet(snippet, p);
             this.cursor = this.cursor.parent!;
         }
         return text;
     }
 
-    async visitSnippet(snippet: PlainText.Snippet, p: PrintOutputCapture): Promise<PlainText.Snippet | undefined> {
-        await this.visitMarkableText(snippet.markers, snippet.text, p);
+    override visitSnippet(snippet: PlainText.Snippet, p: PrintOutputCapture): PlainText.Snippet | undefined {
+        this.visitMarkableText(snippet.markers, snippet.text, p);
         return snippet;
     }
 
-    private async visitMarkableText(markers: Markers, text: string, p: PrintOutputCapture): Promise<void> {
+    private visitMarkableText(markers: Markers, text: string, p: PrintOutputCapture): void {
         for (const marker of markers.markers) {
             p.append(p.markerPrinter.beforePrefix(marker, new Cursor(marker, this.cursor), PlainTextPrinter.TEXT_MARKER_WRAPPER));
         }
-        await this.visitMarkers(markers, p);
+        this.visitMarkers(markers, p);
         for (const marker of markers.markers) {
             p.append(p.markerPrinter.beforeSyntax(marker, new Cursor(marker, this.cursor), PlainTextPrinter.TEXT_MARKER_WRAPPER));
         }

@@ -13,7 +13,7 @@ export class IsSourceFile extends TreeVisitor<any, ExecutionContext> {
         this.matcher = picomatch.default ? picomatch.default(filePattern) : (picomatch as any)(filePattern);
     }
 
-    protected async preVisit(tree: any, _: ExecutionContext): Promise<any> {
+    protected preVisit(tree: any, _: ExecutionContext): any {
         this.stopAfterPreVisit();
         if (isSourceFile(tree) && tree.sourcePath) {
             const path = tree.sourcePath.replace(/\\/g, '/'); // Normalize to Unix separators

@@ -47,8 +47,8 @@ describe('MinimumViableSpacingVisitor', () => {
             }
 
             static RemoveSpaces = class <P> extends JavaScriptVisitor<P> {
-                override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
-                    const ret = await super.visitSpace(space, p) as J.Space;
+                override visitSpace(space: J.Space, p: P): J.Space {
+                    const ret = super.visitSpace(space, p) as J.Space;
                     return ret && produce(ret, draft => {
                         draft.whitespace = "";
                     });

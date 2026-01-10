@@ -49,9 +49,9 @@ export class Print {
                     const out = new PrintOutputCapture(PrintMarkerPrinter[request.markerPrinter]);
                     let result: string;
                     if (isSourceFile(tree)) {
-                        result = await printer(tree).print(tree, out);
+                        result = printer(tree).print(tree, out);
                     } else {
-                        result = await printer(request.sourceFileType).print(tree, out);
+                        result = printer(request.sourceFileType).print(tree, out);
                     }
                     return result;
                 }

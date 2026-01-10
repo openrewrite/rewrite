@@ -27,12 +27,12 @@ export class Result {
     constructor(public readonly before?: SourceFile, public readonly after?: SourceFile) {
     }
 
-    async diff(): Promise<string> {
+    diff(): string {
         return createTwoFilesPatch(
             this.before?.sourcePath ?? "",
             this.after?.sourcePath ?? "",
-            this.before ? await TreePrinters.print(this.before) : "",
-            this.after ? await TreePrinters.print(this.after) : "",
+            this.before ? TreePrinters.print(this.before) : "",
+            this.after ? TreePrinters.print(this.after) : "",
             "",
             "",
             {context: 3}

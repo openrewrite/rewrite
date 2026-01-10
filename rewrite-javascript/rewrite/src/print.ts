@@ -15,7 +15,7 @@
  */
 import {Marker, MarkersKind, Markup, SearchResult} from "./markers";
 import {Cursor, isSourceFile, SourceFile, Tree} from "./tree";
-import {TreeVisitor} from "./visitor";
+import {TreeVisitor, AsyncTreeVisitor} from "./visitor";
 import {trimIndent} from "./util";
 
 type CommentWrapper = (input: string) => string;
@@ -125,7 +125,7 @@ interface TreePrinter {
      * printing a subtree whose LST type is shared between multiple languages in a language family.
      * @param out Accumulates printing output.
      */
-    print(tree: Tree, out?: PrintOutputCapture): Promise<string>;
+    print(tree: Tree, out?: PrintOutputCapture): string;
 }
 
 export class TreePrinters {
@@ -134,9 +134,9 @@ export class TreePrinters {
 
     static register(kind: string, printer: () => TreeVisitor<any, PrintOutputCapture>): void {
         this._registry.set(kind, {
-            async print(tree: Tree, out?: PrintOutputCapture): Promise<string> {
+            print(tree: Tree, out?: PrintOutputCapture): string {
                 const p = out || new PrintOutputCapture();
-                await printer().visit(tree, p);
+                printer().visit(tree, p);
                 return p.out;
             }
         })
@@ -162,12 +162,12 @@ export class TreePrinters {
         return this._registry.get(sourceFileKind)!;
     }
 
-    static print(sourceFile: SourceFile): Promise<string> {
+    static print(sourceFile: SourceFile): string {
         return this.printer(sourceFile).print(sourceFile);
     }
 
-    static async printTrimmed(sourceFile: SourceFile): Promise<string> {
-        return trimIndent(await this.print(sourceFile));
+    static printTrimmed(sourceFile: SourceFile): string {
+        return trimIndent(this.print(sourceFile));
     }
 }
 

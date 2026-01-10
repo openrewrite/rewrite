@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
+import {Cursor, isTree, Tree, updateIfChanged} from '../..';
 import {emptySpace, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
@@ -118,12 +118,12 @@ class TemplateCache {
     /**
      * Gets a cached compilation unit or creates and caches a new one.
      */
-    async getOrParse(
+    getOrParse(
         templateString: string,
         captures: (Capture | Any)[],
         contextStatements: string[],
         dependencies: Record<string, string>
-    ): Promise<JS.CompilationUnit> {
+    ): JS.CompilationUnit {
         const key = this.generateKey(templateString, captures, contextStatements, dependencies);
 
         let cu = this.cache.get(key);
@@ -136,7 +136,7 @@ class TemplateCache {
         // the same dependencies will automatically share the same workspace
         let workspaceDir: string | undefined;
         if (dependencies && Object.keys(dependencies).length > 0) {
-            workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
+            workspaceDir = DependencyWorkspace.getOrCreateWorkspace({dependencies});
         }
 
         // Prepend context statements for type attribution context
@@ -150,8 +150,7 @@ class TemplateCache {
             relativeTo: workspaceDir,
             sourceFileCache: templateSourceFileCache
         });
-        const parseGenerator = parser.parse({text: fullTemplateString, sourcePath: 'template.ts'});
-        cu = (await parseGenerator.next()).value as JS.CompilationUnit;
+        cu = parser.parseOne({text: fullTemplateString, sourcePath: 'template.ts'}) as JS.CompilationUnit;
 
         this.cache.set(key, cu);
         return cu;
@@ -192,14 +191,14 @@ export class TemplateEngine {
      * @param parameters The parameters between the string parts
      * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
      * @param dependencies NPM dependencies for type attribution
-     * @returns A Promise resolving to the extracted template AST
+     * @returns The extracted template AST
      */
-    static async getTemplateTree(
+    static getTemplateTree(
         templateParts: TemplateStringsArray,
         parameters: Parameter[],
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {}
-    ): Promise<J> {
+    ): J {
         // Generate type preamble for captures/parameters with types
         const preamble = TemplateEngine.generateTypePreamble(parameters);
 
@@ -212,7 +211,7 @@ export class TemplateEngine {
             : contextStatements;
 
         // Use cache to get or parse the compilation unit
-        const cu = await templateCache.getOrParse(
+        const cu = templateCache.getOrParse(
             templateString,
             [],
             contextWithPreamble,
@@ -243,16 +242,16 @@ export class TemplateEngine {
      * @param coordinates The coordinates specifying where and how to insert the generated AST
      * @param values Map of capture names to values to replace the parameters with
      * @param wrappersMap Map of capture names to J.RightPadded wrappers (for preserving markers)
-     * @returns A Promise resolving to the generated AST node
+     * @returns The generated AST node
      */
-    static async applyTemplateFromAst(
+    static applyTemplateFromAst(
         ast: JS.CompilationUnit,
         parameters: Parameter[],
         cursor: Cursor,
         coordinates: JavaCoordinates,
         values: Pick<Map<string, J>, 'get'> = new Map(),
         wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map()
-    ): Promise<J | undefined> {
+    ): J | undefined {
         // Create substitutions map for placeholders
         const substitutions = new Map<string, Parameter>();
         for (let i = 0; i < parameters.length; i++) {
@@ -262,7 +261,7 @@ export class TemplateEngine {
 
         // Unsubstitute placeholders with actual parameter values and match results
         const visitor = new PlaceholderReplacementVisitor(substitutions, values, wrappersMap);
-        const unsubstitutedAst = (await visitor.visit(ast, null))!;
+        const unsubstitutedAst = (visitor.visit(ast, null))!;
 
         // Apply the template to the current AST
         return new TemplateApplier(cursor, coordinates, unsubstitutedAst).apply();
@@ -421,14 +420,14 @@ export class TemplateEngine {
      * @param captures The captures between the string parts (can include RawCode)
      * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
      * @param dependencies NPM dependencies for type attribution
-     * @returns A Promise resolving to the extracted pattern AST with capture markers
+     * @returns The extracted pattern AST with capture markers
      */
-    static async getPatternTree(
+    static getPatternTree(
         templateParts: TemplateStringsArray,
         captures: (Capture | Any | RawCode)[],
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {}
-    ): Promise<J> {
+    ): J {
         // Generate type preamble for captures with types (skip RawCode)
         const preamble: string[] = [];
         for (const capture of captures) {
@@ -486,7 +485,7 @@ export class TemplateEngine {
         ) as (Capture | Any)[];
 
         // Use cache to get or parse the compilation unit
-        const cu = await templateCache.getOrParse(
+        const cu = templateCache.getOrParse(
             templateString,
             actualCaptures,
             contextWithPreamble,
@@ -506,7 +505,7 @@ export class TemplateEngine {
 
         // Attach CaptureMarkers to capture identifiers (only for actual captures, not raw code)
         const visitor = new MarkerAttachmentVisitor(actualCaptures);
-        return (await visitor.visit(extracted, undefined))!;
+        return (visitor.visit(extracted, undefined))!;
     }
 }
 
@@ -523,9 +522,9 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
     /**
      * Attaches CaptureMarker to capture identifiers.
      */
-    protected override async visitIdentifier(ident: J.Identifier, p: undefined): Promise<J | undefined> {
+    protected override visitIdentifier(ident: J.Identifier, p: undefined): J | undefined {
         // First call parent to handle standard visitation
-        const visited = await super.visitIdentifier(ident, p);
+        const visited = super.visitIdentifier(ident, p);
         if (!visited || visited.kind !== J.Kind.Identifier) {
             return visited;
         }
@@ -557,14 +556,14 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
     /**
      * Propagates markers from element to RightPadded wrapper.
      */
-    public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: undefined): Promise<J.RightPadded<T> | undefined> {
+    public override visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: undefined): J.RightPadded<T> | undefined {
         if (!isTree(right.element)) {
             return right;
         }
 
-        const visitedElement = await this.visit(right.element as J, p);
+        const visitedElement = this.visit(right.element as J, p);
         if (visitedElement && visitedElement !== right.element as Tree) {
-            const result = await produceAsync<J.RightPadded<T>>(right, async (draft: any) => {
+            const result = produce<J.RightPadded<T>>(right, (draft: any) => {
                 // Visit element first
                 if (right.element && (right.element as any).kind) {
                     // Check if element has a CaptureMarker
@@ -585,9 +584,9 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
     /**
      * Propagates markers from expression to ExpressionStatement.
      */
-    protected override async visitExpressionStatement(expressionStatement: JS.ExpressionStatement, p: undefined): Promise<J | undefined> {
+    protected override visitExpressionStatement(expressionStatement: JS.ExpressionStatement, p: undefined): J | undefined {
         // Visit the expression
-        const visitedExpression = await this.visit(expressionStatement.expression, p);
+        const visitedExpression = this.visit(expressionStatement.expression, p);
 
         // Check if expression has a CaptureMarker
         const expressionMarker = PlaceholderUtils.getCaptureMarker(visitedExpression as any);
@@ -611,9 +610,9 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
      * This handles destructuring patterns like {${props}} where the capture marker
      * is on the identifier but needs to be on the BindingElement for container matching.
      */
-    protected override async visitBindingElement(bindingElement: JS.BindingElement, p: undefined): Promise<J | undefined> {
+    protected override visitBindingElement(bindingElement: JS.BindingElement, p: undefined): J | undefined {
         // Visit the name
-        const visitedName = await this.visit(bindingElement.name, p);
+        const visitedName = this.visit(bindingElement.name, p);
 
         // Check if name has a CaptureMarker
         const nameMarker = PlaceholderUtils.getCaptureMarker(visitedName as any);
@@ -648,9 +647,9 @@ export class TemplateApplier {
     /**
      * Applies the template to the current AST.
      *
-     * @returns A Promise resolving to the modified AST
+     * @returns The modified AST
      */
-    async apply(): Promise<J | undefined> {
+    apply(): J | undefined {
         const {loc} = this.coordinates;
 
         // Apply the template based on the location and mode
@@ -667,9 +666,9 @@ export class TemplateApplier {
     /**
      * Applies the template to an expression.
      *
-     * @returns A Promise resolving to the modified AST
+     * @returns The modified AST
      */
-    private async applyInternal(): Promise<J | undefined> {
+    private applyInternal(): J | undefined {
         const {tree} = this.coordinates;
 
         if (!tree) {
@@ -681,7 +680,7 @@ export class TemplateApplier {
         return this.format(resultToUse, originalTree);
     }
 
-    private async format(resultToUse: J, originalTree: J) {
+    private format(resultToUse: J, originalTree: J): J {
         // Create a copy of the AST with the prefix from the target
         const result = {
             ...resultToUse,
@@ -692,7 +691,7 @@ export class TemplateApplier {
 
         // Apply auto-formatting to the result
         const formatted =
-            await maybeAutoFormat(originalTree, result, null, undefined, this.cursor?.parent);
+            maybeAutoFormat(originalTree, result, null, undefined, this.cursor?.parent);
 
         // Restore the original ID
         return {...formatted, id: resultToUse.id};

@@ -112,7 +112,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         };
     }
 
-    override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
+    override visit<R extends J>(j: Tree, p: J, parent?: Cursor): R | undefined {
         // Check if the pattern node is a capture - this handles unwrapped captures
         // (Wrapped captures in J.RightPadded are handled by visitRightPadded override)
         // Note: targetCursor will be pushed by parent's visit() method after this check
@@ -154,7 +154,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         }
 
         // Continue with parent's visit which will push targetCursor and traverse
-        return await super.visit(j, p, parent);
+        return super.visit(j, p, parent);
     }
 
     protected hasSameKind(j: J, other: J): boolean {
@@ -180,7 +180,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
      * Override visitRightPadded to check if this wrapper has a CaptureMarker.
      * If so, capture the entire wrapper (to preserve markers like semicolons).
      */
-    override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: J): Promise<J.RightPadded<T>> {
+    override visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: J): J.RightPadded<T> {
         if (!this.match) {
             return right;
         }
@@ -225,7 +225,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         return super.visitRightPadded(right, p);
     }
 
-    override async visitContainer<T extends J>(container: J.Container<T>, p: J): Promise<J.Container<T>> {
+    override visitContainer<T extends J>(container: J.Container<T>, p: J): J.Container<T> {
         // Check if any elements are variadic captures
         const hasVariadicCapture = container.elements.some(elem =>
             PlaceholderUtils.isVariadicCapture(elem)
@@ -266,7 +266,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         try {
             // Use matchSequence for variadic matching
             // filterEmpty=true to skip J.Empty elements (they represent missing elements in destructuring)
-            if (!await this.matchSequence(container.elements as J.RightPadded<J>[], otherContainer.elements as J.RightPadded<J>[], true)) {
+            if (!this.matchSequence(container.elements as J.RightPadded<J>[], otherContainer.elements as J.RightPadded<J>[], true)) {
                 return this.structuralMismatch('elements');
             }
         } finally {
@@ -286,16 +286,16 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
      * @param index The index in the container
      * @returns true if matching should continue, false if it failed
      */
-    protected async visitContainerElement<T extends J>(
+    protected visitContainerElement<T extends J>(
         element: J.RightPadded<T>,
         otherElement: J.RightPadded<T>,
         index: number
-    ): Promise<boolean> {
-        await this.visitRightPadded(element as any, otherElement as any);
+    ): boolean {
+        this.visitRightPadded(element as any, otherElement as any);
         return this.match;
     }
 
-    override async visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): Promise<J | undefined> {
+    override visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): J | undefined {
         // Check if any arguments are variadic captures
         const hasVariadicCapture = methodInvocation.arguments.elements.some(arg =>
             PlaceholderUtils.isVariadicCapture(arg)
@@ -340,7 +340,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
 
             // Visit select if present
             if (methodInvocation.select && otherMethodInvocation.select) {
-                await this.visit(methodInvocation.select.element, otherMethodInvocation.select.element);
+                this.visit(methodInvocation.select.element, otherMethodInvocation.select.element);
                 if (!this.match) return methodInvocation;
             }
 
@@ -357,19 +357,19 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
 
                 // Visit each type parameter in lock step (visit RightPadded to check for markers)
                 for (let i = 0; i < methodInvocation.typeParameters.elements.length; i++) {
-                    await this.visitRightPadded(methodInvocation.typeParameters.elements[i], otherMethodInvocation.typeParameters.elements[i] as any);
+                    this.visitRightPadded(methodInvocation.typeParameters.elements[i], otherMethodInvocation.typeParameters.elements[i] as any);
                     if (!this.match) return methodInvocation;
                 }
             }
 
             // Visit name
-            await this.visit(methodInvocation.name, otherMethodInvocation.name);
+            this.visit(methodInvocation.name, otherMethodInvocation.name);
             if (!this.match) {
                 return methodInvocation;
             }
 
             // Special handling for variadic captures in arguments
-            if (!await this.matchArguments(methodInvocation.arguments.elements, otherMethodInvocation.arguments.elements)) {
+            if (!this.matchArguments(methodInvocation.arguments.elements, otherMethodInvocation.arguments.elements)) {
                 return this.structuralMismatch('arguments');
             }
 
@@ -380,7 +380,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         }
     }
 
-    override async visitBlock(block: J.Block, other: J): Promise<J | undefined> {
+    override visitBlock(block: J.Block, other: J): J | undefined {
         // Check if any statements have CaptureMarker indicating they're variadic
         const hasVariadicCapture = block.statements.some(stmt => {
             const captureMarker = PlaceholderUtils.getCaptureMarker(stmt);
@@ -420,7 +420,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         this.targetCursor = new Cursor(otherBlock, this.targetCursor);
         try {
             // Special handling for variadic captures in statements
-            if (!await this.matchSequence(block.statements, otherBlock.statements, false)) {
+            if (!this.matchSequence(block.statements, otherBlock.statements, false)) {
                 return this.structuralMismatch('statements');
             }
 
@@ -431,7 +431,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         }
     }
 
-    override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, other: J): Promise<J | undefined> {
+    override visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, other: J): J | undefined {
         // Check if any statements are variadic captures
         const hasVariadicCapture = compilationUnit.statements.some(stmt => {
             return PlaceholderUtils.isVariadicCapture(stmt);
@@ -470,7 +470,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         this.targetCursor = new Cursor(otherCompilationUnit, this.targetCursor);
         try {
             // Special handling for variadic captures in top-level statements
-            if (!await this.matchSequence(compilationUnit.statements, otherCompilationUnit.statements, false)) {
+            if (!this.matchSequence(compilationUnit.statements, otherCompilationUnit.statements, false)) {
                 return this.structuralMismatch('statements');
             }
 
@@ -485,8 +485,8 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
      * Matches argument lists, with special handling for variadic captures.
      * A variadic capture can match zero or more consecutive arguments.
      */
-    private async matchArguments(patternArgs: J.RightPadded<J>[], targetArgs: J.RightPadded<J>[]): Promise<boolean> {
-        return await this.matchSequence(patternArgs, targetArgs, true);
+    private matchArguments(patternArgs: J.RightPadded<J>[], targetArgs: J.RightPadded<J>[]): boolean {
+        return this.matchSequence(patternArgs, targetArgs, true);
     }
 
     /**
@@ -501,8 +501,8 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
      * @param filterEmpty Whether to filter out J.Empty elements when capturing (true for arguments, false for statements)
      * @returns true if the sequence matches, false otherwise
      */
-    protected async matchSequence(patternElements: J.RightPadded<J>[], targetElements: J.RightPadded<J>[], filterEmpty: boolean): Promise<boolean> {
-        return await this.matchSequenceOptimized(patternElements, targetElements, 0, 0, filterEmpty);
+    protected matchSequence(patternElements: J.RightPadded<J>[], targetElements: J.RightPadded<J>[], filterEmpty: boolean): boolean {
+        return this.matchSequenceOptimized(patternElements, targetElements, 0, 0, filterEmpty);
     }
 
     /**
@@ -517,13 +517,13 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
      * @param filterEmpty Whether to filter out J.Empty elements when capturing
      * @returns true if the remaining sequence matches, false otherwise
      */
-    protected async matchSequenceOptimized(
+    protected matchSequenceOptimized(
         patternElements: J.RightPadded<J>[],
         targetElements: J.RightPadded<J>[],
         patternIdx: number,
         targetIdx: number,
         filterEmpty: boolean
-    ): Promise<boolean> {
+    ): boolean {
         // Base case: all patterns matched
         if (patternIdx >= patternElements.length) {
             return targetIdx >= targetElements.length; // Success if all targets consumed
@@ -585,7 +585,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                         const savedMatch = this.match;
                         const savedState = this.matcher.saveState();
 
-                        await this.visitRightPadded(nextPattern, candidateElement as any);
+                        this.visitRightPadded(nextPattern, candidateElement as any);
                         const matchesNext = this.match;
 
                         this.match = savedMatch;
@@ -660,7 +660,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 }
 
                 // Try to match the rest of the pattern
-                const restMatches = await this.matchSequenceOptimized(
+                const restMatches = this.matchSequenceOptimized(
                     patternElements,
                     targetElements,
                     patternIdx + 1,
@@ -691,12 +691,12 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 return false;
             }
 
-            if (!await this.visitSequenceElement(patternWrapper, targetWrapper, targetIdx)) {
+            if (!this.visitSequenceElement(patternWrapper, targetWrapper, targetIdx)) {
                 return false;
             }
 
             // Continue matching the rest
-            return await this.matchSequenceOptimized(
+            return this.matchSequenceOptimized(
                 patternElements,
                 targetElements,
                 patternIdx + 1,
@@ -715,16 +715,16 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
      * @param targetIdx The index in the target sequence
      * @returns true if matching succeeded, false otherwise
      */
-    protected async visitSequenceElement(
+    protected visitSequenceElement(
         patternWrapper: J.RightPadded<J>,
         targetWrapper: J.RightPadded<J>,
         targetIdx: number
-    ): Promise<boolean> {
+    ): boolean {
         // Save current state for backtracking (both match state and capture bindings)
         const savedMatch = this.match;
         const savedState = this.matcher.saveState();
 
-        await this.visitRightPadded(patternWrapper, targetWrapper as any);
+        this.visitRightPadded(patternWrapper, targetWrapper as any);
 
         if (!this.match) {
             // Restore state on match failure
@@ -896,7 +896,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         }
     }
 
-    override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
+    override visit<R extends J>(j: Tree, p: J, parent?: Cursor): R | undefined {
         const captureMarker = PlaceholderUtils.getCaptureMarker(j)!;
         if (captureMarker) {
             const savedTargetCursor = this.targetCursor;
@@ -926,10 +926,10 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             }
         }
 
-        return await super.visit(j, p, parent);
+        return super.visit(j, p, parent);
     }
 
-    protected override async visitElement<T extends J>(j: T, other: T): Promise<T> {
+    protected override visitElement<T extends J>(j: T, other: T): T {
         if (!this.match) {
             return j;
         }
@@ -960,7 +960,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                     this.debug.pushPath(`${kindStr}#${key}`);
                     this.debug.pushPath(i.toString());
                     try {
-                        await this.visitProperty(jValue[i], otherValue[i]);
+                        this.visitProperty(jValue[i], otherValue[i]);
                         if (!this.match) {
                             return j;
                         }
@@ -972,7 +972,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             } else {
                 this.debug.pushPath(`${kindStr}#${key}`);
                 try {
-                    await this.visitProperty(jValue, otherValue);
+                    this.visitProperty(jValue, otherValue);
                     if (!this.match) {
                         return j;
                     }
@@ -985,7 +985,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         return j;
     }
 
-    override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: J): Promise<J.RightPadded<T>> {
+    override visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: J): J.RightPadded<T> {
         if (!this.match) {
             return right;
         }
@@ -1023,10 +1023,10 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             }
         }
 
-        return await super.visitRightPadded(right, p);
+        return super.visitRightPadded(right, p);
     }
 
-    override async visitContainer<T extends J>(container: J.Container<T>, p: J): Promise<J.Container<T>> {
+    override visitContainer<T extends J>(container: J.Container<T>, p: J): J.Container<T> {
         if (!this.match) {
             return container;
         }
@@ -1047,7 +1047,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         this.targetCursor = new Cursor(otherContainer, this.targetCursor);
         try {
             if (hasVariadicCapture) {
-                if (!await this.matchSequence(container.elements as J.RightPadded<J>[], otherContainer.elements as J.RightPadded<J>[], true)) {
+                if (!this.matchSequence(container.elements as J.RightPadded<J>[], otherContainer.elements as J.RightPadded<J>[], true)) {
                     return this.arrayLengthMismatch('elements');
                 }
             } else {
@@ -1059,7 +1059,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                 for (let i = 0; i < container.elements.length; i++) {
                     this.debug.pushPath(i.toString());
                     try {
-                        if (!await this.visitContainerElement(container.elements[i], otherContainer.elements[i], i)) {
+                        if (!this.visitContainerElement(container.elements[i], otherContainer.elements[i], i)) {
                             return container;
                         }
                     } finally {
@@ -1078,11 +1078,11 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
     /**
      * Override visitContainerProperty to add path tracking with property context.
      */
-    protected override async visitContainerProperty<T extends J>(
+    protected override visitContainerProperty<T extends J>(
         propertyName: string,
         container: J.Container<T>,
         otherContainer: J.Container<T>
-    ): Promise<J.Container<T>> {
+    ): J.Container<T> {
         // Get parent from cursor
         const parent = this.cursor.value as J;
 
@@ -1091,7 +1091,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         this.debug.pushPath(`${kindStr}#${propertyName}`);
 
         try {
-            await this.visitContainer(container, otherContainer as any);
+            this.visitContainer(container, otherContainer as any);
             return container;
         } finally {
             this.debug.popPath();
@@ -1101,11 +1101,11 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
     /**
      * Override visitRightPaddedProperty to add path tracking with property context.
      */
-    protected override async visitRightPaddedProperty<T extends J | boolean>(
+    protected override visitRightPaddedProperty<T extends J | boolean>(
         propertyName: string,
         rightPadded: J.RightPadded<T>,
         otherRightPadded: J.RightPadded<T>
-    ): Promise<J.RightPadded<T>> {
+    ): J.RightPadded<T> {
         // Get parent from cursor
         const parent = this.cursor.value as J;
 
@@ -1114,7 +1114,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         this.debug.pushPath(`${kindStr}#${propertyName}`);
 
         try {
-            return await this.visitRightPadded(rightPadded, otherRightPadded as any);
+            return this.visitRightPadded(rightPadded, otherRightPadded as any);
         } finally {
             this.debug.popPath();
         }
@@ -1123,11 +1123,11 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
     /**
      * Override visitLeftPaddedProperty to add path tracking with property context.
      */
-    protected override async visitLeftPaddedProperty<T extends J | J.Space | number | string | boolean>(
+    protected override visitLeftPaddedProperty<T extends J | J.Space | number | string | boolean>(
         propertyName: string,
         leftPadded: J.LeftPadded<T>,
         otherLeftPadded: J.LeftPadded<T>
-    ): Promise<J.LeftPadded<T>> {
+    ): J.LeftPadded<T> {
         // Get parent from cursor
         const parent = this.cursor.value as J;
 
@@ -1136,29 +1136,29 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         this.debug.pushPath(`${kindStr}#${propertyName}`);
 
         try {
-            return await this.visitLeftPadded(leftPadded, otherLeftPadded as any);
+            return this.visitLeftPadded(leftPadded, otherLeftPadded as any);
         } finally {
             this.debug.popPath();
         }
     }
 
 
-    protected override async visitContainerElement<T extends J>(
+    protected override visitContainerElement<T extends J>(
         element: J.RightPadded<T>,
         otherElement: J.RightPadded<T>,
         index: number
-    ): Promise<boolean> {
+    ): boolean {
         // Don't push index here - it should be handled by the caller with proper context
-        return await super.visitContainerElement(element, otherElement, index);
+        return super.visitContainerElement(element, otherElement, index);
     }
 
-    protected override async visitArrayProperty<T>(
+    protected override visitArrayProperty<T>(
         parent: J,
         propertyName: string,
         array1: T[],
         array2: T[],
-        visitor: (item1: T, item2: T, index: number) => Promise<void>
-    ): Promise<void> {
+        visitor: (item1: T, item2: T, index: number) => void
+    ): void {
         // Push path for the property
         const kindStr = this.formatKind((parent as any).kind);
         this.debug.pushPath(`${kindStr}#${propertyName}`);
@@ -1174,7 +1174,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             for (let i = 0; i < array1.length; i++) {
                 this.debug.pushPath(i.toString());
                 try {
-                    await visitor(array1[i], array2[i], i);
+                    visitor(array1[i], array2[i], i);
                     if (!this.match) {
                         return;
                     }
@@ -1187,11 +1187,11 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         }
     }
 
-    protected override async matchSequence(
+    protected override matchSequence(
         patternElements: J.RightPadded<J>[],
         targetElements: J.RightPadded<J>[],
         filterEmpty: boolean
-    ): Promise<boolean> {
+    ): boolean {
         // Push path component for the container
         // Extract kind from cursors if available
         const pattern = this.cursor?.value as any;
@@ -1208,7 +1208,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         }
 
         try {
-            return await super.matchSequence(patternElements, targetElements, filterEmpty);
+            return super.matchSequence(patternElements, targetElements, filterEmpty);
         } finally {
             if (this.cursor?.value) {
                 this.debug.popPath();
@@ -1216,18 +1216,18 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         }
     }
 
-    protected override async visitSequenceElement(
+    protected override visitSequenceElement(
         patternWrapper: J.RightPadded<J>,
         targetWrapper: J.RightPadded<J>,
         targetIdx: number
-    ): Promise<boolean> {
+    ): boolean {
         this.debug.pushPath(targetIdx.toString());
         try {
             // Save current state for backtracking (both match state and capture bindings)
             const savedMatch = this.match;
             const savedState = this.matcher.saveState();
 
-            await this.visitRightPadded(patternWrapper, targetWrapper as any);
+            this.visitRightPadded(patternWrapper, targetWrapper as any);
 
             if (!this.match) {
                 // Preserve explanation before restoring state
@@ -1248,13 +1248,13 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         }
     }
 
-    protected override async matchSequenceOptimized(
+    protected override matchSequenceOptimized(
         patternElements: J.RightPadded<J>[],
         targetElements: J.RightPadded<J>[],
         patternIdx: number,
         targetIdx: number,
         filterEmpty: boolean
-    ): Promise<boolean> {
+    ): boolean {
         if (patternIdx >= patternElements.length) {
             return targetIdx >= targetElements.length;
         }
@@ -1304,7 +1304,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                         const savedMatch = this.match;
                         const savedState = this.matcher.saveState();
 
-                        await this.visitRightPadded(nextPattern, candidateElement as any);
+                        this.visitRightPadded(nextPattern, candidateElement as any);
                         const matchesNext = this.match;
 
                         this.match = savedMatch;
@@ -1371,7 +1371,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                     continue;
                 }
 
-                const restMatches = await this.matchSequenceOptimized(
+                const restMatches = this.matchSequenceOptimized(
                     patternElements,
                     targetElements,
                     patternIdx + 1,
@@ -1406,11 +1406,11 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                 return false;
             }
 
-            if (!await this.visitSequenceElement(patternWrapper, targetWrapper, targetIdx)) {
+            if (!this.visitSequenceElement(patternWrapper, targetWrapper, targetIdx)) {
                 return false;
             }
 
-            return await this.matchSequenceOptimized(
+            return this.matchSequenceOptimized(
                 patternElements,
                 targetElements,
                 patternIdx + 1,

@@ -26,7 +26,7 @@ describe('param() function', () => {
         const tmpl = template`${value} * 2`;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+            override visitLiteral(literal: J.Literal, p: any): J | undefined {
                 if (literal.valueSource === '5') {
                     const ten = produce(literal, draft => {
                         draft.value = 10;
@@ -48,7 +48,7 @@ describe('param() function', () => {
         const tmpl = template`${value} + 1`;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+            override visitLiteral(literal: J.Literal, p: any): J | undefined {
                 if (literal.valueSource === '7') {
                     return tmpl.apply(literal, this.cursor, { values: new Map([[value.getName(), literal]]) });
                 }
@@ -67,7 +67,7 @@ describe('param() function', () => {
         const tmpl = template`${left} * ${right}`;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
                 if (binary.operator.element === J.Binary.Type.Addition) {
                     return tmpl.apply(binary, this.cursor, {
                         values: new Map([

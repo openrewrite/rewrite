@@ -59,9 +59,9 @@ RpcCodecs.registerCodec(J.Markers.TrailingComma, {
         });
     },
 
-    async rpcSend(after: TrailingComma, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.suffix);
+    rpcSend(after: TrailingComma, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.suffix);
     }
 });
 
@@ -78,8 +78,8 @@ export function registerMarkerCodec<M extends Marker>(
             } as Partial<M>);
         },
 
-        async rpcSend(after: M, q: RpcSendQueue): Promise<void> {
-            await q.getAndSend(after, a => a.id);
+        rpcSend(after: M, q: RpcSendQueue): void {
+            q.getAndSend(after, a => a.id);
         }
     });
 }

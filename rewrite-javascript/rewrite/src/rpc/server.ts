@@ -133,9 +133,9 @@ async function main() {
 
     new RewriteRpc(connection, {
         batchSize: options.batchSize,
-        logger: logger,
+        logger,
         metricsCsv: options.metricsCsv,
-        recipeInstallDir: recipeInstallDir
+        recipeInstallDir
     });
 }
 

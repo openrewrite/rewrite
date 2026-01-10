@@ -31,8 +31,8 @@ export class RemoveDuplicateObjectKeys extends Recipe {
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
 
-            protected async visitNewClass(newClass: J.NewClass, ctx: ExecutionContext): Promise<J | undefined> {
-                newClass = await super.visitNewClass(newClass, ctx) as J.NewClass;
+            protected visitNewClass(newClass: J.NewClass, ctx: ExecutionContext): J | undefined {
+                newClass = super.visitNewClass(newClass, ctx) as J.NewClass;
 
                 // Only process object literals (NewClass with body but no class or arguments)
                 if (!newClass.body || newClass.class || (newClass.arguments?.elements && newClass.arguments.elements.length > 0)) {

@@ -489,7 +489,7 @@ any.nextAnonId = 1;
  * // ✅ GOOD: Use param() for standalone templates
  * const value = param<J.Literal>('value');
  * const tmpl = template`return ${value} * 2;`;
- * await tmpl.apply(cursor, node, new Map([['value', someLiteral]]));
+ * tmpl.apply(cursor, node, new Map([['value', someLiteral]]));
  *
  * @example
  * // ✅ GOOD: Use capture() with patterns

@@ -20,94 +20,94 @@ import {updateIfChanged} from "../util";
 
 class YamlSender extends YamlVisitor<RpcSendQueue> {
 
-    protected async preVisit(y: Yaml, q: RpcSendQueue): Promise<Yaml | undefined> {
-        await q.getAndSend(y, y2 => y2.id);
-        await q.getAndSend(y, y2 => y2.prefix);
-        await q.getAndSend(y, y2 => y2.markers);
+    protected preVisit(y: Yaml, q: RpcSendQueue): Yaml | undefined {
+        q.getAndSend(y, y2 => y2.id);
+        q.getAndSend(y, y2 => y2.prefix);
+        q.getAndSend(y, y2 => y2.markers);
         return y;
     }
 
-    protected async visitDocuments(documents: Yaml.Documents, q: RpcSendQueue): Promise<Yaml | undefined> {
-        await q.getAndSend(documents, d => d.sourcePath);
-        await q.getAndSend(documents, d => d.charsetName);
-        await q.getAndSend(documents, d => d.charsetBomMarked);
-        await q.getAndSend(documents, d => d.checksum);
-        await q.getAndSend(documents, d => d.fileAttributes);
-        await q.getAndSendList(documents, d => d.documents, doc => doc.id,
-            async doc => await this.visit(doc, q));
-        await q.getAndSend(documents, d => d.suffix);
+    protected visitDocuments(documents: Yaml.Documents, q: RpcSendQueue): Yaml | undefined {
+        q.getAndSend(documents, d => d.sourcePath);
+        q.getAndSend(documents, d => d.charsetName);
+        q.getAndSend(documents, d => d.charsetBomMarked);
+        q.getAndSend(documents, d => d.checksum);
+        q.getAndSend(documents, d => d.fileAttributes);
+        q.getAndSendList(documents, d => d.documents, doc => doc.id,
+            doc => this.visit(doc, q));
+        q.getAndSend(documents, d => d.suffix);
         return documents;
     }
 
-    protected async visitDocument(document: Yaml.Document, q: RpcSendQueue): Promise<Yaml | undefined> {
-        await q.getAndSend(document, d => d.explicit);
-        await q.getAndSend(document, d => d.block, async b => await this.visit(b, q));
-        await q.getAndSend(document, d => d.end, async e => await this.visit(e, q));
+    protected visitDocument(document: Yaml.Document, q: RpcSendQueue): Yaml | undefined {
+        q.getAndSend(document, d => d.explicit);
+        q.getAndSend(document, d => d.block, b => this.visit(b, q));
+        q.getAndSend(document, d => d.end, e => this.visit(e, q));
         return document;
     }
 
-    protected async visitDocumentEnd(end: Yaml.DocumentEnd, q: RpcSendQueue): Promise<Yaml | undefined> {
-        await q.getAndSend(end, e => e.explicit);
+    protected visitDocumentEnd(end: Yaml.DocumentEnd, q: RpcSendQueue): Yaml | undefined {
+        q.getAndSend(end, e => e.explicit);
         return end;
     }
 
-    protected async visitMapping(mapping: Yaml.Mapping, q: RpcSendQueue): Promise<Yaml | undefined> {
-        await q.getAndSend(mapping, m => m.openingBracePrefix);
-        await q.getAndSendList(mapping, m => m.entries, e => e.id,
-            async e => await this.visit(e, q));
-        await q.getAndSend(mapping, m => m.closingBracePrefix);
-        await q.getAndSend(mapping, m => m.anchor, async a => a ? await this.visit(a, q) : undefined);
-        await q.getAndSend(mapping, m => m.tag, async t => t ? await this.visit(t, q) : undefined);
+    protected visitMapping(mapping: Yaml.Mapping, q: RpcSendQueue): Yaml | undefined {
+        q.getAndSend(mapping, m => m.openingBracePrefix);
+        q.getAndSendList(mapping, m => m.entries, e => e.id,
+            e => this.visit(e, q));
+        q.getAndSend(mapping, m => m.closingBracePrefix);
+        q.getAndSend(mapping, m => m.anchor, a => a ? this.visit(a, q) : undefined);
+        q.getAndSend(mapping, m => m.tag, t => t ? this.visit(t, q) : undefined);
         return mapping;
     }
 
-    protected async visitMappingEntry(entry: Yaml.MappingEntry, q: RpcSendQueue): Promise<Yaml | undefined> {
-        await q.getAndSend(entry, e => e.key, async k => await this.visit(k, q));
-        await q.getAndSend(entry, e => e.beforeMappingValueIndicator);
-        await q.getAndSend(entry, e => e.value, async v => await this.visit(v, q));
+    protected visitMappingEntry(entry: Yaml.MappingEntry, q: RpcSendQueue): Yaml | undefined {
+        q.getAndSend(entry, e => e.key, k => this.visit(k, q));
+        q.getAndSend(entry, e => e.beforeMappingValueIndicator);
+        q.getAndSend(entry, e => e.value, v => this.visit(v, q));
         return entry;
     }
 
-    protected async visitScalar(scalar: Yaml.Scalar, q: RpcSendQueue): Promise<Yaml | undefined> {
-        await q.getAndSend(scalar, s => s.style);
-        await q.getAndSend(scalar, s => s.anchor, async a => a ? await this.visit(a, q) : undefined);
-        await q.getAndSend(scalar, s => s.tag, async t => t ? await this.visit(t, q) : undefined);
-        await q.getAndSend(scalar, s => s.value);
+    protected visitScalar(scalar: Yaml.Scalar, q: RpcSendQueue): Yaml | undefined {
+        q.getAndSend(scalar, s => s.style);
+        q.getAndSend(scalar, s => s.anchor, a => a ? this.visit(a, q) : undefined);
+        q.getAndSend(scalar, s => s.tag, t => t ? this.visit(t, q) : undefined);
+        q.getAndSend(scalar, s => s.value);
         return scalar;
     }
 
-    protected async visitSequence(sequence: Yaml.Sequence, q: RpcSendQueue): Promise<Yaml | undefined> {
-        await q.getAndSend(sequence, s => s.openingBracketPrefix);
-        await q.getAndSendList(sequence, s => s.entries, e => e.id,
-            async e => await this.visit(e, q));
-        await q.getAndSend(sequence, s => s.closingBracketPrefix);
-        await q.getAndSend(sequence, s => s.anchor, async a => a ? await this.visit(a, q) : undefined);
-        await q.getAndSend(sequence, s => s.tag, async t => t ? await this.visit(t, q) : undefined);
+    protected visitSequence(sequence: Yaml.Sequence, q: RpcSendQueue): Yaml | undefined {
+        q.getAndSend(sequence, s => s.openingBracketPrefix);
+        q.getAndSendList(sequence, s => s.entries, e => e.id,
+            e => this.visit(e, q));
+        q.getAndSend(sequence, s => s.closingBracketPrefix);
+        q.getAndSend(sequence, s => s.anchor, a => a ? this.visit(a, q) : undefined);
+        q.getAndSend(sequence, s => s.tag, t => t ? this.visit(t, q) : undefined);
         return sequence;
     }
 
-    protected async visitSequenceEntry(entry: Yaml.SequenceEntry, q: RpcSendQueue): Promise<Yaml | undefined> {
-        await q.getAndSend(entry, e => e.block, async b => await this.visit(b, q));
-        await q.getAndSend(entry, e => e.dash);
-        await q.getAndSend(entry, e => e.trailingCommaPrefix);
+    protected visitSequenceEntry(entry: Yaml.SequenceEntry, q: RpcSendQueue): Yaml | undefined {
+        q.getAndSend(entry, e => e.block, b => this.visit(b, q));
+        q.getAndSend(entry, e => e.dash);
+        q.getAndSend(entry, e => e.trailingCommaPrefix);
         return entry;
     }
 
-    protected async visitAnchor(anchor: Yaml.Anchor, q: RpcSendQueue): Promise<Yaml | undefined> {
-        await q.getAndSend(anchor, a => a.postfix);
-        await q.getAndSend(anchor, a => a.key);
+    protected visitAnchor(anchor: Yaml.Anchor, q: RpcSendQueue): Yaml | undefined {
+        q.getAndSend(anchor, a => a.postfix);
+        q.getAndSend(anchor, a => a.key);
         return anchor;
     }
 
-    protected async visitAlias(alias: Yaml.Alias, q: RpcSendQueue): Promise<Yaml | undefined> {
-        await q.getAndSend(alias, a => a.anchor, async a => await this.visit(a, q));
+    protected visitAlias(alias: Yaml.Alias, q: RpcSendQueue): Yaml | undefined {
+        q.getAndSend(alias, a => a.anchor, a => this.visit(a, q));
         return alias;
     }
 
-    protected async visitTag(tag: Yaml.Tag, q: RpcSendQueue): Promise<Yaml | undefined> {
-        await q.getAndSend(tag, t => t.name);
-        await q.getAndSend(tag, t => t.suffix);
-        await q.getAndSend(tag, t => t.tagKind);
+    protected visitTag(tag: Yaml.Tag, q: RpcSendQueue): Yaml | undefined {
+        q.getAndSend(tag, t => t.name);
+        q.getAndSend(tag, t => t.suffix);
+        q.getAndSend(tag, t => t.tagKind);
         return tag;
     }
 }
@@ -285,8 +285,8 @@ for (const kind of Object.values(Yaml.Kind)) {
             return receiver.visit(before, q)!;
         },
 
-        async rpcSend(after: Yaml, q: RpcSendQueue): Promise<void> {
-            await sender.visit(after, q);
+        rpcSend(after: Yaml, q: RpcSendQueue): void {
+            sender.visit(after, q);
         }
     }, Yaml.Kind.Documents);
 }

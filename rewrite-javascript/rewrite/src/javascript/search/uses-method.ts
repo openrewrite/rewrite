@@ -12,7 +12,7 @@ export class UsesMethod extends JavaVisitor<ExecutionContext> {
         this.matcher = new MethodMatcher(pattern);
     }
 
-    protected async visitExpression(expression: Expression, p: ExecutionContext): Promise<J | undefined> {
+    protected visitExpression(expression: Expression, p: ExecutionContext): J | undefined {
         if (JS.isMethodCall(expression) && this.matcher.matches(expression.methodType)) {
             return foundSearchResult(expression);
         }

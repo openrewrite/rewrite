@@ -31,9 +31,9 @@ RpcCodecs.registerCodec(TreeKind.Checksum, {
         });
     },
 
-    async rpcSend(after: Checksum, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, c => c.algorithm);
-        await q.getAndSend(after, c => c.value);
+    rpcSend(after: Checksum, q: RpcSendQueue): void {
+        q.getAndSend(after, c => c.algorithm);
+        q.getAndSend(after, c => c.value);
     }
 });
 
@@ -50,14 +50,14 @@ RpcCodecs.registerCodec(TreeKind.FileAttributes, {
         });
     },
 
-    async rpcSend(after: FileAttributes, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.creationDate);
-        await q.getAndSend(after, a => a.lastModifiedTime);
-        await q.getAndSend(after, a => a.lastAccessTime);
-        await q.getAndSend(after, a => a.isReadable);
-        await q.getAndSend(after, a => a.isWritable);
-        await q.getAndSend(after, a => a.isExecutable);
-        await q.getAndSend(after, a => a.size);
+    rpcSend(after: FileAttributes, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.creationDate);
+        q.getAndSend(after, a => a.lastModifiedTime);
+        q.getAndSend(after, a => a.lastAccessTime);
+        q.getAndSend(after, a => a.isReadable);
+        q.getAndSend(after, a => a.isWritable);
+        q.getAndSend(after, a => a.isExecutable);
+        q.getAndSend(after, a => a.size);
     }
 });
 
@@ -71,9 +71,9 @@ RpcCodecs.registerCodec(MarkersKind.Markers, {
             : { ...before, id, markers };
     },
 
-    async rpcSend(after: Markers, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, m => m.id);
-        await q.getAndSendList(after, m => m.markers.map(marker => asRef(marker)), m => m.id);
+    rpcSend(after: Markers, q: RpcSendQueue): void {
+        q.getAndSend(after, m => m.id);
+        q.getAndSendList(after, m => m.markers.map(marker => asRef(marker)), m => m.id);
     }
 });
 
@@ -86,9 +86,9 @@ RpcCodecs.registerCodec(MarkersKind.SearchResult, {
         });
     },
 
-    async rpcSend(after: SearchResult, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.description);
+    rpcSend(after: SearchResult, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.description);
     }
 });
 
@@ -101,10 +101,10 @@ RpcCodecs.registerCodec(MarkersKind.MarkupError, {
         });
     },
 
-    async rpcSend(after: MarkupError, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.message);
-        await q.getAndSend(after, a => a.detail);
+    rpcSend(after: MarkupError, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.message);
+        q.getAndSend(after, a => a.detail);
     }
 });
 
@@ -117,10 +117,10 @@ RpcCodecs.registerCodec(MarkersKind.MarkupWarn, {
         });
     },
 
-    async rpcSend(after: MarkupWarn, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.message);
-        await q.getAndSend(after, a => a.detail);
+    rpcSend(after: MarkupWarn, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.message);
+        q.getAndSend(after, a => a.detail);
     }
 });
 
@@ -133,10 +133,10 @@ RpcCodecs.registerCodec(MarkersKind.MarkupInfo, {
         });
     },
 
-    async rpcSend(after: MarkupInfo, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.message);
-        await q.getAndSend(after, a => a.detail);
+    rpcSend(after: MarkupInfo, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.message);
+        q.getAndSend(after, a => a.detail);
     }
 });
 
@@ -149,9 +149,9 @@ RpcCodecs.registerCodec(MarkersKind.MarkupDebug, {
         });
     },
 
-    async rpcSend(after: MarkupDebug, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.message);
-        await q.getAndSend(after, a => a.detail);
+    rpcSend(after: MarkupDebug, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.message);
+        q.getAndSend(after, a => a.detail);
     }
 });

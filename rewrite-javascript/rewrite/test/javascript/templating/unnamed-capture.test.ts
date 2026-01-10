@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
+import {JavaScriptVisitor, capture, pattern, rewrite, template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 
 describe('unnamed capture', () => {
@@ -24,15 +24,15 @@ describe('unnamed capture', () => {
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
 
-            protected override async visitExpression(expr: Expression, p: any): Promise<J | undefined> {
+            protected override visitExpression(expr: Expression, p: any): J | undefined {
                 const left = capture();
                 const right = capture();
 
                 //language=typescript
-                let m = await pattern`${left} + ${right}`.match(expr, this.cursor) ||
-                    await pattern`${left} * ${right}`.match(expr, this.cursor);
+                let m = pattern`${left} + ${right}`.match(expr, this.cursor) ||
+                    pattern`${left} * ${right}`.match(expr, this.cursor);
 
-                return m && await template`${right} + ${left}`.apply(expr, this.cursor, {values: m}) || expr;
+                return m && template`${right} + ${left}`.apply(expr, this.cursor, {values: m}) || expr;
             }
         });
 
@@ -49,13 +49,13 @@ describe('unnamed capture', () => {
     test('more complex example using replace', () => {
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
+            override visitTernary(ternary: J.Ternary, p: any): J | undefined {
                 const obj = capture();
                 const property = capture();
                 const defaultValue = capture();
 
                 //language=typescript
-                return await rewrite(() => ({
+                return rewrite(() => ({
                     before: [
                         pattern`${obj} === null || ${obj} === undefined ? ${defaultValue} : ${obj}.${property}`,
                         pattern`${obj} === undefined || ${obj} === null ? ${defaultValue} : ${obj}.${property}`

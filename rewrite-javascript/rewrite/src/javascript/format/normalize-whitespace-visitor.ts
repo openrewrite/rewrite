@@ -26,14 +26,14 @@ export class NormalizeWhitespaceVisitor<P> extends JavaScriptVisitor<P> {
         super();
     }
 
-    override async visit<R extends J>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
+    override visit<R extends J>(tree: Tree, p: P, parent?: Cursor): R | undefined {
         if (this.cursor?.getNearestMessage("stop") != null) {
             return tree as R;
         }
         return super.visit(tree, p, parent);
     }
 
-    override async postVisit(tree: J, p: P): Promise<J | undefined> {
+    override postVisit(tree: J, p: P): J | undefined {
         if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
             this.cursor?.root.messages.set("stop", true);
         }

@@ -1,4 +1,4 @@
-import {JavaScriptVisitor} from "./visitor";
+import {AsyncJavaScriptVisitor, JavaScriptVisitor} from "./visitor";
 import {emptySpace, J, rightPadded, singleSpace, space, Statement, Type} from "../java";
 import {JS} from "./tree";
 import {randomId} from "../uuid";
@@ -74,10 +74,12 @@ export interface AddImportOptions {
  * maybeAddImport(visitor, { module: 'core-js/stable', sideEffectOnly: true });
  */
 export function maybeAddImport(
-    visitor: JavaScriptVisitor<any>,
+    visitor: JavaScriptVisitor<any> | AsyncJavaScriptVisitor<any>,
     options: AddImportOptions
 ) {
-    for (const v of visitor.afterVisit || []) {
+    // Type assertion needed because afterVisit has different types in sync vs async visitors
+    const afterVisit = visitor.afterVisit as any[];
+    for (const v of afterVisit || []) {
         if (v instanceof AddImport &&
             v.module === options.module &&
             v.member === options.member &&
@@ -87,7 +89,7 @@ export function maybeAddImport(
             return;
         }
     }
-    visitor.afterVisit.push(new AddImport(options));
+    afterVisit.push(new AddImport(options));
 }
 
 export class AddImport<P> extends JavaScriptVisitor<P> {
@@ -324,9 +326,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         return null;
     }
 
-    override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: P): Promise<J | undefined> {
+    override visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: P): J | undefined {
         // First, check if the import already exists
-        const hasImport = await this.checkImportExists(compilationUnit);
+        const hasImport = this.checkImportExists(compilationUnit);
         if (hasImport) {
             return compilationUnit;
         }
@@ -334,7 +336,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // If onlyIfReferenced is true, check if the identifier is actually used
         // Skip this check for side-effect imports
         if (!this.sideEffectOnly && this.onlyIfReferenced) {
-            const isReferenced = await this.checkIdentifierReferenced(compilationUnit);
+            const isReferenced = this.checkIdentifierReferenced(compilationUnit);
             if (!isReferenced) {
                 return compilationUnit;
             }
@@ -349,7 +351,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // - Case 2: Default import without named bindings - add named bindings
         // Don't try to merge default imports (member === 'default'), side-effect imports, or namespace imports (member === '*')
         if (!this.sideEffectOnly && this.member !== undefined && this.member !== 'default' && this.member !== '*') {
-            const mergedCu = await this.tryMergeIntoExistingImport(compilationUnit, p);
+            const mergedCu = this.tryMergeIntoExistingImport(compilationUnit, p);
             if (mergedCu !== compilationUnit) {
                 return mergedCu;
             }
@@ -363,11 +365,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         // Add ES6 import (handles ES6Named, ES6Namespace, ES6Default)
-        return this.produceJavaScript(compilationUnit, p, async draft => {
+        return this.produceJavaScript(compilationUnit, p, draft => {
             // Find the position to insert the import
             const insertionIndex = this.findImportInsertionIndex(compilationUnit);
 
-            const newImport = await this.createImportStatement(compilationUnit, insertionIndex, p);
+            const newImport = this.createImportStatement(compilationUnit, insertionIndex, p);
 
             // Insert the import at the appropriate position
             // Create semicolon marker for the import statement
@@ -430,7 +432,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     /**
      * Try to merge the new member into an existing import from the same module
      */
-    private async tryMergeIntoExistingImport(compilationUnit: JS.CompilationUnit, p: P): Promise<JS.CompilationUnit> {
+    private tryMergeIntoExistingImport(compilationUnit: JS.CompilationUnit, p: P): JS.CompilationUnit {
         for (let i = 0; i < compilationUnit.statements.length; i++) {
             const stmt = compilationUnit.statements[i];
             const statement = stmt.element;
@@ -468,7 +470,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     }
 
                     // We found a matching import with named bindings - merge into it
-                    return this.produceJavaScript(compilationUnit, p, async draft => {
+                    return this.produceJavaScript(compilationUnit, p, draft => {
                         const namedImports = importClause.namedBindings as JS.NamedImports;
                         const existingElements = namedImports.elements.elements;
 
@@ -491,10 +493,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         const trailingSpace = existingElements[lastIndex].after;
 
                         // Build the new elements array with proper spacing
-                        const updatedNamedImports: JS.NamedImports = await this.produceJavaScript(
-                            namedImports, p, async namedDraft => {
+                        const updatedNamedImports: JS.NamedImports = this.produceJavaScript(
+                            namedImports, p, namedDraft => {
                                 const newSpecifier = this.createImportSpecifier();
-
+                        
                                 const newElements = existingElements.flatMap((elem, j) => {
                                     const results: J.RightPadded<JS.ImportSpecifier>[] = [];
                                     if (j === insertIndex) {
@@ -516,21 +518,21 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                     results.push(adjusted);
                                     return results;
                                 });
-
+                        
                                 // Append at end if inserting after all existing elements
                                 if (insertIndex > lastIndex) {
                                     newElements.push(rightPadded({...newSpecifier, prefix: singleSpace}, trailingSpace));
                                 }
-
+                        
                                 namedDraft.elements = {...namedImports.elements, elements: newElements};
                             }
                         );
 
                         // Update the import with the new named imports
-                        const updatedImport: JS.Import = await this.produceJavaScript(
-                            jsImport, p, async importDraft => {
-                                importDraft.importClause = await this.produceJavaScript(
-                                    importClause, p, async clauseDraft => {
+                        const updatedImport: JS.Import = this.produceJavaScript(
+                            jsImport, p, importDraft => {
+                                importDraft.importClause = this.produceJavaScript(
+                                    importClause, p, clauseDraft => {
                                         clauseDraft.namedBindings = updatedNamedImports;
                                     }
                                 );
@@ -547,7 +549,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 // Case 2: Default import without named bindings - add named bindings
                 // Transform: import React from 'react' -> import React, { useState } from 'react'
                 if (importClause.name && !importClause.namedBindings) {
-                    return this.produceJavaScript(compilationUnit, p, async draft => {
+                    return this.produceJavaScript(compilationUnit, p, draft => {
                         const newSpecifier = this.createImportSpecifier();
 
                         // Get the spaces style for brace spacing
@@ -571,10 +573,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
                         // Update the import clause to include named bindings
                         // Also update name.after to emptySpace since the comma goes right after the name
-                        const updatedImport: JS.Import = await this.produceJavaScript(
-                            jsImport, p, async importDraft => {
-                                importDraft.importClause = await this.produceJavaScript(
-                                    importClause, p, async clauseDraft => {
+                        const updatedImport: JS.Import = this.produceJavaScript(
+                            jsImport, p, importDraft => {
+                                importDraft.importClause = this.produceJavaScript(
+                                    importClause, p, clauseDraft => {
                                         // Remove space after default name (comma goes right after)
                                         if (clauseDraft.name) {
                                             clauseDraft.name = {...clauseDraft.name, after: emptySpace};
@@ -607,7 +609,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     /**
      * Check if the import already exists in the compilation unit
      */
-    private async checkImportExists(compilationUnit: JS.CompilationUnit): Promise<boolean> {
+    private checkImportExists(compilationUnit: JS.CompilationUnit): boolean {
         for (const stmt of compilationUnit.statements) {
             const statement = stmt.element;
 
@@ -837,7 +839,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     /**
      * Check if the identifier is actually referenced in the file
      */
-    private async checkIdentifierReferenced(compilationUnit: JS.CompilationUnit): Promise<boolean> {
+    private checkIdentifierReferenced(compilationUnit: JS.CompilationUnit): boolean {
         // For namespace imports, we cannot use type attribution to detect usage
         // because the namespace itself is used as an identifier, not individual members.
         // For simplicity, we skip the onlyIfReferenced check for namespace imports.
@@ -908,7 +910,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // If there ARE existing imports, look for references with the expected declaring type
 
         const collector = new class extends JavaScriptVisitor<void> {
-            override async visitIdentifier(identifier: J.Identifier, p: void): Promise<J | undefined> {
+            override visitIdentifier(identifier: J.Identifier, p: void): J | undefined {
                 if (identifier.simpleName === targetName) {
                     const type = identifier.type;
                     const fieldType = identifier.fieldType;
@@ -976,7 +978,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 return super.visitIdentifier(identifier, p);
             }
 
-            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: void): Promise<J | undefined> {
+            override visitMethodInvocation(methodInvocation: J.MethodInvocation, p: void): J | undefined {
                 if (methodInvocation.methodType && methodInvocation.methodType.name === targetName) {
                     if (expectedDeclaringType) {
                         const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodInvocation.methodType.declaringType);
@@ -988,7 +990,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 return super.visitMethodInvocation(methodInvocation, p);
             }
 
-            override async visitFunctionCall(functionCall: JS.FunctionCall, p: void): Promise<J | undefined> {
+            override visitFunctionCall(functionCall: JS.FunctionCall, p: void): J | undefined {
                 if (functionCall.methodType && functionCall.methodType.name === targetName) {
                     if (expectedDeclaringType) {
                         const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(functionCall.methodType.declaringType);
@@ -1000,7 +1002,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 return super.visitFunctionCall(functionCall, p);
             }
 
-            override async visitFieldAccess(fieldAccess: J.FieldAccess, p: void): Promise<J | undefined> {
+            override visitFieldAccess(fieldAccess: J.FieldAccess, p: void): J | undefined {
                 const type = fieldAccess.type;
                 if (type && Type.isMethod(type)) {
                     const methodType = type as Type.Method;
@@ -1017,7 +1019,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
         };
 
-        await collector.visit(compilationUnit, undefined);
+        collector.visit(compilationUnit, undefined);
 
         return found;
     }
@@ -1025,7 +1027,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     /**
      * Create a new import statement
      */
-    private async createImportStatement(compilationUnit: JS.CompilationUnit, insertionIndex: number, p: P): Promise<JS.Import> {
+    private createImportStatement(compilationUnit: JS.CompilationUnit, insertionIndex: number, p: P): JS.Import {
         // Determine the appropriate prefix (spacing before the import)
         const prefix = this.determineImportPrefix(compilationUnit, insertionIndex);
 

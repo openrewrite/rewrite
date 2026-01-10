@@ -60,17 +60,17 @@ describe("function type mapping", () => {
                     let foundGreet = false;
 
                     await (new class extends JavaScriptVisitor<any> {
-                        async visitIdentifier(identifier: J.Identifier, _: any): Promise<J | undefined> {
+                        visitIdentifier(identifier: J.Identifier, _: any): J | undefined {
                             if (identifier.simpleName === 'add' && identifier.type) {
                                 foundAdd = true;
                                 assertFunctionType(identifier.type, 2, ['a', 'b'], 'double');
                             }
-
+                        
                             if (identifier.simpleName === 'greet' && identifier.type) {
                                 foundGreet = true;
                                 assertFunctionType(identifier.type, 1, ['name'], 'String');
                             }
-
+                        
                             return identifier;
                         }
                     }).visit(cu, 0);
@@ -95,7 +95,7 @@ describe("function type mapping", () => {
                     let foundMultiply = false;
 
                     await (new class extends JavaScriptVisitor<any> {
-                        async visitIdentifier(identifier: J.Identifier, _: any): Promise<J | undefined> {
+                        visitIdentifier(identifier: J.Identifier, _: any): J | undefined {
                             if (identifier.simpleName === 'multiply' && identifier.type) {
                                 foundMultiply = true;
                                 assertFunctionType(identifier.type, 2, ['x', 'y'], 'double');
@@ -123,7 +123,7 @@ describe("function type mapping", () => {
                     let foundDivide = false;
 
                     await (new class extends JavaScriptVisitor<any> {
-                        async visitIdentifier(identifier: J.Identifier, _: any): Promise<J | undefined> {
+                        visitIdentifier(identifier: J.Identifier, _: any): J | undefined {
                             if (identifier.simpleName === 'divide' && identifier.type) {
                                 foundDivide = true;
                                 assertFunctionType(identifier.type, 2, ['a', 'b'], 'double');

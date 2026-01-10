@@ -35,7 +35,7 @@ export class FindIdentifier extends Recipe {
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         const identifier = this.identifier;
         return new class extends JavaScriptVisitor<ExecutionContext> {
-            protected async visitIdentifier(ident: J.Identifier, ctx: ExecutionContext): Promise<J | undefined> {
+            protected visitIdentifier(ident: J.Identifier, ctx: ExecutionContext): J | undefined {
                 if (ident.simpleName === identifier) {
                     return foundSearchResult(ident);
                 }

@@ -69,9 +69,9 @@ export class DataTable<Row> {
     public constructor(name: string, displayName: string, description: string,
                        private rowConstructor: { [key: string | symbol]: any }) {
         this._descriptor = {
-            name: name,
-            displayName: displayName,
-            description: description,
+            name,
+            displayName,
+            description,
             columns: []
         }
     }

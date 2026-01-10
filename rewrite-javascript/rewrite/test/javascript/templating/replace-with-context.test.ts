@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, JavaScriptVisitor, pattern, rewrite, template, typescript} from '../../../src/javascript';
-import {RecipeSpec, fromVisitor} from '../../../src/test';
+import {JavaScriptVisitor, capture, pattern, rewrite, template, typescript} from '../../../src/javascript';
+import {fromVisitor, RecipeSpec} from '../../../src/test';
 import {J} from '../../../src/java';
 
 describe('replace with context', () => {
@@ -23,7 +23,7 @@ describe('replace with context', () => {
     describe('new replace API', () => {
         test('multiple patterns replacement', () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
                     const rule = rewrite(() => {
                         const left = capture("left");
                         const right = capture("right");
@@ -35,7 +35,7 @@ describe('replace with context', () => {
                             after: template`${left} === ${right}`
                         };
                     });
-                    return await rule.tryOn(this.cursor, binary) || binary;
+                    return rule.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -51,7 +51,7 @@ describe('replace with context', () => {
 
         test('captures work across patterns and template', () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
                     const rule = rewrite(() => {
                         const expr = capture();
                         return {
@@ -62,7 +62,7 @@ describe('replace with context', () => {
                             after: template`${expr}`
                         };
                     });
-                    return await rule.tryOn(this.cursor, binary) || binary;
+                    return rule.tryOn(this.cursor, binary) || binary;
                 }
             });
 

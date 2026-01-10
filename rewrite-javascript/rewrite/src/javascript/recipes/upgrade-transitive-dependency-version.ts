@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {Option, ScanningRecipe} from "../../recipe";
+import {Option, RecipeVisitor, ScanningRecipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
 import {TreeVisitor} from "../../visitor";
 import {Tree} from "../../tree";
@@ -39,8 +39,7 @@ import {
     getAllLockFileNames,
     getLockFileName,
     parseLockFileContent,
-    runInstallIfNeeded,
-    runInstallInTempDir,
+    runInstallInTempDirAsync,
     storeInstallResult,
     updateNodeResolutionMarker
 } from "../package-manager";
@@ -122,12 +121,12 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
         };
     }
 
-    async scanner(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
+    async scanner(acc: Accumulator): Promise<RecipeVisitor> {
         const recipe = this;
         const LOCK_FILE_NAMES = getAllLockFileNames();
 
         return new class extends TreeVisitor<Tree, ExecutionContext> {
-            protected async accept(tree: Tree, ctx: ExecutionContext): Promise<Tree | undefined> {
+            protected accept(tree: Tree, ctx: ExecutionContext): Tree | undefined {
                 // Handle JSON documents (package.json and JSON lock files)
                 if (isJson(tree) && tree.kind === Json.Kind.Document) {
                     return this.handleJsonDocument(tree as Json.Document, ctx);
@@ -146,12 +145,12 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                 return tree;
             }
 
-            private async handleJsonDocument(doc: Json.Document, _ctx: ExecutionContext): Promise<Json | undefined> {
+            private handleJsonDocument(doc: Json.Document, _ctx: ExecutionContext): Json | undefined {
                 const basename = path.basename(doc.sourcePath);
 
                 // Capture JSON lock file content (package-lock.json, bun.lock)
                 if (LOCK_FILE_NAMES.includes(basename)) {
-                    acc.originalLockFiles.set(doc.sourcePath, await TreePrinters.print(doc));
+                    acc.originalLockFiles.set(doc.sourcePath, TreePrinters.print(doc));
                     return doc;
                 }
 
@@ -215,7 +214,7 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
 
                 acc.projectsToUpdate.set(doc.sourcePath, {
                     packageJsonPath: doc.sourcePath,
-                    originalPackageJson: await TreePrinters.print(doc),
+                    originalPackageJson: TreePrinters.print(doc),
                     newVersion: recipe.newVersion,
                     packageManager: pm,
                     skipInstall: false, // Always need to run install for overrides
@@ -226,30 +225,36 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                 return doc;
             }
 
-            private async handleYamlDocument(docs: Yaml.Documents, _ctx: ExecutionContext): Promise<Yaml.Documents | undefined> {
+            private handleYamlDocument(docs: Yaml.Documents, _ctx: ExecutionContext): Yaml.Documents | undefined {
                 const basename = path.basename(docs.sourcePath);
                 if (LOCK_FILE_NAMES.includes(basename)) {
-                    acc.originalLockFiles.set(docs.sourcePath, await TreePrinters.print(docs));
+                    acc.originalLockFiles.set(docs.sourcePath, TreePrinters.print(docs));
                 }
                 return docs;
             }
 
-            private async handlePlainTextDocument(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+            private handlePlainTextDocument(text: PlainText, _ctx: ExecutionContext): PlainText | undefined {
                 const basename = path.basename(text.sourcePath);
                 if (LOCK_FILE_NAMES.includes(basename)) {
-                    acc.originalLockFiles.set(text.sourcePath, await TreePrinters.print(text));
+                    acc.originalLockFiles.set(text.sourcePath, TreePrinters.print(text));
                 }
                 return text;
             }
         };
     }
 
-    async editorWithData(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editorWithData(acc: Accumulator): Promise<RecipeVisitor> {
         const recipe = this;
 
+        // Run all package manager installs once, before any files are visited
+        await acc.ensurePrepared(async (_sourcePath, updateInfo) => {
+            await this.runPackageManagerInstall(acc, updateInfo);
+        });
+
         // Create JSON visitor that handles both package.json and JSON lock files
+        // This visitor is now pure - no I/O, just AST transformation using pre-computed data
         const jsonEditor = new class extends JsonVisitor<ExecutionContext> {
-            protected async visitDocument(doc: Json.Document, ctx: ExecutionContext): Promise<Json | undefined> {
+            protected visitDocument(doc: Json.Document, _ctx: ExecutionContext): Json | undefined {
                 const sourcePath = doc.sourcePath;
 
                 // Handle package.json files
@@ -259,10 +264,8 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                         return doc; // This package.json doesn't need updating
                     }
 
-                    // Run package manager install if needed, check for failure
-                    const failureMessage = await runInstallIfNeeded(sourcePath, acc, () =>
-                        recipe.runPackageManagerInstall(acc, updateInfo, ctx)
-                    );
+                    // Check for failure from the pre-computed install
+                    const failureMessage = acc.failedProjects.get(sourcePath);
                     if (failureMessage) {
                         return markupWarn(
                             doc,
@@ -272,7 +275,7 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                     }
 
                     // Add override entries
-                    const modifiedDoc = await this.addOverrideEntry(doc, updateInfo);
+                    const modifiedDoc = this.addOverrideEntry(doc, updateInfo);
 
                     // Update the NodeResolutionResult marker
                     return updateNodeResolutionMarker(modifiedDoc, updateInfo, acc);
@@ -283,7 +286,7 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                 if (getAllLockFileNames().includes(lockFileName)) {
                     const updatedLockContent = acc.updatedLockFiles.get(sourcePath);
                     if (updatedLockContent) {
-                        const parsed = await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Json.Document;
+                        const parsed = parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Json.Document;
                         // Preserve original ID for RPC compatibility
                         return {
                             ...doc,
@@ -299,12 +302,12 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
             /**
              * Adds override entry to package.json for transitive dependency upgrade.
              */
-            private async addOverrideEntry(
+            private addOverrideEntry(
                 doc: Json.Document,
                 updateInfo: ProjectUpdateInfo
-            ): Promise<Json.Document> {
+            ): Json.Document {
                 // Parse current package.json content
-                const currentContent = await TreePrinters.print(doc);
+                const currentContent = TreePrinters.print(doc);
                 let packageJson: Record<string, any>;
                 try {
                     packageJson = JSON.parse(currentContent);
@@ -327,7 +330,7 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
                 const newContent = JSON.stringify(modifiedPackageJson, null, indent);
 
                 // Re-parse with JsonParser to get proper AST
-                const parsed = await new JsonParser({}).parseOne({
+                const parsed = new JsonParser({}).parseOne({
                     text: newContent,
                     sourcePath: doc.sourcePath
                 }) as Json.Document;
@@ -348,11 +351,11 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
     /**
      * Runs the package manager in a temporary directory to update the lock file.
      * All file contents are provided from in-memory sources (SourceFiles), not read from disk.
+     * This is called from editorWithData() before returning the visitor.
      */
     private async runPackageManagerInstall(
         acc: Accumulator,
-        updateInfo: ProjectUpdateInfo,
-        _ctx: ExecutionContext
+        updateInfo: ProjectUpdateInfo
     ): Promise<void> {
         // Create modified package.json with the override
         const modifiedPackageJson = this.createModifiedPackageJson(
@@ -370,7 +373,7 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
         // Look up the original lock file content from captured SourceFiles
         const originalLockFileContent = acc.originalLockFiles.get(lockFilePath);
 
-        const result = await runInstallInTempDir(
+        const result = await runInstallInTempDirAsync(
             updateInfo.packageManager,
             modifiedPackageJson,
             {

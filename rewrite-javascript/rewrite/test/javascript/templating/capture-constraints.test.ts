@@ -49,12 +49,12 @@ describe('Capture Constraints', () => {
             const pat = pattern`${value}`;
 
             // Should match: 150 > 100
-            const match1 = await pat.match(await parseExpression('150'), new Cursor(await parseExpression('150'), undefined));
+            const match1 = pat.match(await parseExpression('150'), new Cursor(await parseExpression('150'), undefined));
             expect(match1).toBeDefined();
             expect(match1?.get(value)).toBeDefined();
 
             // Should not match: 50 <= 100
-            const match2 = await pat.match(await parseExpression('50'), new Cursor(await parseExpression('50'), undefined));
+            const match2 = pat.match(await parseExpression('50'), new Cursor(await parseExpression('50'), undefined));
             expect(match2).toBeUndefined();
         });
 
@@ -65,12 +65,12 @@ describe('Capture Constraints', () => {
             const pat = pattern`${text}`;
 
             // Should match: starts with "hello"
-            const match1 = await pat.match(await parseExpression('"hello world"'), new Cursor(await parseExpression('"hello world"'), undefined));
+            const match1 = pat.match(await parseExpression('"hello world"'), new Cursor(await parseExpression('"hello world"'), undefined));
             expect(match1).toBeDefined();
             expect((match1?.get(text) as J.Literal)?.value).toBe('hello world');
 
             // Should not match: doesn't start with "hello"
-            const match2 = await pat.match(await parseExpression('"goodbye world"'), new Cursor(await parseExpression('"goodbye world"'), undefined));
+            const match2 = pat.match(await parseExpression('"goodbye world"'), new Cursor(await parseExpression('"goodbye world"'), undefined));
             expect(match2).toBeUndefined();
         });
     });
@@ -88,12 +88,12 @@ describe('Capture Constraints', () => {
             const pat = pattern`${value}`;
 
             // Should match: 100 satisfies all constraints
-            const match1 = await pat.match(await parseExpression('100'), new Cursor(await parseExpression('100'), undefined));
+            const match1 = pat.match(await parseExpression('100'), new Cursor(await parseExpression('100'), undefined));
             expect(match1).toBeDefined();
             expect((match1?.get(value) as J.Literal)?.value).toBe(100);
 
             // Should not match: 99 fails even constraint
-            const match2 = await pat.match(await parseExpression('99'), new Cursor(await parseExpression('99'), undefined));
+            const match2 = pat.match(await parseExpression('99'), new Cursor(await parseExpression('99'), undefined));
             expect(match2).toBeUndefined();
         });
     });
@@ -109,15 +109,15 @@ describe('Capture Constraints', () => {
             const pat = pattern`${value}`;
 
             // Should match: is a string
-            const match1 = await pat.match(await parseExpression('"text"'), new Cursor(await parseExpression('"text"'), undefined));
+            const match1 = pat.match(await parseExpression('"text"'), new Cursor(await parseExpression('"text"'), undefined));
             expect(match1).toBeDefined();
 
             // Should match: number > 1000
-            const match2 = await pat.match(await parseExpression('2000'), new Cursor(await parseExpression('2000'), undefined));
+            const match2 = pat.match(await parseExpression('2000'), new Cursor(await parseExpression('2000'), undefined));
             expect(match2).toBeDefined();
 
             // Should not match: number <= 1000 and not a string
-            const match3 = await pat.match(await parseExpression('100'), new Cursor(await parseExpression('100'), undefined));
+            const match3 = pat.match(await parseExpression('100'), new Cursor(await parseExpression('100'), undefined));
             expect(match3).toBeUndefined();
         });
     });
@@ -130,11 +130,11 @@ describe('Capture Constraints', () => {
             const pat = pattern`${value}`;
 
             // Should match: number (not a string)
-            const match1 = await pat.match(await parseExpression('42'), new Cursor(await parseExpression('42'), undefined));
+            const match1 = pat.match(await parseExpression('42'), new Cursor(await parseExpression('42'), undefined));
             expect(match1).toBeDefined();
 
             // Should not match: is a string
-            const match2 = await pat.match(await parseExpression('"text"'), new Cursor(await parseExpression('"text"'), undefined));
+            const match2 = pat.match(await parseExpression('"text"'), new Cursor(await parseExpression('"text"'), undefined));
             expect(match2).toBeUndefined();
         });
     });
@@ -163,16 +163,16 @@ describe('Capture Constraints', () => {
             const expr45 = await parseExpression('45');
 
             // 52: > 50, even, not divisible by 10 ✓
-            expect(await pat.match(expr52, new Cursor(expr52, undefined))).toBeDefined();
+            expect(pat.match(expr52, new Cursor(expr52, undefined))).toBeDefined();
 
             // 202: > 50, > 200, even, not divisible by 10 ✓
-            expect(await pat.match(expr202, new Cursor(expr202, undefined))).toBeDefined();
+            expect(pat.match(expr202, new Cursor(expr202, undefined))).toBeDefined();
 
             // 60: > 50, even, but divisible by 10 ✗
-            expect(await pat.match(expr60, new Cursor(expr60, undefined))).toBeUndefined();
+            expect(pat.match(expr60, new Cursor(expr60, undefined))).toBeUndefined();
 
             // 45: not > 50 ✗
-            expect(await pat.match(expr45, new Cursor(expr45, undefined))).toBeUndefined();
+            expect(pat.match(expr45, new Cursor(expr45, undefined))).toBeUndefined();
         });
     });
 
@@ -184,12 +184,12 @@ describe('Capture Constraints', () => {
             const pat = pattern`${name}`;
 
             // Should match: starts with 'get' and no underscore
-            const match1 = await pat.match(await parseExpression('getData'), new Cursor(await parseExpression('getData'), undefined));
+            const match1 = pat.match(await parseExpression('getData'), new Cursor(await parseExpression('getData'), undefined));
             expect(match1).toBeDefined();
             expect((match1?.get(name) as J.Identifier)?.simpleName).toBe('getData');
 
             // Should not match: contains underscore
-            const match2 = await pat.match(await parseExpression('get_data'), new Cursor(await parseExpression('get_data'), undefined));
+            const match2 = pat.match(await parseExpression('get_data'), new Cursor(await parseExpression('get_data'), undefined));
             expect(match2).toBeUndefined();
         });
     });
@@ -203,12 +203,12 @@ describe('Capture Constraints', () => {
 
             // Should match: 20 > 10
             const expr1 = await parseExpression('foo(20)');
-            const match1 = await pat.match(expr1, new Cursor(expr1, undefined));
+            const match1 = pat.match(expr1, new Cursor(expr1, undefined));
             expect(match1).toBeDefined();
 
             // Should not match: 5 <= 10
             const expr2 = await parseExpression('foo(5)');
-            const match2 = await pat.match(expr2, new Cursor(expr2, undefined));
+            const match2 = pat.match(expr2, new Cursor(expr2, undefined));
             expect(match2).toBeUndefined();
         });
 
@@ -222,11 +222,11 @@ describe('Capture Constraints', () => {
             const pat = pattern`${left} + ${right}`;
 
             // Should match: 10 > 5 and 2 < 5
-            const match1 = await pat.match(await parseExpression('10 + 2'), new Cursor(await parseExpression('10 + 2'), undefined));
+            const match1 = pat.match(await parseExpression('10 + 2'), new Cursor(await parseExpression('10 + 2'), undefined));
             expect(match1).toBeDefined();
 
             // Should not match: 3 <= 5
-            const match2 = await pat.match(await parseExpression('3 + 10'), new Cursor(await parseExpression('3 + 10'), undefined));
+            const match2 = pat.match(await parseExpression('3 + 10'), new Cursor(await parseExpression('3 + 10'), undefined));
             expect(match2).toBeUndefined();
         });
     });
@@ -252,7 +252,7 @@ describe('Capture Constraints', () => {
 
             // Match against a binary expression
             const expr = await parseExpression('10 + 20') as J.Binary;
-            const match = await pat.match(expr, new Cursor(expr, undefined));
+            const match = pat.match(expr, new Cursor(expr, undefined));
 
             expect(match).toBeDefined();
             expect(constraintCalled).toBe(true);
@@ -350,7 +350,7 @@ describe('Capture Constraints', () => {
 
             // Match against the expression
             const expr = await parseExpression('10 + 20') as J.Binary;
-            const match = await pat.match(expr, new Cursor(expr, undefined));
+            const match = pat.match(expr, new Cursor(expr, undefined));
 
             expect(match).toBeDefined();
             expect(capturedNode).toBeDefined();
@@ -381,7 +381,7 @@ describe('Capture Constraints', () => {
             const pat = pattern`foo(${arg})`;
 
             const expr = await parseExpression('foo(42)') as J.MethodInvocation;
-            const match = await pat.match(expr, new Cursor(expr, undefined));
+            const match = pat.match(expr, new Cursor(expr, undefined));
 
             expect(match).toBeDefined();
             expect(capturedArg).toBeDefined();
@@ -409,13 +409,13 @@ describe('Capture Constraints', () => {
             const pat = pattern`${left} + ${right}`;
 
             // Should match: both sides have same value (10)
-            const match1 = await pat.match(await parseExpression('10 + 10'), new Cursor(await parseExpression('10 + 10'), undefined));
+            const match1 = pat.match(await parseExpression('10 + 10'), new Cursor(await parseExpression('10 + 10'), undefined));
             expect(match1).toBeDefined();
             expect((match1?.get(left) as J.Literal)?.value).toBe(10);
             expect((match1?.get(right) as J.Literal)?.value).toBe(10);
 
             // Should not match: different values (10 vs 20)
-            const match2 = await pat.match(await parseExpression('10 + 20'), new Cursor(await parseExpression('10 + 20'), undefined));
+            const match2 = pat.match(await parseExpression('10 + 20'), new Cursor(await parseExpression('10 + 20'), undefined));
             expect(match2).toBeUndefined();
         });
 
@@ -433,11 +433,11 @@ describe('Capture Constraints', () => {
             const pat = pattern`${left} + ${right}`;
 
             // Should match: same values
-            const match1 = await pat.match(await parseExpression('5 + 5'), new Cursor(await parseExpression('5 + 5'), undefined));
+            const match1 = pat.match(await parseExpression('5 + 5'), new Cursor(await parseExpression('5 + 5'), undefined));
             expect(match1).toBeDefined();
 
             // Should not match: different values
-            const match2 = await pat.match(await parseExpression('5 + 10'), new Cursor(await parseExpression('5 + 10'), undefined));
+            const match2 = pat.match(await parseExpression('5 + 10'), new Cursor(await parseExpression('5 + 10'), undefined));
             expect(match2).toBeUndefined();
         });
 
@@ -458,7 +458,7 @@ describe('Capture Constraints', () => {
             const pat = pattern`${left} + ${right}`;
 
             const expr = await parseExpression('15 + 25');
-            const match = await pat.match(expr, new Cursor(expr, undefined));
+            const match = pat.match(expr, new Cursor(expr, undefined));
             expect(match).toBeDefined();
             expect(hasLeftByCapture).toBe(true);
             expect(hasLeftByString).toBe(true);
@@ -491,7 +491,7 @@ describe('Capture Constraints', () => {
 
             // Should match: 1 < 5 < 10 (strictly increasing)
             const expr1 = await parseExpression('1 + 5 + 10');
-            const match1 = await pat.match(expr1, new Cursor(expr1, undefined));
+            const match1 = pat.match(expr1, new Cursor(expr1, undefined));
             expect(match1).toBeDefined();
             expect((match1?.get(a) as J.Literal)?.value).toBe(1);
             expect((match1?.get(b) as J.Literal)?.value).toBe(5);
@@ -499,12 +499,12 @@ describe('Capture Constraints', () => {
 
             // Should not match: 5 < 10 but 10 NOT > 10
             const expr2 = await parseExpression('5 + 10 + 10');
-            const match2 = await pat.match(expr2, new Cursor(expr2, undefined));
+            const match2 = pat.match(expr2, new Cursor(expr2, undefined));
             expect(match2).toBeUndefined();
 
             // Should not match: 10 NOT > 5
             const expr3 = await parseExpression('10 + 5 + 1');
-            const match3 = await pat.match(expr3, new Cursor(expr3, undefined));
+            const match3 = pat.match(expr3, new Cursor(expr3, undefined));
             expect(match3).toBeUndefined();
         });
 
@@ -533,7 +533,7 @@ describe('Capture Constraints', () => {
             const pat = pattern`${left} + ${right}`;
 
             const expr = await parseExpression('30 + 40');
-            const match = await pat.match(expr, new Cursor(expr, undefined));
+            const match = pat.match(expr, new Cursor(expr, undefined));
             expect(match).toBeDefined();
             expect(rightConstraintCalled).toBe(true);
             expect(leftWasAvailable).toBe(true); // Should see left capture

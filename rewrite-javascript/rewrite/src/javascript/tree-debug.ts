@@ -1014,7 +1014,7 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
         this.printPostVisit = config.printPostVisit ?? false;
     }
 
-    public async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
+    public visitContainer<T extends J>(container: J.Container<T>, p: P): J.Container<T> {
         if (this.printPreVisit) {
             const indent = '  '.repeat(this.depth);
             const messages = formatCursorMessages(this.cursor);
@@ -1035,15 +1035,15 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
             console.info(line);
         }
         this.depth++;
-        const result = await super.visitContainer(container, p);
+        const result = super.visitContainer(container, p);
         this.depth--;
         return result;
     }
 
-    public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(
+    public visitLeftPadded<T extends J | J.Space | number | string | boolean>(
         left: J.LeftPadded<T>,
         p: P
-    ): Promise<J.LeftPadded<T> | undefined> {
+    ): J.LeftPadded<T> | undefined {
         if (this.printPreVisit) {
             const indent = '  '.repeat(this.depth);
             const messages = formatCursorMessages(this.cursor);
@@ -1073,15 +1073,15 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
             console.info(line);
         }
         this.depth++;
-        const result = await super.visitLeftPadded(left, p);
+        const result = super.visitLeftPadded(left, p);
         this.depth--;
         return result;
     }
 
-    public async visitRightPadded<T extends J | boolean>(
+    public visitRightPadded<T extends J | boolean>(
         right: J.RightPadded<T>,
         p: P
-    ): Promise<J.RightPadded<T> | undefined> {
+    ): J.RightPadded<T> | undefined {
         if (this.printPreVisit) {
             const indent = '  '.repeat(this.depth);
             const messages = formatCursorMessages(this.cursor);
@@ -1111,12 +1111,12 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
             console.info(line);
         }
         this.depth++;
-        const result = await super.visitRightPadded(right, p);
+        const result = super.visitRightPadded(right, p);
         this.depth--;
         return result;
     }
 
-    protected async preVisit(tree: J, _p: P): Promise<J | undefined> {
+    protected preVisit(tree: J, _p: P): J | undefined {
         if (this.printPreVisit) {
             const typeName = shortTypeName(tree.kind);
             const indent = '  '.repeat(this.depth);
@@ -1145,7 +1145,7 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
         return tree;
     }
 
-    protected async postVisit(tree: J, _p: P): Promise<J | undefined> {
+    protected postVisit(tree: J, _p: P): J | undefined {
         this.depth--;
         if (this.printPostVisit) {
             const typeName = shortTypeName(tree.kind);

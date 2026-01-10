@@ -146,7 +146,7 @@ export function foundSearchResult<T extends { markers: Markers }>(t: T, descript
                 markers: [...t.markers.markers, {
                     kind: MarkersKind.SearchResult,
                     id: randomId(),
-                    description: description
+                    description
                 } as SearchResult]
             }
         } as T;

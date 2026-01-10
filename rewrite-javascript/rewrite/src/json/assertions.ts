@@ -20,7 +20,7 @@ import {Json} from "./tree";
 export function json(before: string | null, after?: AfterRecipeText): SourceSpec<Json.Document> {
     return {
         kind: Json.Kind.Document,
-        before: before,
+        before,
         after: dedentAfter(after),
         ext: 'json',
         parser: () => new JsonParser()

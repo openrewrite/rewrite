@@ -24,8 +24,8 @@ export class MarkPrimitiveTypes extends Recipe {
 
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
-            protected async visitLiteral(literal: J.Literal, ctx: ExecutionContext): Promise<J.Literal> {
-                const visited = await super.visitLiteral(literal, ctx) as J.Literal;
+            protected visitLiteral(literal: J.Literal, ctx: ExecutionContext): J.Literal {
+                const visited = super.visitLiteral(literal, ctx) as J.Literal;
                 if (literal.type && Type.isPrimitive(literal.type)) {
                     const typeDescription = literal.type.keyword || 'None';
                     return foundSearchResult(visited, typeDescription);

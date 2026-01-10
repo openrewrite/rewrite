@@ -29,7 +29,7 @@ export class ExportAssignmentToExportDefault extends Recipe {
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
 
-            protected async visitExportAssignment(exportAssignment: JS.ExportAssignment, p: ExecutionContext): Promise<J | undefined> {
+            protected visitExportAssignment(exportAssignment: JS.ExportAssignment, p: ExecutionContext): J | undefined {
                 // Only transform export = to export default
                 if (exportAssignment.exportEquals) {
                     return produce(exportAssignment, draft => {

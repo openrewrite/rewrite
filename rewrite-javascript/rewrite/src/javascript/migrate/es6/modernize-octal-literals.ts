@@ -29,7 +29,7 @@ export class ModernizeOctalLiterals extends Recipe {
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
 
-            protected async visitLiteral(literal: J.Literal, _ctx: ExecutionContext): Promise<J | undefined> {
+            protected visitLiteral(literal: J.Literal, _ctx: ExecutionContext): J | undefined {
                 // Only process numeric literals
                 if (typeof literal.value !== 'number') {
                     return literal;

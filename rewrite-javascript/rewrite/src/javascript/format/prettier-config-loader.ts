@@ -421,3 +421,65 @@ async function loadPrettierVersionInternal(version: string): Promise<typeof impo
     await installPrettierToCache(version);
     return loadPrettierFromCache(version);
 }
+
+/**
+ * Cache of loaded sync Prettier modules by version.
+ */
+const prettierSyncModuleCache: Map<string, { format: (source: string, options: any) => string }> = new Map();
+
+/**
+ * Synchronously loads a specific version of Prettier for formatting.
+ *
+ * This function will attempt to load Prettier in this order:
+ * 1. From the in-memory cache (if already loaded)
+ * 2. From the current working directory's node_modules (if version matches)
+ * 3. From the cached npm project at ~/.cache/openrewrite/prettier/<version>/
+ *
+ * If the version is not cached, it will throw an error (use loadPrettierVersion first
+ * to ensure the version is installed).
+ *
+ * Uses @prettier/sync for synchronous access to Prettier's format function.
+ *
+ * @param version The Prettier version to load (e.g., "3.4.2")
+ * @returns Object with synchronous format function
+ */
+export function loadPrettierVersionSync(version: string): { format: (source: string, options: any) => string } {
+    // Check in-memory cache first
+    const cached = prettierSyncModuleCache.get(version);
+    if (cached) {
+        return cached;
+    }
+
+    // Try to load from local node_modules if version matches
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const localPrettier = require('prettier');
+        if (localPrettier.version === version) {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const prettierSync = require('@prettier/sync');
+            prettierSyncModuleCache.set(version, prettierSync);
+            return prettierSync;
+        }
+    } catch {
+        // Local prettier not available
+    }
+
+    // Check if version is cached on disk
+    if (isPrettierCached(version)) {
+        // Create sync wrapper using @prettier/sync's createSynchronizedPrettier
+        // Note: We must specify the explicit file path, not just the directory,
+        // because make-synchronized uses dynamic import() which doesn't support
+        // directory imports in ES modules.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { createSynchronizedPrettier } = require('@prettier/sync');
+        const prettierPath = getPrettierCacheDir(version) + '/node_modules/prettier/index.mjs';
+        const syncPrettier = createSynchronizedPrettier({ prettierEntry: prettierPath });
+        prettierSyncModuleCache.set(version, syncPrettier);
+        return syncPrettier;
+    }
+
+    // If not cached, throw an error - sync version can't install
+    throw new Error(
+        `Prettier version ${version} is not cached. Use loadPrettierVersion() first to ensure the version is installed.`
+    );
+}

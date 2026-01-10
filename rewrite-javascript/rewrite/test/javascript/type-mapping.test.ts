@@ -1395,21 +1395,21 @@ describe('JavaScript type mapping', () => {
 
                 async editor(): Promise<JavaScriptVisitor<ExecutionContext>> {
                     return new class extends JavaScriptVisitor<ExecutionContext> {
-                        async visitParameterizedType(paramType: J.ParameterizedType, p: ExecutionContext): Promise<J.ParameterizedType> {
-                            const visited = await super.visitParameterizedType(paramType, p) as J.ParameterizedType;
-
+                        visitParameterizedType(paramType: J.ParameterizedType, p: ExecutionContext): J.ParameterizedType {
+                            const visited = super.visitParameterizedType(paramType, p) as J.ParameterizedType;
+                        
                             // Check if this is React.Ref
                             if (paramType.class.kind === J.Kind.FieldAccess) {
                                 const fa = paramType.class as J.FieldAccess;
                                 const targetName = fa.target.kind === J.Kind.Identifier ?
                                     (fa.target as J.Identifier).simpleName : '';
                                 const fieldName = fa.name.element.simpleName;
-
+                        
                                 if (targetName === 'React' && fieldName === 'Ref') {
                                     reactRefType = paramType.type;
                                 }
                             }
-
+                        
                             return visited;
                         }
                     }
@@ -1843,8 +1843,8 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
 
         async editor(): Promise<JavaScriptVisitor<ExecutionContext>> {
             return new class extends JavaScriptVisitor<ExecutionContext> {
-                async visitLiteral(literal: J.Literal, p: ExecutionContext): Promise<J.Literal> {
-                    const visited = await super.visitLiteral(literal, p) as J.Literal;
+                visitLiteral(literal: J.Literal, p: ExecutionContext): J.Literal {
+                    const visited = super.visitLiteral(literal, p) as J.Literal;
                     const description = predicate(literal, literal.type);
                     if (description) {
                         return foundSearchResult(visited, description);
@@ -1852,8 +1852,8 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
                     return visited;
                 }
 
-                async visitIdentifier(ident: J.Identifier, p: ExecutionContext): Promise<J.Identifier> {
-                    const visited = await super.visitIdentifier(ident, p) as J.Identifier;
+                visitIdentifier(ident: J.Identifier, p: ExecutionContext): J.Identifier {
+                    const visited = super.visitIdentifier(ident, p) as J.Identifier;
                     const description = predicate(ident, ident.type);
                     if (description) {
                         return foundSearchResult(visited, description);
@@ -1861,8 +1861,8 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
                     return visited;
                 }
 
-                async visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): Promise<J.MethodDeclaration> {
-                    const visited = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
+                visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                    const visited = super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
                     const description = predicate(visited, visited.methodType);
                     if (description) {
                         return foundSearchResult(visited, description);
@@ -1870,8 +1870,8 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
                     return visited;
                 }
 
-                async visitNewArray(newArray: J.NewArray, p: ExecutionContext): Promise<J.NewArray> {
-                    const visited = await super.visitNewArray(newArray, p) as J.NewArray;
+                visitNewArray(newArray: J.NewArray, p: ExecutionContext): J.NewArray {
+                    const visited = super.visitNewArray(newArray, p) as J.NewArray;
                     const description = predicate(visited, visited.type);
                     if (description) {
                         return foundSearchResult(visited, description);
@@ -1879,8 +1879,8 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
                     return visited;
                 }
 
-                async visitLambda(lambda: J.Lambda, p: ExecutionContext): Promise<J.Lambda> {
-                    const visited = await super.visitLambda(lambda, p) as J.Lambda;
+                visitLambda(lambda: J.Lambda, p: ExecutionContext): J.Lambda {
+                    const visited = super.visitLambda(lambda, p) as J.Lambda;
                     const description = predicate(visited, (visited as any).methodType);
                     if (description) {
                         return foundSearchResult(visited, description);
@@ -1888,8 +1888,8 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
                     return visited;
                 }
 
-                async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J.MethodInvocation> {
-                    const visited = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
+                    const visited = super.visitMethodInvocation(method, p) as J.MethodInvocation;
                     const description = predicate(visited, visited.methodType);
                     if (description) {
                         return foundSearchResult(visited, description);

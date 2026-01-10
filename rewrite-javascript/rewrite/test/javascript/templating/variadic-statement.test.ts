@@ -14,7 +14,15 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, Pattern, pattern, Template, template, typescript} from "../../../src/javascript";
+import {
+    JavaScriptVisitor,
+    capture,
+    Pattern,
+    pattern,
+    Template,
+    template,
+    typescript
+} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {create as produce} from "mutative";
 
@@ -26,11 +34,11 @@ describe('variadic statement matching and expansion', () => {
      */
     function matchAndReplaceFunction(pat: Pattern, tmpl: Template) {
         return new class extends JavaScriptVisitor<any> {
-            override async visitMethodDeclaration(func: J.MethodDeclaration, p: any): Promise<J | undefined> {
+            override visitMethodDeclaration(func: J.MethodDeclaration, p: any): J | undefined {
                 if (func.body) {
-                    const match = await pat.match(func.body, this.cursor);
+                    const match = pat.match(func.body, this.cursor);
                     if (match) {
-                        const newBody = await tmpl.apply(func.body, this.cursor, {values: match});
+                        const newBody = tmpl.apply(func.body, this.cursor, {values: match});
                         if (newBody && newBody !== func.body) {
                             return produce(func, draft => {
                                 draft.body = newBody as J.Block;

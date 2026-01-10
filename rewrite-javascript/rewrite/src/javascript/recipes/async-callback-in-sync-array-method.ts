@@ -39,7 +39,7 @@ const SYNC_ARRAY_METHODS = new Set([
 
 /**
  * Check if a type is a Promise type.
- * Looks for types like Promise<T>, PromiseLike<T>, or the Promise class itself.
+ * Looks for types like T, PromiseLike<T>, or the Promise class itself.
  */
 function isPromiseType(type?: Type): boolean {
     if (!type) return false;
@@ -53,12 +53,12 @@ function isPromiseType(type?: Type): boolean {
             fqn.endsWith('.PromiseLike');
     }
 
-    // Check for Parameterized type (e.g., Promise<boolean>)
+    // Check for Parameterized type (e.g., boolean)
     if (Type.isParameterized(type)) {
         return isPromiseType(type.type);
     }
 
-    // Check for Union type (e.g., Promise<T> | undefined)
+    // Check for Union type (e.g., T | undefined)
     if (Type.isUnion(type)) {
         return type.bounds.some(b => isPromiseType(b));
     }
@@ -137,7 +137,7 @@ function callbackReturnsPromise(arg: any): boolean {
                     return true;
                 }
             }
-            // Check if it's a parameterized type like Promise<boolean>
+            // Check if it's a parameterized type like boolean
             if (returnType.kind === J.Kind.ParameterizedType) {
                 const pt = returnType as J.ParameterizedType;
                 // ParameterizedType has 'clazz' property which is the base type
@@ -207,8 +207,8 @@ export class AsyncCallbackInSyncArrayMethod extends Recipe {
 
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
-            override async visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): Promise<J | undefined> {
-                let m = await super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
+            override visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J | undefined {
+                let m = super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
 
                 const methodName = m.name?.simpleName;
                 if (!methodName || !SYNC_ARRAY_METHODS.has(methodName)) {

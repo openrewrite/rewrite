@@ -154,10 +154,10 @@ export class TemplateBuilder {
  * const pat = pattern`foo(${method})`;
  * const tmpl = template`bar(${method.name})`; // Access the 'name' property
  *
- * const match = await pat.match(someNode);
+ * const match = pat.match(someNode, cursor);
  * if (match) {
  *     // The template will insert just the 'name' subtree from the captured method
- *     const result = await tmpl.apply(cursor, someNode, match);
+ *     const result = tmpl.apply(someNode, cursor, { values: match });
  * }
  *
  * @example
@@ -236,7 +236,7 @@ export class Template {
      * @returns The cached or newly computed template tree
      * @internal
      */
-    private async getTemplateTree(): Promise<JS.CompilationUnit> {
+    private getTemplateTree(): JS.CompilationUnit {
         // Level 1: Instance cache (fastest path)
         if (this._cachedTemplate) {
             return this._cachedTemplate as JS.CompilationUnit;
@@ -269,7 +269,7 @@ export class Template {
         }
 
         // Level 3: Compute via TemplateEngine (slow path)
-        const result = await TemplateEngine.getTemplateTree(
+        const result = TemplateEngine.getTemplateTree(
             this.templateParts,
             this.parameters,
             contextStatements,
@@ -289,24 +289,24 @@ export class Template {
      * @param tree Input tree to transform
      * @param cursor The cursor pointing to the current location in the AST
      * @param options Optional configuration including values for parameters
-     * @returns A Promise resolving to the generated AST node
+     * @returns The generated AST node
      *
      * @example
      * ```typescript
      * // Simple application without values
-     * const result = await tmpl.apply(node, cursor);
+     * const result = tmpl.apply(node, cursor);
      *
      * // With values from pattern match
-     * const match = await pat.match(node, cursor);
-     * const result = await tmpl.apply(node, cursor, { values: match });
+     * const match = pat.match(node, cursor);
+     * const result = tmpl.apply(node, cursor, { values: match });
      *
      * // With explicit values
-     * const result = await tmpl.apply(node, cursor, {
+     * const result = tmpl.apply(node, cursor, {
      *     values: { x: someNode, y: anotherNode }
      * });
      * ```
      */
-    async apply(tree: J, cursor: Cursor, options?: ApplyOptions): Promise<J | undefined> {
+    apply(tree: J, cursor: Cursor, options?: ApplyOptions): J | undefined {
         // Extract values from options
         const values = options?.values;
 
@@ -346,7 +346,7 @@ export class Template {
         }
 
         // Use instance-level cache to get the template tree
-        const ast = await this.getTemplateTree();
+        const ast = this.getTemplateTree();
 
         // Delegate to TemplateEngine for placeholder substitution and application
         return TemplateEngine.applyTemplateFromAst(
@@ -383,7 +383,7 @@ export class Template {
  * @example
  * // Simple template with literal
  * const tmpl = template`console.log("hello")`;
- * const result = await tmpl.apply(cursor, node);
+ * const result = tmpl.apply(node, cursor);
  *
  * @example
  * // Template with capture - matches captured value from pattern
@@ -391,9 +391,9 @@ export class Template {
  * const pat = pattern`foo(${expr})`;
  * const tmpl = template`bar(${expr})`;
  *
- * const match = await pat.match(node);
+ * const match = pat.match(node, cursor);
  * if (match) {
- *     const result = await tmpl.apply(cursor, node, match);
+ *     const result = tmpl.apply(node, cursor, { values: match });
  * }
  *
  * @example

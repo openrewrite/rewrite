@@ -28,10 +28,10 @@ describe('forwardRef pattern with replacement', () => {
         const tmpl = template`${arg}`;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
-                const m = await pat.match(methodInvocation, this.cursor);
+            override visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): J | undefined {
+                const m = pat.match(methodInvocation, this.cursor);
                 if (m) {
-                    const result = await tmpl.apply(methodInvocation, this.cursor, { values: m });
+                    const result = tmpl.apply(methodInvocation, this.cursor, { values: m });
                     if (result) {
                         return result;
                     }
@@ -67,11 +67,11 @@ describe('forwardRef pattern with replacement', () => {
         const tmpl = template`${componentDef}`;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
+            override visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): J | undefined {
                 if ((methodInvocation.name as J.Identifier).simpleName === 'forwardRef') {
-                    const m = await pat.match(methodInvocation, this.cursor);
+                    const m = pat.match(methodInvocation, this.cursor);
                     if (m) {
-                        const result = await tmpl.apply(methodInvocation, this.cursor, { values: m });
+                        const result = tmpl.apply(methodInvocation, this.cursor, { values: m });
                         if (result) {
                             return result;
                         }
@@ -112,12 +112,12 @@ describe('forwardRef pattern with replacement', () => {
         const tmpl = template`bar(${methodName})`;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
+            override visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): J | undefined {
                 if ((methodInvocation.name as J.Identifier).simpleName === 'foo') {
-                    const m = await pat.match(methodInvocation, this.cursor);
+                    const m = pat.match(methodInvocation, this.cursor);
                     if (m) {
                         // Replace foo(baz()) with bar(baz)
-                        const result = await tmpl.apply(methodInvocation, this.cursor, { values: m });
+                        const result = tmpl.apply(methodInvocation, this.cursor, { values: m });
                         if (result) {
                             return result;
                         }
@@ -156,12 +156,12 @@ describe('forwardRef pattern with replacement', () => {
         const tmpl = template`bar(${(invocation.arguments.elements[0].element)})`;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
+            override visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): J | undefined {
                 if ((methodInvocation.name as J.Identifier).simpleName === 'foo') {
-                    const m = await pat.match(methodInvocation, this.cursor);
+                    const m = pat.match(methodInvocation, this.cursor);
                     if (m) {
                         // Replace foo(baz()) with bar(baz())
-                        const result = await tmpl.apply(methodInvocation, this.cursor, { values: m });
+                        const result = tmpl.apply(methodInvocation, this.cursor, { values: m });
                         if (result) {
                             return result;
                         }

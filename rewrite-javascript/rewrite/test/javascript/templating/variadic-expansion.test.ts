@@ -14,7 +14,16 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {any, capture, JavaScriptVisitor, pattern, Pattern, template, Template, typescript} from "../../../src/javascript";
+import {
+    any,
+    JavaScriptVisitor,
+    capture,
+    pattern,
+    Pattern,
+    template,
+    Template,
+    typescript
+} from "../../../src/javascript";
 import {J} from "../../../src/java";
 
 describe('variadic template expansion', () => {
@@ -25,10 +34,10 @@ describe('variadic template expansion', () => {
      */
     function matchAndReplace(pat: Pattern, tmpl: Template) {
         return new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                const match = await pat.match(method, this.cursor);
+            override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
+                const match = pat.match(method, this.cursor);
                 if (match) {
-                    return await tmpl.apply(method, this.cursor, {values: match});
+                    return tmpl.apply(method, this.cursor, {values: match});
                 }
                 return method;
             }

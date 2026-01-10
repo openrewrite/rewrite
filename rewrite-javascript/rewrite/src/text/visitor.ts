@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {TreeVisitor} from "../visitor";
+import {AsyncTreeVisitor, TreeVisitor} from "../visitor";
 import {SourceFile, Tree} from "../tree";
-import {mapAsync} from "../util";
+import {mapAsync, mapSync} from "../util";
 import {isPlainText, PlainText} from "./tree";
 
-export class PlainTextVisitor<P> extends TreeVisitor<Tree, P> {
+export class AsyncPlainTextVisitor<P> extends AsyncTreeVisitor<Tree, P> {
     async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
         return isPlainText(sourceFile);
     }
@@ -34,6 +34,33 @@ export class PlainTextVisitor<P> extends TreeVisitor<Tree, P> {
     }
 
     protected async accept(t: Tree, p: P): Promise<Tree | undefined> {
+        switch (t.kind) {
+            case PlainText.Kind.PlainText:
+                return this.visitText(t as PlainText, p);
+            case PlainText.Kind.Snippet:
+                return this.visitSnippet(t as PlainText.Snippet, p);
+            default:
+                throw new Error(`Unexpected text kind ${t.kind}`);
+        }
+    }
+}
+
+export class PlainTextVisitor<P> extends TreeVisitor<Tree, P> {
+    isAcceptable(sourceFile: SourceFile): boolean {
+        return isPlainText(sourceFile);
+    }
+
+    protected visitText(text: PlainText, p: P): PlainText | undefined {
+        return this.produceTree<PlainText>(text, p, draft => {
+            draft.snippets = mapSync(text.snippets, snippet => this.visit(snippet, p));
+        })
+    }
+
+    protected visitSnippet(snippet: PlainText.Snippet, p: P): PlainText.Snippet | undefined {
+        return this.produceTree<PlainText.Snippet>(snippet, p)
+    }
+
+    protected accept(t: Tree, p: P): Tree | undefined {
         switch (t.kind) {
             case PlainText.Kind.PlainText:
                 return this.visitText(t as PlainText, p);

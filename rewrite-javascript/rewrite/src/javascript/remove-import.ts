@@ -1,11 +1,11 @@
-import {JavaScriptVisitor} from "./visitor";
+import {AsyncJavaScriptVisitor, JavaScriptVisitor} from "./visitor";
 import {J} from "../java";
 import {JS, JSX} from "./tree";
-import {mapAsync} from "../util";
+import {mapSync} from "../util";
 import {ElementRemovalFormatter} from "../java";
 
 /**
- * @param visitor The visitor to add the import removal to
+ * @param visitor The visitor to add the import removal to (supports both sync and async visitors)
  * @param module The module name (e.g., 'fs', 'react') to remove imports from
  * @param member Optionally, the specific member to remove from the import.
  *               If not specified, removes all unused imports from the module.
@@ -30,13 +30,14 @@ import {ElementRemovalFormatter} from "../java";
  * // Remove namespace import if unused
  * maybeRemoveImport(visitor, 'fs', '*');
  */
-export function maybeRemoveImport(visitor: JavaScriptVisitor<any>, module: string, member?: string) {
-    for (const v of visitor.afterVisit || []) {
+export function maybeRemoveImport(visitor: JavaScriptVisitor<any> | AsyncJavaScriptVisitor<any>, module: string, member?: string) {
+    const afterVisit = visitor.afterVisit as any[];
+    for (const v of afterVisit || []) {
         if (v instanceof RemoveImport && v.module === module && v.member === member) {
             return;
         }
     }
-    visitor.afterVisit.push(new RemoveImport(module, member));
+    afterVisit.push(new RemoveImport(module, member));
 }
 
 // Type alias for RightPadded elements to simplify type signatures
@@ -68,12 +69,12 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
      * first remaining element to maintain proper spacing. Also preserves trailing space
      * from the last element if it's removed.
      */
-    private async filterElementsWithPrefixPreservation<T extends J>(
+    private filterElementsWithPrefixPreservation<T extends J>(
         elements: RightPaddedElement<T>[],
         shouldKeep: (elem: T) => boolean,
-        updatePrefix: (elem: T, prefix: J.Space) => Promise<T>,
+        updatePrefix: (elem: T, prefix: J.Space) => T,
         _p: P
-    ): Promise<{ filtered: RightPaddedElement<T>[], allRemoved: boolean }> {
+    ): { filtered: RightPaddedElement<T>[], allRemoved: boolean } {
         const filtered: RightPaddedElement<T>[] = [];
         let removedPrefix: J.Space | undefined;
 
@@ -86,7 +87,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 // If we removed the previous element and this is the first kept element,
                 // apply the removed element's prefix to maintain formatting
                 if (removedPrefix && filtered.length === 0) {
-                    const updatedElement = await updatePrefix(elem.element, removedPrefix);
+                    const updatedElement = updatePrefix(elem.element, removedPrefix);
                     filtered.push({...elem, element: updatedElement});
                     removedPrefix = undefined;
                 } else {
@@ -119,64 +120,64 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
     /**
      * Helper to update an import clause by removing specific bindings
      */
-    private async updateImportClause(
+    private updateImportClause(
         jsImport: JS.Import,
         importClause: JS.ImportClause,
-        updateFn: (draft: any) => void | Promise<void>,
+        updateFn: (draft: any) => void,
         p: P
-    ): Promise<JS.Import> {
-        return this.produceJavaScript(jsImport, p, async draft => {
+    ): JS.Import {
+        return this.produceJavaScript(jsImport, p,  draft => {
             if (draft.importClause) {
-                draft.importClause = await this.produceJavaScript(
-                    importClause, p, async (clauseDraft: any) => await updateFn(clauseDraft)
+                draft.importClause = this.produceJavaScript(
+                    importClause, p,  (clauseDraft: any) => updateFn(clauseDraft)
                 );
             }
         });
     }
 
-    override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: P): Promise<J | undefined> {
+    override visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: P): J | undefined {
         // First, collect all used identifiers in the file
         const usedIdentifiers = new Set<string>();
         const usedTypes = new Set<string>();
 
         // Traverse the AST to collect used identifiers
-        await this.collectUsedIdentifiers(compilationUnit, usedIdentifiers, usedTypes);
+        this.collectUsedIdentifiers(compilationUnit, usedIdentifiers, usedTypes);
 
         // Now process imports with knowledge of what's used
-        return this.produceJavaScript(compilationUnit, p, async draft => {
+        return this.produceJavaScript(compilationUnit, p,  draft => {
             const formatter = new ElementRemovalFormatter<J>(true); // Preserve file headers from first import
 
-            draft.statements = await mapAsync(compilationUnit.statements, async (stmt) => {
+            draft.statements = mapSync(compilationUnit.statements,  (stmt) => {
                 const statement = stmt.element;
-
+            
                 // Handle ES6 imports
                 if (statement?.kind === JS.Kind.Import) {
                     const jsImport = statement as JS.Import;
-                    const result = await this.processImport(jsImport, usedIdentifiers, usedTypes, p);
+                    const result = this.processImport(jsImport, usedIdentifiers, usedTypes, p);
                     if (result === undefined) {
                         formatter.markRemoved(statement);
                         return undefined;
                     }
-
+            
                     const finalResult = formatter.processKept(result) as JS.Import;
                     return {...stmt, element: finalResult};
                 }
-
+            
                 // Handle CommonJS require statements
                 // Note: const fs = require() comes as J.VariableDeclarations
                 // Multi-variable declarations might come as JS.ScopedVariableDeclarations
                 if (statement?.kind === J.Kind.VariableDeclarations) {
                     const varDecl = statement as J.VariableDeclarations;
-                    const result = await this.processRequireFromVarDecls(varDecl, usedIdentifiers, p);
+                    const result = this.processRequireFromVarDecls(varDecl, usedIdentifiers, p);
                     if (result === undefined) {
                         formatter.markRemoved(statement);
                         return undefined;
                     }
-
+            
                     const finalResult = formatter.processKept(result) as J.VariableDeclarations;
                     return {...stmt, element: finalResult};
                 }
-
+            
                 // Handle JS.ScopedVariableDeclarations (multi-variable var/let/const)
                 if (statement?.kind === JS.Kind.ScopedVariableDeclarations) {
                     const scopedVarDecl = statement as any;
@@ -184,11 +185,11 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     const filteredVariables: any[] = [];
                     let hasChanges = false;
                     const varFormatter = new ElementRemovalFormatter<J.VariableDeclarations>(true); // Preserve file headers
-
+            
                     for (const v of scopedVarDecl.variables) {
                         const varDecl = v.element;
                         if (varDecl?.kind === J.Kind.VariableDeclarations) {
-                            const result = await this.processRequireFromVarDecls(varDecl as J.VariableDeclarations, usedIdentifiers, p);
+                            const result = this.processRequireFromVarDecls(varDecl as J.VariableDeclarations, usedIdentifiers, p);
                             if (result === undefined) {
                                 hasChanges = true;
                                 varFormatter.markRemoved(varDecl);
@@ -200,40 +201,40 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                             filteredVariables.push(v);
                         }
                     }
-
+            
                     if (filteredVariables.length === 0) {
                         formatter.markRemoved(statement);
                         return undefined;
                     }
-
+            
                     const finalElement: any = hasChanges
                         ? formatter.processKept({...scopedVarDecl, variables: filteredVariables})
                         : formatter.processKept(statement);
-
+            
                     return {...stmt, element: finalElement};
                 }
-
+            
                 // For any other statement type, apply prefix from removed elements
                 if (statement) {
                     const finalStatement = formatter.processKept(statement);
                     return {...stmt, element: finalStatement};
                 }
-
+            
                 return stmt;
             });
 
             // Filter out undefined (removed) statements
             draft.statements = draft.statements.filter(s => s !== undefined);
-            draft.eof = await this.visitSpace(compilationUnit.eof, p);
+            draft.eof = this.visitSpace(compilationUnit.eof, p);
         });
     }
 
-    private async processImport(
+    private processImport(
         jsImport: JS.Import,
         usedIdentifiers: Set<string>,
         usedTypes: Set<string>,
         p: P
-    ): Promise<JS.Import | undefined> {
+    ): JS.Import | undefined {
         // Handle import-equals-require syntax: import util = require("util");
         if (jsImport.initializer) {
             return this.processImportEqualsRequire(jsImport, usedIdentifiers, usedTypes, p);
@@ -276,13 +277,13 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                         return undefined;
                     }
                     // Otherwise, just remove the default import and fix spacing
-                    return this.updateImportClause(jsImport, importClause, async draft => {
+                    return this.updateImportClause(jsImport, importClause,  draft => {
                         draft.name = undefined;
                         // When removing the default import, we need to transfer its prefix to namedBindings
                         // to maintain proper spacing (the default import's prefix is typically empty)
                         if (draft.namedBindings && importClause.name?.element) {
-                            draft.namedBindings = await this.produceJava(
-                                draft.namedBindings, p, async bindingsDraft => {
+                            draft.namedBindings = this.produceJava(
+                                draft.namedBindings, p,  bindingsDraft => {
                                     bindingsDraft.prefix = importClause.name!.element!.prefix;
                                 }
                             );
@@ -361,7 +362,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             // Handle named imports: import { a, b } from 'module'
             if (namedBindings.kind === JS.Kind.NamedImports) {
                 const namedImports = namedBindings as JS.NamedImports;
-                const updatedImports = await this.processNamedImports(namedImports, usedIdentifiers, usedTypes, p);
+                const updatedImports = this.processNamedImports(namedImports, usedIdentifiers, usedTypes, p);
 
                 if (updatedImports === undefined) {
                     // All named imports were removed
@@ -389,12 +390,12 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
      * Process TypeScript import-equals-require syntax: import util = require("util");
      * This is represented as a JS.Import with an initializer containing the require() call.
      */
-    private async processImportEqualsRequire(
+    private processImportEqualsRequire(
         jsImport: JS.Import,
         usedIdentifiers: Set<string>,
         usedTypes: Set<string>,
         p: P
-    ): Promise<JS.Import | undefined> {
+    ): JS.Import | undefined {
         const initializer = jsImport.initializer?.element;
         if (!initializer || !this.isRequireCall(initializer)) {
             return jsImport;
@@ -453,24 +454,24 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         return !usedIdentifiers.has(name) && !usedTypes.has(name);
     }
 
-    private async processNamedImports(
+    private processNamedImports(
         namedImports: JS.NamedImports,
         usedIdentifiers: Set<string>,
         usedTypes: Set<string>,
         p: P
-    ): Promise<JS.NamedImports | undefined> {
-        const {filtered, allRemoved} = await this.filterElementsWithPrefixPreservation(
+    ): JS.NamedImports | undefined {
+        const {filtered, allRemoved} = this.filterElementsWithPrefixPreservation(
             namedImports.elements.elements,
             (elem: J) => {
                 if (elem.kind === JS.Kind.ImportSpecifier) {
                     const specifier = elem as JS.ImportSpecifier;
                     const importName = this.getImportName(specifier);
                     const aliasName = this.getImportAlias(specifier);
-
+        
                     // For aliased imports, check if the alias is used
                     // For non-aliased imports, check if the import name is used
                     const nameToCheck = aliasName || importName;
-
+        
                     // Check if we should remove this import
                     if (this.member !== undefined) {
                         // We're removing a specific member - check if this matches
@@ -486,10 +487,10 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 }
                 return true; // Keep non-ImportSpecifier elements
             },
-            async (elem: J, prefix: J.Space) => {
+            (elem: J, prefix: J.Space) => {
                 if (elem.kind === JS.Kind.ImportSpecifier) {
                     return this.produceJavaScript(
-                        elem as JS.ImportSpecifier, p, async draft => {
+                        elem as JS.ImportSpecifier, p,  draft => {
                             draft.prefix = prefix;
                         }
                     );
@@ -508,7 +509,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         }
 
         // Create updated named imports with filtered elements
-        return this.produceJavaScript(namedImports, p, async draft => {
+        return this.produceJavaScript(namedImports, p,  draft => {
             draft.elements = {
                 ...namedImports.elements,
                 elements: filtered as any
@@ -516,11 +517,11 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         });
     }
 
-    private async processRequireFromVarDecls(
+    private processRequireFromVarDecls(
         varDecls: J.VariableDeclarations,
         usedIdentifiers: Set<string>,
         p: P
-    ): Promise<J.VariableDeclarations | undefined> {
+    ): J.VariableDeclarations | undefined {
         // Check if this is a require() call
         if (varDecls.variables.length !== 1) {
             return varDecls;
@@ -558,15 +559,15 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         // Handle: const { readFile } = require('fs')
         if (pattern.kind === JS.Kind.ObjectBindingPattern && this.member !== undefined) {
             const objectPattern = pattern as JS.ObjectBindingPattern;
-            const updatedPattern = await this.processObjectBindingPattern(objectPattern, usedIdentifiers, p);
+            const updatedPattern = this.processObjectBindingPattern(objectPattern, usedIdentifiers, p);
 
             if (updatedPattern === undefined) {
                 return undefined; // Remove entire require
             } else if (updatedPattern !== objectPattern) {
                 // Update with filtered bindings
-                return this.produceJava(varDecls, p, async draft => {
-                    const updatedNamedVar = await this.produceJava(
-                        namedVar, p, async namedDraft => {
+                return this.produceJava(varDecls, p,  draft => {
+                    const updatedNamedVar = this.produceJava(
+                        namedVar, p,  namedDraft => {
                             namedDraft.name = updatedPattern;
                         }
                     );
@@ -595,12 +596,12 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         return (firstArg as J.Literal).value?.toString();
     }
 
-    private async processObjectBindingPattern(
+    private processObjectBindingPattern(
         pattern: JS.ObjectBindingPattern,
         usedIdentifiers: Set<string>,
         p: P
-    ): Promise<JS.ObjectBindingPattern | undefined> {
-        const {filtered, allRemoved} = await this.filterElementsWithPrefixPreservation(
+    ): JS.ObjectBindingPattern | undefined {
+        const {filtered, allRemoved} = this.filterElementsWithPrefixPreservation(
             pattern.bindings.elements,
             (elem: J) => {
                 if (elem.kind === JS.Kind.BindingElement) {
@@ -612,16 +613,16 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 }
                 return true; // Keep other element types
             },
-            async (elem: J, prefix: J.Space) => {
+            (elem: J, prefix: J.Space) => {
                 if (elem.kind === J.Kind.Identifier) {
                     return this.produceJava(
-                        elem as J.Identifier, p, async draft => {
+                        elem as J.Identifier, p,  draft => {
                             draft.prefix = prefix;
                         }
                     );
                 } else if (elem.kind === JS.Kind.BindingElement) {
                     return this.produceJavaScript(
-                        elem as JS.BindingElement, p, async draft => {
+                        elem as JS.BindingElement, p,  draft => {
                             draft.prefix = prefix;
                         }
                     );
@@ -639,7 +640,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             return pattern;
         }
 
-        return this.produceJavaScript(pattern, p, async draft => {
+        return this.produceJavaScript(pattern, p,  draft => {
             draft.bindings = {
                 ...pattern.bindings,
                 elements: filtered as any
@@ -722,29 +723,29 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
     /**
      * Helper to traverse parameters from various node types
      */
-    private async traverseParameters(
+    private traverseParameters(
         params: any,
         usedIdentifiers: Set<string>,
         usedTypes: Set<string>
-    ): Promise<void> {
+    ): void {
         if (!params || typeof params !== 'object') return;
 
         if (Array.isArray(params)) {
             for (const p of params) {
                 // Array elements might be RightPadded, so unwrap them
                 const elem = (p as any).element || p;
-                await this.collectUsedIdentifiers(elem, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers(elem, usedIdentifiers, usedTypes);
             }
         } else if (params.elements) {
             for (const p of params.elements) {
                 if (p.element) {
-                    await this.collectUsedIdentifiers(p.element, usedIdentifiers, usedTypes);
+                    this.collectUsedIdentifiers(p.element, usedIdentifiers, usedTypes);
                 }
             }
         } else if (params.parameters) {
             for (const p of params.parameters) {
                 const elem = p.element || p;
-                await this.collectUsedIdentifiers(elem, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers(elem, usedIdentifiers, usedTypes);
             }
         }
     }
@@ -752,18 +753,18 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
     /**
      * Helper to traverse statements from various node types
      */
-    private async traverseStatements(
+    private traverseStatements(
         statements: any,
         usedIdentifiers: Set<string>,
         usedTypes: Set<string>
-    ): Promise<void> {
+    ): void {
         if (!statements) return;
 
         if (Array.isArray(statements)) {
             for (const stmt of statements) {
                 const element = stmt.element || stmt;
                 if (element) {
-                    await this.collectUsedIdentifiers(element, usedIdentifiers, usedTypes);
+                    this.collectUsedIdentifiers(element, usedIdentifiers, usedTypes);
                 }
             }
         }
@@ -772,20 +773,20 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
     /**
      * Helper to check for type expressions and collect type usage
      */
-    private async checkTypeExpression(
+    private checkTypeExpression(
         node: any,
         usedTypes: Set<string>
-    ): Promise<void> {
+    ): void {
         if (node.typeExpression) {
-            await this.collectTypeUsage(node.typeExpression, usedTypes);
+            this.collectTypeUsage(node.typeExpression, usedTypes);
         }
     }
 
-    private async collectUsedIdentifiers(
+    private collectUsedIdentifiers(
         node: J,
         usedIdentifiers: Set<string>,
         usedTypes: Set<string>
-    ): Promise<void> {
+    ): void {
         // This is a simplified version - in a real implementation,
         // we'd need to traverse the entire AST and collect all identifier usages
         // For now, we'll implement a basic traversal
@@ -796,11 +797,11 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         } else if (node.kind === J.Kind.VariableDeclarations) {
             const varDecls = node as J.VariableDeclarations;
             // Check the type expression on the VariableDeclarations itself
-            await this.checkTypeExpression(varDecls, usedTypes);
+            this.checkTypeExpression(varDecls, usedTypes);
             for (const v of varDecls.variables) {
                 // Check the initializer
                 if (v.element.initializer?.element) {
-                    await this.collectUsedIdentifiers(v.element.initializer.element, usedIdentifiers, usedTypes);
+                    this.collectUsedIdentifiers(v.element.initializer.element, usedIdentifiers, usedTypes);
                 }
             }
         } else if (node.kind === J.Kind.MethodInvocation) {
@@ -828,13 +829,13 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             if (methodInv.arguments) {
                 for (const arg of methodInv.arguments.elements) {
                     if (arg.element) {
-                        await this.collectUsedIdentifiers(arg.element, usedIdentifiers, usedTypes);
+                        this.collectUsedIdentifiers(arg.element, usedIdentifiers, usedTypes);
                     }
                 }
             }
             // Check select (object being called on)
             if (methodInv.select?.element) {
-                await this.collectUsedIdentifiers(methodInv.select.element, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers(methodInv.select.element, usedIdentifiers, usedTypes);
             }
         } else if (node.kind === J.Kind.MemberReference) {
             const memberRef = node as J.MemberReference;
@@ -849,7 +850,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             }
             // Recursively check the target
             if (fieldAccess.target) {
-                await this.collectUsedIdentifiers(fieldAccess.target, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers(fieldAccess.target, usedIdentifiers, usedTypes);
             }
         } else if (node.kind === JS.Kind.CompilationUnit) {
             const cu = node as JS.CompilationUnit;
@@ -873,11 +874,11 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                         }
                         if (!isRequire) {
                             // Not a require statement, process normally
-                            await this.collectUsedIdentifiers(stmt.element, usedIdentifiers, usedTypes);
+                            this.collectUsedIdentifiers(stmt.element, usedIdentifiers, usedTypes);
                         }
                     } else if (stmt.element.kind !== JS.Kind.ScopedVariableDeclarations) {
                         // Process other non-import, non-require statements normally
-                        await this.collectUsedIdentifiers(stmt.element, usedIdentifiers, usedTypes);
+                        this.collectUsedIdentifiers(stmt.element, usedIdentifiers, usedTypes);
                     }
                 }
             }
@@ -885,13 +886,13 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             // Handle return statements
             const returnStmt = node as J.Return;
             if (returnStmt.expression) {
-                await this.collectUsedIdentifiers(returnStmt.expression, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers(returnStmt.expression, usedIdentifiers, usedTypes);
             }
         } else if (node.kind === J.Kind.Block) {
             const block = node as J.Block;
             for (const stmt of block.statements) {
                 if (stmt.element) {
-                    await this.collectUsedIdentifiers(stmt.element, usedIdentifiers, usedTypes);
+                    this.collectUsedIdentifiers(stmt.element, usedIdentifiers, usedTypes);
                 }
             }
         } else if (node.kind === J.Kind.MethodDeclaration) {
@@ -901,59 +902,59 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 for (const param of method.parameters.elements) {
                     // Parameters can be various types, handle them recursively
                     if (param.element) {
-                        await this.collectUsedIdentifiers(param.element, usedIdentifiers, usedTypes);
+                        this.collectUsedIdentifiers(param.element, usedIdentifiers, usedTypes);
                     }
                 }
             }
             // Check body
             if (method.body) {
-                await this.collectUsedIdentifiers(method.body, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers(method.body, usedIdentifiers, usedTypes);
             }
         } else if (node.kind === JS.Kind.TypeOf) {
             // Handle typeof expressions like: typeof util
             const typeOf = node as JS.TypeOf;
             if (typeOf.expression) {
-                await this.collectUsedIdentifiers(typeOf.expression, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers(typeOf.expression, usedIdentifiers, usedTypes);
             }
         } else if (node.kind === JS.Kind.TypeQuery) {
             // Handle typeof type queries like: const x: typeof util
             const typeQuery = node as JS.TypeQuery;
             if (typeQuery.typeExpression) {
-                await this.collectUsedIdentifiers(typeQuery.typeExpression, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers(typeQuery.typeExpression, usedIdentifiers, usedTypes);
             }
         } else if ((node as any).typeExpression) {
             // Handle nodes with type expressions (parameters, variables, etc.)
-            await this.checkTypeExpression(node, usedTypes);
+            this.checkTypeExpression(node, usedTypes);
             // Continue traversing other parts
             if ((node as any).name) {
-                await this.collectUsedIdentifiers((node as any).name, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers((node as any).name, usedIdentifiers, usedTypes);
             }
             if ((node as any).initializer) {
-                await this.collectUsedIdentifiers((node as any).initializer, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers((node as any).initializer, usedIdentifiers, usedTypes);
             }
         } else if (node.kind === JS.Kind.ArrowFunction || node.kind === J.Kind.Lambda) {
             // Handle arrow functions and lambdas
             const func = node as any;
             if (func.parameters) {
-                await this.collectUsedIdentifiers(func.parameters, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers(func.parameters, usedIdentifiers, usedTypes);
             }
             if (func.lambda) {
-                await this.collectUsedIdentifiers(func.lambda, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers(func.lambda, usedIdentifiers, usedTypes);
             }
             if (func.body) {
-                await this.collectUsedIdentifiers(func.body, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers(func.body, usedIdentifiers, usedTypes);
             }
         } else if (node.kind === J.Kind.Lambda) {
             const lambda = node as J.Lambda;
             if (lambda.parameters?.parameters) {
                 for (const param of lambda.parameters.parameters) {
                     if (param.element) {
-                        await this.collectUsedIdentifiers(param.element, usedIdentifiers, usedTypes);
+                        this.collectUsedIdentifiers(param.element, usedIdentifiers, usedTypes);
                     }
                 }
             }
             if (lambda.body) {
-                await this.collectUsedIdentifiers(lambda.body, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers(lambda.body, usedIdentifiers, usedTypes);
             }
         } else if (node.kind === JS.Kind.JsxTag) {
             // Handle JSX tags like <div>content</div>
@@ -962,7 +963,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             if (jsxTag.attributes) {
                 for (const attr of jsxTag.attributes) {
                     if (attr.element) {
-                        await this.collectUsedIdentifiers(attr.element, usedIdentifiers, usedTypes);
+                        this.collectUsedIdentifiers(attr.element, usedIdentifiers, usedTypes);
                     }
                 }
             }
@@ -970,7 +971,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             if (jsxTag.children) {
                 for (const child of jsxTag.children) {
                     if (child) {
-                        await this.collectUsedIdentifiers(child, usedIdentifiers, usedTypes);
+                        this.collectUsedIdentifiers(child, usedIdentifiers, usedTypes);
                     }
                 }
             }
@@ -980,51 +981,51 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             // The expression is wrapped in RightPadded, so unwrap it
             const expr = embedded.expression?.element || embedded.expression;
             if (expr) {
-                await this.collectUsedIdentifiers(expr, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers(expr, usedIdentifiers, usedTypes);
             }
         } else if (node.kind === JS.Kind.JsxAttribute) {
             // Handle JSX attributes like onClick={handler}
             const jsxAttr = node as any;
             if (jsxAttr.value) {
-                await this.collectUsedIdentifiers(jsxAttr.value, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers(jsxAttr.value, usedIdentifiers, usedTypes);
             }
         } else if (node.kind === JS.Kind.TypeDeclaration) {
             // Handle type alias declarations like: type Props = { children: React.ReactNode }
             const typeDecl = node as JS.TypeDeclaration;
             // The initializer contains the type expression (the right side of the =)
             if (typeDecl.initializer?.element) {
-                await this.collectTypeUsage(typeDecl.initializer.element, usedTypes);
+                this.collectTypeUsage(typeDecl.initializer.element, usedTypes);
             }
         } else if ((node as any).statements) {
             // Generic handler for nodes with statements
-            await this.traverseStatements((node as any).statements, usedIdentifiers, usedTypes);
+            this.traverseStatements((node as any).statements, usedIdentifiers, usedTypes);
         } else if ((node as any).body) {
             // Generic handler for nodes with body
-            await this.collectUsedIdentifiers((node as any).body, usedIdentifiers, usedTypes);
+            this.collectUsedIdentifiers((node as any).body, usedIdentifiers, usedTypes);
         } else if ((node as any).parameters) {
             // Handle anything with parameters (functions, methods, etc.)
-            await this.traverseParameters((node as any).parameters, usedIdentifiers, usedTypes);
+            this.traverseParameters((node as any).parameters, usedIdentifiers, usedTypes);
             // Continue with the body if it exists
             if ((node as any).body) {
-                await this.collectUsedIdentifiers((node as any).body, usedIdentifiers, usedTypes);
+                this.collectUsedIdentifiers((node as any).body, usedIdentifiers, usedTypes);
             }
         }
     }
 
-    private async collectTypeUsage(typeExpr: J, usedTypes: Set<string>): Promise<void> {
+    private collectTypeUsage(typeExpr: J, usedTypes: Set<string>): void {
         if (typeExpr.kind === J.Kind.Identifier) {
             usedTypes.add((typeExpr as J.Identifier).simpleName);
         } else if (typeExpr.kind === J.Kind.ParameterizedType) {
             const paramType = typeExpr as J.ParameterizedType;
             // First, collect usage from the base type (e.g., React.Ref from React.Ref<T>)
             if (paramType.class) {
-                await this.collectTypeUsage(paramType.class, usedTypes);
+                this.collectTypeUsage(paramType.class, usedTypes);
             }
             // Then collect usage from type parameters (e.g., HTMLButtonElement from React.Ref<HTMLButtonElement>)
             if (paramType.typeParameters) {
                 for (const typeParam of paramType.typeParameters.elements) {
                     if (typeParam.element) {
-                        await this.collectTypeUsage(typeParam.element, usedTypes);
+                        this.collectTypeUsage(typeParam.element, usedTypes);
                     }
                 }
             }
@@ -1035,14 +1036,14 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 usedTypes.add((fieldAccess.target as J.Identifier).simpleName);
             } else if (fieldAccess.target) {
                 // Recursively handle nested field accesses
-                await this.collectTypeUsage(fieldAccess.target, usedTypes);
+                this.collectTypeUsage(fieldAccess.target, usedTypes);
             }
         } else if (typeExpr.kind === JS.Kind.Intersection) {
             // Handle intersection types like ButtonProps & { ref?: React.Ref<HTMLButtonElement> }
             const intersection = typeExpr as JS.Intersection;
             for (const typeElem of intersection.types) {
                 if (typeElem.element) {
-                    await this.collectTypeUsage(typeElem.element, usedTypes);
+                    this.collectTypeUsage(typeElem.element, usedTypes);
                 }
             }
         } else if (typeExpr.kind === JS.Kind.TypeLiteral) {
@@ -1052,14 +1053,14 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             for (const stmt of typeLiteral.members.statements) {
                 if (stmt.element) {
                     // Each statement is typically a VariableDeclarations representing a property
-                    await this.collectUsedIdentifiers(stmt.element, new Set(), usedTypes);
+                    this.collectUsedIdentifiers(stmt.element, new Set(), usedTypes);
                 }
             }
         } else if (typeExpr.kind === JS.Kind.TypeQuery) {
             // Handle typeof type queries like: const x: typeof util
             const typeQuery = typeExpr as JS.TypeQuery;
             if (typeQuery.typeExpression) {
-                await this.collectTypeUsage(typeQuery.typeExpression, usedTypes);
+                this.collectTypeUsage(typeQuery.typeExpression, usedTypes);
             }
         } else if (typeExpr.kind === JS.Kind.TypeOf) {
             // Handle typeof expressions in types
@@ -1070,27 +1071,27 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 if (typeOf.expression.kind === J.Kind.Identifier) {
                     usedTypes.add((typeOf.expression as J.Identifier).simpleName);
                 } else {
-                    await this.collectTypeUsage(typeOf.expression, usedTypes);
+                    this.collectTypeUsage(typeOf.expression, usedTypes);
                 }
             }
         } else if (typeExpr.kind === JS.Kind.TypeTreeExpression) {
             // Handle TypeTreeExpression which wraps type identifiers
             const typeTree = typeExpr as JS.TypeTreeExpression;
             if (typeTree.expression) {
-                await this.collectTypeUsage(typeTree.expression, usedTypes);
+                this.collectTypeUsage(typeTree.expression, usedTypes);
             }
         } else if (typeExpr.kind === JS.Kind.TypeInfo) {
             // Handle TypeInfo which contains type identifiers
             const typeInfo = typeExpr as JS.TypeInfo;
             if (typeInfo.typeIdentifier) {
-                await this.collectTypeUsage(typeInfo.typeIdentifier, usedTypes);
+                this.collectTypeUsage(typeInfo.typeIdentifier, usedTypes);
             }
         } else if ((typeExpr as any).expression) {
             // Generic handler for nodes with expression property
-            await this.collectTypeUsage((typeExpr as any).expression, usedTypes);
+            this.collectTypeUsage((typeExpr as any).expression, usedTypes);
         } else if ((typeExpr as any).typeIdentifier) {
             // Generic handler for nodes with typeIdentifier property
-            await this.collectTypeUsage((typeExpr as any).typeIdentifier, usedTypes);
+            this.collectTypeUsage((typeExpr as any).typeIdentifier, usedTypes);
         }
         // Add more type expression handlers as needed
     }

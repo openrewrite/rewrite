@@ -14,7 +14,16 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, npm, packageJson, pattern, template, tsx, typescript} from "../../../src/javascript";
+import {
+    JavaScriptVisitor,
+    capture,
+    npm,
+    packageJson,
+    pattern,
+    template,
+    tsx,
+    typescript
+} from "../../../src/javascript";
 import {J, Type} from "../../../src/java";
 import {withDir} from "tmp-promise";
 
@@ -38,9 +47,9 @@ describe('lenient type matching in patterns', () => {
             let capturedBody: any = undefined;
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                override visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): J | undefined {
                     if ((methodInvocation.name as J.Identifier).simpleName === 'forwardRef') {
-                        const m = await pat.match(methodInvocation, this.cursor);
+                        const m = pat.match(methodInvocation, this.cursor);
                         if (m) {
                             matchFound = true;
                             capturedProps = m.get('props');
@@ -101,8 +110,8 @@ function greet(): string { return "hello"; }
         let capturedName: any = undefined;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, _p: any): Promise<J | undefined> {
-                const m = await pat.match(methodDeclaration, this.cursor);
+            override visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, _p: any): J | undefined {
+                const m = pat.match(methodDeclaration, this.cursor);
                 if (m) {
                     matchFound = true;
                     capturedName = m.get('name');
@@ -132,10 +141,10 @@ function greet(): string { return "hello"; }
         const tmpl = template`console.log(${capture('name')})`;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
-                const m = await pat.match(methodInvocation, this.cursor);
+            override visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): J | undefined {
+                const m = pat.match(methodInvocation, this.cursor);
                 if (m) {
-                    return await tmpl.apply(methodInvocation, this.cursor, { values: m });
+                    return tmpl.apply(methodInvocation, this.cursor, { values: m });
                 }
                 return methodInvocation;
             }
@@ -170,8 +179,8 @@ function greet(): string { return "hello"; }
         let matchFound = false;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, _p: any): Promise<J | undefined> {
-                const m = await pat.match(methodDeclaration, this.cursor);
+            override visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, _p: any): J | undefined {
+                const m = pat.match(methodDeclaration, this.cursor);
                 if (m) {
                     matchFound = true;
                 }
@@ -202,8 +211,8 @@ function greet(): string { return "hello"; }
         let capturedName: any = undefined;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, _p: any): Promise<J | undefined> {
-                const m = await pat.match(methodDeclaration, this.cursor);
+            override visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, _p: any): J | undefined {
+                const m = pat.match(methodDeclaration, this.cursor);
                 if (m) {
                     matchFound = true;
                     capturedName = m.get('name');
@@ -236,8 +245,8 @@ function greet(): string { return "hello"; }
         let capturedName: any = undefined;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, _p: any): Promise<J | undefined> {
-                const m = await pat.match(methodDeclaration, this.cursor);
+            override visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, _p: any): J | undefined {
+                const m = pat.match(methodDeclaration, this.cursor);
                 if (m) {
                     matchFound = true;
                     capturedName = m.get('name');
@@ -272,8 +281,8 @@ function greet(): string { return "hello"; }
             let capturedArg: any = undefined;
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
-                    const m = await pat.match(methodInvocation, this.cursor);
+                override visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): J | undefined {
+                    const m = pat.match(methodInvocation, this.cursor);
                     if (m) {
                         matchFound = true;
                         capturedArg = m.get('arg');
@@ -330,8 +339,8 @@ function greet(): string { return "hello"; }
             let capturedArg: any = undefined;
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
-                    const m = await pat.match(methodInvocation, this.cursor);
+                override visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): J | undefined {
+                    const m = pat.match(methodInvocation, this.cursor);
                     if (m) {
                         matchFound = true;
                         capturedArg = m.get('arg');
@@ -385,8 +394,8 @@ function greet(): string { return "hello"; }
         let capturedArg: any = undefined;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
-                const m = await pat.match(methodInvocation, this.cursor);
+            override visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): J | undefined {
+                const m = pat.match(methodInvocation, this.cursor);
                 if (m) {
                     matchFound = true;
                     capturedArg = m.get('arg');
@@ -429,8 +438,8 @@ function greet(): string { return "hello"; }
             let namespaceImportMatched = false;
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
-                    const m = await pat.match(methodInvocation, this.cursor);
+                override visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): J | undefined {
+                    const m = pat.match(methodInvocation, this.cursor);
                     if (m) {
                         const select = methodInvocation.select;
                         if (!select) {
@@ -488,7 +497,7 @@ function greet(): string { return "hello"; }
             let namespaceImportDeclaringType: string | undefined;
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                override visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): J | undefined {
                     const methodName = (methodInvocation.name as J.Identifier).simpleName;
                     if (methodName === 'forwardRef' && methodInvocation.methodType) {
                         const declaringType = methodInvocation.methodType.declaringType;

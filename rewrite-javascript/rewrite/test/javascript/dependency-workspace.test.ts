@@ -32,7 +32,7 @@ describe('dependency workspace', () => {
             'lodash': '^4.17.21'
         };
 
-        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
+        const workspaceDir = DependencyWorkspace.getOrCreateWorkspace({dependencies});
 
         // Check workspace exists
         expect(fs.existsSync(workspaceDir)).toBe(true);
@@ -59,8 +59,8 @@ describe('dependency workspace', () => {
             'uuid': '^9.0.0'
         };
 
-        const workspace1 = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
-        const workspace2 = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
+        const workspace1 = DependencyWorkspace.getOrCreateWorkspace({dependencies});
+        const workspace2 = DependencyWorkspace.getOrCreateWorkspace({dependencies});
 
         // Should return the same workspace directory
         expect(workspace1).toBe(workspace2);
@@ -70,8 +70,8 @@ describe('dependency workspace', () => {
         const deps1 = { 'lodash': '^4.17.21' };
         const deps2 = { 'uuid': '^9.0.0' };
 
-        const workspace1 = await DependencyWorkspace.getOrCreateWorkspace({dependencies: deps1});
-        const workspace2 = await DependencyWorkspace.getOrCreateWorkspace({dependencies: deps2});
+        const workspace1 = DependencyWorkspace.getOrCreateWorkspace({dependencies: deps1});
+        const workspace2 = DependencyWorkspace.getOrCreateWorkspace({dependencies: deps2});
 
         // Should return different workspace directories
         expect(workspace1).not.toBe(workspace2);
@@ -84,7 +84,7 @@ describe('dependency workspace', () => {
         };
 
         // Create a workspace directory with the dependencies
-        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
+        const workspaceDir = DependencyWorkspace.getOrCreateWorkspace({dependencies});
 
         // Create parser with workspace directory as relativeTo
         const parser = new JavaScriptParser({relativeTo: workspaceDir});
@@ -101,7 +101,7 @@ describe('dependency workspace', () => {
         // Verify type attribution exists
         let foundMethodInvocation = false;
         await (new class extends JavaScriptVisitor<any> {
-            protected async visitMethodInvocation(method: J.MethodInvocation, _: any): Promise<J | undefined> {
+            protected visitMethodInvocation(method: J.MethodInvocation, _: any): J | undefined {
                 if (method.name.simpleName === 'v4') {
                     foundMethodInvocation = true;
                     // Verify that the method has type information from the workspace dependencies
@@ -133,7 +133,7 @@ describe('dependency workspace', () => {
                         afterRecipe: async cu => {
                             let foundMethodInvocation = false;
                             await (new class extends JavaScriptVisitor<any> {
-                                protected async visitMethodInvocation(method: J.MethodInvocation, _: any): Promise<J | undefined> {
+                                protected visitMethodInvocation(method: J.MethodInvocation, _: any): J | undefined {
                                     if (method.name.simpleName === 'v4') {
                                         foundMethodInvocation = true;
                                         // Verify type attribution works with on-disk dependencies (baseline comparison)

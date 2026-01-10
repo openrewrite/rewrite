@@ -38,7 +38,7 @@ export interface RpcCodec<T> {
      * @param after - The object to be sent.
      * @param q - The RPC send queue where the object will be enqueued.
      */
-    rpcSend(after: T, q: RpcSendQueue): Promise<void>;
+    rpcSend(after: T, q: RpcSendQueue): void;
 
     /**
      * Receives and deserializes an object from a sync receive queue.
@@ -120,8 +120,8 @@ export class RpcSendQueue {
                 private readonly tracing: boolean) {
     }
 
-    async generate(after: any, before: any): Promise<RpcRawMessage[]> {
-        await this.send(after, before);
+    generate(after: any, before: any): RpcRawMessage[] {
+        this.send(after, before);
 
         const result = this.q;
         result.push(rpcMsg(RpcObjectState.END_OF_OBJECT));
@@ -140,34 +140,34 @@ export class RpcSendQueue {
 
     getAndSend<T, U>(parent: T,
                      value: (parent: T) => U | undefined,
-                     onChange?: (value: U) => Promise<any>): Promise<void> {
+                     onChange?: (value: U) => void): void {
         const after = value(parent);
         const before = this.before === undefined ? undefined : value(this.before as T);
-        return this.send(after, before, onChange && (() => onChange(after!)));
+        this.send(after, before, onChange && (() => onChange(after!)));
     }
 
     getAndSendList<T, U>(parent: T,
                          values: (parent: T) => U[] | undefined,
                          id: (value: U) => any,
-                         onChange?: (value: U) => Promise<any>): Promise<void> {
+                         onChange?: (value: U) => void): void {
         const after = values(parent);
         const before = this.before === undefined ? undefined : values(this.before as T);
-        return this.sendList(after, before, id, onChange);
+        this.sendList(after, before, id, onChange);
     }
 
-    send<T>(after: T | undefined, before: T | undefined, onChange?: (() => Promise<any>)): Promise<void> {
-        return saveTrace(this.tracing, async () => {
+    send<T>(after: T | undefined, before: T | undefined, onChange?: (() => void)): void {
+        saveTrace(this.tracing, () => {
             if (before === after) {
                 this.put(rpcMsg(RpcObjectState.NO_CHANGE, null, null, null, this.trace()));
             } else if (before === undefined || (after !== undefined && this.typesAreDifferent(after, before))) {
                 // Treat as ADD when before is undefined OR types differ (it's a new object, not a change)
-                await this.add(after, onChange);
+                this.add(after, onChange);
             } else if (after === undefined) {
                 this.put(rpcMsg(RpcObjectState.DELETE, null, null, null, this.trace()));
             } else {
                 let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after, this.sourceFileType);
                 this.put(rpcMsg(RpcObjectState.CHANGE, null, onChange || afterCodec ? null : after, null, this.trace()));
-                await this.doChange(after, before, onChange, afterCodec);
+                this.doChange(after, before, onChange, afterCodec);
             }
         });
     }
@@ -175,8 +175,8 @@ export class RpcSendQueue {
     sendList<T>(after: T[] | undefined,
                 before: T[] | undefined,
                 id: (value: T) => any,
-                onChange?: (value: T) => Promise<any>): Promise<void> {
-        return this.send(after, before, async () => {
+                onChange?: (value: T) => void): void {
+        this.send(after, before, () => {
             if (!after) {
                 throw new Error("A DELETE event should have been sent.");
             }
@@ -187,17 +187,17 @@ export class RpcSendQueue {
                 const beforePos = beforeIdx.get(id(anAfter));
                 const onChangeRun = onChange ? () => onChange(anAfter) : undefined;
                 if (!beforePos) {
-                    await this.add(anAfter, onChangeRun);
+                    this.add(anAfter, onChangeRun);
                 } else {
                     const aBefore = before?.[beforePos];
                     if (aBefore === anAfter) {
                         this.put(rpcMsg(RpcObjectState.NO_CHANGE, null, null, null, this.trace()));
                     } else if (anAfter !== undefined && this.typesAreDifferent(anAfter, aBefore)) {
                         // Type changed - treat as ADD
-                        await this.add(anAfter, onChangeRun);
+                        this.add(anAfter, onChangeRun);
                     } else {
                         this.put(rpcMsg(RpcObjectState.CHANGE, null, null, null, this.trace()));
-                        await this.doChange(anAfter, aBefore, onChangeRun, RpcCodecs.forInstance(anAfter, this.sourceFileType));
+                        this.doChange(anAfter, aBefore, onChangeRun, RpcCodecs.forInstance(anAfter, this.sourceFileType));
                     }
                 }
             }
@@ -222,7 +222,7 @@ export class RpcSendQueue {
         return beforeIdx;
     }
 
-    private async add(after: any, onChange: (() => Promise<any>) | undefined): Promise<void> {
+    private add(after: any, onChange: (() => void) | undefined): void {
         let ref: number | undefined;
         if (isRef(after)) {
             ref = this.refs.get(after);
@@ -240,19 +240,19 @@ export class RpcSendQueue {
             ref,
             this.trace()
         ));
-        await this.doChange(after, undefined, onChange, afterCodec);
+        this.doChange(after, undefined, onChange, afterCodec);
     }
 
-    private async doChange(after: any, before: any, onChange?: () => Promise<void>, afterCodec?: RpcCodec<any>): Promise<void> {
+    private doChange(after: any, before: any, onChange?: () => void, afterCodec?: RpcCodec<any>): void {
         const lastBefore = this.before;
         this.before = before;
         try {
             if (onChange) {
                 if (after !== undefined) {
-                    await onChange();
+                    onChange();
                 }
             } else if (afterCodec) {
-                await afterCodec.rpcSend(after, this);
+                afterCodec.rpcSend(after, this);
             }
         } finally {
             this.before = lastBefore;

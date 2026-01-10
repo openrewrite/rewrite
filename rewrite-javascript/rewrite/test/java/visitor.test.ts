@@ -24,9 +24,9 @@ describe('visitor', () => {
         // given
         let global = "";
         const CustomVisitor = class extends JavaScriptVisitor<ExecutionContext> {
-            protected async visitStatement(statement: Statement, p: ExecutionContext): Promise<J | undefined> {
+            protected visitStatement(statement: Statement, p: ExecutionContext): J | undefined {
                 global = global + "/" + statement.kind;
-                return await super.visitStatement(statement, p);
+                return super.visitStatement(statement, p);
             }
         }
         const spec = new RecipeSpec();
@@ -47,10 +47,10 @@ describe('visitor', () => {
         let visitCounter = 0;
         let visits = "";
         const CustomVisitor = class extends JavaScriptVisitor<ExecutionContext> {
-            protected async visitExpression(expression: Expression, p: ExecutionContext): Promise<J | undefined> {
+            protected visitExpression(expression: Expression, p: ExecutionContext): J | undefined {
                 visitCounter++;
                 visits = visits + "/" + expression.kind;
-                return await super.visitExpression(expression, p);
+                return super.visitExpression(expression, p);
             }
         }
         const spec = new RecipeSpec();

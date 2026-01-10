@@ -61,17 +61,15 @@ export abstract class Parser {
      * Parses a single input and returns the first source file.
      * This is a convenience method for when you know you're parsing exactly one input.
      *
+     * Subclasses should override this method to provide parsing capability.
+     *
      * @param input The input to parse
      * @returns The parsed source file
-     * @throws Error if the parser produces no results
+     * @throws Error if not implemented or parser produces no results
      */
-    async parseOne(input: ParserInput): Promise<SourceFile> {
-        const result = await this.parse(input).next();
-        if (result.done) {
-            const sourcePath = typeof input === 'string' ? input : input.sourcePath;
-            throw new Error(`Parser produced no results for: ${sourcePath}`);
-        }
-        return result.value;
+    parseOne(input: ParserInput): SourceFile {
+        const sourcePath = typeof input === 'string' ? input : input.sourcePath;
+        throw new Error(`parseOne not implemented for ${this.constructor.name}: ${sourcePath}`);
     }
 
     protected relativePath(sourcePath: ParserInput): string {

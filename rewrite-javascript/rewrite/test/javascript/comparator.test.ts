@@ -40,7 +40,7 @@ describe('JavaScriptComparatorVisitor', () => {
         const stmt1 = getFirstStatement(ast1);
         const stmt2 = getFirstStatement(ast2);
 
-        expect(await comparator.compare(stmt1, stmt2)).toBe(true);
+        expect(comparator.compare(stmt1, stmt2)).toBe(true);
     });
 
     test('different literals do not match', async () => {
@@ -50,7 +50,7 @@ describe('JavaScriptComparatorVisitor', () => {
         const stmt1 = getFirstStatement(ast1);
         const stmt2 = getFirstStatement(ast2);
 
-        expect(await comparator.compare(stmt1, stmt2)).toBe(false);
+        expect(comparator.compare(stmt1, stmt2)).toBe(false);
     });
 
     test('identical identifiers match', async () => {
@@ -60,7 +60,7 @@ describe('JavaScriptComparatorVisitor', () => {
         const stmt1 = getFirstStatement(ast1);
         const stmt2 = getFirstStatement(ast2);
 
-        expect(await comparator.compare(stmt1, stmt2)).toBe(true);
+        expect(comparator.compare(stmt1, stmt2)).toBe(true);
     });
 
     test('different identifiers do not match', async () => {
@@ -70,7 +70,7 @@ describe('JavaScriptComparatorVisitor', () => {
         const stmt1 = getFirstStatement(ast1);
         const stmt2 = getFirstStatement(ast2);
 
-        expect(await comparator.compare(stmt1, stmt2)).toBe(false);
+        expect(comparator.compare(stmt1, stmt2)).toBe(false);
     });
 
     test('identical binary expressions match', async () => {
@@ -80,7 +80,7 @@ describe('JavaScriptComparatorVisitor', () => {
         const stmt1 = getFirstStatement(ast1);
         const stmt2 = getFirstStatement(ast2);
 
-        expect(await comparator.compare(stmt1, stmt2)).toBe(true);
+        expect(comparator.compare(stmt1, stmt2)).toBe(true);
     });
 
     test('binary expressions with different operators do not match', async () => {
@@ -90,7 +90,7 @@ describe('JavaScriptComparatorVisitor', () => {
         const stmt1 = getFirstStatement(ast1);
         const stmt2 = getFirstStatement(ast2);
 
-        expect(await comparator.compare(stmt1, stmt2)).toBe(false);
+        expect(comparator.compare(stmt1, stmt2)).toBe(false);
     });
 
     test('binary expressions with different operands do not match', async () => {
@@ -100,7 +100,7 @@ describe('JavaScriptComparatorVisitor', () => {
         const stmt1 = getFirstStatement(ast1);
         const stmt2 = getFirstStatement(ast2);
 
-        expect(await comparator.compare(stmt1, stmt2)).toBe(false);
+        expect(comparator.compare(stmt1, stmt2)).toBe(false);
     });
 
     test('identical blocks match', async () => {
@@ -110,7 +110,7 @@ describe('JavaScriptComparatorVisitor', () => {
         const stmt1 = getFirstStatement(ast1);
         const stmt2 = getFirstStatement(ast2);
 
-        expect(await comparator.compare(stmt1, stmt2)).toBe(true);
+        expect(comparator.compare(stmt1, stmt2)).toBe(true);
     });
 
     test('blocks with different statements do not match', async () => {
@@ -120,7 +120,7 @@ describe('JavaScriptComparatorVisitor', () => {
         const stmt1 = getFirstStatement(ast1);
         const stmt2 = getFirstStatement(ast2);
 
-        expect(await comparator.compare(stmt1, stmt2)).toBe(false);
+        expect(comparator.compare(stmt1, stmt2)).toBe(false);
     });
 
     test('blocks with different number of statements do not match', async () => {
@@ -130,28 +130,28 @@ describe('JavaScriptComparatorVisitor', () => {
         const stmt1 = getFirstStatement(ast1);
         const stmt2 = getFirstStatement(ast2);
 
-        expect(await comparator.compare(stmt1, stmt2)).toBe(false);
+        expect(comparator.compare(stmt1, stmt2)).toBe(false);
     });
 
     test('identical compilation units match', async () => {
         const ast1 = await parse('const a = 1;\nconst b = 2;');
         const ast2 = await parse('const a = 1;\nconst b = 2;');
 
-        expect(await comparator.compare(ast1, ast2)).toBe(true);
+        expect(comparator.compare(ast1, ast2)).toBe(true);
     });
 
     test('compilation units with different statements do not match', async () => {
         const ast1 = await parse('const a = 1;\nconst b = 2;');
         const ast2 = await parse('const a = 1;\nconst b = 3;');
 
-        expect(await comparator.compare(ast1, ast2)).toBe(false);
+        expect(comparator.compare(ast1, ast2)).toBe(false);
     });
 
     test('compilation units with different number of statements do not match', async () => {
         const ast1 = await parse('const a = 1;\nconst b = 2;');
         const ast2 = await parse('const a = 1;');
 
-        expect(await comparator.compare(ast1, ast2)).toBe(false);
+        expect(comparator.compare(ast1, ast2)).toBe(false);
     });
 
     test('nodes of different kinds do not match', async () => {
@@ -161,20 +161,20 @@ describe('JavaScriptComparatorVisitor', () => {
         const stmt1 = getFirstStatement(ast1);
         const stmt2 = getFirstStatement(ast2);
 
-        expect(await comparator.compare(stmt1, stmt2)).toBe(false);
+        expect(comparator.compare(stmt1, stmt2)).toBe(false);
     });
 
     test('complex expressions match when identical', async () => {
         const ast1 = await parse('function foo(a, b) { return a + b * (c - d); }');
         const ast2 = await parse('function foo(a, b) { return a + b * (c - d); }');
 
-        expect(await comparator.compare(ast1, ast2)).toBe(true);
+        expect(comparator.compare(ast1, ast2)).toBe(true);
     });
 
     test('complex expressions do not match when different', async () => {
         const ast1 = await parse('function foo(a, b) { return a + b * (c - d); }');
         const ast2 = await parse('function foo(a, b) { return a + b * (c + d); }');
 
-        expect(await comparator.compare(ast1, ast2)).toBe(false);
+        expect(comparator.compare(ast1, ast2)).toBe(false);
     });
 });

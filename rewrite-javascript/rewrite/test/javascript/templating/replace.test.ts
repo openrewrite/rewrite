@@ -14,17 +14,16 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, template, typescript} from "../../../src/javascript";
+import {JavaScriptVisitor, capture, pattern, template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 import {create as produce} from "mutative";
-import {produceAsync} from "../../../src";
 
 describe('template2 replace', () => {
     const spec = new RecipeSpec();
 
     test('raw string', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+            override visitLiteral(literal: J.Literal, p: any): J | undefined {
                 if (literal.valueSource === '1') {
                     // Use the new template API with tagged template literals
                     return template`2`.apply(literal, this.cursor);
@@ -40,7 +39,7 @@ describe('template2 replace', () => {
 
     test('tree replacement', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+            override visitLiteral(literal: J.Literal, p: any): J | undefined {
                 if (literal.valueSource === '1') {
                     // Create a new AST node for the number 2
                     const two = produce(literal, draft => {
@@ -62,15 +61,13 @@ describe('template2 replace', () => {
 
     test('binary expression replacement', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
                 if (binary.operator.element === J.Binary.Type.Equal) {
-                    return await produceAsync(binary, async draft => {
-
-                        draft.left = (await template`${binary.right}`.apply(
+                    return produce(binary, draft => {
+                        draft.left = (template`${binary.right}`.apply(
                             binary,
                             this.cursor
                         )) as Expression;
-
                     });
                 }
                 return binary;
@@ -84,7 +81,7 @@ describe('template2 replace', () => {
 
     test('late binding with capture', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+            override visitLiteral(literal: J.Literal, p: any): J | undefined {
                 if (literal.valueSource === '1') {
                     // Create a replacement value
                     const replacement = produce(literal, draft => {
@@ -111,10 +108,10 @@ describe('template2 replace', () => {
         const tmpl = template`bar(${arg})`;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                const match = await pat.match(method, this.cursor);
+            override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
+                const match = pat.match(method, this.cursor);
                 if (match) {
-                    return await tmpl.apply(method, this.cursor, {values: match});
+                    return tmpl.apply(method, this.cursor, {values: match});
                 }
                 return method;
             }
@@ -134,10 +131,10 @@ describe('template2 replace', () => {
         const tmpl = template`newFunc(${arg})`;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                const match = await pat.match(method, this.cursor);
+            override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
+                const match = pat.match(method, this.cursor);
                 if (match) {
-                    return await tmpl.apply(method, this.cursor, {values: match});
+                    return tmpl.apply(method, this.cursor, {values: match});
                 }
                 return method;
             }
@@ -153,10 +150,10 @@ describe('template2 replace', () => {
 
     test('capture binding in method select position', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+            override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
                 if ((method.name as J.Identifier).simpleName === 'oldMethod' && method.select) {
                     const select = capture();
-                    return await template`${select}.newMethod()`.apply(
+                    return template`${select}.newMethod()`.apply(
                         method,
                         this.cursor,
                         {values: new Map([[select, method.select.element]])}

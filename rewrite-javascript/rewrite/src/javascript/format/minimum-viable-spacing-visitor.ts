@@ -29,29 +29,29 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         super();
     }
 
-    override async visit<R extends J>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
+    override visit<R extends J>(tree: Tree, p: P, parent?: Cursor): R | undefined {
         if (this.cursor?.getNearestMessage("stop") != null) {
             return tree as R;
         }
         return super.visit(tree, p, parent);
     }
 
-    override async postVisit(tree: J, p: P): Promise<J | undefined> {
+    override postVisit(tree: J, p: P): J | undefined {
         if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
             this.cursor?.root.messages.set("stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    protected async visitAwait(await_: JS.Await, p: P): Promise<J | undefined> {
-        const ret = await super.visitAwait(await_, p) as JS.Await;
+    protected visitAwait(await_: JS.Await, p: P): J | undefined {
+        const ret = super.visitAwait(await_, p) as JS.Await;
         return produce(ret, draft => {
             this.ensureSpace(draft.expression.prefix)
         });
     }
 
-    protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J | undefined> {
-        let c = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
+    protected visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): J | undefined {
+        let c = super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
         let first = c.leadingAnnotations.length === 0;
 
         if (c.modifiers.length > 0) {
@@ -107,8 +107,8 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         return c;
     }
 
-    protected async visitMethodDeclaration(method: J.MethodDeclaration, p: P): Promise<J | undefined> {
-        let m = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
+    protected visitMethodDeclaration(method: J.MethodDeclaration, p: P): J | undefined {
+        let m = super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
         let first = m.leadingAnnotations.length === 0;
 
         if (m.modifiers.length > 0) {
@@ -146,8 +146,8 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         return m;
     }
 
-    protected async visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, p: P): Promise<J | undefined> {
-        const ret = await super.visitNamespaceDeclaration(namespaceDeclaration, p) as JS.NamespaceDeclaration;
+    protected visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, p: P): J | undefined {
+        const ret = super.visitNamespaceDeclaration(namespaceDeclaration, p) as JS.NamespaceDeclaration;
         return produce(ret, draft => {
             if (draft.modifiers.length > 0) {
                 draft.keywordType.before.whitespace=" ";
@@ -156,8 +156,8 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         });
     }
 
-    protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
-        const ret = await super.visitNewClass(newClass, p) as J.NewClass;
+    protected visitNewClass(newClass: J.NewClass, p: P): J | undefined {
+        const ret = super.visitNewClass(newClass, p) as J.NewClass;
         return produce(ret, draft => {
             if (draft.class) {
                 if (draft.class.kind == J.Kind.Identifier) {
@@ -167,8 +167,8 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         });
     }
 
-    protected async visitReturn(returnNode: J.Return, p: P): Promise<J | undefined> {
-        const r = await super.visitReturn(returnNode, p) as J.Return;
+    protected visitReturn(returnNode: J.Return, p: P): J | undefined {
+        const r = super.visitReturn(returnNode, p) as J.Return;
         if (r.expression && r.expression.prefix.whitespace === "" &&
             !r.markers.markers.find(m => m.id === "org.openrewrite.java.marker.ImplicitReturn")) {
             return produce(r, draft => {
@@ -178,15 +178,15 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         return r;
     }
 
-    protected async visitThrow(thrown: J.Throw, p: P): Promise<J | undefined> {
-        const ret = await super.visitThrow(thrown, p) as J.Throw;
+    protected visitThrow(thrown: J.Throw, p: P): J | undefined {
+        const ret = super.visitThrow(thrown, p) as J.Throw;
         return ret && produce(ret, draft => {
            this.ensureSpace(draft.exception.prefix);
         });
     }
 
-    protected async visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, p: P): Promise<J | undefined> {
-        const ret = await super.visitTypeDeclaration(typeDeclaration, p) as JS.TypeDeclaration;
+    protected visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, p: P): J | undefined {
+        const ret = super.visitTypeDeclaration(typeDeclaration, p) as JS.TypeDeclaration;
         return produce(ret, draft => {
             if (draft.modifiers.length > 0) {
                 this.ensureSpace(draft.name.before);
@@ -195,15 +195,15 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         });
     }
 
-    protected async visitTypeOf(typeOf: JS.TypeOf, p: P): Promise<J | undefined> {
-        const ret = await super.visitTypeOf(typeOf, p) as JS.TypeOf;
+    protected visitTypeOf(typeOf: JS.TypeOf, p: P): J | undefined {
+        const ret = super.visitTypeOf(typeOf, p) as JS.TypeOf;
         return produce(ret, draft => {
             this.ensureSpace(draft.expression.prefix);
         });
     }
 
-    protected async visitTypeParameter(typeParam: J.TypeParameter, p: P): Promise<J | undefined> {
-        const ret = await super.visitTypeParameter(typeParam, p) as J.TypeParameter;
+    protected visitTypeParameter(typeParam: J.TypeParameter, p: P): J | undefined {
+        const ret = super.visitTypeParameter(typeParam, p) as J.TypeParameter;
         return produce(ret, draft => {
             if (draft.bounds && draft.bounds.elements.length > 0) {
                 this.ensureSpace(draft.bounds.before);
@@ -212,8 +212,8 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         });
     }
 
-    protected async visitVariableDeclarations(v: J.VariableDeclarations, p: P): Promise<J | undefined> {
-        let ret = await super.visitVariableDeclarations(v, p) as J.VariableDeclarations;
+    protected visitVariableDeclarations(v: J.VariableDeclarations, p: P): J | undefined {
+        let ret = super.visitVariableDeclarations(v, p) as J.VariableDeclarations;
         let first = ret.leadingAnnotations.length === 0;
 
         if (first && ret.modifiers.length > 0) {
@@ -235,8 +235,8 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
     }
 
 
-    protected async visitCase(caseNode: J.Case, p: P): Promise<J | undefined> {
-        const c = await super.visitCase(caseNode, p) as J.Case;
+    protected visitCase(caseNode: J.Case, p: P): J | undefined {
+        const c = super.visitCase(caseNode, p) as J.Case;
 
         if (c.guard && c.caseLabels.elements.length > 0 && c.caseLabels.elements[c.caseLabels.elements.length - 1].after.whitespace === "") {
             return produce(c, draft => {

@@ -21,10 +21,10 @@ import {Markers} from "../markers";
 
 class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
 
-    protected async visitDocuments(documents: Yaml.Documents, p: PrintOutputCapture): Promise<Yaml | undefined> {
-        await this.visitMarkers(documents.markers, p);
+    protected visitDocuments(documents: Yaml.Documents, p: PrintOutputCapture): Yaml | undefined {
+        this.visitMarkers(documents.markers, p);
         for (const document of documents.documents) {
-            await this.visit(document, p);
+            this.visit(document, p);
         }
         if (documents.suffix) {
             p.append(documents.suffix);
@@ -33,36 +33,36 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         return documents;
     }
 
-    protected async visitDocument(document: Yaml.Document, p: PrintOutputCapture): Promise<Yaml | undefined> {
-        await this.beforeSyntax(document, p);
+    protected visitDocument(document: Yaml.Document, p: PrintOutputCapture): Yaml | undefined {
+        this.beforeSyntax(document, p);
         if (document.explicit) {
             p.append("---");
         }
-        await this.visit(document.block, p);
-        await this.visit(document.end, p);
+        this.visit(document.block, p);
+        this.visit(document.end, p);
         this.afterSyntax(document, p);
         return document;
     }
 
-    protected async visitDocumentEnd(end: Yaml.DocumentEnd, p: PrintOutputCapture): Promise<Yaml | undefined> {
-        await this.beforeSyntax(end, p);
+    protected visitDocumentEnd(end: Yaml.DocumentEnd, p: PrintOutputCapture): Yaml | undefined {
+        this.beforeSyntax(end, p);
         if (end.explicit) {
             p.append("...");
         }
         return end;
     }
 
-    protected async visitMapping(mapping: Yaml.Mapping, p: PrintOutputCapture): Promise<Yaml | undefined> {
-        await this.beforeSyntax(mapping, p);
+    protected visitMapping(mapping: Yaml.Mapping, p: PrintOutputCapture): Yaml | undefined {
+        this.beforeSyntax(mapping, p);
         if (mapping.anchor) {
-            await this.visit(mapping.anchor, p);
+            this.visit(mapping.anchor, p);
         }
         if (mapping.openingBracePrefix !== undefined) {
             p.append(mapping.openingBracePrefix);
             p.append('{');
         }
         for (const entry of mapping.entries) {
-            await this.visit(entry, p);
+            this.visit(entry, p);
         }
         if (mapping.closingBracePrefix !== undefined) {
             p.append(mapping.closingBracePrefix);
@@ -72,23 +72,23 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         return mapping;
     }
 
-    protected async visitMappingEntry(entry: Yaml.MappingEntry, p: PrintOutputCapture): Promise<Yaml | undefined> {
-        await this.beforeSyntax(entry, p);
-        await this.visit(entry.key, p);
+    protected visitMappingEntry(entry: Yaml.MappingEntry, p: PrintOutputCapture): Yaml | undefined {
+        this.beforeSyntax(entry, p);
+        this.visit(entry.key, p);
         p.append(entry.beforeMappingValueIndicator);
         p.append(':');
-        await this.visit(entry.value, p);
+        this.visit(entry.value, p);
         this.afterSyntax(entry, p);
         return entry;
     }
 
-    protected async visitScalar(scalar: Yaml.Scalar, p: PrintOutputCapture): Promise<Yaml | undefined> {
-        await this.beforeSyntax(scalar, p);
+    protected visitScalar(scalar: Yaml.Scalar, p: PrintOutputCapture): Yaml | undefined {
+        this.beforeSyntax(scalar, p);
         if (scalar.tag) {
-            await this.visit(scalar.tag, p);
+            this.visit(scalar.tag, p);
         }
         if (scalar.anchor) {
-            await this.visit(scalar.anchor, p);
+            this.visit(scalar.anchor, p);
         }
         switch (scalar.style) {
             case Yaml.ScalarStyle.DOUBLE_QUOTED:
@@ -118,17 +118,17 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         return scalar;
     }
 
-    protected async visitSequence(sequence: Yaml.Sequence, p: PrintOutputCapture): Promise<Yaml | undefined> {
-        await this.beforeSyntax(sequence, p);
+    protected visitSequence(sequence: Yaml.Sequence, p: PrintOutputCapture): Yaml | undefined {
+        this.beforeSyntax(sequence, p);
         if (sequence.anchor) {
-            await this.visit(sequence.anchor, p);
+            this.visit(sequence.anchor, p);
         }
         if (sequence.openingBracketPrefix !== undefined) {
             p.append(sequence.openingBracketPrefix);
             p.append('[');
         }
         for (const entry of sequence.entries) {
-            await this.visit(entry, p);
+            this.visit(entry, p);
         }
         if (sequence.closingBracketPrefix !== undefined) {
             p.append(sequence.closingBracketPrefix);
@@ -138,12 +138,12 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         return sequence;
     }
 
-    protected async visitSequenceEntry(entry: Yaml.SequenceEntry, p: PrintOutputCapture): Promise<Yaml | undefined> {
+    protected visitSequenceEntry(entry: Yaml.SequenceEntry, p: PrintOutputCapture): Yaml | undefined {
         p.append(entry.prefix);
         if (entry.dash) {
             p.append('-');
         }
-        await this.visit(entry.block, p);
+        this.visit(entry.block, p);
         if (entry.trailingCommaPrefix !== undefined) {
             p.append(entry.trailingCommaPrefix);
             p.append(',');
@@ -152,8 +152,8 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         return entry;
     }
 
-    protected async visitAnchor(anchor: Yaml.Anchor, p: PrintOutputCapture): Promise<Yaml | undefined> {
-        await this.visitMarkers(anchor.markers, p);
+    protected visitAnchor(anchor: Yaml.Anchor, p: PrintOutputCapture): Yaml | undefined {
+        this.visitMarkers(anchor.markers, p);
         p.append(anchor.prefix);
         p.append('&');
         p.append(anchor.key);
@@ -162,8 +162,8 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         return anchor;
     }
 
-    protected async visitAlias(alias: Yaml.Alias, p: PrintOutputCapture): Promise<Yaml | undefined> {
-        await this.beforeSyntax(alias, p);
+    protected visitAlias(alias: Yaml.Alias, p: PrintOutputCapture): Yaml | undefined {
+        this.beforeSyntax(alias, p);
         p.append('*');
         if (alias.anchor) {
             p.append(alias.anchor.key);
@@ -172,8 +172,8 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         return alias;
     }
 
-    protected async visitTag(tag: Yaml.Tag, p: PrintOutputCapture): Promise<Yaml | undefined> {
-        await this.visitMarkers(tag.markers, p);
+    protected visitTag(tag: Yaml.Tag, p: PrintOutputCapture): Yaml | undefined {
+        this.visitMarkers(tag.markers, p);
         p.append(tag.prefix);
         p.append(printTag(tag));
         p.append(tag.suffix);
@@ -183,16 +183,16 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
 
     private yamlMarkerWrapper = (out: string): string => `~~${out}${out ? "~~" : ""}>`;
 
-    private async beforeSyntax(yaml: Yaml, p: PrintOutputCapture): Promise<void> {
-        await this.beforeSyntaxWithMarkers(yaml.prefix, yaml.markers, p);
+    private beforeSyntax(yaml: Yaml, p: PrintOutputCapture): void {
+        this.beforeSyntaxWithMarkers(yaml.prefix, yaml.markers, p);
     }
 
-    private async beforeSyntaxWithMarkers(prefix: string, markers: Markers, p: PrintOutputCapture): Promise<void> {
+    private beforeSyntaxWithMarkers(prefix: string, markers: Markers, p: PrintOutputCapture): void {
         for (const marker of markers.markers) {
             p.append(p.markerPrinter.beforePrefix(marker, new Cursor(marker, this.cursor), this.yamlMarkerWrapper));
         }
         p.append(prefix);
-        await this.visitMarkers(markers, p);
+        this.visitMarkers(markers, p);
         for (const marker of markers.markers) {
             p.append(p.markerPrinter.beforeSyntax(marker, new Cursor(marker, this.cursor), this.yamlMarkerWrapper));
         }

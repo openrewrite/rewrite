@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {check, ExecutionContext, Option, Recipe, TreeVisitor} from "@openrewrite/rewrite";
+import {check, ExecutionContext, Option, Recipe, RecipeVisitor} from "@openrewrite/rewrite";
 import {FindIdentifier} from "./search-recipe";
 import {hasSourcePath} from "@openrewrite/rewrite/javascript";
 
@@ -41,7 +41,7 @@ export class FindIdentifierWithRemotePathPrecondition extends Recipe {
         super(options);
     }
 
-    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editor(): Promise<RecipeVisitor> {
         // Use the check function to apply the precondition
         return check(
             hasSourcePath(this.requiredPath),

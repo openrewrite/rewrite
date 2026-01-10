@@ -14,20 +14,19 @@
  * limitations under the License.
  */
 import {Yaml} from "../../src/yaml";
-import {emptyMarkers, randomId} from "../../src";
-import {printer, PrintOutputCapture} from "../../src/print";
+import {emptyMarkers, printer, randomId} from "../../src";
 
 // Import the printer to register it
 import "../../src/yaml/print";
 
-async function print(yaml: Yaml.Documents): Promise<string> {
+function print(yaml: Yaml.Documents): string {
     const p = printer(yaml);
-    return await p.print(yaml);
+    return p.print(yaml);
 }
 
 describe('printing YAML', () => {
 
-    test('print plain scalar', async () => {
+    test('print plain scalar', () => {
         const scalar: Yaml.Scalar = {
             kind: Yaml.Kind.Scalar,
             id: randomId(),
@@ -67,11 +66,11 @@ describe('printing YAML', () => {
             suffix: undefined
         };
 
-        const result = await print(documents);
+        const result = print(documents);
         expect(result).toBe("test");
     });
 
-    test('print double quoted scalar', async () => {
+    test('print double quoted scalar', () => {
         const scalar: Yaml.Scalar = {
             kind: Yaml.Kind.Scalar,
             id: randomId(),
@@ -111,11 +110,11 @@ describe('printing YAML', () => {
             suffix: undefined
         };
 
-        const result = await print(documents);
+        const result = print(documents);
         expect(result).toBe('"test"');
     });
 
-    test('print single quoted scalar', async () => {
+    test('print single quoted scalar', () => {
         const scalar: Yaml.Scalar = {
             kind: Yaml.Kind.Scalar,
             id: randomId(),
@@ -155,11 +154,11 @@ describe('printing YAML', () => {
             suffix: undefined
         };
 
-        const result = await print(documents);
+        const result = print(documents);
         expect(result).toBe("'test'");
     });
 
-    test('print mapping with entry', async () => {
+    test('print mapping with entry', () => {
         const keyScalar: Yaml.Scalar = {
             kind: Yaml.Kind.Scalar,
             id: randomId(),
@@ -232,11 +231,11 @@ describe('printing YAML', () => {
             suffix: undefined
         };
 
-        const result = await print(documents);
+        const result = print(documents);
         expect(result).toBe("key: value");
     });
 
-    test('print sequence with dash', async () => {
+    test('print sequence with dash', () => {
         const item: Yaml.Scalar = {
             kind: Yaml.Kind.Scalar,
             id: randomId(),
@@ -298,11 +297,11 @@ describe('printing YAML', () => {
             suffix: undefined
         };
 
-        const result = await print(documents);
+        const result = print(documents);
         expect(result).toBe("- item");
     });
 
-    test('print explicit document start', async () => {
+    test('print explicit document start', () => {
         const scalar: Yaml.Scalar = {
             kind: Yaml.Kind.Scalar,
             id: randomId(),
@@ -342,11 +341,11 @@ describe('printing YAML', () => {
             suffix: undefined
         };
 
-        const result = await print(documents);
+        const result = print(documents);
         expect(result).toBe("---\ntest");
     });
 
-    test('print explicit document end', async () => {
+    test('print explicit document end', () => {
         const scalar: Yaml.Scalar = {
             kind: Yaml.Kind.Scalar,
             id: randomId(),
@@ -386,11 +385,11 @@ describe('printing YAML', () => {
             suffix: undefined
         };
 
-        const result = await print(documents);
+        const result = print(documents);
         expect(result).toBe("test\n...");
     });
 
-    test('print anchor', async () => {
+    test('print anchor', () => {
         const anchor: Yaml.Anchor = {
             kind: Yaml.Kind.Anchor,
             id: randomId(),
@@ -406,7 +405,7 @@ describe('printing YAML', () => {
             prefix: "",
             markers: emptyMarkers,
             style: Yaml.ScalarStyle.PLAIN,
-            anchor: anchor,
+            anchor,
             tag: undefined,
             value: "test"
         };
@@ -439,11 +438,11 @@ describe('printing YAML', () => {
             suffix: undefined
         };
 
-        const result = await print(documents);
+        const result = print(documents);
         expect(result).toBe("&myanchor test");
     });
 
-    test('print alias', async () => {
+    test('print alias', () => {
         const anchor: Yaml.Anchor = {
             kind: Yaml.Kind.Anchor,
             id: randomId(),
@@ -458,7 +457,7 @@ describe('printing YAML', () => {
             id: randomId(),
             prefix: "",
             markers: emptyMarkers,
-            anchor: anchor
+            anchor
         };
 
         const documentEnd: Yaml.DocumentEnd = {
@@ -489,11 +488,11 @@ describe('printing YAML', () => {
             suffix: undefined
         };
 
-        const result = await print(documents);
+        const result = print(documents);
         expect(result).toBe("*myanchor");
     });
 
-    test('print inline sequence', async () => {
+    test('print inline sequence', () => {
         const item1: Yaml.Scalar = {
             kind: Yaml.Kind.Scalar,
             id: randomId(),
@@ -576,7 +575,7 @@ describe('printing YAML', () => {
             suffix: undefined
         };
 
-        const result = await print(documents);
+        const result = print(documents);
         expect(result).toBe("[a, b]");
     });
 });

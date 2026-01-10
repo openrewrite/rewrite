@@ -42,19 +42,19 @@ for (const kind of Object.values(PlainText.Kind)) {
             });
         },
 
-        async rpcSend(after: PlainText, q: RpcSendQueue): Promise<void> {
-            await q.getAndSend(after, p => p.id);
-            await q.getAndSend(after, p => p.markers);
-            await q.getAndSend(after, p => p.sourcePath);
-            await q.getAndSend(after, p => p.charsetName);
-            await q.getAndSend(after, p => p.charsetBomMarked);
-            await q.getAndSend(after, p => p.checksum);
-            await q.getAndSend(after, p => p.fileAttributes);
-            await q.getAndSend(after, p => p.text);
-            await q.getAndSendList(after, a => a.snippets, s => s.id, async (snippet) => {
-                await q.getAndSend(snippet, p => p.id);
-                await q.getAndSend(snippet, p => p.markers);
-                await q.getAndSend(snippet, p => p.text);
+        rpcSend(after: PlainText, q: RpcSendQueue): void {
+            q.getAndSend(after, p => p.id);
+            q.getAndSend(after, p => p.markers);
+            q.getAndSend(after, p => p.sourcePath);
+            q.getAndSend(after, p => p.charsetName);
+            q.getAndSend(after, p => p.charsetBomMarked);
+            q.getAndSend(after, p => p.checksum);
+            q.getAndSend(after, p => p.fileAttributes);
+            q.getAndSend(after, p => p.text);
+            q.getAndSendList(after, a => a.snippets, s => s.id, async (snippet) => {
+                q.getAndSend(snippet, p => p.id);
+                q.getAndSend(snippet, p => p.markers);
+                q.getAndSend(snippet, p => p.text);
             });
         }
     }, PlainText.Kind.PlainText);

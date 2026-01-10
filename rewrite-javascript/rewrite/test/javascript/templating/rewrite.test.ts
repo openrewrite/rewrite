@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
+import {JavaScriptVisitor, capture, pattern, rewrite, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 
 describe('RewriteRule composition', () => {
@@ -37,8 +37,8 @@ describe('RewriteRule composition', () => {
             const combined = rule1.andThen(rule2);
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await combined.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return combined.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -64,8 +64,8 @@ describe('RewriteRule composition', () => {
             const combined = rule1.andThen(rule2);
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await combined.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return combined.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -92,8 +92,8 @@ describe('RewriteRule composition', () => {
             const combined = rule1.andThen(rule2);
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await combined.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return combined.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -126,8 +126,8 @@ describe('RewriteRule composition', () => {
             const combined = rule1.andThen(rule2).andThen(rule3);
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await combined.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return combined.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -154,8 +154,8 @@ describe('RewriteRule composition', () => {
             const combined = rule1.andThen(rule2);
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await combined.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return combined.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -184,8 +184,8 @@ describe('RewriteRule composition', () => {
             const combined = rule1.orElse(rule2);
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await combined.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return combined.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -212,8 +212,8 @@ describe('RewriteRule composition', () => {
             const combined = rule1.orElse(rule2);
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await combined.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return combined.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -240,8 +240,8 @@ describe('RewriteRule composition', () => {
             const combined = rule1.orElse(rule2);
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await combined.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return combined.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -268,8 +268,8 @@ describe('RewriteRule composition', () => {
             const combined = specific.orElse(general);
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    return await combined.tryOn(this.cursor, invocation) || invocation;
+                override visitMethodInvocation(invocation: J.MethodInvocation, p: any): J | undefined {
+                    return combined.tryOn(this.cursor, invocation) || invocation;
                 }
             });
 
@@ -306,8 +306,8 @@ const b = baz(x, 1);`
             const combined = rule1.orElse(rule2).orElse(rule3);
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await combined.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return combined.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -348,8 +348,8 @@ const c = multiply(x, y);`
             const combined = specific.orElse(general).andThen(addParens);
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    return await combined.tryOn(this.cursor, invocation) || invocation;
+                override visitMethodInvocation(invocation: J.MethodInvocation, p: any): J | undefined {
+                    return combined.tryOn(this.cursor, invocation) || invocation;
                 }
             });
 
@@ -392,8 +392,8 @@ const b = (baz(x, 1));`
             const combined = subToFunc.andThen(optimizeSub).orElse(addToFunc.andThen(optimizeAdd));
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await combined.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return combined.tryOn(this.cursor, binary) || binary;
                 }
             });
 
