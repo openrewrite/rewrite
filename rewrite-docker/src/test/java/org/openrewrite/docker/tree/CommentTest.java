@@ -26,7 +26,7 @@ class CommentTest implements RewriteTest {
     @Test
     void commentsAtTop() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               # This is a comment
               # Another comment line
@@ -39,7 +39,7 @@ class CommentTest implements RewriteTest {
     @Test
     void commentsInline() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:20.04  # Base image
               RUN apt-get update  # Update packages
@@ -51,7 +51,7 @@ class CommentTest implements RewriteTest {
     @Test
     void commentsBetweenInstructions() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:20.04
               # Update and install dependencies
@@ -66,7 +66,7 @@ class CommentTest implements RewriteTest {
     @Test
     void emptyLinesAndComments() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               # Base image
               FROM ubuntu:20.04
@@ -84,7 +84,7 @@ class CommentTest implements RewriteTest {
     @Test
     void trailingCommentAfterImage() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM 'ubuntu:22.04' # Trailing comment
               RUN apt-get update
