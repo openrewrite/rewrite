@@ -17,15 +17,18 @@ package org.openrewrite.docker;
 
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.docker.tree.Docker;
-import org.openrewrite.tree.ParseError;
 import org.openrewrite.ParseExceptionResult;
+import org.openrewrite.SourceFile;
+import org.openrewrite.tree.ParseError;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -55,29 +58,24 @@ public class LocalDockerParser {
                 .map(Parser.Input::fromFile)
                 .collect(Collectors.toList());
 
-        List<String> errors = new ArrayList<>();
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
-            errors.add(t.getMessage());
-        });
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
 
-        List<Docker.File> parsedFiles = new ArrayList<>();
-        Map<Path, List<String>> baseImagesByFile = new LinkedHashMap<>();
+        List<SourceFile> parsedFiles = new ArrayList<>();
         Map<Path, String> failedFiles = new LinkedHashMap<>();
 
         parser.parseInputs(inputs, dir, ctx).forEach(sourceFile -> {
-            if (sourceFile instanceof Docker.File dockerFile) {
-                parsedFiles.add(dockerFile);
-                baseImagesByFile.put(dockerFile.getSourcePath(), extractBaseImages(dockerFile));
-            } else if (sourceFile instanceof ParseError parseError) {
+            if (sourceFile instanceof ParseError parseError) {
                 String errorMsg = parseError.getMarkers()
                         .findFirst(ParseExceptionResult.class)
                         .map(ex -> ex.getExceptionType() + ": " + ex.getMessage())
                         .orElse("Unknown error");
                 failedFiles.put(parseError.getSourcePath(), errorMsg);
+            } else {
+                parsedFiles.add(sourceFile);
             }
         });
 
-        printSummary(parsedFiles, baseImagesByFile, failedFiles);
+        printSummary(parsedFiles, failedFiles);
     }
 
     private static List<Path> findDockerFiles(Path dir, DockerParser parser) {
@@ -92,53 +90,7 @@ public class LocalDockerParser {
         }
     }
 
-    private static List<String> extractBaseImages(Docker.File file) {
-        List<String> baseImages = new ArrayList<>();
-        for (Docker.Stage stage : file.getStages()) {
-            String baseImage = formatFromInstruction(stage.getFrom());
-            baseImages.add(baseImage);
-        }
-        return baseImages;
-    }
-
-    private static String formatFromInstruction(Docker.From from) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(extractArgumentText(from.getImageName()));
-
-        if (from.getTag() != null) {
-            sb.append(":").append(extractArgumentText(from.getTag()));
-        } else if (from.getDigest() != null) {
-            sb.append("@").append(extractArgumentText(from.getDigest()));
-        }
-
-        if (from.getAs() != null) {
-            sb.append(" AS ").append(extractArgumentText(from.getAs().getName()));
-        }
-
-        return sb.toString();
-    }
-
-    private static String extractArgumentText(Docker.Argument arg) {
-        StringBuilder sb = new StringBuilder();
-        for (Docker.ArgumentContent content : arg.getContents()) {
-            if (content instanceof Docker.PlainText) {
-                sb.append(((Docker.PlainText) content).getText());
-            } else if (content instanceof Docker.QuotedString) {
-                sb.append(((Docker.QuotedString) content).getValue());
-            } else if (content instanceof Docker.EnvironmentVariable) {
-                Docker.EnvironmentVariable env = (Docker.EnvironmentVariable) content;
-                sb.append(env.isBraced() ? "${" + env.getName() + "}" : "$" + env.getName());
-            }
-        }
-        return sb.toString();
-    }
-
-    private static void printSummary(List<Docker.File> parsedFiles, Map<Path, List<String>> baseImagesByFile,
-                                      Map<Path, String> failedFiles) {
-        System.out.println("=".repeat(60));
-        System.out.println("Docker File Parsing Summary");
-        System.out.println("=".repeat(60));
-        System.out.println();
+    private static void printSummary(List<SourceFile> parsedFiles, Map<Path, String> failedFiles) {
         System.out.println("Files parsed successfully: " + parsedFiles.size());
         System.out.println("Files failed to parse: " + failedFiles.size());
         System.out.println();
@@ -157,36 +109,11 @@ public class LocalDockerParser {
             for (Map.Entry<String, List<Path>> group : errorGroups.entrySet()) {
                 System.out.println("  ERROR: " + group.getKey());
                 System.out.println("  Files affected (" + group.getValue().size() + "):");
-                for (Path path : group.getValue().stream().limit(10).toList()) {
+                for (Path path : group.getValue()) {
                     System.out.println("    - " + path);
-                }
-                if (group.getValue().size() > 10) {
-                    System.out.println("    ... and " + (group.getValue().size() - 10) + " more");
                 }
                 System.out.println();
             }
         }
-
-        System.out.println("Files and Base Images:");
-        System.out.println("-".repeat(60));
-        for (Map.Entry<Path, List<String>> entry : baseImagesByFile.entrySet()) {
-            System.out.println("  " + entry.getKey());
-            for (String baseImage : entry.getValue()) {
-                System.out.println("    - " + baseImage);
-            }
-        }
-        System.out.println();
-
-        Set<String> uniqueBaseImages = baseImagesByFile.values().stream()
-                .flatMap(Collection::stream)
-                .collect(Collectors.toCollection(TreeSet::new));
-
-        System.out.println("Unique Base Images (" + uniqueBaseImages.size() + "):");
-        System.out.println("-".repeat(60));
-        for (String baseImage : uniqueBaseImages) {
-            System.out.println("  - " + baseImage);
-        }
-        System.out.println();
-        System.out.println("=".repeat(60));
     }
 }
