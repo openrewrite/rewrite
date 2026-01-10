@@ -117,4 +117,18 @@ class LabelTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void labelMaintainerKeyword() {
+        // LABEL with 'maintainer' as key (keyword used as label key)
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              LABEL maintainer "Jessie Frazelle <jess@linux.com>"
+              RUN apk add curl
+              """
+          )
+        );
+    }
 }

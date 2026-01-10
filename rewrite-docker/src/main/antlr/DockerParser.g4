@@ -223,6 +223,9 @@ labelPair
 
 labelKey
     : UNQUOTED_TEXT | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING
+    // Allow MAINTAINER as a label key (e.g., LABEL maintainer "name")
+    // Note: other instruction keywords are NOT allowed here to avoid consuming the next instruction
+    | MAINTAINER
     ;
 
 labelValue
