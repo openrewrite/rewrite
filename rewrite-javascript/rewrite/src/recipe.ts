@@ -24,11 +24,17 @@ const OPTIONS_KEY = "__recipe_options__";
 export type Minutes = number;
 
 /**
- * Union type for recipe visitors. Recipes can return either async or sync visitors.
- * Use the `async` property to discriminate at runtime: TreeVisitor has `async: false`,
- * AsyncTreeVisitor has `async: true`.
+ * Interface for recipe visitors. Recipes can return either sync or async visitors.
+ * TreeVisitor and AsyncTreeVisitor both satisfy this interface.
+ *
+ * Uses `any` for the visit return type to accommodate both sync visitors (returning T)
+ * and async visitors (returning Promise<T>), while allowing generic type parameters
+ * on the visit method in implementations.
  */
-export type RecipeVisitor<T extends Tree = any> = TreeVisitor<T, ExecutionContext> | AsyncTreeVisitor<T, ExecutionContext>;
+export interface RecipeVisitor {
+    visit(tree: Tree, ctx: ExecutionContext, parent?: Cursor): any;
+    isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): boolean | Promise<boolean>;
+}
 
 export abstract class Recipe {
     constructor(options?: {}) {

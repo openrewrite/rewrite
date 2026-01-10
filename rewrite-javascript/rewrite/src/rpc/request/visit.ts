@@ -73,7 +73,7 @@ export class Visit {
     private static async instantiateVisitor(request: Visit,
                                       preparedRecipes: Map<String, Recipe>,
                                       recipeCursors: WeakMap<Recipe, Cursor>,
-                                      p: any): Promise<RecipeVisitor<any>> {
+                                      p: any): Promise<RecipeVisitor> {
         const visitorName = request.visitor;
         if (visitorName.startsWith("scan:")) {
             const recipeKey = visitorName.substring("scan:".length);

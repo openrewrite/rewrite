@@ -238,7 +238,7 @@ class NoopRecipe extends Recipe {
     displayName = "Do nothing";
     description = "Default no-op test, does nothing.";
 
-    async editor(): Promise<RecipeVisitor<any>> {
+    async editor(): Promise<RecipeVisitor> {
         return noopVisitor();
     }
 }
@@ -325,15 +325,15 @@ export class AdHocRecipe extends Recipe {
     displayName = "ad-hoc"
     description = "ad-hoc."
 
-    constructor(private visitor: RecipeVisitor<any>) {
+    constructor(private visitor: RecipeVisitor) {
         super();
     }
 
-    async editor(): Promise<RecipeVisitor<any>> {
+    async editor(): Promise<RecipeVisitor> {
         return this.visitor;
     }
 }
 
-export function fromVisitor(visitor: RecipeVisitor<any>): Recipe {
+export function fromVisitor(visitor: RecipeVisitor): Recipe {
     return new AdHocRecipe(visitor);
 }

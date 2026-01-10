@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {Option, ScanningRecipe} from "../../recipe";
+import {Option, RecipeVisitor, ScanningRecipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
 import {TreeVisitor} from "../../visitor";
 import {Tree} from "../../tree";
@@ -147,7 +147,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         return semver.gt(newMin, currentMin);
     }
 
-    async scanner(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
+    async scanner(acc: Accumulator): Promise<RecipeVisitor> {
         const recipe = this;
         const LOCK_FILE_NAMES = getAllLockFileNames();
 
@@ -266,20 +266,19 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         };
     }
 
-    async editorWithData(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editorWithData(acc: Accumulator): Promise<RecipeVisitor> {
         const recipe = this;
 
-        // Run all package manager installs BEFORE returning the visitor
-        // This keeps async I/O out of the visitor, making it pure tree transformation
-        for (const [sourcePath, updateInfo] of acc.projectsToUpdate) {
-            if (!updateInfo.skipInstall && !acc.processedProjects.has(sourcePath)) {
+        // Run all package manager installs once, before any files are visited
+        // Skip install if the resolved version already satisfies the new constraint
+        await acc.ensurePrepared(async (sourcePath, updateInfo) => {
+            if (!updateInfo.skipInstall) {
                 await this.runPackageManagerInstall(acc, updateInfo);
-                acc.processedProjects.add(sourcePath);
             }
-        }
+        });
 
         // Create JSON visitor that handles both package.json and JSON lock files
-        // This visitor is now pure - no I/O, just AST transformation using pre-computed data
+        // This visitor is pure - no I/O, just AST transformation using pre-computed data
         const jsonEditor = new class extends JsonVisitor<ExecutionContext> {
             protected visitDocument(doc: Json.Document, _ctx: ExecutionContext): Json | undefined {
                 const sourcePath = doc.sourcePath;

@@ -66,7 +66,7 @@ export class FindIdentifierWithPathPrecondition extends Recipe {
         super(options);
     }
 
-    async editor(): Promise<RecipeVisitor<any>> {
+    async editor(): Promise<RecipeVisitor> {
         const precondition = new PathPreconditionVisitor(this.requiredPath);
         const findIdentifier = new FindIdentifier({identifier: this.identifier});
 
@@ -99,7 +99,7 @@ export class ConditionalFindIdentifier extends Recipe {
         super(options);
     }
 
-    async editor(): Promise<RecipeVisitor<any>> {
+    async editor(): Promise<RecipeVisitor> {
         const findIdentifier = new FindIdentifier({identifier: this.identifier});
 
         // Use the check function with a boolean condition

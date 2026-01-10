@@ -19,7 +19,6 @@ import {describe, expect, test} from "@jest/globals";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     AddImport,
-    AsyncJavaScriptVisitor,
     ImportStyle,
     IntelliJ,
     javascript,
@@ -130,7 +129,7 @@ function createAddImportWithTemplateVisitor(
     module: string,
     member?: string,
     alias?: string
-): AsyncJavaScriptVisitor<any> {
+): JavaScriptVisitor<any> {
     // Construct the import statement for type attribution
     let importStatement: string;
     if (member) {
@@ -143,14 +142,14 @@ function createAddImportWithTemplateVisitor(
         importStatement = `import ${alias || module} from '${module}'`;
     }
 
-    return new class extends AsyncJavaScriptVisitor<any> {
+    return new class extends JavaScriptVisitor<any> {
         constructor() {
             super();
             // Register AddImport in afterVisit so it runs after template changes
             maybeAddImport(this, { module, member, alias });
         }
 
-        override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): Promise<J | undefined> {
+        override visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): J | undefined {
             if (methodInvocation.name?.kind === J.Kind.Identifier &&
                 (methodInvocation.name as J.Identifier).simpleName === 'placeholder') {
                 // Use builder API for string code with import context so TypeScript can type-attribute the call
@@ -1062,11 +1061,11 @@ describe('AddImport visitor', () => {
             const spec = new RecipeSpec();
             // This test manually removes the import statement, then adds it back with onlyIfReferenced: true
             // This tests that type attribution correctly detects usage even when declaring type != module name
-            spec.recipe = fromVisitor(new class extends AsyncJavaScriptVisitor<any> {
-                override async visitJsCompilationUnit(cu: any, p: any): Promise<J | undefined> {
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override visitJsCompilationUnit(cu: any, p: any): J | undefined {
                     const jsCu = cu as any;
                     // First, manually remove the first statement (the import)
-                    let result: any = await this.produceJavaScript(jsCu, p, async (draft: any) => {
+                    let result: any = produce(jsCu, (draft: any) => {
                         if (draft.statements && draft.statements.length > 0) {
                             draft.statements = draft.statements.slice(1);
                             draft.statements[0].element.prefix = emptySpace;
@@ -1080,7 +1079,7 @@ describe('AddImport visitor', () => {
                             member: "memo",
                             onlyIfReferenced: true
                         });
-                        result = await addImport.visit(result, p) as any;
+                        result = addImport.visit(result, p) as any;
                     }
 
                     return result;

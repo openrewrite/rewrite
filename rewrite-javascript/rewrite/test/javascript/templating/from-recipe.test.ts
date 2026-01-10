@@ -38,7 +38,7 @@ describe('fromRecipe', () => {
             displayName = 'Change One to Two';
             description = 'Changes literal 1 to literal 2.';
 
-            async editor(): Promise<RecipeVisitor<any>> {
+            async editor(): Promise<RecipeVisitor> {
                 return new class extends JavaScriptVisitor<ExecutionContext> {
                     override visitLiteral(literal: J.Literal, p: ExecutionContext): J | undefined {
                         if (literal.valueSource === '1') {
@@ -73,7 +73,7 @@ describe('fromRecipe', () => {
             displayName = 'Change X to Y';
             description = 'Changes identifier x to y.';
 
-            async editor(): Promise<RecipeVisitor<any>> {
+            async editor(): Promise<RecipeVisitor> {
                 return new class extends AsyncJavaScriptVisitor<ExecutionContext> {
                     override async visitIdentifier(ident: J.Identifier, p: ExecutionContext): Promise<J | undefined> {
                         if (ident.simpleName === 'x') {
@@ -115,7 +115,7 @@ describe('fromRecipe', () => {
             displayName = 'Change Two to Three';
             description = 'Changes literal 2 to literal 3.';
 
-            async editor(): Promise<RecipeVisitor<any>> {
+            async editor(): Promise<RecipeVisitor> {
                 return new class extends AsyncJavaScriptVisitor<ExecutionContext> {
                     override async visitLiteral(literal: J.Literal, p: ExecutionContext): Promise<J | undefined> {
                         if (literal.valueSource === '2') {
@@ -158,7 +158,7 @@ describe('fromRecipe', () => {
             displayName = 'No-op';
             description = 'Does nothing.';
 
-            async editor(): Promise<RecipeVisitor<any>> {
+            async editor(): Promise<RecipeVisitor> {
                 return new class extends JavaScriptVisitor<ExecutionContext> {
                     override visitLiteral(literal: J.Literal, p: ExecutionContext): J | undefined {
                         // Always return the same literal unchanged
@@ -191,7 +191,7 @@ describe('fromRecipe', () => {
             displayName = 'Change One to Two';
             description = 'Changes literal 1 to literal 2.';
 
-            async editor(): Promise<RecipeVisitor<any>> {
+            async editor(): Promise<RecipeVisitor> {
                 return new class extends AsyncJavaScriptVisitor<ExecutionContext> {
                     override async visitLiteral(literal: J.Literal, p: ExecutionContext): Promise<J | undefined> {
                         if (literal.valueSource === '1') {
@@ -212,7 +212,7 @@ describe('fromRecipe', () => {
             displayName = 'Change Two to Three';
             description = 'Changes literal 2 to literal 3.';
 
-            async editor(): Promise<RecipeVisitor<any>> {
+            async editor(): Promise<RecipeVisitor> {
                 return new class extends AsyncJavaScriptVisitor<ExecutionContext> {
                     override async visitLiteral(literal: J.Literal, p: ExecutionContext): Promise<J | undefined> {
                         if (literal.valueSource === '2') {

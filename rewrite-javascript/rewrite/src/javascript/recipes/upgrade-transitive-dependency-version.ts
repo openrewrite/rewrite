@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {Option, ScanningRecipe} from "../../recipe";
+import {Option, RecipeVisitor, ScanningRecipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
 import {TreeVisitor} from "../../visitor";
 import {Tree} from "../../tree";
@@ -121,7 +121,7 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
         };
     }
 
-    async scanner(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
+    async scanner(acc: Accumulator): Promise<RecipeVisitor> {
         const recipe = this;
         const LOCK_FILE_NAMES = getAllLockFileNames();
 
@@ -243,17 +243,13 @@ export class UpgradeTransitiveDependencyVersion extends ScanningRecipe<Accumulat
         };
     }
 
-    async editorWithData(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editorWithData(acc: Accumulator): Promise<RecipeVisitor> {
         const recipe = this;
 
-        // Run all package manager installs BEFORE returning the visitor
-        // This keeps async I/O out of the visitor, making it pure tree transformation
-        for (const [sourcePath, updateInfo] of acc.projectsToUpdate) {
-            if (!acc.processedProjects.has(sourcePath)) {
-                await this.runPackageManagerInstall(acc, updateInfo);
-                acc.processedProjects.add(sourcePath);
-            }
-        }
+        // Run all package manager installs once, before any files are visited
+        await acc.ensurePrepared(async (_sourcePath, updateInfo) => {
+            await this.runPackageManagerInstall(acc, updateInfo);
+        });
 
         // Create JSON visitor that handles both package.json and JSON lock files
         // This visitor is now pure - no I/O, just AST transformation using pre-computed data

@@ -406,19 +406,40 @@ export interface DependencyRecipeAccumulator<T> {
 
     /** Track projects where npm install failed: packageJsonPath -> error message */
     failedProjects: Map<string, string>;
+
+    /**
+     * Ensures the preparation step (e.g., running package manager installs) is executed
+     * exactly once, regardless of how many times editorWithData() is called.
+     *
+     * @param prepareProject Function to run for each project that needs updating
+     */
+    ensurePrepared(prepareProject: (sourcePath: string, updateInfo: T) => Promise<void>): Promise<void>;
 }
 
 /**
  * Creates a new empty accumulator for dependency recipes.
  */
 export function createDependencyRecipeAccumulator<T>(): DependencyRecipeAccumulator<T> {
-    return {
+    let prepared = false;
+
+    const acc: DependencyRecipeAccumulator<T> = {
         projectsToUpdate: new Map(),
         updatedLockFiles: new Map(),
         updatedPackageJsons: new Map(),
         processedProjects: new Set(),
-        failedProjects: new Map()
+        failedProjects: new Map(),
+
+        async ensurePrepared(prepareProject: (sourcePath: string, updateInfo: T) => Promise<void>): Promise<void> {
+            if (!prepared) {
+                for (const [sourcePath, updateInfo] of acc.projectsToUpdate) {
+                    await prepareProject(sourcePath, updateInfo);
+                }
+                prepared = true;
+            }
+        }
     };
+
+    return acc;
 }
 
 /**

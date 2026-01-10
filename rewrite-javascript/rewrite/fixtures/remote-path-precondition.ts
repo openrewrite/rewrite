@@ -41,7 +41,7 @@ export class FindIdentifierWithRemotePathPrecondition extends Recipe {
         super(options);
     }
 
-    async editor(): Promise<RecipeVisitor<any>> {
+    async editor(): Promise<RecipeVisitor> {
         // Use the check function to apply the precondition
         return check(
             hasSourcePath(this.requiredPath),

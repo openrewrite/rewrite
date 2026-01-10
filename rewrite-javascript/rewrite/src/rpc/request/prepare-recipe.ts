@@ -93,7 +93,7 @@ export class PrepareRecipe {
      * precondition passes.
      */
     private static async optimizePreconditions(recipe: Recipe, phase: "edit" | "scan", preconditions: Precondition[]): Promise<Recipe> {
-        let visitor: RecipeVisitor<any>;
+        let visitor: RecipeVisitor;
         if (phase === "edit") {
             visitor = await recipe.editor();
         } else if (phase === "scan") {
@@ -112,12 +112,12 @@ export class PrepareRecipe {
                     recipe,
                     phase === "edit" ?
                         {
-                            async editor(): Promise<RecipeVisitor<any>> {
+                            async editor(): Promise<RecipeVisitor> {
                                 return visitor.v;
                             }
                         } :
                         {
-                            async scanner(acc: any): Promise<RecipeVisitor<any>> {
+                            async scanner(acc: any): Promise<RecipeVisitor> {
                                 const checkVisitor = await (recipe as ScanningRecipe<any>).scanner(acc);
                                 return (checkVisitor as Check<any>).v;
                             }
@@ -131,7 +131,7 @@ export class PrepareRecipe {
         return recipe;
     }
 
-    private static visitorTypePrecondition(preconditions: Precondition[], v: RecipeVisitor<any>): Precondition[] {
+    private static visitorTypePrecondition(preconditions: Precondition[], v: RecipeVisitor): Precondition[] {
         let treeType: string | undefined;
 
         // Use CommonJS require to defer loading and avoid circular dependencies
