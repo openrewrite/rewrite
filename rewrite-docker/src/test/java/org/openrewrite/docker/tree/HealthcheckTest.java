@@ -15,7 +15,6 @@
  */
 package org.openrewrite.docker.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -107,24 +106,6 @@ class HealthcheckTest implements RewriteTest {
     }
 
     @Test
-    void healthcheckWithTimeoutFlag() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:20.04
-              HEALTHCHECK --timeout=3s CMD curl -f http://localhost/ || exit 1
-              """,
-            spec -> spec.afterRecipe(doc -> {
-                var healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(healthcheck.isNone()).isFalse();
-                assertThat(healthcheck.getFlags()).hasSize(1);
-                assertThat(healthcheck.getFlags().getFirst().getName()).isEqualTo("timeout");
-            })
-          )
-        );
-    }
-
-    @Test
     void healthcheckWithAllFlags() {
         rewriteRun(
           docker(
@@ -148,9 +129,9 @@ class HealthcheckTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
-    void healthcheckWithLineContinuation() {
+    void healthcheckWithLineContinuationInCommand() {
+        // Line continuation in the command itself (after CMD)
         rewriteRun(
           docker(
             """
