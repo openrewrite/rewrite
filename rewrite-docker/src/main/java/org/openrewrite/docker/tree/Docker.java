@@ -705,8 +705,6 @@ public interface Docker extends Tree {
 
         String keyword;
 
-        boolean isNone;  // true for HEALTHCHECK NONE
-
         @Nullable
         List<Flag> flags;
 
@@ -716,6 +714,10 @@ public interface Docker extends Tree {
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitHealthcheck(this, p);
+        }
+
+        public boolean isNone() {
+            return cmd == null;
         }
     }
 

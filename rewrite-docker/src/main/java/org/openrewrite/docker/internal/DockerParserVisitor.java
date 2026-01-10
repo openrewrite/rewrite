@@ -1163,7 +1163,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
-        return new Docker.Healthcheck(randomId(), prefix, Markers.EMPTY, healthcheckKeyword, isNone, flags, cmd);
+        return new Docker.Healthcheck(randomId(), prefix, Markers.EMPTY, healthcheckKeyword, flags, cmd);
     }
 
     @Override
