@@ -18,10 +18,7 @@ package org.openrewrite.docker;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
@@ -29,6 +26,7 @@ import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
@@ -48,7 +46,7 @@ public class AddOrUpdateLabel extends Recipe {
     String value;
 
     @Option(displayName = "Overwrite existing",
-            description = "If true, overwrite the label if it already exists. If false, skip if exists.",
+            description = "If true, overwrite the label if it already exists. If false, skip if exists. Defaults to true.",
             required = false)
     @Nullable
     Boolean overwriteExisting;
@@ -67,22 +65,18 @@ public class AddOrUpdateLabel extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Adds or updates a LABEL instruction in a Dockerfile. " +
-               "By default, adds to the final stage only.";
+        return "Adds or updates a LABEL instruction in a Dockerfile. By default, adds to the final stage only.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         boolean shouldOverwrite = overwriteExisting == null || overwriteExisting;
-
         return new DockerIsoVisitor<ExecutionContext>() {
-
             @Override
             public Docker.File visitFile(Docker.File file, ExecutionContext ctx) {
                 Docker.File f = super.visitFile(file, ctx);
-
-                if (f.getStages().isEmpty()) {
-                    return f;
+                if (hasMatchingLabel(f)) {
+                    return f; // No further changes needed
                 }
 
                 // Determine which stages to modify
@@ -95,7 +89,7 @@ public class AddOrUpdateLabel extends Recipe {
 
                     // Check if we should target this stage
                     if (stageName != null) {
-                        String currentStageName = getStageName(stage);
+                        String currentStageName = stage.getFrom().getAs() != null ? stage.getFrom().getAs().getName().getText() : null;
                         if (!stageName.equals(currentStageName)) {
                             continue; // Skip this stage
                         }
@@ -117,11 +111,21 @@ public class AddOrUpdateLabel extends Recipe {
                 return f;
             }
 
-            private @Nullable String getStageName(Docker.Stage stage) {
-                if (stage.getFrom().getAs() != null) {
-                    return stage.getFrom().getAs().getName().getText();
-                }
-                return null;
+            private boolean hasMatchingLabel(Docker.File f) {
+                return new DockerIsoVisitor<AtomicBoolean>() {
+                    @Override
+                    public Docker.Label.LabelPair visitLabelPair(Docker.Label.LabelPair pair, AtomicBoolean matchFound) {
+                        if (matchFound.get()) {
+                            return pair; // Short-circuit if already found
+                        }
+                        if (key.equals(extractText(pair.getKey())) &&
+                                value.equals(extractText(pair.getValue()))) {
+                            matchFound.set(true);
+                            return pair;
+                        }
+                        return super.visitLabelPair(pair, matchFound);
+                    }
+                }.reduce(f, new AtomicBoolean(false), getCursor().getParentOrThrow()).get();
             }
 
             private Docker.Stage addOrUpdateLabel(Docker.Stage stage, boolean shouldOverwrite) {
@@ -166,8 +170,8 @@ public class AddOrUpdateLabel extends Recipe {
             }
 
             private Docker.Stage updateExistingLabel(Docker.Stage stage,
-                                                      Docker.Label existingLabel,
-                                                      int index) {
+                                                     Docker.Label existingLabel,
+                                                     int index) {
                 // Find and update the specific pair
                 List<Docker.Label.LabelPair> newPairs = new ArrayList<>();
 
@@ -192,8 +196,14 @@ public class AddOrUpdateLabel extends Recipe {
 
             private Docker.Stage addNewLabel(Docker.Stage stage) {
                 // Create new LABEL instruction
-                Docker.Label.LabelPair pair = createLabelPair(key, value, Space.SINGLE_SPACE);
-
+                Docker.Label.LabelPair pair = new Docker.Label.LabelPair(
+                        Tree.randomId(),
+                        Space.SINGLE_SPACE,
+                        Markers.EMPTY,
+                        createArgument(key, null),
+                        true,  // hasEquals - use modern format with equals sign
+                        createArgument(value, null)
+                );
                 Docker.Label newLabel = new Docker.Label(
                         randomId(),
                         Space.format("\n"),
@@ -214,34 +224,14 @@ public class AddOrUpdateLabel extends Recipe {
             private int findLabelInsertPosition(Docker.Stage stage) {
                 // Insert after other LABEL instructions, or at beginning, before CMD/ENTRYPOINT
                 int lastLabelIndex = -1;
-                int cmdEntrypointIndex = stage.getInstructions().size();
-
                 for (int i = 0; i < stage.getInstructions().size(); i++) {
                     Docker.Instruction inst = stage.getInstructions().get(i);
                     if (inst instanceof Docker.Label) {
                         lastLabelIndex = i;
-                    } else if (inst instanceof Docker.Cmd || inst instanceof Docker.Entrypoint) {
-                        cmdEntrypointIndex = i;
-                        break;
                     }
                 }
-
                 // Prefer after last LABEL, then at beginning but before CMD
-                if (lastLabelIndex >= 0) {
-                    return lastLabelIndex + 1;
-                }
-                return Math.min(0, cmdEntrypointIndex);
-            }
-
-            private Docker.Label.LabelPair createLabelPair(String labelKey, String labelValue, Space prefix) {
-                return new Docker.Label.LabelPair(
-                        randomId(),
-                        prefix,
-                        Markers.EMPTY,
-                        createArgument(labelKey, null),
-                        true,  // hasEquals - use modern format with equals sign
-                        createArgument(labelValue, null)
-                );
+                return lastLabelIndex + 1;
             }
 
             private Docker.Argument createArgument(String text, Docker.@Nullable Argument original) {
@@ -260,29 +250,11 @@ public class AddOrUpdateLabel extends Recipe {
                             }
                         }
                     }
-                    content = new Docker.Literal(
-                            randomId(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            text,
-                            quoteStyle
-                    );
+                    content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, quoteStyle);
                 } else {
-                    content = new Docker.Literal(
-                            randomId(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            text,
-                            null
-                    );
+                    content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, null);
                 }
-
-                return new Docker.Argument(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        singletonList(content)
-                );
+                return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(content));
             }
 
             private @Nullable String extractText(Docker.@Nullable Argument arg) {
@@ -294,7 +266,13 @@ public class AddOrUpdateLabel extends Recipe {
                     if (content instanceof Docker.Literal) {
                         builder.append(((Docker.Literal) content).getText());
                     } else if (content instanceof Docker.EnvironmentVariable) {
-                        return null;
+                        Docker.EnvironmentVariable env = (Docker.EnvironmentVariable) content;
+                        // Include the variable reference as-is (e.g., ${VAR} or $VAR)
+                        if (env.isBraced()) {
+                            builder.append("${").append(env.getName()).append("}");
+                        } else {
+                            builder.append("$").append(env.getName());
+                        }
                     }
                 }
                 return builder.toString();
