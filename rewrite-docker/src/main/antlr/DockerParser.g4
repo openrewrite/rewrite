@@ -179,11 +179,13 @@ shellFormTextElement
     ;
 
 // Keywords that can safely appear in shell form text
-// These are keywords that don't start new instructions when appearing mid-line
-// Note: Instruction-starting keywords (RUN, COPY, etc.) are NOT included because they
-// signal the end of shell form and start of a new instruction
+// These are keywords that commonly appear as shell commands/arguments:
+// - ADD: appears in "apt-get add", "apk add", "git add" - very common
+// - RUN: appears in "go run", "npm run" - fairly common
+// - SHELL, USER, AS: various shell flags and arguments
+// NOTE: COPY, CMD, ENV are NOT included because they more commonly start new instructions
 shellSafeKeyword
-    : SHELL | USER | AS
+    : SHELL | USER | AS | ADD | RUN
     ;
 
 heredoc
