@@ -264,4 +264,31 @@ class FindDockerBaseImagesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findBaseImageWithGlobalArg() {
+        rewriteRun(
+          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+            //language=csv
+            """
+              sourceFile,stageName,imageName,tag,digest,platform
+              Dockerfile,,"${BASE_IMAGE}","${BASE_TAG}",,
+              """
+          ),
+          Assertions.docker(
+            """
+              ARG BASE_IMAGE=ubuntu
+              ARG BASE_TAG=22.04
+              FROM ${BASE_IMAGE}:${BASE_TAG}
+              RUN apt-get update
+              """,
+            """
+              ARG BASE_IMAGE=ubuntu
+              ARG BASE_TAG=22.04
+              ~~(${BASE_IMAGE}:${BASE_TAG})~~>FROM ${BASE_IMAGE}:${BASE_TAG}
+              RUN apt-get update
+              """
+          )
+        );
+    }
 }

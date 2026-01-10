@@ -107,8 +107,13 @@ public class FindDockerBaseImages extends Recipe {
                     } else if (content instanceof Docker.QuotedString) {
                         builder.append(((Docker.QuotedString) content).getValue());
                     } else if (content instanceof Docker.EnvironmentVariable) {
-                        // Cannot evaluate environment variables at static analysis time
-                        return null;
+                        Docker.EnvironmentVariable env = (Docker.EnvironmentVariable) content;
+                        // Include the variable reference as-is (e.g., ${VAR} or $VAR)
+                        if (env.isBraced()) {
+                            builder.append("${").append(env.getName()).append("}");
+                        } else {
+                            builder.append("$").append(env.getName());
+                        }
                     }
                 }
                 return builder.toString();
