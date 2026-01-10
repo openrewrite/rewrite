@@ -1,0 +1,6 @@
+org.openrewrite.python.internal.rpc.PythonRpcCodec
+org.openrewrite.python.internal.rpc.PythonRightPaddedRpcCodec
+org.openrewrite.python.internal.rpc.PythonLeftPaddedRpcCodec
+org.openrewrite.python.internal.rpc.PythonContainerRpcCodec
+org.openrewrite.python.internal.rpc.PythonSpaceRpcCodec
+org.openrewrite.python.internal.rpc.PythonTrailingCommaRpcCodec

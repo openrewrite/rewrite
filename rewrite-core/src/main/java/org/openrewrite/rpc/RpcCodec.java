@@ -46,10 +46,16 @@ public interface RpcCodec<T> {
     T rpcReceive(T before, RpcReceiveQueue q);
 
     static <T> @Nullable RpcCodec<T> forInstance(T t, @Nullable String sourceFileType) {
+        // First check for a dynamic dispatch codec (allows language-specific overrides)
+        RpcCodec<T> dynamicCodec = DynamicDispatchRpcCodec.getCodec(t, sourceFileType);
+        if (dynamicCodec != null) {
+            return dynamicCodec;
+        }
+        // Fall back to object's own codec implementation
         if (t instanceof RpcCodec) {
             //noinspection unchecked
             return (RpcCodec<T>) t;
         }
-        return DynamicDispatchRpcCodec.getCodec(t, sourceFileType);
+        return null;
     }
 }
