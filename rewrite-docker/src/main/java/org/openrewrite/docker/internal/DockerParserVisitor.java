@@ -475,7 +475,16 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         String argKeyword = ctx.ARG().getText();
         skip(ctx.ARG().getSymbol());
 
-        Docker.Argument name = visitArgument(ctx.argName());
+        // ARG name is always a simple identifier
+        Space namePrefix = prefix(ctx.argName().getStart());
+        skip(ctx.argName().getStop());
+        Docker.Literal name = new Docker.Literal(
+                randomId(),
+                namePrefix,
+                Markers.EMPTY,
+                ctx.argName().getText(),
+                null
+        );
 
         Docker.Argument value = null;
         if (ctx.EQUALS() != null) {

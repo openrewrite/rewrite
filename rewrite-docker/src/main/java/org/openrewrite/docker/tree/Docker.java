@@ -323,7 +323,7 @@ public interface Docker extends Tree {
 
         String keyword;
 
-        Argument name;
+        Literal name;
 
         @Nullable
         Argument value;
