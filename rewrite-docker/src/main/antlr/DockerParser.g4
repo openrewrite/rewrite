@@ -179,7 +179,7 @@ shellFormTextElement
     ;
 
 // Keywords that can safely appear in shell form text
-// Only non-instruction-starting keywords: SHELL (--shell flag), USER (--user flag), AS (--as flag)
+// These don't start new instructions when appearing mid-line
 shellSafeKeyword
     : SHELL | USER | AS
     ;
