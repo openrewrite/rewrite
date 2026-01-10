@@ -243,6 +243,16 @@ public interface DockerParserListener extends ParseTreeListener {
 	 */
 	void exitHealthcheckInstruction(DockerParser.HealthcheckInstructionContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link DockerParser#healthcheckCommand}.
+	 * @param ctx the parse tree
+	 */
+	void enterHealthcheckCommand(DockerParser.HealthcheckCommandContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#healthcheckCommand}.
+	 * @param ctx the parse tree
+	 */
+	void exitHealthcheckCommand(DockerParser.HealthcheckCommandContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link DockerParser#shellInstruction}.
 	 * @param ctx the parse tree
 	 */
@@ -303,15 +313,15 @@ public interface DockerParserListener extends ParseTreeListener {
 	 */
 	void exitFlagValue(DockerParser.FlagValueContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link DockerParser#flagValueElement}.
+	 * Enter a parse tree produced by {@link DockerParser#flagValueToken}.
 	 * @param ctx the parse tree
 	 */
-	void enterFlagValueElement(DockerParser.FlagValueElementContext ctx);
+	void enterFlagValueToken(DockerParser.FlagValueTokenContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link DockerParser#flagValueElement}.
+	 * Exit a parse tree produced by {@link DockerParser#flagValueToken}.
 	 * @param ctx the parse tree
 	 */
-	void exitFlagValueElement(DockerParser.FlagValueElementContext ctx);
+	void exitFlagValueToken(DockerParser.FlagValueTokenContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerParser#execForm}.
 	 * @param ctx the parse tree
@@ -352,16 +362,6 @@ public interface DockerParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitShellFormTextElement(DockerParser.ShellFormTextElementContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link DockerParser#shellSafeKeyword}.
-	 * @param ctx the parse tree
-	 */
-	void enterShellSafeKeyword(DockerParser.ShellSafeKeywordContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#shellSafeKeyword}.
-	 * @param ctx the parse tree
-	 */
-	void exitShellSafeKeyword(DockerParser.ShellSafeKeywordContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerParser#heredoc}.
 	 * @param ctx the parse tree
@@ -463,16 +463,6 @@ public interface DockerParserListener extends ParseTreeListener {
 	 */
 	void exitLabelPair(DockerParser.LabelPairContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link DockerParser#labelKeyWithKeyword}.
-	 * @param ctx the parse tree
-	 */
-	void enterLabelKeyWithKeyword(DockerParser.LabelKeyWithKeywordContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#labelKeyWithKeyword}.
-	 * @param ctx the parse tree
-	 */
-	void exitLabelKeyWithKeyword(DockerParser.LabelKeyWithKeywordContext ctx);
-	/**
 	 * Enter a parse tree produced by {@link DockerParser#labelKey}.
 	 * @param ctx the parse tree
 	 */
@@ -562,16 +552,6 @@ public interface DockerParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitEnvKey(DockerParser.EnvKeyContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link DockerParser#envSafeKeyword}.
-	 * @param ctx the parse tree
-	 */
-	void enterEnvSafeKeyword(DockerParser.EnvSafeKeywordContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#envSafeKeyword}.
-	 * @param ctx the parse tree
-	 */
-	void exitEnvSafeKeyword(DockerParser.EnvSafeKeywordContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerParser#envValueEquals}.
 	 * @param ctx the parse tree

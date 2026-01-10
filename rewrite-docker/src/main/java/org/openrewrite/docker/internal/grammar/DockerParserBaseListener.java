@@ -296,6 +296,18 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterHealthcheckCommand(DockerParser.HealthcheckCommandContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitHealthcheckCommand(DockerParser.HealthcheckCommandContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterShellInstruction(DockerParser.ShellInstructionContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -368,13 +380,13 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterFlagValueElement(DockerParser.FlagValueElementContext ctx) { }
+	@Override public void enterFlagValueToken(DockerParser.FlagValueTokenContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitFlagValueElement(DockerParser.FlagValueElementContext ctx) { }
+	@Override public void exitFlagValueToken(DockerParser.FlagValueTokenContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -423,18 +435,6 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitShellFormTextElement(DockerParser.ShellFormTextElementContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterShellSafeKeyword(DockerParser.ShellSafeKeywordContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitShellSafeKeyword(DockerParser.ShellSafeKeywordContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -560,18 +560,6 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterLabelKeyWithKeyword(DockerParser.LabelKeyWithKeywordContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitLabelKeyWithKeyword(DockerParser.LabelKeyWithKeywordContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
 	@Override public void enterLabelKey(DockerParser.LabelKeyContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -675,18 +663,6 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitEnvKey(DockerParser.EnvKeyContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterEnvSafeKeyword(DockerParser.EnvSafeKeywordContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitEnvSafeKeyword(DockerParser.EnvSafeKeywordContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

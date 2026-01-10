@@ -158,6 +158,12 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitHealthcheckInstruction(DockerParser.HealthcheckInstructionContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link DockerParser#healthcheckCommand}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitHealthcheckCommand(DockerParser.HealthcheckCommandContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link DockerParser#shellInstruction}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -194,11 +200,11 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitFlagValue(DockerParser.FlagValueContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link DockerParser#flagValueElement}.
+	 * Visit a parse tree produced by {@link DockerParser#flagValueToken}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitFlagValueElement(DockerParser.FlagValueElementContext ctx);
+	T visitFlagValueToken(DockerParser.FlagValueTokenContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#execForm}.
 	 * @param ctx the parse tree
@@ -223,12 +229,6 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitShellFormTextElement(DockerParser.ShellFormTextElementContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link DockerParser#shellSafeKeyword}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitShellSafeKeyword(DockerParser.ShellSafeKeywordContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#heredoc}.
 	 * @param ctx the parse tree
@@ -290,12 +290,6 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitLabelPair(DockerParser.LabelPairContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link DockerParser#labelKeyWithKeyword}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitLabelKeyWithKeyword(DockerParser.LabelKeyWithKeywordContext ctx);
-	/**
 	 * Visit a parse tree produced by {@link DockerParser#labelKey}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -349,12 +343,6 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitEnvKey(DockerParser.EnvKeyContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link DockerParser#envSafeKeyword}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitEnvSafeKeyword(DockerParser.EnvSafeKeywordContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#envValueEquals}.
 	 * @param ctx the parse tree

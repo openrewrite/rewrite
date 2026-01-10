@@ -11,6 +11,8 @@ lexer grammar DockerLexer;
 {
     private Stack<String> heredocIdentifier = new Stack<String>();
     private boolean heredocIdentifierCaptured = false;
+    // Track if we're at the start of a logical line (where instructions can appear)
+    private boolean atLineStart = true;
 }
 
 options {
@@ -18,37 +20,43 @@ options {
 }
 
 // Parser directives (must be at the beginning of file)
-PARSER_DIRECTIVE : '#' WS_CHAR* [A-Z_]+ WS_CHAR* '=' WS_CHAR* ~[\r\n]* NEWLINE_CHAR;
+// After a parser directive, we're at line start (it consumes the newline)
+PARSER_DIRECTIVE : '#' WS_CHAR* [A-Z_]+ WS_CHAR* '=' WS_CHAR* ~[\r\n]* NEWLINE_CHAR { atLineStart = true; };
 
 // Comments (after parser directives) - HIDDEN in main mode
 COMMENT : '#' ~[\r\n]* -> channel(HIDDEN);
 
 // Instructions (case-insensitive)
-FROM       : 'FROM';
-RUN        : 'RUN';
-CMD        : 'CMD';
-LABEL      : 'LABEL';
-EXPOSE     : 'EXPOSE';
-ENV        : 'ENV';
-ADD        : 'ADD';
-COPY       : 'COPY';
-ENTRYPOINT : 'ENTRYPOINT';
-VOLUME     : 'VOLUME';
-USER       : 'USER';
-WORKDIR    : 'WORKDIR';
-ARG        : 'ARG';
-ONBUILD    : 'ONBUILD';
-STOPSIGNAL : 'STOPSIGNAL';
-HEALTHCHECK: 'HEALTHCHECK';
-SHELL      : 'SHELL';
-MAINTAINER : 'MAINTAINER';
+// Instructions are only recognized at line start. Otherwise they become UNQUOTED_TEXT.
+// This eliminates ambiguity between instruction keywords and shell command text.
+FROM       : 'FROM'       { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+RUN        : 'RUN'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+CMD        : 'CMD'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+LABEL      : 'LABEL'      { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+EXPOSE     : 'EXPOSE'     { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+ENV        : 'ENV'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+ADD        : 'ADD'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+COPY       : 'COPY'       { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+ENTRYPOINT : 'ENTRYPOINT' { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+VOLUME     : 'VOLUME'     { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+USER       : 'USER'       { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+WORKDIR    : 'WORKDIR'    { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+ARG        : 'ARG'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+// ONBUILD is special: it keeps atLineStart true so the following instruction is recognized
+ONBUILD    : 'ONBUILD'    { if (!atLineStart) setType(UNQUOTED_TEXT); /* atLineStart stays true */ };
+STOPSIGNAL : 'STOPSIGNAL' { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+// HEALTHCHECK is special: it keeps atLineStart true so the following CMD instruction is recognized
+HEALTHCHECK: 'HEALTHCHECK'{ if (!atLineStart) setType(UNQUOTED_TEXT); /* atLineStart stays true for CMD */ };
+SHELL      : 'SHELL'      { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+MAINTAINER : 'MAINTAINER' { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 
 // Special keywords
-AS         : 'AS';
+AS         : 'AS' { atLineStart = false; };
 
 // Heredoc start - captures <<EOF or <<-EOF and switches to HEREDOC_PREAMBLE mode
 HEREDOC_START : '<<' '-'? {
     heredocIdentifierCaptured = false;  // Reset for new heredoc
+    atLineStart = false;
 } -> pushMode(HEREDOC_PREAMBLE);
 
 // Line continuation - HIDDEN in main mode
@@ -56,13 +64,13 @@ HEREDOC_START : '<<' '-'? {
 LINE_CONTINUATION : ('\\' | '`') [ \t]* NEWLINE_CHAR -> channel(HIDDEN);
 
 // JSON array delimiters (for exec form) - no mode switching, handled in parser
-LBRACKET : '[';
-RBRACKET : ']';
-COMMA    : ',';
+LBRACKET : '[' { atLineStart = false; };
+RBRACKET : ']' { atLineStart = false; };
+COMMA    : ',' { atLineStart = false; };
 
 // Assignment and flags
-EQUALS     : '=';
-DASH_DASH  : '--';
+EQUALS     : '=' { atLineStart = false; };
+DASH_DASH  : '--' { atLineStart = false; };
 
 // Unquoted text fragment (to be used in UNQUOTED_TEXT)
 // This matches text that doesn't start with -- or <<
@@ -73,10 +81,10 @@ fragment ESCAPED_CHAR : '\\' .;
 // String literals
 // Double-quoted strings support escape sequences and line continuation (backslash or backtick)
 // Backtick followed by whitespace+newline is continuation; standalone backtick is regular char
-DOUBLE_QUOTED_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | ~["\\\r\n`] )* '"';
+DOUBLE_QUOTED_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | ~["\\\r\n`] )* '"' { atLineStart = false; };
 // Single-quoted strings in shell are literal - no escape processing inside
 // But they DO support line continuation (backslash or backtick followed by newline)
-SINGLE_QUOTED_STRING : '\'' ( INLINE_CONTINUATION | ~['\r\n] )* '\'';
+SINGLE_QUOTED_STRING : '\'' ( INLINE_CONTINUATION | ~['\r\n] )* '\'' { atLineStart = false; };
 
 // Inline line continuation (inside strings) - backtick or backslash followed by newline
 fragment INLINE_CONTINUATION : ('\\' | '`') [ \t]* [\r\n]+;
@@ -88,20 +96,20 @@ fragment ESCAPE_SEQUENCE
 fragment HEX_DIGIT : [0-9A-F];
 
 // Environment variable reference
-ENV_VAR : '$' '{' [A-Z_][A-Z0-9_]* ( ':-' | ':+' | ':' )? ~[}]* '}' | '$' [A-Z_][A-Z0-9_]*;
+ENV_VAR : ('$' '{' [A-Z_][A-Z0-9_]* ( ':-' | ':+' | ':' )? ~[}]* '}' | '$' [A-Z_][A-Z0-9_]*) { atLineStart = false; };
 
 // Special shell variables ($!, $$, $?, $#, $@, $*, $0-$9)
-SPECIAL_VAR : '$' [!$?#@*0-9];
+SPECIAL_VAR : '$' [!$?#@*0-9] { atLineStart = false; };
 
 // Command substitution $(command) or $((arithmetic))
 // Handles nested parentheses by counting them
-COMMAND_SUBST : '$(' ( COMMAND_SUBST | ~[()] | '(' COMMAND_SUBST_INNER* ')' )* ')';
+COMMAND_SUBST : '$(' ( COMMAND_SUBST | ~[()] | '(' COMMAND_SUBST_INNER* ')' )* ')' { atLineStart = false; };
 fragment COMMAND_SUBST_INNER : COMMAND_SUBST | ~[()];
 
 // Backtick command substitution `command`
 // First char after backtick must NOT be whitespace/newline (which would be line continuation)
 // Content cannot span newlines (backtick command substitution doesn't support that)
-BACKTICK_SUBST : '`' ~[ \t\r\n`] ~[`\r\n]* '`';
+BACKTICK_SUBST : '`' ~[ \t\r\n`] ~[`\r\n]* '`' { atLineStart = false; };
 
 // Unquoted text (arguments, file paths, etc.)
 // This should be after more specific tokens
@@ -109,12 +117,13 @@ BACKTICK_SUBST : '`' ~[ \t\r\n`] ~[`\r\n]* '`';
 // We structure this to not match text starting with -- (so DASH_DASH can match first)
 // Also exclude < from starting char to allow HEREDOC_START (<<) to match
 UNQUOTED_TEXT
-    : ~[-< \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*   // Start with non-hyphen, non-<, non-space
+    : ( ~[-< \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*   // Start with non-hyphen, non-<, non-space
     | '-' ~[- \t\r\n\\"'$[\]=<] ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Single hyphen followed by non-hyphen, non-space
     | '-'  // Just a hyphen by itself
     | '<' ~[< \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Single < followed by non-<
     | '<'  // Just a < by itself
     | ESCAPED_CHAR ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Start with escaped char (e.g., \; in find -exec)
+    ) { atLineStart = false; }
     ;
 
 // Whitespace - HIDDEN in main mode
@@ -122,8 +131,8 @@ WS : WS_CHAR+ -> channel(HIDDEN);
 
 fragment WS_CHAR : [ \t];
 
-// Newlines - HIDDEN in main mode
-NEWLINE : NEWLINE_CHAR+ -> channel(HIDDEN);
+// Newlines - HIDDEN in main mode, but set atLineStart for next token
+NEWLINE : NEWLINE_CHAR+ { atLineStart = true; } -> channel(HIDDEN);
 
 fragment NEWLINE_CHAR : [\r\n];
 
@@ -163,6 +172,7 @@ HEREDOC_CONTENT : ~[\n]+
       setType(UNQUOTED_TEXT);
       heredocIdentifier.pop();
       popMode();
+      atLineStart = true;  // After heredoc ends, next line is at line start
   }
 };
 

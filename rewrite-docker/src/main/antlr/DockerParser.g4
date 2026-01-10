@@ -114,7 +114,13 @@ stopsignalInstruction
     ;
 
 healthcheckInstruction
-    : HEALTHCHECK ( UNQUOTED_TEXT | flags? cmdInstruction )
+    : HEALTHCHECK flags? healthcheckCommand
+    ;
+
+// HEALTHCHECK body: either NONE or CMD followed by command
+// CMD can be a token (when no flags) or UNQUOTED_TEXT (when 'cmd' appears after flags)
+healthcheckCommand
+    : ( CMD | UNQUOTED_TEXT ) ( execForm | shellForm )?
     ;
 
 shellInstruction
@@ -136,17 +142,25 @@ flag
 
 flagName
     : UNQUOTED_TEXT
-    | FROM  // Allow 'from' as flag name (e.g., --from=builder in COPY)
-    | AS    // Allow 'as' as flag name
+    // Note: 'from' in --from=builder is UNQUOTED_TEXT (instruction keywords are only recognized at line start)
+    | AS    // AS is always a keyword token (not instruction-specific)
     ;
 
+// Flag value parsing: allows patterns like "value" or "type=cache,target=/path"
+// The key insight is that multi-token values use EQUALS as separator, not spaces
 flagValue
-    : flagValueElement+
+    : flagValueToken ( EQUALS flagValueToken )*
     ;
 
-flagValueElement
-    : UNQUOTED_TEXT | EQUALS | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING | ENV_VAR
-    | COMMAND_SUBST | BACKTICK_SUBST | SPECIAL_VAR
+// Single token in a flag value - no spaces allowed between consecutive tokens
+flagValueToken
+    : UNQUOTED_TEXT
+    | DOUBLE_QUOTED_STRING
+    | SINGLE_QUOTED_STRING
+    | ENV_VAR
+    | COMMAND_SUBST
+    | BACKTICK_SUBST
+    | SPECIAL_VAR
     ;
 
 execForm
@@ -157,7 +171,10 @@ shellForm
     : shellFormText
     ;
 
-// Text that can contain keywords (used in shell form where --shell, --user etc. are valid)
+// Text in shell form commands
+// Note: Instruction keywords (RUN, ADD, COPY, etc.) are UNQUOTED_TEXT here because
+// they are only recognized as instruction tokens at line start.
+// AS is still a keyword token and needs explicit handling.
 shellFormText
     : shellFormTextElement+
     ;
@@ -175,17 +192,7 @@ shellFormTextElement
     | LBRACKET   // Allow [ in shell commands (e.g., if [ -f file ])
     | RBRACKET   // Allow ] in shell commands
     | COMMA      // Allow , in shell commands
-    | shellSafeKeyword  // Allow certain keywords in shell commands (e.g., RUN useradd --shell /bin/false)
-    ;
-
-// Keywords that can safely appear in shell form text
-// These are keywords that commonly appear as shell commands/arguments:
-// - ADD: appears in "apt-get add", "apk add", "git add" - very common
-// - RUN: appears in "go run", "npm run" - fairly common
-// - SHELL, USER, AS: various shell flags and arguments
-// NOTE: COPY, CMD, ENV are NOT included because they more commonly start new instructions
-shellSafeKeyword
-    : SHELL | USER | AS | ADD | RUN
+    | AS         // AS is always a keyword token
     ;
 
 heredoc
@@ -225,28 +232,23 @@ labelPairs
     ;
 
 labelPair
-    : labelKeyWithKeyword EQUALS labelValue    // New format: key=value (allows keyword keys like RUN)
-    | labelKey labelOldValue                   // Old format: key value (no instruction keyword keys)
+    : labelKey EQUALS labelValue    // New format: key=value
+    | labelKey labelOldValue        // Old format: key value
     ;
 
-// Label key that allows all keywords (safe because EQUALS follows)
-labelKeyWithKeyword
-    : UNQUOTED_TEXT | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING
-    | MAINTAINER | FROM | RUN | CMD | LABEL | EXPOSE | ENV | ADD | COPY | ENTRYPOINT
-    | VOLUME | USER | WORKDIR | ARG | ONBUILD | STOPSIGNAL | HEALTHCHECK | SHELL | AS
-    ;
-
-// Label key for old format (only allows MAINTAINER, not instruction-starting keywords)
+// Label key - instruction keywords become UNQUOTED_TEXT since they're not at line start
+// AS is still a keyword token
 labelKey
     : UNQUOTED_TEXT | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING
-    | MAINTAINER
+    | AS
     ;
 
 labelValue
     : UNQUOTED_TEXT | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING
     ;
 
-// Value in old-style LABEL (can contain instruction keywords like "run")
+// Value in old-style LABEL (rest of line after key)
+// Instruction keywords are UNQUOTED_TEXT here (not at line start)
 labelOldValue
     : labelOldValueElement+
     ;
@@ -264,9 +266,6 @@ labelOldValueElement
     | LBRACKET
     | RBRACKET
     | COMMA
-    // Old-style LABEL values can contain instruction keywords
-    | FROM | RUN | CMD | LABEL | EXPOSE | ENV | ADD | COPY | ENTRYPOINT
-    | VOLUME | USER | WORKDIR | ARG | ONBUILD | STOPSIGNAL | HEALTHCHECK | SHELL | MAINTAINER
     | AS
     ;
 
@@ -280,6 +279,7 @@ port
     | COMMAND_SUBST   // Allow $(command)
     | BACKTICK_SUBST  // Allow `command`
     | SPECIAL_VAR     // Allow $!, $$, etc.
+    | AS
     ;
 
 envPairs
@@ -291,15 +291,11 @@ envPair
     | envKey envValueSpace           // Old form: KEY value (rest of line, can have =)
     ;
 
+// Env key - instruction keywords become UNQUOTED_TEXT (not at line start)
+// AS is still a keyword token
 envKey
     : UNQUOTED_TEXT
-    | envSafeKeyword  // Allow certain keywords as env keys (e.g., ENV SHELL /bin/bash)
-    ;
-
-// Keywords that are safe to use as ENV variable names
-// Only non-instruction keywords - instruction keywords signal new instructions
-envSafeKeyword
-    : SHELL | USER | AS
+    | AS
     ;
 
 envValueEquals
@@ -322,6 +318,7 @@ envTextElementEquals
     | COMMAND_SUBST
     | BACKTICK_SUBST
     | SPECIAL_VAR
+    | AS
     // NOTE: EQUALS is explicitly NOT included to allow multiple KEY=value pairs
     ;
 
@@ -353,6 +350,7 @@ volumePath
     | COMMAND_SUBST   // Allow $(command)
     | BACKTICK_SUBST  // Allow `command`
     | SPECIAL_VAR     // Allow $!, $$, etc.
+    | AS
     ;
 
 userSpec
@@ -375,6 +373,9 @@ text
     : textElement+
     ;
 
+// Generic text element - used for paths, image names, arg values, etc.
+// Instruction keywords are UNQUOTED_TEXT (not at line start)
+// Note: AS is NOT included here to avoid greediness issues in FROM imageName AS alias
 textElement
     : UNQUOTED_TEXT
     | DOUBLE_QUOTED_STRING
