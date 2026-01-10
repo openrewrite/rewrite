@@ -371,8 +371,8 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
     @Override
     public Docker visitShellForm(Docker.ShellForm shellForm, PrintOutputCapture<P> p) {
         beforeSyntax(shellForm, p);
-        for (Docker.Argument arg : shellForm.getArguments()) {
-            visit(arg, p);
+        for (Docker.Literal literal : shellForm.getArguments()) {
+            visit(literal, p);
         }
         afterSyntax(shellForm, p);
         return shellForm;
@@ -382,8 +382,8 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
     public Docker visitExecForm(Docker.ExecForm execForm, PrintOutputCapture<P> p) {
         beforeSyntax(execForm, p);
         p.append("[");
-        for (Docker.Argument arg : execForm.getArguments()) {
-            visit(arg, p);
+        for (Docker.Literal literal : execForm.getArguments()) {
+            visit(literal, p);
         }
         visitSpace(execForm.getClosingBracketPrefix(), p);
         p.append("]");

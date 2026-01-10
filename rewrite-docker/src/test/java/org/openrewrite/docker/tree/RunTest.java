@@ -37,7 +37,7 @@ class RunTest implements RewriteTest {
                 Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommandLine().getForm();
                 assertThat(shellForm.getArguments())
                   .singleElement()
-                  .extracting(arg -> ((Docker.Literal) arg.getContents().getFirst()).getText())
+                  .extracting(Docker.Literal::getText)
                   .isEqualTo("apt-get update");
             })
           )
@@ -58,8 +58,8 @@ class RunTest implements RewriteTest {
                 Docker.ExecForm execForm = (Docker.ExecForm) run.getCommandLine().getForm();
                 assertThat(execForm.getArguments()).hasSize(2)
                   .satisfiesExactly(
-                    arg -> assertThat(((Docker.Literal) arg.getContents().getFirst()).getText()).isEqualTo("apt-get"),
-                    arg -> assertThat(((Docker.Literal) arg.getContents().getFirst()).getText()).isEqualTo("update")
+                    arg -> assertThat(arg.getText()).isEqualTo("apt-get"),
+                    arg -> assertThat(arg.getText()).isEqualTo("update")
                   );
             })
           )
@@ -81,7 +81,7 @@ class RunTest implements RewriteTest {
                 Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommandLine().getForm();
                 assertThat(shellForm.getArguments())
                   .singleElement()
-                  .extracting(arg -> ((Docker.Literal) arg.getContents().getFirst()).getText())
+                  .extracting(Docker.Literal::getText)
                   .isEqualTo("CGO_ENABLED=0 go build -o app");
             })
           )

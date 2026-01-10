@@ -1345,14 +1345,28 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     }
 
     private Docker.ShellForm visitShellFormContext(DockerParser.ShellFormContext ctx) {
-        return convert(ctx, (c, prefix) ->
-                new Docker.ShellForm(
-                        randomId(),
-                        prefix,
-                        Markers.EMPTY,
-                        singletonList(visitArgument(c.shellFormText()))
-                )
-        );
+        return convert(ctx, (c, prefix) -> {
+            // Parse the shell form text as a single Literal
+            int startIndex = c.shellFormText().getStart().getStartIndex();
+            int stopIndex = c.shellFormText().getStop().getStopIndex();
+            int startCharIndex = source.offsetByCodePoints(0, startIndex);
+            int stopCharIndex = source.offsetByCodePoints(0, stopIndex + 1);
+            String fullText = source.substring(startCharIndex, stopCharIndex);
+
+            Docker.Literal literal = new Docker.Literal(
+                    randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    fullText,
+                    null
+            );
+            return new Docker.ShellForm(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    singletonList(literal)
+            );
+        });
     }
 
     private Docker.ExecForm visitExecFormContext(DockerParser.ExecFormContext ctx) {
@@ -1371,7 +1385,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     }
 
     private Docker.ExecForm visitJsonArrayAsExecFormInternal(DockerParser.JsonArrayContext jsonArray, Space prefix) {
-        List<Docker.Argument> args = new ArrayList<>();
+        List<Docker.Literal> args = new ArrayList<>();
 
         skip(jsonArray.LBRACKET().getSymbol());
 
@@ -1385,18 +1399,12 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 }
                 advanceCursor(jsonStr.DOUBLE_QUOTED_STRING().getSymbol().getStopIndex() + 1);
 
-                Docker.Literal qs = new Docker.Literal(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        value,
-                        Docker.Literal.QuoteStyle.DOUBLE
-                );
-                args.add(new Docker.Argument(
+                args.add(new Docker.Literal(
                         randomId(),
                         argPrefix,
                         Markers.EMPTY,
-                        singletonList(qs)
+                        value,
+                        Docker.Literal.QuoteStyle.DOUBLE
                 ));
             }
         }

@@ -785,7 +785,7 @@ public interface Docker extends Tree {
         Space prefix;
         Markers markers;
 
-        List<Argument> arguments;
+        List<Literal> arguments;
 
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
@@ -806,7 +806,7 @@ public interface Docker extends Tree {
         Space prefix;
         Markers markers;
 
-        List<Argument> arguments;
+        List<Literal> arguments;
 
         /**
          * Whitespace before the closing bracket (to preserve " ]" vs "]")
