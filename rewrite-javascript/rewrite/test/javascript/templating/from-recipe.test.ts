@@ -173,7 +173,7 @@ describe('fromRecipe', () => {
                 const rule = await fromRecipe(new NoOpRecipe(), p);
                 // Note: For async recipes, tryOn() returns a Promise at runtime,
                 // so we must await it before using || fallback
-                return (await (rule.tryOn(this.cursor, literal) as any)) || literal;
+                return rule.tryOn(this.cursor, literal) as any || literal;
             }
         });
 

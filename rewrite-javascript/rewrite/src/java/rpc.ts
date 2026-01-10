@@ -16,7 +16,7 @@
 import {JavaVisitor} from "./visitor";
 import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {Expression, isSpace, J, TextComment} from "./tree";
-import {isTree} from "../tree";
+import {Cursor, isTree, Tree} from "../tree";
 import {Type} from "./type";
 import {TypeVisitor} from "./type-visitor";
 import {updateIfChanged} from "../util";
@@ -287,6 +287,14 @@ class TypeReceiver {
 }
 
 export class JavaSender extends JavaVisitor<RpcSendQueue> {
+
+    // Override visit() to skip cursor handling for performance
+    override visit<R extends J>(tree: Tree | undefined, p: RpcSendQueue, _parent?: Cursor): R | undefined {
+        if (!tree) return undefined;
+        let result = this.preVisit(tree as J, p);
+        if (!result) return undefined;
+        return this.accept(result, p) as R | undefined;
+    }
 
     protected preVisit(j: J, q: RpcSendQueue): J | undefined {
         q.getAndSend(j, j2 => j2.id);
@@ -849,9 +857,20 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 }
 
-export class JavaReceiver {
+export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
-    protected preVisit(j: J, q: RpcReceiveQueue): J | undefined {
+    // Override visit() to skip cursor handling for performance
+    override visit<R extends J>(tree: Tree | undefined, q: RpcReceiveQueue, _parent?: Cursor): R | undefined {
+        if (!tree) return undefined;
+
+        const j = tree as J;
+        let result = this.preVisit(j, q);
+        if (result === undefined) return undefined;
+
+        return this.accept(result, q) as R | undefined;
+    }
+
+    protected override preVisit(j: J, q: RpcReceiveQueue): J | undefined {
         try {
             const updates = {
                 id: q.receive(j.id),
@@ -864,230 +883,153 @@ export class JavaReceiver {
         }
     }
 
-    public visit<T extends J>(tree: T | undefined, q: RpcReceiveQueue): T | undefined {
-        if (!tree) return undefined;
-
-        // Call preVisit first
-        let result: J | undefined = this.preVisit(tree, q);
-        if (!result) return undefined;
-
-        // Dispatch to specific visitor based on kind
+    protected override accept(tree: J, q: RpcReceiveQueue): J | undefined {
         switch (tree.kind) {
             case J.Kind.AnnotatedType:
-                result = this.visitAnnotatedType(result as J.AnnotatedType, q);
-                break;
+                return this.visitAnnotatedType(tree as J.AnnotatedType, q);
             case J.Kind.Annotation:
-                result = this.visitAnnotation(result as J.Annotation, q);
-                break;
+                return this.visitAnnotation(tree as J.Annotation, q);
             case J.Kind.ArrayAccess:
-                result = this.visitArrayAccess(result as J.ArrayAccess, q);
-                break;
+                return this.visitArrayAccess(tree as J.ArrayAccess, q);
             case J.Kind.ArrayDimension:
-                result = this.visitArrayDimension(result as J.ArrayDimension, q);
-                break;
+                return this.visitArrayDimension(tree as J.ArrayDimension, q);
             case J.Kind.ArrayType:
-                result = this.visitArrayType(result as J.ArrayType, q);
-                break;
+                return this.visitArrayType(tree as J.ArrayType, q);
             case J.Kind.Assert:
-                result = this.visitAssert(result as J.Assert, q);
-                break;
+                return this.visitAssert(tree as J.Assert, q);
             case J.Kind.Assignment:
-                result = this.visitAssignment(result as J.Assignment, q);
-                break;
+                return this.visitAssignment(tree as J.Assignment, q);
             case J.Kind.AssignmentOperation:
-                result = this.visitAssignmentOperation(result as J.AssignmentOperation, q);
-                break;
+                return this.visitAssignmentOperation(tree as J.AssignmentOperation, q);
             case J.Kind.Binary:
-                result = this.visitBinary(result as J.Binary, q);
-                break;
+                return this.visitBinary(tree as J.Binary, q);
             case J.Kind.Block:
-                result = this.visitBlock(result as J.Block, q);
-                break;
+                return this.visitBlock(tree as J.Block, q);
             case J.Kind.Break:
-                result = this.visitBreak(result as J.Break, q);
-                break;
+                return this.visitBreak(tree as J.Break, q);
             case J.Kind.Case:
-                result = this.visitCase(result as J.Case, q);
-                break;
+                return this.visitCase(tree as J.Case, q);
             case J.Kind.ClassDeclaration:
-                result = this.visitClassDeclaration(result as J.ClassDeclaration, q);
-                break;
+                return this.visitClassDeclaration(tree as J.ClassDeclaration, q);
             case J.Kind.ClassDeclarationKind:
-                result = this.visitClassDeclarationKind(result as J.ClassDeclaration.Kind, q);
-                break;
+                return this.visitClassDeclarationKind(tree as J.ClassDeclaration.Kind, q);
             case J.Kind.CompilationUnit:
-                result = this.visitCompilationUnit(result as J.CompilationUnit, q);
-                break;
+                return this.visitCompilationUnit(tree as J.CompilationUnit, q);
             case J.Kind.Continue:
-                result = this.visitContinue(result as J.Continue, q);
-                break;
+                return this.visitContinue(tree as J.Continue, q);
             case J.Kind.ControlParentheses:
-                result = this.visitControlParentheses(result as J.ControlParentheses<J>, q);
-                break;
+                return this.visitControlParentheses(tree as J.ControlParentheses<J>, q);
             case J.Kind.DeconstructionPattern:
-                result = this.visitDeconstructionPattern(result as J.DeconstructionPattern, q);
-                break;
+                return this.visitDeconstructionPattern(tree as J.DeconstructionPattern, q);
             case J.Kind.DoWhileLoop:
-                result = this.visitDoWhileLoop(result as J.DoWhileLoop, q);
-                break;
+                return this.visitDoWhileLoop(tree as J.DoWhileLoop, q);
             case J.Kind.Empty:
-                result = this.visitEmpty(result as J.Empty);
-                break;
+                return this.visitEmpty(tree as J.Empty);
             case J.Kind.EnumValue:
-                result = this.visitEnumValue(result as J.EnumValue, q);
-                break;
+                return this.visitEnumValue(tree as J.EnumValue, q);
             case J.Kind.EnumValueSet:
-                result = this.visitEnumValueSet(result as J.EnumValueSet, q);
-                break;
+                return this.visitEnumValueSet(tree as J.EnumValueSet, q);
             case J.Kind.Erroneous:
-                result = this.visitErroneous(result as J.Erroneous, q);
-                break;
+                return this.visitErroneous(tree as J.Erroneous, q);
             case J.Kind.FieldAccess:
-                result = this.visitFieldAccess(result as J.FieldAccess, q);
-                break;
+                return this.visitFieldAccess(tree as J.FieldAccess, q);
             case J.Kind.ForEachLoop:
-                result = this.visitForEachLoop(result as J.ForEachLoop, q);
-                break;
+                return this.visitForEachLoop(tree as J.ForEachLoop, q);
             case J.Kind.ForEachLoopControl:
-                result = this.visitForEachLoopControl(result as J.ForEachLoop.Control, q);
-                break;
+                return this.visitForEachLoopControl(tree as J.ForEachLoop.Control, q);
             case J.Kind.ForLoop:
-                result = this.visitForLoop(result as J.ForLoop, q);
-                break;
+                return this.visitForLoop(tree as J.ForLoop, q);
             case J.Kind.ForLoopControl:
-                result = this.visitForLoopControl(result as J.ForLoop.Control, q);
-                break;
+                return this.visitForLoopControl(tree as J.ForLoop.Control, q);
             case J.Kind.Identifier:
-                result = this.visitIdentifier(result as J.Identifier, q);
-                break;
+                return this.visitIdentifier(tree as J.Identifier, q);
             case J.Kind.If:
-                result = this.visitIf(result as J.If, q);
-                break;
+                return this.visitIf(tree as J.If, q);
             case J.Kind.IfElse:
-                result = this.visitElse(result as J.If.Else, q);
-                break;
+                return this.visitElse(tree as J.If.Else, q);
             case J.Kind.Import:
-                result = this.visitImport(result as J.Import, q);
-                break;
+                return this.visitImport(tree as J.Import, q);
             case J.Kind.InstanceOf:
-                result = this.visitInstanceOf(result as J.InstanceOf, q);
-                break;
+                return this.visitInstanceOf(tree as J.InstanceOf, q);
             case J.Kind.IntersectionType:
-                result = this.visitIntersectionType(result as J.IntersectionType, q);
-                break;
+                return this.visitIntersectionType(tree as J.IntersectionType, q);
             case J.Kind.Label:
-                result = this.visitLabel(result as J.Label, q);
-                break;
+                return this.visitLabel(tree as J.Label, q);
             case J.Kind.Lambda:
-                result = this.visitLambda(result as J.Lambda, q);
-                break;
+                return this.visitLambda(tree as J.Lambda, q);
             case J.Kind.LambdaParameters:
-                result = this.visitLambdaParameters(result as J.Lambda.Parameters, q);
-                break;
+                return this.visitLambdaParameters(tree as J.Lambda.Parameters, q);
             case J.Kind.Literal:
-                result = this.visitLiteral(result as J.Literal, q);
-                break;
+                return this.visitLiteral(tree as J.Literal, q);
             case J.Kind.MemberReference:
-                result = this.visitMemberReference(result as J.MemberReference, q);
-                break;
+                return this.visitMemberReference(tree as J.MemberReference, q);
             case J.Kind.MethodDeclaration:
-                result = this.visitMethodDeclaration(result as J.MethodDeclaration, q);
-                break;
+                return this.visitMethodDeclaration(tree as J.MethodDeclaration, q);
             case J.Kind.MethodInvocation:
-                result = this.visitMethodInvocation(result as J.MethodInvocation, q);
-                break;
+                return this.visitMethodInvocation(tree as J.MethodInvocation, q);
             case J.Kind.Modifier:
-                result = this.visitModifier(result as J.Modifier, q);
-                break;
+                return this.visitModifier(tree as J.Modifier, q);
             case J.Kind.MultiCatch:
-                result = this.visitMultiCatch(result as J.MultiCatch, q);
-                break;
+                return this.visitMultiCatch(tree as J.MultiCatch, q);
             case J.Kind.NamedVariable:
-                result = this.visitVariable(result as J.VariableDeclarations.NamedVariable, q);
-                break;
+                return this.visitVariable(tree as J.VariableDeclarations.NamedVariable, q);
             case J.Kind.NewArray:
-                result = this.visitNewArray(result as J.NewArray, q);
-                break;
+                return this.visitNewArray(tree as J.NewArray, q);
             case J.Kind.NewClass:
-                result = this.visitNewClass(result as J.NewClass, q);
-                break;
+                return this.visitNewClass(tree as J.NewClass, q);
             case J.Kind.NullableType:
-                result = this.visitNullableType(result as J.NullableType, q);
-                break;
+                return this.visitNullableType(tree as J.NullableType, q);
             case J.Kind.Package:
-                result = this.visitPackage(result as J.Package, q);
-                break;
+                return this.visitPackage(tree as J.Package, q);
             case J.Kind.ParameterizedType:
-                result = this.visitParameterizedType(result as J.ParameterizedType, q);
-                break;
+                return this.visitParameterizedType(tree as J.ParameterizedType, q);
             case J.Kind.Parentheses:
-                result = this.visitParentheses(result as J.Parentheses<J>, q);
-                break;
+                return this.visitParentheses(tree as J.Parentheses<J>, q);
             case J.Kind.ParenthesizedTypeTree:
-                result = this.visitParenthesizedTypeTree(result as J.ParenthesizedTypeTree, q);
-                break;
+                return this.visitParenthesizedTypeTree(tree as J.ParenthesizedTypeTree, q);
             case J.Kind.Primitive:
-                result = this.visitPrimitive(result as J.Primitive, q);
-                break;
+                return this.visitPrimitive(tree as J.Primitive, q);
             case J.Kind.Return:
-                result = this.visitReturn(result as J.Return, q);
-                break;
+                return this.visitReturn(tree as J.Return, q);
             case J.Kind.Switch:
-                result = this.visitSwitch(result as J.Switch, q);
-                break;
+                return this.visitSwitch(tree as J.Switch, q);
             case J.Kind.SwitchExpression:
-                result = this.visitSwitchExpression(result as J.SwitchExpression, q);
-                break;
+                return this.visitSwitchExpression(tree as J.SwitchExpression, q);
             case J.Kind.Synchronized:
-                result = this.visitSynchronized(result as J.Synchronized, q);
-                break;
+                return this.visitSynchronized(tree as J.Synchronized, q);
             case J.Kind.Ternary:
-                result = this.visitTernary(result as J.Ternary, q);
-                break;
+                return this.visitTernary(tree as J.Ternary, q);
             case J.Kind.Throw:
-                result = this.visitThrow(result as J.Throw, q);
-                break;
+                return this.visitThrow(tree as J.Throw, q);
             case J.Kind.Try:
-                result = this.visitTry(result as J.Try, q);
-                break;
+                return this.visitTry(tree as J.Try, q);
             case J.Kind.TryResource:
-                result = this.visitTryResource(result as J.Try.Resource, q);
-                break;
+                return this.visitTryResource(tree as J.Try.Resource, q);
             case J.Kind.TryCatch:
-                result = this.visitTryCatch(result as J.Try.Catch, q);
-                break;
+                return this.visitTryCatch(tree as J.Try.Catch, q);
             case J.Kind.TypeCast:
-                result = this.visitTypeCast(result as J.TypeCast, q);
-                break;
+                return this.visitTypeCast(tree as J.TypeCast, q);
             case J.Kind.TypeParameter:
-                result = this.visitTypeParameter(result as J.TypeParameter, q);
-                break;
+                return this.visitTypeParameter(tree as J.TypeParameter, q);
             case J.Kind.TypeParameters:
-                result = this.visitTypeParameters(result as J.TypeParameters, q);
-                break;
+                return this.visitTypeParameters(tree as J.TypeParameters, q);
             case J.Kind.Unary:
-                result = this.visitUnary(result as J.Unary, q);
-                break;
+                return this.visitUnary(tree as J.Unary, q);
             case J.Kind.Unknown:
-                result = this.visitUnknown(result as J.Unknown, q);
-                break;
+                return this.visitUnknown(tree as J.Unknown, q);
             case J.Kind.UnknownSource:
-                result = this.visitUnknownSource(result as J.UnknownSource, q);
-                break;
+                return this.visitUnknownSource(tree as J.UnknownSource, q);
             case J.Kind.VariableDeclarations:
-                result = this.visitVariableDeclarations(result as J.VariableDeclarations, q);
-                break;
+                return this.visitVariableDeclarations(tree as J.VariableDeclarations, q);
             case J.Kind.WhileLoop:
-                result = this.visitWhileLoop(result as J.WhileLoop, q);
-                break;
+                return this.visitWhileLoop(tree as J.WhileLoop, q);
             case J.Kind.Wildcard:
-                result = this.visitWildcard(result as J.Wildcard, q);
-                break;
+                return this.visitWildcard(tree as J.Wildcard, q);
             case J.Kind.Yield:
-                result = this.visitYield(result as J.Yield, q);
-                break;
+                return this.visitYield(tree as J.Yield, q);
+            default:
+                return tree;
         }
-        return result as T | undefined;
     }
 
     protected visitAnnotatedType(annotatedType: J.AnnotatedType, q: RpcReceiveQueue): J | undefined {
@@ -1841,7 +1783,7 @@ export class JavaReceiver {
 }
 
 export function registerJLanguageCodecs(sourceFileType: string,
-                                        receiver: JavaReceiver,
+                                        receiver: JavaVisitor<RpcReceiveQueue>,
                                         sender: JavaVisitor<RpcSendQueue>,
                                         extendedKinds?: any) {
     const kinds = new Set([
