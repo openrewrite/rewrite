@@ -31,6 +31,7 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.lang.String.format;
@@ -71,11 +72,13 @@ public class DockerParser implements Parser {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
+    private static final Pattern PATTERN = Pattern.compile(
+            "^dockerfile\\b.*|\\.dockerfile$|^containerfile\\b|\\.containerfile$",
+            Pattern.CASE_INSENSITIVE);
+
     @Override
     public boolean accept(Path path) {
-        String fileName = path.getFileName().toString().toLowerCase();
-        return fileName.startsWith("dockerfile") || fileName.startsWith("containerfile") ||
-                fileName.endsWith("dockerfile") || fileName.endsWith("containerfile");
+        return PATTERN.matcher(path.getFileName().toString().toLowerCase()).find();
     }
 
     @Override
