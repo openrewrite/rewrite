@@ -1126,12 +1126,78 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             Docker.Argument flagValue = null;
             if (flagCtx.EQUALS() != null) {
                 skip(flagCtx.EQUALS().getSymbol());
-                flagValue = visitArgument(flagCtx.flagValue());
+                flagValue = parseFlagValue(flagCtx.flagValue());
             }
 
             flags.add(new Docker.Flag(randomId(), flagPrefix, Markers.EMPTY, flagName, flagValue));
         }
         return flags;
+    }
+
+    private Docker.Argument parseFlagValue(DockerParser.FlagValueContext ctx) {
+        if (ctx == null) {
+            return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, emptyList());
+        }
+
+        Space argPrefix = prefix(ctx);
+        List<Docker.ArgumentContent> contents = new ArrayList<>();
+
+        for (DockerParser.FlagValueElementContext elemCtx : ctx.flagValueElement()) {
+            if (elemCtx.getChildCount() > 0 && elemCtx.getChild(0) instanceof TerminalNode) {
+                TerminalNode terminal = (TerminalNode) elemCtx.getChild(0);
+                Token token = terminal.getSymbol();
+                String tokenText = token.getText();
+
+                // Check if there's whitespace before this element (without advancing cursor).
+                // If so (and it's not the first element), this token belongs to the shell form.
+                if (!contents.isEmpty() && token.getStartIndex() > codePointCursor) {
+                    break;
+                }
+
+                Space elementPrefix = prefix(token);
+                skip(token);
+
+                if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
+                    String value = tokenText.substring(1, tokenText.length() - 1);
+                    contents.add(new Docker.QuotedString(
+                            randomId(),
+                            elementPrefix,
+                            Markers.EMPTY,
+                            value,
+                            Docker.QuotedString.QuoteStyle.DOUBLE
+                    ));
+                } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
+                    String value = tokenText.substring(1, tokenText.length() - 1);
+                    contents.add(new Docker.QuotedString(
+                            randomId(),
+                            elementPrefix,
+                            Markers.EMPTY,
+                            value,
+                            Docker.QuotedString.QuoteStyle.SINGLE
+                    ));
+                } else if (token.getType() == DockerLexer.ENV_VAR) {
+                    boolean braced = tokenText.startsWith("${");
+                    String varName = braced ? tokenText.substring(2, tokenText.length() - 1) : tokenText.substring(1);
+                    contents.add(new Docker.EnvironmentVariable(
+                            randomId(),
+                            elementPrefix,
+                            Markers.EMPTY,
+                            varName,
+                            braced
+                    ));
+                } else {
+                    // Plain text for UNQUOTED_TEXT and EQUALS
+                    contents.add(new Docker.PlainText(
+                            randomId(),
+                            elementPrefix,
+                            Markers.EMPTY,
+                            tokenText
+                    ));
+                }
+            }
+        }
+
+        return new Docker.Argument(randomId(), argPrefix, Markers.EMPTY, contents);
     }
 
     private Docker.ShellForm visitShellFormContext(DockerParser.ShellFormContext ctx) {
