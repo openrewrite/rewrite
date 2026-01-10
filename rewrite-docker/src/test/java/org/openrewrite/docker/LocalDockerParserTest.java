@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import static java.util.stream.Collectors.groupingBy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class LocalDockerParserTest {
@@ -43,6 +44,15 @@ class LocalDockerParserTest {
         Map<Path, String> parsedErrors = parseResult.parsedErrors();
         System.out.println("Files parsed successfully: " + parsedFiles.size());
         System.out.println("Files failed to parse: " + parsedErrors.size());
+
+        parsedErrors.entrySet().stream()
+          .collect(groupingBy(e -> e.getValue()
+            .replace(e.getKey().toString(), "{}")
+            .replaceAll("at line \\d+:\\d+", "at line {}:{}")))
+          .forEach((errorMsg, entries) -> {
+              System.out.println(entries.size() + "x : " + errorMsg);
+              entries.forEach(e -> System.out.println("  " + e.getValue().replace(DOCKER_FILES.toString(), "")));
+          });
 
         assertThat(parsedFiles).hasSizeGreaterThan(1500);
         assertThat(parsedErrors).hasSizeLessThan(80);
