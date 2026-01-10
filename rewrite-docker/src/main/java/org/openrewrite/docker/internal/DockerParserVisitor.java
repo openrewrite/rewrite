@@ -379,7 +379,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         skip(ctx.RUN().getSymbol());
 
         List<Docker.Flag> flags = ctx.flags() != null ? convertFlags(ctx.flags()) : null;
-        Docker.CommandLine commandLine = visitCommandLine(ctx);
+        Docker.CommandLine commandLine = visitCommandLineForRun(ctx);
 
         // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
@@ -1167,7 +1167,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return new Docker.Maintainer(randomId(), prefix, Markers.EMPTY, maintainerKeyword, text);
     }
 
-    private Docker.CommandLine visitCommandLine(DockerParser.RunInstructionContext ctx) {
+    private Docker.CommandLine visitCommandLineForRun(DockerParser.RunInstructionContext ctx) {
         Docker.CommandForm form;
         if (ctx.execForm() != null) {
             form = visitExecFormContext(ctx.execForm());
