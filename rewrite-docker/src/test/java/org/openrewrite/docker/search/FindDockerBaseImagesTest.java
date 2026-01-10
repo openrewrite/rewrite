@@ -46,7 +46,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~>FROM ubuntu:22.04
+              ~~(ubuntu:22.04)~~>FROM ubuntu:22.04
               RUN apt-get update
               """
           )
@@ -70,7 +70,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~>FROM ubuntu:22.04
+              ~~(ubuntu:22.04)~~>FROM ubuntu:22.04
               RUN apt-get update
               """
           )
@@ -106,7 +106,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~>FROM ubuntu@sha256:abc123
+              ~~(ubuntu@sha256:abc123)~~>FROM ubuntu@sha256:abc123
               RUN apt-get update
               """
           )
@@ -129,7 +129,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~>FROM --platform=linux/amd64 ubuntu:22.04
+              ~~(ubuntu:22.04)~~>FROM --platform=linux/amd64 ubuntu:22.04
               RUN apt-get update
               """
           )
@@ -152,7 +152,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
               RUN go build -o app .
               """,
             """
-              ~~>FROM golang:1.21 AS builder
+              ~~(golang:1.21)~~>FROM golang:1.21 AS builder
               RUN go build -o app .
               """
           )
@@ -179,10 +179,10 @@ class FindDockerBaseImagesTest implements RewriteTest {
               COPY --from=builder /app /app
               """,
             """
-              ~~>FROM golang:1.21 AS builder
+              ~~(golang:1.21)~~>FROM golang:1.21 AS builder
               RUN go build -o app .
 
-              ~~>FROM alpine:latest
+              ~~(alpine:latest)~~>FROM alpine:latest
               COPY --from=builder /app /app
               """
           )
@@ -212,7 +212,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
               FROM golang:1.21 AS builder
               RUN go build -o app .
 
-              ~~>FROM alpine:latest
+              ~~(alpine:latest)~~>FROM alpine:latest
               COPY --from=builder /app /app
               """
           )
@@ -235,7 +235,30 @@ class FindDockerBaseImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~>FROM --platform=linux/arm64 ubuntu:22.04 AS base
+              ~~(ubuntu:22.04)~~>FROM --platform=linux/arm64 ubuntu:22.04 AS base
+              RUN apt-get update
+              """
+          )
+        );
+    }
+
+    @Test
+    void findBaseImageWithoutTag() {
+        rewriteRun(
+          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+            //language=csv
+            """
+              sourceFile,imageName,tag,digest,platform,stageName
+              Dockerfile,ubuntu,,,,
+              """
+          ),
+          Assertions.docker(
+            """
+              FROM ubuntu
+              RUN apt-get update
+              """,
+            """
+              ~~(ubuntu)~~>FROM ubuntu
               RUN apt-get update
               """
           )

@@ -28,6 +28,9 @@ import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.SearchResult;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindExposedPorts extends Recipe {
@@ -70,7 +73,7 @@ public class FindExposedPorts extends Recipe {
                     stageName = extractText(stage.getFrom().getAs().getName());
                 }
 
-                boolean anyMatch = false;
+                List<String> matchedPorts = new ArrayList<>();
 
                 for (Docker.Argument portArg : e.getPorts()) {
                     String portSpec = extractText(portArg);
@@ -98,7 +101,7 @@ public class FindExposedPorts extends Recipe {
                         continue;
                     }
 
-                    anyMatch = true;
+                    matchedPorts.add(portSpec);
 
                     exposedPorts.insertRow(ctx, new DockerExposedPorts.Row(
                             sourceFile,
@@ -109,8 +112,8 @@ public class FindExposedPorts extends Recipe {
                     ));
                 }
 
-                if (anyMatch) {
-                    return SearchResult.found(e);
+                if (!matchedPorts.isEmpty()) {
+                    return SearchResult.found(e, String.join(", ", matchedPorts));
                 }
 
                 return e;

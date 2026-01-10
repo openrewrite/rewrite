@@ -84,8 +84,16 @@ public class FindDockerBaseImages extends Recipe {
                         stageName
                 ));
 
+                // Build message with image reference
+                String message = imageName;
+                if (digest != null) {
+                    message += "@" + digest;
+                } else if (tag != null) {
+                    message += ":" + tag;
+                }
+
                 // Mark the FROM instruction as a search result
-                return SearchResult.found(f);
+                return SearchResult.found(f, message);
             }
 
             private @Nullable String extractText(Docker.@Nullable Argument arg) {

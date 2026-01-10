@@ -46,7 +46,7 @@ class FindExposedPortsTest implements RewriteTest {
               """,
             """
               FROM nginx:latest
-              ~~>EXPOSE 80
+              ~~(80)~~>EXPOSE 80
               """
           )
         );
@@ -69,7 +69,7 @@ class FindExposedPortsTest implements RewriteTest {
               """,
             """
               FROM nginx:latest
-              ~~>EXPOSE 80 443
+              ~~(80, 443)~~>EXPOSE 80 443
               """
           )
         );
@@ -92,7 +92,7 @@ class FindExposedPortsTest implements RewriteTest {
               """,
             """
               FROM ubuntu:22.04
-              ~~>EXPOSE 53/udp 53/tcp
+              ~~(53/udp, 53/tcp)~~>EXPOSE 53/udp 53/tcp
               """
           )
         );
@@ -114,7 +114,7 @@ class FindExposedPortsTest implements RewriteTest {
               """,
             """
               FROM ubuntu:22.04
-              ~~>EXPOSE 8000-8100
+              ~~(8000-8100)~~>EXPOSE 8000-8100
               """
           )
         );
@@ -143,7 +143,7 @@ class FindExposedPortsTest implements RewriteTest {
               RUN go build -o app .
 
               FROM alpine:3.18 AS app
-              ~~>EXPOSE 8080
+              ~~(8080)~~>EXPOSE 8080
               COPY --from=builder /app /app
               """
           )
@@ -168,7 +168,7 @@ class FindExposedPortsTest implements RewriteTest {
               """,
             """
               FROM nginx:latest
-              ~~>EXPOSE 80 443 8080
+              ~~(80, 8080)~~>EXPOSE 80 443 8080
               """
           )
         );
@@ -191,7 +191,7 @@ class FindExposedPortsTest implements RewriteTest {
               """,
             """
               FROM ubuntu:22.04
-              ~~>EXPOSE 53/udp 53/tcp
+              ~~(53/udp)~~>EXPOSE 53/udp 53/tcp
               """
           )
         );
@@ -228,8 +228,8 @@ class FindExposedPortsTest implements RewriteTest {
               """,
             """
               FROM nginx:latest
-              ~~>EXPOSE 80
-              ~~>EXPOSE 443
+              ~~(80)~~>EXPOSE 80
+              ~~(443)~~>EXPOSE 443
               """
           )
         );
