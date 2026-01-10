@@ -33,7 +33,7 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.User user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(((Docker.PlainText) user.getUser().getContents().getFirst()).getText()).isEqualTo("nobody");
+                assertThat(((Docker.Literal) user.getUser().getContents().getFirst()).getText()).isEqualTo("nobody");
                 assertThat(user.getGroup()).isNull();
             })
           )
@@ -50,8 +50,8 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.User user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(((Docker.PlainText) user.getUser().getContents().getFirst()).getText()).isEqualTo("app");
-                assertThat(((Docker.PlainText) user.getGroup().getContents().getFirst()).getText()).isEqualTo("group");
+                assertThat(((Docker.Literal) user.getUser().getContents().getFirst()).getText()).isEqualTo("app");
+                assertThat(((Docker.Literal) user.getGroup().getContents().getFirst()).getText()).isEqualTo("group");
             })
           )
         );

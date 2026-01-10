@@ -33,9 +33,9 @@ class ArgTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(((Docker.PlainText) arg.getName().getContents().getFirst()).getText()).isEqualTo("VERSION");
+                assertThat(((Docker.Literal) arg.getName().getContents().getFirst()).getText()).isEqualTo("VERSION");
                 assertThat(arg.getValue()).isNotNull();
-                assertThat(((Docker.PlainText) arg.getValue().getContents().getFirst()).getText()).isEqualTo("1.0.0");
+                assertThat(((Docker.Literal) arg.getValue().getContents().getFirst()).getText()).isEqualTo("1.0.0");
             })
           )
         );
@@ -51,7 +51,7 @@ class ArgTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(((Docker.PlainText) arg.getName().getContents().getFirst()).getText()).isEqualTo("VERSION");
+                assertThat(((Docker.Literal) arg.getName().getContents().getFirst()).getText()).isEqualTo("VERSION");
                 assertThat(arg.getValue()).isNull();
             })
           )
@@ -82,7 +82,7 @@ class ArgTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 assertThat(doc.getGlobalArgs()).hasSize(1);
                 Docker.Arg globalArg = doc.getGlobalArgs().getFirst();
-                assertThat(((Docker.PlainText) globalArg.getName().getContents().getFirst()).getText()).isEqualTo("VERSION");
+                assertThat(((Docker.Literal) globalArg.getName().getContents().getFirst()).getText()).isEqualTo("VERSION");
             })
           )
         );

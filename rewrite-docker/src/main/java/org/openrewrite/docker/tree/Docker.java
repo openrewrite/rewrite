@@ -911,49 +911,43 @@ public interface Docker extends Tree {
     }
 
     /**
-     * Plain unquoted text
+     * A literal text value, either plain (unquoted) or quoted (single/double quotes).
      */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class PlainText implements ArgumentContent {
+    class Literal implements ArgumentContent {
         @EqualsAndHashCode.Include
         UUID id;
 
         Space prefix;
         Markers markers;
 
+        /**
+         * The text value (without surrounding quotes if quoted)
+         */
         String text;
 
-        @Override
-        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
-            return v.visitPlainText(this, p);
-        }
-    }
-
-    /**
-     * Quoted string (single or double quotes)
-     */
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class QuotedString implements ArgumentContent {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-
-        String value;
+        /**
+         * The quote style, or null for plain unquoted text
+         */
+        @Nullable
         QuoteStyle quoteStyle;
 
         public enum QuoteStyle {
             DOUBLE, SINGLE
         }
 
+        /**
+         * Returns true if this is a quoted string
+         */
+        public boolean isQuoted() {
+            return quoteStyle != null;
+        }
+
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
-            return v.visitQuotedString(this, p);
+            return v.visitLiteral(this, p);
         }
     }
 

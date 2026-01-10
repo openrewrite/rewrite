@@ -33,7 +33,7 @@ class StopsignalTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.Stopsignal stopsignal = (Docker.Stopsignal) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(((Docker.PlainText) stopsignal.getSignal().getContents().getFirst()).getText()).isEqualTo("SIGTERM");
+                assertThat(((Docker.Literal) stopsignal.getSignal().getContents().getFirst()).getText()).isEqualTo("SIGTERM");
             })
           )
         );

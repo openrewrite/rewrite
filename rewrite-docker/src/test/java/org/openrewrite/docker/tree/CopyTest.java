@@ -36,8 +36,8 @@ class CopyTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Copy copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(copy.getSources()).hasSize(1);
-                assertThat(((Docker.PlainText) copy.getSources().getFirst().getContents().getFirst()).getText()).isEqualTo("app.jar");
-                assertThat(((Docker.PlainText) copy.getDestination().getContents().getFirst()).getText()).isEqualTo("/app/");
+                assertThat(((Docker.Literal) copy.getSources().getFirst().getContents().getFirst()).getText()).isEqualTo("app.jar");
+                assertThat(((Docker.Literal) copy.getDestination().getContents().getFirst()).getText()).isEqualTo("/app/");
             })
           )
         );
@@ -57,12 +57,12 @@ class CopyTest implements RewriteTest {
                 Docker.Copy copy1 = (Docker.Copy) instructions.getFirst();
                 assertThat(copy1.getFlags()).hasSize(1);
                 assertThat(copy1.getFlags().getFirst().getName()).isEqualTo("chown");
-                assertThat(((Docker.PlainText) copy1.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("app:app");
+                assertThat(((Docker.Literal) copy1.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("app:app");
 
                 Docker.Copy copy2 = (Docker.Copy) instructions.get(1);
                 assertThat(copy2.getFlags()).hasSize(1);
                 assertThat(copy2.getFlags().getFirst().getName()).isEqualTo("from");
-                assertThat(((Docker.PlainText) copy2.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("builder");
+                assertThat(((Docker.Literal) copy2.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("builder");
             })
           )
         );

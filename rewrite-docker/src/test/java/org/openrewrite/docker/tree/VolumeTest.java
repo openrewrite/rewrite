@@ -52,8 +52,8 @@ class VolumeTest implements RewriteTest {
                 Docker.Volume volume = (Docker.Volume) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(volume.getValues()).hasSize(2);
                 assertThat(volume.isJsonForm()).isFalse();
-                assertThat(((Docker.PlainText) volume.getValues().get(0).getContents().getFirst()).getText()).isEqualTo("/data");
-                assertThat(((Docker.PlainText) volume.getValues().get(1).getContents().getFirst()).getText()).isEqualTo("/logs");
+                assertThat(((Docker.Literal) volume.getValues().get(0).getContents().getFirst()).getText()).isEqualTo("/data");
+                assertThat(((Docker.Literal) volume.getValues().get(1).getContents().getFirst()).getText()).isEqualTo("/logs");
             })
           )
         );

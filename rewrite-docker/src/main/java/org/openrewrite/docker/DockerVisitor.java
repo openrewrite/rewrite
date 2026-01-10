@@ -298,16 +298,10 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         return a.withContents(ListUtils.map(a.getContents(), content -> (Docker.ArgumentContent) visit(content, p)));
     }
 
-    public Docker visitPlainText(Docker.PlainText plainText, P p) {
-        Docker.PlainText pt = plainText;
-        pt = pt.withPrefix(visitSpace(pt.getPrefix(), p));
-        return pt.withMarkers(visitMarkers(pt.getMarkers(), p));
-    }
-
-    public Docker visitQuotedString(Docker.QuotedString quotedString, P p) {
-        Docker.QuotedString qs = quotedString;
-        qs = qs.withPrefix(visitSpace(qs.getPrefix(), p));
-        return qs.withMarkers(visitMarkers(qs.getMarkers(), p));
+    public Docker visitLiteral(Docker.Literal literal, P p) {
+        Docker.Literal l = literal;
+        l = l.withPrefix(visitSpace(l.getPrefix(), p));
+        return l.withMarkers(visitMarkers(l.getMarkers(), p));
     }
 
     public Docker visitEnvironmentVariable(Docker.EnvironmentVariable environmentVariable, P p) {

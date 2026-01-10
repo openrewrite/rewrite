@@ -171,13 +171,8 @@ public class DockerIsoVisitor<P> extends DockerVisitor<P> {
     }
 
     @Override
-    public Docker.PlainText visitPlainText(Docker.PlainText plainText, P p) {
-        return (Docker.PlainText) super.visitPlainText(plainText, p);
-    }
-
-    @Override
-    public Docker.QuotedString visitQuotedString(Docker.QuotedString quotedString, P p) {
-        return (Docker.QuotedString) super.visitQuotedString(quotedString, p);
+    public Docker.Literal visitLiteral(Docker.Literal literal, P p) {
+        return (Docker.Literal) super.visitLiteral(literal, p);
     }
 
     @Override

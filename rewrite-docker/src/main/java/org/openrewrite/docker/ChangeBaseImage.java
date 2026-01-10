@@ -86,10 +86,8 @@ public class ChangeBaseImage extends Recipe {
 
                 // Add image name
                 for (Docker.ArgumentContent content : f.getImageName().getContents()) {
-                    if (content instanceof Docker.PlainText) {
-                        imageTextBuilder.append(((Docker.PlainText) content).getText());
-                    } else if (content instanceof Docker.QuotedString) {
-                        imageTextBuilder.append(((Docker.QuotedString) content).getValue());
+                    if (content instanceof Docker.Literal) {
+                        imageTextBuilder.append(((Docker.Literal) content).getText());
                     } else if (content instanceof Docker.EnvironmentVariable) {
                         // For environment variables, we can't know the actual value, so skip matching
                         return f;
@@ -100,10 +98,8 @@ public class ChangeBaseImage extends Recipe {
                 if (f.getTag() != null) {
                     imageTextBuilder.append(":");
                     for (Docker.ArgumentContent content : f.getTag().getContents()) {
-                        if (content instanceof Docker.PlainText) {
-                            imageTextBuilder.append(((Docker.PlainText) content).getText());
-                        } else if (content instanceof Docker.QuotedString) {
-                            imageTextBuilder.append(((Docker.QuotedString) content).getValue());
+                        if (content instanceof Docker.Literal) {
+                            imageTextBuilder.append(((Docker.Literal) content).getText());
                         } else if (content instanceof Docker.EnvironmentVariable) {
                             return f;
                         }
@@ -111,10 +107,8 @@ public class ChangeBaseImage extends Recipe {
                 } else if (f.getDigest() != null) {
                     imageTextBuilder.append("@");
                     for (Docker.ArgumentContent content : f.getDigest().getContents()) {
-                        if (content instanceof Docker.PlainText) {
-                            imageTextBuilder.append(((Docker.PlainText) content).getText());
-                        } else if (content instanceof Docker.QuotedString) {
-                            imageTextBuilder.append(((Docker.QuotedString) content).getValue());
+                        if (content instanceof Docker.Literal) {
+                            imageTextBuilder.append(((Docker.Literal) content).getText());
                         } else if (content instanceof Docker.EnvironmentVariable) {
                             return f;
                         }
@@ -159,8 +153,8 @@ public class ChangeBaseImage extends Recipe {
 
                     if (wasSingleContent) {
                         // Keep as a single content item (don't split)
-                        boolean wasQuoted = hasQuotedString(f.getImageName());
-                        Docker.ArgumentContent newContent = createContent(newImageName, wasQuoted, f.getImageName());
+                        Docker.Literal.QuoteStyle quoteStyle = getQuoteStyle(f.getImageName());
+                        Docker.ArgumentContent newContent = createContent(newImageName, quoteStyle);
                         Docker.Argument newImageArg = f.getImageName().withContents(singletonList(newContent));
                         return result.withImageName(newImageArg);
                     }
@@ -172,21 +166,21 @@ public class ChangeBaseImage extends Recipe {
                     String newDigest = parts[2];
 
                     // Check if the original used quotes
-                    boolean wasQuoted = hasQuotedString(f.getImageName());
+                    Docker.Literal.QuoteStyle quoteStyle = getQuoteStyle(f.getImageName());
 
                     // Create new image name argument
-                    Docker.ArgumentContent newImageContent = createContent(newImage, wasQuoted, f.getImageName());
+                    Docker.ArgumentContent newImageContent = createContent(newImage, quoteStyle);
                     Docker.Argument newImageArg = f.getImageName().withContents(singletonList(newImageContent));
                     result = result.withImageName(newImageArg);
 
                     // Create new tag argument if present
                     if (newTag != null) {
-                        Docker.ArgumentContent newTagContent = createContent(newTag, wasQuoted, f.getTag());
+                        Docker.ArgumentContent newTagContent = createContent(newTag, quoteStyle);
                         Docker.Argument newTagArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(newTagContent));
                         return result.withTag(newTagArg).withDigest(null);
                     }
                     if (newDigest != null) {
-                        Docker.ArgumentContent newDigestContent = createContent(newDigest, wasQuoted, f.getDigest());
+                        Docker.ArgumentContent newDigestContent = createContent(newDigest, quoteStyle);
                         Docker.Argument newDigestArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(newDigestContent));
                         return result.withDigest(newDigestArg).withTag(null);
                     }
@@ -222,27 +216,21 @@ public class ChangeBaseImage extends Recipe {
         return new @Nullable String[]{imageName, tag, digest};
     }
 
-    private boolean hasQuotedString(Docker.Argument arg) {
-        return arg.getContents().stream()
-                .anyMatch(content -> content instanceof Docker.QuotedString);
+    private Docker.Literal.@Nullable QuoteStyle getQuoteStyle(Docker.Argument arg) {
+        for (Docker.ArgumentContent content : arg.getContents()) {
+            if (content instanceof Docker.Literal) {
+                Docker.Literal.QuoteStyle style = ((Docker.Literal) content).getQuoteStyle();
+                if (style != null) {
+                    return style;
+                }
+            }
+        }
+        return null;
     }
 
-    private Docker.ArgumentContent createContent(String text, boolean quoted, Docker.@Nullable Argument original) {
-		if (quoted) {
-			// Preserve the quote style from the original
-			Docker.QuotedString.QuoteStyle quoteStyle = Docker.QuotedString.QuoteStyle.DOUBLE;
-			if (original != null) {
-				for (Docker.ArgumentContent content : original.getContents()) {
-					if (content instanceof Docker.QuotedString) {
-						quoteStyle = ((Docker.QuotedString)content).getQuoteStyle();
-						break;
-					}
-				}
-			}
-			return new Docker.QuotedString(randomId(), Space.EMPTY, Markers.EMPTY, text, quoteStyle);
-		}
-		return new Docker.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, text);
-	}
+    private Docker.ArgumentContent createContent(String text, Docker.Literal.@Nullable QuoteStyle quoteStyle) {
+        return new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, quoteStyle);
+    }
 
     private @Nullable String getPlatformFlag(Docker.From from) {
         if (from.getFlags() == null) {
@@ -252,11 +240,8 @@ public class ChangeBaseImage extends Recipe {
         for (Docker.Flag flag : from.getFlags()) {
             if ("platform".equals(flag.getName()) && flag.getValue() != null) {
                 for (Docker.ArgumentContent content : flag.getValue().getContents()) {
-                    if (content instanceof Docker.PlainText) {
-                        return ((Docker.PlainText) content).getText();
-                    }
-                    if (content instanceof Docker.QuotedString) {
-                        return ((Docker.QuotedString) content).getValue();
+                    if (content instanceof Docker.Literal) {
+                        return ((Docker.Literal) content).getText();
                     }
                 }
             }
@@ -298,12 +283,8 @@ public class ChangeBaseImage extends Recipe {
         if (existingValue != null && !existingValue.getContents().isEmpty()) {
             // Update existing value using withers
             Docker.ArgumentContent firstContent = existingValue.getContents().get(0);
-            if (firstContent instanceof Docker.PlainText) {
-                Docker.PlainText updated = ((Docker.PlainText) firstContent).withText(platform);
-                return existingValue.withContents(singletonList(updated));
-            }
-            if (firstContent instanceof Docker.QuotedString) {
-                Docker.QuotedString updated = ((Docker.QuotedString) firstContent).withValue(platform);
+            if (firstContent instanceof Docker.Literal) {
+                Docker.Literal updated = ((Docker.Literal) firstContent).withText(platform);
                 return existingValue.withContents(singletonList(updated));
             }
         }
@@ -316,11 +297,12 @@ public class ChangeBaseImage extends Recipe {
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                singletonList(new Docker.PlainText(
+                singletonList(new Docker.Literal(
                         randomId(),
                         Space.EMPTY,
                         Markers.EMPTY,
-                        platform
+                        platform,
+                        null
                 ))
         );
     }

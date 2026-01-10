@@ -34,8 +34,8 @@ class LabelTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Label label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(label.getPairs()).hasSize(1);
-                assertThat(((Docker.PlainText) label.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("version");
-                assertThat(((Docker.PlainText) label.getPairs().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("1.0.0");
+                assertThat(((Docker.Literal) label.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("version");
+                assertThat(((Docker.Literal) label.getPairs().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("1.0.0");
             })
           )
         );
@@ -52,8 +52,8 @@ class LabelTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Label label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(label.getPairs()).hasSize(2);
-                assertThat(((Docker.PlainText) label.getPairs().get(0).getKey().getContents().getFirst()).getText()).isEqualTo("version");
-                assertThat(((Docker.PlainText) label.getPairs().get(1).getKey().getContents().getFirst()).getText()).isEqualTo("app");
+                assertThat(((Docker.Literal) label.getPairs().get(0).getKey().getContents().getFirst()).getText()).isEqualTo("version");
+                assertThat(((Docker.Literal) label.getPairs().get(1).getKey().getContents().getFirst()).getText()).isEqualTo("app");
             })
           )
         );
@@ -84,7 +84,7 @@ class LabelTest implements RewriteTest {
                 Docker.Label label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(label.getPairs()).hasSize(1);
                 assertThat(label.getPairs().getFirst().isHasEquals()).isFalse();
-                assertThat(((Docker.PlainText) label.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("author");
+                assertThat(((Docker.Literal) label.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("author");
             })
           )
         );

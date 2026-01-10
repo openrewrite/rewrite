@@ -34,8 +34,8 @@ class AddTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Add add = (Docker.Add) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(add.getSources()).hasSize(1);
-                assertThat(((Docker.PlainText) add.getSources().getFirst().getContents().getFirst()).getText()).isEqualTo("app.tar.gz");
-                assertThat(((Docker.PlainText) add.getDestination().getContents().getFirst()).getText()).isEqualTo("/app/");
+                assertThat(((Docker.Literal) add.getSources().getFirst().getContents().getFirst()).getText()).isEqualTo("app.tar.gz");
+                assertThat(((Docker.Literal) add.getDestination().getContents().getFirst()).getText()).isEqualTo("/app/");
             })
           )
         );

@@ -429,20 +429,16 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public Docker visitPlainText(Docker.PlainText plainText, PrintOutputCapture<P> p) {
-        beforeSyntax(plainText, p);
-        p.append(plainText.getText());
-        afterSyntax(plainText, p);
-        return plainText;
-    }
-
-    @Override
-    public Docker visitQuotedString(Docker.QuotedString quotedString, PrintOutputCapture<P> p) {
-        beforeSyntax(quotedString, p);
-        char quote = quotedString.getQuoteStyle() == Docker.QuotedString.QuoteStyle.DOUBLE ? '"' : '\'';
-        p.append(quote).append(quotedString.getValue()).append(quote);
-        afterSyntax(quotedString, p);
-        return quotedString;
+    public Docker visitLiteral(Docker.Literal literal, PrintOutputCapture<P> p) {
+        beforeSyntax(literal, p);
+        if (literal.getQuoteStyle() != null) {
+            char quote = literal.getQuoteStyle() == Docker.Literal.QuoteStyle.DOUBLE ? '"' : '\'';
+            p.append(quote).append(literal.getText()).append(quote);
+        } else {
+            p.append(literal.getText());
+        }
+        afterSyntax(literal, p);
+        return literal;
     }
 
     @Override

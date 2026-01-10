@@ -37,7 +37,7 @@ class RunTest implements RewriteTest {
                 Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommandLine().getForm();
                 assertThat(shellForm.getArguments())
                   .singleElement()
-                  .extracting(arg -> ((Docker.PlainText) arg.getContents().getFirst()).getText())
+                  .extracting(arg -> ((Docker.Literal) arg.getContents().getFirst()).getText())
                   .isEqualTo("apt-get update");
             })
           )
@@ -58,8 +58,8 @@ class RunTest implements RewriteTest {
                 Docker.ExecForm execForm = (Docker.ExecForm) run.getCommandLine().getForm();
                 assertThat(execForm.getArguments()).hasSize(2)
                   .satisfiesExactly(
-                    arg -> assertThat(((Docker.QuotedString) arg.getContents().getFirst()).getValue()).isEqualTo("apt-get"),
-                    arg -> assertThat(((Docker.QuotedString) arg.getContents().getFirst()).getValue()).isEqualTo("update")
+                    arg -> assertThat(((Docker.Literal) arg.getContents().getFirst()).getText()).isEqualTo("apt-get"),
+                    arg -> assertThat(((Docker.Literal) arg.getContents().getFirst()).getText()).isEqualTo("update")
                   );
             })
           )
@@ -81,7 +81,7 @@ class RunTest implements RewriteTest {
                 Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommandLine().getForm();
                 assertThat(shellForm.getArguments())
                   .singleElement()
-                  .extracting(arg -> ((Docker.PlainText) arg.getContents().getFirst()).getText())
+                  .extracting(arg -> ((Docker.Literal) arg.getContents().getFirst()).getText())
                   .isEqualTo("CGO_ENABLED=0 go build -o app");
             })
           )
@@ -114,7 +114,7 @@ class RunTest implements RewriteTest {
                 Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(run.getFlags()).hasSize(1);
                 assertThat(run.getFlags().getFirst().getName()).isEqualTo("network");
-                assertThat(((Docker.PlainText) run.getFlags().getFirst().getValue().getContents().getFirst()).getText()).contains("none");
+                assertThat(((Docker.Literal) run.getFlags().getFirst().getValue().getContents().getFirst()).getText()).contains("none");
             })
           )
         );
@@ -132,12 +132,12 @@ class RunTest implements RewriteTest {
                 Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(run.getFlags()).hasSize(2);
                 assertThat(run.getFlags().get(0).getName()).isEqualTo("network");
-                assertThat(((Docker.PlainText) run.getFlags().get(0).getValue().getContents().getFirst()).getText()).isEqualTo("none");
+                assertThat(((Docker.Literal) run.getFlags().get(0).getValue().getContents().getFirst()).getText()).isEqualTo("none");
                 assertThat(run.getFlags().get(1).getName()).isEqualTo("mount");
                 // Flag value is parsed as multiple elements: type, =, cache,target, =, /cache
                 Docker.Argument mountValue = run.getFlags().get(1).getValue();
                 assertThat(mountValue.getContents()).hasSize(5);
-                assertThat(((Docker.PlainText) mountValue.getContents().get(0)).getText()).isEqualTo("type");
+                assertThat(((Docker.Literal) mountValue.getContents().get(0)).getText()).isEqualTo("type");
             })
           )
         );

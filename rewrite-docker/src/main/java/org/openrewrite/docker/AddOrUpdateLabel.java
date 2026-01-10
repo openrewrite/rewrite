@@ -251,16 +251,16 @@ public class AddOrUpdateLabel extends Recipe {
 
                 if (needsQuotes) {
                     // Preserve quote style from original if available
-                    Docker.QuotedString.QuoteStyle quoteStyle = Docker.QuotedString.QuoteStyle.DOUBLE;
+                    Docker.Literal.QuoteStyle quoteStyle = Docker.Literal.QuoteStyle.DOUBLE;
                     if (original != null) {
                         for (Docker.ArgumentContent c : original.getContents()) {
-                            if (c instanceof Docker.QuotedString) {
-                                quoteStyle = ((Docker.QuotedString) c).getQuoteStyle();
+                            if (c instanceof Docker.Literal && ((Docker.Literal) c).isQuoted()) {
+                                quoteStyle = ((Docker.Literal) c).getQuoteStyle();
                                 break;
                             }
                         }
                     }
-                    content = new Docker.QuotedString(
+                    content = new Docker.Literal(
                             randomId(),
                             Space.EMPTY,
                             Markers.EMPTY,
@@ -268,11 +268,12 @@ public class AddOrUpdateLabel extends Recipe {
                             quoteStyle
                     );
                 } else {
-                    content = new Docker.PlainText(
+                    content = new Docker.Literal(
                             randomId(),
                             Space.EMPTY,
                             Markers.EMPTY,
-                            text
+                            text,
+                            null
                     );
                 }
 
@@ -290,10 +291,8 @@ public class AddOrUpdateLabel extends Recipe {
                 }
                 StringBuilder builder = new StringBuilder();
                 for (Docker.ArgumentContent content : arg.getContents()) {
-                    if (content instanceof Docker.PlainText) {
-                        builder.append(((Docker.PlainText) content).getText());
-                    } else if (content instanceof Docker.QuotedString) {
-                        builder.append(((Docker.QuotedString) content).getValue());
+                    if (content instanceof Docker.Literal) {
+                        builder.append(((Docker.Literal) content).getText());
                     } else if (content instanceof Docker.EnvironmentVariable) {
                         return null;
                     }

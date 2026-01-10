@@ -38,8 +38,8 @@ class EnvTest implements RewriteTest {
                 List<Docker.Instruction> instructions = doc.getStages().getFirst().getInstructions();
                 Docker.Env env1 = (Docker.Env) instructions.getFirst();
                 assertThat(env1.getPairs()).hasSize(1);
-                assertThat(((Docker.PlainText) env1.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("NODE_VERSION");
-                assertThat(((Docker.PlainText) env1.getPairs().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
+                assertThat(((Docker.Literal) env1.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("NODE_VERSION");
+                assertThat(((Docker.Literal) env1.getPairs().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
             })
           )
         );
@@ -56,10 +56,10 @@ class EnvTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Env env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(env.getPairs()).hasSize(2);
-                assertThat(((Docker.PlainText) env.getPairs().get(0).getKey().getContents().getFirst()).getText()).isEqualTo("NODE_VERSION");
-                assertThat(((Docker.PlainText) env.getPairs().get(0).getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
-                assertThat(((Docker.PlainText) env.getPairs().get(1).getKey().getContents().getFirst()).getText()).isEqualTo("NPM_VERSION");
-                assertThat(((Docker.PlainText) env.getPairs().get(1).getValue().getContents().getFirst()).getText()).isEqualTo("9.0.0");
+                assertThat(((Docker.Literal) env.getPairs().get(0).getKey().getContents().getFirst()).getText()).isEqualTo("NODE_VERSION");
+                assertThat(((Docker.Literal) env.getPairs().get(0).getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
+                assertThat(((Docker.Literal) env.getPairs().get(1).getKey().getContents().getFirst()).getText()).isEqualTo("NPM_VERSION");
+                assertThat(((Docker.Literal) env.getPairs().get(1).getValue().getContents().getFirst()).getText()).isEqualTo("9.0.0");
             })
           )
         );
@@ -78,8 +78,8 @@ class EnvTest implements RewriteTest {
                 Docker.Env env1 = (Docker.Env) instructions.getFirst();
                 assertThat(env1.getPairs()).hasSize(1);
                 assertThat(env1.getPairs().getFirst().isHasEquals()).isFalse();
-                assertThat(((Docker.PlainText) env1.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("NODE_VERSION");
-                assertThat(((Docker.PlainText) env1.getPairs().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
+                assertThat(((Docker.Literal) env1.getPairs().getFirst().getKey().getContents().getFirst()).getText()).isEqualTo("NODE_VERSION");
+                assertThat(((Docker.Literal) env1.getPairs().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
             })
           )
         );

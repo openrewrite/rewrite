@@ -122,10 +122,8 @@ public class FindExposedPorts extends Recipe {
                 }
                 StringBuilder builder = new StringBuilder();
                 for (Docker.ArgumentContent content : arg.getContents()) {
-                    if (content instanceof Docker.PlainText) {
-                        builder.append(((Docker.PlainText) content).getText());
-                    } else if (content instanceof Docker.QuotedString) {
-                        builder.append(((Docker.QuotedString) content).getValue());
+                    if (content instanceof Docker.Literal) {
+                        builder.append(((Docker.Literal) content).getText());
                     } else if (content instanceof Docker.EnvironmentVariable) {
                         return null;
                     }

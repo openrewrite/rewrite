@@ -34,8 +34,8 @@ class FromTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.From from = doc.getStages().getFirst().getFrom();
-                assertThat(((Docker.PlainText) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
-                assertThat(((Docker.PlainText) from.getTag().getContents().getFirst()).getText()).isEqualTo("20.04");
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("20.04");
                 assertThat(from.getDigest()).isNull();
                 assertThat(from.getAs()).isNull();
             })
@@ -54,9 +54,9 @@ class FromTest implements RewriteTest {
                 Docker.From from = doc.getStages().getFirst().getFrom();
                 assertThat(from.getFlags()).hasSize(1);
                 assertThat(from.getFlags().getFirst().getName()).isEqualTo("platform");
-                assertThat(((Docker.PlainText) from.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("linux/amd64");
-                assertThat(((Docker.PlainText) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
-                assertThat(((Docker.PlainText) from.getTag().getContents().getFirst()).getText()).isEqualTo("20.04");
+                assertThat(((Docker.Literal) from.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("linux/amd64");
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("20.04");
             })
           )
         );
@@ -71,10 +71,10 @@ class FromTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.From from = doc.getStages().getFirst().getFrom();
-                assertThat(((Docker.PlainText) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
-                assertThat(((Docker.PlainText) from.getTag().getContents().getFirst()).getText()).isEqualTo("20.04");
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("20.04");
                 assertThat(from.getAs()).isNotNull();
-                assertThat(((Docker.PlainText) from.getAs().getName().getContents().getFirst()).getText()).isEqualTo("base");
+                assertThat(((Docker.Literal) from.getAs().getName().getContents().getFirst()).getText()).isEqualTo("base");
             })
           )
         );
@@ -93,8 +93,8 @@ class FromTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> assertThat(doc.getStages())
               .satisfiesExactly(
-                golang -> assertThat(((Docker.PlainText) golang.getFrom().getImageName().getContents().getFirst()).getText()).isEqualTo("golang"),
-                alpine -> assertThat(((Docker.PlainText) alpine.getFrom().getImageName().getContents().getFirst()).getText()).isEqualTo("alpine")
+                golang -> assertThat(((Docker.Literal) golang.getFrom().getImageName().getContents().getFirst()).getText()).isEqualTo("golang"),
+                alpine -> assertThat(((Docker.Literal) alpine.getFrom().getImageName().getContents().getFirst()).getText()).isEqualTo("alpine")
               ))
           )
         );
@@ -153,14 +153,14 @@ class FromTest implements RewriteTest {
                 List<Docker.ArgumentContent> imageNameContents = from.getImageName().getContents();
                 assertThat(imageNameContents).hasSize(2);
                 assertThat(imageNameContents.getFirst()).extracting(arg -> ((Docker.EnvironmentVariable) arg).getName()).isEqualTo("REGISTRY");
-                assertThat(imageNameContents.get(1)).extracting(arg -> ((Docker.PlainText) arg).getText()).isEqualTo("/image");
+                assertThat(imageNameContents.get(1)).extracting(arg -> ((Docker.Literal) arg).getText()).isEqualTo("/image");
 
                 // Check tag contents
                 assertThat(from.getTag()).isNotNull();
                 List<Docker.ArgumentContent> tagContents = from.getTag().getContents();
                 assertThat(tagContents).hasSize(2);
                 assertThat(tagContents.getFirst()).extracting(arg -> ((Docker.EnvironmentVariable) arg).getName()).isEqualTo("VERSION");
-                assertThat(tagContents.get(1)).extracting(arg -> ((Docker.PlainText) arg).getText()).isEqualTo("-suffix");
+                assertThat(tagContents.get(1)).extracting(arg -> ((Docker.Literal) arg).getText()).isEqualTo("-suffix");
 
                 // Check no digest
                 assertThat(from.getDigest()).isNull();

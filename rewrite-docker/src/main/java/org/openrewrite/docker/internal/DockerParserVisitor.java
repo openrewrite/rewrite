@@ -168,7 +168,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         advanceCursor(ctx.text().getStop().getStopIndex() + 1);
 
         // If the entire image is a single quoted string, don't split it
-        if (contents.size() == 1 && contents.get(0) instanceof Docker.QuotedString) {
+        if (contents.size() == 1 && contents.get(0) instanceof Docker.Literal && ((Docker.Literal) contents.get(0)).isQuoted()) {
             // Single quoted string - keep it as-is
             Docker.Argument imageName = new Docker.Argument(randomId(), prefix, Markers.EMPTY, contents);
             return new Docker.@Nullable Argument[]{imageName, null, null};
@@ -183,8 +183,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         boolean foundAt = false;
 
         for (Docker.ArgumentContent content : contents) {
-            if (content instanceof Docker.PlainText) {
-                String text = ((Docker.PlainText) content).getText();
+            if (content instanceof Docker.Literal && !((Docker.Literal) content).isQuoted()) {
+                String text = ((Docker.Literal) content).getText();
 
                 // Look for @ first (digest takes precedence over tag)
                 int atIndex = text.indexOf('@');
@@ -197,10 +197,10 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     String digestPart = text.substring(atIndex + 1);
 
                     if (!imagePart.isEmpty()) {
-                        imageNameContents.add(new Docker.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, imagePart));
+                        imageNameContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, imagePart, null));
                     }
                     if (!digestPart.isEmpty()) {
-                        digestContents.add(new Docker.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, digestPart));
+                        digestContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, digestPart, null));
                     }
                 } else if (colonIndex >= 0 && !foundColon && !foundAt) {
                     // Split at :
@@ -209,10 +209,10 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     String tagPart = text.substring(colonIndex + 1);
 
                     if (!imagePart.isEmpty()) {
-                        imageNameContents.add(new Docker.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, imagePart));
+                        imageNameContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, imagePart, null));
                     }
                     if (!tagPart.isEmpty()) {
-                        tagContents.add(new Docker.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, tagPart));
+                        tagContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tagPart, null));
                     }
                 } else {
                     // Add to appropriate list
@@ -278,11 +278,12 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         if (!hasQuotedString && !hasEnvironmentVariable && !hasComment) {
             // Simple case: just plain text
-            contents.add(new Docker.PlainText(
+            contents.add(new Docker.Literal(
                     randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
-                    fullText
+                    fullText,
+                    null
             ));
             return contents;
         }
@@ -320,23 +321,23 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                         Space elementPrefix = prefix(token);
                         skip(token);
                         String value = tokenText.substring(1, tokenText.length() - 1);
-                        contents.add(new Docker.QuotedString(
+                        contents.add(new Docker.Literal(
                                 randomId(),
                                 elementPrefix,
                                 Markers.EMPTY,
                                 value,
-                                Docker.QuotedString.QuoteStyle.DOUBLE
+                                Docker.Literal.QuoteStyle.DOUBLE
                         ));
                     } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
                         Space elementPrefix = prefix(token);
                         skip(token);
                         String value = tokenText.substring(1, tokenText.length() - 1);
-                        contents.add(new Docker.QuotedString(
+                        contents.add(new Docker.Literal(
                                 randomId(),
                                 elementPrefix,
                                 Markers.EMPTY,
                                 value,
-                                Docker.QuotedString.QuoteStyle.SINGLE
+                                Docker.Literal.QuoteStyle.SINGLE
                         ));
                     } else if (token.getType() == DockerLexer.ENV_VAR) {
                         Space elementPrefix = prefix(token);
@@ -354,11 +355,12 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                         // Plain text for other tokens
                         Space elementPrefix = prefix(token);
                         skip(token);
-                        contents.add(new Docker.PlainText(
+                        contents.add(new Docker.Literal(
                                 randomId(),
                                 elementPrefix,
                                 Markers.EMPTY,
-                                tokenText
+                                tokenText,
+                                null
                         ));
                     }
                 }
@@ -580,16 +582,16 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
                     // Remove quotes
                     String value = text.substring(1, text.length() - 1);
-                    contents.add(new Docker.QuotedString(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.QuotedString.QuoteStyle.DOUBLE));
+                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.Literal.QuoteStyle.DOUBLE));
                     skip(token);
                 } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
                     // Remove quotes
                     String value = text.substring(1, text.length() - 1);
-                    contents.add(new Docker.QuotedString(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.QuotedString.QuoteStyle.SINGLE));
+                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.Literal.QuoteStyle.SINGLE));
                     skip(token);
                 } else {
                     // UNQUOTED_TEXT
-                    contents.add(new Docker.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, text));
+                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, null));
                     skip(token);
                 }
             }
@@ -614,10 +616,10 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
                     if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
                         String value = text.substring(1, text.length() - 1);
-                        contents.add(new Docker.QuotedString(randomId(), elementPrefix, Markers.EMPTY, value, Docker.QuotedString.QuoteStyle.DOUBLE));
+                        contents.add(new Docker.Literal(randomId(), elementPrefix, Markers.EMPTY, value, Docker.Literal.QuoteStyle.DOUBLE));
                     } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
                         String value = text.substring(1, text.length() - 1);
-                        contents.add(new Docker.QuotedString(randomId(), elementPrefix, Markers.EMPTY, value, Docker.QuotedString.QuoteStyle.SINGLE));
+                        contents.add(new Docker.Literal(randomId(), elementPrefix, Markers.EMPTY, value, Docker.Literal.QuoteStyle.SINGLE));
                     } else if (token.getType() == DockerLexer.ENV_VAR) {
                         boolean braced = text.startsWith("${");
                         String varName = braced
@@ -626,7 +628,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                         contents.add(new Docker.EnvironmentVariable(randomId(), elementPrefix, Markers.EMPTY, varName, braced));
                     } else {
                         // Plain text - includes UNQUOTED_TEXT, EQUALS, DASH_DASH, and instruction keywords
-                        contents.add(new Docker.PlainText(randomId(), elementPrefix, Markers.EMPTY, text));
+                        contents.add(new Docker.Literal(randomId(), elementPrefix, Markers.EMPTY, text, null));
                     }
                 }
             }
@@ -786,23 +788,23 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     text = token.getText();
                     skip(token);
                     List<Docker.ArgumentContent> contents = new ArrayList<>();
-                    contents.add(new Docker.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, text));
+                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, null));
                     values.add(new Docker.Argument(randomId(), pathPrefix, Markers.EMPTY, contents));
                 } else if (pathCtx.DOUBLE_QUOTED_STRING() != null) {
                     token = pathCtx.DOUBLE_QUOTED_STRING().getSymbol();
                     text = token.getText();
                     skip(token);
                     List<Docker.ArgumentContent> contents = new ArrayList<>();
-                    contents.add(new Docker.QuotedString(randomId(), Space.EMPTY, Markers.EMPTY,
-                        text.substring(1, text.length() - 1), Docker.QuotedString.QuoteStyle.DOUBLE));
+                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY,
+                        text.substring(1, text.length() - 1), Docker.Literal.QuoteStyle.DOUBLE));
                     values.add(new Docker.Argument(randomId(), pathPrefix, Markers.EMPTY, contents));
                 } else if (pathCtx.SINGLE_QUOTED_STRING() != null) {
                     token = pathCtx.SINGLE_QUOTED_STRING().getSymbol();
                     text = token.getText();
                     skip(token);
                     List<Docker.ArgumentContent> contents = new ArrayList<>();
-                    contents.add(new Docker.QuotedString(randomId(), Space.EMPTY, Markers.EMPTY,
-                        text.substring(1, text.length() - 1), Docker.QuotedString.QuoteStyle.SINGLE));
+                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY,
+                        text.substring(1, text.length() - 1), Docker.Literal.QuoteStyle.SINGLE));
                     values.add(new Docker.Argument(randomId(), pathPrefix, Markers.EMPTY, contents));
                 } else if (pathCtx.ENV_VAR() != null) {
                     token = pathCtx.ENV_VAR().getSymbol();
@@ -878,7 +880,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         // Actually, we'll handle commas in the calling method
 
         List<Docker.ArgumentContent> contents = new ArrayList<>();
-        contents.add(new Docker.QuotedString(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.QuotedString.QuoteStyle.DOUBLE));
+        contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.Literal.QuoteStyle.DOUBLE));
         return new Docker.Argument(randomId(), prefix, Markers.EMPTY, contents);
     }
 
@@ -997,8 +999,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         boolean foundColon = false;
 
         for (Docker.ArgumentContent content : contents) {
-            if (content instanceof Docker.PlainText) {
-                String text = ((Docker.PlainText) content).getText();
+            if (content instanceof Docker.Literal && !((Docker.Literal) content).isQuoted()) {
+                String text = ((Docker.Literal) content).getText();
                 int colonIndex = text.indexOf(':');
 
                 if (colonIndex >= 0 && !foundColon) {
@@ -1008,10 +1010,10 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     String groupPart = text.substring(colonIndex + 1);
 
                     if (!userPart.isEmpty()) {
-                        userContents.add(new Docker.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, userPart));
+                        userContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, userPart, null));
                     }
                     if (!groupPart.isEmpty()) {
-                        groupContents.add(new Docker.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, groupPart));
+                        groupContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, groupPart, null));
                     }
                 } else {
                     // Add to the appropriate list
@@ -1269,21 +1271,21 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
                 if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
                     String value = tokenText.substring(1, tokenText.length() - 1);
-                    contents.add(new Docker.QuotedString(
+                    contents.add(new Docker.Literal(
                             randomId(),
                             elementPrefix,
                             Markers.EMPTY,
                             value,
-                            Docker.QuotedString.QuoteStyle.DOUBLE
+                            Docker.Literal.QuoteStyle.DOUBLE
                     ));
                 } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
                     String value = tokenText.substring(1, tokenText.length() - 1);
-                    contents.add(new Docker.QuotedString(
+                    contents.add(new Docker.Literal(
                             randomId(),
                             elementPrefix,
                             Markers.EMPTY,
                             value,
-                            Docker.QuotedString.QuoteStyle.SINGLE
+                            Docker.Literal.QuoteStyle.SINGLE
                     ));
                 } else if (token.getType() == DockerLexer.ENV_VAR) {
                     boolean braced = tokenText.startsWith("${");
@@ -1297,11 +1299,12 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     ));
                 } else {
                     // Plain text for UNQUOTED_TEXT, EQUALS, etc.
-                    contents.add(new Docker.PlainText(
+                    contents.add(new Docker.Literal(
                             randomId(),
                             elementPrefix,
                             Markers.EMPTY,
-                            tokenText
+                            tokenText,
+                            null
                     ));
                 }
             }
@@ -1351,12 +1354,12 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 }
                 advanceCursor(jsonStr.DOUBLE_QUOTED_STRING().getSymbol().getStopIndex() + 1);
 
-                Docker.QuotedString qs = new Docker.QuotedString(
+                Docker.Literal qs = new Docker.Literal(
                         randomId(),
                         Space.EMPTY,
                         Markers.EMPTY,
                         value,
-                        Docker.QuotedString.QuoteStyle.DOUBLE
+                        Docker.Literal.QuoteStyle.DOUBLE
                 );
                 args.add(new Docker.Argument(
                         randomId(),
@@ -1458,11 +1461,12 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
             String fullText = source.substring(startCharIndex, stopCharIndex);
 
-            Docker.PlainText plainText = new Docker.PlainText(
+            Docker.Literal plainText = new Docker.Literal(
                     randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
-                    fullText
+                    fullText,
+                    null
             );
             return new Docker.Argument(randomId(), prefix, Markers.EMPTY, singletonList(plainText));
         });
