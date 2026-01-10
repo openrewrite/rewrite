@@ -134,6 +134,27 @@ class RunTest implements RewriteTest {
     }
 
     @Test
+    void runWithConditional() {
+        rewriteRun(
+          docker(
+            """
+              ARG VERSION
+              FROM golang AS backend
+              RUN if [[ -z "$VERSION" ]] ; then make heedy ; else make heedy VERSION=$VERSION ; fi
+              """,
+            spec -> spec.afterRecipe(file -> {
+                var run = (Docker.Run) file.getStages().getFirst().getInstructions().getLast();
+                var form = (Docker.CommandForm.ShellForm) run.getCommand();
+                assertThat(form.getArguments())
+                  .singleElement()
+                  .extracting(Docker.Literal::getText)
+                  .isEqualTo("if [[ -z \"$VERSION\" ]] ; then make heedy ; else make heedy VERSION=$VERSION ; fi");
+            })
+          )
+        );
+    }
+
+    @Test
     void runWithSimpleFlag() {
         rewriteRun(
           docker(
