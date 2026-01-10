@@ -103,6 +103,37 @@ class RunTest implements RewriteTest {
     }
 
     @Test
+    void runWithLineContinuationAndConditional() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY app.jar /app/
+              RUN if [ -d /app ]; then \\
+                  echo "App directory exists"; \\
+              else \\
+                  mkdir -p /app; \\
+              fi
+              """,
+            spec -> spec.afterRecipe(file -> {
+                var run = (Docker.Run) file.getStages().getFirst().getInstructions().getLast();
+                var form = (Docker.CommandForm.ShellForm) run.getCommandLine().getForm();
+                assertThat(form.getArguments())
+                  .singleElement()
+                  .extracting(Docker.Literal::getText)
+                  .isEqualTo("""
+                  if [ -d /app ]; then \\
+                      echo "App directory exists"; \\
+                  else \\
+                      mkdir -p /app; \\
+                  fi\
+                  """);
+            })
+          )
+        );
+    }
+
+    @Test
     void runWithSimpleFlag() {
         rewriteRun(
           docker(
