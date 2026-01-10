@@ -78,11 +78,11 @@ envInstruction
     ;
 
 addInstruction
-    : ADD flags? ( heredoc | sourceList destination )
+    : ADD flags? ( heredoc | jsonArray | sourceList destination )
     ;
 
 copyInstruction
-    : COPY flags? ( heredoc | sourceList destination )
+    : COPY flags? ( heredoc | jsonArray | sourceList destination )
     ;
 
 entrypointInstruction

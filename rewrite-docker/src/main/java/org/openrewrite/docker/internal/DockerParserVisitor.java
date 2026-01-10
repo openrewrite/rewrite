@@ -398,14 +398,17 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         List<Docker.Flag> flags = ctx.flags() != null ? convertFlags(ctx.flags()) : null;
 
         Docker.HeredocForm heredoc = null;
+        Docker.ExecForm execForm = null;
         List<Docker.Argument> sources = null;
         Docker.Argument destination = null;
 
-        // Check if heredoc or sourceList is present
+        // Check if heredoc, jsonArray, or sourceList is present
         if (ctx.heredoc() != null) {
             heredoc = visitHeredocContext(ctx.heredoc());
             // For heredoc, destination is part of the heredoc (if present)
             // No separate destination to parse
+        } else if (ctx.jsonArray() != null) {
+            execForm = visitJsonArrayAsExecForm(ctx.jsonArray());
         } else if (ctx.sourceList() != null) {
             sources = new ArrayList<>();
             for (DockerParser.SourceContext sourceCtx : ctx.sourceList().source()) {
@@ -420,7 +423,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
-        return new Docker.Add(randomId(), prefix, Markers.EMPTY, addKeyword, flags, heredoc, sources, destination);
+        return new Docker.Add(randomId(), prefix, Markers.EMPTY, addKeyword, flags, heredoc, execForm, sources, destination);
     }
 
     @Override
@@ -434,14 +437,17 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         List<Docker.Flag> flags = ctx.flags() != null ? convertFlags(ctx.flags()) : null;
 
         Docker.HeredocForm heredoc = null;
+        Docker.ExecForm execForm = null;
         List<Docker.Argument> sources = null;
         Docker.Argument destination = null;
 
-        // Check if heredoc or sourceList is present
+        // Check if heredoc, jsonArray, or sourceList is present
         if (ctx.heredoc() != null) {
             heredoc = visitHeredocContext(ctx.heredoc());
             // For heredoc, destination is part of the heredoc (if present)
             // No separate destination to parse
+        } else if (ctx.jsonArray() != null) {
+            execForm = visitJsonArrayAsExecForm(ctx.jsonArray());
         } else if (ctx.sourceList() != null) {
             sources = new ArrayList<>();
             for (DockerParser.SourceContext sourceCtx : ctx.sourceList().source()) {
@@ -456,7 +462,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
-        return new Docker.Copy(randomId(), prefix, Markers.EMPTY, copyKeyword, flags, heredoc, sources, destination);
+        return new Docker.Copy(randomId(), prefix, Markers.EMPTY, copyKeyword, flags, heredoc, execForm, sources, destination);
     }
 
     @Override
@@ -1228,43 +1234,55 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
     private Docker.ExecForm visitExecFormContext(DockerParser.ExecFormContext ctx) {
         return convert(ctx, (c, prefix) -> {
-            List<Docker.Argument> args = new ArrayList<>();
             DockerParser.JsonArrayContext jsonArray = c.jsonArray();
-
-            skip(jsonArray.LBRACKET().getSymbol());
-
-            if (jsonArray.jsonArrayElements() != null) {
-                for (DockerParser.JsonStringContext jsonStr : jsonArray.jsonArrayElements().jsonString()) {
-                    Space argPrefix = prefix(jsonStr.getStart());
-                    String value = jsonStr.JSON_STRING().getText();
-                    // Remove surrounding quotes
-                    if (value.startsWith("\"") && value.endsWith("\"")) {
-                        value = value.substring(1, value.length() - 1);
-                    }
-                    advanceCursor(jsonStr.JSON_STRING().getSymbol().getStopIndex() + 1);
-
-                    Docker.QuotedString qs = new Docker.QuotedString(
-                            randomId(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            value,
-                            Docker.QuotedString.QuoteStyle.DOUBLE
-                    );
-                    args.add(new Docker.Argument(
-                            randomId(),
-                            argPrefix,
-                            Markers.EMPTY,
-                            singletonList(qs)
-                    ));
-                }
-            }
-
-            // Capture whitespace before closing bracket to preserve " ]" vs "]"
-            Space closingBracketPrefix = prefix(jsonArray.JSON_RBRACKET().getSymbol());
-            skip(jsonArray.JSON_RBRACKET().getSymbol());
-
-            return new Docker.ExecForm(randomId(), prefix, Markers.EMPTY, args, closingBracketPrefix);
+            return visitJsonArrayAsExecFormInternal(jsonArray, prefix);
         });
+    }
+
+    /**
+     * Parse a JSON array directly as an ExecForm (used by COPY/ADD instructions)
+     */
+    private Docker.ExecForm visitJsonArrayAsExecForm(DockerParser.JsonArrayContext ctx) {
+        Space prefix = prefix(ctx.getStart());
+        return visitJsonArrayAsExecFormInternal(ctx, prefix);
+    }
+
+    private Docker.ExecForm visitJsonArrayAsExecFormInternal(DockerParser.JsonArrayContext jsonArray, Space prefix) {
+        List<Docker.Argument> args = new ArrayList<>();
+
+        skip(jsonArray.LBRACKET().getSymbol());
+
+        if (jsonArray.jsonArrayElements() != null) {
+            for (DockerParser.JsonStringContext jsonStr : jsonArray.jsonArrayElements().jsonString()) {
+                Space argPrefix = prefix(jsonStr.getStart());
+                String value = jsonStr.JSON_STRING().getText();
+                // Remove surrounding quotes
+                if (value.startsWith("\"") && value.endsWith("\"")) {
+                    value = value.substring(1, value.length() - 1);
+                }
+                advanceCursor(jsonStr.JSON_STRING().getSymbol().getStopIndex() + 1);
+
+                Docker.QuotedString qs = new Docker.QuotedString(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        value,
+                        Docker.QuotedString.QuoteStyle.DOUBLE
+                );
+                args.add(new Docker.Argument(
+                        randomId(),
+                        argPrefix,
+                        Markers.EMPTY,
+                        singletonList(qs)
+                ));
+            }
+        }
+
+        // Capture whitespace before closing bracket to preserve " ]" vs "]"
+        Space closingBracketPrefix = prefix(jsonArray.JSON_RBRACKET().getSymbol());
+        skip(jsonArray.JSON_RBRACKET().getSymbol());
+
+        return new Docker.ExecForm(randomId(), prefix, Markers.EMPTY, args, closingBracketPrefix);
     }
 
     private Docker.HeredocForm visitHeredocContext(DockerParser.HeredocContext ctx) {
