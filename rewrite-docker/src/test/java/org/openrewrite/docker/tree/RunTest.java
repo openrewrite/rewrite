@@ -332,4 +332,38 @@ class RunTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void runWithWindowsBacktickContinuation() {
+        // Test Windows-style backtick line continuation
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              FROM mcr.microsoft.com/windows/servercore:ltsc2022
+              RUN powershell -Command " `
+                  $ErrorActionPreference = 'Stop'; `
+                  Write-Host 'Hello World'"
+              """
+          )
+        );
+    }
+
+    @Test
+    void runWithWindowsMultilineString() {
+        // Test Windows-style multi-line string with backtick continuation
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              FROM mcr.microsoft.com/windows/servercore:ltsc2022
+              RUN powershell -Command " `
+                  $var = 'test'; `
+                  if ($var -eq 'test') { `
+                      Write-Host 'Match'; `
+                  }"
+              """
+          )
+        );
+    }
 }

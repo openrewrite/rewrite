@@ -52,7 +52,8 @@ HEREDOC_START : '<<' '-'? {
 } -> pushMode(HEREDOC_PREAMBLE);
 
 // Line continuation - HIDDEN in main mode
-LINE_CONTINUATION : '\\' [ \t]* NEWLINE_CHAR -> channel(HIDDEN);
+// Supports both backslash (Linux) and backtick (Windows with # escape=`)
+LINE_CONTINUATION : ('\\' | '`') [ \t]* NEWLINE_CHAR -> channel(HIDDEN);
 
 // JSON array delimiters (for exec form) - no mode switching, handled in parser
 LBRACKET : '[';
@@ -70,15 +71,18 @@ fragment UNQUOTED_CHAR : ~[ \t\r\n\\"'$[\]=<];
 fragment ESCAPED_CHAR : '\\' .;
 
 // String literals
-DOUBLE_QUOTED_STRING : '"' ( ESCAPE_SEQUENCE | ~["\\\r\n] )* '"';
+// Double-quoted strings support escape sequences and line continuation (backslash or backtick)
+// Backtick followed by whitespace+newline is continuation; standalone backtick is regular char
+DOUBLE_QUOTED_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | ~["\\\r\n`] )* '"';
 // Single-quoted strings in shell are literal - no escape processing
 // Allow any character except single quote and newlines
 SINGLE_QUOTED_STRING : '\'' ~['\r\n]* '\'';
 
+// Inline line continuation (inside strings) - backtick or backslash followed by newline
+fragment INLINE_CONTINUATION : ('\\' | '`') [ \t]* [\r\n]+;
+
 fragment ESCAPE_SEQUENCE
-    : '\\' [nrt"'\\$]
-    | '\\' 'u' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT
-    | '\\' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT
+    : '\\' ~[\r\n]   // Backslash followed by any char except newline (includes \n, \t, \\, \", Windows paths like \P)
     ;
 
 fragment HEX_DIGIT : [0-9A-F];
@@ -95,7 +99,9 @@ COMMAND_SUBST : '$(' ( COMMAND_SUBST | ~[()] | '(' COMMAND_SUBST_INNER* ')' )* '
 fragment COMMAND_SUBST_INNER : COMMAND_SUBST | ~[()];
 
 // Backtick command substitution `command`
-BACKTICK_SUBST : '`' ~[`]* '`';
+// First char after backtick must NOT be whitespace/newline (which would be line continuation)
+// Content cannot span newlines (backtick command substitution doesn't support that)
+BACKTICK_SUBST : '`' ~[ \t\r\n`] ~[`\r\n]* '`';
 
 // Unquoted text (arguments, file paths, etc.)
 // This should be after more specific tokens

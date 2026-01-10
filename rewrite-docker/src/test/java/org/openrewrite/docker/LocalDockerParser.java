@@ -21,7 +21,9 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.tree.ParseError;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,13 +37,14 @@ import static java.util.stream.Collectors.toList;
 
 public class LocalDockerParser {
 
-    public static void main(String[] args) {
-        if (args.length == 0) {
-            System.err.println("Usage: LocalDockerParser <directory>");
+    public static void main(String... args) throws Exception {
+        if (args.length < 2) {
+            System.err.println("Usage: LocalDockerParser <directory> <output-file>");
             System.exit(1);
         }
 
         Path dir = Path.of(args[0]);
+        Path outputFile = Path.of(args[1]);
         if (!Files.isDirectory(dir)) {
             System.err.println("Error: " + dir + " is not a directory");
             System.exit(1);
@@ -51,7 +54,7 @@ public class LocalDockerParser {
 
         List<Path> dockerFiles = findDockerFiles(dir, parser);
         if (dockerFiles.isEmpty()) {
-            System.out.println("No Dockerfiles or Containerfiles found in " + dir);
+            System.err.println("No Dockerfiles or Containerfiles found in " + dir);
             return;
         }
 
@@ -85,7 +88,8 @@ public class LocalDockerParser {
             }
         }
 
-        printSummary(parsedFiles, parsedErrors);
+        printSummary(outputFile, parsedFiles, parsedErrors);
+        System.out.println("Output written to: " + outputFile);
     }
 
     private static List<Path> findDockerFiles(Path dir, DockerParser parser) {
@@ -100,26 +104,28 @@ public class LocalDockerParser {
         }
     }
 
-    private static void printSummary(List<SourceFile> parsedFiles, Map<Path, String> failedFiles) {
-        System.out.println("Files parsed successfully: " + parsedFiles.size());
-        System.out.println("Files failed to parse: " + failedFiles.size());
-        System.out.println();
+    private static void printSummary(Path outputFile, List<SourceFile> parsedFiles, Map<Path, String> parsedErrors) throws Exception{
+        try (PrintStream out = new PrintStream(new FileOutputStream(outputFile.toFile()))) {
+            out.println("Files parsed successfully: " + parsedFiles.size());
+            out.println("Files failed to parse: " + parsedErrors.size());
+            out.println();
 
-        if (!failedFiles.isEmpty()) {
-            // Group failures by error message
-            Map<String, List<Path>> errorGroups = new LinkedHashMap<>();
-            for (Map.Entry<Path, String> entry : failedFiles.entrySet()) {
-                errorGroups.computeIfAbsent(entry.getValue(), k -> new ArrayList<>())
-                  .add(entry.getKey());
-            }
-
-            for (Map.Entry<String, List<Path>> group : errorGroups.entrySet()) {
-                System.out.println("  ERROR: " + group.getKey());
-                System.out.println("  Files affected (" + group.getValue().size() + "):");
-                for (Path path : group.getValue()) {
-                    System.out.println("    - " + path);
+            if (!parsedErrors.isEmpty()) {
+                // Group failures by error message
+                Map<String, List<Path>> errorGroups = new LinkedHashMap<>();
+                for (Map.Entry<Path, String> entry : parsedErrors.entrySet()) {
+                    errorGroups.computeIfAbsent(entry.getValue(), k -> new ArrayList<>())
+                      .add(entry.getKey());
                 }
-                System.out.println();
+
+                for (Map.Entry<String, List<Path>> group : errorGroups.entrySet()) {
+                    out.println("  ERROR: " + group.getKey());
+                    out.println("  Files affected (" + group.getValue().size() + "):");
+                    for (Path path : group.getValue()) {
+                        out.println("    - " + path);
+                    }
+                    out.println();
+                }
             }
         }
     }

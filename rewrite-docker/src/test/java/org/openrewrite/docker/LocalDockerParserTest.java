@@ -17,16 +17,15 @@ package org.openrewrite.docker;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.jupiter.api.io.CleanupMode;
+import org.junit.jupiter.api.io.TempDir;
 
-import java.io.FileOutputStream;
-import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 class LocalDockerParserTest {
 
     private static final String DOCKER_IMAGES_DIR = "/home/tim/Documents/workspace/docker-images/";
-    private static final String OUTPUT_FILE = "/tmp/docker-parser-output.txt";
 
     static boolean dockerImagesDirExists() {
         return Files.isDirectory(Path.of(DOCKER_IMAGES_DIR));
@@ -34,16 +33,9 @@ class LocalDockerParserTest {
 
     @Test
     @EnabledIf("dockerImagesDirExists")
-    void parseDockerImagesDirectory() throws Exception {
-        try (PrintStream out = new PrintStream(new FileOutputStream(OUTPUT_FILE))) {
-            PrintStream originalOut = System.out;
-            System.setOut(out);
-            try {
-                LocalDockerParser.main(new String[]{DOCKER_IMAGES_DIR});
-            } finally {
-                System.setOut(originalOut);
-            }
-        }
-        System.out.println("Output written to: " + OUTPUT_FILE);
+    void parseDockerImagesDirectory(@TempDir(cleanup = CleanupMode.NEVER) Path tempDir) throws Exception {
+        LocalDockerParser.main(
+          DOCKER_IMAGES_DIR,
+          tempDir.resolve("docker-parser-output.txt").toString());
     }
 }
