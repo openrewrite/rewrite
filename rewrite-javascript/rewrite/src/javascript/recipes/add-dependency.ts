@@ -16,9 +16,9 @@
 
 import {Option, ScanningRecipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
-import {AsyncTreeVisitor, TreeVisitor} from "../../visitor";
+import {TreeVisitor} from "../../visitor";
 import {Tree} from "../../tree";
-import {AsyncJsonVisitor, detectIndent, getMemberKeyName, isJson, isObject, Json, rightPadded, space} from "../../json";
+import {detectIndent, getMemberKeyName, isJson, isObject, Json, JsonVisitor, rightPadded, space} from "../../json";
 import {isDocuments, isYaml, Yaml} from "../../yaml";
 import {isPlainText, PlainText} from "../../text";
 import {
@@ -211,12 +211,12 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
         };
     }
 
-    async editorWithData(acc: Accumulator): Promise<AsyncTreeVisitor<any, ExecutionContext>> {
+    async editorWithData(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
         const recipe = this;
 
         // Create JSON visitor that handles both package.json and JSON lock files
-        const jsonEditor = new class extends AsyncJsonVisitor<ExecutionContext> {
-            protected async visitDocument(doc: Json.Document, ctx: ExecutionContext): Promise<Json | undefined> {
+        const jsonEditor = new class extends JsonVisitor<ExecutionContext> {
+            protected visitDocument(doc: Json.Document, ctx: ExecutionContext): Json | undefined {
                 const sourcePath = doc.sourcePath;
 
                 // Handle package.json files
@@ -227,7 +227,7 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
                     }
 
                     // Run package manager install if needed, check for failure
-                    const failureMessage = await runInstallIfNeeded(sourcePath, acc, () =>
+                    const failureMessage = runInstallIfNeeded(sourcePath, acc, () =>
                         recipe.runPackageManagerInstall(acc, updateInfo, ctx)
                     );
                     if (failureMessage) {
@@ -244,7 +244,7 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
                         recipe.version,
                         updateInfo.dependencyScope
                     );
-                    const modifiedDoc = await visitor.visit(doc, undefined) as Json.Document;
+                    const modifiedDoc = visitor.visit(doc, undefined) as Json.Document;
 
                     // Update the NodeResolutionResult marker
                     return updateNodeResolutionMarker(modifiedDoc, updateInfo, acc);
@@ -277,11 +277,11 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
      * Runs the package manager in a temporary directory to update the lock file.
      * All file contents are provided from in-memory sources (SourceFiles), not read from disk.
      */
-    private async runPackageManagerInstall(
+    private runPackageManagerInstall(
         acc: Accumulator,
         updateInfo: ProjectUpdateInfo,
         _ctx: ExecutionContext
-    ): Promise<void> {
+    ): void {
         // Create modified package.json with the new dependency
         const modifiedPackageJson = this.createModifiedPackageJson(
             updateInfo.originalPackageJson,
@@ -298,7 +298,7 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
         // Look up the original lock file content from captured SourceFiles
         const originalLockFileContent = acc.originalLockFiles.get(lockFilePath);
 
-        const result = await runInstallInTempDir(
+        const result = runInstallInTempDir(
             updateInfo.packageManager,
             modifiedPackageJson,
             {
@@ -333,7 +333,7 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
  * Visitor that adds a new dependency to a specific scope in package.json.
  * If the scope doesn't exist, it creates it.
  */
-class AddDependencyVisitor extends AsyncJsonVisitor<void> {
+class AddDependencyVisitor extends JsonVisitor<void> {
     private readonly packageName: string;
     private readonly version: string;
     private readonly targetScope: DependencyScope;
@@ -348,11 +348,11 @@ class AddDependencyVisitor extends AsyncJsonVisitor<void> {
         this.targetScope = targetScope;
     }
 
-    protected async visitDocument(doc: Json.Document, p: void): Promise<Json | undefined> {
+    protected visitDocument(doc: Json.Document, p: void): Json | undefined {
         // Detect indentation from the document
         this.baseIndent = detectIndent(doc);
 
-        const result = await super.visitDocument(doc, p) as Json.Document;
+        const result = super.visitDocument(doc, p) as Json.Document;
 
         // If scope wasn't found, we need to add it to the document
         if (!this.scopeFound && !this.dependencyAdded) {
@@ -362,7 +362,7 @@ class AddDependencyVisitor extends AsyncJsonVisitor<void> {
         return result;
     }
 
-    protected async visitMember(member: Json.Member, p: void): Promise<Json | undefined> {
+    protected visitMember(member: Json.Member, p: void): Json | undefined {
         const keyName = getMemberKeyName(member);
 
         if (keyName === this.targetScope) {

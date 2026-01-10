@@ -27,7 +27,7 @@ export class Result {
     constructor(public readonly before?: SourceFile, public readonly after?: SourceFile) {
     }
 
-    async diff(): Promise<string> {
+    diff(): string {
         return createTwoFilesPatch(
             this.before?.sourcePath ?? "",
             this.after?.sourcePath ?? "",

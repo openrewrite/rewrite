@@ -16,9 +16,9 @@
 
 import {Option, ScanningRecipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
-import {AsyncTreeVisitor} from "../../visitor";
+import {TreeVisitor} from "../../visitor";
 import {Tree} from "../../tree";
-import {getMemberKeyName, isJson, isLiteral, Json, AsyncJsonVisitor} from "../../json";
+import {getMemberKeyName, isJson, isLiteral, Json, JsonVisitor} from "../../json";
 import {isDocuments, isYaml, Yaml} from "../../yaml";
 import {isPlainText, PlainText} from "../../text";
 import {
@@ -148,12 +148,12 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         return semver.gt(newMin, currentMin);
     }
 
-    async scanner(acc: Accumulator): Promise<AsyncTreeVisitor<any, ExecutionContext>> {
+    async scanner(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
         const recipe = this;
         const LOCK_FILE_NAMES = getAllLockFileNames();
 
-        return new class extends AsyncTreeVisitor<Tree, ExecutionContext> {
-            protected async accept(tree: Tree, ctx: ExecutionContext): Promise<Tree | undefined> {
+        return new class extends TreeVisitor<Tree, ExecutionContext> {
+            protected accept(tree: Tree, ctx: ExecutionContext): Tree | undefined {
                 // Handle JSON documents (package.json and JSON lock files)
                 if (isJson(tree) && tree.kind === Json.Kind.Document) {
                     return this.handleJsonDocument(tree as Json.Document, ctx);
@@ -172,7 +172,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                 return tree;
             }
 
-            private async handleJsonDocument(doc: Json.Document, _ctx: ExecutionContext): Promise<Json | undefined> {
+            private handleJsonDocument(doc: Json.Document, _ctx: ExecutionContext): Json | undefined {
                 const basename = path.basename(doc.sourcePath);
 
                 // Capture JSON lock file content (package-lock.json, bun.lock)
@@ -249,7 +249,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                 return doc;
             }
 
-            private async handleYamlDocument(docs: Yaml.Documents, _ctx: ExecutionContext): Promise<Yaml.Documents | undefined> {
+            private handleYamlDocument(docs: Yaml.Documents, _ctx: ExecutionContext): Yaml.Documents | undefined {
                 const basename = path.basename(docs.sourcePath);
                 if (LOCK_FILE_NAMES.includes(basename)) {
                     acc.originalLockFiles.set(docs.sourcePath, TreePrinters.print(docs));
@@ -257,7 +257,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                 return docs;
             }
 
-            private async handlePlainTextDocument(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+            private handlePlainTextDocument(text: PlainText, _ctx: ExecutionContext): PlainText | undefined {
                 const basename = path.basename(text.sourcePath);
                 if (LOCK_FILE_NAMES.includes(basename)) {
                     acc.originalLockFiles.set(text.sourcePath, TreePrinters.print(text));
@@ -267,12 +267,12 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         };
     }
 
-    async editorWithData(acc: Accumulator): Promise<AsyncTreeVisitor<any, ExecutionContext>> {
+    async editorWithData(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
         const recipe = this;
 
         // Create JSON visitor that handles both package.json and JSON lock files
-        const jsonEditor = new class extends AsyncJsonVisitor<ExecutionContext> {
-            protected async visitDocument(doc: Json.Document, ctx: ExecutionContext): Promise<Json | undefined> {
+        const jsonEditor = new class extends JsonVisitor<ExecutionContext> {
+            protected visitDocument(doc: Json.Document, ctx: ExecutionContext): Json | undefined {
                 const sourcePath = doc.sourcePath;
 
                 // Handle package.json files
@@ -286,7 +286,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                     // Skip if the resolved version already satisfies the new constraint
                     const failureMessage = updateInfo.skipInstall
                         ? undefined
-                        : await runInstallIfNeeded(sourcePath, acc, () =>
+                        : runInstallIfNeeded(sourcePath, acc, () =>
                             recipe.runPackageManagerInstall(acc, updateInfo, ctx)
                         );
                     if (failureMessage) {
@@ -303,7 +303,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                         updateInfo.newVersion,
                         updateInfo.dependencyScope
                     );
-                    const modifiedDoc = await visitor.visit(doc, undefined) as Json.Document;
+                    const modifiedDoc = visitor.visit(doc, undefined) as Json.Document;
 
                     // Update the NodeResolutionResult marker
                     if (updateInfo.skipInstall) {
@@ -341,11 +341,11 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
      * Writes a modified package.json with the new version, then runs install to update the lock file.
      * All file contents are provided from in-memory sources (SourceFiles), not read from disk.
      */
-    private async runPackageManagerInstall(
+    private runPackageManagerInstall(
         acc: Accumulator,
         updateInfo: ProjectUpdateInfo,
         _ctx: ExecutionContext
-    ): Promise<void> {
+    ): void {
         // Create modified package.json with the new version constraint
         const modifiedPackageJson = this.createModifiedPackageJson(
             updateInfo.originalPackageJson,
@@ -363,7 +363,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         // Look up the original lock file content from captured SourceFiles
         const originalLockFileContent = acc.originalLockFiles.get(lockFilePath);
 
-        const result = await runInstallInTempDir(
+        const result = runInstallInTempDir(
             updateInfo.packageManager,
             modifiedPackageJson,
             {
@@ -429,7 +429,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
 /**
  * Visitor that updates the version of a specific dependency in a specific scope.
  */
-class UpdateVersionVisitor extends AsyncJsonVisitor<void> {
+class UpdateVersionVisitor extends JsonVisitor<void> {
     private readonly packageName: string;
     private readonly newVersion: string;
     private readonly targetScope: DependencyScope;
@@ -442,14 +442,14 @@ class UpdateVersionVisitor extends AsyncJsonVisitor<void> {
         this.targetScope = targetScope;
     }
 
-    protected async visitMember(member: Json.Member, p: void): Promise<Json | undefined> {
+    protected visitMember(member: Json.Member, p: void): Json | undefined {
         // Check if we're entering the target scope
         const keyName = getMemberKeyName(member);
 
         if (keyName === this.targetScope) {
             // We're entering the dependencies scope
             this.inTargetScope = true;
-            const result = await super.visitMember(member, p);
+            const result = super.visitMember(member, p);
             this.inTargetScope = false;
             return result;
         }
