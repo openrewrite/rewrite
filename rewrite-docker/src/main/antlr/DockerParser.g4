@@ -250,6 +250,7 @@ portList
 
 port
     : UNQUOTED_TEXT
+    | ENV_VAR  // Allow environment variables (e.g., EXPOSE ${PORT})
     ;
 
 envPairs
@@ -315,6 +316,7 @@ volumePath
     : UNQUOTED_TEXT
     | DOUBLE_QUOTED_STRING
     | SINGLE_QUOTED_STRING
+    | ENV_VAR  // Allow environment variables (e.g., VOLUME ${DATA_DIR})
     ;
 
 userSpec

@@ -693,12 +693,20 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
     private Docker.Argument convertPort(DockerParser.PortContext ctx) {
         Space prefix = prefix(ctx.getStart());
-        Token token = ctx.UNQUOTED_TEXT().getSymbol();
-        String text = token.getText();
-        skip(token);
-
         List<Docker.ArgumentContent> contents = new ArrayList<>();
-        contents.add(new Docker.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, text));
+
+        if (ctx.UNQUOTED_TEXT() != null) {
+            Token token = ctx.UNQUOTED_TEXT().getSymbol();
+            String text = token.getText();
+            skip(token);
+            contents.add(new Docker.PlainText(randomId(), Space.EMPTY, Markers.EMPTY, text));
+        } else if (ctx.ENV_VAR() != null) {
+            Token token = ctx.ENV_VAR().getSymbol();
+            String text = token.getText();
+            skip(token);
+            contents.add(createEnvVar(text));
+        }
+
         return new Docker.Argument(randomId(), prefix, Markers.EMPTY, contents);
     }
 
@@ -748,6 +756,13 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     List<Docker.ArgumentContent> contents = new ArrayList<>();
                     contents.add(new Docker.QuotedString(randomId(), Space.EMPTY, Markers.EMPTY,
                         text.substring(1, text.length() - 1), Docker.QuotedString.QuoteStyle.SINGLE));
+                    values.add(new Docker.Argument(randomId(), pathPrefix, Markers.EMPTY, contents));
+                } else if (pathCtx.ENV_VAR() != null) {
+                    token = pathCtx.ENV_VAR().getSymbol();
+                    text = token.getText();
+                    skip(token);
+                    List<Docker.ArgumentContent> contents = new ArrayList<>();
+                    contents.add(createEnvVar(text));
                     values.add(new Docker.Argument(randomId(), pathPrefix, Markers.EMPTY, contents));
                 }
             }
@@ -1377,6 +1392,15 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             );
             return new Docker.Argument(randomId(), prefix, Markers.EMPTY, singletonList(plainText));
         });
+    }
+
+    /**
+     * Parse an ENV_VAR token text (e.g., "${VAR}" or "$VAR") into an EnvironmentVariable content
+     */
+    private Docker.EnvironmentVariable createEnvVar(String text) {
+        boolean braced = text.startsWith("${");
+        String varName = braced ? text.substring(2, text.length() - 1) : text.substring(1);
+        return new Docker.EnvironmentVariable(randomId(), Space.EMPTY, Markers.EMPTY, varName, braced);
     }
 
     // Helper methods for cursor management

@@ -57,4 +57,18 @@ class ExposeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void exposeWithEnvironmentVariable() {
+        // EXPOSE with environment variable reference
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ENV PORT=8080
+              EXPOSE ${PORT}
+              """
+          )
+        );
+    }
 }

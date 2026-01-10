@@ -71,4 +71,18 @@ class VolumeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void volumeWithEnvironmentVariable() {
+        // VOLUME with environment variable reference
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ENV DATA_DIR=/data
+              VOLUME ${DATA_DIR}
+              """
+          )
+        );
+    }
 }
