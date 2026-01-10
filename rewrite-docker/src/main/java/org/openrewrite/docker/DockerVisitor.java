@@ -254,7 +254,7 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         Docker.ShellForm sf = shellForm;
         sf = sf.withPrefix(visitSpace(sf.getPrefix(), p));
         sf = sf.withMarkers(visitMarkers(sf.getMarkers(), p));
-        return sf.withArguments(ListUtils.map(sf.getArguments(), arg -> (Docker.Literal) visit(arg, p)));
+        return sf.withArgument((Docker.Literal) visit(sf.getArgument(), p));
     }
 
     public Docker visitExecForm(Docker.ExecForm execForm, P p) {

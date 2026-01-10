@@ -34,6 +34,7 @@ class HealthcheckTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Healthcheck healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(healthcheck.isNone()).isTrue();
+                assertThat(healthcheck.getCmd()).isNull();
             })
           )
         );
@@ -51,6 +52,8 @@ class HealthcheckTest implements RewriteTest {
                 Docker.Healthcheck healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(healthcheck.isNone()).isFalse();
                 assertThat(healthcheck.getCmd()).isNotNull();
+                var command = (Docker.ShellForm) healthcheck.getCmd().getCommand();
+                assertThat(command.getArgument().getText()).isEqualTo("curl -f http://localhost/ || exit 1");
             })
           )
         );
@@ -73,9 +76,8 @@ class HealthcheckTest implements RewriteTest {
                 assertThat(doc.getStages()).hasSize(2);
                 // Final stage should have HEALTHCHECK as first instruction and COPY as second
                 Docker.Stage finalStage = doc.getStages().get(1);
-                assertThat(finalStage.getInstructions()).hasSize(2);
-                assertThat(finalStage.getInstructions().get(0)).isInstanceOf(Docker.Healthcheck.class);
-                assertThat(finalStage.getInstructions().get(1)).isInstanceOf(Docker.Copy.class);
+                assertThat(finalStage.getInstructions().getFirst()).isInstanceOf(Docker.Healthcheck.class);
+                assertThat(finalStage.getInstructions().getLast()).isInstanceOf(Docker.Copy.class);
             })
           )
         );

@@ -35,10 +35,7 @@ class RunTest implements RewriteTest {
                 Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(run.getCommand()).isInstanceOf(Docker.ShellForm.class);
                 Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
-                assertThat(shellForm.getArguments())
-                  .singleElement()
-                  .extracting(Docker.Literal::getText)
-                  .isEqualTo("apt-get update");
+                assertThat(shellForm.getArgument().getText()).isEqualTo("apt-get update");
             })
           )
         );
@@ -79,10 +76,7 @@ class RunTest implements RewriteTest {
                 assertThat(run.getFlags()).isNull();
                 assertThat(run.getCommand()).isInstanceOf(Docker.ShellForm.class);
                 Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
-                assertThat(shellForm.getArguments())
-                  .singleElement()
-                  .extracting(Docker.Literal::getText)
-                  .isEqualTo("CGO_ENABLED=0 go build -o app");
+                assertThat(shellForm.getArgument().getText()).isEqualTo("CGO_ENABLED=0 go build -o app");
             })
           )
         );
@@ -118,10 +112,7 @@ class RunTest implements RewriteTest {
             spec -> spec.afterRecipe(file -> {
                 var run = (Docker.Run) file.getStages().getFirst().getInstructions().getLast();
                 var form = (Docker.CommandForm.ShellForm) run.getCommand();
-                assertThat(form.getArguments())
-                  .singleElement()
-                  .extracting(Docker.Literal::getText)
-                  .isEqualTo("""
+                assertThat(form.getArgument().getText()).isEqualTo("""
                   if [ -d /app ]; then \\
                       echo "App directory exists"; \\
                   else \\
@@ -145,10 +136,7 @@ class RunTest implements RewriteTest {
             spec -> spec.afterRecipe(file -> {
                 var run = (Docker.Run) file.getStages().getFirst().getInstructions().getLast();
                 var form = (Docker.CommandForm.ShellForm) run.getCommand();
-                assertThat(form.getArguments())
-                  .singleElement()
-                  .extracting(Docker.Literal::getText)
-                  .isEqualTo("if [[ -z \"$VERSION\" ]] ; then make heedy ; else make heedy VERSION=$VERSION ; fi");
+                assertThat(form.getArgument().getText()).isEqualTo("if [[ -z \"$VERSION\" ]] ; then make heedy ; else make heedy VERSION=$VERSION ; fi");
             })
           )
         );

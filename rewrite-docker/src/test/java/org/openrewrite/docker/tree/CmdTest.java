@@ -32,10 +32,9 @@ class CmdTest implements RewriteTest {
               CMD nginx -g daemon off;
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Cmd cmd = (Docker.Cmd) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(cmd.getCommand()).isInstanceOf(Docker.ShellForm.class);
-                Docker.ShellForm shellForm = (Docker.ShellForm) cmd.getCommand();
-                assertThat(shellForm.getArguments()).hasSize(1);
+                var cmd = (Docker.Cmd) doc.getStages().getFirst().getInstructions().getLast();
+                var shellForm = (Docker.ShellForm) cmd.getCommand();
+                assertThat(shellForm.getArgument().getText()).isEqualTo("nginx -g daemon off;");
             })
           )
         );
@@ -50,9 +49,9 @@ class CmdTest implements RewriteTest {
               CMD ["nginx", "-g", "daemon off;"]
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Cmd cmd = (Docker.Cmd) doc.getStages().getFirst().getInstructions().getLast();
+                var cmd = (Docker.Cmd) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(cmd.getCommand()).isInstanceOf(Docker.ExecForm.class);
-                Docker.ExecForm execForm = (Docker.ExecForm) cmd.getCommand();
+                var execForm = (Docker.ExecForm) cmd.getCommand();
                 assertThat(execForm.getArguments()).hasSize(3);
             })
           )

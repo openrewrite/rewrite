@@ -21,6 +21,7 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.docker.DockerParsingException;
 import org.openrewrite.docker.internal.grammar.DockerLexer;
 import org.openrewrite.docker.internal.grammar.DockerParser;
 import org.openrewrite.docker.internal.grammar.DockerParserBaseVisitor;
@@ -1114,7 +1115,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         skip(ctx.HEALTHCHECK().getSymbol());
 
         List<Docker.Flag> flags = null;
-        Docker.Cmd cmd = null;
+        Docker.@Nullable Cmd cmd;
 
         // Parse flags if present
         if (ctx.flags() != null) {
@@ -1131,13 +1132,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             // HEALTHCHECK NONE - create a dummy CMD to hold the prefix/whitespace
             Space nonePrefix = prefix(cmdKeyword.getSymbol());
             skip(cmdKeyword.getSymbol());
-            cmd = new Docker.Cmd(
-                    randomId(),
-                    nonePrefix,
-                    Markers.EMPTY,
-                    "",
-                    new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, emptyList())
-            );
+            cmd = null;
         } else {
             // HEALTHCHECK CMD ... - parse the CMD form
             Space cmdPrefix = prefix(cmdKeyword.getSymbol());
@@ -1150,7 +1145,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 form = visitShellFormContext(cmdCtx.shellForm());
             } else {
                 // Should not happen, but provide a fallback
-                form = new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, emptyList());
+                form = new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY,
+                        new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null));
             }
 
             cmd = new Docker.Cmd(
@@ -1196,7 +1192,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             return visitHeredocContext(ctx.heredoc());
         } else {
             // Fallback to empty shell form
-            return new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, emptyList());
+            return new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null));
         }
     }
 
@@ -1206,7 +1202,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         } else if (ctx.shellForm() != null) {
             return visitShellFormContext(ctx.shellForm());
         } else {
-            return new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, emptyList());
+            return new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null));
         }
     }
 
@@ -1216,7 +1212,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         } else if (ctx.shellForm() != null) {
             return visitShellFormContext(ctx.shellForm());
         } else {
-            return new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, emptyList());
+            return new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null));
         }
     }
 
@@ -1329,7 +1325,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     randomId(),
                     prefix,
                     Markers.EMPTY,
-                    singletonList(literal)
+                    literal
             );
         });
     }

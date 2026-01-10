@@ -53,7 +53,7 @@ class EntrypointTest implements RewriteTest {
                 Docker.Entrypoint entrypoint = (Docker.Entrypoint) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(entrypoint.getCommand()).isInstanceOf(Docker.ShellForm.class);
                 Docker.ShellForm shellForm = (Docker.ShellForm) entrypoint.getCommand();
-                assertThat(shellForm.getArguments()).hasSize(1);
+                assertThat(shellForm.getArgument()).isNotNull();
             })
           )
         );

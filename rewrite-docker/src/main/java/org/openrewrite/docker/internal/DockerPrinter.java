@@ -332,11 +332,7 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
         beforeSyntax(healthcheck, p);
         p.append(healthcheck.getKeyword());
         if (healthcheck.isNone()) {
-            // Need to print the space and NONE keyword
-            if (healthcheck.getCmd() != null) {
-                visitSpace(healthcheck.getCmd().getPrefix(), p);
-            }
-            p.append("NONE");
+            p.append(" NONE");
         } else {
             if (healthcheck.getFlags() != null) {
                 for (Docker.Flag flag : healthcheck.getFlags()) {
@@ -363,9 +359,7 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
     @Override
     public Docker visitShellForm(Docker.ShellForm shellForm, PrintOutputCapture<P> p) {
         beforeSyntax(shellForm, p);
-        for (Docker.Literal literal : shellForm.getArguments()) {
-            visit(literal, p);
-        }
+        visit(shellForm.getArgument(), p);
         afterSyntax(shellForm, p);
         return shellForm;
     }
