@@ -33,12 +33,13 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     // Override visit() to skip cursor handling for performance
     override visit<R extends J>(tree: Tree | undefined, p: RpcSendQueue, _parent?: Cursor): R | undefined {
         if (!tree) return undefined;
-        let result = this.preVisit(tree as JS, p);
-        if (!result) return undefined;
-        if (isJavaScript(result)) {
+        // Only call preVisit for JavaScript elements - Java elements are handled by the delegate
+        if (isJavaScript(tree)) {
+            let result = this.preVisit(tree as JS, p);
+            if (!result) return undefined;
             return this.accept(result, p) as R | undefined;
         }
-        return this.delegate.visit(result, p) as R | undefined;
+        return this.delegate.visit(tree, p) as R | undefined;
     }
 
     override preVisit(j: JS, q: RpcSendQueue): J | undefined {
@@ -593,17 +594,15 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public override visit<R extends J>(tree: Tree | undefined, q: RpcReceiveQueue, _parent?: Cursor): R | undefined {
         if (!tree) return undefined;
 
-        const j = tree as J;
-        let result = this.preVisit(j as JS, q);
-        if (result === undefined) return undefined;
-
-        // If it's a JavaScript node, use accept() for dispatch
-        if (isJavaScript(result)) {
+        // Only call preVisit for JavaScript elements - Java elements are handled by the delegate
+        if (isJavaScript(tree)) {
+            let result = this.preVisit(tree as JS, q);
+            if (result === undefined) return undefined;
             return this.accept(result as JS, q) as R | undefined;
         }
 
-        // Otherwise delegate to Java receiver
-        return this._delegate.visit(result, q) as R | undefined;
+        // Otherwise delegate to Java receiver (which handles its own preVisit)
+        return this._delegate.visit(tree, q) as R | undefined;
     }
 
     protected preVisit(j: JS, q: RpcReceiveQueue): J | undefined {
