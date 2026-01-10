@@ -725,6 +725,11 @@ public interface Docker extends Tree {
 
         List<Argument> arguments;
 
+        /**
+         * Whitespace before the closing bracket (to preserve " ]" vs "]")
+         */
+        Space closingBracketPrefix;
+
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitExecForm(this, p);

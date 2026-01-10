@@ -17,7 +17,10 @@ package org.openrewrite.docker;
 
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.docker.tree.Docker;
+import org.openrewrite.tree.ParseError;
+import org.openrewrite.ParseExceptionResult;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -53,20 +56,29 @@ public class LocalDockerParser {
                 .map(Parser.Input::fromFile)
                 .collect(Collectors.toList());
 
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+        List<String> errors = new ArrayList<>();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
+            errors.add(t.getMessage());
+        });
 
         List<Docker.File> parsedFiles = new ArrayList<>();
         Map<Path, List<String>> baseImagesByFile = new LinkedHashMap<>();
+        Map<Path, String> failedFiles = new LinkedHashMap<>();
 
         parser.parseInputs(inputs, dir, ctx).forEach(sourceFile -> {
-            if (sourceFile instanceof Docker.File) {
-                Docker.File dockerFile = (Docker.File) sourceFile;
+            if (sourceFile instanceof Docker.File dockerFile) {
                 parsedFiles.add(dockerFile);
                 baseImagesByFile.put(dockerFile.getSourcePath(), extractBaseImages(dockerFile));
+            } else if (sourceFile instanceof ParseError parseError) {
+                String errorMsg = parseError.getMarkers()
+                        .findFirst(ParseExceptionResult.class)
+                        .map(ex -> ex.getExceptionType() + ": " + ex.getMessage())
+                        .orElse("Unknown error");
+                failedFiles.put(parseError.getSourcePath(), errorMsg);
             }
         });
 
-        printSummary(parsedFiles, baseImagesByFile);
+        printSummary(parsedFiles, baseImagesByFile, failedFiles);
     }
 
     private static List<Path> findDockerFiles(Path dir, DockerParser parser) {
@@ -122,13 +134,39 @@ public class LocalDockerParser {
         return sb.toString();
     }
 
-    private static void printSummary(List<Docker.File> parsedFiles, Map<Path, List<String>> baseImagesByFile) {
+    private static void printSummary(List<Docker.File> parsedFiles, Map<Path, List<String>> baseImagesByFile,
+                                      Map<Path, String> failedFiles) {
         System.out.println("=".repeat(60));
         System.out.println("Docker File Parsing Summary");
         System.out.println("=".repeat(60));
         System.out.println();
-        System.out.println("Files parsed: " + parsedFiles.size());
+        System.out.println("Files parsed successfully: " + parsedFiles.size());
+        System.out.println("Files failed to parse: " + failedFiles.size());
         System.out.println();
+
+        if (!failedFiles.isEmpty()) {
+            System.out.println("FAILED FILES:");
+            System.out.println("-".repeat(60));
+
+            // Group failures by error message
+            Map<String, List<Path>> errorGroups = new LinkedHashMap<>();
+            for (Map.Entry<Path, String> entry : failedFiles.entrySet()) {
+                errorGroups.computeIfAbsent(entry.getValue(), k -> new ArrayList<>())
+                        .add(entry.getKey());
+            }
+
+            for (Map.Entry<String, List<Path>> group : errorGroups.entrySet()) {
+                System.out.println("  ERROR: " + group.getKey());
+                System.out.println("  Files affected (" + group.getValue().size() + "):");
+                for (Path path : group.getValue().stream().limit(10).toList()) {
+                    System.out.println("    - " + path);
+                }
+                if (group.getValue().size() > 10) {
+                    System.out.println("    ... and " + (group.getValue().size() - 10) + " more");
+                }
+                System.out.println();
+            }
+        }
 
         System.out.println("Files and Base Images:");
         System.out.println("-".repeat(60));

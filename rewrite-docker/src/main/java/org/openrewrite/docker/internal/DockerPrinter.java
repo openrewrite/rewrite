@@ -381,6 +381,7 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
         for (Docker.Argument arg : execForm.getArguments()) {
             visit(arg, p);
         }
+        visitSpace(execForm.getClosingBracketPrefix(), p);
         p.append("]");
         afterSyntax(execForm, p);
         return execForm;

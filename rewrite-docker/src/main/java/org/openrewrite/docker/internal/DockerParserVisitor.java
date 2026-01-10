@@ -1131,9 +1131,11 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 }
             }
 
+            // Capture whitespace before closing bracket to preserve " ]" vs "]"
+            Space closingBracketPrefix = prefix(jsonArray.JSON_RBRACKET().getSymbol());
             skip(jsonArray.JSON_RBRACKET().getSymbol());
 
-            return new Docker.ExecForm(randomId(), prefix, Markers.EMPTY, args);
+            return new Docker.ExecForm(randomId(), prefix, Markers.EMPTY, args, closingBracketPrefix);
         });
     }
 
