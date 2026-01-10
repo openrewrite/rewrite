@@ -17,25 +17,34 @@ package org.openrewrite.docker;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.junit.jupiter.api.io.CleanupMode;
-import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.SourceFile;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class LocalDockerParserTest {
 
-    private static final String DOCKER_IMAGES_DIR = "/home/tim/Documents/workspace/docker-images/";
+    static final Path DOCKER_FILES = Path.of("/home/tim/Documents/workspace/docker-images/");
 
     static boolean dockerImagesDirExists() {
-        return Files.isDirectory(Path.of(DOCKER_IMAGES_DIR));
+        return Files.isDirectory(DOCKER_FILES);
     }
 
     @Test
     @EnabledIf("dockerImagesDirExists")
-    void parseDockerImagesDirectory(@TempDir(cleanup = CleanupMode.NEVER) Path tempDir) throws Exception {
-        LocalDockerParser.main(
-          DOCKER_IMAGES_DIR,
-          tempDir.resolve("docker-parser-output.txt").toString());
+    void parseDockerImagesDirectory() {
+        var parseResult = LocalDockerParser.parse(DOCKER_FILES);
+
+        List<SourceFile> parsedFiles = parseResult.parsedFiles();
+        Map<Path, String> parsedErrors = parseResult.parsedErrors();
+        System.out.println("Files parsed successfully: " + parsedFiles.size());
+        System.out.println("Files failed to parse: " + parsedErrors.size());
+
+        assertThat(parsedFiles).hasSizeGreaterThan(1500);
+        assertThat(parsedErrors).hasSizeLessThan(50);
     }
 }

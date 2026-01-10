@@ -50,12 +50,18 @@ public class LocalDockerParser {
             System.exit(1);
         }
 
+        ParseResult result = parse(dir);
+        printSummary(outputFile, result.parsedFiles(), result.parsedErrors());
+        System.out.println("Output written to: " + outputFile);
+    }
+
+    static ParseResult parse(Path dir) {
         DockerParser parser = DockerParser.builder().build();
 
         List<Path> dockerFiles = findDockerFiles(dir, parser);
         if (dockerFiles.isEmpty()) {
             System.err.println("No Dockerfiles or Containerfiles found in " + dir);
-            return;
+            return new ParseResult(List.of(), Map.of());
         }
 
         List<Parser.Input> inputs = dockerFiles.stream()
@@ -87,9 +93,12 @@ public class LocalDockerParser {
                 parsedErrors.put(dockerEx.getPath(), dockerEx.getMessage());
             }
         }
+        return new ParseResult(parsedFiles, parsedErrors);
+    }
 
-        printSummary(outputFile, parsedFiles, parsedErrors);
-        System.out.println("Output written to: " + outputFile);
+    record ParseResult(
+      List<SourceFile> parsedFiles,
+      Map<Path, String> parsedErrors) {
     }
 
     private static List<Path> findDockerFiles(Path dir, DockerParser parser) {
@@ -104,7 +113,7 @@ public class LocalDockerParser {
         }
     }
 
-    private static void printSummary(Path outputFile, List<SourceFile> parsedFiles, Map<Path, String> parsedErrors) throws Exception{
+    private static void printSummary(Path outputFile, List<SourceFile> parsedFiles, Map<Path, String> parsedErrors) throws Exception {
         try (PrintStream out = new PrintStream(new FileOutputStream(outputFile.toFile()))) {
             out.println("Files parsed successfully: " + parsedFiles.size());
             out.println("Files failed to parse: " + parsedErrors.size());
