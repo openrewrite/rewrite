@@ -33,8 +33,8 @@ class CmdTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.Cmd cmd = (Docker.Cmd) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(cmd.getCommandLine().getForm()).isInstanceOf(Docker.ShellForm.class);
-                Docker.ShellForm shellForm = (Docker.ShellForm) cmd.getCommandLine().getForm();
+                assertThat(cmd.getCommand()).isInstanceOf(Docker.ShellForm.class);
+                Docker.ShellForm shellForm = (Docker.ShellForm) cmd.getCommand();
                 assertThat(shellForm.getArguments()).hasSize(1);
             })
           )
@@ -51,8 +51,8 @@ class CmdTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.Cmd cmd = (Docker.Cmd) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(cmd.getCommandLine().getForm()).isInstanceOf(Docker.ExecForm.class);
-                Docker.ExecForm execForm = (Docker.ExecForm) cmd.getCommandLine().getForm();
+                assertThat(cmd.getCommand()).isInstanceOf(Docker.ExecForm.class);
+                Docker.ExecForm execForm = (Docker.ExecForm) cmd.getCommand();
                 assertThat(execForm.getArguments()).hasSize(3);
             })
           )

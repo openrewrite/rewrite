@@ -33,8 +33,8 @@ class RunTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(run.getCommandLine().getForm()).isInstanceOf(Docker.ShellForm.class);
-                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommandLine().getForm();
+                assertThat(run.getCommand()).isInstanceOf(Docker.ShellForm.class);
+                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
                 assertThat(shellForm.getArguments())
                   .singleElement()
                   .extracting(Docker.Literal::getText)
@@ -54,8 +54,8 @@ class RunTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(run.getCommandLine().getForm()).isInstanceOf(Docker.ExecForm.class);
-                Docker.ExecForm execForm = (Docker.ExecForm) run.getCommandLine().getForm();
+                assertThat(run.getCommand()).isInstanceOf(Docker.ExecForm.class);
+                Docker.ExecForm execForm = (Docker.ExecForm) run.getCommand();
                 assertThat(execForm.getArguments()).hasSize(2)
                   .satisfiesExactly(
                     arg -> assertThat(arg.getText()).isEqualTo("apt-get"),
@@ -77,8 +77,8 @@ class RunTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Run run = (Docker.Run) doc.getStages().getLast().getInstructions().getFirst();
                 assertThat(run.getFlags()).isNull();
-                assertThat(run.getCommandLine().getForm()).isInstanceOf(Docker.ShellForm.class);
-                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommandLine().getForm();
+                assertThat(run.getCommand()).isInstanceOf(Docker.ShellForm.class);
+                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
                 assertThat(shellForm.getArguments())
                   .singleElement()
                   .extracting(Docker.Literal::getText)
@@ -117,7 +117,7 @@ class RunTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(file -> {
                 var run = (Docker.Run) file.getStages().getFirst().getInstructions().getLast();
-                var form = (Docker.CommandForm.ShellForm) run.getCommandLine().getForm();
+                var form = (Docker.CommandForm.ShellForm) run.getCommand();
                 assertThat(form.getArguments())
                   .singleElement()
                   .extracting(Docker.Literal::getText)

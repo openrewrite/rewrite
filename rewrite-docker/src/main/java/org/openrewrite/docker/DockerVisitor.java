@@ -77,7 +77,7 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         if (r.getFlags() != null) {
             r = r.withFlags(ListUtils.map(r.getFlags(), flag -> (Docker.Flag) visit(flag, p)));
         }
-        return r.withCommandLine((Docker.CommandLine) visit(r.getCommandLine(), p));
+        return r.withCommand((Docker.CommandForm) visit(r.getCommand(), p));
     }
 
     public Docker visitAdd(Docker.Add add, P p) {
@@ -161,14 +161,14 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         Docker.Cmd c = cmd;
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
-        return c.withCommandLine((Docker.CommandLine) visit(c.getCommandLine(), p));
+        return c.withCommand((Docker.CommandForm) visit(c.getCommand(), p));
     }
 
     public Docker visitEntrypoint(Docker.Entrypoint entrypoint, P p) {
         Docker.Entrypoint e = entrypoint;
         e = e.withPrefix(visitSpace(e.getPrefix(), p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
-        return e.withCommandLine((Docker.CommandLine) visit(e.getCommandLine(), p));
+        return e.withCommand((Docker.CommandForm) visit(e.getCommand(), p));
     }
 
     public Docker visitExpose(Docker.Expose expose, P p) {
@@ -248,13 +248,6 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
         return m.withText((Docker.Argument) visit(m.getText(), p));
-    }
-
-    public Docker visitCommandLine(Docker.CommandLine commandLine, P p) {
-        Docker.CommandLine cl = commandLine;
-        cl = cl.withPrefix(visitSpace(cl.getPrefix(), p));
-        cl = cl.withMarkers(visitMarkers(cl.getMarkers(), p));
-        return cl.withForm((Docker.CommandForm) visit(cl.getForm(), p));
     }
 
     public Docker visitShellForm(Docker.ShellForm shellForm, P p) {

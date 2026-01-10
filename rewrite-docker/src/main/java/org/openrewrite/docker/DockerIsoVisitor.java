@@ -141,11 +141,6 @@ public class DockerIsoVisitor<P> extends DockerVisitor<P> {
     }
 
     @Override
-    public Docker.CommandLine visitCommandLine(Docker.CommandLine commandLine, P p) {
-        return (Docker.CommandLine) super.visitCommandLine(commandLine, p);
-    }
-
-    @Override
     public Docker.ShellForm visitShellForm(Docker.ShellForm shellForm, P p) {
         return (Docker.ShellForm) super.visitShellForm(shellForm, p);
     }

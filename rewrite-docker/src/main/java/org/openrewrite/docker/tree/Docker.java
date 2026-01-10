@@ -216,7 +216,7 @@ public interface Docker extends Tree {
         @Nullable
         List<Flag> flags;
 
-        CommandLine commandLine;
+        CommandForm command;
 
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
@@ -423,7 +423,7 @@ public interface Docker extends Tree {
 
         String keyword;
 
-        CommandLine commandLine;
+        CommandForm command;
 
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
@@ -446,7 +446,7 @@ public interface Docker extends Tree {
 
         String keyword;
 
-        CommandLine commandLine;
+        CommandForm command;
 
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
@@ -739,30 +739,6 @@ public interface Docker extends Tree {
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitMaintainer(this, p);
-        }
-    }
-
-    /**
-     * Command line that can be in shell or exec form
-     */
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class CommandLine implements Docker {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-
-        /**
-         * Either ShellForm or ExecForm
-         */
-        CommandForm form;
-
-        @Override
-        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
-            return v.visitCommandLine(this, p);
         }
     }
 

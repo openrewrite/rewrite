@@ -104,7 +104,7 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
                 visit(flag, p);
             }
         }
-        visit(run.getCommandLine(), p);
+        visit(run.getCommand(), p);
         afterSyntax(run, p);
         return run;
     }
@@ -204,7 +204,7 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
     public Docker visitCmd(Docker.Cmd cmd, PrintOutputCapture<P> p) {
         beforeSyntax(cmd, p);
         p.append(cmd.getKeyword());
-        visit(cmd.getCommandLine(), p);
+        visit(cmd.getCommand(), p);
         afterSyntax(cmd, p);
         return cmd;
     }
@@ -213,7 +213,7 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
     public Docker visitEntrypoint(Docker.Entrypoint entrypoint, PrintOutputCapture<P> p) {
         beforeSyntax(entrypoint, p);
         p.append(entrypoint.getKeyword());
-        visit(entrypoint.getCommandLine(), p);
+        visit(entrypoint.getCommand(), p);
         afterSyntax(entrypoint, p);
         return entrypoint;
     }
@@ -358,14 +358,6 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
         visit(maintainer.getText(), p);
         afterSyntax(maintainer, p);
         return maintainer;
-    }
-
-    @Override
-    public Docker visitCommandLine(Docker.CommandLine commandLine, PrintOutputCapture<P> p) {
-        beforeSyntax(commandLine, p);
-        visit(commandLine.getForm(), p);
-        afterSyntax(commandLine, p);
-        return commandLine;
     }
 
     @Override

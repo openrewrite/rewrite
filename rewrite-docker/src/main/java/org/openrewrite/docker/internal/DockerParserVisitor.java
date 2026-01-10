@@ -391,14 +391,14 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         skip(ctx.RUN().getSymbol());
 
         List<Docker.Flag> flags = ctx.flags() != null ? convertFlags(ctx.flags()) : null;
-        Docker.CommandLine commandLine = visitCommandLineForRun(ctx);
+        Docker.CommandForm command = visitCommandFormForRun(ctx);
 
         // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
-        return new Docker.Run(randomId(), prefix, Markers.EMPTY, runKeyword, flags, commandLine);
+        return new Docker.Run(randomId(), prefix, Markers.EMPTY, runKeyword, flags, command);
     }
 
     @Override
@@ -676,14 +676,14 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         String cmdKeyword = ctx.CMD().getText();
         skip(ctx.CMD().getSymbol());
 
-        Docker.CommandLine commandLine = visitCommandLineForCmd(ctx);
+        Docker.CommandForm command = visitCommandFormForCmd(ctx);
 
         // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
-        return new Docker.Cmd(randomId(), prefix, Markers.EMPTY, cmdKeyword, commandLine);
+        return new Docker.Cmd(randomId(), prefix, Markers.EMPTY, cmdKeyword, command);
     }
 
     @Override
@@ -693,14 +693,14 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         String entrypointKeyword = ctx.ENTRYPOINT().getText();
         skip(ctx.ENTRYPOINT().getSymbol());
 
-        Docker.CommandLine commandLine = visitCommandLineForEntrypoint(ctx);
+        Docker.CommandForm command = visitCommandFormForEntrypoint(ctx);
 
         // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
-        return new Docker.Entrypoint(randomId(), prefix, Markers.EMPTY, entrypointKeyword, commandLine);
+        return new Docker.Entrypoint(randomId(), prefix, Markers.EMPTY, entrypointKeyword, command);
     }
 
     @Override
@@ -1136,12 +1136,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     nonePrefix,
                     Markers.EMPTY,
                     "",
-                    new Docker.CommandLine(
-                            randomId(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, emptyList())
-                    )
+                    new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, emptyList())
             );
         } else {
             // HEALTHCHECK CMD ... - parse the CMD form
@@ -1157,19 +1152,13 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 // Should not happen, but provide a fallback
                 form = new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, emptyList());
             }
-            Docker.CommandLine commandLine = new Docker.CommandLine(
-                    randomId(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    form
-            );
 
             cmd = new Docker.Cmd(
                     randomId(),
                     cmdPrefix,
                     Markers.EMPTY,
                     cmdKeywordText,
-                    commandLine
+                    form
             );
         }
 
@@ -1198,61 +1187,37 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return new Docker.Maintainer(randomId(), prefix, Markers.EMPTY, maintainerKeyword, text);
     }
 
-    private Docker.CommandLine visitCommandLineForRun(DockerParser.RunInstructionContext ctx) {
-        Docker.CommandForm form;
+    private Docker.CommandForm visitCommandFormForRun(DockerParser.RunInstructionContext ctx) {
         if (ctx.execForm() != null) {
-            form = visitExecFormContext(ctx.execForm());
+            return visitExecFormContext(ctx.execForm());
         } else if (ctx.shellForm() != null) {
-            form = visitShellFormContext(ctx.shellForm());
+            return visitShellFormContext(ctx.shellForm());
         } else if (ctx.heredoc() != null) {
-            form = visitHeredocContext(ctx.heredoc());
+            return visitHeredocContext(ctx.heredoc());
         } else {
             // Fallback to empty shell form
-            form = new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, emptyList());
+            return new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, emptyList());
         }
-
-        return new Docker.CommandLine(
-                randomId(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                form
-        );
     }
 
-    private Docker.CommandLine visitCommandLineForCmd(DockerParser.CmdInstructionContext ctx) {
-        Docker.CommandForm form;
+    private Docker.CommandForm visitCommandFormForCmd(DockerParser.CmdInstructionContext ctx) {
         if (ctx.execForm() != null) {
-            form = visitExecFormContext(ctx.execForm());
+            return visitExecFormContext(ctx.execForm());
         } else if (ctx.shellForm() != null) {
-            form = visitShellFormContext(ctx.shellForm());
+            return visitShellFormContext(ctx.shellForm());
         } else {
-            form = new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, emptyList());
+            return new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, emptyList());
         }
-
-        return new Docker.CommandLine(
-                randomId(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                form
-        );
     }
 
-    private Docker.CommandLine visitCommandLineForEntrypoint(DockerParser.EntrypointInstructionContext ctx) {
-        Docker.CommandForm form;
+    private Docker.CommandForm visitCommandFormForEntrypoint(DockerParser.EntrypointInstructionContext ctx) {
         if (ctx.execForm() != null) {
-            form = visitExecFormContext(ctx.execForm());
+            return visitExecFormContext(ctx.execForm());
         } else if (ctx.shellForm() != null) {
-            form = visitShellFormContext(ctx.shellForm());
+            return visitShellFormContext(ctx.shellForm());
         } else {
-            form = new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, emptyList());
+            return new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, emptyList());
         }
-
-        return new Docker.CommandLine(
-                randomId(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                form
-        );
     }
 
     private List<Docker.Flag> convertFlags(DockerParser.FlagsContext ctx) {

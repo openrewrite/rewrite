@@ -33,8 +33,8 @@ class EntrypointTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.Entrypoint entrypoint = (Docker.Entrypoint) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(entrypoint.getCommandLine().getForm()).isInstanceOf(Docker.ExecForm.class);
-                Docker.ExecForm execForm = (Docker.ExecForm) entrypoint.getCommandLine().getForm();
+                assertThat(entrypoint.getCommand()).isInstanceOf(Docker.ExecForm.class);
+                Docker.ExecForm execForm = (Docker.ExecForm) entrypoint.getCommand();
                 assertThat(execForm.getArguments()).hasSize(1);
             })
           )
@@ -51,8 +51,8 @@ class EntrypointTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.Entrypoint entrypoint = (Docker.Entrypoint) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(entrypoint.getCommandLine().getForm()).isInstanceOf(Docker.ShellForm.class);
-                Docker.ShellForm shellForm = (Docker.ShellForm) entrypoint.getCommandLine().getForm();
+                assertThat(entrypoint.getCommand()).isInstanceOf(Docker.ShellForm.class);
+                Docker.ShellForm shellForm = (Docker.ShellForm) entrypoint.getCommand();
                 assertThat(shellForm.getArguments()).hasSize(1);
             })
           )
