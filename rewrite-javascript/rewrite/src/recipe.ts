@@ -25,9 +25,10 @@ export type Minutes = number;
 
 /**
  * Union type for recipe visitors. Recipes can return either async or sync visitors.
- * Sync visitors provide better performance by avoiding Promise overhead.
+ * Use the `async` property to discriminate at runtime: TreeVisitor has `async: false`,
+ * AsyncTreeVisitor has `async: true`.
  */
-export type RecipeVisitor<T extends Tree> = TreeVisitor<T, ExecutionContext> | AsyncTreeVisitor<T, ExecutionContext>;
+export type RecipeVisitor<T extends Tree = any> = TreeVisitor<T, ExecutionContext> | AsyncTreeVisitor<T, ExecutionContext>;
 
 export abstract class Recipe {
     constructor(options?: {}) {
@@ -122,7 +123,7 @@ export abstract class Recipe {
      *
      * @returns A visitor that performs the recipe's transformation
      */
-    async editor(): Promise<RecipeVisitor<any>> {
+    async editor(): Promise<RecipeVisitor> {
         return noopVisitor()
     }
 
@@ -170,12 +171,12 @@ export abstract class ScanningRecipe<P> extends Recipe {
 
     abstract initialValue(ctx: ExecutionContext): P
 
-    async editor(): Promise<RecipeVisitor<any>> {
+    async editor(): Promise<RecipeVisitor> {
         const editorWithContext = (cursor: Cursor, ctx: ExecutionContext) =>
             this.editorWithData(this.accumulator(cursor, ctx));
 
         return new class extends AsyncTreeVisitor<any, ExecutionContext> {
-            private delegate?: RecipeVisitor<any>
+            private delegate?: RecipeVisitor
 
             async isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): Promise<boolean> {
                 const d = await this.delegateForCtx(ctx);
@@ -196,7 +197,7 @@ export abstract class ScanningRecipe<P> extends Recipe {
         }
     }
 
-    async editorWithData(_acc: P): Promise<RecipeVisitor<any>> {
+    async editorWithData(_acc: P): Promise<RecipeVisitor> {
         return noopVisitor();
     }
 
@@ -204,7 +205,7 @@ export abstract class ScanningRecipe<P> extends Recipe {
         return [];
     }
 
-    async scanner(_acc: P): Promise<RecipeVisitor<any>> {
+    async scanner(_acc: P): Promise<RecipeVisitor> {
         return noopVisitor();
     }
 }
