@@ -74,9 +74,9 @@ fragment ESCAPED_CHAR : '\\' .;
 // Double-quoted strings support escape sequences and line continuation (backslash or backtick)
 // Backtick followed by whitespace+newline is continuation; standalone backtick is regular char
 DOUBLE_QUOTED_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | ~["\\\r\n`] )* '"';
-// Single-quoted strings in shell are literal - no escape processing
-// Allow any character except single quote and newlines
-SINGLE_QUOTED_STRING : '\'' ~['\r\n]* '\'';
+// Single-quoted strings in shell are literal - no escape processing inside
+// But they DO support line continuation (backslash or backtick followed by newline)
+SINGLE_QUOTED_STRING : '\'' ( INLINE_CONTINUATION | ~['\r\n] )* '\'';
 
 // Inline line continuation (inside strings) - backtick or backslash followed by newline
 fragment INLINE_CONTINUATION : ('\\' | '`') [ \t]* [\r\n]+;

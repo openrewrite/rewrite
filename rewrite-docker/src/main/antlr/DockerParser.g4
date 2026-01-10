@@ -179,7 +179,9 @@ shellFormTextElement
     ;
 
 // Keywords that can safely appear in shell form text
-// These don't start new instructions when appearing mid-line
+// These are keywords that don't start new instructions when appearing mid-line
+// Note: Instruction-starting keywords (RUN, COPY, etc.) are NOT included because they
+// signal the end of shell form and start of a new instruction
 shellSafeKeyword
     : SHELL | USER | AS
     ;
@@ -292,7 +294,8 @@ envKey
     | envSafeKeyword  // Allow certain keywords as env keys (e.g., ENV SHELL /bin/bash)
     ;
 
-// Keywords that are safe to use as ENV variable names (not instruction-starting keywords)
+// Keywords that are safe to use as ENV variable names
+// Only non-instruction keywords - instruction keywords signal new instructions
 envSafeKeyword
     : SHELL | USER | AS
     ;
