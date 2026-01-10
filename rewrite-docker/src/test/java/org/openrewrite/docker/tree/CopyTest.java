@@ -83,4 +83,35 @@ class CopyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void copyWithLinkAndFromFlags() {
+        // Test COPY with both --link and --from flags (common pattern in multi-stage builds)
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              ENTRYPOINT [ "app.wasm" ]
+              COPY --link --from=build /app.wasm /app.wasm
+              """
+          )
+        );
+    }
+
+    @Test
+    void heredocWithBash() {
+        // Test heredoc with bash as command
+        // Note: EOT must not be indented - heredoc terminators must match exactly
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN <<EOT bash
+              set -ex
+              apt-get update
+              EOT
+              """
+          )
+        );
+    }
 }

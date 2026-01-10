@@ -35,8 +35,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public class DockerParser implements Parser {
-    private static final Pattern DOCKERFILE_PATTERN = Pattern.compile("(?i)(dockerfile|containerfile).*");
-
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
@@ -48,7 +46,7 @@ public class DockerParser implements Parser {
                 lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
                 org.openrewrite.docker.internal.grammar.DockerParser parser =
-                    new org.openrewrite.docker.internal.grammar.DockerParser(new CommonTokenStream(lexer));
+                        new org.openrewrite.docker.internal.grammar.DockerParser(new CommonTokenStream(lexer));
                 parser.removeErrorListeners();
                 parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
@@ -74,10 +72,9 @@ public class DockerParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        String fileName = path.getFileName().toString();
-        return DOCKERFILE_PATTERN.matcher(fileName).matches() ||
-               fileName.endsWith(".dockerfile") ||
-               fileName.endsWith(".containerfile");
+        String fileName = path.getFileName().toString().toLowerCase();
+        return fileName.startsWith("dockerfile") || fileName.startsWith("containerfile") ||
+                fileName.endsWith("dockerfile") || fileName.endsWith("containerfile");
     }
 
     @Override

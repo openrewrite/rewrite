@@ -10,6 +10,7 @@ lexer grammar DockerLexer;
 @lexer::members
 {
     private Stack<String> heredocIdentifier = new Stack<String>();
+    private boolean heredocIdentifierCaptured = false;
 }
 
 options {
@@ -46,7 +47,9 @@ MAINTAINER : 'MAINTAINER';
 AS         : 'AS';
 
 // Heredoc start - captures <<EOF or <<-EOF and switches to HEREDOC_PREAMBLE mode
-HEREDOC_START : '<<' '-'? -> pushMode(HEREDOC_PREAMBLE);
+HEREDOC_START : '<<' '-'? {
+    heredocIdentifierCaptured = false;  // Reset for new heredoc
+} -> pushMode(HEREDOC_PREAMBLE);
 
 // Line continuation - HIDDEN in main mode
 LINE_CONTINUATION : '\\' [ \t]* NEWLINE_CHAR -> channel(HIDDEN);
@@ -131,7 +134,11 @@ HP_COMMENT : '/*' .*? '*/'  -> channel(HIDDEN);
 HP_LINE_COMMENT : ('//' | '#') ~[\r\n]* '\r'? -> channel(HIDDEN);
 
 HPIdentifier : [A-Z_][A-Z0-9_]* {
-    heredocIdentifier.push(getText());
+    // Only push the first identifier (the heredoc marker), not subsequent text like interpreter names
+    if (!heredocIdentifierCaptured) {
+        heredocIdentifier.push(getText());
+        heredocIdentifierCaptured = true;
+    }
 } -> type(UNQUOTED_TEXT);
 
 // Any other text on the heredoc line (destination paths, etc.)
