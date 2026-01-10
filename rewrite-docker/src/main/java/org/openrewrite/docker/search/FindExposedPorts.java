@@ -105,8 +105,7 @@ public class FindExposedPorts extends Recipe {
                             sourceFile,
                             stageName,
                             portNumber,
-                            protocol,
-                            port.isRange()
+                            protocol
                     ));
                 }
 

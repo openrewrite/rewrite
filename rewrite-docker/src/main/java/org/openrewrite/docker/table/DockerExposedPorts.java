@@ -48,9 +48,5 @@ public class DockerExposedPorts extends DataTable<DockerExposedPorts.Row> {
                 description = "The protocol if specified (tcp or udp), null if not specified.")
         @Nullable
         String protocol;
-
-        @Column(displayName = "Is range",
-                description = "True if the port specification is a range (e.g., 8000-8100).")
-        boolean range;
     }
 }
