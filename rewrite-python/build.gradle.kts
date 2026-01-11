@@ -28,8 +28,81 @@ tasks.withType<Javadoc>().configureEach {
     exclude("**/Py.java")
 }
 
-// Python-specific build tasks will be added here
-// Similar to rewrite-javascript's npm tasks
+// Python-specific build tasks
+val pythonDir = projectDir.resolve("rewrite")
+val venvDir = pythonDir.resolve(".venv")
+val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+val pythonExe = if (isWindows) venvDir.resolve("Scripts/python.exe") else venvDir.resolve("bin/python")
+val pipExe = if (isWindows) venvDir.resolve("Scripts/pip.exe") else venvDir.resolve("bin/pip")
+
+// Find system Python
+fun findPython(): String {
+    val candidates = if (isWindows) {
+        listOf("python", "python3", "py")
+    } else {
+        listOf("python3", "python")
+    }
+    for (cmd in candidates) {
+        try {
+            val process = ProcessBuilder(cmd, "--version")
+                .redirectErrorStream(true)
+                .start()
+            if (process.waitFor() == 0) {
+                return cmd
+            }
+        } catch (e: Exception) {
+            // Command not found, try next
+        }
+    }
+    throw GradleException("Python 3 not found. Please install Python 3.10+ and ensure it's on your PATH.")
+}
+
+val pythonSetupVenv by tasks.registering(Exec::class) {
+    group = "python"
+    description = "Create Python virtual environment"
+
+    onlyIf { !venvDir.exists() }
+
+    workingDir = pythonDir
+    commandLine(findPython(), "-m", "venv", ".venv")
+
+    doFirst {
+        logger.lifecycle("Creating Python virtual environment in ${venvDir}")
+    }
+}
+
+val pythonUpgradePip by tasks.registering(Exec::class) {
+    group = "python"
+    description = "Upgrade pip in virtual environment"
+
+    dependsOn(pythonSetupVenv)
+    onlyIf { venvDir.exists() }
+
+    workingDir = pythonDir
+    commandLine(pythonExe.absolutePath, "-m", "pip", "install", "--upgrade", "pip")
+
+    doFirst {
+        logger.lifecycle("Upgrading pip in virtual environment")
+    }
+}
+
+val pythonInstall by tasks.registering(Exec::class) {
+    group = "python"
+    description = "Install Python package in development mode"
+
+    dependsOn(pythonUpgradePip)
+
+    workingDir = pythonDir
+    commandLine(pipExe.absolutePath, "install", "-e", ".")
+
+    // Re-run if pyproject.toml changes
+    inputs.file(pythonDir.resolve("pyproject.toml"))
+    outputs.file(venvDir.resolve("pyvenv.cfg"))
+
+    doFirst {
+        logger.lifecycle("Installing Python package with pip")
+    }
+}
 
 testing {
     suites {
@@ -52,6 +125,9 @@ testing {
 // The Python RPC server uses ThreadLocal, but test state can interfere
 // when multiple tests run rapidly on the same thread
 tasks.withType<Test> {
+    // Ensure Python venv is set up before running tests
+    dependsOn(pythonInstall)
+
     maxParallelForks = 1
     // Add timeout to identify hanging tests - tests that hang will fail with timeout
     systemProperty("junit.jupiter.execution.timeout.default", "30s")
