@@ -1115,132 +1115,35 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         skip(ctx.HEALTHCHECK().getSymbol());
 
         List<Docker.Flag> flags = null;
-        Docker.@Nullable Cmd cmd;
+        Docker.@Nullable Cmd cmd = null;
 
-        // Parse flags if present
-        if (ctx.flags() != null) {
-            flags = convertFlags(ctx.flags());
-        }
-
-        // Parse healthcheck command (CMD or NONE)
-        // When flags are present, the grammar's flagValue: flagValueToken+ greedily consumes
-        // tokens including CMD and the shell form text. In this case, we need to extract
-        // the command directly from the source text after the cursor position.
-        DockerParser.HealthcheckCommandContext cmdCtx = ctx.healthcheckCommand();
-
-        if (flags != null && !flags.isEmpty()) {
-            // Flags were present - extract remaining text from source
-            int instructionEndCodePoint = ctx.getStop().getStopIndex() + 1;
-            int instructionEndChar = source.offsetByCodePoints(0, instructionEndCodePoint);
-            String remainingText = source.substring(cursor, instructionEndChar);
-
-            // Strip leading whitespace but preserve it for prefix
-            // Also handle line continuation: \ followed by newline
-            int leadingWhitespaceLen = 0;
-            while (leadingWhitespaceLen < remainingText.length()) {
-                char c = remainingText.charAt(leadingWhitespaceLen);
-                if (c == '\\' && leadingWhitespaceLen + 1 < remainingText.length() &&
-                    (remainingText.charAt(leadingWhitespaceLen + 1) == '\n' ||
-                     remainingText.charAt(leadingWhitespaceLen + 1) == '\r')) {
-                    // Line continuation - skip backslash and newline(s)
-                    leadingWhitespaceLen++; // skip backslash
-                    if (remainingText.charAt(leadingWhitespaceLen) == '\r') {
-                        leadingWhitespaceLen++; // skip \r
-                    }
-                    if (leadingWhitespaceLen < remainingText.length() && remainingText.charAt(leadingWhitespaceLen) == '\n') {
-                        leadingWhitespaceLen++; // skip \n
-                    }
-                } else if (Character.isWhitespace(c)) {
-                    leadingWhitespaceLen++;
-                } else {
-                    break;
-                }
-            }
-            String leadingWhitespace = remainingText.substring(0, leadingWhitespaceLen);
-            remainingText = remainingText.substring(leadingWhitespaceLen);
-
-            if (remainingText.isEmpty() || "NONE".equalsIgnoreCase(remainingText.trim())) {
-                cmd = null;
-            } else if (remainingText.toUpperCase().startsWith("CMD")) {
-                // Extract CMD keyword
-                Space cmdPrefix = Space.format(leadingWhitespace);
-                String cmdKeywordText = remainingText.substring(0, 3);
-                String afterCmd = remainingText.substring(3);
-
-                // Check if it's exec form (starts with [ after CMD and optional whitespace)
-                String afterCmdTrimmed = afterCmd.trim();
-                if (afterCmdTrimmed.startsWith("[")) {
-                    // Exec form: CMD ["cmd", "arg"]
-                    Docker.ExecForm form = parseExecFormFromText(afterCmd);
-                    cmd = new Docker.Cmd(randomId(), cmdPrefix, Markers.EMPTY, cmdKeywordText, form);
-                } else {
-                    // Shell form: CMD <command>
-                    // Strip leading whitespace from shell form text but capture it for prefix
-                    int shellFormWhitespaceLen = 0;
-                    while (shellFormWhitespaceLen < afterCmd.length() &&
-                           Character.isWhitespace(afterCmd.charAt(shellFormWhitespaceLen))) {
-                        shellFormWhitespaceLen++;
-                    }
-                    String shellFormPrefix = afterCmd.substring(0, shellFormWhitespaceLen);
-                    String shellFormText = afterCmd.substring(shellFormWhitespaceLen);
-
-                    Docker.ShellForm form = new Docker.ShellForm(
-                            randomId(),
-                            Space.format(shellFormPrefix),
-                            Markers.EMPTY,
-                            new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, shellFormText, null)
-                    );
-
-                    cmd = new Docker.Cmd(
-                            randomId(),
-                            cmdPrefix,
-                            Markers.EMPTY,
-                            cmdKeywordText,
-                            form
-                    );
-                }
-            } else {
-                // Unexpected format, try to parse as shell form
-                Space cmdPrefix = Space.format(leadingWhitespace);
-                cmd = new Docker.Cmd(randomId(), cmdPrefix, Markers.EMPTY, "CMD",
-                        new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY,
-                                new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, remainingText, null)));
-            }
+        // Check if this is HEALTHCHECK NONE
+        if (ctx.NONE() != null) {
+            // HEALTHCHECK NONE - skip the NONE token, cmd stays null
+            skip(ctx.NONE().getSymbol());
         } else {
-            // No flags - use ANTLR context directly
-            TerminalNode cmdKeyword = cmdCtx.CMD() != null ? cmdCtx.CMD() : cmdCtx.UNQUOTED_TEXT();
-            String cmdKeywordText = cmdKeyword.getText();
-            boolean isNone = "NONE".equalsIgnoreCase(cmdKeywordText);
-
-            if (isNone) {
-                // HEALTHCHECK NONE
-                Space nonePrefix = prefix(cmdKeyword.getSymbol());
-                skip(cmdKeyword.getSymbol());
-                cmd = null;
-            } else {
-                // HEALTHCHECK CMD ... - parse the CMD form
-                Space cmdPrefix = prefix(cmdKeyword.getSymbol());
-                skip(cmdKeyword.getSymbol());
-
-                Docker.CommandForm form;
-                if (cmdCtx.execForm() != null) {
-                    form = visitExecFormContext(cmdCtx.execForm());
-                } else if (cmdCtx.shellForm() != null) {
-                    form = visitShellFormContext(cmdCtx.shellForm());
-                } else {
-                    // Should not happen, but provide a fallback
-                    form = new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY,
-                            new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null));
-                }
-
-                cmd = new Docker.Cmd(
-                        randomId(),
-                        cmdPrefix,
-                        Markers.EMPTY,
-                        cmdKeywordText,
-                        form
-                );
+            // HEALTHCHECK [options] CMD (execForm | shellForm)
+            if (ctx.healthcheckOptions() != null) {
+                flags = convertHealthcheckOptions(ctx.healthcheckOptions());
             }
+
+            // Parse CMD and its form
+            Space cmdPrefix = prefix(ctx.CMD().getSymbol());
+            String cmdKeywordText = ctx.CMD().getText();
+            skip(ctx.CMD().getSymbol());
+
+            Docker.CommandForm form;
+            if (ctx.execForm() != null) {
+                form = visitExecFormContext(ctx.execForm());
+            } else if (ctx.shellForm() != null) {
+                form = visitShellFormContext(ctx.shellForm());
+            } else {
+                // Should not happen, but provide a fallback
+                form = new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY,
+                        new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null));
+            }
+
+            cmd = new Docker.Cmd(randomId(), cmdPrefix, Markers.EMPTY, cmdKeywordText, form);
         }
 
         // Advance cursor to end of instruction
@@ -1249,6 +1152,55 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         }
 
         return new Docker.Healthcheck(randomId(), prefix, Markers.EMPTY, healthcheckKeyword, flags, cmd);
+    }
+
+    private List<Docker.Flag> convertHealthcheckOptions(DockerParser.HealthcheckOptionsContext ctx) {
+        List<Docker.Flag> flags = new ArrayList<>();
+        for (DockerParser.HealthcheckOptionContext optCtx : ctx.healthcheckOption()) {
+            Space flagPrefix = prefix(optCtx.getStart());
+            skip(optCtx.DASH_DASH().getSymbol());
+
+            String flagName = optCtx.flagName().getText();
+            advanceCursor(optCtx.flagName().getStop().getStopIndex() + 1);
+
+            skip(optCtx.EQUALS().getSymbol());
+
+            // Parse the single-token flag value
+            DockerParser.HealthcheckOptionValueContext valueCtx = optCtx.healthcheckOptionValue();
+            Docker.Argument flagValue = parseHealthcheckOptionValue(valueCtx);
+
+            flags.add(new Docker.Flag(randomId(), flagPrefix, Markers.EMPTY, flagName, flagValue));
+        }
+        return flags;
+    }
+
+    private Docker.Argument parseHealthcheckOptionValue(DockerParser.HealthcheckOptionValueContext ctx) {
+        Space argPrefix = prefix(ctx);
+        List<Docker.ArgumentContent> contents = new ArrayList<>();
+
+        TerminalNode terminal = (TerminalNode) ctx.getChild(0);
+        Token token = terminal.getSymbol();
+        String tokenText = token.getText();
+        Space elementPrefix = prefix(token);
+        skip(token);
+
+        Docker.ArgumentContent content;
+        if (ctx.DOUBLE_QUOTED_STRING() != null) {
+            String value = tokenText.substring(1, tokenText.length() - 1);
+            content = new Docker.Literal(randomId(), elementPrefix, Markers.EMPTY, value, Docker.Literal.QuoteStyle.DOUBLE);
+        } else if (ctx.SINGLE_QUOTED_STRING() != null) {
+            String value = tokenText.substring(1, tokenText.length() - 1);
+            content = new Docker.Literal(randomId(), elementPrefix, Markers.EMPTY, value, Docker.Literal.QuoteStyle.SINGLE);
+        } else if (ctx.ENV_VAR() != null) {
+            boolean braced = tokenText.startsWith("${");
+            String varName = braced ? tokenText.substring(2, tokenText.length() - 1) : tokenText.substring(1);
+            content = new Docker.EnvironmentVariable(randomId(), elementPrefix, Markers.EMPTY, varName, braced);
+        } else {
+            content = new Docker.Literal(randomId(), elementPrefix, Markers.EMPTY, tokenText, null);
+        }
+        contents.add(content);
+
+        return new Docker.Argument(randomId(), argPrefix, Markers.EMPTY, contents);
     }
 
     @Override

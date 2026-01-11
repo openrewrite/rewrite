@@ -158,11 +158,23 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitHealthcheckInstruction(DockerParser.HealthcheckInstructionContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link DockerParser#healthcheckCommand}.
+	 * Visit a parse tree produced by {@link DockerParser#healthcheckOptions}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitHealthcheckCommand(DockerParser.HealthcheckCommandContext ctx);
+	T visitHealthcheckOptions(DockerParser.HealthcheckOptionsContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link DockerParser#healthcheckOption}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitHealthcheckOption(DockerParser.HealthcheckOptionContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link DockerParser#healthcheckOptionValue}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitHealthcheckOptionValue(DockerParser.HealthcheckOptionValueContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#shellInstruction}.
 	 * @param ctx the parse tree

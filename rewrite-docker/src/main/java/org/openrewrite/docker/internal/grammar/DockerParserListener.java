@@ -243,15 +243,35 @@ public interface DockerParserListener extends ParseTreeListener {
 	 */
 	void exitHealthcheckInstruction(DockerParser.HealthcheckInstructionContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link DockerParser#healthcheckCommand}.
+	 * Enter a parse tree produced by {@link DockerParser#healthcheckOptions}.
 	 * @param ctx the parse tree
 	 */
-	void enterHealthcheckCommand(DockerParser.HealthcheckCommandContext ctx);
+	void enterHealthcheckOptions(DockerParser.HealthcheckOptionsContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link DockerParser#healthcheckCommand}.
+	 * Exit a parse tree produced by {@link DockerParser#healthcheckOptions}.
 	 * @param ctx the parse tree
 	 */
-	void exitHealthcheckCommand(DockerParser.HealthcheckCommandContext ctx);
+	void exitHealthcheckOptions(DockerParser.HealthcheckOptionsContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerParser#healthcheckOption}.
+	 * @param ctx the parse tree
+	 */
+	void enterHealthcheckOption(DockerParser.HealthcheckOptionContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#healthcheckOption}.
+	 * @param ctx the parse tree
+	 */
+	void exitHealthcheckOption(DockerParser.HealthcheckOptionContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerParser#healthcheckOptionValue}.
+	 * @param ctx the parse tree
+	 */
+	void enterHealthcheckOptionValue(DockerParser.HealthcheckOptionValueContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#healthcheckOptionValue}.
+	 * @param ctx the parse tree
+	 */
+	void exitHealthcheckOptionValue(DockerParser.HealthcheckOptionValueContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerParser#shellInstruction}.
 	 * @param ctx the parse tree

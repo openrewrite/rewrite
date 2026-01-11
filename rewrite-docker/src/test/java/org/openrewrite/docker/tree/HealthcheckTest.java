@@ -141,6 +141,15 @@ class HealthcheckTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
+
+                Docker.Flag interval = healthcheck.getFlags().getFirst();
+                assertThat(interval.getName()).isEqualTo("interval");
+                assertThat(((Docker.Literal)interval.getValue().getContents().getFirst()).getText()).isEqualTo("5m");
+
+                Docker.Flag timeout = healthcheck.getFlags().getLast();
+                assertThat(timeout.getName()).isEqualTo("timeout");
+                assertThat(((Docker.Literal)timeout.getValue().getContents().getFirst()).getText()).isEqualTo("3s");
+
                 var command = (Docker.ShellForm) healthcheck.getCmd().getCommand();
                 assertThat(command.getArgument().getText()).isEqualTo("curl -f http://localhost/ || exit 1");
             })
@@ -158,6 +167,11 @@ class HealthcheckTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
+
+                Docker.Flag interval = healthcheck.getFlags().getFirst();
+                assertThat(interval.getName()).isEqualTo("interval");
+                assertThat(((Docker.Literal)interval.getValue().getContents().getFirst()).getText()).isEqualTo("30s");
+
                 assertThat(healthcheck.getCmd()).isNotNull();
                 assertThat(healthcheck.getCmd().getCommand()).isInstanceOf(Docker.ExecForm.class);
                 var execForm = (Docker.ExecForm) healthcheck.getCmd().getCommand();

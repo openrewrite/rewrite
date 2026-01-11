@@ -114,13 +114,25 @@ stopsignalInstruction
     ;
 
 healthcheckInstruction
-    : HEALTHCHECK flags? healthcheckCommand
+    : HEALTHCHECK NONE                                    // Disable health checks
+    | HEALTHCHECK healthcheckOptions? CMD ( execForm | shellForm )  // Health check command
     ;
 
-// HEALTHCHECK body: either NONE or CMD followed by command
-// CMD can be a token (when no flags) or UNQUOTED_TEXT (when 'cmd' appears after flags)
-healthcheckCommand
-    : ( CMD | UNQUOTED_TEXT ) ( execForm | shellForm )?
+// HEALTHCHECK-specific options (non-greedy flag values)
+healthcheckOptions
+    : healthcheckOption+
+    ;
+
+healthcheckOption
+    : DASH_DASH flagName EQUALS healthcheckOptionValue
+    ;
+
+// Non-greedy: single token only, so it won't consume CMD
+healthcheckOptionValue
+    : UNQUOTED_TEXT
+    | DOUBLE_QUOTED_STRING
+    | SINGLE_QUOTED_STRING
+    | ENV_VAR
     ;
 
 shellInstruction

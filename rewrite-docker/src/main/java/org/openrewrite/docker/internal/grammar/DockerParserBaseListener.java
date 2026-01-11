@@ -296,13 +296,37 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterHealthcheckCommand(DockerParser.HealthcheckCommandContext ctx) { }
+	@Override public void enterHealthcheckOptions(DockerParser.HealthcheckOptionsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitHealthcheckCommand(DockerParser.HealthcheckCommandContext ctx) { }
+	@Override public void exitHealthcheckOptions(DockerParser.HealthcheckOptionsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterHealthcheckOption(DockerParser.HealthcheckOptionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitHealthcheckOption(DockerParser.HealthcheckOptionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterHealthcheckOptionValue(DockerParser.HealthcheckOptionValueContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitHealthcheckOptionValue(DockerParser.HealthcheckOptionValueContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

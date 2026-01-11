@@ -13,6 +13,8 @@ lexer grammar DockerLexer;
     private boolean heredocIdentifierCaptured = false;
     // Track if we're at the start of a logical line (where instructions can appear)
     private boolean atLineStart = true;
+    // Track if we're after HEALTHCHECK to allow CMD/NONE to be recognized after flags
+    private boolean afterHealthcheck = false;
 }
 
 options {
@@ -31,7 +33,9 @@ COMMENT : '#' ~[\r\n]* -> channel(HIDDEN);
 // This eliminates ambiguity between instruction keywords and shell command text.
 FROM       : 'FROM'       { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 RUN        : 'RUN'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-CMD        : 'CMD'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+CMD        : 'CMD'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false; };
+// NONE is only recognized after HEALTHCHECK (when atLineStart is still true)
+NONE       : 'NONE'       { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false; };
 LABEL      : 'LABEL'      { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 EXPOSE     : 'EXPOSE'     { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 ENV        : 'ENV'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
@@ -45,8 +49,8 @@ ARG        : 'ARG'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStar
 // ONBUILD is special: it keeps atLineStart true so the following instruction is recognized
 ONBUILD    : 'ONBUILD'    { if (!atLineStart) setType(UNQUOTED_TEXT); /* atLineStart stays true */ };
 STOPSIGNAL : 'STOPSIGNAL' { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-// HEALTHCHECK is special: it keeps atLineStart true so the following CMD instruction is recognized
-HEALTHCHECK: 'HEALTHCHECK'{ if (!atLineStart) setType(UNQUOTED_TEXT); /* atLineStart stays true for CMD */ };
+// HEALTHCHECK is special: it keeps atLineStart true and sets afterHealthcheck so CMD/NONE are recognized after flags
+HEALTHCHECK: 'HEALTHCHECK'{ if (!atLineStart) setType(UNQUOTED_TEXT); else afterHealthcheck = true; /* atLineStart stays true */ };
 SHELL      : 'SHELL'      { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 MAINTAINER : 'MAINTAINER' { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 
@@ -69,8 +73,9 @@ RBRACKET : ']' { atLineStart = false; };
 COMMA    : ',' { atLineStart = false; };
 
 // Assignment and flags
-EQUALS     : '=' { atLineStart = false; };
-DASH_DASH  : '--' { atLineStart = false; };
+// When afterHealthcheck, preserve atLineStart so CMD/NONE can be recognized after flags
+EQUALS     : '=' { if (!afterHealthcheck) atLineStart = false; };
+DASH_DASH  : '--' { if (!afterHealthcheck) atLineStart = false; };
 
 // Unquoted text fragment (to be used in UNQUOTED_TEXT)
 // This matches text that doesn't start with -- or <<
@@ -81,10 +86,10 @@ fragment ESCAPED_CHAR : '\\' .;
 // String literals
 // Double-quoted strings support escape sequences and line continuation (backslash or backtick)
 // Backtick followed by whitespace+newline is continuation; standalone backtick is regular char
-DOUBLE_QUOTED_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | ~["\\\r\n`] )* '"' { atLineStart = false; };
+DOUBLE_QUOTED_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | ~["\\\r\n`] )* '"' { if (!afterHealthcheck) atLineStart = false; };
 // Single-quoted strings in shell are literal - no escape processing inside
 // But they DO support line continuation (backslash or backtick followed by newline)
-SINGLE_QUOTED_STRING : '\'' ( INLINE_CONTINUATION | ~['\r\n] )* '\'' { atLineStart = false; };
+SINGLE_QUOTED_STRING : '\'' ( INLINE_CONTINUATION | ~['\r\n] )* '\'' { if (!afterHealthcheck) atLineStart = false; };
 
 // Inline line continuation (inside strings) - backtick or backslash followed by newline
 fragment INLINE_CONTINUATION : ('\\' | '`') [ \t]* [\r\n]+;
@@ -123,7 +128,7 @@ UNQUOTED_TEXT
     | '<' ~[< \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Single < followed by non-<
     | '<'  // Just a < by itself
     | ESCAPED_CHAR ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Start with escaped char (e.g., \; in find -exec)
-    ) { atLineStart = false; }
+    ) { if (!afterHealthcheck) atLineStart = false; }
     ;
 
 // Whitespace - HIDDEN in main mode
@@ -131,8 +136,8 @@ WS : WS_CHAR+ -> channel(HIDDEN);
 
 fragment WS_CHAR : [ \t];
 
-// Newlines - HIDDEN in main mode, but set atLineStart for next token
-NEWLINE : NEWLINE_CHAR+ { atLineStart = true; } -> channel(HIDDEN);
+// Newlines - HIDDEN in main mode, but set atLineStart for next token and clear afterHealthcheck
+NEWLINE : NEWLINE_CHAR+ { atLineStart = true; afterHealthcheck = false; } -> channel(HIDDEN);
 
 fragment NEWLINE_CHAR : [\r\n];
 
