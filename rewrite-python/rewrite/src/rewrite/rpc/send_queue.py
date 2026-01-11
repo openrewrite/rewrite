@@ -28,9 +28,17 @@ ADDED_LIST_ITEM = -1
 T = TypeVar('T')
 
 
-def to_java_type_name(py_type: type) -> str:
-    """Convert Python type name to Java type name."""
+def to_java_type_name(py_type: type) -> Optional[str]:
+    """Convert Python type name to Java type name.
+
+    Returns None for Python built-in types that don't have Java equivalents.
+    """
     module = py_type.__module__
+
+    # Skip Python built-in types - they don't have Java equivalents
+    if module == 'builtins':
+        return None
+
     # Use __qualname__ to get full nested class path (e.g., "If.Else" instead of just "Else")
     qualname = py_type.__qualname__
     # Convert dots to $ for Java nested class naming (If.Else -> If$Else)

@@ -341,14 +341,9 @@ def handle_get_languages(params: dict) -> List[str]:
 def handle_print(params: dict) -> str:
     """Handle a Print RPC request.
 
-    NOTE: We use the local cached object instead of fetching from Java to avoid
-    a bidirectional RPC deadlock. Java is waiting for our Print response, so if
-    we send a GetObject request back to Java, we'll deadlock:
-    - Java blocked waiting for Print response
-    - Python blocked waiting for GetObject response
-
-    For tests that just parse and print (no modifications), using local cache works.
-    For real recipes that modify trees, we'd need proper async bidirectional RPC.
+    Fetches the tree from Java to ensure we have the latest version,
+    including any modifications made by recipes. Java's GetObject handler
+    runs on a separate thread (ForkJoinPool), so bidirectional RPC works.
     """
     # Java sends 'treeId', but also accept 'id' for compatibility
     obj_id = params.get('treeId') or params.get('id')
@@ -356,16 +351,11 @@ def handle_print(params: dict) -> str:
 
     logger.info(f"handle_print: treeId={obj_id}, sourceFileType={source_file_type}")
 
-    # Use locally cached object to avoid bidirectional RPC deadlock
-    # The object should be in local_objects if we parsed it
-    obj = local_objects.get(obj_id)
-
-    # Also check remote_objects in case we received it from Java previously
-    if obj is None:
-        obj = remote_objects.get(obj_id)
+    # Fetch the object from Java to get the latest version (including recipe modifications)
+    obj = get_object_from_java(obj_id, source_file_type)
 
     if obj is None:
-        logger.warning(f"Object {obj_id} not found in local cache")
+        logger.warning(f"Object {obj_id} not found")
         return ""
 
     # If it's a CompilationUnit, use the printer
@@ -507,67 +497,6 @@ def _serialize_value(value) -> Any:
     return str(value)
 
 
-def handle_push_object(params: dict) -> bool:
-    """Handle a PushObject RPC request - receives an object from Java.
-
-    This is called by Java before Print to sync a modified tree to Python.
-    This avoids the bidirectional RPC deadlock that would occur if Python
-    tried to fetch the object during Print handling.
-
-    Args:
-        params: Contains 'id', 'sourceFileType', and 'data' (serialized object)
-
-    Returns:
-        True on success
-    """
-    obj_id = params.get('id')
-    source_file_type = params.get('sourceFileType')
-    data = params.get('data')
-
-    logger.info(f"handle_push_object: id={obj_id}, sourceFileType={source_file_type}")
-
-    if not obj_id or not data:
-        logger.warning("PushObject missing id or data")
-        return False
-
-    try:
-        from rewrite.rpc.receive_queue import RpcReceiveQueue
-        from rewrite.rpc.python_receiver import PythonRpcReceiver
-
-        # Data is a list of RpcObjectData dicts
-        batch = list(data)
-
-        def pull_batch() -> List[Dict[str, Any]]:
-            nonlocal batch
-            result = batch
-            batch = []
-            return result
-
-        q = RpcReceiveQueue(remote_refs, source_file_type, pull_batch, trace=_trace_rpc)
-        receiver = PythonRpcReceiver()
-
-        # Get the "before" state - our understanding of what Java had
-        before = remote_objects.get(obj_id)
-
-        # Receive and deserialize the object (applies diffs to before state)
-        obj = receiver.receive(before, q)
-
-        if obj is not None:
-            # Store in both caches so Print can find it
-            remote_objects[obj_id] = obj
-            local_objects[str(obj.id)] = obj
-            logger.info(f"PushObject: stored object {obj_id}")
-            return True
-        else:
-            logger.warning(f"PushObject: failed to deserialize object {obj_id}")
-            return False
-
-    except Exception as e:
-        logger.error(f"Error in handle_push_object: {e}")
-        traceback.print_exc()
-        return False
-
-
 def handle_request(method: str, params: dict) -> Any:
     """Handle an RPC request."""
     handlers = {
@@ -576,7 +505,6 @@ def handle_request(method: str, params: dict) -> Any:
         'GetObject': handle_get_object,
         'GetLanguages': handle_get_languages,
         'Print': handle_print,
-        'PushObject': handle_push_object,
         'Reset': handle_reset,
         'GetMarketplace': handle_get_marketplace,
     }
