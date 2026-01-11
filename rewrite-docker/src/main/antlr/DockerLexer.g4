@@ -13,7 +13,9 @@ lexer grammar DockerLexer;
     private boolean heredocIdentifierCaptured = false;
     // Track if we're at the start of a logical line (where instructions can appear)
     private boolean atLineStart = true;
-    // Track if we're after HEALTHCHECK to allow CMD/NONE to be recognized after flags
+    // Track if we're after FROM to recognize AS as a keyword (for stage aliasing)
+    private boolean afterFrom = false;
+    // Track if we're after HEALTHCHECK to recognize CMD/NONE as keywords
     private boolean afterHealthcheck = false;
 }
 
@@ -31,11 +33,12 @@ COMMENT : '#' ~[\r\n]* -> channel(HIDDEN);
 // Instructions (case-insensitive)
 // Instructions are only recognized at line start. Otherwise they become UNQUOTED_TEXT.
 // This eliminates ambiguity between instruction keywords and shell command text.
-FROM       : 'FROM'       { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+FROM       : 'FROM'       { if (!atLineStart) setType(UNQUOTED_TEXT); else afterFrom = true; atLineStart = false; };
 RUN        : 'RUN'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-CMD        : 'CMD'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false; };
-// NONE is only recognized after HEALTHCHECK (when atLineStart is still true)
-NONE       : 'NONE'       { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false; };
+// CMD is a keyword at line start (CMD instruction) or after HEALTHCHECK
+CMD        : 'CMD'        { if (!atLineStart && !afterHealthcheck) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false; };
+// NONE is only a keyword after HEALTHCHECK
+NONE       : 'NONE'       { if (!afterHealthcheck) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false; };
 LABEL      : 'LABEL'      { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 EXPOSE     : 'EXPOSE'     { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 ENV        : 'ENV'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
@@ -54,8 +57,8 @@ HEALTHCHECK: 'HEALTHCHECK'{ if (!atLineStart) setType(UNQUOTED_TEXT); else after
 SHELL      : 'SHELL'      { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 MAINTAINER : 'MAINTAINER' { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 
-// Special keywords
-AS         : 'AS' { atLineStart = false; };
+// AS is only a keyword after FROM (for stage aliasing)
+AS         : 'AS' { if (!afterFrom) setType(UNQUOTED_TEXT); atLineStart = false; afterFrom = false; };
 
 // Heredoc start - captures <<EOF or <<-EOF and switches to HEREDOC_PREAMBLE mode
 HEREDOC_START : '<<' '-'? {
@@ -136,8 +139,8 @@ WS : WS_CHAR+ -> channel(HIDDEN);
 
 fragment WS_CHAR : [ \t];
 
-// Newlines - HIDDEN in main mode, but set atLineStart for next token and clear afterHealthcheck
-NEWLINE : NEWLINE_CHAR+ { atLineStart = true; afterHealthcheck = false; } -> channel(HIDDEN);
+// Newlines - HIDDEN in main mode, reset state for next line
+NEWLINE : NEWLINE_CHAR+ { atLineStart = true; afterFrom = false; afterHealthcheck = false; } -> channel(HIDDEN);
 
 fragment NEWLINE_CHAR : [\r\n];
 

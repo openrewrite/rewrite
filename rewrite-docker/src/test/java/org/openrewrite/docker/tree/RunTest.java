@@ -406,4 +406,77 @@ class RunTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void runWithAsInShellCommand() {
+        // Test 'as' appearing in shell commands - should NOT be treated as AS keyword
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN useradd user && su - user -c "whoami" as user
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
+                // The entire command including 'as user' should be preserved
+                assertThat(shellForm.getArgument().getText()).isEqualTo("useradd user && su - user -c \"whoami\" as user");
+            })
+          )
+        );
+    }
+
+    @Test
+    void runWithAsInFilename() {
+        // Test 'as' appearing in a filename
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN ./install-as-root.sh
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
+                assertThat(shellForm.getArgument().getText()).isEqualTo("./install-as-root.sh");
+            })
+          )
+        );
+    }
+
+    @Test
+    void runWithCmdInShellCommand() {
+        // Test 'cmd' appearing in shell commands (Windows cmd.exe)
+        rewriteRun(
+          docker(
+            """
+              FROM mcr.microsoft.com/windows/servercore:ltsc2022
+              RUN cmd /c echo Hello World
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
+                assertThat(shellForm.getArgument().getText()).isEqualTo("cmd /c echo Hello World");
+            })
+          )
+        );
+    }
+
+    @Test
+    void runWithNoneInShellCommand() {
+        // Test 'none' appearing in shell commands
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN echo "Setting value to none" && export VAL=none
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
+                assertThat(shellForm.getArgument().getText()).isEqualTo("echo \"Setting value to none\" && export VAL=none");
+            })
+          )
+        );
+    }
 }

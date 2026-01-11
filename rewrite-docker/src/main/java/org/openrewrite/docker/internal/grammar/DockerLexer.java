@@ -128,7 +128,9 @@ public class DockerLexer extends Lexer {
 	    private boolean heredocIdentifierCaptured = false;
 	    // Track if we're at the start of a logical line (where instructions can appear)
 	    private boolean atLineStart = true;
-	    // Track if we're after HEALTHCHECK to allow CMD/NONE to be recognized after flags
+	    // Track if we're after FROM to recognize AS as a keyword (for stage aliasing)
+	    private boolean afterFrom = false;
+	    // Track if we're after HEALTHCHECK to recognize CMD/NONE as keywords
 	    private boolean afterHealthcheck = false;
 
 
@@ -281,7 +283,7 @@ public class DockerLexer extends Lexer {
 	private void FROM_action(RuleContext _localctx, int actionIndex) {
 		switch (actionIndex) {
 		case 1:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; 
+			 if (!atLineStart) setType(UNQUOTED_TEXT); else afterFrom = true; atLineStart = false; 
 			break;
 		}
 	}
@@ -295,14 +297,14 @@ public class DockerLexer extends Lexer {
 	private void CMD_action(RuleContext _localctx, int actionIndex) {
 		switch (actionIndex) {
 		case 3:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false; 
+			 if (!atLineStart && !afterHealthcheck) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false; 
 			break;
 		}
 	}
 	private void NONE_action(RuleContext _localctx, int actionIndex) {
 		switch (actionIndex) {
 		case 4:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false; 
+			 if (!afterHealthcheck) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false; 
 			break;
 		}
 	}
@@ -414,7 +416,7 @@ public class DockerLexer extends Lexer {
 	private void AS_action(RuleContext _localctx, int actionIndex) {
 		switch (actionIndex) {
 		case 20:
-			 atLineStart = false; 
+			 if (!afterFrom) setType(UNQUOTED_TEXT); atLineStart = false; afterFrom = false; 
 			break;
 		}
 	}
@@ -515,7 +517,7 @@ public class DockerLexer extends Lexer {
 	private void NEWLINE_action(RuleContext _localctx, int actionIndex) {
 		switch (actionIndex) {
 		case 34:
-			 atLineStart = true; afterHealthcheck = false; 
+			 atLineStart = true; afterFrom = false; afterHealthcheck = false; 
 			break;
 		}
 	}

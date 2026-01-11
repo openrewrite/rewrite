@@ -154,8 +154,7 @@ flag
 
 flagName
     : UNQUOTED_TEXT
-    // Note: 'from' in --from=builder is UNQUOTED_TEXT (instruction keywords are only recognized at line start)
-    | AS    // AS is always a keyword token (not instruction-specific)
+    // Note: 'from' and 'as' in --from=builder are UNQUOTED_TEXT (keywords only recognized in specific contexts)
     ;
 
 // Flag value parsing: allows patterns like "value" or "type=cache,target=/path"
@@ -187,9 +186,8 @@ shellForm
     ;
 
 // Text in shell form commands
-// Note: Instruction keywords (RUN, ADD, COPY, etc.) are UNQUOTED_TEXT here because
-// they are only recognized as instruction tokens at line start.
-// AS is still a keyword token and needs explicit handling.
+// Note: Instruction keywords (RUN, ADD, COPY, AS, CMD, etc.) become UNQUOTED_TEXT here
+// because they are only recognized as keyword tokens in specific contexts.
 shellFormText
     : shellFormTextElement+
     ;
@@ -207,7 +205,6 @@ shellFormTextElement
     | LBRACKET   // Allow [ in shell commands (e.g., if [ -f file ])
     | RBRACKET   // Allow ] in shell commands
     | COMMA      // Allow , in shell commands
-    | AS         // AS is always a keyword token
     ;
 
 heredoc
@@ -252,10 +249,8 @@ labelPair
     ;
 
 // Label key - instruction keywords become UNQUOTED_TEXT since they're not at line start
-// AS is still a keyword token
 labelKey
     : UNQUOTED_TEXT | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING
-    | AS
     ;
 
 labelValue
@@ -281,7 +276,6 @@ labelOldValueElement
     | LBRACKET
     | RBRACKET
     | COMMA
-    | AS
     ;
 
 portList
@@ -294,7 +288,6 @@ port
     | COMMAND_SUBST   // Allow $(command)
     | BACKTICK_SUBST  // Allow `command`
     | SPECIAL_VAR     // Allow $!, $$, etc.
-    | AS
     ;
 
 envPairs
@@ -307,10 +300,8 @@ envPair
     ;
 
 // Env key - instruction keywords become UNQUOTED_TEXT (not at line start)
-// AS is still a keyword token
 envKey
     : UNQUOTED_TEXT
-    | AS
     ;
 
 envValueEquals
@@ -333,7 +324,6 @@ envTextElementEquals
     | COMMAND_SUBST
     | BACKTICK_SUBST
     | SPECIAL_VAR
-    | AS
     // NOTE: EQUALS is explicitly NOT included to allow multiple KEY=value pairs
     ;
 
@@ -365,7 +355,6 @@ volumePath
     | COMMAND_SUBST   // Allow $(command)
     | BACKTICK_SUBST  // Allow `command`
     | SPECIAL_VAR     // Allow $!, $$, etc.
-    | AS
     ;
 
 userSpec
@@ -389,8 +378,8 @@ text
     ;
 
 // Generic text element - used for paths, image names, arg values, etc.
-// Instruction keywords are UNQUOTED_TEXT (not at line start)
-// Note: AS is NOT included here to avoid greediness issues in FROM imageName AS alias
+// Instruction keywords and contextual keywords (AS, CMD, NONE) become UNQUOTED_TEXT
+// when not in their specific contexts.
 textElement
     : UNQUOTED_TEXT
     | DOUBLE_QUOTED_STRING
