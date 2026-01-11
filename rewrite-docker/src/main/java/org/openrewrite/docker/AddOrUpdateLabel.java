@@ -24,7 +24,6 @@ import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -70,213 +69,132 @@ public class AddOrUpdateLabel extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        boolean shouldOverwrite = overwriteExisting == null || overwriteExisting;
-        return new DockerIsoVisitor<ExecutionContext>() {
-            @Override
-            public Docker.File visitFile(Docker.File file, ExecutionContext ctx) {
-                Docker.File f = super.visitFile(file, ctx);
-                if (hasMatchingLabel(f)) {
-                    return f; // No further changes needed
-                }
+        return Preconditions.or(new UpdateLabelVisitor(), new AddLabelVisitor());
+    }
 
-                // Determine which stages to modify
-                List<Docker.Stage> newStages = new ArrayList<>(f.getStages());
-                boolean modified = false;
-
-                for (int i = 0; i < newStages.size(); i++) {
-                    Docker.Stage stage = newStages.get(i);
-                    boolean isFinalStage = (i == newStages.size() - 1);
-
-                    // Check if we should target this stage
-                    if (stageName != null) {
-                        String currentStageName = stage.getFrom().getAs() != null ? stage.getFrom().getAs().getName().getText() : null;
-                        if (!stageName.equals(currentStageName)) {
-                            continue; // Skip this stage
-                        }
-                    } else if (!isFinalStage) {
-                        // By default, only modify final stage
-                        continue;
-                    }
-
-                    Docker.Stage modifiedStage = addOrUpdateLabel(stage, shouldOverwrite);
-                    if (modifiedStage != stage) {
-                        newStages.set(i, modifiedStage);
-                        modified = true;
-                    }
-                }
-
-                if (modified) {
-                    return f.withStages(newStages);
-                }
-                return f;
+    /**
+     * Only update existing labels.
+     */
+    private class UpdateLabelVisitor extends DockerIsoVisitor<ExecutionContext> {
+        @Override
+        public Docker.Stage visitStage(Docker.Stage stage, ExecutionContext ctx) {
+            if (stageName != null && !stageName.equals(stage.getFrom().getAs() != null ? stage.getFrom().getAs().getName().getText() : null)) {
+                return stage; // Skip this stage
             }
+            return super.visitStage(stage, ctx); // Update existing labels anywhere
+        }
 
-            private boolean hasMatchingLabel(Docker.File f) {
-                return new DockerIsoVisitor<AtomicBoolean>() {
-                    @Override
-                    public Docker.Label.LabelPair visitLabelPair(Docker.Label.LabelPair pair, AtomicBoolean matchFound) {
-                        if (matchFound.get()) {
-                            return pair; // Short-circuit if already found
-                        }
-                        if (key.equals(extractText(pair.getKey())) &&
-                                value.equals(extractText(pair.getValue()))) {
-                            matchFound.set(true);
-                            return pair;
-                        }
-                        return super.visitLabelPair(pair, matchFound);
-                    }
-                }.reduce(f, new AtomicBoolean(false), getCursor().getParentOrThrow()).get();
+        @Override
+        public Docker.Label.LabelPair visitLabelPair(Docker.Label.LabelPair pair, ExecutionContext ctx) {
+            if (key.equals(extractText(pair.getKey()))) {
+                boolean shouldOverwrite = overwriteExisting == null || overwriteExisting;
+                return shouldOverwrite && !value.equals(extractText(pair.getValue())) ?
+                        pair.withValue(createArgument(value, pair.getValue())) : pair;
             }
+            return super.visitLabelPair(pair, ctx);
+        }
+    }
 
-            private Docker.Stage addOrUpdateLabel(Docker.Stage stage, boolean shouldOverwrite) {
-                // Look for existing LABEL instruction with this key
-                Docker.Label existingLabel = null;
-                int existingLabelIndex = -1;
-                String existingValue = null;
+    /**
+     * Only add new labels.
+     */
+    private class AddLabelVisitor extends DockerIsoVisitor<ExecutionContext> {
+        @Override
+        public Docker.Stage visitStage(Docker.Stage stage, ExecutionContext ctx) {
+            if (stageName == null) { // Only modify final stage by default
+                List<Docker.Stage> stages = getCursor().getParentTreeCursor().<Docker.File>getValue().getStages();
+                return stage == stages.get(stages.size() - 1) ? addNewLabel(stage) : stage;
+            }
+            Docker.From.As as = stage.getFrom().getAs();
+            return stageName.equals(as != null ? as.getName().getText() : null) ? addNewLabel(stage) : stage;
+        }
 
-                for (int i = 0; i < stage.getInstructions().size(); i++) {
-                    Docker.Instruction inst = stage.getInstructions().get(i);
-                    if (inst instanceof Docker.Label) {
-                        Docker.Label label = (Docker.Label) inst;
-                        for (Docker.Label.LabelPair pair : label.getPairs()) {
-                            String pairKey = extractText(pair.getKey());
-                            if (key.equals(pairKey)) {
-                                existingLabel = label;
-                                existingLabelIndex = i;
-                                existingValue = extractText(pair.getValue());
-                                break;
-                            }
-                        }
+        private Docker.Stage addNewLabel(Docker.Stage stage) {
+            if (hasLabel(stage)) {
+                return stage; // Prevent adding duplicate label
+            }
+            return stage.withInstructions(ListUtils.insert(
+                    stage.getInstructions(),
+                    createLabel(),
+                    findLabelInsertPosition(stage)));
+        }
+
+        private boolean hasLabel(Docker.Stage stage) {
+            return new DockerIsoVisitor<AtomicBoolean>() {
+                @Override
+                public Docker.Label.LabelPair visitLabelPair(Docker.Label.LabelPair pair, AtomicBoolean matchFound) {
+                    if (!matchFound.get() && key.equals(extractText(pair.getKey()))) {
+                        matchFound.set(true);
                     }
-                    if (existingLabel != null) {
+                    return pair;
+                }
+            }.reduce(stage, new AtomicBoolean(false)).get();
+        }
+
+        private Docker.Label createLabel() {
+            Docker.Label.LabelPair pair = new Docker.Label.LabelPair(
+                    Tree.randomId(),
+                    Space.SINGLE_SPACE,
+                    Markers.EMPTY,
+                    createArgument(key, null),
+                    true,  // hasEquals - use modern format with equals sign
+                    createArgument(value, null)
+            );
+            return new Docker.Label(randomId(), Space.format("\n"), Markers.EMPTY, "LABEL", singletonList(pair));
+        }
+
+        private int findLabelInsertPosition(Docker.Stage stage) {
+            int lastLabelIndex = -1; // Insert at start if no labels found
+            for (int i = 0; i < stage.getInstructions().size(); i++) {
+                Docker.Instruction inst = stage.getInstructions().get(i);
+                if (inst instanceof Docker.Label) {
+                    lastLabelIndex = i; // After any existing labels
+                }
+            }
+            return lastLabelIndex + 1;
+        }
+    }
+
+    private static @Nullable String extractText(Docker.@Nullable Argument arg) {
+        if (arg == null) {
+            return null;
+        }
+        StringBuilder builder = new StringBuilder();
+        for (Docker.ArgumentContent content : arg.getContents()) {
+            if (content instanceof Docker.Literal) {
+                builder.append(((Docker.Literal) content).getText());
+            } else if (content instanceof Docker.EnvironmentVariable) {
+                Docker.EnvironmentVariable env = (Docker.EnvironmentVariable) content;
+                // Include the variable reference as-is (e.g., ${VAR} or $VAR)
+                if (env.isBraced()) {
+                    builder.append("${").append(env.getName()).append("}");
+                } else {
+                    builder.append("$").append(env.getName());
+                }
+            }
+        }
+        return builder.toString();
+    }
+
+    private static Docker.Argument createArgument(String text, Docker.@Nullable Argument original) {
+        // Quote if contains spaces or special characters
+        boolean needsQuotes = text.contains(" ") || text.contains("=");
+        Docker.ArgumentContent content;
+        if (needsQuotes) {
+            // Preserve quote style from original if available
+            Docker.Literal.QuoteStyle quoteStyle = Docker.Literal.QuoteStyle.DOUBLE;
+            if (original != null) {
+                for (Docker.ArgumentContent c : original.getContents()) {
+                    if (c instanceof Docker.Literal && ((Docker.Literal) c).isQuoted()) {
+                        quoteStyle = ((Docker.Literal) c).getQuoteStyle();
                         break;
                     }
                 }
-
-                if (existingLabel != null) {
-                    // Label exists - check if value already matches
-                    if (value.equals(existingValue)) {
-                        return stage; // Already has the correct value, no change needed
-                    }
-                    if (!shouldOverwrite) {
-                        return stage; // Skip, label already exists with different value
-                    }
-                    // Update existing label
-                    return updateExistingLabel(stage, existingLabel, existingLabelIndex);
-                } else {
-                    // Add new LABEL instruction
-                    return addNewLabel(stage);
-                }
             }
-
-            private Docker.Stage updateExistingLabel(Docker.Stage stage,
-                                                     Docker.Label existingLabel,
-                                                     int index) {
-                // Find and update the specific pair
-                List<Docker.Label.LabelPair> newPairs = new ArrayList<>();
-
-                for (Docker.Label.LabelPair pair : existingLabel.getPairs()) {
-                    String pairKey = extractText(pair.getKey());
-                    if (key.equals(pairKey)) {
-                        // Update the value
-                        Docker.Argument newValue = createArgument(value, pair.getValue());
-                        newPairs.add(pair.withValue(newValue));
-                    } else {
-                        newPairs.add(pair);
-                    }
-                }
-
-                Docker.Label updatedLabel = existingLabel.withPairs(newPairs);
-
-                List<Docker.Instruction> newInstructions = new ArrayList<>(stage.getInstructions());
-                newInstructions.set(index, updatedLabel);
-
-                return stage.withInstructions(newInstructions);
-            }
-
-            private Docker.Stage addNewLabel(Docker.Stage stage) {
-                // Create new LABEL instruction
-                Docker.Label.LabelPair pair = new Docker.Label.LabelPair(
-                        Tree.randomId(),
-                        Space.SINGLE_SPACE,
-                        Markers.EMPTY,
-                        createArgument(key, null),
-                        true,  // hasEquals - use modern format with equals sign
-                        createArgument(value, null)
-                );
-                Docker.Label newLabel = new Docker.Label(
-                        randomId(),
-                        Space.format("\n"),
-                        Markers.EMPTY,
-                        "LABEL",
-                        singletonList(pair)
-                );
-
-                // Find the best position to insert (after FROM and other LABELs, before CMD/ENTRYPOINT)
-                int insertIndex = findLabelInsertPosition(stage);
-
-                List<Docker.Instruction> newInstructions = ListUtils.insert(
-                        stage.getInstructions(), newLabel, insertIndex);
-
-                return stage.withInstructions(newInstructions);
-            }
-
-            private int findLabelInsertPosition(Docker.Stage stage) {
-                // Insert after other LABEL instructions, or at beginning, before CMD/ENTRYPOINT
-                int lastLabelIndex = -1;
-                for (int i = 0; i < stage.getInstructions().size(); i++) {
-                    Docker.Instruction inst = stage.getInstructions().get(i);
-                    if (inst instanceof Docker.Label) {
-                        lastLabelIndex = i;
-                    }
-                }
-                // Prefer after last LABEL, then at beginning but before CMD
-                return lastLabelIndex + 1;
-            }
-
-            private Docker.Argument createArgument(String text, Docker.@Nullable Argument original) {
-                // Quote if contains spaces or special characters
-                boolean needsQuotes = text.contains(" ") || text.contains("=");
-                Docker.ArgumentContent content;
-
-                if (needsQuotes) {
-                    // Preserve quote style from original if available
-                    Docker.Literal.QuoteStyle quoteStyle = Docker.Literal.QuoteStyle.DOUBLE;
-                    if (original != null) {
-                        for (Docker.ArgumentContent c : original.getContents()) {
-                            if (c instanceof Docker.Literal && ((Docker.Literal) c).isQuoted()) {
-                                quoteStyle = ((Docker.Literal) c).getQuoteStyle();
-                                break;
-                            }
-                        }
-                    }
-                    content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, quoteStyle);
-                } else {
-                    content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, null);
-                }
-                return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(content));
-            }
-
-            private @Nullable String extractText(Docker.@Nullable Argument arg) {
-                if (arg == null) {
-                    return null;
-                }
-                StringBuilder builder = new StringBuilder();
-                for (Docker.ArgumentContent content : arg.getContents()) {
-                    if (content instanceof Docker.Literal) {
-                        builder.append(((Docker.Literal) content).getText());
-                    } else if (content instanceof Docker.EnvironmentVariable) {
-                        Docker.EnvironmentVariable env = (Docker.EnvironmentVariable) content;
-                        // Include the variable reference as-is (e.g., ${VAR} or $VAR)
-                        if (env.isBraced()) {
-                            builder.append("${").append(env.getName()).append("}");
-                        } else {
-                            builder.append("$").append(env.getName());
-                        }
-                    }
-                }
-                return builder.toString();
-            }
-        };
+            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, quoteStyle);
+        } else {
+            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, null);
+        }
+        return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(content));
     }
 }
