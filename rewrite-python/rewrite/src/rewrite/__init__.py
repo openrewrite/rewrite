@@ -7,8 +7,9 @@ try:
 except ImportError:
     pass  # pytest not available, skip assert rewriting
 
-from .execution import ExecutionContext, DelegatingExecutionContext, InMemoryExecutionContext, Recipe, \
-    RecipeRunException
+from .execution import ExecutionContext, DelegatingExecutionContext, InMemoryExecutionContext, \
+    RecipeRunException, LargeSourceSet, InMemoryLargeSourceSet, Result
+from .recipe import Recipe, ScanningRecipe, option, OptionDescriptor, RecipeDescriptor
 from .markers import *
 from .parser import *
 from .result import *
@@ -18,39 +19,53 @@ from .utils import random_id, list_find, list_map, list_map_last
 from .visitor import Cursor, TreeVisitor
 
 __all__ = [
+    # Tree
     'Checksum',
     'FileAttributes',
     'SourceFile',
     'Tree',
     'PrintOutputCapture',
     'PrinterFactory',
+
+    # Utils
     'random_id',
     'list_find',
     'list_map',
     'list_map_last',
+
+    # Visitor
     'Cursor',
     'TreeVisitor',
+
+    # Execution
     'ExecutionContext',
     'DelegatingExecutionContext',
     'InMemoryExecutionContext',
+    'RecipeRunException',
+    'LargeSourceSet',
+    'InMemoryLargeSourceSet',
+    'Result',
+
+    # Recipe
+    'Recipe',
+    'ScanningRecipe',
+    'option',
+    'OptionDescriptor',
+    'RecipeDescriptor',
 
     # Markers
     'Marker',
     'Markers',
     'SearchResult',
     'UnknownJavaMarker',
+    'ParseExceptionResult',
 
-    # Execution
-    'Recipe',
-    'RecipeRunException',
+    # Parser
     'Parser',
     'ParserInput',
     'ParseError',
     'ParseErrorVisitor',
     'ParserBuilder',
-    'ParseExceptionResult',
-    'Result',
-    'SourceFile',
 
     # Style
     'Style',

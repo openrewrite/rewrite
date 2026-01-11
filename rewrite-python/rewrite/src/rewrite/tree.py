@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import threading
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, replace as dataclass_replace
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Any, TypeVar, cast, TYPE_CHECKING, Generic, ClassVar, Callable, Type
@@ -48,7 +48,9 @@ class Tree(ABC):
         return v.default_value(self, p)
 
     def print(self, cursor: 'Cursor', capture: 'PrintOutputCapture[P]') -> str:
-        self.printer(cursor).visit(self, capture, cursor)
+        printer = self.printer(cursor)
+        printer.set_cursor(cursor)
+        printer.visit(self, capture)
         return capture.get_out()
 
     def printer(self, cursor: 'Cursor') -> 'TreeVisitor[Any, PrintOutputCapture[P]]':
@@ -64,6 +66,27 @@ class Tree(ABC):
 
     def __hash__(self) -> int:
         return hash(self.id)
+
+    def replace(self, **kwargs) -> 'Tree':
+        """Replace fields on this tree node using dataclasses.replace.
+
+        Handles the convention where properties use public names (e.g., 'prefix')
+        but dataclass fields use private names (e.g., '_prefix').
+        """
+        # Map public property names to private field names
+        mapped_kwargs = {}
+        for key, value in kwargs.items():
+            # If the key doesn't start with underscore, try the private version
+            if not key.startswith('_'):
+                private_key = f'_{key}'
+                # Check if the private field exists
+                if hasattr(self, private_key):
+                    mapped_kwargs[private_key] = value
+                else:
+                    mapped_kwargs[key] = value
+            else:
+                mapped_kwargs[key] = value
+        return dataclass_replace(self, **mapped_kwargs)
 
 
 class PrinterFactory(ABC):
@@ -194,6 +217,10 @@ class PrintOutputCapture(Generic[P]):
 
     @property
     def marker_printer(self) -> MarkerPrinter:
+        return self._marker_printer
+
+    def get_marker_printer(self) -> MarkerPrinter:
+        """Return the marker printer (alias for marker_printer property)."""
         return self._marker_printer
 
 

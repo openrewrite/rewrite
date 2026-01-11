@@ -606,11 +606,11 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
 
-    def printer(self, cursor: Cursor) -> TreeVisitor[Tree, PrintOutputCapture[P]]:
+    def printer(self, cursor: Cursor) -> TreeVisitor[Tree, PrintOutputCapture]:
         if factory := PrinterFactory.current():
             return factory.create_printer(cursor)
         from .printer import PythonPrinter
-        return PythonPrinter[PrintOutputCapture[P]]()
+        return PythonPrinter()
 
     def accept_python(self, v: PythonVisitor[P], p: P) -> J:
         return v.visit_compilation_unit(self, p)

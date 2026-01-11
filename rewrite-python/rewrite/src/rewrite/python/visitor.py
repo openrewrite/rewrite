@@ -32,6 +32,7 @@ from rewrite.python.support_types import Py, PySpace
 from rewrite.tree import SourceFile
 
 if TYPE_CHECKING:
+    from rewrite.visitor import Cursor
     from rewrite.python.tree import (
         Async,
         Await,
@@ -189,25 +190,21 @@ class PythonVisitor(JavaVisitor[P]):
 
     def visit_compilation_unit(self, cu: CompilationUnit, p: P) -> J:
         """Visit a Python compilation unit (module)."""
-        cu = cu.replace(
-            prefix=self.visit_space(cu.prefix, Space.Location.ANY, p)
-        )
-        cu = cu.replace(markers=self.visit_markers(cu.markers, p))
-        cu = cu.replace(
-            imports=list_map(
+        cu = cu.with_prefix(self.visit_space(cu.prefix, Space.Location.ANY, p))
+        cu = cu.with_markers(self.visit_markers(cu.markers, p))
+        cu = cu.padding.with_imports(
+            list_map(
                 lambda v: self.visit_right_padded(v, None, p),
-                cu.imports
+                cu.padding.imports
             )
         )
-        cu = cu.replace(
-            statements=list_map(
+        cu = cu.padding.with_statements(
+            list_map(
                 lambda v: self.visit_right_padded(v, None, p),
-                cu.statements
+                cu.padding.statements
             )
         )
-        cu = cu.replace(
-            eof=self.visit_space(cu.eof, Space.Location.ANY, p)
-        )
+        cu = cu.with_eof(self.visit_space(cu.eof, Space.Location.ANY, p))
         return cu
 
     def visit_comprehension_expression(self, comp: ComprehensionExpression, p: P) -> J:
@@ -762,10 +759,12 @@ class PythonVisitor(JavaVisitor[P]):
         result = self.visit(tree, p)
         return result
 
-    def visit(self, tree: Any, p: P) -> Any:
+    def visit(self, tree: Any, p: P, parent: Optional['Cursor'] = None) -> Any:
         """Visit a tree node."""
+        if parent is not None:
+            self._cursor = parent
         if tree is None:
             return None
         if isinstance(tree, Py):
             return tree.accept_python(self, p)
-        return super().visit(tree, p)
+        return super().visit(tree, p, parent)

@@ -28,9 +28,10 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from rewrite.visitor import TreeVisitor
-    from rewrite.execution import ExecutionContext
+    from rewrite.visitor import TreeVisitor, Cursor
+    from rewrite.execution import ExecutionContext, LargeSourceSet
     from rewrite.tree import SourceFile
+    from rewrite.result import Result
 
 
 def option(
@@ -236,6 +237,36 @@ class Recipe(ABC):
     def descriptor(self) -> RecipeDescriptor:
         """Get the recipe descriptor for marketplace display."""
         return RecipeDescriptor.from_recipe(self)
+
+    def run(self, before: LargeSourceSet, ctx: ExecutionContext) -> List[Result]:
+        """
+        Run this recipe on a set of source files.
+
+        Args:
+            before: The source files to transform
+            ctx: The execution context
+
+        Returns:
+            List of results showing before/after for each changed file
+        """
+        from rewrite.visitor import Cursor
+
+        lss = self._run_internal(before, ctx, Cursor(None, Cursor.ROOT_VALUE))
+        return lss.get_changeset()
+
+    def _run_internal(
+        self, before: LargeSourceSet, ctx: ExecutionContext, root: Cursor
+    ) -> LargeSourceSet:
+        """
+        Internal implementation of recipe execution.
+
+        Applies this recipe's editor to each source file, then recursively
+        applies any child recipes from recipe_list().
+        """
+        after = before.edit(lambda source: self.editor().visit(source, ctx, root))
+        for recipe in self.recipe_list():
+            after = recipe._run_internal(after, ctx, root)
+        return after
 
 
 T = TypeVar("T")

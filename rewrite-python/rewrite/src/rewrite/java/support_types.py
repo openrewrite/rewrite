@@ -573,6 +573,17 @@ class JRightPadded(Generic[T]):
     def with_markers(self, markers: Markers) -> JRightPadded[T]:
         return self if markers is self._markers else replace(self, _markers=markers)
 
+    def replace(self, **kwargs) -> 'JRightPadded[T]':
+        """Replace fields using keyword arguments."""
+        # Map public property names to private field names
+        mapped = {}
+        for key, value in kwargs.items():
+            if not key.startswith('_') and hasattr(self, f'_{key}'):
+                mapped[f'_{key}'] = value
+            else:
+                mapped[key] = value
+        return replace(self, **mapped)
+
     @classmethod
     def get_elements(cls, padded_list: List[JRightPadded[T]]) -> List[T]:
         return [x.element for x in padded_list]

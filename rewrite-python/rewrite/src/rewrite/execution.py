@@ -109,23 +109,3 @@ class InMemoryLargeSourceSet(LargeSourceSet):
 class Result:
     _before: Optional[SourceFile]
     _after: Optional[SourceFile]
-
-
-class Recipe:
-    def get_visitor(self):
-        from .visitor import TreeVisitor
-        return TreeVisitor.noop()
-
-    def get_recipe_list(self) -> List[Recipe]:
-        return []
-
-    def run(self, before: LargeSourceSet, ctx: ExecutionContext) -> List[Result]:
-        from .visitor import Cursor
-        lss = self.run_internal(before, ctx, Cursor(None, Cursor.ROOT_VALUE))
-        return lss.get_changeset()
-
-    def run_internal(self, before: LargeSourceSet, ctx: ExecutionContext, root: Cursor) -> LargeSourceSet:
-        after = before.edit(lambda before: self.get_visitor().visit(before, ctx, root))
-        for recipe in self.get_recipe_list():
-            after = recipe.run_internal(after, ctx, root)
-        return after
