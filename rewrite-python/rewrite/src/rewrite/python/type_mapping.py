@@ -1,11 +1,23 @@
 import ast
-from typing import Optional
-
-from pytype import config
-from pytype.pytd.pytd import CallableType, GenericType, ClassType, UnionType, NothingType, TypeParameter
-from pytype.tools.annotate_ast.annotate_ast import AnnotateAstVisitor, PytypeError, infer_types
+from typing import Optional, TYPE_CHECKING
 
 from ..java import JavaType
+
+# pytype is optional - it provides type inference but is not required for parsing
+# It also doesn't support Python 3.13+
+_PYTYPE_AVAILABLE = False
+try:
+    from pytype import config
+    from pytype.pytd.pytd import CallableType, GenericType, ClassType, UnionType, NothingType, TypeParameter
+    from pytype.tools.annotate_ast.annotate_ast import AnnotateAstVisitor, PytypeError, infer_types
+    _PYTYPE_AVAILABLE = True
+except ImportError:
+    # pytype not available - type inference will be disabled
+    config = None  # type: ignore
+    CallableType = GenericType = ClassType = UnionType = NothingType = TypeParameter = None  # type: ignore
+    AnnotateAstVisitor = None  # type: ignore
+    PytypeError = Exception  # type: ignore
+    infer_types = None  # type: ignore
 
 
 class PythonTypeMapping:
@@ -13,10 +25,13 @@ class PythonTypeMapping:
     __cache: dict[str, JavaType] = {}
 
     def __init__(self, source: str):
+        self._source_with_types = None
+        if not self.__enabled or not _PYTYPE_AVAILABLE:
+            return
         pytype_options = config.Options.create(python_version='3.12', check=False, precise_return=True,
                                                output_debug=False)
         try:
-            self._source_with_types = infer_types(source, pytype_options) if self.__enabled else None
+            self._source_with_types = infer_types(source, pytype_options)
         except PytypeError:
             self._source_with_types = None
 
@@ -49,6 +64,8 @@ class PythonTypeMapping:
         return self.__map_type(node.func.resolved_type, node) if self.__enabled else None
 
     def __map_type(self, type, node):
+        if not _PYTYPE_AVAILABLE:
+            return None
         signature = get_type_string(type)
         result = self.__cache.get(signature)
         if result:
@@ -77,6 +94,8 @@ class PythonTypeMapping:
 
 
 def get_type_string(typ):
+    if not _PYTYPE_AVAILABLE:
+        return "None"
     if typ is None:
         return "None"
     elif isinstance(typ, ClassType):
@@ -101,7 +120,10 @@ def get_type_string(typ):
         return str(typ)
 
 
-class MyAnnotateAstVisitor(AnnotateAstVisitor):
-    # TODO check if we really should have this
-    def visit_Call(self, node):
-        self._maybe_annotate(node)
+if _PYTYPE_AVAILABLE:
+    class MyAnnotateAstVisitor(AnnotateAstVisitor):
+        # TODO check if we really should have this
+        def visit_Call(self, node):
+            self._maybe_annotate(node)
+else:
+    MyAnnotateAstVisitor = None  # type: ignore

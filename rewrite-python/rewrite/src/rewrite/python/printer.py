@@ -320,7 +320,9 @@ class PythonPrinter:
     def _visit_markers(self, markers: Markers, p: PrintOutputCapture) -> Markers:
         """Visit markers that need printing (like TrailingComma, Semicolon)."""
         for marker in markers.markers:
-            if isinstance(marker, TrailingComma):
+            if isinstance(marker, Semicolon):
+                p.append(';')
+            elif isinstance(marker, TrailingComma):
                 p.append(',')
                 self._visit_space(marker.suffix, Space.Location.LANGUAGE_EXTENSION, p)
         return markers
@@ -566,7 +568,7 @@ class PythonPrinter:
         """Visit an error from expression."""
         self._before_syntax(expr, PySpace.Location.ERROR_FROM_PREFIX, p)
         self.visit(expr.error, p)
-        self._visit_space(expr.padding.from_.before, PySpace.Location.ERROR_FROM_SOURCE, p)
+        self._visit_space(expr.padding.from_.before, PySpace.Location.ERROR_FROM_EXPRESSION_FROM_PREFIX, p)
         p.append("from")
         self.visit(expr.from_, p)
         return expr
@@ -668,10 +670,10 @@ class PythonPrinter:
         elif kind in (MatchCase.Pattern.Kind.CAPTURE, MatchCase.Pattern.Kind.LITERAL):
             self._visit_container("", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, "", "", p)
         elif kind == MatchCase.Pattern.Kind.CLASS:
-            self._visit_space(children.before, PySpace.Location.MATCH_CASE_PATTERN_CHILD_PREFIX, p)
+            self._visit_space(children.before, PySpace.Location.MATCH_CASE_PATTERN_CHILDREN_PREFIX, p)
             elements = children.padding.elements
             self._visit_right_padded(elements[0], PyRightPadded.Location.MATCH_CASE_PATTERN_CHILD, p)
-            rest = JContainer.build(elements[1:])
+            rest = JContainer(Space.EMPTY, elements[1:], Markers.EMPTY)
             self._visit_container("(", rest, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, ",", ")", p)
         elif kind == MatchCase.Pattern.Kind.DOUBLE_STAR:
             self._visit_container("**", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, "", "", p)
@@ -778,10 +780,14 @@ class PythonPrinter:
         return star
 
     def visit_statement_expression(self, stmt: 'py.StatementExpression', p: PrintOutputCapture) -> J:
-        """Visit a statement expression."""
-        self._before_syntax(stmt, PySpace.Location.STATEMENT_EXPRESSION_PREFIX, p)
+        """Visit a statement expression.
+
+        StatementExpression is a thin wrapper around statements that are also expressions
+        (like yield, assignment expressions, etc.). It doesn't need its own prefix/suffix
+        handling since the contained statement already has the correct spacing.
+        """
+        self._visit_markers(stmt.markers, p)
         self.visit(stmt.statement, p)
-        self._after_syntax(stmt, p)
         return stmt
 
     def visit_trailing_else_wrapper(self, wrapper: 'py.TrailingElseWrapper', p: PrintOutputCapture) -> J:
@@ -1547,7 +1553,7 @@ class PythonJavaPrinter:
 
         # Visit select with appropriate separator
         if method.padding.select:
-            suffix = "" if not method.simple_name else "."
+            suffix = "" if not method.name.simple_name else "."
             self._visit_right_padded(method.padding.select, JRightPadded.Location.METHOD_SELECT, p, suffix)
 
         # Visit type parameters

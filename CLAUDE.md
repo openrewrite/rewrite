@@ -40,6 +40,13 @@ OpenRewrite is an automated refactoring ecosystem for source code that eliminate
 - Tests should be comprehensive and cover edge cases
 - Use appropriate testing frameworks (JUnit for Java, Jest for TypeScript)
 
+#### RPC-based Language Tests (Python, JavaScript)
+- **CRITICAL**: Tests for RPC-based languages (like `rewrite-python`) can hang indefinitely when RPC communication fails
+- **ALWAYS** set explicit timeouts when running these tests (e.g., `timeout: 60000` for individual tests, `timeout: 120000` for small test classes)
+- Run individual tests or small test classes rather than entire test suites to avoid long-running hangs
+- If a test hangs, it usually indicates an RPC communication issue (deadlock, malformed response, etc.)
+- Common failure modes: printer bugs causing empty output, bidirectional RPC message interleaving issues
+
 ### Error Handling
 - Handle errors appropriately and provide meaningful error messages
 - Use exceptions for exceptional conditions, not for control flow

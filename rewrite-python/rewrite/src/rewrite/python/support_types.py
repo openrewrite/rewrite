@@ -84,6 +84,7 @@ class PySpace:
         SLICE_STEP_SUFFIX = auto()
         SLICE_STOP_SUFFIX = auto()
         SPECIAL_PARAMETER_PREFIX = auto()
+        STATEMENT_EXPRESSION_PREFIX = auto()
         STAR_PREFIX = auto()
         TOP_LEVEL_STATEMENT = auto()
         TRAILING_ELSE_WRAPPER_PREFIX = auto()

@@ -929,3 +929,57 @@ class PythonRpcReceiver:
         # For now, just receive without transformation
         # Full type handling would need more work
         return java_type
+
+
+# Register marker codecs
+def _register_marker_codecs():
+    """Register receive codecs for Java marker types."""
+    from rewrite.java.markers import Semicolon, TrailingComma, OmitParentheses
+    from rewrite.java.support_types import Space
+    from rewrite.rpc.receive_queue import register_receive_codec
+
+    def _receive_semicolon(semicolon: Semicolon, q: RpcReceiveQueue) -> Semicolon:
+        new_id = q.receive(semicolon.id)
+        if new_id is semicolon.id:
+            return semicolon
+        return semicolon.with_id(new_id)
+
+    def _receive_trailing_comma(trailing_comma: TrailingComma, q: RpcReceiveQueue) -> TrailingComma:
+        new_id = q.receive(trailing_comma.id)
+        new_suffix = q.receive(trailing_comma.suffix)
+        if new_id is trailing_comma.id and new_suffix is trailing_comma.suffix:
+            return trailing_comma
+        result = trailing_comma
+        if new_id is not trailing_comma.id:
+            result = result.with_id(new_id)
+        if new_suffix is not trailing_comma.suffix:
+            result = result.with_suffix(new_suffix)
+        return result
+
+    def _receive_omit_parentheses(omit_paren: OmitParentheses, q: RpcReceiveQueue) -> OmitParentheses:
+        new_id = q.receive(omit_paren.id)
+        if new_id is omit_paren.id:
+            return omit_paren
+        return omit_paren.with_id(new_id)
+
+    from uuid import uuid4
+
+    register_receive_codec(
+        'org.openrewrite.java.marker.Semicolon',
+        _receive_semicolon,
+        lambda: Semicolon(uuid4())
+    )
+    register_receive_codec(
+        'org.openrewrite.java.marker.TrailingComma',
+        _receive_trailing_comma,
+        lambda: TrailingComma(uuid4(), Space.EMPTY)
+    )
+    register_receive_codec(
+        'org.openrewrite.java.marker.OmitParentheses',
+        _receive_omit_parentheses,
+        lambda: OmitParentheses(uuid4())
+    )
+
+
+# Register codecs on module import
+_register_marker_codecs()

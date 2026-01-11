@@ -48,6 +48,20 @@ testing {
     }
 }
 
+// Run tests serially to avoid issues with concurrent Python RPC processes
+// The Python RPC server uses ThreadLocal, but test state can interfere
+// when multiple tests run rapidly on the same thread
+tasks.withType<Test> {
+    maxParallelForks = 1
+    // Add timeout to identify hanging tests - tests that hang will fail with timeout
+    systemProperty("junit.jupiter.execution.timeout.default", "30s")
+    // Show test names as they run
+    testLogging {
+        events("started", "passed", "failed", "skipped")
+        showStandardStreams = true
+    }
+}
+
 // Note: Python IDE support is configured via the standalone module at:
 // .idea/modules/rewrite-python-src/rewrite-python-src.iml
 // This is separate from Gradle because IntelliJ's Gradle integration doesn't support Python source roots.

@@ -57,6 +57,8 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
+import org.openrewrite.rpc.request.PushObject;
+
 /**
  * Base class for RPC clients with thread-local context support.
  */
@@ -183,6 +185,24 @@ public class RewriteRpc {
             logOut.close();
         }
         jsonRpc.shutdown();
+    }
+
+    /**
+     * Resets all cached state in both the local and remote RPC processes.
+     * This should be called between operations that don't share state (e.g., between tests)
+     * to prevent unbounded memory growth from accumulated objects.
+     */
+    public void reset() {
+        // Send reset to remote process
+        send("Reset", null, Boolean.class);
+
+        // Clear local caches
+        remoteObjects.clear();
+        localObjects.clear();
+        localObjectIds.clear();
+        remoteRefs.clear();
+        localRefs.clear();
+        remoteLanguages = null;
     }
 
     public <P> @Nullable Tree visit(SourceFile sourceFile, String visitorName, P p) {
@@ -389,18 +409,59 @@ public class RewriteRpc {
     }
 
     public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
-        localObjects.put(tree.getId().toString(), tree);
+        String treeId = tree.getId().toString();
+        localObjects.put(treeId, tree);
         SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : parent.firstEnclosingOrThrow(SourceFile.class);
+        String sourceFileType = sourceFile.getClass().getName();
+
+        // Push the potentially modified tree to the remote process before printing.
+        // This avoids a bidirectional RPC deadlock that would occur if the remote
+        // tried to fetch the tree during Print handling.
+        pushObject(tree, sourceFileType);
+
         return send(
                 "Print",
                 new Print(
-                        tree.getId().toString(),
+                        treeId,
                         sourceFile.getSourcePath(),
-                        sourceFile.getClass().getName(),
+                        sourceFileType,
                         markerPrinter
                 ),
                 String.class
         );
+    }
+
+    /**
+     * Push an object to the remote process, syncing its current state.
+     * This is used before Print to ensure the remote has the latest version
+     * of a potentially modified tree.
+     */
+    private void pushObject(Tree tree, @Nullable String sourceFileType) {
+        String id = tree.getId().toString();
+
+        // Get our understanding of what the remote had (the "before" state)
+        Object before = remoteObjects.get(id);
+
+        // Serialize the tree using RpcSendQueue with a reasonable batch size
+        // The drain function collects all batches into a single list
+        List<RpcObjectData> allData = new ArrayList<>();
+        RpcSendQueue sendQueue = new RpcSendQueue(
+                batchSize.get(),
+                allData::addAll,
+                localRefs,
+                sourceFileType,
+                traceGetObject.get().isSend()
+        );
+
+        sendQueue.send(tree, before, null);
+        sendQueue.put(new RpcObjectData(END_OF_OBJECT, null, null, null, traceGetObject.get().isSend()));
+        sendQueue.flush();
+
+        // Send PushObject to remote
+        send("PushObject", new PushObject(id, sourceFileType, allData), Boolean.class);
+
+        // Update our understanding of the remote state
+        remoteObjects.put(id, tree);
     }
 
     public RewriteRpc traceGetObject(boolean receive, boolean send) {

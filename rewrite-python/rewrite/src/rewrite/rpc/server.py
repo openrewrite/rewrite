@@ -25,6 +25,7 @@ import ast
 import json
 import logging
 import os
+import select
 import sys
 import traceback
 import threading
@@ -64,16 +65,22 @@ def _next_request_id() -> int:
         return _request_id_counter
 
 
-def send_request(method: str, params: dict) -> Any:
+def send_request(method: str, params: dict, timeout_seconds: float = 10.0) -> Any:
     """Send a JSON-RPC request to Java and wait for the response.
 
     This enables bidirectional communication - Python can request
     objects from Java while processing an incoming request.
 
-    IMPORTANT: This is a synchronous call that will block until
-    Java sends back the response. This works because:
-    1. Java's RPC implementation can handle nested requests
-    2. Python's single-threaded model means we process one thing at a time
+    Args:
+        method: The RPC method name
+        params: The request parameters
+        timeout_seconds: Maximum time to wait for response (default 10s)
+
+    Returns:
+        The result from the RPC response
+
+    Raises:
+        RuntimeError: If request times out or fails
     """
     request_id = _next_request_id()
 
@@ -90,13 +97,11 @@ def send_request(method: str, params: dict) -> Any:
     # Send the request to Java via stdout
     write_message(request)
 
-    # Read the response from Java
-    # Since we're in the middle of handling a request, this will
-    # block until Java processes our request and sends back a response
-    response = read_message()
+    # Read the response from Java with timeout
+    response = read_message_with_timeout(timeout_seconds)
 
     if response is None:
-        raise RuntimeError(f"No response received for {method} request")
+        raise RuntimeError(f"No response received for {method} request (timeout after {timeout_seconds}s)")
 
     if _trace_rpc:
         logger.debug(f"Received response from Java: {json.dumps(response)}")
@@ -112,17 +117,15 @@ def send_request(method: str, params: dict) -> Any:
 def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) -> Any:
     """Fetch an object from Java and deserialize it using PythonRpcReceiver.
 
-    This is used when Python needs to work with an object that Java holds,
-    such as when printing a tree that was modified by Java.
+    This ALWAYS sends a GetObject RPC to Java, even if we have a local copy.
+    The local copy (in remote_objects) represents our understanding of what
+    Java had at some point, and the GetObject response will contain any diffs
+    that need to be applied to get the current state.
+
+    This is how the RPC protocol works - each side tracks local and remote
+    state, and GetObject transmits only the changes (diffs) between states.
     """
-    # Check if we already have this object locally
-    if obj_id in local_objects:
-        return local_objects[obj_id]
-
-    if obj_id in remote_objects:
-        return remote_objects[obj_id]
-
-    # Request the object from Java
+    # Request the object from Java - ALWAYS send this, don't short-circuit
     result = send_request('GetObject', {
         'id': obj_id,
         'sourceFileType': source_file_type
@@ -147,15 +150,17 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
     q = RpcReceiveQueue(remote_refs, source_file_type, pull_batch, trace=_trace_rpc)
     receiver = PythonRpcReceiver()
 
-    # Get the "before" state if we have one
+    # Get the "before" state - our understanding of what Java had
+    # This is used to apply diffs from the GetObject response
     before = remote_objects.get(obj_id)
 
-    # Receive and deserialize the object
+    # Receive and deserialize the object (applies diffs to before state)
     obj = receiver.receive(before, q)
 
     if obj is not None:
+        # Update our understanding of what Java has
         remote_objects[obj_id] = obj
-        # Also add to local_objects so future lookups find it
+        # Also update local_objects for consistency
         local_objects[str(obj.id)] = obj
 
     return obj
@@ -273,10 +278,15 @@ def handle_get_object(params: dict) -> List[dict]:
 
     This serializes an object for RPC transfer as RpcObjectData[].
     Returns list of RpcObjectData objects that Java can deserialize.
+
+    After sending, we update remote_objects to track that the remote (Java)
+    now has this version of the object. This is essential for the diff-based
+    RPC protocol to work correctly.
     """
     obj_id = params.get('id')
     source_file_type = params.get('sourceFileType')
     obj = local_objects.get(obj_id)
+    logger.info(f"handle_get_object: id={obj_id}, type={type(obj).__name__ if obj else 'None'}")
 
     if obj is None:
         return [
@@ -287,11 +297,18 @@ def handle_get_object(params: dict) -> List[dict]:
     try:
         from rewrite.rpc.send_queue import RpcSendQueue
 
+        # Get the "before" state - what we previously sent to Java
+        before = remote_objects.get(obj_id)
+
         q = RpcSendQueue(source_file_type)
-        result = q.generate(obj, None)
+        result = q.generate(obj, before)
         logger.debug(f"GetObject result: {len(result)} items")
         for i, item in enumerate(result[:10]):  # Log first 10 items
             logger.debug(f"  [{i}] {item}")
+
+        # Update remote_objects to track that Java now has this version
+        remote_objects[obj_id] = obj
+
         return result
 
     except Exception as e:
@@ -324,28 +341,31 @@ def handle_get_languages(params: dict) -> List[str]:
 def handle_print(params: dict) -> str:
     """Handle a Print RPC request.
 
-    This may need to fetch the object from Java if Python doesn't have it locally.
-    This enables printing of trees that Java has modified.
+    NOTE: We use the local cached object instead of fetching from Java to avoid
+    a bidirectional RPC deadlock. Java is waiting for our Print response, so if
+    we send a GetObject request back to Java, we'll deadlock:
+    - Java blocked waiting for Print response
+    - Python blocked waiting for GetObject response
+
+    For tests that just parse and print (no modifications), using local cache works.
+    For real recipes that modify trees, we'd need proper async bidirectional RPC.
     """
     # Java sends 'treeId', but also accept 'id' for compatibility
     obj_id = params.get('treeId') or params.get('id')
     source_file_type = params.get('sourceFileType')
 
     logger.info(f"handle_print: treeId={obj_id}, sourceFileType={source_file_type}")
-    logger.info(f"handle_print: local_objects has {len(local_objects)} items: {list(local_objects.keys())[:5]}")
 
-    # First try local objects
+    # Use locally cached object to avoid bidirectional RPC deadlock
+    # The object should be in local_objects if we parsed it
     obj = local_objects.get(obj_id)
 
-    if obj is not None:
-        logger.info(f"handle_print: found object locally, type={type(obj).__name__}")
-    else:
-        # If not found locally, try to fetch from Java
-        logger.info(f"handle_print: Object {obj_id} not found locally, fetching from Java...")
-        obj = get_object_from_java(obj_id, source_file_type)
+    # Also check remote_objects in case we received it from Java previously
+    if obj is None:
+        obj = remote_objects.get(obj_id)
 
     if obj is None:
-        logger.warning(f"Object {obj_id} not found locally or remotely")
+        logger.warning(f"Object {obj_id} not found in local cache")
         return ""
 
     # If it's a CompilationUnit, use the printer
@@ -368,6 +388,77 @@ def handle_print(params: dict) -> str:
     return ""
 
 
+def handle_reset(params: dict) -> bool:
+    """Handle a Reset RPC request - clears all cached state."""
+    global local_objects, remote_objects, remote_refs
+    local_objects.clear()
+    remote_objects.clear()
+    remote_refs.clear()
+    logger.info("Reset: cleared all cached state")
+    return True
+
+
+def handle_push_object(params: dict) -> bool:
+    """Handle a PushObject RPC request - receives an object from Java.
+
+    This is called by Java before Print to sync a modified tree to Python.
+    This avoids the bidirectional RPC deadlock that would occur if Python
+    tried to fetch the object during Print handling.
+
+    Args:
+        params: Contains 'id', 'sourceFileType', and 'data' (serialized object)
+
+    Returns:
+        True on success
+    """
+    obj_id = params.get('id')
+    source_file_type = params.get('sourceFileType')
+    data = params.get('data')
+
+    logger.info(f"handle_push_object: id={obj_id}, sourceFileType={source_file_type}")
+
+    if not obj_id or not data:
+        logger.warning("PushObject missing id or data")
+        return False
+
+    try:
+        from rewrite.rpc.receive_queue import RpcReceiveQueue
+        from rewrite.rpc.python_receiver import PythonRpcReceiver
+
+        # Data is a list of RpcObjectData dicts
+        batch = list(data)
+
+        def pull_batch() -> List[Dict[str, Any]]:
+            nonlocal batch
+            result = batch
+            batch = []
+            return result
+
+        q = RpcReceiveQueue(remote_refs, source_file_type, pull_batch, trace=_trace_rpc)
+        receiver = PythonRpcReceiver()
+
+        # Get the "before" state - our understanding of what Java had
+        before = remote_objects.get(obj_id)
+
+        # Receive and deserialize the object (applies diffs to before state)
+        obj = receiver.receive(before, q)
+
+        if obj is not None:
+            # Store in both caches so Print can find it
+            remote_objects[obj_id] = obj
+            local_objects[str(obj.id)] = obj
+            logger.info(f"PushObject: stored object {obj_id}")
+            return True
+        else:
+            logger.warning(f"PushObject: failed to deserialize object {obj_id}")
+            return False
+
+    except Exception as e:
+        logger.error(f"Error in handle_push_object: {e}")
+        traceback.print_exc()
+        return False
+
+
 def handle_request(method: str, params: dict) -> Any:
     """Handle an RPC request."""
     handlers = {
@@ -376,6 +467,8 @@ def handle_request(method: str, params: dict) -> Any:
         'GetObject': handle_get_object,
         'GetLanguages': handle_get_languages,
         'Print': handle_print,
+        'PushObject': handle_push_object,
+        'Reset': handle_reset,
     }
 
     handler = handlers.get(method)
@@ -385,8 +478,50 @@ def handle_request(method: str, params: dict) -> Any:
         raise ValueError(f"Unknown method: {method}")
 
 
+def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
+    """Read a JSON-RPC message from stdin with timeout.
+
+    Uses select() to wait for data with a timeout, preventing indefinite blocking.
+
+    Args:
+        timeout_seconds: Maximum time to wait for data
+
+    Returns:
+        Parsed JSON message, or None on timeout/error
+    """
+    try:
+        # Wait for stdin to be readable with timeout
+        # Note: select works on file descriptors, stdin.fileno() gives us that
+        readable, _, _ = select.select([sys.stdin], [], [], timeout_seconds)
+
+        if not readable:
+            logger.warning(f"Timeout waiting for RPC response after {timeout_seconds}s")
+            return None
+
+        # Read Content-Length header
+        header_line = sys.stdin.readline()
+        if not header_line:
+            return None
+
+        if not header_line.startswith('Content-Length:'):
+            logger.error(f"Invalid header: {header_line}")
+            return None
+
+        content_length = int(header_line.split(':')[1].strip())
+
+        # Read empty line
+        sys.stdin.readline()
+
+        # Read content
+        content = sys.stdin.read(content_length)
+        return json.loads(content)
+    except Exception as e:
+        logger.error(f"Error reading message with timeout: {e}")
+        return None
+
+
 def read_message() -> Optional[dict]:
-    """Read a JSON-RPC message from stdin."""
+    """Read a JSON-RPC message from stdin (blocking, no timeout)."""
     try:
         # Read Content-Length header
         header_line = sys.stdin.readline()

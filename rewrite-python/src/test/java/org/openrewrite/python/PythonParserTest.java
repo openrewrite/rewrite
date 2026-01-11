@@ -46,13 +46,6 @@ class PythonParserTest implements RewriteTest {
 
     @Test
     void parseStringWithParser() {
-        // Set up tracing for debugging
-        org.openrewrite.python.rpc.PythonRewriteRpc.setFactory(
-            org.openrewrite.python.rpc.PythonRewriteRpc.builder()
-                .traceRpcMessages()
-                .log(java.nio.file.Paths.get("build/python-rpc.log"))
-        );
-
         SourceFile sf = PythonParser.builder().build()
           .parse(
             //language=python

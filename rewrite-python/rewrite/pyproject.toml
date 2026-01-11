@@ -23,6 +23,8 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "cbor2>=5.6.5",
+    "more_itertools>=10.0.0",
+    "pytype>=2024.1.1; python_version < '3.13'",
 ]
 
 [project.optional-dependencies]

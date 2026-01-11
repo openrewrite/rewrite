@@ -89,6 +89,20 @@ public class PythonRewriteRpc extends RewriteRpc {
     }
 
     /**
+     * Resets the cached state of the current Python RPC instance.
+     * This clears all parsed objects and references on both the Java and Python sides,
+     * preventing memory accumulation across multiple parse operations.
+     * <p>
+     * Call this between tests or after batch operations that don't need to share state.
+     */
+    public static void resetCurrent() {
+        PythonRewriteRpc current = MANAGER.get();
+        if (current != null) {
+            current.reset();
+        }
+    }
+
+    /**
      * Parses an entire Python project directory.
      * Discovers and parses all relevant source files.
      *

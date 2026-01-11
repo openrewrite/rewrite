@@ -4,6 +4,7 @@ Python RPC Sender that mirrors Java's PythonSender structure.
 This uses the visitor pattern with pre_visit handling common fields (id, prefix, markers)
 and type-specific visit methods handling only additional fields.
 """
+import sys
 from typing import Any
 
 from rewrite import Markers
@@ -17,6 +18,12 @@ from rewrite.python.tree import (
     TypeAlias, YieldFrom, UnionType, VariableScope, Del, SpecialParameter,
     Star, NamedArgument, TypeHintedExpression, ErrorFrom, MatchCase, Slice
 )
+
+_DEBUG_SENDER = False
+
+def _debug(msg: str) -> None:
+    if _DEBUG_SENDER:
+        print(f"[SENDER] {msg}", file=sys.stderr, flush=True)
 
 
 class PythonRpcSender:
@@ -51,6 +58,8 @@ class PythonRpcSender:
         """Visit a tree node, dispatching to appropriate visitor method."""
         if tree is None:
             return
+
+        _debug(f"_visit: {type(tree).__name__}")
 
         # First handle common J fields via pre_visit
         # ExpressionStatement and StatementExpression delegate prefix/markers to their child, so skip them
@@ -317,14 +326,22 @@ class PythonRpcSender:
         q.get_and_send(ef, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
 
     def _visit_match_case(self, mc: MatchCase, q: 'RpcSendQueue') -> None:
+        _debug(f"_visit_match_case: id={mc.id}")
         q.get_and_send(mc, lambda x: x.pattern, lambda el: self._visit(el, q))
+        _debug("_visit_match_case: sent pattern")
         q.get_and_send(mc, lambda x: x.padding.guard, lambda el: self._visit_left_padded(el, q))
+        _debug("_visit_match_case: sent guard")
         q.get_and_send(mc, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
+        _debug("_visit_match_case: done")
 
     def _visit_match_case_pattern(self, p: MatchCase.Pattern, q: 'RpcSendQueue') -> None:
+        _debug(f"_visit_match_case_pattern: kind={p.kind}, children_count={len(p.children) if p.children else 0}")
         q.get_and_send(p, lambda x: x.kind)
+        _debug("_visit_match_case_pattern: sent kind")
         q.get_and_send(p, lambda x: x.padding.children, lambda el: self._visit_container(el, q))
+        _debug("_visit_match_case_pattern: sent children")
         q.get_and_send(p, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
+        _debug("_visit_match_case_pattern: done")
 
     def _visit_slice(self, slice_: Slice, q: 'RpcSendQueue') -> None:
         q.get_and_send(slice_, lambda x: x.padding.start, lambda el: self._visit_right_padded(el, q))
@@ -846,9 +863,12 @@ class PythonRpcSender:
         """Visit a JContainer wrapper."""
         if container is None:
             return
+        elements = container.padding.elements if container else []
+        _debug(f"_visit_container: {len(elements)} elements")
         q.get_and_send(container, lambda x: x.before, lambda space: self._visit_space(space, q))
         # Use padding.elements to get JRightPadded list, not unwrapped elements
         q.get_and_send_list(container, lambda x: x.padding.elements,
                            lambda el: el.element.id,
                            lambda el: self._visit_right_padded(el, q))
         q.get_and_send(container, lambda x: x.markers)
+        _debug("_visit_container: done")
