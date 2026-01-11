@@ -398,6 +398,115 @@ def handle_reset(params: dict) -> bool:
     return True
 
 
+# Global marketplace instance (lazily initialized)
+_marketplace = None
+
+
+def _get_marketplace():
+    """Get or create the global marketplace instance."""
+    global _marketplace
+    if _marketplace is None:
+        from rewrite.discovery import discover_recipes
+        from rewrite.marketplace import RecipeMarketplace
+        from rewrite import activate
+
+        # First try to discover from installed packages
+        _marketplace = discover_recipes()
+
+        # Also activate local recipes (in case package isn't installed)
+        # This ensures recipes work during development
+        activate(_marketplace)
+
+    return _marketplace
+
+
+def handle_get_marketplace(params: dict) -> List[dict]:
+    """Handle a GetMarketplace RPC request.
+
+    Returns all recipes organized by category in a format compatible with Java.
+
+    Returns:
+        List of dicts with 'descriptor' and 'categoryPaths' for each recipe.
+    """
+    from dataclasses import asdict
+
+    marketplace = _get_marketplace()
+    rows: List[dict] = []
+
+    def collect_recipes(category, category_path: List[dict]):
+        """Recursively collect recipes from a category and its subcategories."""
+        current_path = [*category_path, _category_descriptor_to_dict(category.descriptor)]
+
+        for recipe_name, (recipe_desc, _recipe_class) in category.recipes.items():
+            # Check if we already have this recipe (it can appear in multiple categories)
+            existing = next((r for r in rows if r['descriptor']['name'] == recipe_desc.name), None)
+            if existing:
+                existing['categoryPaths'].append(current_path)
+            else:
+                rows.append({
+                    'descriptor': _recipe_descriptor_to_dict(recipe_desc),
+                    'categoryPaths': [current_path]
+                })
+
+        for subcategory in category.categories:
+            collect_recipes(subcategory, current_path)
+
+    # Start from the root's children (skip the root itself)
+    for category in marketplace.categories():
+        collect_recipes(category, [])
+
+    logger.info(f"GetMarketplace: returning {len(rows)} recipes")
+    return rows
+
+
+def _category_descriptor_to_dict(descriptor) -> dict:
+    """Convert a CategoryDescriptor to a dict for JSON serialization."""
+    return {
+        'displayName': descriptor.display_name,
+        'packageName': descriptor.package_name,
+        'description': descriptor.description,
+        'tags': list(descriptor.tags),
+        'root': descriptor.root,
+        'priority': descriptor.priority,
+        'synthetic': descriptor.synthetic,
+    }
+
+
+def _recipe_descriptor_to_dict(descriptor) -> dict:
+    """Convert a RecipeDescriptor to a dict for JSON serialization."""
+    return {
+        'name': descriptor.name,
+        'displayName': descriptor.display_name,
+        'description': descriptor.description,
+        'tags': descriptor.tags,
+        'estimatedEffortPerOccurrence': descriptor.estimated_effort_per_occurrence,
+        'options': [
+            {
+                'name': name,
+                'value': _serialize_value(value),
+                'displayName': opt.display_name,
+                'description': opt.description,
+                'example': opt.example,
+                'required': opt.required,
+                'valid': opt.valid,
+            }
+            for name, value, opt in descriptor.options
+        ],
+        'recipeList': [_recipe_descriptor_to_dict(r) for r in descriptor.recipe_list],
+    }
+
+
+def _serialize_value(value) -> Any:
+    """Serialize a value to JSON-compatible format."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (list, tuple)):
+        return [_serialize_value(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _serialize_value(v) for k, v in value.items()}
+    return str(value)
+
+
 def handle_push_object(params: dict) -> bool:
     """Handle a PushObject RPC request - receives an object from Java.
 
@@ -469,6 +578,7 @@ def handle_request(method: str, params: dict) -> Any:
         'Print': handle_print,
         'PushObject': handle_push_object,
         'Reset': handle_reset,
+        'GetMarketplace': handle_get_marketplace,
     }
 
     handler = handlers.get(method)

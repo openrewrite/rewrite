@@ -17,11 +17,18 @@
 from typing import Any
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor
+from rewrite.category import CategoryDescriptor
+from rewrite.decorators import categorize
+from rewrite.marketplace import Python
 from rewrite.python.tree import Pass
 from rewrite.python.visitor import PythonVisitor
 from rewrite.java import J
 
+# Define category path locally to avoid circular imports
+_Cleanup = [*Python, CategoryDescriptor(display_name="Cleanup")]
 
+
+@categorize(_Cleanup)
 class RemovePass(Recipe):
     """
     Remove `pass` statements from Python code.

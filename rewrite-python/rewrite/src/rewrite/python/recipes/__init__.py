@@ -14,8 +14,19 @@
 
 """Python recipes for OpenRewrite."""
 
+from rewrite.category import CategoryDescriptor
+from rewrite.marketplace import Python
+
 from .remove_pass import RemovePass
+
+# Category constants for Python recipes
+# Use these when decorating recipes with @recipe(category=...)
+# Note: Also defined in remove_pass.py to avoid circular imports
+Cleanup = [*Python, CategoryDescriptor(display_name="Cleanup")]
 
 __all__ = [
     "RemovePass",
+    # Category constants
+    "Python",
+    "Cleanup",
 ]

@@ -7,8 +7,12 @@ try:
 except ImportError:
     pass  # pytest not available, skip assert rewriting
 
+from .category import CategoryDescriptor, LOWEST_PRECEDENCE, DEFAULT_PRECEDENCE, HIGHEST_PRECEDENCE
+from .decorators import categorize, get_recipe_category
+from .discovery import discover_recipes, discover_decorated_recipes_in_module
 from .execution import ExecutionContext, DelegatingExecutionContext, InMemoryExecutionContext, \
     RecipeRunException, LargeSourceSet, InMemoryLargeSourceSet, Result
+from .marketplace import RecipeMarketplace, Python
 from .recipe import Recipe, ScanningRecipe, option, OptionDescriptor, RecipeDescriptor
 from .markers import *
 from .parser import *
@@ -53,6 +57,19 @@ __all__ = [
     'OptionDescriptor',
     'RecipeDescriptor',
 
+    # Categories and Marketplace
+    'CategoryDescriptor',
+    'LOWEST_PRECEDENCE',
+    'DEFAULT_PRECEDENCE',
+    'HIGHEST_PRECEDENCE',
+    'RecipeMarketplace',
+    'Python',
+    'categorize',
+    'get_recipe_category',
+    'discover_recipes',
+    'discover_decorated_recipes_in_module',
+    'activate',
+
     # Markers
     'Marker',
     'Markers',
@@ -72,3 +89,23 @@ __all__ = [
     'NamedStyles',
     'GeneralFormatStyle',
 ]
+
+
+def activate(marketplace: RecipeMarketplace) -> None:
+    """
+    Install all recipes in this package into the marketplace.
+
+    This function is called by the discovery mechanism when the
+    openrewrite package is found via entry points. It installs all
+    the built-in Python recipes into the provided marketplace.
+
+    Args:
+        marketplace: The RecipeMarketplace to install recipes into
+    """
+    from rewrite.decorators import get_recipe_category
+    from rewrite.python.recipes import RemovePass
+
+    # Install all Python recipes with their categories
+    category = get_recipe_category(RemovePass)
+    if category is not None:
+        marketplace.install(RemovePass, category)
