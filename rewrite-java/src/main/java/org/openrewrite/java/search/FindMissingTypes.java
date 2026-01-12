@@ -21,6 +21,7 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.*;
@@ -229,6 +230,14 @@ public class FindMissingTypes extends Recipe {
         }
 
         @Override
+        public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
+            J.Package p = pkg.withAnnotations(ListUtils.map(pkg.getAnnotations(),
+                    a -> isWellFormedType(a.getType(), seenTypes) ? a :
+                            SearchResult.found(a, "Annotation type is missing or malformed")));
+            return p == pkg ? super.visitPackage(pkg, ctx) : p;
+        }
+
+        @Override
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
             J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
             JavaType.FullyQualified t = cd.getType();
@@ -317,7 +326,7 @@ public class FindMissingTypes extends Recipe {
             Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.FieldAccess &&
                     (ident == ((J.FieldAccess) value).getName() ||
-                        ident == ((J.FieldAccess) value).getTarget() && !"class".equals(((J.FieldAccess) value).getSimpleName()));
+                            ident == ((J.FieldAccess) value).getTarget() && !"class".equals(((J.FieldAccess) value).getSimpleName()));
         }
 
         private boolean isBeingDeclared(J.Identifier ident) {
@@ -343,7 +352,7 @@ public class FindMissingTypes extends Recipe {
         private boolean isMemberReference(J.Identifier ident) {
             Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.MemberReference &&
-                   ident == ((J.MemberReference) value).getReference();
+                    ident == ((J.MemberReference) value).getReference();
         }
 
         private boolean isInJavaDoc(J.Identifier ident) {
