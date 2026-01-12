@@ -70,10 +70,10 @@ class RewriteRpcTest implements RewriteTest {
         JsonMessageFormatter clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
         JsonMessageFormatter serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
-        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut), clientFormatter), marketplace)
+        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), marketplace)
           .batchSize(1);
 
-        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut), serverFormatter), marketplace)
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), marketplace)
           .batchSize(1);
     }
 

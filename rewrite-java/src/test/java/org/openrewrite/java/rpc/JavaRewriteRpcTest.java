@@ -60,8 +60,8 @@ class JavaRewriteRpcTest implements RewriteTest {
         JsonMessageFormatter clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
         JsonMessageFormatter serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
-        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut), clientFormatter), env.toMarketplace(runtimeClasspath()));
-        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut), serverFormatter), env.toMarketplace(runtimeClasspath()))
+        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), env.toMarketplace(runtimeClasspath()));
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), env.toMarketplace(runtimeClasspath()))
           .log(System.out);
 //        client.traceGetObject(true, true);
     }

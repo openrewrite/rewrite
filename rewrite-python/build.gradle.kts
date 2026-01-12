@@ -1,5 +1,8 @@
 @file:Suppress("UnstableApiUsage")
 
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 plugins {
     id("org.openrewrite.build.language-library")
     id("org.openrewrite.build.moderne-source-available-license")
@@ -141,3 +144,121 @@ tasks.withType<Test> {
 // Note: Python IDE support is configured via the standalone module at:
 // .idea/modules/rewrite-python-src/rewrite-python-src.iml
 // This is separate from Gradle because IntelliJ's Gradle integration doesn't support Python source roots.
+
+// ============================================
+// Python Publishing Tasks (PyPI)
+// ============================================
+
+// Generate a PEP 440 compliant version for CI builds
+// Snapshots use .dev suffix: 8.71.0.dev20260112145318
+// Releases use clean version: 8.71.0
+val pythonVersion: String = if (System.getenv("CI") != null) {
+    project.version.toString().replace(
+        "-SNAPSHOT",
+        ".dev${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
+    )
+} else {
+    project.version.toString().replace("-SNAPSHOT", ".dev0")
+}
+
+// Task to update version in pyproject.toml
+val pythonUpdateVersion by tasks.registering {
+    group = "python"
+    description = "Update version in pyproject.toml"
+
+    dependsOn(pythonSetupVenv)
+
+    val pyprojectFile = pythonDir.resolve("pyproject.toml")
+    inputs.property("version", pythonVersion)
+    outputs.file(pyprojectFile)
+
+    doLast {
+        val content = pyprojectFile.readText()
+        val updated = content.replace(
+            Regex("""version\s*=\s*"[^"]*""""),
+            """version = "$pythonVersion""""
+        )
+        pyprojectFile.writeText(updated)
+        logger.lifecycle("Updated pyproject.toml version to $pythonVersion")
+    }
+}
+
+// Task to install build dependencies
+val pythonInstallBuildDeps by tasks.registering(Exec::class) {
+    group = "python"
+    description = "Install Python build and publish dependencies"
+
+    dependsOn(pythonUpgradePip)
+
+    workingDir = pythonDir
+    commandLine(pipExe.absolutePath, "install", "build>=1.0.0", "twine>=5.0.0")
+
+    doFirst {
+        logger.lifecycle("Installing Python build dependencies (build, twine)")
+    }
+}
+
+// Task to build Python distribution (wheel + sdist)
+val pythonBuild by tasks.registering(Exec::class) {
+    group = "python"
+    description = "Build Python distribution packages"
+
+    dependsOn(pythonUpdateVersion, pythonInstallBuildDeps)
+
+    workingDir = pythonDir
+    commandLine(pythonExe.absolutePath, "-m", "build")
+
+    inputs.dir(pythonDir.resolve("src"))
+    inputs.file(pythonDir.resolve("pyproject.toml"))
+    outputs.dir(pythonDir.resolve("dist"))
+
+    doFirst {
+        // Clean previous builds
+        pythonDir.resolve("dist").deleteRecursively()
+        logger.lifecycle("Building Python distribution packages")
+    }
+}
+
+// Task to create .pypirc for authentication
+val setupPypirc by tasks.registering {
+    group = "python"
+    description = "Create .pypirc file for PyPI authentication"
+
+    doLast {
+        if (project.hasProperty("pypiToken")) {
+            val pypirc = pythonDir.resolve(".pypirc")
+            pypirc.writeText("""
+                [pypi]
+                username = __token__
+                password = ${project.property("pypiToken")}
+            """.trimIndent())
+            logger.lifecycle("Created .pypirc for PyPI authentication")
+        } else {
+            logger.warn("No pypiToken property found, skipping .pypirc creation")
+        }
+    }
+}
+
+// Task to publish to PyPI
+val pythonPublish by tasks.registering(Exec::class) {
+    group = "python"
+    description = "Publish Python package to PyPI"
+
+    dependsOn(pythonBuild, setupPypirc)
+
+    workingDir = pythonDir
+    commandLine(
+        pythonExe.absolutePath, "-m", "twine", "upload",
+        "--config-file", ".pypirc",
+        "dist/*"
+    )
+
+    doFirst {
+        logger.lifecycle("Publishing Python package to PyPI (version: $pythonVersion)")
+    }
+}
+
+// Wire into the main publish task
+tasks.named("publish") {
+    dependsOn(pythonPublish)
+}

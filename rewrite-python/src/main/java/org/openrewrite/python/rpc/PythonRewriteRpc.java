@@ -42,12 +42,6 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-/**
- * RPC client for communicating with a Python parser process.
- * <p>
- * This class follows the same pattern as {@code JavaScriptRewriteRpc} - it starts a Python
- * subprocess that handles parsing and communicates via JSON-RPC over stdin/stdout.
- */
 @Getter
 public class PythonRewriteRpc extends RewriteRpc {
     private static final RewriteRpcProcessManager<PythonRewriteRpc> MANAGER = new RewriteRpcProcessManager<>(builder());

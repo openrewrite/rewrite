@@ -34,6 +34,10 @@ dev = [
     "black>=24.0.0",
     "ruff>=0.1.0",
 ]
+publish = [
+    "build>=1.0.0",
+    "twine>=5.0.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/openrewrite/rewrite"
