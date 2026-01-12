@@ -424,16 +424,10 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         } else if (ctx.jsonArray() != null) {
             execForm = visitJsonArrayAsExecForm(ctx.jsonArray());
         } else if (ctx.sourceList() != null) {
-            // Parse all paths (sources + destination) together
-            // The grammar's flagValue may have greedily consumed some source tokens,
-            // so we need to parse from the current cursor position
-            List<Docker.Argument> allPaths = parseAllPaths(ctx.destination());
-            if (allPaths.size() >= 2) {
-                destination = allPaths.get(allPaths.size() - 1);
-                sources = new ArrayList<>(allPaths.subList(0, allPaths.size() - 1));
-            } else if (allPaths.size() == 1) {
-                destination = allPaths.get(0);
-            }
+            // With lexer modes for flag values, the grammar's token allocation is now correct
+            // Parse sources and destination directly from the grammar contexts
+            sources = parseSourcePaths(ctx.sourceList());
+            destination = parseDestinationPath(ctx.destination());
         }
 
         // Advance cursor to end of instruction
@@ -467,16 +461,10 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         } else if (ctx.jsonArray() != null) {
             execForm = visitJsonArrayAsExecForm(ctx.jsonArray());
         } else if (ctx.sourceList() != null) {
-            // Parse all paths (sources + destination) together
-            // The grammar's flagValue may have greedily consumed some source tokens,
-            // so we need to parse from the current cursor position
-            List<Docker.Argument> allPaths = parseAllPaths(ctx.destination());
-            if (allPaths.size() >= 2) {
-                destination = allPaths.get(allPaths.size() - 1);
-                sources = new ArrayList<>(allPaths.subList(0, allPaths.size() - 1));
-            } else if (allPaths.size() == 1) {
-                destination = allPaths.get(0);
-            }
+            // With lexer modes for flag values, the grammar's token allocation is now correct
+            // Parse sources and destination directly from the grammar contexts
+            sources = parseSourcePaths(ctx.sourceList());
+            destination = parseDestinationPath(ctx.destination());
         }
 
         // Advance cursor to end of instruction
@@ -488,103 +476,50 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     }
 
     /**
-     * Parse all paths (sources + destination) by scanning from the current cursor position.
-     * This method ignores the grammar's token allocation because the greedy flagValue rule
-     * may have consumed source tokens when flags are present.
-     *
-     * @param destinationCtx the grammar's destination context (used to find the end position)
-     * @return a list of Arguments, where the last one is the destination
+     * Parse source paths from the grammar's sourceList context.
+     * With lexer modes for flag values, the grammar's token allocation is now correct.
      */
-    private List<Docker.Argument> parseAllPaths(DockerParser.DestinationContext destinationCtx) {
-        List<Docker.Argument> allPaths = new ArrayList<>();
+    private List<Docker.Argument> parseSourcePaths(DockerParser.SourceListContext ctx) {
+        List<Docker.Argument> sources = new ArrayList<>();
+        for (DockerParser.SourcePathContext pathCtx : ctx.sourcePath()) {
+            sources.add(parsePathToken(pathCtx));
+        }
+        return sources;
+    }
 
-        // Find the end position of all paths (end of destination)
-        int endCodePoint = destinationCtx.getStop().getStopIndex() + 1;
-        int endCharIndex = source.offsetByCodePoints(0, endCodePoint);
+    /**
+     * Parse destination path from the grammar's destination context.
+     */
+    private Docker.Argument parseDestinationPath(DockerParser.DestinationContext ctx) {
+        return parsePathToken(ctx.destinationPath());
+    }
 
-        // Parse paths from current cursor position
-        int currentPos = cursor;
-        int currentCodePoint = codePointCursor;
+    /**
+     * Parse a single path token (source or destination) into an Argument.
+     */
+    private Docker.Argument parsePathToken(ParserRuleContext pathCtx) {
+        Space argPrefix = prefix(pathCtx.getStart());
+        Token token = pathCtx.getStart();
+        String tokenText = token.getText();
+        skip(token);
 
-        while (currentCodePoint < endCodePoint) {
-            // Skip leading whitespace and capture it as prefix
-            int prefixStart = currentPos;
-            while (currentCodePoint < endCodePoint) {
-                int charIndex = source.offsetByCodePoints(0, currentCodePoint);
-                if (charIndex >= source.length()) break;
-                char c = source.charAt(charIndex);
-                if (!Character.isWhitespace(c)) break;
-                currentCodePoint++;
-                currentPos = source.offsetByCodePoints(0, currentCodePoint);
-            }
-
-            if (currentCodePoint >= endCodePoint) break;
-
-            Space argPrefix = Space.format(source, prefixStart, currentPos);
-
-            int tokenStart = currentPos;
-
-            // Read until whitespace or end
-            while (currentCodePoint < endCodePoint) {
-                int charIndex = source.offsetByCodePoints(0, currentCodePoint);
-                if (charIndex >= source.length()) break;
-                char c = source.charAt(charIndex);
-
-                // Handle quoted strings
-                if (c == '"' || c == '\'') {
-                    char quote = c;
-                    currentCodePoint++;
-                    currentPos = source.offsetByCodePoints(0, currentCodePoint);
-                    // Find closing quote
-                    while (currentCodePoint < endCodePoint) {
-                        charIndex = source.offsetByCodePoints(0, currentCodePoint);
-                        if (charIndex >= source.length()) break;
-                        char innerC = source.charAt(charIndex);
-                        if (innerC == '\\' && currentCodePoint + 1 < endCodePoint) {
-                            // Skip escaped character
-                            currentCodePoint += 2;
-                            currentPos = source.offsetByCodePoints(0, currentCodePoint);
-                        } else if (innerC == quote) {
-                            currentCodePoint++;
-                            currentPos = source.offsetByCodePoints(0, currentCodePoint);
-                            break;
-                        } else {
-                            currentCodePoint++;
-                            currentPos = source.offsetByCodePoints(0, currentCodePoint);
-                        }
-                    }
-                } else if (Character.isWhitespace(c)) {
-                    break;
-                } else {
-                    currentCodePoint++;
-                    currentPos = source.offsetByCodePoints(0, currentCodePoint);
-                }
-            }
-
-            // Extract the token text and store as a simple Literal
-            // Don't try to parse env vars here - just preserve the raw text for lossless printing
-            String tokenText = source.substring(tokenStart, currentPos);
-
-            Docker.ArgumentContent content;
-            if (tokenText.startsWith("\"") && tokenText.endsWith("\"") && tokenText.length() >= 2) {
-                String value = tokenText.substring(1, tokenText.length() - 1);
-                content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.Literal.QuoteStyle.DOUBLE);
-            } else if (tokenText.startsWith("'") && tokenText.endsWith("'") && tokenText.length() >= 2) {
-                String value = tokenText.substring(1, tokenText.length() - 1);
-                content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.Literal.QuoteStyle.SINGLE);
-            } else {
-                // Store as plain literal - includes env vars like ${DEPENDENCY}/path
-                content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tokenText, null);
-            }
-
-            allPaths.add(new Docker.Argument(randomId(), argPrefix, Markers.EMPTY, singletonList(content)));
+        Docker.ArgumentContent content;
+        if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
+            String value = tokenText.substring(1, tokenText.length() - 1);
+            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.Literal.QuoteStyle.DOUBLE);
+        } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
+            String value = tokenText.substring(1, tokenText.length() - 1);
+            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.Literal.QuoteStyle.SINGLE);
+        } else if (token.getType() == DockerLexer.ENV_VAR) {
+            boolean braced = tokenText.startsWith("${");
+            String varName = braced ? tokenText.substring(2, tokenText.length() - 1) : tokenText.substring(1);
+            content = new Docker.EnvironmentVariable(randomId(), Space.EMPTY, Markers.EMPTY, varName, braced);
+        } else {
+            // UNQUOTED_TEXT - store as plain literal (includes complex paths like ${VAR}/path)
+            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tokenText, null);
         }
 
-        // Update cursor to end position
-        cursor = endCharIndex;
-        codePointCursor = endCodePoint;
-
-        return allPaths;
+        return new Docker.Argument(randomId(), argPrefix, Markers.EMPTY, singletonList(content));
     }
 
     @Override
@@ -1273,50 +1208,9 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     private List<Docker.Flag> convertHealthcheckOptions(DockerParser.HealthcheckOptionsContext ctx) {
         List<Docker.Flag> flags = new ArrayList<>();
         for (DockerParser.HealthcheckOptionContext optCtx : ctx.healthcheckOption()) {
-            Space flagPrefix = prefix(optCtx.getStart());
-            skip(optCtx.DASH_DASH().getSymbol());
-
-            String flagName = optCtx.flagName().getText();
-            advanceCursor(optCtx.flagName().getStop().getStopIndex() + 1);
-
-            skip(optCtx.EQUALS().getSymbol());
-
-            // Parse the single-token flag value
-            DockerParser.HealthcheckOptionValueContext valueCtx = optCtx.healthcheckOptionValue();
-            Docker.Argument flagValue = parseHealthcheckOptionValue(valueCtx);
-
-            flags.add(new Docker.Flag(randomId(), flagPrefix, Markers.EMPTY, flagName, flagValue));
+            flags.add(parseFlag(optCtx.FLAG().getSymbol()));
         }
         return flags;
-    }
-
-    private Docker.Argument parseHealthcheckOptionValue(DockerParser.HealthcheckOptionValueContext ctx) {
-        Space argPrefix = prefix(ctx);
-        List<Docker.ArgumentContent> contents = new ArrayList<>();
-
-        TerminalNode terminal = (TerminalNode) ctx.getChild(0);
-        Token token = terminal.getSymbol();
-        String tokenText = token.getText();
-        Space elementPrefix = prefix(token);
-        skip(token);
-
-        Docker.ArgumentContent content;
-        if (ctx.DOUBLE_QUOTED_STRING() != null) {
-            String value = tokenText.substring(1, tokenText.length() - 1);
-            content = new Docker.Literal(randomId(), elementPrefix, Markers.EMPTY, value, Docker.Literal.QuoteStyle.DOUBLE);
-        } else if (ctx.SINGLE_QUOTED_STRING() != null) {
-            String value = tokenText.substring(1, tokenText.length() - 1);
-            content = new Docker.Literal(randomId(), elementPrefix, Markers.EMPTY, value, Docker.Literal.QuoteStyle.SINGLE);
-        } else if (ctx.ENV_VAR() != null) {
-            boolean braced = tokenText.startsWith("${");
-            String varName = braced ? tokenText.substring(2, tokenText.length() - 1) : tokenText.substring(1);
-            content = new Docker.EnvironmentVariable(randomId(), elementPrefix, Markers.EMPTY, varName, braced);
-        } else {
-            content = new Docker.Literal(randomId(), elementPrefix, Markers.EMPTY, tokenText, null);
-        }
-        contents.add(content);
-
-        return new Docker.Argument(randomId(), argPrefix, Markers.EMPTY, contents);
     }
 
     @Override
@@ -1372,90 +1266,122 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     private List<Docker.Flag> convertFlags(DockerParser.FlagsContext ctx) {
         List<Docker.Flag> flags = new ArrayList<>();
         for (DockerParser.FlagContext flagCtx : ctx.flag()) {
-            Space flagPrefix = prefix(flagCtx.getStart());
-            skip(flagCtx.DASH_DASH().getSymbol());
-
-            String flagName = flagCtx.flagName().getText();
-            advanceCursor(flagCtx.flagName().getStop().getStopIndex() + 1);
-
-            Docker.Argument flagValue = null;
-            if (flagCtx.EQUALS() != null) {
-                skip(flagCtx.EQUALS().getSymbol());
-                flagValue = parseFlagValue(flagCtx.flagValue());
-            }
-
-            flags.add(new Docker.Flag(randomId(), flagPrefix, Markers.EMPTY, flagName, flagValue));
+            flags.add(parseFlag(flagCtx.FLAG().getSymbol()));
         }
         return flags;
     }
 
-    private Docker.Argument parseFlagValue(DockerParser.FlagValueContext ctx) {
-        if (ctx == null) {
-            return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, emptyList());
+    /**
+     * Parse a FLAG token into a Flag AST node.
+     * FLAG token format: --name or --name=value
+     */
+    private Docker.Flag parseFlag(Token flagToken) {
+        Space flagPrefix = prefix(flagToken);
+        String tokenText = flagToken.getText();
+        skip(flagToken);
+
+        // Parse the flag text: --name or --name=value
+        // Skip the leading "--"
+        String flagContent = tokenText.substring(2);
+
+        String flagName;
+        Docker.Argument flagValue = null;
+
+        int equalsIdx = flagContent.indexOf('=');
+        if (equalsIdx >= 0) {
+            flagName = flagContent.substring(0, equalsIdx);
+            String valueText = flagContent.substring(equalsIdx + 1);
+
+            // Parse the value text into its components
+            List<Docker.ArgumentContent> contents = parseFlagValueText(valueText);
+            flagValue = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, contents);
+        } else {
+            flagName = flagContent;
         }
 
-        Space argPrefix = prefix(ctx);
+        return new Docker.Flag(randomId(), flagPrefix, Markers.EMPTY, flagName, flagValue);
+    }
+
+    /**
+     * Parse a flag value text into its component parts.
+     * Recognizes environment variables ($VAR, ${VAR}), and splits on = signs.
+     */
+    private List<Docker.ArgumentContent> parseFlagValueText(String text) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        int i = 0;
 
-        // Process flagValueToken+ with whitespace detection
-        // Stop consuming tokens if there's whitespace between them (indicates new argument)
-        for (DockerParser.FlagValueTokenContext tokenCtx : ctx.flagValueToken()) {
-            if (tokenCtx.getChildCount() > 0 && tokenCtx.getChild(0) instanceof TerminalNode) {
-                TerminalNode terminal = (TerminalNode) tokenCtx.getChild(0);
-                Token token = terminal.getSymbol();
+        while (i < text.length()) {
+            char c = text.charAt(i);
 
-                // Check if there's whitespace before this token (gap in character positions)
-                // If so, this token belongs to the next argument, not the flag value
-                if (!contents.isEmpty() && token.getStartIndex() > codePointCursor) {
-                    break;
+            if (c == '$') {
+                // Flush any accumulated text
+                if (current.length() > 0) {
+                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, current.toString(), null));
+                    current.setLength(0);
                 }
 
-                String tokenText = token.getText();
-                Space elementPrefix = prefix(token);
-                skip(token);
-
-                if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
-                    String value = tokenText.substring(1, tokenText.length() - 1);
-                    contents.add(new Docker.Literal(
-                            randomId(),
-                            elementPrefix,
-                            Markers.EMPTY,
-                            value,
-                            Docker.Literal.QuoteStyle.DOUBLE
-                    ));
-                } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
-                    String value = tokenText.substring(1, tokenText.length() - 1);
-                    contents.add(new Docker.Literal(
-                            randomId(),
-                            elementPrefix,
-                            Markers.EMPTY,
-                            value,
-                            Docker.Literal.QuoteStyle.SINGLE
-                    ));
-                } else if (token.getType() == DockerLexer.ENV_VAR) {
-                    boolean braced = tokenText.startsWith("${");
-                    String varName = braced ? tokenText.substring(2, tokenText.length() - 1) : tokenText.substring(1);
-                    contents.add(new Docker.EnvironmentVariable(
-                            randomId(),
-                            elementPrefix,
-                            Markers.EMPTY,
-                            varName,
-                            braced
-                    ));
-                } else {
-                    // Plain text for UNQUOTED_TEXT, EQUALS, etc.
-                    contents.add(new Docker.Literal(
-                            randomId(),
-                            elementPrefix,
-                            Markers.EMPTY,
-                            tokenText,
-                            null
-                    ));
+                // Parse environment variable
+                if (i + 1 < text.length() && text.charAt(i + 1) == '{') {
+                    // Braced form: ${VAR}
+                    int endBrace = text.indexOf('}', i + 2);
+                    if (endBrace > i + 2) {
+                        String varContent = text.substring(i + 2, endBrace);
+                        // Handle ${VAR:-default} and similar forms
+                        String varName = varContent;
+                        int colonIdx = varContent.indexOf(':');
+                        if (colonIdx >= 0) {
+                            varName = varContent.substring(0, colonIdx);
+                        }
+                        contents.add(new Docker.EnvironmentVariable(randomId(), Space.EMPTY, Markers.EMPTY, varName, true));
+                        i = endBrace + 1;
+                        continue;
+                    }
+                } else if (i + 1 < text.length()) {
+                    // Unbraced form: $VAR
+                    int varStart = i + 1;
+                    int varEnd = varStart;
+                    while (varEnd < text.length() && isVarChar(text.charAt(varEnd), varEnd == varStart)) {
+                        varEnd++;
+                    }
+                    if (varEnd > varStart) {
+                        String varName = text.substring(varStart, varEnd);
+                        contents.add(new Docker.EnvironmentVariable(randomId(), Space.EMPTY, Markers.EMPTY, varName, false));
+                        i = varEnd;
+                        continue;
+                    }
                 }
+                // Not a valid env var, treat $ as literal
+                current.append(c);
+                i++;
+            } else if (c == '=') {
+                // Flush any accumulated text
+                if (current.length() > 0) {
+                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, current.toString(), null));
+                    current.setLength(0);
+                }
+                // Add the equals sign as its own element
+                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "=", null));
+                i++;
+            } else {
+                current.append(c);
+                i++;
             }
         }
 
-        return new Docker.Argument(randomId(), argPrefix, Markers.EMPTY, contents);
+        // Flush remaining text
+        if (current.length() > 0) {
+            contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, current.toString(), null));
+        }
+
+        return contents.isEmpty() ? singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null)) : contents;
+    }
+
+    private boolean isVarChar(char c, boolean isFirst) {
+        if (isFirst) {
+            return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
+        }
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
     }
 
     private Docker.ShellForm visitShellFormContext(DockerParser.ShellFormContext ctx) {

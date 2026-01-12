@@ -118,21 +118,13 @@ healthcheckInstruction
     | HEALTHCHECK healthcheckOptions? CMD ( execForm | shellForm )  // Health check command
     ;
 
-// HEALTHCHECK-specific options (non-greedy flag values)
+// HEALTHCHECK-specific options - uses FLAG token like regular flags
 healthcheckOptions
     : healthcheckOption+
     ;
 
 healthcheckOption
-    : DASH_DASH flagName EQUALS healthcheckOptionValue
-    ;
-
-// Non-greedy: single token only, so it won't consume CMD
-healthcheckOptionValue
-    : UNQUOTED_TEXT
-    | DOUBLE_QUOTED_STRING
-    | SINGLE_QUOTED_STRING
-    | ENV_VAR
+    : FLAG
     ;
 
 shellInstruction
@@ -148,33 +140,10 @@ flags
     : flag+
     ;
 
+// Flag token captures entire flag: --name or --name=value
+// The lexer handles stopping at whitespace, so no greedy parsing issues
 flag
-    : DASH_DASH flagName ( EQUALS flagValue )?
-    ;
-
-flagName
-    : UNQUOTED_TEXT
-    // Note: 'from' and 'as' in --from=builder are UNQUOTED_TEXT (keywords only recognized in specific contexts)
-    ;
-
-// Flag value parsing: allows patterns like "value" or "type=cache,target=/path"
-// Multi-token values are allowed (e.g., "moby-build-$TARGETPLATFORM")
-// The visitor handles whitespace detection to stop at argument boundaries
-// Note: AS is NOT included to allow FROM --flag=value image AS alias parsing
-flagValue
-    : flagValueToken+
-    ;
-
-// Token types allowed in flag values
-flagValueToken
-    : UNQUOTED_TEXT
-    | DOUBLE_QUOTED_STRING
-    | SINGLE_QUOTED_STRING
-    | ENV_VAR
-    | COMMAND_SUBST
-    | BACKTICK_SUBST
-    | SPECIAL_VAR
-    | EQUALS
+    : FLAG
     ;
 
 execForm
@@ -201,6 +170,7 @@ shellFormTextElement
     | BACKTICK_SUBST     // Allow `command` in shell commands
     | SPECIAL_VAR        // Allow $!, $$, $?, etc. in shell commands
     | EQUALS
+    | FLAG               // Allow --option or --option=value in shell commands
     | DASH_DASH
     | LBRACKET   // Allow [ in shell commands (e.g., if [ -f file ])
     | RBRACKET   // Allow ] in shell commands
@@ -272,6 +242,7 @@ labelOldValueElement
     | BACKTICK_SUBST
     | SPECIAL_VAR
     | EQUALS
+    | FLAG
     | DASH_DASH
     | LBRACKET
     | RBRACKET
@@ -408,6 +379,7 @@ textElement
     | BACKTICK_SUBST  // Allow `command` in text
     | SPECIAL_VAR     // Allow $!, $$, $?, etc. in text
     | EQUALS     // Allow = in shell form text (e.g., ENV_VAR=value in RUN commands)
+    | FLAG       // Allow --option or --option=value in text
     | DASH_DASH  // Allow -- in shell form text (e.g., --option in shell commands)
     | LBRACKET   // Allow [ in text (e.g., shell test expressions)
     | RBRACKET   // Allow ] in text

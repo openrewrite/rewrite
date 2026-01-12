@@ -80,9 +80,15 @@ LBRACKET : '[' { atLineStart = false; };
 RBRACKET : ']' { atLineStart = false; };
 COMMA    : ',' { atLineStart = false; };
 
-// Assignment and flags
-// When afterHealthcheck, preserve atLineStart so CMD/NONE can be recognized after flags
+// Assignment (used in ENV, ARG, LABEL, etc.)
 EQUALS     : '=' { if (!afterHealthcheck) atLineStart = false; };
+
+// Flag with optional value: --name or --name=value
+// Captures the entire flag as a single token, stopping at whitespace
+// This avoids the greedy flagValue+ parsing issue while keeping shell commands working
+FLAG : '--' [a-zA-Z] [a-zA-Z0-9_-]* ('=' ~[ \t\r\n]+)? { if (!afterHealthcheck) atLineStart = false; };
+
+// Standalone -- (double dash without flag name) - used in shell commands
 DASH_DASH  : '--' { if (!afterHealthcheck) atLineStart = false; };
 
 // Unquoted text fragment (to be used in UNQUOTED_TEXT)

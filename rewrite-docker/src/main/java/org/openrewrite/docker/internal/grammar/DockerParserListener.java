@@ -263,16 +263,6 @@ public interface DockerParserListener extends ParseTreeListener {
 	 */
 	void exitHealthcheckOption(DockerParser.HealthcheckOptionContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link DockerParser#healthcheckOptionValue}.
-	 * @param ctx the parse tree
-	 */
-	void enterHealthcheckOptionValue(DockerParser.HealthcheckOptionValueContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#healthcheckOptionValue}.
-	 * @param ctx the parse tree
-	 */
-	void exitHealthcheckOptionValue(DockerParser.HealthcheckOptionValueContext ctx);
-	/**
 	 * Enter a parse tree produced by {@link DockerParser#shellInstruction}.
 	 * @param ctx the parse tree
 	 */
@@ -312,36 +302,6 @@ public interface DockerParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitFlag(DockerParser.FlagContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link DockerParser#flagName}.
-	 * @param ctx the parse tree
-	 */
-	void enterFlagName(DockerParser.FlagNameContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#flagName}.
-	 * @param ctx the parse tree
-	 */
-	void exitFlagName(DockerParser.FlagNameContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link DockerParser#flagValue}.
-	 * @param ctx the parse tree
-	 */
-	void enterFlagValue(DockerParser.FlagValueContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#flagValue}.
-	 * @param ctx the parse tree
-	 */
-	void exitFlagValue(DockerParser.FlagValueContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link DockerParser#flagValueToken}.
-	 * @param ctx the parse tree
-	 */
-	void enterFlagValueToken(DockerParser.FlagValueTokenContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#flagValueToken}.
-	 * @param ctx the parse tree
-	 */
-	void exitFlagValueToken(DockerParser.FlagValueTokenContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerParser#execForm}.
 	 * @param ctx the parse tree
