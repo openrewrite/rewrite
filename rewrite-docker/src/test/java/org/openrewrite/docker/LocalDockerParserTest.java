@@ -55,6 +55,6 @@ class LocalDockerParserTest {
           });
 
         assertThat(parsedFiles).hasSizeGreaterThanOrEqualTo(1491);
-        assertThat(parsedErrors).hasSizeLessThanOrEqualTo(21);
+        assertThat(parsedErrors).hasSizeLessThanOrEqualTo(5);
     }
 }

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.docker.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -539,7 +538,6 @@ class RunTest implements RewriteTest {
         );
     }
 
-    @Disabled("Multi-line quoted strings with bare newlines (no continuation char) are not supported - see DOUBLE_QUOTED_STRING in DockerLexer.g4")
     @Test
     void commentLineWithoutBacktick() {
         rewriteRun(

@@ -98,12 +98,14 @@ fragment UNQUOTED_CHAR : ~[ \t\r\n\\"'$[\]=<];
 fragment ESCAPED_CHAR : '\\' .;
 
 // String literals
-// Double-quoted strings support escape sequences and line continuation (backslash or backtick)
+// Double-quoted strings support escape sequences, line continuation, and bare newlines
 // Backtick followed by whitespace+newline is continuation; standalone backtick is regular char
-DOUBLE_QUOTED_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | ~["\\\r\n`] )* '"' { if (!afterHealthcheck) atLineStart = false; };
+// Bare newlines are allowed (e.g., comment lines inside PowerShell strings don't need trailing backtick)
+DOUBLE_QUOTED_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | [\r\n] | ~["\\\r\n`] )* '"' { if (!afterHealthcheck) atLineStart = false; };
 // Single-quoted strings in shell are literal - no escape processing inside
 // But they DO support line continuation (backslash or backtick followed by newline)
-SINGLE_QUOTED_STRING : '\'' ( INLINE_CONTINUATION | ~['\r\n] )* '\'' { if (!afterHealthcheck) atLineStart = false; };
+// Bare newlines are also allowed for multi-line strings
+SINGLE_QUOTED_STRING : '\'' ( INLINE_CONTINUATION | [\r\n] | ~['\r\n] )* '\'' { if (!afterHealthcheck) atLineStart = false; };
 
 // Inline line continuation (inside strings) - backtick or backslash followed by newline
 fragment INLINE_CONTINUATION : ('\\' | '`') [ \t]* [\r\n]+;
