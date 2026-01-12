@@ -69,7 +69,10 @@ public class XmlParser implements Parser {
             "csproj",
             "vbproj",
             "fsproj",
-            "props"));
+            "props",
+            // JasperReports files
+            "jrxml"
+            ));
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
