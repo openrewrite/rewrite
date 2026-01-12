@@ -266,6 +266,11 @@ public class ChangePackage extends Recipe {
 
                     for (J.Import anImport : sf.getImports()) {
                         if (anImport.getPackageName().equals(changingTo) && !anImport.isStatic()) {
+                            // Skip removal for nested class imports - they still need the import even in the same package
+                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(anImport.getQualid().getType());
+                            if (fq != null && fq.getOwningClass() != null) {
+                                continue;
+                            }
                             sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(anImport.getTypeName(), true)
                                     .visitNonNull(sf, ctx, getCursor().getParentTreeCursor());
                         }
