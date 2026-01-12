@@ -20,6 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.docker.Assertions.docker;
+import static org.openrewrite.test.TypeValidation.all;
 
 class HealthcheckTest implements RewriteTest {
 
@@ -133,6 +134,7 @@ class HealthcheckTest implements RewriteTest {
     void healthcheckWithLineContinuationInCommand() {
         // Line continuation in the command itself (after CMD)
         rewriteRun(
+          spec -> spec.typeValidationOptions(all().allowNonWhitespaceInWhitespace(true)),
           docker(
             """
               FROM ubuntu:20.04
