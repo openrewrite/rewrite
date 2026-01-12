@@ -125,6 +125,15 @@ public class RemoveUnusedImports extends Recipe {
                 }
             }
 
+            // Collect simple names of package annotations for fallback when type info is missing
+            // (TypesInUse now handles the case when type info IS available)
+            Set<String> packageAnnotationSimpleNames = new HashSet<>();
+            if (cu.getPackageDeclaration() != null) {
+                for (J.Annotation annotation : cu.getPackageDeclaration().getAnnotations()) {
+                    packageAnnotationSimpleNames.add(annotation.getSimpleName());
+                }
+            }
+
             boolean changed = false;
 
             // the key is a list because a star import may get replaced with multiple unfolded imports
@@ -230,7 +239,9 @@ public class RemoveUnusedImports extends Recipe {
                             .filter(fq -> fq.getOwningClass() == null || !topLevelTypeNames.contains(fq.getOwningClass().getFullyQualifiedName()))
                             .collect(toSet());
                     JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
-                    if (combinedTypes.isEmpty() || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
+                    // Check if import is used by a package annotation (fallback for when type info is missing)
+                    boolean usedByPackageAnnotation = packageAnnotationSimpleNames.contains(elem.getClassName());
+                    if ((combinedTypes.isEmpty() && !usedByPackageAnnotation) || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(elem.getQualid().getSimpleName())) {
@@ -266,7 +277,7 @@ public class RemoveUnusedImports extends Recipe {
                         } else {
                             usedWildcardImports.add(target);
                         }
-                    } else if (combinedTypes.stream().noneMatch(c -> {
+                    } else if (!usedByPackageAnnotation && combinedTypes.stream().noneMatch(c -> {
                         if ("*".equals(elem.getQualid().getSimpleName())) {
                             return elem.getPackageName().equals(c.getPackageName());
                         }

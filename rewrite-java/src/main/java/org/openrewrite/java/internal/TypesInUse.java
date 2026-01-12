@@ -65,6 +65,17 @@ public class TypesInUse {
         }
 
         @Override
+        public J.Package visitPackage(J.Package pkg, Integer p) {
+            for (J.Annotation annotation : pkg.getAnnotations()) {
+                JavaType type = annotation.getType();
+                if (type != null && !(type instanceof JavaType.Unknown)) {
+                    types.add(type);
+                }
+            }
+            return super.visitPackage(pkg, p);
+        }
+
+        @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
             Object parent = Objects.requireNonNull(getCursor().getParent()).getValue();
             if (parent instanceof J.ClassDeclaration) {
