@@ -427,7 +427,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             // Parse all paths (sources + destination) together
             // The grammar's flagValue may have greedily consumed some source tokens,
             // so we need to parse from the current cursor position
-            List<Docker.Argument> allPaths = parseAllPaths(ctx.sourceList(), ctx.destination());
+            List<Docker.Argument> allPaths = parseAllPaths(ctx.destination());
             if (allPaths.size() >= 2) {
                 destination = allPaths.get(allPaths.size() - 1);
                 sources = new ArrayList<>(allPaths.subList(0, allPaths.size() - 1));
@@ -470,7 +470,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             // Parse all paths (sources + destination) together
             // The grammar's flagValue may have greedily consumed some source tokens,
             // so we need to parse from the current cursor position
-            List<Docker.Argument> allPaths = parseAllPaths(ctx.sourceList(), ctx.destination());
+            List<Docker.Argument> allPaths = parseAllPaths(ctx.destination());
             if (allPaths.size() >= 2) {
                 destination = allPaths.get(allPaths.size() - 1);
                 sources = new ArrayList<>(allPaths.subList(0, allPaths.size() - 1));
@@ -492,11 +492,10 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
      * This method ignores the grammar's token allocation because the greedy flagValue rule
      * may have consumed source tokens when flags are present.
      *
-     * @param sourceListCtx the grammar's sourceList context (used only to find the end position)
-     * @param destinationCtx the grammar's destination context (used only to find the end position)
+     * @param destinationCtx the grammar's destination context (used to find the end position)
      * @return a list of Arguments, where the last one is the destination
      */
-    private List<Docker.Argument> parseAllPaths(DockerParser.SourceListContext sourceListCtx, DockerParser.DestinationContext destinationCtx) {
+    private List<Docker.Argument> parseAllPaths(DockerParser.DestinationContext destinationCtx) {
         List<Docker.Argument> allPaths = new ArrayList<>();
 
         // Find the end position of all paths (end of destination)
