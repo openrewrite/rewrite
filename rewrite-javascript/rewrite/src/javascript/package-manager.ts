@@ -28,6 +28,7 @@ import {PlainTextParser} from "../text";
 import {SourceFile} from "../tree";
 import {TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
+import {getPlatformCommand} from "../shell-utils";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
@@ -231,7 +232,7 @@ function runInstall(pm: PackageManager, options: InstallOptions): PackageManager
     const [cmd, ...args] = command;
 
     try {
-        const result = spawnSync(cmd, args, {
+        const result = spawnSync(getPlatformCommand(cmd), args, {
             cwd: options.cwd,
             encoding: 'utf-8',
             stdio: ['pipe', 'pipe', 'pipe'],
@@ -285,7 +286,7 @@ export function runList(pm: PackageManager, cwd: string, timeout: number = 30000
 
     const [cmd, ...args] = config.listCommand;
 
-    const result = spawnSync(cmd, args, {
+    const result = spawnSync(getPlatformCommand(cmd), args, {
         cwd,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],

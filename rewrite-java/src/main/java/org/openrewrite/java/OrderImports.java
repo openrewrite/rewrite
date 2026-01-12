@@ -18,10 +18,9 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.config.YamlResourceLoader;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.style.ImportLayoutStyle;
@@ -29,16 +28,21 @@ import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
-import java.util.List;
-import java.util.Optional;
+import java.io.ByteArrayInputStream;
+import java.net.URI;
+import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 
 /**
  * This recipe will group and order the imports for a compilation unit using the rules defined by an {@link ImportLayoutStyle}.
- * If a style has not been defined, this recipe will use the default import layout style that is modelled after
+ * If a style has not been defined, this recipe will use the default import layout style that is modeled after
  * IntelliJ's default import settings.
  * <p>
  * The @{link {@link OrderImports#removeUnused}} flag (which is defaulted to true) can be used to also remove any
@@ -54,6 +58,29 @@ public class OrderImports extends Recipe {
     @Nullable
     Boolean removeUnused;
 
+    @Option(displayName = "Style YAML",
+            description = "An OpenRewrite [style](https://docs.openrewrite.org/concepts-and-explanations/styles) formatted in YAML.",
+            //language=yaml
+            example = "type: specs.openrewrite.org/v1beta/style\n" +
+                    "name: com.yourorg.CustomImportLayout\n" +
+                    "styleConfigs:\n" +
+                    "  - org.openrewrite.java.style.ImportLayoutStyle:\n" +
+                    "      classCountToUseStarImport: 999\n" +
+                    "      nameCountToUseStarImport: 999\n" +
+                    "      layout:\n" +
+                    "        - 'import java.*'\n" +
+                    "        - 'import javax.*'\n" +
+                    "        - '<blank line>'\n" +
+                    "        - 'import all other imports'\n" +
+                    "        - '<blank line>'\n" +
+                    "        - 'import static all other imports'\n" +
+                    "      packagesToFold:\n" +
+                    "        - 'import java.awt.*'\n" +
+                    "        - 'import static org.junit.jupiter.api.Assertions.*",
+            required = false)
+    @Nullable
+    String style;
+
     @Override
     public String getDisplayName() {
         return "Order imports";
@@ -68,19 +95,18 @@ public class OrderImports extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        List<NamedStyles> namedStyles = styleFromYaml(style);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, cu))
-                        .orElse(IntelliJ.importLayout());
-
                 Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
                 List<JavaType.FullyQualified> classpath = emptyList();
                 if (sourceSet.isPresent()) {
                     classpath = sourceSet.get().getClasspath();
                 }
 
-                List<JRightPadded<J.Import>> orderedImports = layoutStyle.orderImports(cu.getPadding().getImports(), classpath);
+                ImportLayoutStyle importLayoutStyle = importLayoutStyle(cu, namedStyles);
+                List<JRightPadded<J.Import>> orderedImports = importLayoutStyle.orderImports(cu.getPadding().getImports(), classpath);
 
                 boolean changed = false;
                 if (orderedImports.size() != cu.getImports().size()) {
@@ -102,8 +128,50 @@ public class OrderImports extends Recipe {
                     doAfterVisit(new FormatFirstClassPrefix<>());
                 }
 
-                return cu;
+                return withStyles(cu, namedStyles);
             }
         };
+    }
+
+    private List<NamedStyles> styleFromYaml(@Nullable String style) {
+        if (style == null) {
+            return emptyList();
+        }
+        return new ArrayList<>(new YamlResourceLoader(new ByteArrayInputStream(style.getBytes()),
+                URI.create("OrderImports$style"),
+                new Properties()).listStyles());
+    }
+
+    private ImportLayoutStyle importLayoutStyle(SourceFile cu, List<NamedStyles> parsedStyles) {
+        if (parsedStyles.isEmpty()) {
+            return Optional.ofNullable(Style.from(ImportLayoutStyle.class, cu))
+                    .orElse(IntelliJ.importLayout());
+        }
+        return requireNonNull(NamedStyles.merge(ImportLayoutStyle.class, parsedStyles));
+    }
+
+    private <T extends SourceFile> T withStyles(T cu, List<NamedStyles> parsedStyles) {
+        if (parsedStyles.isEmpty()) {
+            return cu;
+        }
+        List<NamedStyles> existingStyles = cu.getMarkers().findAll(NamedStyles.class);
+        // Check if all parsed styles already exist (ignoring id)
+        boolean allPresent = parsedStyles.stream()
+                .allMatch(ns -> existingStyles.stream().anyMatch(es -> namedStylesEqual(ns, es)));
+        if (allPresent) {
+            return cu;
+        }
+        // New styles must appear first to take precedence
+        List<Marker> markers = cu.getMarkers().getMarkers();
+        for (NamedStyles namedStyle : parsedStyles) {
+            if (existingStyles.stream().noneMatch(es -> namedStylesEqual(namedStyle, es))) {
+                markers = ListUtils.concat(namedStyle, markers);
+            }
+        }
+        return cu.withMarkers(Markers.build(markers));
+    }
+
+    private boolean namedStylesEqual(NamedStyles a, NamedStyles b) {
+        return a.getName().equals(b.getName());
     }
 }

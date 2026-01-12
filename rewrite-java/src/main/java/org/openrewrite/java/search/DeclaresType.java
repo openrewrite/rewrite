@@ -43,4 +43,12 @@ public class DeclaresType<P> extends JavaIsoVisitor<P> {
         }
         return super.visitClassDeclaration(classDecl, p);
     }
+
+    @Override
+    public J.NewClass visitNewClass(J.NewClass newClass, P p) {
+        if (includeSubtypes && newClass.getBody() != null && TypeUtils.isAssignableTo(type, newClass.getType())) {
+            return SearchResult.found(newClass);
+        }
+        return super.visitNewClass(newClass, p);
+    }
 }

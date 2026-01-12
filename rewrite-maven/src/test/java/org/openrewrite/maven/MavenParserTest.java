@@ -51,6 +51,7 @@ import static java.util.stream.Collectors.groupingBy;
 import static org.assertj.core.api.Assertions.*;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.test.SourceSpecs.dir;
 
 class MavenParserTest implements RewriteTest {
 
@@ -1555,7 +1556,6 @@ class MavenParserTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1427")
     @Test
     void parseEmptyActivationTag() {
-        //noinspection DataFlowIssue
         rewriteRun(
           pomXml(
             """
@@ -1611,7 +1611,6 @@ class MavenParserTest implements RewriteTest {
                 assertThat(activation).isNotNull();
                 assertThat(activation.getActiveByDefault()).isNull();
                 assertThat(activation.getJdk()).isNull();
-                //noinspection DataFlowIssue
                 assertThat(activation.getProperty()).isNull();
             })
           )
@@ -3116,7 +3115,7 @@ class MavenParserTest implements RewriteTest {
     @Test
     void escapedA() {
         rewriteRun(
-          spec -> spec.recipe(new AddManagedDependency("ch.qos.logback", "logback-classic", "1.4.14", null, null, null, null, null, null, null)),
+          spec -> spec.recipe(new AddManagedDependency("ch.qos.logback", "logback-classic", "1.4.14", null, null, null, null, null, null, null, null)),
           //language=xml
           pomXml(
             """
@@ -3629,7 +3628,7 @@ class MavenParserTest implements RewriteTest {
                 <version>1.0-SNAPSHOT</version>
                 <packaging>pom</packaging>
                 <name>parent</name>
-                <url>http://www.example.com</url>
+                <url>https://www.example.com</url>
                 <properties>
                   <hatversion>SYSTEM_PROPERTY_SHOULD_OVERRIDE_THIS</hatversion>
                 </properties>
@@ -4807,6 +4806,124 @@ class MavenParserTest implements RewriteTest {
                   assertThat(pomCache.getPom(new ResolvedGroupArtifactVersion(MavenRepository.MAVEN_CENTRAL.getUri(), "org.bouncycastle", "bcprov-jdk18on", "1.71", "1.71"))).isNull();
               })
             )
+          )
+        );
+    }
+
+    @Test
+    void groupIdAndArtifactIdAsProperties() {
+        rewriteRun(
+          mavenProject("my-app",
+            pomXml("""
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1</version>
+                <packaging>pom</packaging>
+                <properties>
+                  <my-app.child-a.groupId>com.example</my-app.child-a.groupId>
+                  <my-app.child-a.artifactId>child-a</my-app.child-a.artifactId>
+                </properties>
+                <modules>
+                  <module>child-a</module>
+                  <module>child-b</module>
+                </modules>
+              </project>
+              """
+            ),
+            dir("child-a",
+              pomXml(
+                """
+                  <project>
+                    <groupId>${my-app.child-a.groupId}</groupId>
+                    <artifactId>${my-app.child-a.artifactId}</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-core</artifactId>
+                        <version>6.2.15</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """
+              )
+            ),
+            dir("child-b",
+              pomXml(
+                """
+                  <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>child-b</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>${my-app.child-a.groupId}</groupId>
+                        <artifactId>${my-app.child-a.artifactId}</artifactId>
+                        <version>1</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pom -> {
+                    assertThat(pom).isNotNull();
+                    Optional<MavenResolutionResult> maybeMrr = pom.getMarkers().findFirst(MavenResolutionResult.class);
+                    assertThat(maybeMrr).isPresent();
+                    assertThat(maybeMrr.get().getDependencies().get(Scope.Compile))
+                      .anyMatch(resolvedDependency ->
+                        "org.springframework".equals(resolvedDependency.getGroupId()) &&
+                        "spring-core".equals(resolvedDependency.getArtifactId()) &&
+                        "6.2.15".equals(resolvedDependency.getVersion()));
+                })
+              )
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6487")
+    @Test
+    void bomsShouldNotAppearInRuntimeDependencies() {
+        // jackson-core takes no direct dependencies
+        // Its parent pom is com.fasterxml.jackson:jackson-base
+        // jackson-base's parent pom is jackson-bom
+        // Like most boms/parents jackson-bom contains only dependencyManagement entries
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>test-app</artifactId>
+                <version>1.0.0</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                    <version>2.17.2</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pom -> {
+                MavenResolutionResult mrr = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                List<ResolvedDependency> runtimeDeps = mrr.getDependencies().get(Scope.Runtime);
+                assertThat(runtimeDeps)
+                  .filteredOn(dep -> "jackson-bom".equals(dep.getArtifactId()))
+                  .as("jackson-bom is jackson-core's parent pom, it is not a runtime dependency")
+                  .isEmpty();
+            })
           )
         );
     }
