@@ -16,6 +16,7 @@
 package org.openrewrite.java.internal.rpc;
 
 import io.moderne.jsonrpc.JsonRpc;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.SneakyThrows;
@@ -53,9 +54,9 @@ class JavaSendReceiveTest implements RewriteTest {
 
         Environment env = Environment.builder().build();
 
-        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverIn, serverOut))), env.toMarketplace(runtimeClasspath()))
+        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverIn, serverOut)), new JsonMessageFormatter()), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
-        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientIn, clientOut))), env.toMarketplace(runtimeClasspath()))
+        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientIn, clientOut)), new JsonMessageFormatter()), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
     }
 
