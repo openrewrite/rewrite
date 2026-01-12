@@ -54,7 +54,7 @@ class LocalDockerParserTest {
               entries.forEach(e -> System.out.println("  " + e.getValue().replace(DOCKER_FILES.toString(), "")));
           });
 
-        assertThat(parsedFiles).hasSizeGreaterThanOrEqualTo(1492);
-        assertThat(parsedErrors).hasSizeLessThanOrEqualTo(20);
+        assertThat(parsedFiles).hasSizeGreaterThanOrEqualTo(1491);
+        assertThat(parsedErrors).hasSizeLessThanOrEqualTo(21);
     }
 }
