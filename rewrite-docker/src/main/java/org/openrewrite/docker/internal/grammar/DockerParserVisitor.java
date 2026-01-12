@@ -386,17 +386,23 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitSourceList(DockerParser.SourceListContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link DockerParser#source}.
+	 * Visit a parse tree produced by {@link DockerParser#sourcePath}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitSource(DockerParser.SourceContext ctx);
+	T visitSourcePath(DockerParser.SourcePathContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#destination}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitDestination(DockerParser.DestinationContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link DockerParser#destinationPath}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitDestinationPath(DockerParser.DestinationPathContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#path}.
 	 * @param ctx the parse tree

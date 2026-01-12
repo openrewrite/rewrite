@@ -60,9 +60,14 @@ MAINTAINER : 'MAINTAINER' { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStar
 // AS is only a keyword after FROM (for stage aliasing)
 AS         : 'AS' { if (!afterFrom) setType(UNQUOTED_TEXT); atLineStart = false; afterFrom = false; };
 
-// Heredoc start - captures <<EOF or <<-EOF and switches to HEREDOC_PREAMBLE mode
-HEREDOC_START : '<<' '-'? {
-    heredocIdentifierCaptured = false;  // Reset for new heredoc
+// Heredoc start - captures <<EOF or <<-EOF including the identifier and switches to HEREDOC_PREAMBLE mode
+HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* {
+    // Extract and store the heredoc marker identifier
+    String text = getText();
+    int prefixLen = text.charAt(2) == '-' ? 3 : 2;
+    String marker = text.substring(prefixLen);
+    heredocIdentifier.push(marker);
+    heredocIdentifierCaptured = true;
     atLineStart = false;
 } -> pushMode(HEREDOC_PREAMBLE);
 
@@ -145,7 +150,8 @@ NEWLINE : NEWLINE_CHAR+ { atLineStart = true; afterFrom = false; afterHealthchec
 fragment NEWLINE_CHAR : [\r\n];
 
 // ----------------------------------------------------------------------------------------------
-// HEREDOC_PREAMBLE mode - for parsing the heredoc identifier and optional flags
+// HEREDOC_PREAMBLE mode - for parsing optional destination path after heredoc marker
+// The heredoc identifier (e.g., EOF) is already captured in HEREDOC_START
 // ----------------------------------------------------------------------------------------------
 mode HEREDOC_PREAMBLE;
 
@@ -154,16 +160,7 @@ HP_WS      : [ \t\r\u000C]+ -> channel(HIDDEN);
 HP_COMMENT : '/*' .*? '*/'  -> channel(HIDDEN);
 HP_LINE_COMMENT : ('//' | '#') ~[\r\n]* '\r'? -> channel(HIDDEN);
 
-HPIdentifier : [A-Z_][A-Z0-9_]* {
-    // Only push the first identifier (the heredoc marker), not subsequent text like interpreter names
-    if (!heredocIdentifierCaptured) {
-        heredocIdentifier.push(getText());
-        heredocIdentifierCaptured = true;
-    }
-} -> type(UNQUOTED_TEXT);
-
-// Any other text on the heredoc line (destination paths, etc.)
-// This must come after HPIdentifier to ensure the identifier is captured first
+// Any text on the heredoc line after the marker (destination paths, interpreter names, etc.)
 HP_UNQUOTED_TEXT : ~[ \t\r\n]+ -> type(UNQUOTED_TEXT);
 
 // ----------------------------------------------------------------------------------------------

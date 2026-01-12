@@ -327,16 +327,35 @@ envTextElementEquals
     // NOTE: EQUALS is explicitly NOT included to allow multiple KEY=value pairs
     ;
 
+// For COPY/ADD: each sourcePath is a separate source
+// The parser will group adjacent tokens without whitespace into single arguments
 sourceList
-    : source+
+    : sourcePath+
     ;
 
-source
-    : path
+sourcePath
+    : UNQUOTED_TEXT
+    | DOUBLE_QUOTED_STRING
+    | SINGLE_QUOTED_STRING
+    | ENV_VAR
+    | COMMAND_SUBST
+    | BACKTICK_SUBST
+    | SPECIAL_VAR
     ;
 
+// Destination is the last path element
 destination
-    : path
+    : destinationPath
+    ;
+
+destinationPath
+    : UNQUOTED_TEXT
+    | DOUBLE_QUOTED_STRING
+    | SINGLE_QUOTED_STRING
+    | ENV_VAR
+    | COMMAND_SUBST
+    | BACKTICK_SUBST
+    | SPECIAL_VAR
     ;
 
 path

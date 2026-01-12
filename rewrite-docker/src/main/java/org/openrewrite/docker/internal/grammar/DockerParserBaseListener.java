@@ -752,13 +752,13 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterSource(DockerParser.SourceContext ctx) { }
+	@Override public void enterSourcePath(DockerParser.SourcePathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitSource(DockerParser.SourceContext ctx) { }
+	@Override public void exitSourcePath(DockerParser.SourcePathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -771,6 +771,18 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitDestination(DockerParser.DestinationContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterDestinationPath(DockerParser.DestinationPathContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitDestinationPath(DockerParser.DestinationPathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

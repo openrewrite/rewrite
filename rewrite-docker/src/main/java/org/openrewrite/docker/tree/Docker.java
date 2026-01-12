@@ -554,6 +554,12 @@ public interface Docker extends Tree {
         String keyword;
 
         boolean jsonForm;  // true for ["path1", "path2"], false for path1 path2
+
+        /**
+         * Whitespace before the opening bracket in JSON form (to preserve "VOLUME [" vs "VOLUME  [")
+         */
+        Space openingBracketPrefix;
+
         List<Argument> values;
 
         /**
@@ -581,6 +587,11 @@ public interface Docker extends Tree {
         Markers markers;
 
         String keyword;
+
+        /**
+         * Whitespace before the opening bracket (to preserve "SHELL [" vs "SHELL  [" vs "SHELL\t[")
+         */
+        Space openingBracketPrefix;
 
         List<Argument> arguments;  // JSON array elements
 
@@ -707,6 +718,11 @@ public interface Docker extends Tree {
 
         @Nullable
         List<Flag> flags;
+
+        /**
+         * Whitespace before NONE when isNone is true (to preserve "HEALTHCHECK NONE" vs "HEALTHCHECK  NONE")
+         */
+        Space nonePrefix;
 
         @Nullable
         Cmd cmd;  // null when isNone is true

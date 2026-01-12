@@ -22,6 +22,8 @@ import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.marker.Marker;
 
+import java.util.List;
+
 public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
 
     @Override
@@ -243,8 +245,8 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
         p.append(volume.getKeyword());
         if (volume.isJsonForm()) {
             // Print the space before [ and the bracket
-            // Note: we assume a single space before [ for now (TODO: capture this properly)
-            p.append(" [");
+            visitSpace(volume.getOpeningBracketPrefix(), p);
+            p.append("[");
             for (int i = 0; i < volume.getValues().size(); i++) {
                 Docker.Argument arg = volume.getValues().get(i);
                 // Print the argument with its prefix (includes space after [ or after ,)
@@ -270,8 +272,8 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
         beforeSyntax(shell, p);
         p.append(shell.getKeyword());
         // Print the space before [ and the bracket
-        // Note: we assume a single space before [ for now (TODO: capture this properly)
-        p.append(" [");
+        visitSpace(shell.getOpeningBracketPrefix(), p);
+        p.append("[");
         for (int i = 0; i < shell.getArguments().size(); i++) {
             Docker.Argument arg = shell.getArguments().get(i);
             // Print the argument with its prefix (includes space after [ or after ,)
@@ -332,7 +334,8 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
         beforeSyntax(healthcheck, p);
         p.append(healthcheck.getKeyword());
         if (healthcheck.isNone()) {
-            p.append(" NONE");
+            visitSpace(healthcheck.getNonePrefix(), p);
+            p.append("NONE");
         } else {
             if (healthcheck.getFlags() != null) {
                 for (Docker.Flag flag : healthcheck.getFlags()) {
@@ -368,8 +371,9 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
     public Docker visitExecForm(Docker.ExecForm execForm, PrintOutputCapture<P> p) {
         beforeSyntax(execForm, p);
         p.append("[");
-        for (Docker.Literal literal : execForm.getArguments()) {
-            visit(literal, p);
+        List<Docker.Literal> arguments = execForm.getArguments();
+        for (Docker.Literal argument : arguments) {
+            visit(argument, p);
         }
         visitSpace(execForm.getClosingBracketPrefix(), p);
         p.append("]");
