@@ -91,7 +91,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     Boolean releasesOnly;
 
     @Option(displayName = "Only if using",
-            description = "Used to determine if the dependency will be added and in which scope it should be placed.",
+            description = "Used to determine if the dependency will be added and in which scope it should be placed. " +
+                          "Required for multi-module projects to avoid adding dependencies unnecessarily.",
             example = "org.junit.jupiter.api.*",
             required = false)
     @Nullable
