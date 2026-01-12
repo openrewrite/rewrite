@@ -38,9 +38,9 @@ def visit_right_padded(v: 'JavaVisitor', right: Optional[JRightPadded[T]], loc: 
     if t is None:
         return None
 
-    right = right.with_element(t)
-    right = right.with_after(v.visit_space(right.after, loc, p))
-    right = right.with_markers(v.visit_markers(right.markers, p))
+    right = right.replace(element=t)
+    right = right.replace(after=v.visit_space(right.after, loc, p))
+    right = right.replace(markers=v.visit_markers(right.markers, p))
     return right
 
 

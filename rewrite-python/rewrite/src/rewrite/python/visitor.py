@@ -162,10 +162,10 @@ class PythonVisitor(JavaVisitor[P]):
             return temp_stmt
         chained = cast("ChainedAssignment", temp_stmt)
         chained = chained.replace(markers=self.visit_markers(chained.markers, p))
-        chained = chained.replace(
-            variables=list_map(
+        chained = chained.padding.replace(variables=
+            list_map(
                 lambda v: self.visit_right_padded(v, None, p),
-                chained.variables
+                chained.padding.variables
             )
         )
         chained = chained.replace(
@@ -184,27 +184,27 @@ class PythonVisitor(JavaVisitor[P]):
         collection = cast("CollectionLiteral", temp_expr)
         collection = collection.replace(markers=self.visit_markers(collection.markers, p))
         collection = collection.replace(
-            elements=self.visit_container(collection.elements, None, p)
+            elements=self.visit_container(collection.padding.elements, None, p)
         )
         return collection
 
     def visit_compilation_unit(self, cu: CompilationUnit, p: P) -> J:
         """Visit a Python compilation unit (module)."""
-        cu = cu.with_prefix(self.visit_space(cu.prefix, Space.Location.ANY, p))
-        cu = cu.with_markers(self.visit_markers(cu.markers, p))
-        cu = cu.padding.with_imports(
+        cu = cu.replace(prefix=self.visit_space(cu.prefix, Space.Location.ANY, p))
+        cu = cu.replace(markers=self.visit_markers(cu.markers, p))
+        cu = cu.padding.replace(imports=
             list_map(
                 lambda v: self.visit_right_padded(v, None, p),
                 cu.padding.imports
             )
         )
-        cu = cu.padding.with_statements(
+        cu = cu.padding.replace(statements=
             list_map(
                 lambda v: self.visit_right_padded(v, None, p),
                 cu.padding.statements
             )
         )
-        cu = cu.with_eof(self.visit_space(cu.eof, Space.Location.ANY, p))
+        cu = cu.replace(eof=self.visit_space(cu.eof, Space.Location.ANY, p))
         return cu
 
     def visit_comprehension_expression(self, comp: ComprehensionExpression, p: P) -> J:
@@ -269,10 +269,10 @@ class PythonVisitor(JavaVisitor[P]):
             return temp_stmt
         del_ = cast("Del", temp_stmt)
         del_ = del_.replace(markers=self.visit_markers(del_.markers, p))
-        del_ = del_.replace(
-            targets=list_map(
+        del_ = del_.padding.replace(targets=
+            list_map(
                 lambda t: self.visit_right_padded(t, None, p),
-                del_.targets
+                del_.padding.targets
             )
         )
         return del_
@@ -288,7 +288,7 @@ class PythonVisitor(JavaVisitor[P]):
         dict_lit = cast("DictLiteral", temp_expr)
         dict_lit = dict_lit.replace(markers=self.visit_markers(dict_lit.markers, p))
         dict_lit = dict_lit.replace(
-            elements=self.visit_container(dict_lit.elements, None, p)
+            elements=self.visit_container(dict_lit.padding.elements, None, p)
         )
         return dict_lit
 
@@ -443,7 +443,7 @@ class PythonVisitor(JavaVisitor[P]):
         )
         pattern = pattern.replace(markers=self.visit_markers(pattern.markers, p))
         pattern = pattern.replace(
-            children=self.visit_container(pattern.children, None, p)
+            children=self.visit_container(pattern.padding.children, None, p)
         )
         return pattern
 
@@ -462,7 +462,7 @@ class PythonVisitor(JavaVisitor[P]):
                 from_=self.visit_right_padded(multi.from_, None, p)
             )
         multi = multi.replace(
-            names=self.visit_container(multi.names, None, p)
+            names=self.visit_container(multi.padding.names, None, p)
         )
         return multi
 
@@ -593,9 +593,9 @@ class PythonVisitor(JavaVisitor[P]):
         alias = alias.replace(
             name=self.visit_and_cast(alias.name, J, p)
         )
-        if alias.type_parameters is not None:
+        if alias.padding.type_parameters is not None:
             alias = alias.replace(
-                type_parameters=self.visit_container(alias.type_parameters, None, p)
+                type_parameters=self.visit_container(alias.padding.type_parameters, None, p)
             )
         alias = alias.replace(
             value=self.visit_left_padded(alias.value, None, p)
@@ -641,10 +641,10 @@ class PythonVisitor(JavaVisitor[P]):
             return temp_expr
         union = cast("UnionType", temp_expr)
         union = union.replace(markers=self.visit_markers(union.markers, p))
-        union = union.replace(
-            types=list_map(
+        union = union.padding.replace(types=
+            list_map(
                 lambda t: self.visit_right_padded(t, None, p),
-                union.types
+                union.padding.types
             )
         )
         return union
@@ -659,10 +659,10 @@ class PythonVisitor(JavaVisitor[P]):
             return temp_stmt
         scope = cast("VariableScope", temp_stmt)
         scope = scope.replace(markers=self.visit_markers(scope.markers, p))
-        scope = scope.replace(
-            names=list_map(
+        scope = scope.padding.replace(names=
+            list_map(
                 lambda n: self.visit_right_padded(n, None, p),
-                scope.names
+                scope.padding.names
             )
         )
         return scope
@@ -738,7 +738,7 @@ class PythonVisitor(JavaVisitor[P]):
         )
         if before is container.before and elements is container.elements:
             return container
-        return container.replace(before=before, elements=elements)
+        return container.replace(before=before).padding.replace(elements=JRightPadded.merge_elements(container.padding.elements, elements))
 
     # -------------------------------------------------------------------------
     # Placeholder methods for inherited JavaVisitor functionality

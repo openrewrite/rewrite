@@ -190,8 +190,8 @@ def parse_python_source(source: str, path: str = "<unknown>") -> dict:
 
         # Convert to OpenRewrite LST
         cu = ParserVisitor(source).visit(tree)
-        cu = cu.with_source_path(Path(path))
-        cu = cu.with_markers(Markers.EMPTY)
+        cu = cu.replace(source_path=Path(path))
+        cu = cu.replace(markers=Markers.EMPTY)
 
         # Store and return
         obj_id = str(cu.id)

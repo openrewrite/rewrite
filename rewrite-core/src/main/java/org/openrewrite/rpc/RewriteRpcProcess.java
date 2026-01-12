@@ -139,7 +139,7 @@ public class RewriteRpcProcess extends Thread {
         if (trace) {
             handler = new TraceMessageHandler("client", handler);
         }
-        this.rpcClient = new JsonRpc(handler);
+        this.rpcClient = new JsonRpc(handler, formatter);
     }
 
     public void shutdown() {

@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.rpc;
 
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.moderne.jsonrpc.JsonRpc;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
@@ -55,8 +57,11 @@ class JavaRewriteRpcTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
-        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)), env.toMarketplace(runtimeClasspath()));
-        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)), env.toMarketplace(runtimeClasspath()))
+        JsonMessageFormatter clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+        JsonMessageFormatter serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+
+        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut), clientFormatter), env.toMarketplace(runtimeClasspath()));
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut), serverFormatter), env.toMarketplace(runtimeClasspath()))
           .log(System.out);
 //        client.traceGetObject(true, true);
     }

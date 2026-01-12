@@ -33,6 +33,7 @@ import org.openrewrite.python.tree.*;
 
 import java.util.List;
 
+@SuppressWarnings("DataFlowIssue")
 public class PythonVisitor<P> extends JavaVisitor<P>
 {
     @Override

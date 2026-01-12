@@ -27,17 +27,9 @@ class Tree(ABC):
     def id(self) -> UUID:
         ...
 
-    @abstractmethod
-    def with_id(self, id: UUID) -> Tree:
-        ...
-
     @property
     @abstractmethod
     def markers(self) -> Markers:
-        ...
-
-    @abstractmethod
-    def with_markers(self, markers: Markers) -> Tree:
         ...
 
     @abstractmethod
@@ -117,17 +109,9 @@ class SourceFile(Tree):
     def source_path(self) -> Path:
         ...
 
-    @abstractmethod
-    def with_source_path(self, source_path: Path) -> SourceFile:
-        ...
-
     @property
     @abstractmethod
     def file_attributes(self) -> Optional[FileAttributes]:
-        ...
-
-    @abstractmethod
-    def with_file_attributes(self, file_attributes: Optional[FileAttributes]) -> SourceFile:
         ...
 
     def print_all(self) -> str:

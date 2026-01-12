@@ -18,7 +18,6 @@ package org.openrewrite.python;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.internal.rpc.PythonValidator;
@@ -28,7 +27,10 @@ import org.openrewrite.text.PlainTextParser;
 import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -101,8 +103,6 @@ public class PythonParser implements Parser {
 
     public static class Builder extends Parser.Builder {
         private long maxSizeBytes = 2 * 1024 * 1024; // 2MB default
-        @SuppressWarnings("unused")
-        private boolean logCompilationWarningsAndErrors;
 
         public Builder() {
             super(Py.CompilationUnit.class);
@@ -117,17 +117,6 @@ public class PythonParser implements Parser {
          */
         public Builder maxSizeBytes(long maxSizeBytes) {
             this.maxSizeBytes = maxSizeBytes;
-            return this;
-        }
-
-        /**
-         * Whether to log compilation warnings and errors.
-         *
-         * @param log Whether to log compilation warnings and errors.
-         * @return This builder.
-         */
-        public Builder logCompilationWarningsAndErrors(boolean log) {
-            this.logCompilationWarningsAndErrors = log;
             return this;
         }
 

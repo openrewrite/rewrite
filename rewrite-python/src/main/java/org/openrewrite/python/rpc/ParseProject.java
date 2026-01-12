@@ -47,18 +47,4 @@ class ParseProject implements RpcRequest {
      */
     @Nullable
     Path relativeTo;
-
-    ParseProject(Path projectPath) {
-        this(projectPath, null, null);
-    }
-
-    ParseProject(Path projectPath, @Nullable List<String> exclusions) {
-        this(projectPath, exclusions, null);
-    }
-
-    ParseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo) {
-        this.projectPath = projectPath;
-        this.exclusions = exclusions;
-        this.relativeTo = relativeTo;
-    }
 }

@@ -22,10 +22,6 @@ class J(Tree):
     def prefix(self) -> Space:
         ...
 
-    @abstractmethod
-    def with_prefix(self, prefix: Space) -> 'J':
-        ...
-
     def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool:
         from .visitor import JavaVisitor
         return isinstance(v, JavaVisitor)
@@ -51,17 +47,11 @@ class Comment(ABC):
     def text(self) -> str:
         return self._text
 
-    def with_text(self, text: str) -> Comment:
-        return self if text is self._text else replace(self, _text=text)
-
     _suffix: str
 
     @property
     def suffix(self) -> str:
         return self._suffix
-
-    def with_suffix(self, suffix: str) -> Comment:
-        return self if suffix is self._suffix else replace(self, _suffix=suffix)
 
     _markers: Markers
 
@@ -69,8 +59,19 @@ class Comment(ABC):
     def markers(self) -> Markers:
         return self._markers
 
-    def with_markers(self, markers: Markers) -> Comment:
-        return self if markers is self._markers else replace(self, _markers=markers)
+    def replace(self, **kwargs) -> 'Comment':
+        """Replace fields on this Comment using dataclasses.replace."""
+        mapped_kwargs = {}
+        for key, value in kwargs.items():
+            if not key.startswith('_'):
+                private_key = f'_{key}'
+                if hasattr(self, private_key):
+                    mapped_kwargs[private_key] = value
+                else:
+                    mapped_kwargs[key] = value
+            else:
+                mapped_kwargs[key] = value
+        return replace(self, **mapped_kwargs)
 
 
 @dataclass(frozen=True)
@@ -80,9 +81,6 @@ class TextComment(Comment):
     @property
     def multiline(self) -> bool:
         return self._multiline
-
-    def with_multiline(self, multiline: bool) -> Comment:
-        return self if multiline is self._multiline else replace(self, _multiline=multiline)
 
     # IMPORTANT: This explicit constructor aligns the parameter order with the Java side
     def __init__(self, _multiline: bool, _text: str, _suffix: str, _markers: Markers) -> None:
@@ -100,17 +98,25 @@ class Space:
     def comments(self) -> List[Comment]:
         return self._comments
 
-    def with_comments(self, comments: List[Comment]) -> Space:
-        return self if comments is self._comments else replace(self, _comments=comments)
-
     _whitespace: Optional[str]
 
     @property
     def whitespace(self) -> str:
         return self._whitespace if self._whitespace is not None else ""
 
-    def with_whitespace(self, whitespace: Optional[str]) -> Space:
-        return self if whitespace is self._whitespace else replace(self, _whitespace=whitespace)
+    def replace(self, **kwargs) -> 'Space':
+        """Replace fields on this Space using dataclasses.replace."""
+        mapped_kwargs = {}
+        for key, value in kwargs.items():
+            if not key.startswith('_'):
+                private_key = f'_{key}'
+                if hasattr(self, private_key):
+                    mapped_kwargs[private_key] = value
+                else:
+                    mapped_kwargs[key] = value
+            else:
+                mapped_kwargs[key] = value
+        return replace(self, **mapped_kwargs)
 
     def is_empty(self) -> bool:
         return len(self._comments) == 0 and (self._whitespace is None or self._whitespace == '')
@@ -123,7 +129,7 @@ class Space:
     def format_first_prefix(cls, trees: List[J2], prefix: Space) -> List[J2]:
         if trees and next(iter(trees)).prefix != prefix:
             formatted_trees = list(trees)
-            formatted_trees[0] = cast(J2, formatted_trees[0].with_prefix(prefix))
+            formatted_trees[0] = cast(J2, formatted_trees[0].replace(prefix=prefix))
             return formatted_trees
         return trees
 
@@ -552,17 +558,11 @@ class JRightPadded(Generic[T]):
     def element(self) -> T:
         return self._element
 
-    def with_element(self, element: T) -> JRightPadded[T]:
-        return self if element is self._element else replace(self, _element=element)
-
     _after: Space
 
     @property
     def after(self) -> Space:
         return self._after
-
-    def with_after(self, after: Space) -> JRightPadded[T]:
-        return self if after is self._after else replace(self, _after=after)
 
     _markers: Markers
 
@@ -570,8 +570,13 @@ class JRightPadded(Generic[T]):
     def markers(self) -> Markers:
         return self._markers
 
-    def with_markers(self, markers: Markers) -> JRightPadded[T]:
-        return self if markers is self._markers else replace(self, _markers=markers)
+    def __eq__(self, other) -> bool:
+        if isinstance(other, JRightPadded):
+            return self._element == other._element
+        return self._element == other
+
+    def __hash__(self) -> int:
+        return hash(self._element)
 
     def replace(self, **kwargs) -> 'JRightPadded[T]':
         """Replace fields using keyword arguments."""
@@ -589,7 +594,7 @@ class JRightPadded(Generic[T]):
         return [x.element for x in padded_list]
 
     @classmethod
-    def with_elements(cls, before: List[JRightPadded[J2]], elements: List[J2]) -> List[JRightPadded[J2]]:
+    def merge_elements(cls, before: List[JRightPadded[J2]], elements: List[J2]) -> List[JRightPadded[J2]]:
         # a cheaper check for the most common case when there are no changes
         if len(elements) == len(before):
             has_changes = False
@@ -613,7 +618,7 @@ class JRightPadded(Generic[T]):
         for t in elements:
             found = before_by_id.get(t.id)
             if found is not None:
-                after.append(found.with_element(t))
+                after.append(found.replace(element=t))
             else:
                 after.append(JRightPadded(t, Space.EMPTY, Markers.EMPTY))
 
@@ -675,17 +680,11 @@ class JLeftPadded(Generic[T]):
     def before(self) -> Space:
         return self._before
 
-    def with_before(self, before: Space) -> JLeftPadded[T]:
-        return self if before is self._before else replace(self, _before=before)
-
     _element: T
 
     @property
     def element(self) -> T:
         return self._element
-
-    def with_element(self, element: T) -> JLeftPadded[T]:
-        return self if element is self._element else replace(self, _element=element)
 
     _markers: Markers
 
@@ -693,8 +692,24 @@ class JLeftPadded(Generic[T]):
     def markers(self) -> Markers:
         return self._markers
 
-    def with_markers(self, markers: Markers) -> JLeftPadded[T]:
-        return self if markers is self._markers else replace(self, _markers=markers)
+    def __eq__(self, other) -> bool:
+        if isinstance(other, JLeftPadded):
+            return self._element == other._element
+        return self._element == other
+
+    def __hash__(self) -> int:
+        return hash(self._element)
+
+    def replace(self, **kwargs) -> 'JLeftPadded[T]':
+        """Replace fields using keyword arguments."""
+        # Map public property names to private field names
+        mapped = {}
+        for key, value in kwargs.items():
+            if not key.startswith('_') and hasattr(self, f'_{key}'):
+                mapped[f'_{key}'] = value
+            else:
+                mapped[key] = value
+        return replace(self, **mapped)
 
     class Location(Enum):
         ARRAY_TYPE_DIMENSION = Space.Location.DIMENSION_PREFIX
@@ -731,17 +746,11 @@ class JContainer(Generic[J2]):
     def before(self) -> Space:
         return self._before
 
-    def with_before(self, before: Space) -> JContainer[J2]:
-        return self if before is self._before else replace(self, _before=before)
-
     _elements: List[JRightPadded[J2]]
 
     @property
     def elements(self) -> List[J2]:
         return JRightPadded.get_elements(self._elements)
-
-    def with_elements(self, elements: List[J2]) -> JContainer[J2]:
-        return self.padding.with_elements(JRightPadded.with_elements(self._elements, elements))
 
     _markers: Markers
 
@@ -749,8 +758,26 @@ class JContainer(Generic[J2]):
     def markers(self) -> Markers:
         return self._markers
 
-    def with_markers(self, markers: Markers) -> JContainer[J2]:
-        return self if markers is self._markers else replace(self, _markers=markers)
+    def __eq__(self, other) -> bool:
+        if isinstance(other, JContainer):
+            return self._elements == other._elements
+        if isinstance(other, list):
+            return self.elements == other
+        return False
+
+    def __hash__(self) -> int:
+        return hash(tuple(self._elements))
+
+    def replace(self, **kwargs) -> 'JContainer[J2]':
+        """Replace fields using keyword arguments."""
+        # Map public property names to private field names
+        mapped = {}
+        for key, value in kwargs.items():
+            if not key.startswith('_') and hasattr(self, f'_{key}'):
+                mapped[f'_{key}'] = value
+            else:
+                mapped[key] = value
+        return replace(self, **mapped)
 
     @dataclass
     class PaddingHelper(Generic[J3]):
@@ -760,8 +787,14 @@ class JContainer(Generic[J2]):
         def elements(self) -> List[JRightPadded[J3]]:
             return self._t._elements
 
-        def with_elements(self, elements: List[JRightPadded[J3]]) -> JContainer[J3]:
-            return self._t if self._t._elements is elements else JContainer(self._t._before, elements, self._t._markers)
+        def replace(self, **kwargs) -> JContainer[J3]:
+            """Replace fields of the container using keyword arguments."""
+            if 'elements' in kwargs:
+                elements = kwargs['elements']
+                if self._t._elements is elements:
+                    return self._t
+                return JContainer(self._t._before, elements, self._t._markers)
+            return self._t
 
     _padding: Optional[weakref.ReferenceType[JContainer.PaddingHelper[J2]]] = None
 
@@ -780,13 +813,13 @@ class JContainer(Generic[J2]):
         return p
 
     @classmethod
-    def with_elements_nullable(cls, before: Optional[JContainer[J2]], elements: Optional[List[J2]]) -> Optional[
+    def build_nullable(cls, before: Optional[JContainer[J2]], elements: Optional[List[J2]]) -> Optional[
         JContainer[J2]]:
         if elements is None or elements == []:
             return None
         if before is None:
-            return JContainer(Space.EMPTY, JRightPadded.with_elements([], elements), Markers.EMPTY)
-        return before.padding.with_elements(JRightPadded.with_elements(before._elements, elements))
+            return JContainer(Space.EMPTY, JRightPadded.merge_elements([], elements), Markers.EMPTY)
+        return before.padding.replace(elements=JRightPadded.merge_elements(before._elements, elements))
 
     _EMPTY: Optional[JContainer[J]] = None
 

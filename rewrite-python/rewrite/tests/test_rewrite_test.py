@@ -221,8 +221,8 @@ class TestRecipeSpecHooks:
         def add_marker(cu: CompilationUnit) -> CompilationUnit:
             # Add a marker to the compilation unit
             new_marker = SearchResult(random_id(), "test")
-            new_markers = cu.markers.with_markers(cu.markers.markers + [new_marker])
-            return cu.with_markers(new_markers)
+            new_markers = cu.markers.replace(markers=cu.markers.markers + [new_marker])
+            return cu.replace(markers=new_markers)
 
         marker_found = []
 

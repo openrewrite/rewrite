@@ -19,9 +19,19 @@ class Marker(ABC):
     def id(self) -> UUID:
         ...
 
-    @abstractmethod
-    def with_id(self, id: UUID) -> Marker:
-        ...
+    def replace(self, **kwargs) -> 'Marker':
+        """Replace fields on this marker using dataclasses.replace."""
+        mapped_kwargs = {}
+        for key, value in kwargs.items():
+            if not key.startswith('_'):
+                private_key = f'_{key}'
+                if hasattr(self, private_key):
+                    mapped_kwargs[private_key] = value
+                else:
+                    mapped_kwargs[key] = value
+            else:
+                mapped_kwargs[key] = value
+        return replace(self, **mapped_kwargs)
 
     def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
         return ''
@@ -46,17 +56,25 @@ class Markers:
     def id(self) -> UUID:
         return self._id
 
-    def with_id(self, id: UUID) -> Markers:
-        return self if id is self._id else Markers(id, self._markers)
-
     _markers: List[Marker]
 
     @property
     def markers(self) -> List[Marker]:
         return self._markers
 
-    def with_markers(self, markers: List[Marker]) -> Markers:
-        return self if markers is self._markers else Markers(self._id, markers)
+    def replace(self, **kwargs) -> 'Markers':
+        """Replace fields on this Markers instance using dataclasses.replace."""
+        mapped_kwargs = {}
+        for key, value in kwargs.items():
+            if not key.startswith('_'):
+                private_key = f'_{key}'
+                if hasattr(self, private_key):
+                    mapped_kwargs[private_key] = value
+                else:
+                    mapped_kwargs[key] = value
+            else:
+                mapped_kwargs[key] = value
+        return replace(self, **mapped_kwargs)
 
     def find_first(self, cls: Type[M]) -> Optional[M]:
         for marker in self.markers:
@@ -75,7 +93,7 @@ class Markers:
         :param remap_fn: function to remap the marker
         :return: new Markers instance with the updated markers, or the same instance if no markers were updated
         """
-        return self.with_markers(list_map(lambda m: remap_fn(m) if isinstance(m, cls) else m, self.markers))
+        return self.replace(markers=list_map(lambda m: remap_fn(m) if isinstance(m, cls) else m, self.markers))
 
     EMPTY: ClassVar[Markers]
 
@@ -103,17 +121,11 @@ class SearchResult(Marker):
     def id(self) -> UUID:
         return self._id
 
-    def with_id(self, id: UUID) -> SearchResult:
-        return self if id is self._id else replace(self, _id=id)
-
     _description: Optional[str]
 
     @property
     def description(self) -> Optional[str]:
         return self._description
-
-    def with_description(self, description: Optional[str]) -> SearchResult:
-        return self if description is self._description else replace(self, _description=description)
 
 
 @dataclass(frozen=True, eq=False)
@@ -124,17 +136,11 @@ class UnknownJavaMarker(Marker):
     def id(self) -> UUID:
         return self._id
 
-    def with_id(self, id: UUID) -> UnknownJavaMarker:
-        return self if id is self._id else replace(self, _id=id)
-
     _data: Dict[str, Any]
 
     @property
     def data(self) -> Dict[str, Any]:
         return self._data
-
-    def with_data(self, data: Dict[str, Any]) -> UnknownJavaMarker:
-        return self if data is self._data else replace(self, _data=data)
 
 
 @dataclass(frozen=True, eq=False)
@@ -151,17 +157,11 @@ class ParseExceptionResult(Marker):
     def id(self) -> UUID:
         return self._id
 
-    def with_id(self, id: UUID) -> ParseExceptionResult:
-        return self if id is self._id else replace(self, _id=id)
-
     _parser_type: str
 
     @property
     def parser_type(self) -> str:
         return self._parser_type
-
-    def with_parser_type(self, parser_type: str) -> ParseExceptionResult:
-        return self if parser_type is self._parser_type else replace(self, _parser_type=parser_type)
 
     _exception_type: str
 
@@ -169,14 +169,8 @@ class ParseExceptionResult(Marker):
     def exception_type(self) -> str:
         return self._exception_type
 
-    def with_exception_type(self, exception_type: str) -> ParseExceptionResult:
-        return self if exception_type is self._exception_type else replace(self, _exception_type=exception_type)
-
     _message: str
 
     @property
     def message(self) -> str:
         return self._message
-
-    def with_message(self, message: str) -> ParseExceptionResult:
-        return self if message is self._message else replace(self, _message=message)

@@ -15,7 +15,9 @@
  */
 package org.openrewrite.rpc;
 
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.moderne.jsonrpc.JsonRpc;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
@@ -65,10 +67,13 @@ class RewriteRpcTest implements RewriteTest {
         marketplace = env.toMarketplace(runtimeClasspath())
           .setResolvers(singletonList(new TestRecipeBundleResolver()));
 
-        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)), marketplace)
+        JsonMessageFormatter clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+        JsonMessageFormatter serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+
+        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut), clientFormatter), marketplace)
           .batchSize(1);
 
-        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)), marketplace)
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut), serverFormatter), marketplace)
           .batchSize(1);
     }
 

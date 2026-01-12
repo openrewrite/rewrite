@@ -220,7 +220,7 @@ class RecipeSpec:
         visitor = ParserVisitor(source)
         tree = ast.parse(source)
         cu = visitor.visit_Module(tree)
-        return cu.with_source_path(source_path)
+        return cu.replace(source_path=source_path)
 
     def _expect_no_parse_failures(
         self, parsed: List[Tuple[SourceSpec, SourceFile]]

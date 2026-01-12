@@ -84,7 +84,7 @@ class JavaVisitor(TreeVisitor[J, P]):
             return None
         if element is right.element:
             return right
-        return right.with_element(element)
+        return right.replace(element=element)
 
     def visit_method_declaration(self, method: 'MethodDeclaration', p: P) -> J:
         """Visit a method declaration, including its body."""
@@ -93,7 +93,7 @@ class JavaVisitor(TreeVisitor[J, P]):
         if method.body is not None:
             body = self.visit(method.body, p)
             if body is not method.body:
-                method = method.with_body(body)
+                method = method.replace(body=body)
         return method
 
     def visit_block(self, block: 'Block', p: P) -> J:
@@ -113,5 +113,5 @@ class JavaVisitor(TreeVisitor[J, P]):
                         changed = True
                         break
             if changed:
-                block = block.padding.with_statements(new_statements)
+                block = block.padding.replace(statements=new_statements)
         return block

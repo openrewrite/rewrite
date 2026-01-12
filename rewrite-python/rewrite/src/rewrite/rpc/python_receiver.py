@@ -72,11 +72,11 @@ class PythonRpcReceiver:
             if isinstance(tree, ExpressionStatement):
                 # Only receive id; prefix/markers are part of expression
                 new_id = q.receive(tree.id)
-                tree = tree.with_id(new_id) if new_id is not tree.id else tree
+                tree = tree.replace(id=new_id) if new_id is not tree.id else tree
             elif isinstance(tree, StatementExpression):
                 # Only receive id; prefix/markers are part of statement
                 new_id = q.receive(tree.id)
-                tree = tree.with_id(new_id) if new_id is not tree.id else tree
+                tree = tree.replace(id=new_id) if new_id is not tree.id else tree
             else:
                 tree = self._pre_visit(tree, q)
 
@@ -168,11 +168,11 @@ class PythonRpcReceiver:
 
         result = j
         if new_id is not j.id:
-            result = result.with_id(new_id)
+            result = result.replace(id=new_id)
         if new_prefix is not j.prefix:
-            result = result.with_prefix(new_prefix)
+            result = result.replace(prefix=new_prefix)
         if new_markers is not j.markers:
-            result = result.with_markers(new_markers)
+            result = result.replace(markers=new_markers)
         return result
 
     def _visit_compilation_unit(self, cu: CompilationUnit, q: RpcReceiveQueue) -> CompilationUnit:
@@ -833,7 +833,7 @@ class PythonRpcReceiver:
         if comments is space.comments and whitespace is space.whitespace:
             return space
 
-        return space.with_comments(comments).with_whitespace(whitespace)
+        return space.replace(comments=comments).replace(whitespace=whitespace)
 
     def _receive_comment(self, comment, q: RpcReceiveQueue):
         """Receive a Comment object."""
@@ -942,7 +942,7 @@ def _register_marker_codecs():
         new_id = q.receive(semicolon.id)
         if new_id is semicolon.id:
             return semicolon
-        return semicolon.with_id(new_id)
+        return semicolon.replace(id=new_id)
 
     def _receive_trailing_comma(trailing_comma: TrailingComma, q: RpcReceiveQueue) -> TrailingComma:
         new_id = q.receive(trailing_comma.id)
@@ -951,16 +951,16 @@ def _register_marker_codecs():
             return trailing_comma
         result = trailing_comma
         if new_id is not trailing_comma.id:
-            result = result.with_id(new_id)
+            result = result.replace(id=new_id)
         if new_suffix is not trailing_comma.suffix:
-            result = result.with_suffix(new_suffix)
+            result = result.replace(suffix=new_suffix)
         return result
 
     def _receive_omit_parentheses(omit_paren: OmitParentheses, q: RpcReceiveQueue) -> OmitParentheses:
         new_id = q.receive(omit_paren.id)
         if new_id is omit_paren.id:
             return omit_paren
-        return omit_paren.with_id(new_id)
+        return omit_paren.replace(id=new_id)
 
     from uuid import uuid4
 

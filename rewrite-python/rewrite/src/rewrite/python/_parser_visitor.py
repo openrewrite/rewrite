@@ -394,7 +394,7 @@ class ParserVisitor(ast.NodeVisitor):
             random_id(),
             loop.prefix,
             Markers.EMPTY,
-            loop.with_prefix(Space.EMPTY),
+            loop.replace(prefix=Space.EMPTY),
             self.__pad_left(
                 self.__source_before('else'),
                 self.__convert_block(node.orelse)
@@ -427,7 +427,7 @@ class ParserVisitor(ast.NodeVisitor):
             random_id(),
             while_.prefix,
             Markers.EMPTY,
-            while_.with_prefix(Space.EMPTY),
+            while_.replace(prefix=Space.EMPTY),
             self.__pad_left(
                 self.__source_before('else'),
                 self.__convert_block(node.orelse)
@@ -582,7 +582,7 @@ class ParserVisitor(ast.NodeVisitor):
             random_id(),
             try_.prefix,
             Markers.EMPTY,
-            try_.with_prefix(Space.EMPTY),
+            try_.replace(prefix=Space.EMPTY),
             else_block
         )
 
@@ -737,7 +737,7 @@ class ParserVisitor(ast.NodeVisitor):
         return py.ComprehensionExpression(
             random_id(),
             prefix,
-            Markers.EMPTY if parenthesized else Markers.EMPTY.with_markers([OmitParentheses(random_id())]),
+            Markers.EMPTY if parenthesized else Markers.EMPTY.replace(markers=[OmitParentheses(random_id())]),
             py.ComprehensionExpression.Kind.GENERATOR,
             result,
             cast(List[py.ComprehensionExpression.Clause], [self.__convert(g) for g in node.generators]),
@@ -864,7 +864,7 @@ class ParserVisitor(ast.NodeVisitor):
         pattern = self.__convert(node.pattern)
         if isinstance(pattern, py.MatchCase) and node.guard:
             guard = self.__pad_left(self.__source_before('if'), self.__convert(node.guard))
-            pattern = pattern.padding.with_guard(guard)
+            pattern = pattern.padding.replace(guard=guard)
 
         return j.Case(
             random_id(),
@@ -1306,7 +1306,7 @@ class ParserVisitor(ast.NodeVisitor):
                     self._type_mapping.type(node)
                 )
 
-        return left.with_prefix(prefix)
+        return left.replace(prefix=prefix)
 
     def __convert_binary_operator(self, op) -> Union[JLeftPadded[j.Binary.Type], JLeftPadded[py.Binary.Type]]:
         operation_map: Dict[Type[ast], Tuple[j.Binary.Type, str]] = {
@@ -1856,8 +1856,8 @@ class ParserVisitor(ast.NodeVisitor):
                 padding_len = len(padding.whitespace) if padding.whitespace else 0
                 for c in padding.comments:
                     padding_len += len(c.text) + 1 + len(c.suffix)
-                unpadded_last = elements.padding.elements[-1].with_after(Space.EMPTY)
-                elements = elements.padding.with_elements(list_map_last(lambda last: unpadded_last, elements.padding.elements))
+                unpadded_last = elements.padding.elements[-1].replace(after=Space.EMPTY)
+                elements = elements.padding.replace(elements=list_map_last(lambda last: unpadded_last, elements.padding.elements))
                 self._cursor -= padding_len
             omit_parens = True
 
@@ -1866,7 +1866,7 @@ class ParserVisitor(ast.NodeVisitor):
             prefix,
             Markers.EMPTY,
             py.CollectionLiteral.Kind.TUPLE,
-            elements.with_markers(
+            elements.replace(markers=
                 Markers.build(random_id(), [OmitParentheses(random_id())])) if omit_parens else elements,
             self._type_mapping.type(node)
         )
@@ -1886,7 +1886,7 @@ class ParserVisitor(ast.NodeVisitor):
         prefix = self.__whitespace()
         converted_type = self.__convert_internal(node, self.__convert_type, self.__convert_type_mapper)
         if isinstance(converted_type, TypeTree):
-            return converted_type.with_prefix(prefix)
+            return converted_type.replace(prefix=prefix)
         else:
             return py.ExpressionTypeTree(
                 random_id(),
@@ -2016,18 +2016,16 @@ class ParserVisitor(ast.NodeVisitor):
         expr_prefix = self.__whitespace()
         handler = (
             lambda e, r: (
-                cast(JContainer, e)
-                .with_before(prefix)
-                .with_elements([
-                    e.with_prefix(expr_prefix) if i == 0 else e
-                    for i, e in enumerate(e.elements)
-                ])
+                (lambda c: c.padding.replace(elements=[
+                    padded.replace(element=padded.element.replace(prefix=expr_prefix)) if i == 0 else padded
+                    for i, padded in enumerate(c.padding.elements)
+                ]))(cast(JContainer, e).replace(before=prefix))
                 if isinstance(e, JContainer)
                 else j.Parentheses(
                     random_id(),
                     prefix,
                     Markers.EMPTY,
-                    self.__pad_right(e.with_prefix(expr_prefix), r)
+                    self.__pad_right(e.replace(prefix=expr_prefix), r)
                 )
             ),
             save_cursor,
@@ -2115,7 +2113,7 @@ class ParserVisitor(ast.NodeVisitor):
         if last and self._cursor < len(self._source):
             if self._source[self._cursor] == delim and end_delim != delim:
                 self._cursor += len(delim)
-                markers = markers.with_markers([TrailingComma(random_id(), self.__whitespace())])
+                markers = markers.replace(markers=[TrailingComma(random_id(), self.__whitespace())])
             elif self._source[self._cursor] != end_delim:
                 if not pad_last:
                     self._cursor = save_cursor
@@ -2189,7 +2187,7 @@ class ParserVisitor(ast.NodeVisitor):
                 whitespace.append(char)
             elif char == '#':
                 if comments:
-                    comments[-1] = comments[-1].with_suffix(''.join(whitespace))
+                    comments[-1] = comments[-1].replace(suffix=''.join(whitespace))
                 else:
                     prefix = ''.join(whitespace)
                 whitespace = []
@@ -2212,7 +2210,7 @@ class ParserVisitor(ast.NodeVisitor):
         if not comments:
             prefix = ''.join(whitespace)
         elif whitespace:
-            comments[-1] = comments[-1].with_suffix(''.join(whitespace))
+            comments[-1] = comments[-1].replace(suffix=''.join(whitespace))
         return Space(comments, prefix), offset
 
     def __position_of_next(self, until_delim: str, stop: Optional[str] = None) -> int:

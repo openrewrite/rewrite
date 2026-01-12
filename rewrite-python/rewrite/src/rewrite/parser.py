@@ -155,7 +155,7 @@ class ParseErrorVisitor(TreeVisitor[Tree, P]):
         return isinstance(source_file, ParseError)
 
     def visit_parse_error(self, e: ParseError, p: P) -> ParseError:
-        return e.with_markers(self.visit_markers(e.markers, p))
+        return e.replace(markers=self.visit_markers(e.markers, p))
 
 
 class Parser(ABC):

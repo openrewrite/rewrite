@@ -172,7 +172,7 @@ class TreeVisitor(ABC, Generic[T, P]):
             return Markers.EMPTY
         elif len(markers.markers) == 0:
             return markers
-        return markers.with_markers(list_map(lambda m: self.visit_marker(m, p), markers.markers))
+        return markers.replace(markers=list_map(lambda m: self.visit_marker(m, p), markers.markers))
 
     def visit_marker(self, marker: Marker, p: P) -> Marker:
         return marker

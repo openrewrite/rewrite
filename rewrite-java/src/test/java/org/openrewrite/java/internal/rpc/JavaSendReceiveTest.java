@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.internal.rpc;
 
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.moderne.jsonrpc.JsonRpc;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.SneakyThrows;
@@ -53,9 +55,12 @@ class JavaSendReceiveTest implements RewriteTest {
 
         Environment env = Environment.builder().build();
 
-        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverIn, serverOut))), env.toMarketplace(runtimeClasspath()))
+        JsonMessageFormatter serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+        JsonMessageFormatter clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+
+        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), serverFormatter), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
-        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientIn, clientOut))), env.toMarketplace(runtimeClasspath()))
+        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), clientFormatter), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
     }
 
