@@ -579,7 +579,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void retainPackageInfoAnnotationWithMissingTypeInformation() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion()),
+          spec -> spec.parser(JavaParser.fromJavaVersion()).typeValidationOptions(TypeValidation.none()),
           java(
             """
               @NullMarked
