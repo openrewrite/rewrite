@@ -17,10 +17,15 @@ package org.openrewrite.docker;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.SourceFile;
 import org.openrewrite.docker.tree.Docker;
+import org.openrewrite.docker.tree.Space;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.test.TypeValidation;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 
 public class Assertions {
@@ -39,7 +44,9 @@ public class Assertions {
                 null,
                 DockerParser.builder(),
                 before,
-                null
+                Assertions::validate,
+                ctx -> {
+                }
         );
         spec.accept(dockerfile);
         return dockerfile;
@@ -59,9 +66,29 @@ public class Assertions {
                 null,
                 DockerParser.builder(),
                 before,
-                s -> after
-        );
+                Assertions::validate,
+                ctx -> {
+                }
+        ).after(s -> after);
         spec.accept(dockerfile);
         return dockerfile;
+    }
+
+    private static SourceFile validate(SourceFile sf, TypeValidation tv) {
+        if (!tv.allowNonWhitespaceInWhitespace()) {
+            List<Docker> elementsWithNonBlankWhitespace = new DockerIsoVisitor<List<Docker>>() {
+                @Override
+                public Space visitSpace(Space space, List<Docker> elements) {
+                    if (!space.getWhitespace().trim().isEmpty()) {
+                        elements.add(getCursor().firstEnclosingOrThrow(Docker.class));
+                    }
+                    return super.visitSpace(space, elements);
+                }
+            }.reduce(sf, new ArrayList<>());
+            if (!elementsWithNonBlankWhitespace.isEmpty()) {
+                throw new AssertionError("Expected no non-whitespace in whitespace, but found: " + elementsWithNonBlankWhitespace);
+            }
+        }
+        return sf;
     }
 }
