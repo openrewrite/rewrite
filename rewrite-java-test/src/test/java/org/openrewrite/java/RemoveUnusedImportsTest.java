@@ -25,8 +25,10 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
-import static java.util.Collections.emptySet;
-import static java.util.Collections.singletonList;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+
+import static java.util.Collections.*;
 import static org.openrewrite.java.Assertions.java;
 
 class RemoveUnusedImportsTest implements RewriteTest {
@@ -556,6 +558,22 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import foo.Bar;
               import foo.Foo;
               """
+          )
+        );
+    }
+
+    @Test
+    void retainPackageInfoAnnotationWithLicenseHeader() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion()),
+          java(
+            """
+              @NullMarked
+              package org.openrewrite.java;
+
+              import org.jspecify.annotations.NullMarked;
+              """,
+            spec -> spec.path("src/main/java/org/openrewrite/java/package-info.java")
           )
         );
     }
