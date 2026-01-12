@@ -66,4 +66,26 @@ class HeredocTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multipleHeredocsInRunCommand() {
+        // Multiple heredocs chained together with && - a common pattern for creating multiple files
+        // See: https://github.com/Bindernews/minblur/blob/7915e7d8765eb3785da4fabda38e744702ec5985/docker/Dockerfile#L13
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN <<EOF1 cat >file1.sh &&\\
+                  <<EOF2 cat >file2.sh &&\\
+                  chmod +x file1.sh file2.sh
+              #!/bin/bash
+              echo "script 1"
+              EOF1
+              #!/bin/bash
+              echo "script 2"
+              EOF2
+              """
+          )
+        );
+    }
 }

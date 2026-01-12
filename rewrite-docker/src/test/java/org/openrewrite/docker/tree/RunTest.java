@@ -479,4 +479,62 @@ class RunTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void execFormCommaNotInPrefix() {
+        // Verify that the comma between exec form elements is NOT included in the element prefix
+        // The comma should be skipped during parsing and printed explicitly by the printer
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN ["apt-get", "update", "-y"]
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(run.getCommand()).isInstanceOf(Docker.ExecForm.class);
+                Docker.ExecForm execForm = (Docker.ExecForm) run.getCommand();
+                assertThat(execForm.getArguments()).hasSize(3);
+
+                // First argument should have no comma in its prefix (just whitespace if any)
+                Docker.Literal first = execForm.getArguments().get(0);
+                assertThat(first.getPrefix().getWhitespace()).containsOnlyWhitespaces();
+                assertThat(first.getText()).isEqualTo("apt-get");
+
+                // Second argument should have no comma in its prefix
+                Docker.Literal second = execForm.getArguments().get(1);
+                assertThat(second.getPrefix().getWhitespace()).containsOnlyWhitespaces();
+                assertThat(second.getText()).isEqualTo("update");
+
+                // Third argument should have no comma in its prefix
+                Docker.Literal third = execForm.getArguments().get(2);
+                assertThat(third.getPrefix().getWhitespace()).containsOnlyWhitespaces();
+                assertThat(third.getText()).isEqualTo("-y");
+            })
+          )
+        );
+    }
+
+    @Test
+    void execFormWithSpacesAfterCommas() {
+        // Verify that spaces after commas are preserved in the prefix
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN ["apt-get",  "update"]
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.ExecForm execForm = (Docker.ExecForm) run.getCommand();
+                assertThat(execForm.getArguments()).hasSize(2);
+
+                // Second argument should have two spaces in its prefix (from ",  ")
+                // The comma should NOT be in the prefix
+                Docker.Literal second = execForm.getArguments().get(1);
+                assertThat(second.getPrefix().getWhitespace()).containsOnlyWhitespaces();
+            })
+          )
+        );
+    }
 }

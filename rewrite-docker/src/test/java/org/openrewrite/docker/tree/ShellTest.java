@@ -51,4 +51,43 @@ class ShellTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void shellWithMultipleSpacesBeforeBracket() {
+        // SHELL with multiple spaces between keyword and opening bracket
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              SHELL  ["/bin/bash", "-c"]
+              """
+          )
+        );
+    }
+
+    @Test
+    void shellWithTabBeforeBracket() {
+        // SHELL with tab between keyword and opening bracket
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              SHELL\t["/bin/bash", "-c"]
+              """
+          )
+        );
+    }
+
+    @Test
+    void shellWithNoSpaceBeforeBracket() {
+        // SHELL with no space between keyword and opening bracket
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              SHELL["/bin/bash", "-c"]
+              """
+          )
+        );
+    }
 }

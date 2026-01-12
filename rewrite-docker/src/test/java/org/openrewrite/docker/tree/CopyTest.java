@@ -118,4 +118,106 @@ class CopyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void copyWithMultipleSources() {
+        // COPY with multiple source files should have separate Argument elements
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY file1.txt file2.txt file3.txt /app/
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                // Should have 3 separate source arguments, not 1 combined argument
+                assertThat(copy.getSources()).hasSize(3);
+                assertThat(((Docker.Literal) copy.getSources().get(0).getContents().getFirst()).getText()).isEqualTo("file1.txt");
+                assertThat(((Docker.Literal) copy.getSources().get(1).getContents().getFirst()).getText()).isEqualTo("file2.txt");
+                assertThat(((Docker.Literal) copy.getSources().get(2).getContents().getFirst()).getText()).isEqualTo("file3.txt");
+                assertThat(((Docker.Literal) copy.getDestination().getContents().getFirst()).getText()).isEqualTo("/app/");
+            })
+          )
+        );
+    }
+
+    @Test
+    void copyWithMultipleSourcesAndFlags() {
+        // COPY with flags and multiple source files
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY --chown=app:app config1.yaml config2.yaml /etc/app/
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getFlags()).hasSize(1);
+                assertThat(copy.getFlags().getFirst().getName()).isEqualTo("chown");
+                assertThat(copy.getSources()).hasSize(2);
+                assertThat(((Docker.Literal) copy.getSources().get(0).getContents().getFirst()).getText()).isEqualTo("config1.yaml");
+                assertThat(((Docker.Literal) copy.getSources().get(1).getContents().getFirst()).getText()).isEqualTo("config2.yaml");
+            })
+          )
+        );
+    }
+
+    @Test
+    void copyHeredocEofInOpeningNotDestination() {
+        // Verify that the EOF marker is in the HeredocForm.opening field, not in destination
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY <<EOF /app/config.txt
+              some content
+              EOF
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getHeredoc()).isNotNull();
+
+                // The opening field should contain "<<EOF"
+                assertThat(copy.getHeredoc().getOpening()).isEqualTo("<<EOF");
+
+                // The destination should contain "/app/config.txt", NOT the EOF marker
+                assertThat(copy.getHeredoc().getDestination()).isNotNull();
+                assertThat(((Docker.Literal) copy.getHeredoc().getDestination().getContents().getFirst()).getText())
+                    .isEqualTo("/app/config.txt");
+                assertThat(((Docker.Literal) copy.getHeredoc().getDestination().getContents().getFirst()).getText())
+                    .doesNotContain("EOF");
+
+                // Content should be the actual content
+                assertThat(copy.getHeredoc().getContentLines()).isNotEmpty();
+
+                // Closing should be "EOF"
+                assertThat(copy.getHeredoc().getClosing()).isEqualTo("EOF");
+            })
+          )
+        );
+    }
+
+    @Test
+    void copyHeredocWithDifferentMarker() {
+        // Verify heredoc with custom marker (not EOF)
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY <<CONFIG /etc/app/settings.ini
+              key=value
+              CONFIG
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getHeredoc()).isNotNull();
+                assertThat(copy.getHeredoc().getOpening()).isEqualTo("<<CONFIG");
+                assertThat(copy.getHeredoc().getDestination()).isNotNull();
+                assertThat(((Docker.Literal) copy.getHeredoc().getDestination().getContents().getFirst()).getText())
+                    .isEqualTo("/etc/app/settings.ini");
+                assertThat(copy.getHeredoc().getClosing()).isEqualTo("CONFIG");
+            })
+          )
+        );
+    }
 }

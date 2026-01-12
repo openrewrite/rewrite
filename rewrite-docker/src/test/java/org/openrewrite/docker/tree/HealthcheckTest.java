@@ -180,4 +180,56 @@ class HealthcheckTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void healthcheckNoneWithMultipleSpaces() {
+        // HEALTHCHECK with multiple spaces between keyword and NONE
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              HEALTHCHECK  NONE
+              """
+          )
+        );
+    }
+
+    @Test
+    void healthcheckNoneWithTab() {
+        // HEALTHCHECK with tab between keyword and NONE
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              HEALTHCHECK\tNONE
+              """
+          )
+        );
+    }
+
+    @Test
+    void healthcheckCmdWithMultipleSpaces() {
+        // HEALTHCHECK with multiple spaces between keyword and CMD
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              HEALTHCHECK  CMD curl -f http://localhost/
+              """
+          )
+        );
+    }
+
+    @Test
+    void healthcheckCmdWithTab() {
+        // HEALTHCHECK with tab between keyword and CMD
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              HEALTHCHECK\tCMD curl -f http://localhost/
+              """
+          )
+        );
+    }
 }
