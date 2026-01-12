@@ -482,9 +482,8 @@ class RunTest implements RewriteTest {
     }
 
     @Test
-    void execFormCommaInPrefix() {
-        // Verify that the comma between exec form elements IS included in the element prefix
-        // This preserves the original formatting, including any whitespace around commas
+    void execFormCommasNotInPrefix() {
+        // Verify that commas are NOT stored in the element prefix - they are printed explicitly
         rewriteRun(
           docker(
             """
@@ -502,14 +501,16 @@ class RunTest implements RewriteTest {
                 assertThat(first.getPrefix().getWhitespace()).doesNotContain(",");
                 assertThat(first.getText()).isEqualTo("apt-get");
 
-                // Second argument includes comma in its prefix
+                // Second argument has only whitespace in prefix (comma is printed separately)
                 Docker.Literal second = execForm.getArguments().get(1);
-                assertThat(second.getPrefix().getWhitespace()).contains(",");
+                assertThat(second.getPrefix().getWhitespace()).doesNotContain(",");
+                assertThat(second.getPrefix().getWhitespace()).isEqualTo(" ");
                 assertThat(second.getText()).isEqualTo("update");
 
-                // Third argument includes comma in its prefix
+                // Third argument has only whitespace in prefix (comma is printed separately)
                 Docker.Literal third = execForm.getArguments().get(2);
-                assertThat(third.getPrefix().getWhitespace()).contains(",");
+                assertThat(third.getPrefix().getWhitespace()).doesNotContain(",");
+                assertThat(third.getPrefix().getWhitespace()).isEqualTo(" ");
                 assertThat(third.getText()).isEqualTo("-y");
             })
           )
@@ -518,7 +519,7 @@ class RunTest implements RewriteTest {
 
     @Test
     void execFormWithSpacesAfterCommas() {
-        // Verify that spaces after commas are preserved in the prefix
+        // Verify that spaces after commas are preserved in the prefix (without the comma)
         rewriteRun(
           docker(
             """
@@ -530,9 +531,9 @@ class RunTest implements RewriteTest {
                 Docker.ExecForm execForm = (Docker.ExecForm) run.getCommand();
                 assertThat(execForm.getArguments()).hasSize(2);
 
-                // Second argument has comma and two spaces in its prefix (from ",  ")
+                // Second argument has two spaces in its prefix (comma is printed separately)
                 Docker.Literal second = execForm.getArguments().get(1);
-                assertThat(second.getPrefix().getWhitespace()).isEqualTo(",  ");
+                assertThat(second.getPrefix().getWhitespace()).isEqualTo("  ");
             })
           )
         );

@@ -1432,14 +1432,14 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         if (jsonArray.jsonArrayElements() != null) {
             DockerParser.JsonArrayElementsContext elementsCtx = jsonArray.jsonArrayElements();
             List<DockerParser.JsonStringContext> jsonStrings = elementsCtx.jsonString();
+            List<TerminalNode> commas = elementsCtx.COMMA();
 
             for (int i = 0; i < jsonStrings.size(); i++) {
                 DockerParser.JsonStringContext jsonStr = jsonStrings.get(i);
 
-                // Capture the prefix including any comma before this element
+                // Capture only whitespace before this element (not the comma)
                 // For first element: captures whitespace after [
-                // For subsequent elements: captures whitespace + comma + whitespace
-                // This preserves the original formatting like ["-quic" ,"--conf"]
+                // For subsequent elements: captures whitespace after comma
                 Space argPrefix = prefix(jsonStr.getStart());
                 String value = jsonStr.DOUBLE_QUOTED_STRING().getText();
                 // Remove surrounding quotes
@@ -1455,6 +1455,11 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                         value,
                         Docker.Literal.QuoteStyle.DOUBLE
                 ));
+
+                // Skip the comma after this element (if not the last element)
+                if (i < commas.size()) {
+                    skip(commas.get(i).getSymbol());
+                }
             }
         }
 
@@ -1468,7 +1473,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     /**
      * Parse an exec form from a string like: {@code ["curl", "-f", "http://localhost/"]}
      * Used when the ANTLR grammar's greedy flagValue rule has consumed the exec form tokens.
-     * Note: Commas are captured as part of the next element's prefix to match how the printer works.
+     * Note: Commas are skipped during parsing and printed explicitly by the printer.
      */
     private Docker.ExecForm parseExecFormFromText(String text) {
         List<Docker.Literal> args = new ArrayList<>();
@@ -1487,12 +1492,9 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         }
         i++; // skip [
 
-        boolean firstElement = true;
-
         // Parse elements: "string" separated by commas
         while (i < text.length()) {
-            // Capture prefix: for first element it's whitespace after [
-            // for subsequent elements it's comma + whitespace (comma included in prefix)
+            // Capture prefix: whitespace only (not comma)
             int prefixStart = i;
 
             // Skip whitespace
@@ -1509,11 +1511,10 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                         Space.format(text.substring(prefixStart, i)));
             }
 
-            // Handle comma for non-first elements
+            // Handle comma - skip it and capture only whitespace after it
             if (text.charAt(i) == ',') {
-                // Include comma in prefix for next element
-                prefixStart = i; // start prefix at comma
                 i++; // skip comma
+                prefixStart = i; // start prefix after comma
                 // Skip whitespace after comma
                 while (i < text.length() && Character.isWhitespace(text.charAt(i))) {
                     i++;

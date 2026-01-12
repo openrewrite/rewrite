@@ -372,8 +372,13 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
         beforeSyntax(execForm, p);
         p.append("[");
         List<Docker.Literal> arguments = execForm.getArguments();
-        for (Docker.Literal argument : arguments) {
+        for (int i = 0; i < arguments.size(); i++) {
+            Docker.Literal argument = arguments.get(i);
             visit(argument, p);
+            // Print comma after this element if not last
+            if (i < arguments.size() - 1) {
+                p.append(",");
+            }
         }
         visitSpace(execForm.getClosingBracketPrefix(), p);
         p.append("]");
