@@ -322,6 +322,9 @@ public class UpdateJavaCompatibility extends Recipe {
         } else if (expression instanceof J.FieldAccess) {
             J.FieldAccess field = (J.FieldAccess) expression;
             J.Identifier identifier = field.getName();
+            if (field.getTarget() instanceof J.FieldAccess && "majorVersion".equals(identifier.getSimpleName())) {
+                identifier = ((J.FieldAccess) field.getTarget()).getName();
+            }
             return getMajorVersion(identifier.getSimpleName());
         } else if (isMethodInvocation(expression, "JavaVersion", "toVersion")) {
             J.MethodInvocation method = (J.MethodInvocation) expression;
@@ -404,7 +407,11 @@ public class UpdateJavaCompatibility extends Recipe {
             if (style == DeclarationStyle.String) {
                 expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), newJavaVersion, "'" + newJavaVersion + "'", emptyList(), JavaType.Primitive.String);
             } else if (style == DeclarationStyle.Enum) {
-                expression = fieldAccess.withName(fieldAccess.getName().withSimpleName(newJavaVersionEnum));
+                if (((J.FieldAccess) expression).getTarget() instanceof J.FieldAccess && "majorVersion".equals(((J.FieldAccess) expression).getName().getSimpleName())) {
+                    expression = fieldAccess.withTarget(changeJavaVersion(fieldAccess.getTarget(), style));
+                } else {
+                    expression = fieldAccess.withName(fieldAccess.getName().withSimpleName(newJavaVersionEnum));
+                }
             } else if (style == DeclarationStyle.Number) {
                 expression = changeJavaVersion(newJavaVersionDouble, fieldAccess.getPrefix(), fieldAccess.getMarkers());
             }
