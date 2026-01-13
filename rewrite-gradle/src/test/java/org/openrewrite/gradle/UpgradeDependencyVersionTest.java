@@ -2230,4 +2230,69 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void upgradesSpringDependencyManagementPluginMavenBomVersionPropertyWithGroovyDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2023.0.x", null)),
+          buildGradle(
+            //language=groovy
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+              repositories { mavenCentral() }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+                  }
+              }
+              """
+          ),
+          properties(
+            """
+              springCloudVersion=2021.0.8
+              """,
+            """
+              springCloudVersion=2023.0.6
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
+
+    @Test
+    void upgradesSpringDependencyManagementPluginMavenBomVersionPropertyWithKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2023.0.x", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+                  id("io.spring.dependency-management") version "1.1.7"
+              }
+              repositories { mavenCentral() }
+
+              val springCloudVersion: String by project
+
+              dependencyManagement {
+                  imports {
+                      mavenBom("org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}")
+                  }
+              }
+              """
+          ),
+          properties(
+            """
+              springCloudVersion=2021.0.8
+              """,
+            """
+              springCloudVersion=2023.0.6
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
 }
