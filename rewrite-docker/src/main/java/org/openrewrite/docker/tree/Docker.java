@@ -285,7 +285,7 @@ public interface Docker extends Tree {
         List<Flag> flags;
 
         /**
-         * Either a heredoc, execForm (JSON array), or source+destination (mutually exclusive)
+         * Either a heredoc, execForm (JSON array), or source+destination (mutually exclusive).
          */
         @Nullable
         HeredocForm heredoc;
@@ -299,6 +299,9 @@ public interface Docker extends Tree {
         @Nullable
         List<Argument> sources;
 
+        /**
+         * Destination path for source files; null when using heredoc or execForm.
+         */
         @Nullable
         Argument destination;
 

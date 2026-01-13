@@ -223,4 +223,83 @@ class CopyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void copyExecFormWithMultipleSources() {
+        // COPY with exec form (JSON array) containing multiple sources and one destination
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY ["src/file1.txt", "src/file2.txt", "config.yaml", "/app/"]
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+
+                // Verify exec form is used (not shell form or heredoc)
+                assertThat(copy.getExecForm()).isNotNull();
+                assertThat(copy.getSources()).isNull();
+                assertThat(copy.getDestination()).isNull();
+                assertThat(copy.getHeredoc()).isNull();
+
+                // Get the arguments from exec form
+                var args = copy.getExecForm().getArguments();
+
+                // Should have 4 arguments: 3 sources + 1 destination
+                assertThat(args).hasSize(4);
+
+                // Verify each argument is a quoted literal with correct text
+                // First source
+                assertThat(args.get(0).getText()).isEqualTo("src/file1.txt");
+                assertThat(args.get(0).getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+
+                // Second source
+                assertThat(args.get(1).getText()).isEqualTo("src/file2.txt");
+                assertThat(args.get(1).getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+
+                // Third source
+                assertThat(args.get(2).getText()).isEqualTo("config.yaml");
+                assertThat(args.get(2).getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+
+                // Destination (last element)
+                assertThat(args.get(3).getText()).isEqualTo("/app/");
+                assertThat(args.get(3).getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+            })
+          )
+        );
+    }
+
+    @Test
+    void copyExecFormWithFlagsAndMultipleSources() {
+        // COPY exec form with --from flag and multiple sources
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY --from=builder ["bin/app", "lib/helper.so", "/usr/local/bin/"]
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+
+                // Verify flags
+                assertThat(copy.getFlags()).hasSize(1);
+                assertThat(copy.getFlags().getFirst().getName()).isEqualTo("from");
+                assertThat(((Docker.Literal) copy.getFlags().getFirst().getValue().getContents().getFirst()).getText())
+                    .isEqualTo("builder");
+
+                // Verify exec form
+                assertThat(copy.getExecForm()).isNotNull();
+                var args = copy.getExecForm().getArguments();
+                assertThat(args).hasSize(3);
+
+                // Sources
+                assertThat(args.get(0).getText()).isEqualTo("bin/app");
+                assertThat(args.get(1).getText()).isEqualTo("lib/helper.so");
+
+                // Destination
+                assertThat(args.get(2).getText()).isEqualTo("/usr/local/bin/");
+            })
+          )
+        );
+    }
 }
