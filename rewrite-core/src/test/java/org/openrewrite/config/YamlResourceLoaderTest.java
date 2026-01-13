@@ -362,8 +362,10 @@ class YamlResourceLoaderTest implements RewriteTest {
         assertThat(recipeB.getRecipeList()).hasSize(1);
         assertThat(recipeB.getRecipeList().getFirst().getName()).isEqualTo("test.D");
 
-        // C should NOT have D since it was already seen when initializing B
-        assertThat(recipeC.getRecipeList()).isEmpty();
+        // C should ALSO have D - deduplication is LOCAL to each recipe's direct children
+        // Each recipe maintains its own scope, so B and C both independently include D
+        assertThat(recipeC.getRecipeList()).hasSize(1);
+        assertThat(recipeC.getRecipeList().getFirst().getName()).isEqualTo("test.D");
 
         assertThat(recipeA.validate().failures()).isEmpty();
         assertThat(recipeB.validate().failures()).isEmpty();
@@ -371,10 +373,10 @@ class YamlResourceLoaderTest implements RewriteTest {
     }
 
     @Test
-    void duplicateDeclarativeRecipesAreDeduplicatedAcrossMultipleYamlResourceLoaders() {
+    void duplicateDeclarativeRecipesAreDeduplicatedLocallyAcrossMultipleYamlResourceLoaders() {
         // Recipe A includes B and C, both B and C include D
         // Each recipe comes from a different YamlResourceLoader
-        // D should only be loaded once across the entire hierarchy
+        // Deduplication is LOCAL to each recipe, so both B and C will have D
         Environment env = Environment.builder()
           .load(new YamlResourceLoader(new ByteArrayInputStream(
             //language=yml
@@ -445,12 +447,62 @@ class YamlResourceLoaderTest implements RewriteTest {
         assertThat(recipeB.getRecipeList()).hasSize(1);
         assertThat(recipeB.getRecipeList().getFirst().getName()).isEqualTo("test.D");
 
-        // C should NOT have D since it was already seen when initializing B
-        assertThat(recipeC.getRecipeList()).isEmpty();
+        // C should ALSO have D - deduplication is LOCAL to each recipe's direct children
+        assertThat(recipeC.getRecipeList()).hasSize(1);
+        assertThat(recipeC.getRecipeList().getFirst().getName()).isEqualTo("test.D");
 
         assertThat(recipeA.validate().failures()).isEmpty();
         assertThat(recipeB.validate().failures()).isEmpty();
         assertThat(recipeC.validate().failures()).isEmpty();
+    }
+
+    @Test
+    void recipeLoadedSeparatelyStillHasAllChildren() {
+        // If A includes B1 and B2, and both B1 and B2 include C,
+        // loading B2 separately should still show C in its recipe list
+        // (loading A shouldn't permanently affect B2's recipe list)
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.C
+              displayName: Recipe C
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello from C!
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.B1
+              displayName: Recipe B1
+              recipeList:
+                  - test.C
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.B2
+              displayName: Recipe B2
+              recipeList:
+                  - test.C
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.A
+              displayName: Recipe A
+              recipeList:
+                  - test.B1
+                  - test.B2
+              """.getBytes()
+          ), URI.create("rewrite.yml"), new Properties()))
+          .build();
+
+        // Load A first - this should initialize B1 and B2 as part of A's tree
+        Recipe recipeA = env.activateRecipes("test.A");
+        assertThat(recipeA.validate().failures()).isEmpty();
+
+        // Now load B2 separately - it should still have C in its recipe list
+        Recipe recipeB2Standalone = env.activateRecipes("test.B2");
+        assertThat(recipeB2Standalone.validate().failures()).isEmpty();
+        assertThat(recipeB2Standalone.getRecipeList()).hasSize(1);
+        assertThat(recipeB2Standalone.getRecipeList().getFirst().getName()).isEqualTo("test.C");
     }
 
     @Test
