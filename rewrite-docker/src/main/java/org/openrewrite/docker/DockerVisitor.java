@@ -271,8 +271,7 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         if (hf.getDestination() != null) {
             hf = hf.withDestination((Docker.Argument) visit(hf.getDestination(), p));
         }
-        hf = hf.withBodies(ListUtils.map(hf.getBodies(), body -> (Docker.HeredocBody) visit(body, p)));
-        return hf;
+        return hf.withBodies(ListUtils.map(hf.getBodies(), body -> (Docker.HeredocBody) visit(body, p)));
     }
 
     public Docker visitHeredocBody(Docker.HeredocBody heredocBody, P p) {
