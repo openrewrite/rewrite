@@ -87,8 +87,7 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         if (a.getFlags() != null) {
             a = a.withFlags(ListUtils.map(a.getFlags(), flag -> (Docker.Flag) visit(flag, p)));
         }
-        a = a.withForm((Docker.CopyAddForm) visit(a.getForm(), p));
-        return a;
+        return a.withForm((Docker.CopyAddForm) visit(a.getForm(), p));
     }
 
     public Docker visitCopy(Docker.Copy copy, P p) {
@@ -98,8 +97,7 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         if (c.getFlags() != null) {
             c = c.withFlags(ListUtils.map(c.getFlags(), flag -> (Docker.Flag) visit(flag, p)));
         }
-        c = c.withForm((Docker.CopyAddForm) visit(c.getForm(), p));
-        return c;
+        return c.withForm((Docker.CopyAddForm) visit(c.getForm(), p));
     }
 
     public Docker visitArg(Docker.Arg arg, P p) {
@@ -263,8 +261,7 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
     public Docker visitHeredocBody(Docker.HeredocBody heredocBody, P p) {
         Docker.HeredocBody hb = heredocBody;
         hb = hb.withPrefix(visitSpace(hb.getPrefix(), p));
-        hb = hb.withMarkers(visitMarkers(hb.getMarkers(), p));
-        return hb;
+        return hb.withMarkers(visitMarkers(hb.getMarkers(), p));
     }
 
     public Docker visitCopyShellForm(Docker.CopyShellForm copyShellForm, P p) {
@@ -272,8 +269,7 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         csf = csf.withPrefix(visitSpace(csf.getPrefix(), p));
         csf = csf.withMarkers(visitMarkers(csf.getMarkers(), p));
         csf = csf.withSources(ListUtils.map(csf.getSources(), source -> (Docker.Argument) visit(source, p)));
-        csf = csf.withDestination((Docker.Argument) visit(csf.getDestination(), p));
-        return csf;
+        return csf.withDestination((Docker.Argument) visit(csf.getDestination(), p));
     }
 
     public Docker visitFlag(Docker.Flag flag, P p) {
