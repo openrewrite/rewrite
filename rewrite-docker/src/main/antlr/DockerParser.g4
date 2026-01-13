@@ -177,30 +177,21 @@ shellFormTextElement
     | COMMA      // Allow , in shell commands
     ;
 
-// Heredoc can be either single (simple) or multi (multiple heredocs in one command)
+// Unified heredoc structure supporting both single and multiple heredocs
+// Single: RUN <<EOF ... EOF or COPY <<EOF /dest ... EOF
+// Multi: RUN <<EOF1 cat >file1 && <<EOF2 cat >file2 ... EOF1 ... EOF2
 heredoc
-    : singleHeredoc
-    | multiHeredoc
+    : heredocPreamble NEWLINE heredocBody+
     ;
 
-// Single heredoc: RUN <<EOF ... EOF or COPY <<EOF /dest ... EOF
-singleHeredoc
-    : HEREDOC_START path? NEWLINE heredocContent heredocEnd
-    ;
-
-// Multi-heredoc: RUN <<EOF1 cat >file1 && <<EOF2 cat >file2 ... EOF1 ... EOF2
-// The preamble contains shell commands with multiple heredoc markers
-multiHeredoc
-    : heredocPreamble NEWLINE heredocBody heredocBody+
-    ;
-
-// Shell command preamble containing heredoc markers
-// First HEREDOC_START followed by shell text and additional HEREDOC_STARTs
+// Shell command preamble containing heredoc marker(s) and optional shell commands
+// For single heredoc: just "<<EOF" or "<<EOF /dest" (for COPY/ADD)
+// For multi heredoc: "<<EOF1 cat >file1 && <<EOF2 cat >file2"
 heredocPreamble
-    : HEREDOC_START preambleElement* ( HEREDOC_START preambleElement* )+
+    : HEREDOC_START preambleElement* ( HEREDOC_START preambleElement* )*
     ;
 
-// Elements that can appear in the heredoc preamble (shell command text)
+// Elements that can appear in the heredoc preamble (shell command text, destination paths)
 preambleElement
     : UNQUOTED_TEXT
     | DOUBLE_QUOTED_STRING

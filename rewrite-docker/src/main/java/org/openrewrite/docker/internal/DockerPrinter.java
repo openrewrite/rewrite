@@ -389,14 +389,17 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
     @Override
     public Docker visitHeredocForm(Docker.HeredocForm heredocForm, PrintOutputCapture<P> p) {
         beforeSyntax(heredocForm, p);
-        p.append(heredocForm.getOpening());
+        // Print the preamble (heredoc marker(s) and optional shell commands)
+        p.append(heredocForm.getPreamble());
+        // Print destination if present (for COPY/ADD heredocs)
         if (heredocForm.getDestination() != null) {
             visit(heredocForm.getDestination(), p);
         }
-        for (String contentLine : heredocForm.getContentLines()) {
-            p.append(contentLine);
+        p.append("\n");
+        // Print each heredoc body - content lines already include their newlines
+        for (Docker.HeredocBody body : heredocForm.getBodies()) {
+            visit(body, p);
         }
-        p.append(heredocForm.getClosing());
         afterSyntax(heredocForm, p);
         return heredocForm;
     }
@@ -410,20 +413,6 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
         p.append(heredocBody.getClosing());
         afterSyntax(heredocBody, p);
         return heredocBody;
-    }
-
-    @Override
-    public Docker visitMultiHeredocForm(Docker.MultiHeredocForm multiHeredocForm, PrintOutputCapture<P> p) {
-        beforeSyntax(multiHeredocForm, p);
-        // Print the shell preamble (includes heredoc markers and shell commands)
-        p.append(multiHeredocForm.getShellPreamble());
-        p.append("\n");
-        // Print each heredoc body - content lines already include their newlines
-        for (Docker.HeredocBody body : multiHeredocForm.getBodies()) {
-            visit(body, p);
-        }
-        afterSyntax(multiHeredocForm, p);
-        return multiHeredocForm;
     }
 
     @Override

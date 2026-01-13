@@ -177,21 +177,23 @@ class CopyTest implements RewriteTest {
                 var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(copy.getHeredoc()).isNotNull();
 
-                // The opening field should contain "<<EOF"
-                assertThat(copy.getHeredoc().getOpening()).isEqualTo("<<EOF");
+                // The preamble should contain "<<EOF"
+                assertThat(copy.getHeredoc().getPreamble()).isEqualTo("<<EOF");
 
                 // The destination should contain "/app/config.txt", NOT the EOF marker
                 assertThat(copy.getHeredoc().getDestination()).isNotNull();
                 assertThat(((Docker.Literal) copy.getHeredoc().getDestination().getContents().getFirst()).getText())
                     .isEqualTo("/app/config.txt");
-                assertThat(((Docker.Literal) copy.getHeredoc().getDestination().getContents().getFirst()).getText())
-                    .doesNotContain("EOF");
 
-                // Content should be the actual content
-                assertThat(copy.getHeredoc().getContentLines()).isNotEmpty();
+                // Should have exactly one body
+                assertThat(copy.getHeredoc().getBodies()).hasSize(1);
+                var body = copy.getHeredoc().getBodies().getFirst();
+
+                // Content should be the actual content (includes trailing newline)
+                assertThat(body.getContentLines()).containsExactly("some content\n");
 
                 // Closing should be "EOF"
-                assertThat(copy.getHeredoc().getClosing()).isEqualTo("EOF");
+                assertThat(body.getClosing()).isEqualTo("EOF");
             })
           )
         );
@@ -211,11 +213,12 @@ class CopyTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(copy.getHeredoc()).isNotNull();
-                assertThat(copy.getHeredoc().getOpening()).isEqualTo("<<CONFIG");
+                assertThat(copy.getHeredoc().getPreamble()).isEqualTo("<<CONFIG");
                 assertThat(copy.getHeredoc().getDestination()).isNotNull();
                 assertThat(((Docker.Literal) copy.getHeredoc().getDestination().getContents().getFirst()).getText())
                     .isEqualTo("/etc/app/settings.ini");
-                assertThat(copy.getHeredoc().getClosing()).isEqualTo("CONFIG");
+                assertThat(copy.getHeredoc().getBodies()).hasSize(1);
+                assertThat(copy.getHeredoc().getBodies().getFirst().getClosing()).isEqualTo("CONFIG");
             })
           )
         );

@@ -814,48 +814,7 @@ public interface Docker extends Tree {
     }
 
     /**
-     * Heredoc form: RUN <<EOF\ncommands\nEOF or COPY <<EOF /dest\ncommands\nEOF
-     * For single heredoc syntax.
-     */
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class HeredocForm implements CommandForm {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-
-        /**
-         * The opening marker including << and optional dash (e.g., "<<EOF" or "<<-EOF")
-         */
-        String opening;
-
-        /**
-         * Optional destination path (for COPY/ADD with inline destination)
-         */
-        @Nullable
-        Argument destination;
-
-        /**
-         * Content lines between opening and closing markers
-         */
-        List<String> contentLines;
-
-        /**
-         * The closing marker (e.g., "EOF")
-         */
-        String closing;
-
-        @Override
-        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
-            return v.visitHeredocForm(this, p);
-        }
-    }
-
-    /**
-     * Represents a single heredoc body within a multi-heredoc command.
+     * Represents a single heredoc body within a heredoc command.
      * Each body has its own opening marker, content lines, and closing marker.
      */
     @Value
@@ -869,7 +828,7 @@ public interface Docker extends Tree {
         Markers markers;
 
         /**
-         * The opening marker including << and optional dash (e.g., "<<EOF1" or "<<-EOF1")
+         * The opening marker including << and optional dash (e.g., "<<EOF" or "<<-EOF")
          */
         String opening;
 
@@ -879,7 +838,7 @@ public interface Docker extends Tree {
         List<String> contentLines;
 
         /**
-         * The closing marker (e.g., "EOF1")
+         * The closing marker (e.g., "EOF")
          */
         String closing;
 
@@ -890,15 +849,18 @@ public interface Docker extends Tree {
     }
 
     /**
-     * Multi-heredoc form for commands with multiple heredocs.
-     * Example: RUN &lt;&lt;EOF1 cat &gt;file1.sh &amp;&amp;\ &lt;&lt;EOF2 cat &gt;file2.sh
-     * Consists of a shell preamble (command with heredoc markers) followed by
-     * ordered heredoc bodies.
+     * Unified heredoc form supporting both single and multiple heredocs.
+     * <p>
+     * Single heredoc example: RUN &lt;&lt;EOF\ncommands\nEOF
+     * Multi-heredoc example: RUN &lt;&lt;EOF1 cat &gt;file1.sh &amp;&amp;\ &lt;&lt;EOF2 cat &gt;file2.sh
+     * <p>
+     * Consists of a shell preamble (containing heredoc markers and optional shell commands)
+     * followed by ordered heredoc bodies.
      */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class MultiHeredocForm implements CommandForm {
+    class HeredocForm implements CommandForm {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -906,12 +868,15 @@ public interface Docker extends Tree {
         Markers markers;
 
         /**
-         * The shell command preamble containing heredoc markers and other shell commands.
-         * This includes the text from the first heredoc marker through to the newline
-         * before the first heredoc body.
-         * Example: "&lt;&lt;EOF1 cat &gt;file1.sh &amp;&amp;\ &lt;&lt;EOF2 cat &gt;file2.sh &amp;&amp;\ chmod +x file1.sh file2.sh"
+         * The shell command preamble containing heredoc marker(s) and optional shell commands.
          */
-        String shellPreamble;
+        String preamble;
+
+        /**
+         * Optional destination path (for COPY/ADD with inline destination).
+         */
+        @Nullable
+        Argument destination;
 
         /**
          * Ordered list of heredoc bodies, matching the order of markers in the preamble.
@@ -920,7 +885,7 @@ public interface Docker extends Tree {
 
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
-            return v.visitMultiHeredocForm(this, p);
+            return v.visitHeredocForm(this, p);
         }
     }
 

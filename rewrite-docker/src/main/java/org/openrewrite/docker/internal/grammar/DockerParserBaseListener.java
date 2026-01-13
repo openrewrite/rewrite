@@ -428,30 +428,6 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterSingleHeredoc(DockerParser.SingleHeredocContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitSingleHeredoc(DockerParser.SingleHeredocContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterMultiHeredoc(DockerParser.MultiHeredocContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitMultiHeredoc(DockerParser.MultiHeredocContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
 	@Override public void enterHeredocPreamble(DockerParser.HeredocPreambleContext ctx) { }
 	/**
 	 * {@inheritDoc}

@@ -353,26 +353,6 @@ public interface DockerParserListener extends ParseTreeListener {
 	 */
 	void exitHeredoc(DockerParser.HeredocContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link DockerParser#singleHeredoc}.
-	 * @param ctx the parse tree
-	 */
-	void enterSingleHeredoc(DockerParser.SingleHeredocContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#singleHeredoc}.
-	 * @param ctx the parse tree
-	 */
-	void exitSingleHeredoc(DockerParser.SingleHeredocContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link DockerParser#multiHeredoc}.
-	 * @param ctx the parse tree
-	 */
-	void enterMultiHeredoc(DockerParser.MultiHeredocContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#multiHeredoc}.
-	 * @param ctx the parse tree
-	 */
-	void exitMultiHeredoc(DockerParser.MultiHeredocContext ctx);
-	/**
 	 * Enter a parse tree produced by {@link DockerParser#heredocPreamble}.
 	 * @param ctx the parse tree
 	 */

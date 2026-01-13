@@ -89,29 +89,29 @@ class HeredocTest implements RewriteTest {
             spec -> spec.afterRecipe(file -> {
                 var run = (Docker.Run) file.getStages().getFirst().getInstructions().getLast();
 
-                // Verify the command is a MultiHeredocForm
-                assertThat(run.getCommand()).isInstanceOf(Docker.MultiHeredocForm.class);
-                var multiHeredoc = (Docker.MultiHeredocForm) run.getCommand();
+                // Verify the command is a HeredocForm
+                assertThat(run.getCommand()).isInstanceOf(Docker.HeredocForm.class);
+                var heredoc = (Docker.HeredocForm) run.getCommand();
 
-                // Verify the shell preamble contains heredoc markers and commands
-                String shellPreamble = multiHeredoc.getShellPreamble();
-                assertThat(shellPreamble).isEqualTo("""
+                // Verify the preamble contains heredoc markers and commands
+                String preamble = heredoc.getPreamble();
+                assertThat(preamble).isEqualTo("""
                   <<EOF1 cat >file1.sh &&\\
                       <<EOF2 cat >file2.sh &&\\
                       chmod +x file1.sh file2.sh\
                   """);
 
                 // Verify we have two heredoc bodies
-                assertThat(multiHeredoc.getBodies()).hasSize(2);
+                assertThat(heredoc.getBodies()).hasSize(2);
 
                 // Verify first heredoc body (EOF1)
-                var body1 = multiHeredoc.getBodies().getFirst();
+                var body1 = heredoc.getBodies().getFirst();
                 assertThat(body1.getOpening()).isEqualTo("<<EOF1");
                 assertThat(body1.getClosing()).isEqualTo("EOF1");
                 assertThat(body1.getContentLines()).anyMatch(line -> line.contains("script 1"));
 
                 // Verify second heredoc body (EOF2)
-                var body2 = multiHeredoc.getBodies().getLast();
+                var body2 = heredoc.getBodies().getLast();
                 assertThat(body2.getOpening()).isEqualTo("<<EOF2");
                 assertThat(body2.getClosing()).isEqualTo("EOF2");
                 assertThat(body2.getContentLines()).anyMatch(line -> line.contains("script 2"));

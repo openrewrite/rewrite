@@ -224,18 +224,6 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitHeredoc(DockerParser.HeredocContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link DockerParser#singleHeredoc}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitSingleHeredoc(DockerParser.SingleHeredocContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link DockerParser#multiHeredoc}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitMultiHeredoc(DockerParser.MultiHeredocContext ctx);
-	/**
 	 * Visit a parse tree produced by {@link DockerParser#heredocPreamble}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

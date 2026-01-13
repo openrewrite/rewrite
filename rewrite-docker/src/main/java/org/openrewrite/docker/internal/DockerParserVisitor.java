@@ -418,8 +418,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         // Check if heredoc, jsonArray, or sourceList is present
         if (ctx.heredoc() != null) {
-            // ADD only supports single heredocs (not multi-heredoc)
-            heredoc = visitSingleHeredocForAddCopy(ctx.heredoc());
+            // For ADD with heredoc, extract destination from preamble
+            heredoc = visitHeredocContext(ctx.heredoc(), true);
             // For heredoc, destination is part of the heredoc (if present)
             // No separate destination to parse
         } else if (ctx.jsonArray() != null) {
@@ -456,8 +456,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         // Check if heredoc, jsonArray, or sourceList is present
         if (ctx.heredoc() != null) {
-            // COPY only supports single heredocs (not multi-heredoc)
-            heredoc = visitSingleHeredocForAddCopy(ctx.heredoc());
+            // For COPY with heredoc, extract destination from preamble
+            heredoc = visitHeredocContext(ctx.heredoc(), true);
             // For heredoc, destination is part of the heredoc (if present)
             // No separate destination to parse
         } else if (ctx.jsonArray() != null) {
@@ -1564,78 +1564,34 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return new Docker.ExecForm(randomId(), prefix, Markers.EMPTY, args, Space.EMPTY);
     }
 
-    private Docker.CommandForm visitHeredocContext(DockerParser.HeredocContext ctx) {
-        // Check if this is a single heredoc or multi-heredoc
-        if (ctx.singleHeredoc() != null) {
-            return visitSingleHeredocContext(ctx.singleHeredoc());
-        } else if (ctx.multiHeredoc() != null) {
-            return visitMultiHeredocContext(ctx.multiHeredoc());
-        } else {
-            // Fallback - shouldn't happen
-            return new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY,
-                    new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null));
-        }
-    }
-
     /**
-     * Visit a heredoc context for ADD/COPY instructions.
-     * These instructions only support single heredocs, not multi-heredoc.
+     * Visit a heredoc context using the unified structure.
+     * Handles both single heredocs (RUN <<EOF ... EOF) and multiple heredocs
+     * (RUN <<EOF1 cmd1 && <<EOF2 cmd2 ... EOF1 ... EOF2).
+     *
+     * @param ctx the heredoc context
+     * @param extractDestination if true, extract destination from preamble (for COPY/ADD)
      */
-    private Docker.HeredocForm visitSingleHeredocForAddCopy(DockerParser.HeredocContext ctx) {
-        if (ctx.singleHeredoc() != null) {
-            return visitSingleHeredocContext(ctx.singleHeredoc());
-        }
-        // Multi-heredoc is not valid for ADD/COPY, but we handle it gracefully
-        // by returning an empty heredoc form
-        return new Docker.HeredocForm(randomId(), Space.EMPTY, Markers.EMPTY, "<<EOF", null, emptyList(), "EOF");
-    }
-
-    private Docker.HeredocForm visitSingleHeredocContext(DockerParser.SingleHeredocContext ctx) {
+    private Docker.HeredocForm visitHeredocContext(DockerParser.HeredocContext ctx, boolean extractDestination) {
         return convert(ctx, (c, prefix) -> {
-            // Get opening marker (<<EOF or <<-EOF)
-            String opening = c.HEREDOC_START().getText();
-            skip(c.HEREDOC_START().getSymbol());
-
-            // Check for optional destination (for COPY/ADD with inline destination)
-            Docker.Argument destination = null;
-            if (c.path() != null) {
-                destination = visitArgument(c.path());
-            }
-
-            // Collect content lines
-            List<String> contentLines = new ArrayList<>();
-
-            // Add the opening newline first (after HEREDOC_START and optional path)
-            if (c.NEWLINE() != null) {
-                String openingNewline = c.NEWLINE().getText();
-                contentLines.add(openingNewline);
-                skip(c.NEWLINE().getSymbol());
-            }
-
-            // Process heredocContent which is ( NEWLINE | HEREDOC_CONTENT )*
-            if (c.heredocContent() != null) {
-                collectHeredocContent(c.heredocContent(), contentLines);
-            }
-
-            // Get closing marker (UNQUOTED_TEXT)
-            String closing = c.heredocEnd().UNQUOTED_TEXT().getText();
-            skip(c.heredocEnd().UNQUOTED_TEXT().getSymbol());
-
-            return new Docker.HeredocForm(randomId(), prefix, Markers.EMPTY, opening, destination, contentLines, closing);
-        });
-    }
-
-    private Docker.MultiHeredocForm visitMultiHeredocContext(DockerParser.MultiHeredocContext ctx) {
-        return convert(ctx, (c, prefix) -> {
-            // Build the shell preamble from the heredocPreamble context
+            // Build the preamble from the heredocPreamble context
             DockerParser.HeredocPreambleContext preambleCtx = c.heredocPreamble();
             StringBuilder preambleBuilder = new StringBuilder();
+            Docker.Argument destination = null;
+
+            // Track if we've seen the first HEREDOC_START (for destination extraction)
+            boolean seenFirstHeredocStart = false;
+            int heredocStartCount = 0;
 
             // Collect all tokens in the preamble (HEREDOC_START and preambleElements)
             for (int i = 0; i < preambleCtx.getChildCount(); i++) {
                 ParseTree child = preambleCtx.getChild(i);
                 if (child instanceof TerminalNode) {
                     TerminalNode tn = (TerminalNode) child;
+                    if (tn.getSymbol().getType() == DockerLexer.HEREDOC_START) {
+                        heredocStartCount++;
+                        seenFirstHeredocStart = true;
+                    }
                     // Add whitespace prefix if any
                     Space tokenPrefix = prefix(tn.getSymbol());
                     preambleBuilder.append(tokenPrefix.getWhitespace());
@@ -1645,13 +1601,23 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     DockerParser.PreambleElementContext elemCtx = (DockerParser.PreambleElementContext) child;
                     Token token = elemCtx.getStart();
                     Space tokenPrefix = prefix(token);
-                    preambleBuilder.append(tokenPrefix.getWhitespace());
-                    preambleBuilder.append(token.getText());
-                    skip(token);
+
+                    // For single heredoc COPY/ADD, extract destination from first element after HEREDOC_START
+                    // The destination is NOT included in the preamble - it's stored separately
+                    if (extractDestination && seenFirstHeredocStart && heredocStartCount == 1 && destination == null) {
+                        // This is the destination path for COPY/ADD
+                        destination = createArgumentFromPreambleElement(elemCtx, tokenPrefix);
+                        skip(token);
+                    } else {
+                        // Add to preamble (not a destination)
+                        preambleBuilder.append(tokenPrefix.getWhitespace());
+                        preambleBuilder.append(token.getText());
+                        skip(token);
+                    }
                 }
             }
 
-            String shellPreamble = preambleBuilder.toString();
+            String preamble = preambleBuilder.toString();
 
             // Skip the NEWLINE after the preamble
             if (c.NEWLINE() != null) {
@@ -1664,8 +1630,38 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 bodies.add(visitHeredocBodyContext(bodyCtx));
             }
 
-            return new Docker.MultiHeredocForm(randomId(), prefix, Markers.EMPTY, shellPreamble, bodies);
+            return new Docker.HeredocForm(randomId(), prefix, Markers.EMPTY, preamble, destination, bodies);
         });
+    }
+
+    /**
+     * Visit a heredoc context for RUN instructions (no destination extraction).
+     */
+    private Docker.HeredocForm visitHeredocContext(DockerParser.HeredocContext ctx) {
+        return visitHeredocContext(ctx, false);
+    }
+
+    /**
+     * Create an Argument from a preamble element (for destination extraction in COPY/ADD).
+     * The prefix is passed in since it was already consumed when building the preamble.
+     */
+    private Docker.Argument createArgumentFromPreambleElement(DockerParser.PreambleElementContext ctx, Space argPrefix) {
+        List<Docker.ArgumentContent> contents = new ArrayList<>();
+        Token token = ctx.getStart();
+        String text = token.getText();
+
+        // Create a literal for the element
+        Docker.Literal.QuoteStyle quoteStyle = null;
+        if (ctx.DOUBLE_QUOTED_STRING() != null) {
+            quoteStyle = Docker.Literal.QuoteStyle.DOUBLE;
+            text = text.substring(1, text.length() - 1); // Remove quotes
+        } else if (ctx.SINGLE_QUOTED_STRING() != null) {
+            quoteStyle = Docker.Literal.QuoteStyle.SINGLE;
+            text = text.substring(1, text.length() - 1); // Remove quotes
+        }
+
+        contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, quoteStyle));
+        return new Docker.Argument(randomId(), argPrefix, Markers.EMPTY, contents);
     }
 
     private Docker.HeredocBody visitHeredocBodyContext(DockerParser.HeredocBodyContext ctx) {
