@@ -353,6 +353,56 @@ public interface DockerParserListener extends ParseTreeListener {
 	 */
 	void exitHeredoc(DockerParser.HeredocContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link DockerParser#singleHeredoc}.
+	 * @param ctx the parse tree
+	 */
+	void enterSingleHeredoc(DockerParser.SingleHeredocContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#singleHeredoc}.
+	 * @param ctx the parse tree
+	 */
+	void exitSingleHeredoc(DockerParser.SingleHeredocContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerParser#multiHeredoc}.
+	 * @param ctx the parse tree
+	 */
+	void enterMultiHeredoc(DockerParser.MultiHeredocContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#multiHeredoc}.
+	 * @param ctx the parse tree
+	 */
+	void exitMultiHeredoc(DockerParser.MultiHeredocContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerParser#heredocPreamble}.
+	 * @param ctx the parse tree
+	 */
+	void enterHeredocPreamble(DockerParser.HeredocPreambleContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#heredocPreamble}.
+	 * @param ctx the parse tree
+	 */
+	void exitHeredocPreamble(DockerParser.HeredocPreambleContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerParser#preambleElement}.
+	 * @param ctx the parse tree
+	 */
+	void enterPreambleElement(DockerParser.PreambleElementContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#preambleElement}.
+	 * @param ctx the parse tree
+	 */
+	void exitPreambleElement(DockerParser.PreambleElementContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerParser#heredocBody}.
+	 * @param ctx the parse tree
+	 */
+	void enterHeredocBody(DockerParser.HeredocBodyContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#heredocBody}.
+	 * @param ctx the parse tree
+	 */
+	void exitHeredocBody(DockerParser.HeredocBodyContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link DockerParser#heredocContent}.
 	 * @param ctx the parse tree
 	 */

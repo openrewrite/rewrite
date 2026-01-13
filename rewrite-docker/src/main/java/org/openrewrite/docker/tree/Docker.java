@@ -815,6 +815,7 @@ public interface Docker extends Tree {
 
     /**
      * Heredoc form: RUN <<EOF\ncommands\nEOF or COPY <<EOF /dest\ncommands\nEOF
+     * For single heredoc syntax.
      */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -850,6 +851,76 @@ public interface Docker extends Tree {
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitHeredocForm(this, p);
+        }
+    }
+
+    /**
+     * Represents a single heredoc body within a multi-heredoc command.
+     * Each body has its own opening marker, content lines, and closing marker.
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class HeredocBody implements Docker {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        /**
+         * The opening marker including << and optional dash (e.g., "<<EOF1" or "<<-EOF1")
+         */
+        String opening;
+
+        /**
+         * Content lines between opening and closing markers (includes newlines)
+         */
+        List<String> contentLines;
+
+        /**
+         * The closing marker (e.g., "EOF1")
+         */
+        String closing;
+
+        @Override
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
+            return v.visitHeredocBody(this, p);
+        }
+    }
+
+    /**
+     * Multi-heredoc form for commands with multiple heredocs.
+     * Example: RUN &lt;&lt;EOF1 cat &gt;file1.sh &amp;&amp;\ &lt;&lt;EOF2 cat &gt;file2.sh
+     * Consists of a shell preamble (command with heredoc markers) followed by
+     * ordered heredoc bodies.
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class MultiHeredocForm implements CommandForm {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        /**
+         * The shell command preamble containing heredoc markers and other shell commands.
+         * This includes the text from the first heredoc marker through to the newline
+         * before the first heredoc body.
+         * Example: "&lt;&lt;EOF1 cat &gt;file1.sh &amp;&amp;\ &lt;&lt;EOF2 cat &gt;file2.sh &amp;&amp;\ chmod +x file1.sh file2.sh"
+         */
+        String shellPreamble;
+
+        /**
+         * Ordered list of heredoc bodies, matching the order of markers in the preamble.
+         */
+        List<HeredocBody> bodies;
+
+        @Override
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
+            return v.visitMultiHeredocForm(this, p);
         }
     }
 

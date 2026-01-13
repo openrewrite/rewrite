@@ -5,11 +5,13 @@
 lexer grammar DockerLexer;
 
 @lexer::header
-{import java.util.Stack;}
+{import java.util.LinkedList;
+import java.util.Queue;}
 
 @lexer::members
 {
-    private Stack<String> heredocIdentifier = new Stack<String>();
+    // Use a queue (FIFO) for heredoc markers so they are matched in order of declaration
+    private Queue<String> heredocIdentifiers = new LinkedList<String>();
     private boolean heredocIdentifierCaptured = false;
     // Track if we're at the start of a logical line (where instructions can appear)
     private boolean atLineStart = true;
@@ -62,11 +64,11 @@ AS         : 'AS' { if (!afterFrom) setType(UNQUOTED_TEXT); atLineStart = false;
 
 // Heredoc start - captures <<EOF or <<-EOF including the identifier and switches to HEREDOC_PREAMBLE mode
 HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* {
-    // Extract and store the heredoc marker identifier
+    // Extract and store the heredoc marker identifier in FIFO order
     String text = getText();
     int prefixLen = text.charAt(2) == '-' ? 3 : 2;
     String marker = text.substring(prefixLen);
-    heredocIdentifier.push(marker);
+    heredocIdentifiers.add(marker);
     heredocIdentifierCaptured = true;
     atLineStart = false;
 } -> pushMode(HEREDOC_PREAMBLE);
@@ -158,34 +160,59 @@ NEWLINE : NEWLINE_CHAR+ { atLineStart = true; afterFrom = false; afterHealthchec
 fragment NEWLINE_CHAR : [\r\n];
 
 // ----------------------------------------------------------------------------------------------
-// HEREDOC_PREAMBLE mode - for parsing optional destination path after heredoc marker
+// HEREDOC_PREAMBLE mode - for parsing shell command preamble after heredoc marker(s)
 // The heredoc identifier (e.g., EOF) is already captured in HEREDOC_START
+// This mode handles the shell command text including additional heredoc markers for multi-heredoc.
 // ----------------------------------------------------------------------------------------------
 mode HEREDOC_PREAMBLE;
 
+// Line continuation in preamble - stay in HEREDOC_PREAMBLE mode
+HP_LINE_CONTINUATION : ('\\' | '`') [ \t]* '\n' -> channel(HIDDEN);
+
+// Newline without continuation - transition to HEREDOC mode for body content
 HP_NEWLINE : '\n' -> type(NEWLINE), mode(HEREDOC);
+
 HP_WS      : [ \t\r\u000C]+ -> channel(HIDDEN);
 HP_COMMENT : '/*' .*? '*/'  -> channel(HIDDEN);
 HP_LINE_COMMENT : ('//' | '#') ~[\r\n]* '\r'? -> channel(HIDDEN);
 
-// Any text on the heredoc line after the marker (destination paths, interpreter names, etc.)
-HP_UNQUOTED_TEXT : ~[ \t\r\n]+ -> type(UNQUOTED_TEXT);
+// Additional heredoc marker in preamble (for multi-heredoc support)
+HP_HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* {
+    // Extract and store the heredoc marker identifier in FIFO order
+    String text = getText();
+    int prefixLen = text.charAt(2) == '-' ? 3 : 2;
+    String marker = text.substring(prefixLen);
+    heredocIdentifiers.add(marker);
+} -> type(HEREDOC_START);
+
+// Any text on the heredoc line after the marker (destination paths, interpreter names, shell commands, etc.)
+// Exclude < to allow HP_HEREDOC_START to match <<
+// Exclude \ and ` to allow HP_LINE_CONTINUATION to match
+HP_UNQUOTED_TEXT : ( ~[<\\` \t\r\n]+
+                   | '<' ~[< \t\r\n] ~[ \t\r\n]*  // single < followed by non-< char
+                   | '<'  // standalone <
+                   ) -> type(UNQUOTED_TEXT);
 
 // ----------------------------------------------------------------------------------------------
 // HEREDOC mode - for parsing heredoc content
+// Supports multiple heredocs by only popping mode when all markers have been matched.
 // ----------------------------------------------------------------------------------------------
 mode HEREDOC;
 
 H_NEWLINE : '\n' -> type(NEWLINE);
 
-// Match heredoc content lines - emit as HEREDOC_CONTENT unless it's the ending identifier
+// Match heredoc content lines - emit as HEREDOC_CONTENT unless it's an ending identifier
+// For multi-heredoc, we only popMode when the queue is empty (all markers matched in FIFO order)
 HEREDOC_CONTENT : ~[\n]+
 {
-  if(!heredocIdentifier.isEmpty() && getText().equals(heredocIdentifier.peek())) {
+  if(!heredocIdentifiers.isEmpty() && getText().equals(heredocIdentifiers.peek())) {
       setType(UNQUOTED_TEXT);
-      heredocIdentifier.pop();
-      popMode();
-      atLineStart = true;  // After heredoc ends, next line is at line start
+      heredocIdentifiers.poll();  // Remove from front of queue (FIFO)
+      // Only pop mode when all heredoc markers have been matched
+      if(heredocIdentifiers.isEmpty()) {
+          popMode();
+          atLineStart = true;  // After heredoc ends, next line is at line start
+      }
   }
 };
 

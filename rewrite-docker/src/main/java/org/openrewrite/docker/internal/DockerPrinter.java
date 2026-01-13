@@ -402,6 +402,31 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public Docker visitHeredocBody(Docker.HeredocBody heredocBody, PrintOutputCapture<P> p) {
+        beforeSyntax(heredocBody, p);
+        for (String contentLine : heredocBody.getContentLines()) {
+            p.append(contentLine);
+        }
+        p.append(heredocBody.getClosing());
+        afterSyntax(heredocBody, p);
+        return heredocBody;
+    }
+
+    @Override
+    public Docker visitMultiHeredocForm(Docker.MultiHeredocForm multiHeredocForm, PrintOutputCapture<P> p) {
+        beforeSyntax(multiHeredocForm, p);
+        // Print the shell preamble (includes heredoc markers and shell commands)
+        p.append(multiHeredocForm.getShellPreamble());
+        p.append("\n");
+        // Print each heredoc body - content lines already include their newlines
+        for (Docker.HeredocBody body : multiHeredocForm.getBodies()) {
+            visit(body, p);
+        }
+        afterSyntax(multiHeredocForm, p);
+        return multiHeredocForm;
+    }
+
+    @Override
     public Docker visitFlag(Docker.Flag flag, PrintOutputCapture<P> p) {
         beforeSyntax(flag, p);
         p.append("--").append(flag.getName());

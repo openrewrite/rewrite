@@ -15,10 +15,10 @@
  */
 package org.openrewrite.docker.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.docker.Assertions.docker;
 
 class HeredocTest implements RewriteTest {
@@ -68,7 +68,6 @@ class HeredocTest implements RewriteTest {
         );
     }
 
-    @Disabled("Multiple heredocs in a single RUN command are not yet supported - requires grammar changes")
     @Test
     void multipleHeredocsInRunCommand() {
         // Multiple heredocs chained together with && - a common pattern for creating multiple files
@@ -86,7 +85,37 @@ class HeredocTest implements RewriteTest {
               #!/bin/bash
               echo "script 2"
               EOF2
-              """
+              """,
+            spec -> spec.afterRecipe(file -> {
+                var run = (Docker.Run) file.getStages().getFirst().getInstructions().getLast();
+
+                // Verify the command is a MultiHeredocForm
+                assertThat(run.getCommand()).isInstanceOf(Docker.MultiHeredocForm.class);
+                var multiHeredoc = (Docker.MultiHeredocForm) run.getCommand();
+
+                // Verify the shell preamble contains heredoc markers and commands
+                String shellPreamble = multiHeredoc.getShellPreamble();
+                assertThat(shellPreamble).isEqualTo("""
+                  <<EOF1 cat >file1.sh &&\\
+                      <<EOF2 cat >file2.sh &&\\
+                      chmod +x file1.sh file2.sh\
+                  """);
+
+                // Verify we have two heredoc bodies
+                assertThat(multiHeredoc.getBodies()).hasSize(2);
+
+                // Verify first heredoc body (EOF1)
+                var body1 = multiHeredoc.getBodies().getFirst();
+                assertThat(body1.getOpening()).isEqualTo("<<EOF1");
+                assertThat(body1.getClosing()).isEqualTo("EOF1");
+                assertThat(body1.getContentLines()).anyMatch(line -> line.contains("script 1"));
+
+                // Verify second heredoc body (EOF2)
+                var body2 = multiHeredoc.getBodies().getLast();
+                assertThat(body2.getOpening()).isEqualTo("<<EOF2");
+                assertThat(body2.getClosing()).isEqualTo("EOF2");
+                assertThat(body2.getContentLines()).anyMatch(line -> line.contains("script 2"));
+            })
           )
         );
     }

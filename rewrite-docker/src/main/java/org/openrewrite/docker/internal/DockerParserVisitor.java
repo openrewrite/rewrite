@@ -418,7 +418,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         // Check if heredoc, jsonArray, or sourceList is present
         if (ctx.heredoc() != null) {
-            heredoc = visitHeredocContext(ctx.heredoc());
+            // ADD only supports single heredocs (not multi-heredoc)
+            heredoc = visitSingleHeredocForAddCopy(ctx.heredoc());
             // For heredoc, destination is part of the heredoc (if present)
             // No separate destination to parse
         } else if (ctx.jsonArray() != null) {
@@ -455,7 +456,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         // Check if heredoc, jsonArray, or sourceList is present
         if (ctx.heredoc() != null) {
-            heredoc = visitHeredocContext(ctx.heredoc());
+            // COPY only supports single heredocs (not multi-heredoc)
+            heredoc = visitSingleHeredocForAddCopy(ctx.heredoc());
             // For heredoc, destination is part of the heredoc (if present)
             // No separate destination to parse
         } else if (ctx.jsonArray() != null) {
@@ -1562,7 +1564,33 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return new Docker.ExecForm(randomId(), prefix, Markers.EMPTY, args, Space.EMPTY);
     }
 
-    private Docker.HeredocForm visitHeredocContext(DockerParser.HeredocContext ctx) {
+    private Docker.CommandForm visitHeredocContext(DockerParser.HeredocContext ctx) {
+        // Check if this is a single heredoc or multi-heredoc
+        if (ctx.singleHeredoc() != null) {
+            return visitSingleHeredocContext(ctx.singleHeredoc());
+        } else if (ctx.multiHeredoc() != null) {
+            return visitMultiHeredocContext(ctx.multiHeredoc());
+        } else {
+            // Fallback - shouldn't happen
+            return new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY,
+                    new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null));
+        }
+    }
+
+    /**
+     * Visit a heredoc context for ADD/COPY instructions.
+     * These instructions only support single heredocs, not multi-heredoc.
+     */
+    private Docker.HeredocForm visitSingleHeredocForAddCopy(DockerParser.HeredocContext ctx) {
+        if (ctx.singleHeredoc() != null) {
+            return visitSingleHeredocContext(ctx.singleHeredoc());
+        }
+        // Multi-heredoc is not valid for ADD/COPY, but we handle it gracefully
+        // by returning an empty heredoc form
+        return new Docker.HeredocForm(randomId(), Space.EMPTY, Markers.EMPTY, "<<EOF", null, emptyList(), "EOF");
+    }
+
+    private Docker.HeredocForm visitSingleHeredocContext(DockerParser.SingleHeredocContext ctx) {
         return convert(ctx, (c, prefix) -> {
             // Get opening marker (<<EOF or <<-EOF)
             String opening = c.HEREDOC_START().getText();
@@ -1586,32 +1614,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
             // Process heredocContent which is ( NEWLINE | HEREDOC_CONTENT )*
             if (c.heredocContent() != null) {
-                DockerParser.HeredocContentContext contentCtx = c.heredocContent();
-                StringBuilder currentLine = new StringBuilder();
-
-                for (int i = 0; i < contentCtx.getChildCount(); i++) {
-                    ParseTree child = contentCtx.getChild(i);
-
-                    if (child instanceof TerminalNode) {
-                        TerminalNode tn = (TerminalNode) child;
-                        if (tn.getSymbol().getType() == DockerLexer.NEWLINE) {
-                            // Newline - end current line and start new one
-                            currentLine.append(tn.getText());
-                            skip(tn.getSymbol());
-                            contentLines.add(currentLine.toString());
-                            currentLine = new StringBuilder();
-                        } else if (tn.getSymbol().getType() == DockerLexer.HEREDOC_CONTENT) {
-                            // Heredoc content line
-                            currentLine.append(tn.getText());
-                            skip(tn.getSymbol());
-                        }
-                    }
-                }
-
-                // Add any remaining content as a line
-                if (currentLine.length() > 0) {
-                    contentLines.add(currentLine.toString());
-                }
+                collectHeredocContent(c.heredocContent(), contentLines);
             }
 
             // Get closing marker (UNQUOTED_TEXT)
@@ -1620,6 +1623,99 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
             return new Docker.HeredocForm(randomId(), prefix, Markers.EMPTY, opening, destination, contentLines, closing);
         });
+    }
+
+    private Docker.MultiHeredocForm visitMultiHeredocContext(DockerParser.MultiHeredocContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            // Build the shell preamble from the heredocPreamble context
+            DockerParser.HeredocPreambleContext preambleCtx = c.heredocPreamble();
+            StringBuilder preambleBuilder = new StringBuilder();
+
+            // Collect all tokens in the preamble (HEREDOC_START and preambleElements)
+            for (int i = 0; i < preambleCtx.getChildCount(); i++) {
+                ParseTree child = preambleCtx.getChild(i);
+                if (child instanceof TerminalNode) {
+                    TerminalNode tn = (TerminalNode) child;
+                    // Add whitespace prefix if any
+                    Space tokenPrefix = prefix(tn.getSymbol());
+                    preambleBuilder.append(tokenPrefix.getWhitespace());
+                    preambleBuilder.append(tn.getText());
+                    skip(tn.getSymbol());
+                } else if (child instanceof DockerParser.PreambleElementContext) {
+                    DockerParser.PreambleElementContext elemCtx = (DockerParser.PreambleElementContext) child;
+                    Token token = elemCtx.getStart();
+                    Space tokenPrefix = prefix(token);
+                    preambleBuilder.append(tokenPrefix.getWhitespace());
+                    preambleBuilder.append(token.getText());
+                    skip(token);
+                }
+            }
+
+            String shellPreamble = preambleBuilder.toString();
+
+            // Skip the NEWLINE after the preamble
+            if (c.NEWLINE() != null) {
+                skip(c.NEWLINE().getSymbol());
+            }
+
+            // Parse each heredoc body
+            List<Docker.HeredocBody> bodies = new ArrayList<>();
+            for (DockerParser.HeredocBodyContext bodyCtx : c.heredocBody()) {
+                bodies.add(visitHeredocBodyContext(bodyCtx));
+            }
+
+            return new Docker.MultiHeredocForm(randomId(), prefix, Markers.EMPTY, shellPreamble, bodies);
+        });
+    }
+
+    private Docker.HeredocBody visitHeredocBodyContext(DockerParser.HeredocBodyContext ctx) {
+        Space prefix = prefix(ctx.getStart());
+
+        // Collect content lines from heredocContent
+        List<String> contentLines = new ArrayList<>();
+        if (ctx.heredocContent() != null) {
+            collectHeredocContent(ctx.heredocContent(), contentLines);
+        }
+
+        // Get closing marker (UNQUOTED_TEXT) - this is also the opening marker name without <<
+        String closing = ctx.heredocEnd().UNQUOTED_TEXT().getText();
+        skip(ctx.heredocEnd().UNQUOTED_TEXT().getSymbol());
+
+        // The opening marker is "<<" + closing (we reconstruct it for the model)
+        String opening = "<<" + closing;
+
+        return new Docker.HeredocBody(randomId(), prefix, Markers.EMPTY, opening, contentLines, closing);
+    }
+
+    /**
+     * Helper method to collect heredoc content lines from a HeredocContentContext.
+     */
+    private void collectHeredocContent(DockerParser.HeredocContentContext contentCtx, List<String> contentLines) {
+        StringBuilder currentLine = new StringBuilder();
+
+        for (int i = 0; i < contentCtx.getChildCount(); i++) {
+            ParseTree child = contentCtx.getChild(i);
+
+            if (child instanceof TerminalNode) {
+                TerminalNode tn = (TerminalNode) child;
+                if (tn.getSymbol().getType() == DockerLexer.NEWLINE) {
+                    // Newline - end current line and start new one
+                    currentLine.append(tn.getText());
+                    skip(tn.getSymbol());
+                    contentLines.add(currentLine.toString());
+                    currentLine = new StringBuilder();
+                } else if (tn.getSymbol().getType() == DockerLexer.HEREDOC_CONTENT) {
+                    // Heredoc content line
+                    currentLine.append(tn.getText());
+                    skip(tn.getSymbol());
+                }
+            }
+        }
+
+        // Add any remaining content as a line
+        if (currentLine.length() > 0) {
+            contentLines.add(currentLine.toString());
+        }
     }
 
     private Docker.Argument visitArgument(@Nullable ParserRuleContext ctx) {

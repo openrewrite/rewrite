@@ -274,6 +274,21 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         return hf;
     }
 
+    public Docker visitHeredocBody(Docker.HeredocBody heredocBody, P p) {
+        Docker.HeredocBody hb = heredocBody;
+        hb = hb.withPrefix(visitSpace(hb.getPrefix(), p));
+        hb = hb.withMarkers(visitMarkers(hb.getMarkers(), p));
+        return hb;
+    }
+
+    public Docker visitMultiHeredocForm(Docker.MultiHeredocForm multiHeredocForm, P p) {
+        Docker.MultiHeredocForm mhf = multiHeredocForm;
+        mhf = mhf.withPrefix(visitSpace(mhf.getPrefix(), p));
+        mhf = mhf.withMarkers(visitMarkers(mhf.getMarkers(), p));
+        mhf = mhf.withBodies(ListUtils.map(mhf.getBodies(), body -> (Docker.HeredocBody) visit(body, p)));
+        return mhf;
+    }
+
     public Docker visitFlag(Docker.Flag flag, P p) {
         Docker.Flag f = flag;
         f = f.withPrefix(visitSpace(f.getPrefix(), p));
