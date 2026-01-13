@@ -72,7 +72,7 @@ class AutodetectTest implements RewriteTest {
             Autodetect.Detector detector = Autodetect.detector();
             sources.forEach(detector::sample);
 
-            SpacesStyle spaces = (SpacesStyle) detector.build().getStyles().stream()
+            var spaces = (SpacesStyle) detector.build().getStyles().stream()
               .filter(SpacesStyle.class::isInstance)
               .findAny().orElseThrow();
             assertions.accept(spaces);
@@ -336,7 +336,7 @@ class AutodetectTest implements RewriteTest {
             Autodetect.Detector detector = Autodetect.detector();
             sources.forEach(detector::sample);
 
-            TabsAndIndentsStyle tabsAndIndents = (TabsAndIndentsStyle) detector.build().getStyles().stream()
+            var tabsAndIndents = (TabsAndIndentsStyle) detector.build().getStyles().stream()
               .filter(TabsAndIndentsStyle.class::isInstance)
               .findAny().orElseThrow();
             assertThat(tabsAndIndents.getIndentSize()).isEqualTo(indentSize);

@@ -250,8 +250,8 @@ class JavaTemplateTest6Test implements RewriteTest {
                   return super.visitMethodDeclaration(method, p);
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
-              J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+              var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              var testMethodDecl = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
               assertThat(testMethodDecl.getMethodType().getThrownExceptions().stream()
                 .map(JavaType.FullyQualified.class::cast)
                 .map(JavaType.FullyQualified::getFullyQualifiedName))
@@ -289,7 +289,7 @@ class JavaTemplateTest6Test implements RewriteTest {
                   return super.visitMethodDeclaration(method, p);
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
               JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();
               assertThat(type).isNotNull();
               var paramTypes = type.getParameterTypes();

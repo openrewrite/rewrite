@@ -242,7 +242,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
             return new TreeVisitor<SourceFile, ExecutionContext>() {
                 @Override
                 public SourceFile visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                    var sourceFile = (SourceFile) requireNonNull(tree);
                     if (Boolean.TRUE.equals(overwriteExisting) && path.equals(sourceFile.getSourcePath())) {
                         if (sourceFile instanceof PlainText text) {
                             return text.withText(fileContents);

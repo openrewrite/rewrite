@@ -112,7 +112,7 @@ class RecipeSchedulerTest implements RewriteTest {
               @Override
               public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                   assert tree != null;
-                  PlainText plainText = (PlainText) tree;
+                  var plainText = (PlainText) tree;
                   Path workingDirectory = WorkingDirectoryExecutionContextView.view(ctx)
                     .getWorkingDirectory();
                   assertThat(workingDirectory).hasParent(path);

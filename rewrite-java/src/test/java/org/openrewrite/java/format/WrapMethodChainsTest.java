@@ -1125,7 +1125,7 @@ class WrapMethodChainsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext p) {
-                  J.CompilationUnit formatted = (J.CompilationUnit) new SpacesVisitor<>(IntelliJ.spaces(), true, null).visit(cu, p, getCursor().getParent());
+                  var formatted = (J.CompilationUnit) new SpacesVisitor<>(IntelliJ.spaces(), true, null).visit(cu, p, getCursor().getParent());
                   formatted = (J.CompilationUnit) new WrappingAndBracesVisitor<>(
                     List.of(fromStyles(
                       new WrappingAndBracesStyle(

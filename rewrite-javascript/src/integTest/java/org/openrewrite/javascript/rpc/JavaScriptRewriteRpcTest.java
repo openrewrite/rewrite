@@ -176,7 +176,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J preVisit(J tree, ExecutionContext ctx) {
-                  SourceFile t = (SourceFile) modifyAll.getVisitor().visitNonNull(tree, ctx);
+                  var t = (SourceFile) modifyAll.getVisitor().visitNonNull(tree, ctx);
                   assertThat(t.printAll()).isEqualTo(java.trim());
                   stopAfterPreVisit();
                   return tree;
