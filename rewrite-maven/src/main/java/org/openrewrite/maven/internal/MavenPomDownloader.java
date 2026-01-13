@@ -520,7 +520,7 @@ public class MavenPomDownloader {
             !StringUtils.isBlank(relativePath) && !relativePath.contains(":")) {
             Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
             if (folderContainingPom != null) {
-                Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
+                Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath).resolve("pom.xml"))
                         .normalize());
                 // Even poms published to remote repositories still contain relative paths to their parent poms
                 // So double check that the GAV coordinates match so that we don't get a relative path from a remote

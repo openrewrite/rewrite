@@ -1802,7 +1802,7 @@ class ChangePackageTest implements RewriteTest {
           ).parser(JavaParser.fromJavaVersion().dependsOn(
             """
               package com.demo;
-              
+
               public class A {
                   public static class B {}
               }
@@ -1811,7 +1811,7 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package app;
-              
+
               import com.demo.A.B;
 
               interface Test {
@@ -1820,7 +1820,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               package app;
-              
+
               import some.thing.X.Y;
 
               interface Test {
@@ -1831,4 +1831,47 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6513")
+    @Test
+    void changePackageUpdatesNestedClassImport() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "dev.nipafx.rewrite_bug",
+            "dev.nipafx.rewrite_changepackage_bug",
+            null
+          )),
+          java(
+            """
+              package dev.nipafx.rewrite_bug;
+              public class Outer {
+                  public static class Inner {
+                  }
+              }
+              """,
+            """
+              package dev.nipafx.rewrite_changepackage_bug;
+              public class Outer {
+                  public static class Inner {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package dev.nipafx.rewrite_bug;
+              import dev.nipafx.rewrite_bug.Outer.Inner;
+              public class Importer {
+                  Inner inner;
+              }
+              """,
+            """
+              package dev.nipafx.rewrite_changepackage_bug;
+              import dev.nipafx.rewrite_changepackage_bug.Outer.Inner;
+              public class Importer {
+                  Inner inner;
+              }
+              """
+          )
+        );
+    }
 }
