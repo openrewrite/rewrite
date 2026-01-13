@@ -149,8 +149,8 @@ class JavaTemplateTest5Test implements RewriteTest {
                   return method;
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
-              J.MethodInvocation m = (J.MethodInvocation) ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().get(2)).getBody()
+              var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              var m = (J.MethodInvocation) ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().get(2)).getBody()
                 .getStatements().getFirst();
               JavaType.Method type = m.getMethodType();
               assertThat(type.getParameterTypes().getFirst()).isEqualTo(JavaType.Primitive.Int);

@@ -53,15 +53,9 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
     @Nullable
     String propertyPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove unused properties";
-    }
+    String displayName = "Remove unused properties";
 
-    @Override
-    public String getDescription() {
-        return "Detect and remove Maven property declarations which do not have any usage within the project.";
-    }
+    String description = "Detect and remove Maven property declarations which do not have any usage within the project.";
 
     public static class Accumulator {
         public Map<String, Set<MavenResolutionResult>> propertiesToUsingPoms = new HashMap<>();

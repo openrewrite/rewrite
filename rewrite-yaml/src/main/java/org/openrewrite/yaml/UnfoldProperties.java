@@ -58,15 +58,9 @@ public class UnfoldProperties extends Recipe {
         this.applyTo = applyTo == null ? emptyList() : applyTo;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Unfold YAML properties";
-    }
+    String displayName = "Unfold YAML properties";
 
-    @Override
-    public String getDescription() {
-        return "Transforms dot-separated property keys in YAML files into nested map hierarchies to enhance clarity and readability, or for compatibility with tools expecting structured YAML.";
-    }
+    String description = "Transforms dot-separated property keys in YAML files into nested map hierarchies to enhance clarity and readability, or for compatibility with tools expecting structured YAML.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

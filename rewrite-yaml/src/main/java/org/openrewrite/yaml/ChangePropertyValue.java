@@ -68,20 +68,14 @@ public class ChangePropertyValue extends Recipe {
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Change YAML property";
-    }
+    String displayName = "Change YAML property";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s` to `%s`", propertyKey, newValue);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a YAML property. Expects dot notation for nested YAML mappings, similar to how Spring Boot interprets `application.yml` files.";
-    }
+    String description = "Change a YAML property. Expects dot notation for nested YAML mappings, similar to how Spring Boot interprets `application.yml` files.";
 
     @Override
     public Validated<Object> validate() {

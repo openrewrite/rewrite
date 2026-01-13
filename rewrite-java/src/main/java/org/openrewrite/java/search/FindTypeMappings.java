@@ -37,15 +37,9 @@ import static java.util.Collections.emptyList;
 public class FindTypeMappings extends ScanningRecipe<Map<FindTypeMappings.TypeAssociation, Integer>> {
     transient TypeMappings typeMappingsPerSource = new TypeMappings(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Find type mappings";
-    }
+    String displayName = "Find type mappings";
 
-    @Override
-    public String getDescription() {
-        return "Study the frequency of `J` types and their `JavaType` type attribution.";
-    }
+    String description = "Study the frequency of `J` types and their `JavaType` type attribution.";
 
     @Override
     public Map<TypeAssociation, Integer> getInitialValue(ExecutionContext ctx) {

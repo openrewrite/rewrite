@@ -107,21 +107,15 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
         this.changeManagedDependency = changeManagedDependency;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven dependency";
-    }
+    String displayName = "Change Maven dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", oldGroupId, oldArtifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before. " +
+    String description = "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before. " +
                 "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided.";
-    }
 
     @Override
     public Validated<Object> validate() {

@@ -219,7 +219,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
               @Override
               public J.Binary visitBinary(J.Binary binary, ExecutionContext executionContext) {
                   if (binary.getLeft() instanceof J.Identifier) {
-                      J.Identifier left = (J.Identifier) binary.getLeft();
+                      var left = (J.Identifier) binary.getLeft();
                       if ("i".equals(left.getSimpleName())) {
                           assertThat(left.getFieldType().getType().toString())
                             .isEqualTo("java.lang.Integer");
@@ -365,7 +365,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                         @Override
                         public J.ArrayType visitArrayType(J.ArrayType arrayType, Integer n) {
                             assert arrayType.getType() instanceof JavaType.Array;
-                            JavaType.Array array = (JavaType.Array) arrayType.getType();
+                            var array = (JavaType.Array) arrayType.getType();
                             if (arrayType.getElementType() instanceof J.ArrayType) {
                                 List<JavaType.FullyQualified> annotations = collectAnnotations(array, new ArrayList<>());
                                 assertThat(annotations).satisfiesExactly(

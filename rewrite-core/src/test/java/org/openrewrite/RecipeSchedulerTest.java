@@ -112,7 +112,7 @@ class RecipeSchedulerTest implements RewriteTest {
               @Override
               public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                   assert tree != null;
-                  PlainText plainText = (PlainText) tree;
+                  var plainText = (PlainText) tree;
                   Path workingDirectory = WorkingDirectoryExecutionContextView.view(ctx)
                     .getWorkingDirectory();
                   assertThat(workingDirectory).hasParent(path);
@@ -195,15 +195,9 @@ class BoomGenerateRecipe extends ScanningRecipe<Integer> {
 
     boolean wrapAsRecipeRunException;
 
-    @Override
-    public String getDisplayName() {
-        return "Boom generate";
-    }
+    String displayName = "Boom generate";
 
-    @Override
-    public String getDescription() {
-        return "Throws a boom exception during ScanningRecipe.generate().";
-    }
+    String description = "Throws a boom exception during ScanningRecipe.generate().";
 
     @Override
     public Integer getInitialValue(ExecutionContext ctx) {

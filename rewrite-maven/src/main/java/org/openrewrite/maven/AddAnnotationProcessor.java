@@ -54,17 +54,11 @@ public class AddAnnotationProcessor extends Recipe {
             example = "0.2.0")
     String version;
 
-    @Override
-    public String getDisplayName() {
-        return "Add an annotation processor to `maven-compiler-plugin`";
-    }
+    String displayName = "Add an annotation processor to `maven-compiler-plugin`";
 
-    @Override
-    public String getDescription() {
-        return "Add an annotation processor to the maven compiler plugin. Will not do anything if it already exists. " +
+    String description = "Add an annotation processor to the maven compiler plugin. Will not do anything if it already exists. " +
                 "Also doesn't add anything when no other annotation processors are defined yet. " +
                 "(Perhaps `ChangePluginConfiguration` can be used).";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

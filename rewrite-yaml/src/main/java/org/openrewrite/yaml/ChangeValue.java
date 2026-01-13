@@ -45,20 +45,14 @@ public class ChangeValue extends Recipe {
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Change value";
-    }
+    String displayName = "Change value";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s` to `%s`", keyPath, value);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a YAML mapping entry value while leaving the key intact.";
-    }
+    String description = "Change a YAML mapping entry value while leaving the key intact.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

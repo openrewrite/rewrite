@@ -149,7 +149,8 @@ export class DependencyWorkspace {
         }
 
         // Determine npm command: use `npm ci` when lock file is provided (faster, deterministic)
-        const npmCommand = packageLockContent ? 'npm ci --silent' : 'npm install --silent';
+        // Use --loglevel=error to suppress normal output but still capture errors in stderr
+        const npmCommand = packageLockContent ? 'npm ci --loglevel=error' : 'npm install --loglevel=error';
 
         // Helper to write package files to a directory
         const writePackageFiles = (dir: string) => {
@@ -234,8 +235,10 @@ export class DependencyWorkspace {
                 });
 
                 return targetDir;
-            } catch (error) {
-                throw new Error(`Failed to create dependency workspace: ${error}`);
+            } catch (error: any) {
+                const stderr = error?.stderr?.toString()?.trim();
+                const errorMsg = stderr || error?.message || String(error);
+                throw new Error(`Failed to create dependency workspace: ${errorMsg}`);
             }
         }
 
@@ -345,7 +348,7 @@ export class DependencyWorkspace {
             this.cache.set(hash, workspaceDir);
 
             return workspaceDir;
-        } catch (error) {
+        } catch (error: any) {
             // Clean up temporary workspace on failure
             try {
                 if (fs.existsSync(tempWorkspaceDir)) {
@@ -354,7 +357,9 @@ export class DependencyWorkspace {
             } catch {
                 // Ignore cleanup errors
             }
-            throw new Error(`Failed to create dependency workspace: ${error}`);
+            const stderr = error?.stderr?.toString()?.trim();
+            const errorMsg = stderr || error?.message || String(error);
+            throw new Error(`Failed to create dependency workspace: ${errorMsg}`);
         }
     }
 

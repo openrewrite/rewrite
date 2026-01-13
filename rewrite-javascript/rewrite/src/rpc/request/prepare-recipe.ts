@@ -124,6 +124,8 @@ export class PrepareRecipe {
         const {JsonVisitor} = require("../../json");
         const {JavaScriptVisitor} = require("../../javascript");
         const {JavaVisitor} = require("../../java");
+        const {PlainTextVisitor} = require("../../text");
+        const {YamlVisitor} = require("../../yaml");
 
         if (v instanceof JsonVisitor) {
             treeType = "org.openrewrite.json.tree.Json";
@@ -133,6 +135,10 @@ export class PrepareRecipe {
             treeType = "org.openrewrite.javascript.tree.JS";
         } else if (v instanceof JavaVisitor) {
             treeType = "org.openrewrite.java.tree.J";
+        } else if (v instanceof PlainTextVisitor) {
+            treeType = "org.openrewrite.text.PlainText";
+        } else if (v instanceof YamlVisitor) {
+            treeType = "org.openrewrite.yaml.tree.Yaml";
         }
         if (treeType) {
             preconditions.push({

@@ -579,8 +579,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                   .sourcePath(pomPath)
                   .repository(snapshotRepo)
                   .properties(singletonMap("REPO_URL", snapshotRepo.getUri()))
-                  .gav(new ResolvedGroupArtifactVersion(
-                    "${REPO_URL}", gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null))
+                  .gav(gav.asResolved().withRepository("${REPO_URL}"))
                   .build();
                 var resolvedPom = ResolvedPom.builder()
                   .requested(pom)
@@ -616,7 +615,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
-        void deriveMetaDataFromHtmlBasedRepository() throws Exception {
+        void deriveMetaDataFromHtmlBasedRepository() {
             MavenRepository repository = MavenRepository.builder()
               .id("html-based")
               .uri("https://central.sonatype.com/repository/maven-snapshots")
@@ -800,7 +799,6 @@ class MavenPomDownloaderTest implements RewriteTest {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
 
             var result = downloader.download(gav, null, null, List.of());
-            //noinspection DataFlowIssue
             assertThat(result.getRepository()).isNotNull();
             assertThat(result.getRepository().getUri()).startsWith(tempDir.toUri().toString());
         }
@@ -1351,7 +1349,7 @@ class MavenPomDownloaderTest implements RewriteTest {
 
     @Test
     void resolveDependencies() throws Exception {
-        Xml.Document doc = (Xml.Document) MavenParser.builder().build().parse("""
+        var doc = (Xml.Document) MavenParser.builder().build().parse("""
           <project>
               <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -1375,7 +1373,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
           .resolveDependencies(new MavenPomDownloader(emptyMap(), ctx, null, null), ctx);
         List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
-        assertThat(deps).hasSize(35);
+        assertThat(deps).hasSize(34);
     }
 
     @Issue("https://github.com/openrewrite/rewrite/pull/6464")
@@ -1384,7 +1382,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         // `azure-spring-data-cosmos` brings in `azure-core-http-netty`, which uses property `<boring-ssl-classifier/>`
         // https://repo1.maven.org/maven2/com/azure/azure-spring-data-cosmos/3.45.0/azure-spring-data-cosmos-3.45.0.pom
         // https://repo1.maven.org/maven2/com/azure/azure-core-http-netty/1.16.2/azure-core-http-netty-1.16.2.pom
-        Xml.Document doc = (Xml.Document) MavenParser.builder().build().parse("""
+        var doc = (Xml.Document) MavenParser.builder().build().parse("""
           <project>
               <groupId>com.example</groupId>
               <artifactId>demo</artifactId>

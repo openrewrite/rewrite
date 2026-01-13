@@ -61,20 +61,14 @@ public class ChangePackaging extends Recipe {
     @Nullable
     String oldPackaging;
 
-    @Override
-    public String getDisplayName() {
-        return "Set Maven project packaging";
-    }
+    String displayName = "Set Maven project packaging";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("for `%s:%s` to `%s`", groupId, artifactId, packaging);
     }
 
-    @Override
-    public String getDescription() {
-        return "Sets the packaging type of Maven projects. Either adds the packaging tag if it is missing or changes its context if present.";
-    }
+    String description = "Sets the packaging type of Maven projects. Either adds the packaging tag if it is missing or changes its context if present.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

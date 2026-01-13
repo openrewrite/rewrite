@@ -692,15 +692,9 @@ class UpgradeDependencyInMarker extends Recipe {
     String configuration;
     BiConsumer<GradleProject, GradleProject> testAssertion;
 
-    @Override
-    public String getDisplayName() {
-        return "Upgrade a version within the GradleProject marker";
-    }
+    String displayName = "Upgrade a version within the GradleProject marker";
 
-    @Override
-    public String getDescription() {
-        return "Upgrade a version within the GradleProject marker. Makes no changes to the source file itself";
-    }
+    String description = "Upgrade a version within the GradleProject marker. Makes no changes to the source file itself";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -739,15 +733,9 @@ class RemoveDependency extends Recipe {
         this.testAssertion = testAssertion;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Remove a dependency within the GradleProject marker";
-    }
+    String displayName = "Remove a dependency within the GradleProject marker";
 
-    @Override
-    public String getDescription() {
-        return "Remove a dependency within the GradleProject marker. Makes no changes to the source file itself";
-    }
+    String description = "Remove a dependency within the GradleProject marker. Makes no changes to the source file itself";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -772,15 +760,9 @@ class ChangeConstraint extends Recipe {
     Map<String, List<GroupArtifactVersion>> configToConstraint;
     BiConsumer<GradleProject, GradleProject> testAssertion;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove a dependency within the GradleProject marker";
-    }
+    String displayName = "Remove a dependency within the GradleProject marker";
 
-    @Override
-    public String getDescription() {
-        return "Remove a dependency within the GradleProject marker. Makes no changes to the source file itself";
-    }
+    String description = "Remove a dependency within the GradleProject marker. Makes no changes to the source file itself";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -805,15 +787,9 @@ class RemoveConstraint extends Recipe {
     List<GroupArtifact> gas;
     BiConsumer<GradleProject, GradleProject> testAssertion;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove a constraint within the GradleProject marker";
-    }
+    String displayName = "Remove a constraint within the GradleProject marker";
 
-    @Override
-    public String getDescription() {
-        return "Remove a constraint within the GradleProject marker. Makes no changes to the source file itself";
-    }
+    String description = "Remove a constraint within the GradleProject marker. Makes no changes to the source file itself";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

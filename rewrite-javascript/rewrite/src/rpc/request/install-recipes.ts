@@ -19,6 +19,7 @@ import * as fs from "fs";
 import {spawn} from "child_process";
 import {withMetrics} from "./metrics";
 import {RecipeMarketplace} from "../../marketplace";
+import {getPlatformCommand} from "../../shell-utils";
 
 export interface InstallRecipesResponse {
     recipesInstalled: number
@@ -35,7 +36,7 @@ async function spawnNpmCommand(
     logger?: rpc.Logger,
     logPrefix?: string
 ): Promise<void> {
-    const child = spawn(command, args, {cwd});
+    const child = spawn(getPlatformCommand(command), args, {cwd});
 
     if (logger) {
         const prefix = logPrefix ? `${logPrefix}: ` : '';

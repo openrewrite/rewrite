@@ -47,15 +47,9 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     @Nullable
     String fullyQualifiedConstantName;
 
-    @Override
-    public String getDisplayName() {
-        return "Replace String literal with constant";
-    }
+    String displayName = "Replace String literal with constant";
 
-    @Override
-    public String getDescription() {
-        return "Replace String literal with constant, adding import on class if needed.";
-    }
+    String description = "Replace String literal with constant, adding import on class if needed.";
 
     public @Nullable String getLiteralValue() {
         if (this.literalValue == null && this.fullyQualifiedConstantName != null) {
