@@ -643,7 +643,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
 
               java {
                   toolchain {
-                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.VERSION_1_8.majorVersion))
+                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.VERSION_1_8))
                   }
               }
               """,
@@ -654,7 +654,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
 
               java {
                   toolchain {
-                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.VERSION_17.majorVersion))
+                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.VERSION_17))
                   }
               }
               """
