@@ -172,7 +172,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         .ifPresent(multiDependency ->
                                 multiDependency.forEach(dep -> scanDependency(dep, ctx)));
 
-                // Check for Spring Dependency Management Plugin entries (mavenBom, dependency, dependencySet)
                 new SpringDependencyManagementPluginEntry.Matcher()
                         .groupId(groupId)
                         .artifactId(artifactId)
@@ -181,9 +180,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return m;
             }
 
-            /**
-             * Scans a Spring Dependency Management Plugin entry and records its version variable.
-             */
             private void scanSpringDependencyManagementEntry(SpringDependencyManagementPluginEntry entry, ExecutionContext ctx) {
                 String entryGroup = entry.getGroup();
                 for (String entryArtifact : entry.getArtifacts()) {

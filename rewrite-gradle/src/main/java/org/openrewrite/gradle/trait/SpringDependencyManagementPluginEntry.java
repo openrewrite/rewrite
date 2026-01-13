@@ -83,12 +83,8 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
 
     /**
      * Gets the version variable name if the dependency's version is specified via a variable reference
-     * in a GString or Kotlin StringTemplate. Handles patterns including:
-     * - Simple variable: $version, ${version}
-     * - Property methods: ${property('version')}, ${findProperty('version')}
-     * - Project property methods: ${project.property('version')}, ${project.findProperty('version')}
-     * - Properties map access: ${project.properties['version']}
-     *
+     * in a GString or Kotlin StringTemplate.
+     * 
      * @return The variable name used for the version, or null if the version is a literal or cannot be determined
      */
     public @Nullable String getVersionVariable() {
