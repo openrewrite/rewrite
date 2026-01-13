@@ -83,7 +83,11 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
 
     /**
      * Gets the version variable name if the dependency's version is specified via a variable reference
-     * in a GString or Kotlin StringTemplate (e.g., "group:artifact:${version}" or "group:artifact:$version").
+     * in a GString or Kotlin StringTemplate. Handles patterns including:
+     * - Simple variable: $version, ${version}
+     * - Property methods: ${property('version')}, ${findProperty('version')}
+     * - Project property methods: ${project.property('version')}, ${project.findProperty('version')}
+     * - Properties map access: ${project.properties['version']}
      *
      * @return The variable name used for the version, or null if the version is a literal or cannot be determined
      */
@@ -95,7 +99,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
 
         Expression arg = m.getArguments().get(0);
 
-        // Handle Groovy GString: "group:artifact:$version"
+        // Handle Groovy GString: "group:artifact:$version" or "group:artifact:${...}"
         if (arg instanceof G.GString) {
             List<J> strings = ((G.GString) arg).getStrings();
             if (strings.size() == 2 && strings.get(0) instanceof J.Literal && strings.get(1) instanceof G.GString.Value) {
@@ -103,8 +107,13 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                 if (versionTree instanceof J.Identifier) {
                     return ((J.Identifier) versionTree).getSimpleName();
                 } else if (versionTree instanceof J.FieldAccess) {
-                    J.FieldAccess fieldAccess = (J.FieldAccess) versionTree;
-                    return fieldAccess.getSimpleName();
+                    return ((J.FieldAccess) versionTree).getSimpleName();
+                } else if (versionTree instanceof J.MethodInvocation) {
+                    // Handle property('version') or findProperty('version')
+                    return extractPropertyNameFromMethodInvocation((J.MethodInvocation) versionTree);
+                } else if (versionTree instanceof G.Binary) {
+                    // Handle project.properties['version']
+                    return extractPropertyNameFromGBinary((G.Binary) versionTree);
                 }
             }
         }
@@ -120,6 +129,37 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             }
         }
 
+        return null;
+    }
+
+    /**
+     * Extract property name from method invocation patterns like property('name')
+     * or findProperty('name'), including project.property('name') and project.findProperty('name').
+     */
+    private static @Nullable String extractPropertyNameFromMethodInvocation(J.MethodInvocation mi) {
+        String methodName = mi.getSimpleName();
+        if ("property".equals(methodName) || "findProperty".equals(methodName)) {
+            if (!mi.getArguments().isEmpty() && mi.getArguments().get(0) instanceof J.Literal) {
+                J.Literal literal = (J.Literal) mi.getArguments().get(0);
+                if (literal.getValue() instanceof String) {
+                    return (String) literal.getValue();
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Handle Groovy binary access like project.properties['name']
+     * where the binary operator is Access (bracket notation).
+     */
+    private static @Nullable String extractPropertyNameFromGBinary(G.Binary binary) {
+        if (binary.getOperator() == G.Binary.Type.Access && binary.getRight() instanceof J.Literal) {
+            J.Literal right = (J.Literal) binary.getRight();
+            if (right.getValue() instanceof String) {
+                return (String) right.getValue();
+            }
+        }
         return null;
     }
 
@@ -223,7 +263,11 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
 
         /**
          * Extracts the version variable name from a method invocation's arguments.
-         * Handles GString and Kotlin StringTemplate patterns.
+         * Handles GString and Kotlin StringTemplate patterns including:
+         * - Simple variable: $version, ${version}
+         * - Property methods: ${property('version')}, ${findProperty('version')}
+         * - Project property methods: ${project.property('version')}, ${project.findProperty('version')}
+         * - Properties map access: ${project.properties['version']}
          */
         private static @Nullable String extractVersionVariable(J.MethodInvocation methodInvocation) {
             if (methodInvocation.getArguments().isEmpty()) {
@@ -232,7 +276,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
 
             Expression arg = methodInvocation.getArguments().get(0);
 
-            // Handle Groovy GString: "group:artifact:$version"
+            // Handle Groovy GString: "group:artifact:$version" or "group:artifact:${...}"
             if (arg instanceof G.GString) {
                 List<J> strings = ((G.GString) arg).getStrings();
                 if (strings.size() == 2 && strings.get(0) instanceof J.Literal && strings.get(1) instanceof G.GString.Value) {
@@ -241,6 +285,12 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                         return ((J.Identifier) versionTree).getSimpleName();
                     } else if (versionTree instanceof J.FieldAccess) {
                         return ((J.FieldAccess) versionTree).getSimpleName();
+                    } else if (versionTree instanceof J.MethodInvocation) {
+                        // Handle property('version') or findProperty('version')
+                        return extractPropertyNameFromMethodInvocation((J.MethodInvocation) versionTree);
+                    } else if (versionTree instanceof G.Binary) {
+                        // Handle project.properties['version']
+                        return extractPropertyNameFromGBinary((G.Binary) versionTree);
                     }
                 }
             }

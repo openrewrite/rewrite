@@ -2231,8 +2231,17 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
-    void upgradesSpringDependencyManagementPluginMavenBomVersionPropertyWithGroovyDSL() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "$springCloudVersion",
+      "${springCloudVersion}",
+      "${property('springCloudVersion')}",
+      "${project.property('springCloudVersion')}",
+      "${findProperty('springCloudVersion')}",
+      "${project.findProperty('springCloudVersion')}",
+      "${project.properties['springCloudVersion']}"
+    })
+    void upgradesSpringDependencyManagementPluginMavenBomVersionPropertyWithGroovyDSL(String versionRef) {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2023.0.x", null)),
           buildGradle(
@@ -2246,10 +2255,10 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
               dependencyManagement {
                   imports {
-                      mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+                      mavenBom "org.springframework.cloud:spring-cloud-dependencies:%s"
                   }
               }
-              """
+              """.formatted(versionRef)
           ),
           properties(
             """
@@ -2263,8 +2272,12 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
-    void upgradesSpringDependencyManagementPluginMavenBomVersionPropertyWithKotlinDSL() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "$springCloudVersion",
+      "${springCloudVersion}"
+    })
+    void upgradesSpringDependencyManagementPluginMavenBomVersionPropertyWithKotlinDSL(String versionRef) {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2023.0.x", null)),
           buildGradleKts(
@@ -2279,10 +2292,10 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
               dependencyManagement {
                   imports {
-                      mavenBom("org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}")
+                      mavenBom("org.springframework.cloud:spring-cloud-dependencies:%s")
                   }
               }
-              """
+              """.formatted(versionRef)
           ),
           properties(
             """
