@@ -30,7 +30,7 @@ public class KotlinAnnotationTemplateGenerator extends AnnotationTemplateGenerat
     }
 
     @Override
-    public void addDummyClass(Cursor cursor, StringBuilder after) {
+    protected void addDummyClass(Cursor cursor, StringBuilder after) {
         if (cursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
             after.insert(0, "class Clazz {}");
         } else {
@@ -39,7 +39,7 @@ public class KotlinAnnotationTemplateGenerator extends AnnotationTemplateGenerat
     }
 
     @Override
-    public void addDummyInterface(StringBuilder after) {
+    protected void addDummyInterface(StringBuilder after) {
         after.append("\nannotation class Placeholder {}");
     }
 
