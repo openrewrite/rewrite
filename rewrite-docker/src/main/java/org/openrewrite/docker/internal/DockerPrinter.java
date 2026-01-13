@@ -120,15 +120,12 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
                 visit(flag, p);
             }
         }
-        if (add.getHeredoc() != null) {
-            visit(add.getHeredoc(), p);
+        if (add.getShellForm() != null) {
+            visit(add.getShellForm(), p);
         } else if (add.getExecForm() != null) {
             visit(add.getExecForm(), p);
-        } else if (add.getSources() != null) {
-            for (Docker.Argument source : add.getSources()) {
-                visit(source, p);
-            }
-            visit(add.getDestination(), p);
+        } else if (add.getHeredoc() != null) {
+            visit(add.getHeredoc(), p);
         }
         afterSyntax(add, p);
         return add;
@@ -143,15 +140,12 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
                 visit(flag, p);
             }
         }
-        if (copy.getHeredoc() != null) {
-            visit(copy.getHeredoc(), p);
+        if (copy.getShellForm() != null) {
+            visit(copy.getShellForm(), p);
         } else if (copy.getExecForm() != null) {
             visit(copy.getExecForm(), p);
-        } else if (copy.getSources() != null) {
-            for (Docker.Argument source : copy.getSources()) {
-                visit(source, p);
-            }
-            visit(copy.getDestination(), p);
+        } else if (copy.getHeredoc() != null) {
+            visit(copy.getHeredoc(), p);
         }
         afterSyntax(copy, p);
         return copy;
@@ -413,6 +407,17 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
         p.append(heredocBody.getClosing());
         afterSyntax(heredocBody, p);
         return heredocBody;
+    }
+
+    @Override
+    public Docker visitCopyShellForm(Docker.CopyShellForm copyShellForm, PrintOutputCapture<P> p) {
+        beforeSyntax(copyShellForm, p);
+        for (Docker.Argument source : copyShellForm.getSources()) {
+            visit(source, p);
+        }
+        visit(copyShellForm.getDestination(), p);
+        afterSyntax(copyShellForm, p);
+        return copyShellForm;
     }
 
     @Override

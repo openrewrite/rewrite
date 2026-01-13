@@ -411,24 +411,27 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         List<Docker.Flag> flags = ctx.flags() != null ? convertFlags(ctx.flags()) : null;
 
-        Docker.HeredocForm heredoc = null;
+        Docker.CopyShellForm shellForm = null;
         Docker.ExecForm execForm = null;
-        List<Docker.Argument> sources = null;
-        Docker.Argument destination = null;
+        Docker.HeredocForm heredoc = null;
 
         // Check if heredoc, jsonArray, or sourceList is present
         if (ctx.heredoc() != null) {
             // For ADD with heredoc, extract destination from preamble
             heredoc = visitHeredocContext(ctx.heredoc(), true);
-            // For heredoc, destination is part of the heredoc (if present)
-            // No separate destination to parse
         } else if (ctx.jsonArray() != null) {
             execForm = visitJsonArrayAsExecForm(ctx.jsonArray());
         } else if (ctx.sourceList() != null) {
-            // With lexer modes for flag values, the grammar's token allocation is now correct
-            // Parse sources and destination directly from the grammar contexts
-            sources = parseSourcePaths(ctx.sourceList());
-            destination = parseDestinationPath(ctx.destination());
+            // Parse sources and destination into CopyShellForm
+            List<Docker.Argument> sources = parseSourcePaths(ctx.sourceList());
+            Docker.Argument destination = parseDestinationPath(ctx.destination());
+            // The prefix for shellForm comes from the first source
+            Space shellFormPrefix = sources.isEmpty() ? Space.EMPTY : sources.get(0).getPrefix();
+            if (!sources.isEmpty()) {
+                // Remove prefix from first source since it's now on the shellForm
+                sources.set(0, sources.get(0).withPrefix(Space.EMPTY));
+            }
+            shellForm = new Docker.CopyShellForm(randomId(), shellFormPrefix, Markers.EMPTY, sources, destination);
         }
 
         // Advance cursor to end of instruction
@@ -436,7 +439,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
-        return new Docker.Add(randomId(), prefix, Markers.EMPTY, addKeyword, flags, heredoc, execForm, sources, destination);
+        return new Docker.Add(randomId(), prefix, Markers.EMPTY, addKeyword, flags, shellForm, execForm, heredoc);
     }
 
     @Override
@@ -449,24 +452,27 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         List<Docker.Flag> flags = ctx.flags() != null ? convertFlags(ctx.flags()) : null;
 
-        Docker.HeredocForm heredoc = null;
+        Docker.CopyShellForm shellForm = null;
         Docker.ExecForm execForm = null;
-        List<Docker.Argument> sources = null;
-        Docker.Argument destination = null;
+        Docker.HeredocForm heredoc = null;
 
         // Check if heredoc, jsonArray, or sourceList is present
         if (ctx.heredoc() != null) {
             // For COPY with heredoc, extract destination from preamble
             heredoc = visitHeredocContext(ctx.heredoc(), true);
-            // For heredoc, destination is part of the heredoc (if present)
-            // No separate destination to parse
         } else if (ctx.jsonArray() != null) {
             execForm = visitJsonArrayAsExecForm(ctx.jsonArray());
         } else if (ctx.sourceList() != null) {
-            // With lexer modes for flag values, the grammar's token allocation is now correct
-            // Parse sources and destination directly from the grammar contexts
-            sources = parseSourcePaths(ctx.sourceList());
-            destination = parseDestinationPath(ctx.destination());
+            // Parse sources and destination into CopyShellForm
+            List<Docker.Argument> sources = parseSourcePaths(ctx.sourceList());
+            Docker.Argument destination = parseDestinationPath(ctx.destination());
+            // The prefix for shellForm comes from the first source
+            Space shellFormPrefix = sources.isEmpty() ? Space.EMPTY : sources.get(0).getPrefix();
+            if (!sources.isEmpty()) {
+                // Remove prefix from first source since it's now on the shellForm
+                sources.set(0, sources.get(0).withPrefix(Space.EMPTY));
+            }
+            shellForm = new Docker.CopyShellForm(randomId(), shellFormPrefix, Markers.EMPTY, sources, destination);
         }
 
         // Advance cursor to end of instruction
@@ -474,7 +480,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
-        return new Docker.Copy(randomId(), prefix, Markers.EMPTY, copyKeyword, flags, heredoc, execForm, sources, destination);
+        return new Docker.Copy(randomId(), prefix, Markers.EMPTY, copyKeyword, flags, shellForm, execForm, heredoc);
     }
 
     /**

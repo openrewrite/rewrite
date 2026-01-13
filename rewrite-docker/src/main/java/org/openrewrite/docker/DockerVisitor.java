@@ -87,13 +87,14 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         if (a.getFlags() != null) {
             a = a.withFlags(ListUtils.map(a.getFlags(), flag -> (Docker.Flag) visit(flag, p)));
         }
+        if (a.getShellForm() != null) {
+            a = a.withShellForm((Docker.CopyShellForm) visit(a.getShellForm(), p));
+        }
+        if (a.getExecForm() != null) {
+            a = a.withExecForm((Docker.ExecForm) visit(a.getExecForm(), p));
+        }
         if (a.getHeredoc() != null) {
             a = a.withHeredoc((Docker.HeredocForm) visit(a.getHeredoc(), p));
-        } else if (a.getSources() != null) {
-            a = a.withSources(ListUtils.map(a.getSources(), source -> (Docker.Argument) visit(source, p)));
-        }
-        if (a.getDestination() != null) {
-            a = a.withDestination((Docker.Argument) visit(a.getDestination(), p));
         }
         return a;
     }
@@ -105,13 +106,14 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         if (c.getFlags() != null) {
             c = c.withFlags(ListUtils.map(c.getFlags(), flag -> (Docker.Flag) visit(flag, p)));
         }
+        if (c.getShellForm() != null) {
+            c = c.withShellForm((Docker.CopyShellForm) visit(c.getShellForm(), p));
+        }
+        if (c.getExecForm() != null) {
+            c = c.withExecForm((Docker.ExecForm) visit(c.getExecForm(), p));
+        }
         if (c.getHeredoc() != null) {
             c = c.withHeredoc((Docker.HeredocForm) visit(c.getHeredoc(), p));
-        } else if (c.getSources() != null) {
-            c = c.withSources(ListUtils.map(c.getSources(), source -> (Docker.Argument) visit(source, p)));
-        }
-        if (c.getDestination() != null) {
-            c = c.withDestination((Docker.Argument) visit(c.getDestination(), p));
         }
         return c;
     }
@@ -279,6 +281,15 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         hb = hb.withPrefix(visitSpace(hb.getPrefix(), p));
         hb = hb.withMarkers(visitMarkers(hb.getMarkers(), p));
         return hb;
+    }
+
+    public Docker visitCopyShellForm(Docker.CopyShellForm copyShellForm, P p) {
+        Docker.CopyShellForm csf = copyShellForm;
+        csf = csf.withPrefix(visitSpace(csf.getPrefix(), p));
+        csf = csf.withMarkers(visitMarkers(csf.getMarkers(), p));
+        csf = csf.withSources(ListUtils.map(csf.getSources(), source -> (Docker.Argument) visit(source, p)));
+        csf = csf.withDestination((Docker.Argument) visit(csf.getDestination(), p));
+        return csf;
     }
 
     public Docker visitFlag(Docker.Flag flag, P p) {

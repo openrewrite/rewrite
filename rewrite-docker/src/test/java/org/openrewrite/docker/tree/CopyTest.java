@@ -35,9 +35,10 @@ class CopyTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(copy.getSources()).hasSize(1);
-                assertThat(((Docker.Literal) copy.getSources().getFirst().getContents().getFirst()).getText()).isEqualTo("app.jar");
-                assertThat(((Docker.Literal) copy.getDestination().getContents().getFirst()).getText()).isEqualTo("/app/");
+                assertThat(copy.getShellForm()).isNotNull();
+                assertThat(copy.getShellForm().getSources()).hasSize(1);
+                assertThat(((Docker.Literal) copy.getShellForm().getSources().get(0).getContents().getFirst()).getText()).isEqualTo("app.jar");
+                assertThat(((Docker.Literal) copy.getShellForm().getDestination().getContents().getFirst()).getText()).isEqualTo("/app/");
             })
           )
         );
@@ -58,9 +59,10 @@ class CopyTest implements RewriteTest {
                 assertThat(copy1.getFlags()).hasSize(1);
                 assertThat(copy1.getFlags().getFirst().getName()).isEqualTo("chown");
                 assertThat(((Docker.Literal) copy1.getFlags().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("app:app");
-                var source = (Docker.Literal) copy1.getSources().getFirst().getContents().getFirst();
+                assertThat(copy1.getShellForm()).isNotNull();
+                var source = (Docker.Literal) copy1.getShellForm().getSources().get(0).getContents().getFirst();
                 assertThat(source.getText()).isEqualTo("app.jar");
-                var destination = (Docker.Literal) copy1.getDestination().getContents().getFirst();
+                var destination = (Docker.Literal) copy1.getShellForm().getDestination().getContents().getFirst();
                 assertThat(destination.getText()).isEqualTo("/app/");
 
                 var copy2 = (Docker.Copy) instructions.getLast();
@@ -130,12 +132,13 @@ class CopyTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getShellForm()).isNotNull();
                 // Should have 3 separate source arguments, not 1 combined argument
-                assertThat(copy.getSources()).hasSize(3);
-                assertThat(((Docker.Literal) copy.getSources().get(0).getContents().getFirst()).getText()).isEqualTo("file1.txt");
-                assertThat(((Docker.Literal) copy.getSources().get(1).getContents().getFirst()).getText()).isEqualTo("file2.txt");
-                assertThat(((Docker.Literal) copy.getSources().get(2).getContents().getFirst()).getText()).isEqualTo("file3.txt");
-                assertThat(((Docker.Literal) copy.getDestination().getContents().getFirst()).getText()).isEqualTo("/app/");
+                assertThat(copy.getShellForm().getSources()).hasSize(3);
+                assertThat(((Docker.Literal) copy.getShellForm().getSources().get(0).getContents().getFirst()).getText()).isEqualTo("file1.txt");
+                assertThat(((Docker.Literal) copy.getShellForm().getSources().get(1).getContents().getFirst()).getText()).isEqualTo("file2.txt");
+                assertThat(((Docker.Literal) copy.getShellForm().getSources().get(2).getContents().getFirst()).getText()).isEqualTo("file3.txt");
+                assertThat(((Docker.Literal) copy.getShellForm().getDestination().getContents().getFirst()).getText()).isEqualTo("/app/");
             })
           )
         );
@@ -154,9 +157,10 @@ class CopyTest implements RewriteTest {
                 var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(copy.getFlags()).hasSize(1);
                 assertThat(copy.getFlags().getFirst().getName()).isEqualTo("chown");
-                assertThat(copy.getSources()).hasSize(2);
-                assertThat(((Docker.Literal) copy.getSources().get(0).getContents().getFirst()).getText()).isEqualTo("config1.yaml");
-                assertThat(((Docker.Literal) copy.getSources().get(1).getContents().getFirst()).getText()).isEqualTo("config2.yaml");
+                assertThat(copy.getShellForm()).isNotNull();
+                assertThat(copy.getShellForm().getSources()).hasSize(2);
+                assertThat(((Docker.Literal) copy.getShellForm().getSources().get(0).getContents().getFirst()).getText()).isEqualTo("config1.yaml");
+                assertThat(((Docker.Literal) copy.getShellForm().getSources().get(1).getContents().getFirst()).getText()).isEqualTo("config2.yaml");
             })
           )
         );
@@ -238,8 +242,7 @@ class CopyTest implements RewriteTest {
 
                 // Verify exec form is used (not shell form or heredoc)
                 assertThat(copy.getExecForm()).isNotNull();
-                assertThat(copy.getSources()).isNull();
-                assertThat(copy.getDestination()).isNull();
+                assertThat(copy.getShellForm()).isNull();
                 assertThat(copy.getHeredoc()).isNull();
 
                 // Get the arguments from exec form

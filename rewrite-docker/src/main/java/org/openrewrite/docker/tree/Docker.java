@@ -243,10 +243,10 @@ public interface Docker extends Tree {
         List<Flag> flags;
 
         /**
-         * Either a heredoc, execForm (JSON array), or source+destination (mutually exclusive)
+         * Shell form: ADD source1 source2 ... destination
          */
         @Nullable
-        HeredocForm heredoc;
+        CopyShellForm shellForm;
 
         /**
          * Exec form: ADD ["source", "dest"] - JSON array containing source(s) and destination
@@ -254,11 +254,11 @@ public interface Docker extends Tree {
         @Nullable
         ExecForm execForm;
 
+        /**
+         * Heredoc form: ADD &lt;&lt;EOF /dest\ncontent\nEOF
+         */
         @Nullable
-        List<Argument> sources;
-
-        @Nullable
-        Argument destination;
+        HeredocForm heredoc;
 
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
@@ -285,10 +285,10 @@ public interface Docker extends Tree {
         List<Flag> flags;
 
         /**
-         * Either a heredoc, execForm (JSON array), or source+destination (mutually exclusive).
+         * Shell form: COPY source1 source2 ... destination
          */
         @Nullable
-        HeredocForm heredoc;
+        CopyShellForm shellForm;
 
         /**
          * Exec form: COPY ["source", "dest"] - JSON array containing source(s) and destination
@@ -296,14 +296,11 @@ public interface Docker extends Tree {
         @Nullable
         ExecForm execForm;
 
-        @Nullable
-        List<Argument> sources;
-
         /**
-         * Destination path for source files; null when using heredoc or execForm.
+         * Heredoc form: COPY &lt;&lt;EOF /dest\ncontent\nEOF
          */
         @Nullable
-        Argument destination;
+        HeredocForm heredoc;
 
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
@@ -889,6 +886,29 @@ public interface Docker extends Tree {
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitHeredocForm(this, p);
+        }
+    }
+
+    /**
+     * Shell form for COPY/ADD instructions: sources followed by destination.
+     * Example: COPY file1.txt file2.txt /app/
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class CopyShellForm implements Docker {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        List<Argument> sources;
+        Argument destination;
+
+        @Override
+        public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
+            return v.visitCopyShellForm(this, p);
         }
     }
 
