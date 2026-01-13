@@ -1242,7 +1242,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         } else if (ctx.shellForm() != null) {
             return visitShellFormContext(ctx.shellForm());
         } else if (ctx.heredoc() != null) {
-            return visitHeredocContext(ctx.heredoc());
+            return visitHeredocContext(ctx.heredoc(), false);
         } else {
             // Fallback to empty shell form
             return new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY, new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null));
@@ -1636,13 +1636,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
             return new Docker.HeredocForm(randomId(), prefix, Markers.EMPTY, preamble, destination, bodies);
         });
-    }
-
-    /**
-     * Visit a heredoc context for RUN instructions (no destination extraction).
-     */
-    private Docker.HeredocForm visitHeredocContext(DockerParser.HeredocContext ctx) {
-        return visitHeredocContext(ctx, false);
     }
 
     /**

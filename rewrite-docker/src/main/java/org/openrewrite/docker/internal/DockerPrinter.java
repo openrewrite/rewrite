@@ -374,9 +374,7 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
         // Print the preamble (heredoc marker(s) and optional shell commands)
         p.append(heredocForm.getPreamble());
         // Print destination if present (for COPY/ADD heredocs)
-        if (heredocForm.getDestination() != null) {
-            visit(heredocForm.getDestination(), p);
-        }
+        visit(heredocForm.getDestination(), p);
         p.append("\n");
         // Print each heredoc body - content lines already include their newlines
         for (Docker.HeredocBody body : heredocForm.getBodies()) {
