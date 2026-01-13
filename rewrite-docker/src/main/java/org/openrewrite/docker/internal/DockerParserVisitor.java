@@ -411,16 +411,14 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         List<Docker.Flag> flags = ctx.flags() != null ? convertFlags(ctx.flags()) : null;
 
-        Docker.CopyShellForm shellForm = null;
-        Docker.ExecForm execForm = null;
-        Docker.HeredocForm heredoc = null;
+        Docker.CopyAddForm form;
 
         // Check if heredoc, jsonArray, or sourceList is present
         if (ctx.heredoc() != null) {
             // For ADD with heredoc, extract destination from preamble
-            heredoc = visitHeredocContext(ctx.heredoc(), true);
+            form = visitHeredocContext(ctx.heredoc(), true);
         } else if (ctx.jsonArray() != null) {
-            execForm = visitJsonArrayAsExecForm(ctx.jsonArray());
+            form = visitJsonArrayAsExecForm(ctx.jsonArray());
         } else if (ctx.sourceList() != null) {
             // Parse sources and destination into CopyShellForm
             List<Docker.Argument> sources = parseSourcePaths(ctx.sourceList());
@@ -431,7 +429,9 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 // Remove prefix from first source since it's now on the shellForm
                 sources.set(0, sources.get(0).withPrefix(Space.EMPTY));
             }
-            shellForm = new Docker.CopyShellForm(randomId(), shellFormPrefix, Markers.EMPTY, sources, destination);
+            form = new Docker.CopyShellForm(randomId(), shellFormPrefix, Markers.EMPTY, sources, destination);
+        } else {
+            throw new IllegalStateException("ADD must have either sourceList or jsonArray or heredoc");
         }
 
         // Advance cursor to end of instruction
@@ -439,7 +439,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
-        return new Docker.Add(randomId(), prefix, Markers.EMPTY, addKeyword, flags, shellForm, execForm, heredoc);
+        return new Docker.Add(randomId(), prefix, Markers.EMPTY, addKeyword, flags, form);
     }
 
     @Override
@@ -452,16 +452,14 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         List<Docker.Flag> flags = ctx.flags() != null ? convertFlags(ctx.flags()) : null;
 
-        Docker.CopyShellForm shellForm = null;
-        Docker.ExecForm execForm = null;
-        Docker.HeredocForm heredoc = null;
+        Docker.CopyAddForm form;
 
         // Check if heredoc, jsonArray, or sourceList is present
         if (ctx.heredoc() != null) {
             // For COPY with heredoc, extract destination from preamble
-            heredoc = visitHeredocContext(ctx.heredoc(), true);
+            form = visitHeredocContext(ctx.heredoc(), true);
         } else if (ctx.jsonArray() != null) {
-            execForm = visitJsonArrayAsExecForm(ctx.jsonArray());
+            form = visitJsonArrayAsExecForm(ctx.jsonArray());
         } else if (ctx.sourceList() != null) {
             // Parse sources and destination into CopyShellForm
             List<Docker.Argument> sources = parseSourcePaths(ctx.sourceList());
@@ -472,7 +470,9 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 // Remove prefix from first source since it's now on the shellForm
                 sources.set(0, sources.get(0).withPrefix(Space.EMPTY));
             }
-            shellForm = new Docker.CopyShellForm(randomId(), shellFormPrefix, Markers.EMPTY, sources, destination);
+            form = new Docker.CopyShellForm(randomId(), shellFormPrefix, Markers.EMPTY, sources, destination);
+        } else {
+            throw new IllegalStateException("COPY must have either sourceList or jsonArray or heredoc");
         }
 
         // Advance cursor to end of instruction
@@ -480,7 +480,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
-        return new Docker.Copy(randomId(), prefix, Markers.EMPTY, copyKeyword, flags, shellForm, execForm, heredoc);
+        return new Docker.Copy(randomId(), prefix, Markers.EMPTY, copyKeyword, flags, form);
     }
 
     /**
@@ -1197,9 +1197,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             } else if (ctx.shellForm() != null) {
                 form = visitShellFormContext(ctx.shellForm());
             } else {
-                // Should not happen, but provide a fallback
-                form = new Docker.ShellForm(randomId(), Space.EMPTY, Markers.EMPTY,
-                        new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null));
+                throw new IllegalStateException("HEALTHCHECK must have either execForm or shellForm after CMD");
             }
 
             cmd = new Docker.Cmd(randomId(), cmdPrefix, Markers.EMPTY, cmdKeywordText, form);

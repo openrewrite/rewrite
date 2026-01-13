@@ -87,15 +87,7 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         if (a.getFlags() != null) {
             a = a.withFlags(ListUtils.map(a.getFlags(), flag -> (Docker.Flag) visit(flag, p)));
         }
-        if (a.getShellForm() != null) {
-            a = a.withShellForm((Docker.CopyShellForm) visit(a.getShellForm(), p));
-        }
-        if (a.getExecForm() != null) {
-            a = a.withExecForm((Docker.ExecForm) visit(a.getExecForm(), p));
-        }
-        if (a.getHeredoc() != null) {
-            a = a.withHeredoc((Docker.HeredocForm) visit(a.getHeredoc(), p));
-        }
+        a = a.withForm((Docker.CopyAddForm) visit(a.getForm(), p));
         return a;
     }
 
@@ -106,15 +98,7 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         if (c.getFlags() != null) {
             c = c.withFlags(ListUtils.map(c.getFlags(), flag -> (Docker.Flag) visit(flag, p)));
         }
-        if (c.getShellForm() != null) {
-            c = c.withShellForm((Docker.CopyShellForm) visit(c.getShellForm(), p));
-        }
-        if (c.getExecForm() != null) {
-            c = c.withExecForm((Docker.ExecForm) visit(c.getExecForm(), p));
-        }
-        if (c.getHeredoc() != null) {
-            c = c.withHeredoc((Docker.HeredocForm) visit(c.getHeredoc(), p));
-        }
+        c = c.withForm((Docker.CopyAddForm) visit(c.getForm(), p));
         return c;
     }
 

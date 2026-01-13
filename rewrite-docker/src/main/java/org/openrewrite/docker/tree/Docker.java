@@ -243,22 +243,30 @@ public interface Docker extends Tree {
         List<Flag> flags;
 
         /**
-         * Shell form: ADD source1 source2 ... destination
+         * The form of this ADD instruction: CopyShellForm, ExecForm, or HeredocForm.
          */
-        @Nullable
-        CopyShellForm shellForm;
+        CopyAddForm form;
 
         /**
-         * Exec form: ADD ["source", "dest"] - JSON array containing source(s) and destination
+         * Returns the form as a CopyShellForm, or null if this instruction uses a different form.
          */
-        @Nullable
-        ExecForm execForm;
+        public @Nullable CopyShellForm getShellForm() {
+            return form instanceof CopyShellForm ? (CopyShellForm) form : null;
+        }
 
         /**
-         * Heredoc form: ADD &lt;&lt;EOF /dest\ncontent\nEOF
+         * Returns the form as an ExecForm, or null if this instruction uses a different form.
          */
-        @Nullable
-        HeredocForm heredoc;
+        public @Nullable ExecForm getExecForm() {
+            return form instanceof ExecForm ? (ExecForm) form : null;
+        }
+
+        /**
+         * Returns the form as a HeredocForm, or null if this instruction uses a different form.
+         */
+        public @Nullable HeredocForm getHeredoc() {
+            return form instanceof HeredocForm ? (HeredocForm) form : null;
+        }
 
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
@@ -285,22 +293,30 @@ public interface Docker extends Tree {
         List<Flag> flags;
 
         /**
-         * Shell form: COPY source1 source2 ... destination
+         * The form of this COPY instruction: CopyShellForm, ExecForm, or HeredocForm.
          */
-        @Nullable
-        CopyShellForm shellForm;
+        CopyAddForm form;
 
         /**
-         * Exec form: COPY ["source", "dest"] - JSON array containing source(s) and destination
+         * Returns the form as a CopyShellForm, or null if this instruction uses a different form.
          */
-        @Nullable
-        ExecForm execForm;
+        public @Nullable CopyShellForm getShellForm() {
+            return form instanceof CopyShellForm ? (CopyShellForm) form : null;
+        }
 
         /**
-         * Heredoc form: COPY &lt;&lt;EOF /dest\ncontent\nEOF
+         * Returns the form as an ExecForm, or null if this instruction uses a different form.
          */
-        @Nullable
-        HeredocForm heredoc;
+        public @Nullable ExecForm getExecForm() {
+            return form instanceof ExecForm ? (ExecForm) form : null;
+        }
+
+        /**
+         * Returns the form as a HeredocForm, or null if this instruction uses a different form.
+         */
+        public @Nullable HeredocForm getHeredoc() {
+            return form instanceof HeredocForm ? (HeredocForm) form : null;
+        }
 
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
@@ -761,9 +777,15 @@ public interface Docker extends Tree {
     }
 
     /**
-     * Base for command forms
+     * Base for command forms (used by RUN, CMD, ENTRYPOINT)
      */
     interface CommandForm extends Docker {
+    }
+
+    /**
+     * Base for COPY/ADD forms (shell form, exec form, or heredoc)
+     */
+    interface CopyAddForm extends Docker {
     }
 
     /**
@@ -789,11 +811,12 @@ public interface Docker extends Tree {
 
     /**
      * Exec form: CMD ["executable", "param1", "param2"]
+     * Also used for COPY/ADD JSON array form.
      */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class ExecForm implements CommandForm {
+    class ExecForm implements CommandForm, CopyAddForm {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -856,11 +879,12 @@ public interface Docker extends Tree {
      * <p>
      * Consists of a shell preamble (containing heredoc markers and optional shell commands)
      * followed by ordered heredoc bodies.
+     * Also used for COPY/ADD heredoc form.
      */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class HeredocForm implements CommandForm {
+    class HeredocForm implements CommandForm, CopyAddForm {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -896,7 +920,7 @@ public interface Docker extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class CopyShellForm implements Docker {
+    class CopyShellForm implements CopyAddForm {
         @EqualsAndHashCode.Include
         UUID id;
 

@@ -120,13 +120,7 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
                 visit(flag, p);
             }
         }
-        if (add.getShellForm() != null) {
-            visit(add.getShellForm(), p);
-        } else if (add.getExecForm() != null) {
-            visit(add.getExecForm(), p);
-        } else if (add.getHeredoc() != null) {
-            visit(add.getHeredoc(), p);
-        }
+        visit(add.getForm(), p);
         afterSyntax(add, p);
         return add;
     }
@@ -140,13 +134,7 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
                 visit(flag, p);
             }
         }
-        if (copy.getShellForm() != null) {
-            visit(copy.getShellForm(), p);
-        } else if (copy.getExecForm() != null) {
-            visit(copy.getExecForm(), p);
-        } else if (copy.getHeredoc() != null) {
-            visit(copy.getHeredoc(), p);
-        }
+        visit(copy.getForm(), p);
         afterSyntax(copy, p);
         return copy;
     }
