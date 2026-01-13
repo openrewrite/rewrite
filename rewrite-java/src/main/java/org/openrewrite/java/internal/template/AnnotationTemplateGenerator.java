@@ -17,6 +17,7 @@ package org.openrewrite.java.internal.template;
 
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
@@ -34,6 +35,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.newSetFromMap;
 
 @RequiredArgsConstructor
+@NoArgsConstructor(force = true)
 public class AnnotationTemplateGenerator {
     private static final String TEMPLATE_COMMENT = "__TEMPLATE_cfcc2025-6662__";
 
@@ -48,11 +50,7 @@ public class AnnotationTemplateGenerator {
         } else if (j instanceof J.VariableDeclarations) {
             after.insert(0, " int $variable;");
         } else if (j instanceof J.ClassDeclaration) {
-            if (cursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
-                after.insert(0, "class $Clazz {}");
-            } else {
-                after.insert(0, "static class $Clazz {}");
-            }
+            addDummyClass(cursor, after);
         }
 
         if (cursor.getParentOrThrow().getValue() instanceof J.ClassDeclaration &&
@@ -92,14 +90,24 @@ public class AnnotationTemplateGenerator {
                     } else if (j instanceof J.ClassDeclaration || annotationParent instanceof J.ClassDeclaration) {
                         // Check if this is a top-level class or nested class
                         Cursor classCursor = j instanceof J.ClassDeclaration ? cursor : cursor.getParent(level);
-                        if (classCursor != null && classCursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
-                            after.insert(0, "class $Clazz {}");
-                        } else {
-                            after.insert(0, "static class $Clazz {}");
+                        if (classCursor != null) {
+                            addDummyClass(classCursor, after);
                         }
                     }
                     return before + "/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
                 });
+    }
+
+    public void addDummyClass(Cursor cursor, StringBuilder after) {
+        if (cursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
+            after.insert(0, "class $Clazz {}");
+        } else {
+            after.insert(0, "static class $Clazz {}");
+        }
+    }
+
+    public void addDummyInterface(StringBuilder after) {
+        after.append("\n@interface $Placeholder {}");
     }
 
     public List<J.Annotation> listAnnotations(JavaSourceFile cu) {
@@ -145,7 +153,7 @@ public class AnnotationTemplateGenerator {
             }
             List<J.ClassDeclaration> classes = cu.getClasses();
             if (!"$Placeholder".equals(classes.get(classes.size() - 1).getName().getSimpleName())) {
-                after.append("\n@interface $Placeholder {}");
+                addDummyInterface(after);
             }
             return;
         } else if (j instanceof J.ClassDeclaration) {
