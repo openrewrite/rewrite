@@ -36,15 +36,9 @@ public class FindKotlinSources extends Recipe {
     @Nullable
     Boolean markCompilationUnits;
 
-    @Override
-    public String getDisplayName() {
-        return "Find Kotlin sources and collect data metrics";
-    }
+    String displayName = "Find Kotlin sources and collect data metrics";
 
-    @Override
-    public String getDescription() {
-        return "Use data table to collect source files types and counts of files with extensions `.kt`.";
-    }
+    String description = "Use data table to collect source files types and counts of files with extensions `.kt`.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

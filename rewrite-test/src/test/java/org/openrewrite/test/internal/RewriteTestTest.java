@@ -147,15 +147,9 @@ class RewriteTestTest implements RewriteTest {
 @Value
 class ScannerEdit extends ScanningRecipe<AtomicBoolean> {
 
-    @Override
-    public String getDisplayName() {
-        return "Attempts mutation during getScanner()";
-    }
+    String displayName = "Attempts mutation during getScanner()";
 
-    @Override
-    public String getDescription() {
-        return "Any changes attempted by a visitor returned from getScanner() should be an error during test execution.";
-    }
+    String description = "Any changes attempted by a visitor returned from getScanner() should be an error during test execution.";
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {
@@ -178,15 +172,9 @@ class ScannerEdit extends ScanningRecipe<AtomicBoolean> {
 @Value
 class MutateExecutionContext extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Mutate execution context";
-    }
+    String displayName = "Mutate execution context";
 
-    @Override
-    public String getDescription() {
-        return "Mutates the execution context to trigger a validation failure.";
-    }
+    String description = "Mutates the execution context to trigger a validation failure.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -205,15 +193,9 @@ class MutateExecutionContext extends Recipe {
 @Value
 class ImproperCursorUsage extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Uses cursor improperly";
-    }
+    String displayName = "Uses cursor improperly";
 
-    @Override
-    public String getDescription() {
-        return "LST elements are acyclic. So a cursor which indicates an element is its own parent is invalid.";
-    }
+    String description = "LST elements are acyclic. So a cursor which indicates an element is its own parent is invalid.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -233,16 +215,10 @@ class ImproperCursorUsage extends Recipe {
 @Value
 class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
 
-    @Override
-    public String getDisplayName() {
-        return "Creates two source files with the same path";
-    }
+    String displayName = "Creates two source files with the same path";
 
-    @Override
-    public String getDescription() {
-        return "A source file's path must be unique. " +
+    String description = "A source file's path must be unique. " +
           "This recipe creates two source files with the same path to show that the test framework helps protect against this mistake.";
-    }
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {

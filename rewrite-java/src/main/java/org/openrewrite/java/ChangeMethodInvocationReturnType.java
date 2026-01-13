@@ -40,15 +40,9 @@ public class ChangeMethodInvocationReturnType extends Recipe {
             example = "long")
     String newReturnType;
 
-    @Override
-    public String getDisplayName() {
-        return "Change method invocation return type";
-    }
+    String displayName = "Change method invocation return type";
 
-    @Override
-    public String getDescription() {
-        return "Changes the return type of a method invocation.";
-    }
+    String description = "Changes the return type of a method invocation.";
 
     @Override
     public Validated<Object> validate() {

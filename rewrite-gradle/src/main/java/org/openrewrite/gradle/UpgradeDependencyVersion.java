@@ -93,25 +93,18 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Nullable
     String versionPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Upgrade Gradle dependency versions";
-    }
+    String displayName = "Upgrade Gradle dependency versions";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        //language=markdown
-        return "Upgrade the version of a dependency in a build.gradle file. " +
+    String description = "Upgrade the version of a dependency in a build.gradle file. " +
                 "Supports updating dependency declarations of various forms:\n" +
                 " * `String` notation: `\"group:artifact:version\"` \n" +
                 " * `Map` notation: `group: 'group', name: 'artifact', version: 'version'`\n" +
                 "Can update version numbers which are defined earlier in the same file in variable declarations.";
-    }
 
     @Override
     public Validated<Object> validate() {

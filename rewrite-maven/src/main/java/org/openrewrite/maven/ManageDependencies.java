@@ -71,20 +71,14 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
     @Nullable
     Boolean skipModelUpdate;
 
-    @Override
-    public String getDisplayName() {
-        return "Manage dependencies";
-    }
+    String displayName = "Manage dependencies";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupPattern, artifactPattern);
     }
 
-    @Override
-    public String getDescription() {
-        return "Make existing dependencies managed by moving their version to be specified in the dependencyManagement section of the POM.";
-    }
+    String description = "Make existing dependencies managed by moving their version to be specified in the dependencyManagement section of the POM.";
 
     @Override
     public Map<GroupArtifactVersion, Collection<ResolvedDependency>> getInitialValue(ExecutionContext ctx) {

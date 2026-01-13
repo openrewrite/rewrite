@@ -60,15 +60,9 @@ public class AddKeyValue extends Recipe {
     @Nullable
     Boolean prepend;
 
-    @Override
-    public String getDisplayName() {
-        return "Add value to JSON Object";
-    }
+    String displayName = "Add value to JSON Object";
 
-    @Override
-    public String getDescription() {
-        return "Adds a `value` at the specified `keyPath` with the specified `key`, if the key doesn't already exist.";
-    }
+    String description = "Adds a `value` at the specified `keyPath` with the specified `key`, if the key doesn't already exist.";
 
 
     @Override

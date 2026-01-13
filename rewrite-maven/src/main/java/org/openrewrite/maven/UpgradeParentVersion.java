@@ -54,21 +54,15 @@ public class UpgradeParentVersion extends Recipe {
     @Nullable
     Boolean onlyExternal;
 
-    @Override
-    public String getDisplayName() {
-        return "Upgrade Maven parent project version";
-    }
+    String displayName = "Upgrade Maven parent project version";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("to `%s:%s:%s`", groupId, artifactId, newVersion);
     }
 
-    @Override
-    public String getDescription() {
-        return "Set the parent pom version number according to a [version selector](https://docs.openrewrite.org/reference/dependency-version-selectors) " +
+    String description = "Set the parent pom version number according to a [version selector](https://docs.openrewrite.org/reference/dependency-version-selectors) " +
                "or to a specific version number.";
-    }
 
     @Override
     public Validated<Object> validate() {

@@ -37,15 +37,9 @@ public class FindKey extends Recipe {
             example = "$.subjects.kind")
     String key;
 
-    @Override
-    public String getDisplayName() {
-        return "Find YAML entries";
-    }
+    String displayName = "Find YAML entries";
 
-    @Override
-    public String getDescription() {
-        return "Find YAML entries that match the specified [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression.";
-    }
+    String description = "Find YAML entries that match the specified [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

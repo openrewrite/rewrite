@@ -33,15 +33,9 @@ public class RemoveProperty extends Recipe {
             example = "junit.version")
     String propertyName;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove Maven project property";
-    }
+    String displayName = "Remove Maven project property";
 
-    @Override
-    public String getDescription() {
-        return "Removes the specified Maven project property from the pom.xml.";
-    }
+    String description = "Removes the specified Maven project property from the pom.xml.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

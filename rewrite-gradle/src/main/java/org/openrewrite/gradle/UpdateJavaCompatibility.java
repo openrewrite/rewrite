@@ -81,15 +81,9 @@ public class UpdateJavaCompatibility extends Recipe {
     private static final String SOURCE_COMPATIBILITY_FOUND = "SOURCE_COMPATIBILITY_FOUND";
     private static final String TARGET_COMPATIBILITY_FOUND = "TARGET_COMPATIBILITY_FOUND";
 
-    @Override
-    public String getDisplayName() {
-        return "Update Gradle project Java compatibility";
-    }
+    String displayName = "Update Gradle project Java compatibility";
 
-    @Override
-    public String getDescription() {
-        return "Find and updates the Java compatibility for the Gradle project.";
-    }
+    String description = "Find and updates the Java compatibility for the Gradle project.";
 
     @Override
     public Validated<Object> validate() {

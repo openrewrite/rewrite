@@ -39,15 +39,9 @@ public class FindMethodDeclaration extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
-    @Override
-    public String getDisplayName() {
-        return "Find method declaration";
-    }
+    String displayName = "Find method declaration";
 
-    @Override
-    public String getDescription() {
-        return "Locates the declaration of a method.";
-    }
+    String description = "Locates the declaration of a method.";
 
     @Override
     public Validated<Object> validate() {

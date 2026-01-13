@@ -195,15 +195,9 @@ class BoomGenerateRecipe extends ScanningRecipe<Integer> {
 
     boolean wrapAsRecipeRunException;
 
-    @Override
-    public String getDisplayName() {
-        return "Boom generate";
-    }
+    String displayName = "Boom generate";
 
-    @Override
-    public String getDescription() {
-        return "Throws a boom exception during ScanningRecipe.generate().";
-    }
+    String description = "Throws a boom exception during ScanningRecipe.generate().";
 
     @Override
     public Integer getInitialValue(ExecutionContext ctx) {

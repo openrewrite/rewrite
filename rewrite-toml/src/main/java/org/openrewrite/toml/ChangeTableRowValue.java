@@ -63,15 +63,9 @@ public class ChangeTableRowValue extends Recipe {
     @Nullable
     String newValue;
 
-    @Override
-    public String getDisplayName() {
-        return "Change TOML table row value";
-    }
+    String displayName = "Change TOML table row value";
 
-    @Override
-    public String getDescription() {
-        return "Change a value in a TOML table row when the identifying property matches the specified matcher.";
-    }
+    String description = "Change a value in a TOML table row when the identifying property matches the specified matcher.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

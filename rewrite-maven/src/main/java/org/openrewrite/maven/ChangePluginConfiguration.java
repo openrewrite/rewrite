@@ -56,20 +56,14 @@ public class ChangePluginConfiguration extends Recipe {
     @Nullable
     String configuration;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven plugin configuration";
-    }
+    String displayName = "Change Maven plugin configuration";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("for `%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Apply the specified configuration to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
-    }
+    String description = "Apply the specified configuration to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

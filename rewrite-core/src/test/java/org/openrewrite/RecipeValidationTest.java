@@ -41,14 +41,8 @@ class RecipeValidationTest {
         @Nullable
         String optionalField;
 
-        @Override
-        public String getDisplayName() {
-            return "Validate nullable JSpecify annotations";
-        }
+        String displayName = "Validate nullable JSpecify annotations";
 
-        @Override
-        public String getDescription() {
-            return "NullUtils should see these annotations.";
-        }
+        String description = "NullUtils should see these annotations.";
     }
 }

@@ -52,15 +52,9 @@ public class MergeTableRow extends Recipe {
             example = "name")
     String identifyingKey;
 
-    @Override
-    public String getDisplayName() {
-        return "Merge TOML table row";
-    }
+    String displayName = "Merge TOML table row";
 
-    @Override
-    public String getDescription() {
-        return "Merge a TOML row into an array table. If a row with the same identifying property exists, merge the values. Otherwise, insert a new row.";
-    }
+    String description = "Merge a TOML row into an array table. If a row with the same identifying property exists, merge the values. Otherwise, insert a new row.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
