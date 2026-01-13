@@ -34,7 +34,7 @@ class QuarkTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
               @Override
               public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                  SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                  var sourceFile = (SourceFile) requireNonNull(tree);
                   return SearchResult.found(sourceFile);
               }
           })),
