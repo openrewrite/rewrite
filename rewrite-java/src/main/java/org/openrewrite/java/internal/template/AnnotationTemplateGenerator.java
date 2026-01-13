@@ -35,7 +35,6 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.newSetFromMap;
 
 @RequiredArgsConstructor
-@NoArgsConstructor(force = true)
 public class AnnotationTemplateGenerator {
     private static final String TEMPLATE_COMMENT = "__TEMPLATE_cfcc2025-6662__";
 
@@ -106,7 +105,7 @@ public class AnnotationTemplateGenerator {
         }
     }
 
-    protected void addDummyInterface(StringBuilder after) {
+    protected void addDummyAnnotationType(StringBuilder after) {
         after.append("\n@interface $Placeholder {}");
     }
 
@@ -153,7 +152,7 @@ public class AnnotationTemplateGenerator {
             }
             List<J.ClassDeclaration> classes = cu.getClasses();
             if (!"$Placeholder".equals(classes.get(classes.size() - 1).getName().getSimpleName())) {
-                addDummyInterface(after);
+                addDummyAnnotationType(after);
             }
             return;
         } else if (j instanceof J.ClassDeclaration) {
