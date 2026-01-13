@@ -43,10 +43,7 @@ import org.openrewrite.tree.ParseError;
 
 import java.net.InetAddress;
 import java.nio.file.Path;
-import java.util.Base64;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.groupingBy;
@@ -4831,6 +4828,70 @@ class MavenParserTest implements RewriteTest {
                   .as("jackson-bom is jackson-core's parent pom, it is not a runtime dependency")
                   .isEmpty();
             })
+          )
+        );
+    }
+
+    @Test
+    void alwaysOnConditionalProfile() {
+        rewriteRun(
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+
+                  <profiles>
+                    <profile>
+                      <id>Always</id>
+                      <activation>
+                        <file>
+                          <exists>${basedir}/pom.xml</exists>
+                        </file>
+                      </activation>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework</groupId>
+                          <artifactId>spring-core</artifactId>
+                          <version>6.2.11</version>
+                        </dependency>
+                      </dependencies>
+                    </profile>
+                  </profiles>
+                </project>
+                """
+            )
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>app</artifactId>
+                  <version>1.0.0</version>
+
+                  <parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0</version>
+                  </parent>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pom -> {
+                  assertThat(pom).isNotNull();
+                  Optional<MavenResolutionResult> maybeMrr = pom.getMarkers().findFirst(MavenResolutionResult.class);
+                  assertThat(maybeMrr).isPresent();
+
+                  MavenResolutionResult mrr = maybeMrr.get();
+                  assertThat(mrr.getDependencies().get(Scope.Compile)).anyMatch(dep ->
+                    "org.springframework".equals(dep.getGroupId()) &&
+                    "spring-core".equals(dep.getArtifactId()));
+              })
+            )
           )
         );
     }
