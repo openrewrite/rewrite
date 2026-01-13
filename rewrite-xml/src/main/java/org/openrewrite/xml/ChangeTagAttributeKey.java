@@ -17,8 +17,10 @@ package org.openrewrite.xml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import static org.openrewrite.internal.ListUtils.map;
@@ -45,17 +47,10 @@ public class ChangeTagAttributeKey extends Recipe {
             example = "render")
     String newAttributeName;
 
-    @Option(displayName = "File matcher",
-            description = "Glob pattern for files to process.",
-            example = "**/*.xhtml",
-            required = false)
-    @Nullable
-    String fileMatcher;
-
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         XPathMatcher xPathMatcher = new XPathMatcher(elementXPath);
-        return Preconditions.check(new FindSourceFiles(fileMatcher), new XmlIsoVisitor<ExecutionContext>() {
+        return new XmlIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
@@ -67,6 +62,6 @@ public class ChangeTagAttributeKey extends Recipe {
                         attr -> oldAttributeName.equals(attr.getKeyAsString()) ?
                                 attr.withKey(attr.getKey().withName(newAttributeName)) : attr));
             }
-        });
+        };
     }
 }

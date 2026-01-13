@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
@@ -27,10 +28,9 @@ class ChangeTagAttributeKeyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ChangeTagAttributeKey(
-          "//a4j:ajax",
+          "/html/body/a4j:ajax",
           "reRender",
-          "render",
-          "**/*.xhtml"
+          "render"
         ));
     }
 
@@ -57,14 +57,13 @@ class ChangeTagAttributeKeyTest implements RewriteTest {
                       <a4j:ajax render="form:output" event="change"/>
                   </body>
               </html>
-              """,
-            spec -> spec.path("test.xhtml")
+              """
           )
         );
     }
 
     @Test
-    void noChangeWhenAttributeNotPresent() {
+    void applyRepeatedly() {
         rewriteRun(
           //language=xml
           xml(
@@ -73,31 +72,65 @@ class ChangeTagAttributeKeyTest implements RewriteTest {
               <html xmlns="http://www.w3.org/1999/xhtml"
                     xmlns:a4j="http://richfaces.org/a4j">
                   <body>
-                      <a4j:ajax render="form:output" event="change"/>
+                      <a4j:ajax reRender="form:output" event="change"/>
+                      <a4j:ajax reRender="form:output" event="change1"/>
+                      <a4j:ajax reRender="form:output" event="change2"/>
                   </body>
               </html>
               """,
-            spec -> spec.path("test.xhtml")
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <html xmlns="http://www.w3.org/1999/xhtml"
+                    xmlns:a4j="http://richfaces.org/a4j">
+                  <body>
+                      <a4j:ajax render="form:output" event="change"/>
+                      <a4j:ajax render="form:output" event="change1"/>
+                      <a4j:ajax render="form:output" event="change2"/>
+                  </body>
+              </html>
+              """
           )
         );
     }
 
-    @Test
-    void noChangeWhenElementDoesNotMatch() {
-        rewriteRun(
-          //language=xml
-          xml(
-            """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <html xmlns="http://www.w3.org/1999/xhtml"
-                    xmlns:h="http://java.sun.com/jsf/html">
-                  <body>
-                      <h:inputText reRender="form:output"/>
-                  </body>
-              </html>
-              """,
-            spec -> spec.path("test.xhtml")
-          )
-        );
+    @Nested
+    class NoChange {
+        @Test
+        void whenAttributeNotPresent() {
+            rewriteRun(
+              //language=xml
+              xml(
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <html xmlns="http://www.w3.org/1999/xhtml"
+                        xmlns:a4j="http://richfaces.org/a4j">
+                      <body>
+                          <a4j:ajax render="form:output" event="change"/>
+                      </body>
+                  </html>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void whenOnOtherXPath() {
+            rewriteRun(
+              //language=xml
+              xml(
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <html xmlns="http://www.w3.org/1999/xhtml"
+                        xmlns:a4j="http://richfaces.org/a4j">
+                      <body>
+                          <div>
+                              <a4j:ajax render="form:output" event="change"/>
+                          </div>
+                      </body>
+                  </html>
+                  """
+              )
+            );
+        }
     }
 }
