@@ -82,15 +82,9 @@ public class ReorderMethodArguments extends Recipe {
     public static class Builder {
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Reorder method arguments";
-    }
+    String displayName = "Reorder method arguments";
 
-    @Override
-    public String getDescription() {
-        return "Reorder method arguments into the specified order.";
-    }
+    String description = "Reorder method arguments into the specified order.";
 
     @Override
     public Validated<Object> validate() {

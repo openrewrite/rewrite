@@ -40,16 +40,10 @@ public class HasBuildToolVersion extends Recipe {
             example = "3.6.0-9999")
     String version;
 
-    @Override
-    public String getDisplayName() {
-        return "Find files with a particular build tool version";
-    }
+    String displayName = "Find files with a particular build tool version";
 
-    @Override
-    public String getDescription() {
-        return "Finds Java source files built with a particular build tool. " +
+    String description = "Finds Java source files built with a particular build tool. " +
                "This is useful especially as a precondition for other recipes.";
-    }
 
     @SuppressWarnings("ConstantConditions")
     @Override

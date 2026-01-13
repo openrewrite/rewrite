@@ -72,15 +72,9 @@ class FormalHello extends Recipe {
             description = "The more formal name of the person.")
     String afterName;
 
-    @Override
-    public String getDisplayName() {
-        return "Formal hello";
-    }
+    String displayName = "Formal hello";
 
-    @Override
-    public String getDescription() {
-        return "Be formal. Be cool.";
-    }
+    String description = "Be formal. Be cool.";
 
     @Override
     public void buildRecipeList(RecipeList recipes) {

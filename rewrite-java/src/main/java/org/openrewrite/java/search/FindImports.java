@@ -43,10 +43,7 @@ public class FindImports extends Recipe {
     @Nullable
     Boolean matchInherited;
 
-    @Override
-    public String getDisplayName() {
-        return "Find source files with imports";
-    }
+    String displayName = "Find source files with imports";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -56,11 +53,8 @@ public class FindImports extends Recipe {
         return super.getInstanceNameSuffix();
     }
 
-    @Override
-    public String getDescription() {
-        return "Locates source files that have imports matching the given type pattern, regardless of whether " +
+    String description = "Locates source files that have imports matching the given type pattern, regardless of whether " +
                "that import is used in the code.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

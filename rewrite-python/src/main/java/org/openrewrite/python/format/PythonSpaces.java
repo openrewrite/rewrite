@@ -26,15 +26,9 @@ import org.openrewrite.TreeVisitor;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class PythonSpaces extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Formats spaces in Python code";
-    }
+    String displayName = "Formats spaces in Python code";
 
-    @Override
-    public String getDescription() {
-        return "Standardizes spaces in Python code. Currently limited to formatting method arguments.";
-    }
+    String description = "Standardizes spaces in Python code. Currently limited to formatting method arguments.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

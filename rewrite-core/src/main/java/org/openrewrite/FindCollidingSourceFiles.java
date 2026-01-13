@@ -31,17 +31,11 @@ import java.util.Set;
 public class FindCollidingSourceFiles extends ScanningRecipe<FindCollidingSourceFiles.Accumulator> {
     transient CollidingSourceFiles collidingSourceFiles = new CollidingSourceFiles(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Find colliding source files";
-    }
+    String displayName = "Find colliding source files";
 
-    @Override
-    public String getDescription() {
-        return "Finds source files which share a path with another source file. " +
+    String description = "Finds source files which share a path with another source file. " +
                "There should always be exactly one source file per path within a repository. " +
                "This is a diagnostic for finding problems in OpenRewrite parsers/build plugins.";
-    }
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {

@@ -62,21 +62,15 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
     @Nullable
     String newVersion;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven plugin group and artifact ID";
-    }
+    String displayName = "Change Maven plugin group and artifact ID";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", newGroupId, newArtifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change the groupId and/or the artifactId of a specified Maven plugin. Optionally update the plugin version. " +
+    String description = "Change the groupId and/or the artifactId of a specified Maven plugin. Optionally update the plugin version. " +
                 "This recipe does not perform any validation and assumes all values passed are valid.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

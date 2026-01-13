@@ -82,16 +82,10 @@ public class DependencyInsight extends Recipe {
     @Nullable
     String configuration;
 
-    @Override
-    public String getDisplayName() {
-        return "Gradle dependency insight";
-    }
+    String displayName = "Gradle dependency insight";
 
-    @Override
-    public String getDescription() {
-        return "Find direct and transitive dependencies matching a group, artifact, resolved version, and optionally a configuration name. " +
+    String description = "Find direct and transitive dependencies matching a group, artifact, resolved version, and optionally a configuration name. " +
                 "Results include dependencies that either directly match or transitively include a matching dependency.";
-    }
 
     @Override
     public Validated<Object> validate() {
