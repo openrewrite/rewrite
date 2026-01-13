@@ -643,7 +643,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
 
               java {
                   toolchain {
-                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.VERSION_1_8))
+                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.VERSION_1_8.majorVersion))
                   }
               }
               """,
@@ -654,7 +654,40 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
 
               java {
                   toolchain {
-                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.VERSION_17))
+                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.VERSION_17.majorVersion))
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void setJavaLanguageVersionOfJavaVersionEnumMajorVersion() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new UpdateJavaCompatibility(11, null, null, null, null),
+            new UpdateJavaCompatibility(17, null, null, null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+
+              java {
+                  toolchain {
+                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.VERSION_1_8.majorVersion))
+                  }
+              }
+              """,
+            """
+              plugins {
+                  java
+              }
+
+              java {
+                  toolchain {
+                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.VERSION_17.majorVersion))
                   }
               }
               """
