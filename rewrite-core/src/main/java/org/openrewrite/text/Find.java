@@ -43,10 +43,7 @@ public class Find extends Recipe {
 
     String displayName = "Find text";
 
-    @Override
-    public String getDescription() {
-        return "Textual search, optionally using Regular Expression (regex) to query.";
-    }
+    String description = "Textual search, optionally using Regular Expression (regex) to query.";
 
     @Option(displayName = "Find",
             description = "The text to find. This snippet can be multiline.",

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.config;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
@@ -36,10 +37,8 @@ public class CompositeRecipe extends Recipe {
         return getName();
     }
 
-    @Override
-    public String getDescription() {
-        return "A recipe that consists of a list of other recipes.";
-    }
+    @Getter
+    final String description = "A recipe that consists of a list of other recipes.";
 
     @Override
     public @Nullable Duration getEstimatedEffortPerOccurrence() {

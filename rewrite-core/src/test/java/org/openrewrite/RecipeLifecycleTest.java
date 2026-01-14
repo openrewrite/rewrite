@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
@@ -479,15 +480,11 @@ class RecipeLifecycleTest implements RewriteTest {
 
 @SuppressWarnings("unused") // referenced in yaml
 class DefaultConstructorRecipe extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "DefaultConstructorRecipe";
-    }
+    @Getter
+    final String displayName = "DefaultConstructorRecipe";
 
-    @Override
-    public String getDescription() {
-        return "DefaultConstructorRecipe.";
-    }
+    @Getter
+    final String description = "DefaultConstructorRecipe.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -506,15 +503,11 @@ class DefaultConstructorRecipe extends Recipe {
 @NoArgsConstructor // referenced in yaml
 @SuppressWarnings("unused")
 class NoArgRecipe extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "NoArgRecipe";
-    }
+    @Getter
+    final String displayName = "NoArgRecipe";
 
-    @Override
-    public String getDescription() {
-        return "NoArgRecipe.";
-    }
+    @Getter
+    final String description = "NoArgRecipe.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
