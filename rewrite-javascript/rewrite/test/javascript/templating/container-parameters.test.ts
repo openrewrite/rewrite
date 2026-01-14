@@ -25,11 +25,11 @@ describe('container parameters in templates', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
             sliceMatcher = new MethodMatcher("Buffer slice(..)");
 
-            override async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
+            override visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J | undefined {
                 if (this.sliceMatcher.matches(method.methodType)) {
                     if (method.select) {
                         const selectExpr = method.select;  // J.RightPadded<Expression>
-                        return await template`${selectExpr}.subarray()`.apply(method, this.cursor);
+                        return template`${selectExpr}.subarray()`.apply(method, this.cursor);
                     }
                 }
                 return super.visitMethodInvocation(method, p);
@@ -55,12 +55,12 @@ describe('container parameters in templates', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
             sliceMatcher = new MethodMatcher("Buffer slice(..)");
 
-            override async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
+            override visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J | undefined {
                 if (this.sliceMatcher.matches(method.methodType)) {
                     if (method.select) {
                         const selectExpr = method.select;  // J.RightPadded<Expression>
                         const args = method.arguments;      // J.Container<Expression>
-                        return await template`${selectExpr}.subarray(${args})`.apply(method, this.cursor);
+                        return template`${selectExpr}.subarray(${args})`.apply(method, this.cursor);
                     }
                 }
                 return super.visitMethodInvocation(method, p);
@@ -84,10 +84,10 @@ describe('container parameters in templates', () => {
 
     test('template accepts array of J.RightPadded as parameter', async () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
-            override async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
+            override visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J | undefined {
                 if ((method.name as J.Identifier).simpleName === 'foo') {
                     const args = method.arguments.elements;  // J.RightPadded<Expression>[]
-                    return await template`bar(${args})`.apply(method, this.cursor);
+                    return template`bar(${args})`.apply(method, this.cursor);
                 }
                 return super.visitMethodInvocation(method, p);
             }

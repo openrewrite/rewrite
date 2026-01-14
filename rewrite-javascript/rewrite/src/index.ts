@@ -84,12 +84,12 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
 }
 
 RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
-    async rpcSend(after: ParseExceptionResult, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.parserType);
-        await q.getAndSend(after, a => a.exceptionType);
-        await q.getAndSend(after, a => a.message);
-        await q.getAndSend(after, a => a.treeType);
+    rpcSend(after: ParseExceptionResult, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.parserType);
+        q.getAndSend(after, a => a.exceptionType);
+        q.getAndSend(after, a => a.message);
+        q.getAndSend(after, a => a.treeType);
     },
     rpcReceive(before: ParseExceptionResult, q: RpcReceiveQueue): ParseExceptionResult {
         return updateIfChanged(before, {

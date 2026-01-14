@@ -25,26 +25,28 @@ import {NamedStyles} from '../../style';
 import {emptyMarkers, findMarker} from '../../markers';
 import {NormalizeWhitespaceVisitor} from './normalize-whitespace-visitor';
 import {MinimumViableSpacingVisitor} from './minimum-viable-spacing-visitor';
-import {loadPrettierVersion} from './prettier-config-loader';
+import {loadPrettierVersionSync} from './prettier-config-loader';
 import {updateIfChanged} from "../../util";
 
 /**
- * Loads Prettier for formatting.
+ * Loads Prettier for synchronous formatting.
  *
- * We use the main Prettier module (not standalone) because:
- * 1. It automatically handles parser resolution
- * 2. Works better with CommonJS (avoids ESM issues in Jest)
- * 3. Simpler - no need to manually load plugins
+ * Uses @prettier/sync to provide synchronous access to Prettier's format function.
+ * This is important for performance when used in synchronous visitor contexts.
+ *
+ * @param version Optional Prettier version to use
+ * @returns Synchronous format function
  */
-async function loadPrettierFormatting(version?: string): Promise<typeof import('prettier')> {
+function loadPrettierFormattingSync(version?: string): { format: (source: string, options: any) => string } {
     if (version) {
         // Ensure the version is installed and get it from cache
-        return await loadPrettierVersion(version);
+        return loadPrettierVersionSync(version);
     }
 
-    // Use bundled Prettier
+    // Use bundled Prettier with sync wrapper
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('prettier');
+    const prettierSync = require('@prettier/sync');
+    return prettierSync;
 }
 
 /**
@@ -116,31 +118,31 @@ export interface PrettierFormatOptions {
  *                  no more whitespace changes are applied to subsequent nodes.
  * @returns The formatted source file with reconciled whitespace
  */
-export async function prettierFormat(
+export function prettierFormat(
     sourceFile: JS.CompilationUnit,
     options: PrettierFormatOptions = {},
     stopAfter?: J
-): Promise<JS.CompilationUnit> {
+): JS.CompilationUnit {
     // Load Prettier - either specific version or bundled
-    let prettier: typeof import('prettier');
+    let prettier: { format: (source: string, options: any) => string };
 
     try {
-        prettier = await loadPrettierFormatting(options.prettierVersion);
+        prettier = loadPrettierFormattingSync(options.prettierVersion);
     } catch (e) {
         console.error('Failed to load Prettier:', e);
         throw new Error(
-            `Prettier is not installed or failed to load. Please install it with: npm install prettier. Error: ${e}`
+            `Prettier is not installed or failed to load. Please install it with: npm install prettier @prettier/sync. Error: ${e}`
         );
     }
 
     // Step 1: Print the AST to string
-    const originalSource = await TreePrinters.print(sourceFile);
+    const originalSource = TreePrinters.print(sourceFile);
 
     // Step 2: Determine parser based on source path
     const parser = getParserForPath(sourceFile.sourcePath);
 
     // Step 3: Format with Prettier
-    // Using the main Prettier module - parsers are resolved automatically
+    // Using @prettier/sync for synchronous formatting
     // Only set parser and filepath - pass through all other options without defaults
     // This lets Prettier use its own defaults for any unspecified options
     const prettierOptions: Record<string, unknown> = {
@@ -151,12 +153,12 @@ export async function prettierFormat(
     // Remove our internal option that Prettier doesn't understand
     delete prettierOptions.prettierVersion;
 
-    const formattedSource = await prettier.format(originalSource, prettierOptions);
+    const formattedSource = prettier.format(originalSource, prettierOptions);
 
     // Step 4: Parse the formatted string using parseOnly() for maximum performance
-    // (bypasses TypeScript's type checker entirely)
+    //         (bypasses TypeScript's type checker entirely - no type attribution needed for formatting)
     const formattedParser = new JavaScriptParser();
-    const formattedAst = await formattedParser.parseOnly({
+    const formattedAst = formattedParser.parseOnly({
         sourcePath: sourceFile.sourcePath,
         text: formattedSource
     });
@@ -311,7 +313,7 @@ function createNullPlaceholder(prefix: J.Space): J.Identifier {
         kind: J.Kind.Identifier,
         id: randomId(),
         markers: emptyMarkers,
-        prefix: prefix,
+        prefix,
         annotations: [],
         simpleName: "null",
         type: undefined,
@@ -461,12 +463,12 @@ function findByPath(tree: any, path: PathSegment[]): any {
  * @param stopAfter Optional node to stop formatting after
  * @returns The formatted subtree, or undefined if formatting failed
  */
-export async function prettierFormatSubtree<T extends J>(
+export function prettierFormatSubtree<T extends J>(
     target: T,
     cursor: Cursor,
     options: PrettierFormatOptions = {},
     stopAfter?: J
-): Promise<T | undefined> {
+): T | undefined {
     // Extract the path and compilation unit in a single cursor traversal
     const { compilationUnit: cu, path } = extractPathFromCursor(cursor, target);
 
@@ -480,7 +482,7 @@ export async function prettierFormatSubtree<T extends J>(
     const prunedCu = pruneTreeForSubtree(cu, path, target);
 
     // Format the pruned compilation unit with Prettier
-    const formattedPrunedCu = await prettierFormat(prunedCu, options);
+    const formattedPrunedCu = prettierFormat(prunedCu, options);
 
     // Find the target node in the formatted tree using the path
     const formattedTarget = findByPath(formattedPrunedCu, path);
@@ -556,13 +558,13 @@ export function getPrettierStyle(
  * @param stopAfter Optional tree to stop after
  * @returns The formatted tree
  */
-export async function applyPrettierFormatting<R extends J, P>(
+export function applyPrettierFormatting<R extends J, P>(
     tree: R,
     prettierStyle: PrettierStyle,
     p: P,
     cursor?: Cursor,
     stopAfter?: Tree
-): Promise<R | undefined> {
+): R | undefined {
     // Run only the essential visitors first
     const essentialVisitors = [
         new NormalizeWhitespaceVisitor(stopAfter),
@@ -571,7 +573,8 @@ export async function applyPrettierFormatting<R extends J, P>(
 
     let t: R | undefined = tree;
     for (const visitor of essentialVisitors) {
-        t = await visitor.visit(t, p, cursor);
+        // Sync visitor.visit() returns J | undefined, cast to R
+        t = visitor.visit(t, p, cursor) as R | undefined;
         if (t === undefined) {
             return undefined;
         }
@@ -592,7 +595,7 @@ export async function applyPrettierFormatting<R extends J, P>(
     try {
         if (t.kind === JS.Kind.CompilationUnit) {
             // Format and reconcile the entire compilation unit
-            const formatted = await prettierFormat(t as unknown as JS.CompilationUnit, prettierOpts, stopAfter as J | undefined);
+            const formatted = prettierFormat(t as unknown as JS.CompilationUnit, prettierOpts, stopAfter as J | undefined);
             return formatted as unknown as R;
         }
 
@@ -603,7 +606,7 @@ export async function applyPrettierFormatting<R extends J, P>(
         }
 
         // Use prettierFormatSubtree for subtree formatting
-        const formatted = await prettierFormatSubtree(t, cursor, prettierOpts, stopAfter as J | undefined);
+        const formatted = prettierFormatSubtree(t, cursor, prettierOpts, stopAfter as J | undefined);
         if (formatted) {
             return formatted as R;
         }

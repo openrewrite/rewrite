@@ -46,8 +46,8 @@ export class UseObjectPropertyShorthand extends Recipe {
             /**
              * Handle object binding patterns (destructuring): const { x: x } = obj
              */
-            protected async visitObjectBindingPattern(pattern: JS.ObjectBindingPattern, p: ExecutionContext): Promise<J | undefined> {
-                const visited = await super.visitObjectBindingPattern(pattern, p) as JS.ObjectBindingPattern;
+            protected visitObjectBindingPattern(pattern: JS.ObjectBindingPattern, p: ExecutionContext): J | undefined {
+                const visited = super.visitObjectBindingPattern(pattern, p) as JS.ObjectBindingPattern;
 
                 let hasChanges = false;
 
@@ -97,8 +97,8 @@ export class UseObjectPropertyShorthand extends Recipe {
              * Handle object literals: { x: x }
              * Object literals are represented as J.NewClass with a body containing JS.PropertyAssignment statements.
              */
-            protected async visitNewClass(newClass: J.NewClass, ctx: ExecutionContext): Promise<J | undefined> {
-                const visited = await super.visitNewClass(newClass, ctx) as J.NewClass;
+            protected visitNewClass(newClass: J.NewClass, ctx: ExecutionContext): J | undefined {
+                const visited = super.visitNewClass(newClass, ctx) as J.NewClass;
 
                 // Only process object literals (NewClass with body but no class or arguments)
                 if (!visited.body || visited.class || (visited.arguments?.elements && visited.arguments.elements.length > 0)) {

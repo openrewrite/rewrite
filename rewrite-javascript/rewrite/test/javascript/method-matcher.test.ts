@@ -14,8 +14,8 @@ describe('MethodMatcher', () => {
             async editor(): Promise<JavaScriptVisitor<ExecutionContext>> {
                 const matcher = new MethodMatcher(pattern);
                 return new class extends JavaScriptVisitor<ExecutionContext> {
-                    async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J.MethodInvocation> {
-                        const visited = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                    visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
+                        const visited = super.visitMethodInvocation(method, p) as J.MethodInvocation;
                         // Debug: Log when we don't have method type
                         if (!method.methodType) {
                             console.log(`No method type for: ${method.name.simpleName}`);

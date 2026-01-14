@@ -33,8 +33,8 @@ test("comments", () =>
         afterRecipe: async (cu: JS.CompilationUnit) => {
             let commentCount = 0;
             const checkSpaces = new class extends JavaScriptVisitor<void> {
-                public override async visitSpace(space: J.Space, p: void): Promise<J.Space> {
-                    const ret = await super.visitSpace(space, p);
+                public override visitSpace(space: J.Space, p: void): J.Space {
+                    const ret = super.visitSpace(space, p);
                     expect(ret.whitespace).not.toContain("/*");
                     commentCount += ret.comments.length;
                     return ret;

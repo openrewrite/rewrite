@@ -5,9 +5,8 @@ describe('Pattern Debug Logging', () => {
     let consoleErrorSpy: jest.SpyInstance;
     let parser: JavaScriptParser;
 
-    async function parseExpression(code: string): Promise<J> {
-        const gen = parser.parse({text: code, sourcePath: 'test.ts'});
-        const cu = (await gen.next()).value as JS.CompilationUnit;
+    function parseExpression(code: string): J {
+        const cu = parser.parseOne({text: code, sourcePath: 'test.ts'}) as JS.CompilationUnit;
         const statement = cu.statements[0].element;
         return isExpressionStatement(statement) ? statement.expression : statement;
     }
@@ -28,9 +27,9 @@ describe('Pattern Debug Logging', () => {
     test('no debug logging by default', async () => {
         const value = capture('value');
         const pat = pattern`console.log(${value})`;
-        const node = await parseExpression('console.log(42)');
+        const node = parseExpression('console.log(42)');
 
-        const match = await pat.match(node, undefined!);
+        const match = pat.match(node, undefined!);
 
         expect(match).toBeDefined();
         expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -39,9 +38,9 @@ describe('Pattern Debug Logging', () => {
     test('call-level debug: { debug: true }', async () => {
         const value = capture('value');
         const pat = pattern`console.log(${value})`;
-        const node = await parseExpression('console.log(42)');
+        const node = parseExpression('console.log(42)');
 
-        const match = await pat.match(node, undefined!, { debug: true });
+        const match = pat.match(node, undefined!, { debug: true });
 
         expect(match).toBeDefined();
         expect(consoleErrorSpy).toHaveBeenCalled();
@@ -54,9 +53,9 @@ describe('Pattern Debug Logging', () => {
     test('pattern-level debug: pattern({ debug: true })', async () => {
         const value = capture('value');
         const pat = pattern({ debug: true })`console.log(${value})`;
-        const node = await parseExpression('console.log(42)');
+        const node = parseExpression('console.log(42)');
 
-        const match = await pat.match(node, undefined!);
+        const match = pat.match(node, undefined!);
 
         expect(match).toBeDefined();
         expect(consoleErrorSpy).toHaveBeenCalled();
@@ -70,9 +69,9 @@ describe('Pattern Debug Logging', () => {
 
         const value = capture('value');
         const pat = pattern`console.log(${value})`;
-        const node = await parseExpression('console.log(42)');
+        const node = parseExpression('console.log(42)');
 
-        const match = await pat.match(node, undefined!);
+        const match = pat.match(node, undefined!);
 
         expect(match).toBeDefined();
         expect(consoleErrorSpy).toHaveBeenCalled();
@@ -87,10 +86,10 @@ describe('Pattern Debug Logging', () => {
         const value = capture('value');
         // Pattern has debug: false, but global is true
         const pat = pattern({ debug: false })`console.log(${value})`;
-        const node = await parseExpression('console.log(42)');
+        const node = parseExpression('console.log(42)');
 
         // Call with debug: true overrides pattern debug: false
-        const match = await pat.match(node, undefined!, { debug: true });
+        const match = pat.match(node, undefined!, { debug: true });
 
         expect(match).toBeDefined();
         expect(consoleErrorSpy).toHaveBeenCalled();
@@ -101,10 +100,10 @@ describe('Pattern Debug Logging', () => {
 
         const value = capture('value');
         const pat = pattern`console.log(${value})`;
-        const node = await parseExpression('console.log(42)');
+        const node = parseExpression('console.log(42)');
 
         // Explicitly disable debug at call level
-        const match = await pat.match(node, undefined!, { debug: false });
+        const match = pat.match(node, undefined!, { debug: false });
 
         expect(match).toBeDefined();
         expect(consoleErrorSpy).not.toHaveBeenCalled();
@@ -114,9 +113,9 @@ describe('Pattern Debug Logging', () => {
         const value = capture('value');
         const pat = pattern`console.log(${value})`;
         // Use console.error instead - should not match
-        const node = await parseExpression('console.error(42)');
+        const node = parseExpression('console.error(42)');
 
-        const match = await pat.match(node, undefined!, { debug: true });
+        const match = pat.match(node, undefined!, { debug: true });
 
         expect(match).toBeUndefined();
         expect(consoleErrorSpy).toHaveBeenCalled();
@@ -134,9 +133,9 @@ describe('Pattern Debug Logging', () => {
         const x = capture('x');
         const y = capture('y');
         const pat = pattern({ debug: true })`foo(${x}, ${y})`;
-        const node = await parseExpression('foo(1, 2)');
+        const node = parseExpression('foo(1, 2)');
 
-        await pat.match(node, undefined!);
+        pat.match(node, undefined!);
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
         // First line should show pattern source with ID
@@ -146,9 +145,9 @@ describe('Pattern Debug Logging', () => {
     test('variadic captures show array format', async () => {
         const args = capture({ variadic: true });
         const pat = pattern({ debug: true })`console.log(${args})`;
-        const node = await parseExpression('console.log(1, 2, 3)');
+        const node = parseExpression('console.log(1, 2, 3)');
 
-        const match = await pat.match(node, undefined!);
+        const match = pat.match(node, undefined!);
 
         expect(match).toBeDefined();
 
@@ -163,9 +162,9 @@ describe('Pattern Debug Logging', () => {
         const y = capture('y');
         const pat = pattern({ debug: true })`${x} + ${y}`;
         // Pattern expects addition, but we provide subtraction
-        const node = await parseExpression('a - b');
+        const node = parseExpression('a - b');
 
-        const match = await pat.match(node, undefined!);
+        const match = pat.match(node, undefined!);
 
         expect(match).toBeUndefined();
         expect(consoleErrorSpy).toHaveBeenCalled();

@@ -111,7 +111,7 @@ export class FindDependency extends Recipe {
             private resolution: NodeResolutionResult | undefined;
             private isPackageJson: boolean = false;
 
-            protected override async visitDocument(document: Json.Document, ctx: ExecutionContext): Promise<Json | undefined> {
+            protected override visitDocument(document: Json.Document, ctx: ExecutionContext): Json | undefined {
                 // Only process package.json files, not package-lock.json or other JSON files
                 const sourcePath = document.sourcePath;
                 this.isPackageJson = sourcePath.endsWith('package.json');
@@ -123,7 +123,7 @@ export class FindDependency extends Recipe {
                 return this.isPackageJson && this.resolution ? super.visitDocument(document, ctx) : document;
             }
 
-            protected override async visitMember(member: Json.Member, ctx: ExecutionContext): Promise<Json | undefined> {
+            protected override visitMember(member: Json.Member, ctx: ExecutionContext): Json | undefined {
                 // Check if we're inside a dependency section
                 const parentSection = this.getParentDependencySection();
                 if (!parentSection) {
@@ -160,8 +160,8 @@ export class FindDependency extends Recipe {
             /**
              * Marks the dependency key with a search result marker.
              */
-            private async markDependency(member: Json.Member, ctx: ExecutionContext): Promise<Json.Member> {
-                const visitedMember = await super.visitMember(member, ctx) as Json.Member;
+            private markDependency(member: Json.Member, ctx: ExecutionContext): Json.Member {
+                const visitedMember = super.visitMember(member, ctx) as Json.Member;
                 const markedKey = foundSearchResult(visitedMember.key.element);
                 return {
                     ...visitedMember,

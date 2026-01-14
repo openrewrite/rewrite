@@ -17,12 +17,8 @@ package org.openrewrite.rpc;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -34,7 +30,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 
-import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -48,8 +43,6 @@ import java.util.Map;
 @Value
 @NoArgsConstructor(force = true, access = AccessLevel.PRIVATE)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-@JsonSerialize(using = RpcObjectData.Serializer.class)
-@JsonDeserialize(using = RpcObjectData.Deserializer.class)
 public class RpcObjectData {
     private static final ObjectMapper mapper = JsonMapper.builder()
             // to be able to construct classes that have @Data and a single field
@@ -106,6 +99,14 @@ public class RpcObjectData {
         this.trace = trace ? Trace.traceSender() : null;
     }
 
+    /**
+     * Creates an RpcObjectData with a pre-existing trace string.
+     * Used during deserialization when the trace is already known.
+     */
+    public static RpcObjectData create(State state, @Nullable String valueType, @Nullable Object value, @Nullable Integer ref, @Nullable String trace) {
+        return new RpcObjectData(state, valueType, value, ref, trace);
+    }
+
     public RpcObjectData withoutTrace() {
         return new RpcObjectData(state, valueType, value, ref, false);
     }
@@ -150,72 +151,6 @@ public class RpcObjectData {
                 case 4: return END_OF_OBJECT;
                 default: throw new IllegalArgumentException("Unknown state ordinal: " + ordinal);
             }
-        }
-    }
-
-    /**
-     * Custom serializer that outputs RpcObjectData as a compact array.
-     * Format: [state, valueType, value, ref?, trace?]
-     */
-    static class Serializer extends JsonSerializer<RpcObjectData> {
-        @Override
-        public void serialize(RpcObjectData data, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            gen.writeStartArray(data, data.trace != null ? 5 : data.ref != null ? 4 : 3);
-            gen.writeNumber(data.state.ordinal());
-            gen.writeString(data.valueType);
-            gen.writeObject(data.value);
-            if (data.ref != null || data.trace != null) {
-                if (data.ref != null) {
-                    gen.writeNumber(data.ref);
-                } else {
-                    gen.writeNull();
-                }
-                if (data.trace != null) {
-                    gen.writeString(data.trace);
-                }
-            }
-            gen.writeEndArray();
-        }
-    }
-
-    /**
-     * Custom deserializer that reads RpcObjectData from a compact array.
-     * Format: [state, valueType, value, ref?, trace?]
-     */
-    static class Deserializer extends JsonDeserializer<RpcObjectData> {
-        @Override
-        public RpcObjectData deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
-            if (p.currentToken() != JsonToken.START_ARRAY) {
-                throw new IOException("Expected array start, got: " + p.currentToken());
-            }
-
-            // Read state (required)
-            p.nextToken();
-            State state = State.from(p.getIntValue());
-
-            // Read valueType (may be null)
-            p.nextToken();
-            String valueType = p.currentToken() == JsonToken.VALUE_NULL ? null : p.getText();
-
-            // Read value (may be null or any type)
-            p.nextToken();
-            Object value = p.currentToken() == JsonToken.VALUE_NULL ? null : p.readValueAs(Object.class);
-
-            // Read optional ref (may be null or not present)
-            Integer ref = null;
-            String trace = null;
-
-            if (p.nextToken() != JsonToken.END_ARRAY) {
-                ref = p.currentToken() == JsonToken.VALUE_NULL ? null : p.getIntValue();
-
-                // Read optional trace
-                if (p.nextToken() != JsonToken.END_ARRAY) {
-                    trace = p.currentToken() == JsonToken.VALUE_NULL ? null : p.getText();
-                    p.nextToken(); // consume END_ARRAY
-                }
-            }
-
-            return new RpcObjectData(state, valueType, value, ref, trace);
         }
     }
 }

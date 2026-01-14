@@ -12,7 +12,7 @@ export class UsesType extends JavaVisitor<ExecutionContext> {
         this.matcher = picomatch.default ? picomatch.default(typePattern) : (picomatch as any)(typePattern);
     }
 
-    protected async preVisit(tree: J, _: ExecutionContext): Promise<J | undefined> {
+    protected preVisit(tree: J, _: ExecutionContext): J | undefined {
         if (J.hasType(tree)) {
             const type = tree.type;
             if (Type.isFullyQualified(type)) {

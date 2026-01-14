@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {mapAsync, updateIfChanged} from "../util";
-import {TreeVisitor, ValidRecipeReturnType} from "../visitor";
+import {mapAsync, mapSync, updateIfChanged} from "../util";
+import {AsyncTreeVisitor, TreeVisitor, ValidRecipeReturnType} from "../visitor";
 import {SourceFile} from "../tree";
 import {isJson, Json} from "./tree";
 import {create, Draft} from "mutative";
 
-export class JsonVisitor<P> extends TreeVisitor<Json, P> {
+export class AsyncJsonVisitor<P> extends AsyncTreeVisitor<Json, P> {
     async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
         return isJson(sourceFile);
     }
@@ -119,6 +119,126 @@ export class JsonVisitor<P> extends TreeVisitor<Json, P> {
     }
 
     protected accept(t: Json, p: P): Promise<Json | undefined> {
+        switch (t.kind) {
+            case Json.Kind.Array:
+                return this.visitArray(t as Json.Array, p);
+            case Json.Kind.Document:
+                return this.visitDocument(t as Json.Document, p);
+            case Json.Kind.Empty:
+                return this.visitEmpty(t as Json.Empty, p);
+            case Json.Kind.Identifier:
+                return this.visitIdentifier(t as Json.Identifier, p);
+            case Json.Kind.Literal:
+                return this.visitLiteral(t as Json.Literal, p);
+            case Json.Kind.Member:
+                return this.visitMember(t as Json.Member, p);
+            case Json.Kind.Object:
+                return this.visitObject(t as Json.Object, p);
+            default:
+                throw new Error(`Unexpected JSON kind ${t.kind}`);
+        }
+    }
+}
+
+export class JsonVisitor<P> extends TreeVisitor<Json, P> {
+    isAcceptable(sourceFile: SourceFile): boolean {
+        return isJson(sourceFile);
+    }
+
+    protected visitArray(array: Json.Array, p: P): Json | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(array.prefix, p),
+            markers: this.visitMarkers(array.markers, p),
+            values: mapSync(array.values, value => this.visitRightPadded(value, p))
+        };
+        return updateIfChanged(array, updates);
+    }
+
+    protected visitDocument(document: Json.Document, p: P): Json | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(document.prefix, p),
+            markers: this.visitMarkers(document.markers, p),
+            value: this.visitDefined(document.value, p),
+            eof: this.visitSpace(document.eof, p)
+        };
+        return updateIfChanged(document, updates);
+    }
+
+    protected visitEmpty(empty: Json.Empty, p: P): Json | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(empty.prefix, p),
+            markers: this.visitMarkers(empty.markers, p)
+        };
+        return updateIfChanged(empty, updates);
+    }
+
+    protected visitIdentifier(identifier: Json.Identifier, p: P): Json | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(identifier.prefix, p),
+            markers: this.visitMarkers(identifier.markers, p)
+        };
+        return updateIfChanged(identifier, updates);
+    }
+
+    protected visitLiteral(literal: Json.Literal, p: P): Json | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(literal.prefix, p),
+            markers: this.visitMarkers(literal.markers, p)
+        };
+        return updateIfChanged(literal, updates);
+    }
+
+    protected visitMember(member: Json.Member, p: P): Json | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(member.prefix, p),
+            markers: this.visitMarkers(member.markers, p),
+            key: (this.visitRightPadded(member.key, p))!,
+            value: this.visitDefined(member.value, p)
+        };
+        return updateIfChanged(member, updates);
+    }
+
+    protected visitObject(jsonObject: Json.Object, p: P): Json | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(jsonObject.prefix, p),
+            markers: this.visitMarkers(jsonObject.markers, p),
+            members: mapSync(jsonObject.members, member => this.visitRightPadded(member, p))
+        };
+        return updateIfChanged(jsonObject, updates);
+    }
+
+    public visitRightPadded<T extends Json>(right: Json.RightPadded<T>, p: P): Json.RightPadded<T> | undefined {
+        const updates: any = {
+            element: this.visitDefined(right.element, p),
+            after: this.visitSpace(right.after, p)
+        };
+        return updateIfChanged(right, updates);
+    }
+
+    public visitSpace(space: Json.Space, p: P): Json.Space {
+        return space;
+    }
+
+    protected produceJson<J extends Json>(
+        before: Json | undefined,
+        p: P,
+        recipe?: (draft: Draft<J>) =>
+            ValidRecipeReturnType<Draft<J>> |
+            PromiseLike<ValidRecipeReturnType<Draft<J>>>
+    ): J | undefined {
+        if (before === undefined) {
+            return undefined;
+        }
+        const [draft, finishDraft] = create(before as J);
+        (draft as Draft<Json>).prefix = this.visitSpace(before!.prefix, p);
+        (draft as Draft<Json>).markers = this.visitMarkers(before!.markers, p);
+        if (recipe) {
+            recipe(draft);
+        }
+        return finishDraft() as J;
+    }
+
+    protected accept(t: Json, p: P): Json | undefined {
         switch (t.kind) {
             case Json.Kind.Array:
                 return this.visitArray(t as Json.Array, p);

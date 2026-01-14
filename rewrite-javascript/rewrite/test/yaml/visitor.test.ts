@@ -31,7 +31,7 @@ describe('visiting YAML', () => {
         };
 
         const visitor = new class extends YamlVisitor<number> {
-            protected async preVisit(y: Yaml, p: number): Promise<Yaml | undefined> {
+            protected preVisit(y: Yaml, p: number): Yaml | undefined {
                 const newId = randomId();
                 return {...y, id: newId} as Yaml;
             }
@@ -54,7 +54,7 @@ describe('visiting YAML', () => {
         };
 
         const visitor = new class extends YamlVisitor<number> {
-            protected async visitScalar(s: Yaml.Scalar, p: number): Promise<Yaml | undefined> {
+            protected visitScalar(s: Yaml.Scalar, p: number): Yaml | undefined {
                 const modified: Yaml.Scalar = {...s, value: "modified"};
                 return modified;
             }
@@ -110,8 +110,8 @@ describe('visiting YAML', () => {
         };
 
         const visitor = new class extends YamlVisitor<number> {
-            protected async visitMappingEntry(e: Yaml.MappingEntry, p: number): Promise<Yaml | undefined> {
-                const result = await super.visitMappingEntry(e, p);
+            protected visitMappingEntry(e: Yaml.MappingEntry, p: number): Yaml | undefined {
+                const result = super.visitMappingEntry(e, p);
                 if (result && result.kind === Yaml.Kind.MappingEntry) {
                     const updated = result as Yaml.MappingEntry;
                     const modified: Yaml.MappingEntry = {...updated, beforeMappingValueIndicator: " "};
@@ -160,7 +160,7 @@ describe('visiting YAML', () => {
         };
 
         const visitor = new class extends YamlVisitor<number> {
-            protected async visitScalar(s: Yaml.Scalar, p: number): Promise<Yaml | undefined> {
+            protected visitScalar(s: Yaml.Scalar, p: number): Yaml | undefined {
                 const modified: Yaml.Scalar = {...s, value: "modified"};
                 return modified;
             }
@@ -201,8 +201,8 @@ describe('visiting YAML', () => {
         };
 
         const visitor = new class extends YamlVisitor<number> {
-            protected async visitDocument(doc: Yaml.Document, p: number): Promise<Yaml | undefined> {
-                const result = await super.visitDocument(doc, p);
+            protected visitDocument(doc: Yaml.Document, p: number): Yaml | undefined {
+                const result = super.visitDocument(doc, p);
                 if (result && result.kind === Yaml.Kind.Document) {
                     const updated = result as Yaml.Document;
                     const modified: Yaml.Document = {...updated, explicit: true};
@@ -257,7 +257,7 @@ describe('visiting YAML', () => {
         };
 
         const visitor = new YamlVisitor<number>();
-        const result = await visitor.isAcceptable(documents);
+        const result = visitor.isAcceptable(documents);
         expect(result).toBe(true);
     });
 });

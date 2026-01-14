@@ -28,8 +28,7 @@ import {
 } from "../../java";
 import {create as produce} from "mutative";
 import {Cursor, isScope, isTree, Tree} from "../../tree";
-import {mapAsync} from "../../util";
-import {produceAsync} from "../../visitor";
+import {mapSync} from "../../util";
 import {TabsAndIndentsStyle} from "../style";
 import {findMarker} from "../../markers";
 
@@ -52,7 +51,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         return " ".repeat(indent);
     }
 
-    protected async preVisit(tree: J, _p: P): Promise<J | undefined> {
+    protected preVisit(tree: J, _p: P): J | undefined {
         this.setupCursorMessagesForTree(this.cursor, tree);
         return tree;
     }
@@ -265,11 +264,11 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         return false;
     }
 
-    override async postVisit(tree: J, _p: P): Promise<J | undefined> {
+    override postVisit(tree: J, _p: P): J | undefined {
         if (this.stopAfter != null && isScope(this.stopAfter, tree)) {
             this.cursor?.root.messages.set("stop", true);
         }
-
+    
         // If parent has chainedIndentContext but no indentContext yet, we're exiting a chain element
         // Set indentContext on parent = [chainedIndent + indentSize, chainedIndentKind]
         // This only happens once at the innermost element; subsequent parents will already have indentContext
@@ -279,13 +278,13 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             const [chainedIndent, chainedIndentKind] = parentChainedContext;
             this.cursor.parent!.messages.set("indentContext", [chainedIndent + this.indentSize, chainedIndentKind] as IndentContext);
         }
-
+    
         const indentContext = this.cursor.messages.get("indentContext") as IndentContext | undefined;
         if (indentContext === undefined) {
             return tree;
         }
         let [myIndent] = indentContext;
-
+    
         // For chain-start MethodInvocations, the prefix contains whitespace before the chain BASE
         // Use chainedIndentContext for the prefix - it already accounts for newlines
         const chainedContext = this.cursor.messages.get("chainedIndentContext") as IndentContext | undefined;
@@ -296,10 +295,10 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 myIndent = chainedContext[0];
             }
         }
-
+    
         let result = tree;
         const indentStr = this.indentString(myIndent);
-
+    
         // Normalize the prefix space including comment suffixes
         if (result.prefix && spaceContainsNewline(result.prefix)) {
             const normalizedPrefix = normalizeSpaceIndent(result.prefix, indentStr);
@@ -309,13 +308,13 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 });
             }
         }
-
+    
         if (result.kind === J.Kind.Block) {
             result = this.normalizeBlockEnd(result as J.Block, myIndent);
         } else if (result.kind === J.Kind.Literal && this.isInsideJsxTag()) {
             result = this.normalizeJsxTextContent(result as J.Literal, myIndent);
         }
-
+    
         return result;
     }
 
@@ -404,26 +403,26 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         });
     }
 
-    public async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
+    public visitContainer<T extends J>(container: J.Container<T>, p: P): J.Container<T> {
         // Create cursor for this container
         this.cursor = new Cursor(container, this.cursor);
-
+    
         // Pre-visit hook: set up cursor messages
         this.preVisitContainer();
-
+    
         // Visit children (similar to base visitor but without cursor management)
-        let ret = (await produceAsync<J.Container<T>>(container, async draft => {
-            draft.before = await this.visitSpace(container.before, p);
-            (draft.elements as J.RightPadded<J>[]) = await mapAsync(container.elements, e => this.visitRightPadded(e, p));
-            draft.markers = await this.visitMarkers(container.markers, p);
+        let ret = (produce<J.Container<T>>(container, draft => {
+            draft.before = this.visitSpace(container.before, p);
+            (draft.elements as J.RightPadded<J>[]) = mapSync(container.elements, e => this.visitRightPadded(e, p));
+            draft.markers = this.visitMarkers(container.markers, p);
         }))!;
-
+    
         // Post-visit hook: normalize indentation
         ret = this.postVisitContainer(ret);
-
+    
         // Restore cursor
         this.cursor = this.cursor.parent!;
-
+    
         return ret;
     }
 
@@ -452,34 +451,34 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         return container;
     }
 
-    public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(
+    public visitLeftPadded<T extends J | J.Space | number | string | boolean>(
         left: J.LeftPadded<T>,
         p: P
-    ): Promise<J.LeftPadded<T> | undefined> {
+    ): J.LeftPadded<T> | undefined {
         // Create cursor for this LeftPadded
         this.cursor = new Cursor(left, this.cursor);
-
+    
         // Pre-visit hook: set up cursor messages
         this.preVisitLeftPadded(left);
-
+    
         // Visit children (similar to base visitor but without cursor management)
-        let ret = await produceAsync<J.LeftPadded<T>>(left, async draft => {
-            draft.before = await this.visitSpace(left.before, p);
+        let ret = produce<J.LeftPadded<T>>(left, draft => {
+            draft.before = this.visitSpace(left.before, p);
             if (isTree(left.element)) {
-                (draft.element as J) = await this.visitDefined(left.element, p);
+                (draft.element as J) = this.visitDefined(left.element, p);
             } else if (isSpace(left.element)) {
-                (draft.element as J.Space) = await this.visitSpace(left.element, p);
+                (draft.element as J.Space) = this.visitSpace(left.element, p);
             }
-            draft.markers = await this.visitMarkers(left.markers, p);
+            draft.markers = this.visitMarkers(left.markers, p);
         });
-
+    
         // Post-visit hook: normalize indentation
-        ret = this.postVisitLeftPadded(ret);
+        const result = this.postVisitLeftPadded(ret);
 
         // Restore cursor
         this.cursor = this.cursor.parent!;
 
-        return ret;
+        return result;
     }
 
     private preVisitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>): void {
@@ -521,28 +520,28 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         });
     }
 
-    public async visitRightPadded<T extends J | boolean>(
+    public visitRightPadded<T extends J | boolean>(
         right: J.RightPadded<T>,
         p: P
-    ): Promise<J.RightPadded<T> | undefined> {
+    ): J.RightPadded<T> | undefined {
         // Create cursor for this RightPadded
         this.cursor = new Cursor(right, this.cursor);
-
+    
         // Pre-visit hook: set up cursor messages, propagate continuation if after has newline
         this.preVisitRightPadded(right);
-
+    
         // Visit children (similar to base visitor but without cursor management)
-        let ret = await produceAsync<J.RightPadded<T>>(right, async draft => {
+        let ret = produce<J.RightPadded<T>>(right, draft => {
             if (isTree(right.element)) {
-                (draft.element as J) = await this.visitDefined(right.element, p);
+                (draft.element as J) = this.visitDefined(right.element, p);
             }
-            draft.after = await this.visitSpace(right.after, p);
-            draft.markers = await this.visitMarkers(right.markers, p);
+            draft.after = this.visitSpace(right.after, p);
+            draft.markers = this.visitMarkers(right.markers, p);
         });
-
+    
         // Restore cursor
         this.cursor = this.cursor.parent!;
-
+    
         if (ret?.element === undefined) {
             return undefined;
         }
@@ -619,17 +618,17 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         return false;
     }
 
-    async visit<R extends J>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
+    visit<R extends J>(tree: Tree, p: P, parent?: Cursor): R | undefined {
         if (this.cursor?.getNearestMessage("stop") != null) {
             return tree as R;
         }
-
+    
         if (parent) {
             this.cursor = new Cursor(tree, parent);
             this.setupAncestorIndents();
         }
-
-        return await super.visit(tree, p) as R;
+    
+        return super.visit(tree, p) as R;
     }
 
     private setupAncestorIndents(): void {

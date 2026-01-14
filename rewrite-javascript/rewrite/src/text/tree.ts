@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {SourceFile, Tree, TreeKind} from "../tree";
+import {SourceFile, Tree} from "../tree";
 
 export interface PlainText extends SourceFile {
     readonly kind: typeof PlainText.Kind.PlainText

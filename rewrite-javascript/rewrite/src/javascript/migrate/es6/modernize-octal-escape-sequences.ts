@@ -43,7 +43,7 @@ export class ModernizeOctalEscapeSequences extends Recipe {
         const useUnicode = this.useUnicodeEscapes;
         return new class extends JavaScriptVisitor<ExecutionContext> {
 
-            protected async visitLiteral(literal: J.Literal, _ctx: ExecutionContext): Promise<J | undefined> {
+            protected visitLiteral(literal: J.Literal, _ctx: ExecutionContext): J | undefined {
                 // Only process string literals
                 if (typeof literal.value !== 'string') {
                     return literal;

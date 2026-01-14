@@ -18,7 +18,6 @@ package org.openrewrite.javascript;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
@@ -27,6 +26,7 @@ import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.text.PlainTextParser;
 import org.openrewrite.tree.ParseError;
 
+import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.*;
@@ -48,7 +48,7 @@ public class JavaScriptParser implements Parser {
             if (input.getFileAttributes() != null && input.getFileAttributes().getSize() > maxSizeBytes) {
                 // File is larger than 2MB, parse with PlainTextParser
                 largeFiles.add(input);
-            } else if (isMinified(input)) {
+            } else if (isMinified(input, ctx)) {
                 // File appears to be minified, parse with PlainTextParser
                 largeFiles.add(input);
             } else {
@@ -101,9 +101,10 @@ public class JavaScriptParser implements Parser {
      * Minified files are typically compressed into a single very long line.
      *
      * @param input The input file to check
+     * @param ctx execution context
      * @return true if the file appears to be minified, false otherwise
      */
-    private boolean isMinified(Input input) {
+    private boolean isMinified(Input input, ExecutionContext ctx) {
         try {
             // Check if filename contains common minification patterns first (no file reading needed)
             String filename = input.getPath().getFileName().toString().toLowerCase();
@@ -114,7 +115,7 @@ public class JavaScriptParser implements Parser {
 
             // Read a sample of the file to detect minified code patterns
             // Many minified/bundled files have license headers followed by very long minified lines
-            try (InputStream is = input.getSource(new InMemoryExecutionContext())) {
+            try (InputStream is = new BufferedInputStream(input.getSource(ctx))) {
                 final int sampleSize = 10 * 1024; // Read up to 10KB sample
                 final int longLineThreshold = 4000; // Lines > 4000 chars indicate minification
                 int currentLineLength = 0;

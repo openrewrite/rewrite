@@ -30,510 +30,514 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         this.delegate = new JavaScriptDelegateSender(this);
     }
 
-    override async visit<R extends J>(tree: Tree, p: RpcSendQueue, parent?: Cursor): Promise<R | undefined> {
+    // Override visit() to skip cursor handling for performance
+    override visit<R extends J>(tree: Tree | undefined, p: RpcSendQueue, _parent?: Cursor): R | undefined {
+        if (!tree) return undefined;
+        // Only call preVisit for JavaScript elements - Java elements are handled by the delegate
         if (isJavaScript(tree)) {
-            return super.visit(tree, p, parent);
+            let result = this.preVisit(tree as JS, p);
+            if (!result) return undefined;
+            return this.accept(result, p) as R | undefined;
         }
-
-        return this.delegate.visit(tree, p, parent);
+        return this.delegate.visit(tree, p) as R | undefined;
     }
 
-    override async preVisit(j: JS, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(j, j2 => j2.id);
-        await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
-        await q.getAndSend(j, j2 => j2.markers);
+    override preVisit(j: JS, q: RpcSendQueue): J | undefined {
+        q.getAndSend(j, j2 => j2.id);
+        q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
+        q.getAndSend(j, j2 => j2.markers);
         return j;
     }
 
-    override async visitJsCompilationUnit(cu: JS.CompilationUnit, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(cu, c => c.sourcePath);
-        await q.getAndSend(cu, c => c.charsetName);
-        await q.getAndSend(cu, c => c.charsetBomMarked);
-        await q.getAndSend(cu, c => c.checksum);
-        await q.getAndSend(cu, c => c.fileAttributes);
-        await q.getAndSendList(cu, c => c.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, q));
-        await q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, q));
+    override visitJsCompilationUnit(cu: JS.CompilationUnit, q: RpcSendQueue): J | undefined {
+        q.getAndSend(cu, c => c.sourcePath);
+        q.getAndSend(cu, c => c.charsetName);
+        q.getAndSend(cu, c => c.charsetBomMarked);
+        q.getAndSend(cu, c => c.checksum);
+        q.getAndSend(cu, c => c.fileAttributes);
+        q.getAndSendList(cu, c => c.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, q));
+        q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, q));
         return cu;
     }
 
-    override async visitAlias(alias: JS.Alias, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(alias, el => el.propertyName, el => this.visitRightPadded(el, q));
-        await q.getAndSend(alias, el => el.alias, el => this.visit(el, q));
+    override visitAlias(alias: JS.Alias, q: RpcSendQueue): J | undefined {
+        q.getAndSend(alias, el => el.propertyName, el => this.visitRightPadded(el, q));
+        q.getAndSend(alias, el => el.alias, el => this.visit(el, q));
         return alias;
     }
 
-    override async visitArrowFunction(arrowFunction: JS.ArrowFunction, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(arrowFunction, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
-        await q.getAndSendList(arrowFunction, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(arrowFunction, el => el.typeParameters, el => this.visit(el, q));
-        await q.getAndSend(arrowFunction, el => el.lambda, el => this.visit(el, q));
-        await q.getAndSend(arrowFunction, el => el.returnTypeExpression, el => this.visit(el, q));
+    override visitArrowFunction(arrowFunction: JS.ArrowFunction, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(arrowFunction, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
+        q.getAndSendList(arrowFunction, el => el.modifiers, el => el.id, el => this.visit(el, q));
+        q.getAndSend(arrowFunction, el => el.typeParameters, el => this.visit(el, q));
+        q.getAndSend(arrowFunction, el => el.lambda, el => this.visit(el, q));
+        q.getAndSend(arrowFunction, el => el.returnTypeExpression, el => this.visit(el, q));
         return arrowFunction;
     }
 
-    override async visitAwait(await_: JS.Await, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(await_, el => el.expression, el => this.visit(el, q));
-        await q.getAndSend(await_, el => asRef(el.type), el => this.visitType(el, q));
+    override visitAwait(await_: JS.Await, q: RpcSendQueue): J | undefined {
+        q.getAndSend(await_, el => el.expression, el => this.visit(el, q));
+        q.getAndSend(await_, el => asRef(el.type), el => this.visitType(el, q));
         return await_;
     }
 
-    override async visitConditionalType(conditionalType: JS.ConditionalType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(conditionalType, el => el.checkType, el => this.visit(el, q));
-        await q.getAndSend(conditionalType, el => el.condition, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(conditionalType, el => asRef(el.type), el => this.visitType(el, q));
+    override visitConditionalType(conditionalType: JS.ConditionalType, q: RpcSendQueue): J | undefined {
+        q.getAndSend(conditionalType, el => el.checkType, el => this.visit(el, q));
+        q.getAndSend(conditionalType, el => el.condition, el => this.visitLeftPadded(el, q));
+        q.getAndSend(conditionalType, el => asRef(el.type), el => this.visitType(el, q));
         return conditionalType;
     }
 
-    override async visitDelete(delete_: JS.Delete, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(delete_, el => el.expression, el => this.visit(el, q));
+    override visitDelete(delete_: JS.Delete, q: RpcSendQueue): J | undefined {
+        q.getAndSend(delete_, el => el.expression, el => this.visit(el, q));
         return delete_;
     }
 
-    override async visitExpressionStatement(expressionStatement: JS.ExpressionStatement, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(expressionStatement, el => el.expression, el => this.visit(el, q));
+    override visitExpressionStatement(expressionStatement: JS.ExpressionStatement, q: RpcSendQueue): J | undefined {
+        q.getAndSend(expressionStatement, el => el.expression, el => this.visit(el, q));
         return expressionStatement;
     }
 
-    override async visitExpressionWithTypeArguments(expressionWithTypeArguments: JS.ExpressionWithTypeArguments, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(expressionWithTypeArguments, el => el.clazz, el => this.visit(el, q));
-        await q.getAndSend(expressionWithTypeArguments, el => el.typeArguments, el => this.visitContainer(el, q));
-        await q.getAndSend(expressionWithTypeArguments, el => asRef(el.type), el => this.visitType(el, q));
+    override visitExpressionWithTypeArguments(expressionWithTypeArguments: JS.ExpressionWithTypeArguments, q: RpcSendQueue): J | undefined {
+        q.getAndSend(expressionWithTypeArguments, el => el.clazz, el => this.visit(el, q));
+        q.getAndSend(expressionWithTypeArguments, el => el.typeArguments, el => this.visitContainer(el, q));
+        q.getAndSend(expressionWithTypeArguments, el => asRef(el.type), el => this.visitType(el, q));
         return expressionWithTypeArguments;
     }
 
-    override async visitFunctionCall(functionCall: JS.FunctionCall, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(functionCall, m => m.function, f => this.visitRightPadded(f, q));
-        await q.getAndSend(functionCall, m => m.typeParameters, params => this.visitContainer(params, q));
-        await q.getAndSend(functionCall, m => m.arguments, args => this.visitContainer(args, q));
-        await q.getAndSend(functionCall, m => asRef(m.methodType), type => this.visitType(type, q));
+    override visitFunctionCall(functionCall: JS.FunctionCall, q: RpcSendQueue): J | undefined {
+        q.getAndSend(functionCall, m => m.function, f => this.visitRightPadded(f, q));
+        q.getAndSend(functionCall, m => m.typeParameters, params => this.visitContainer(params, q));
+        q.getAndSend(functionCall, m => m.arguments, args => this.visitContainer(args, q));
+        q.getAndSend(functionCall, m => asRef(m.methodType), type => this.visitType(type, q));
         return functionCall;
     }
 
-    override async visitFunctionType(functionType: JS.FunctionType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(functionType, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(functionType, el => el.constructorType, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(functionType, el => el.typeParameters, el => this.visit(el, q));
-        await q.getAndSend(functionType, el => el.parameters, el => this.visitContainer(el, q));
-        await q.getAndSend(functionType, el => el.returnType, el => this.visitLeftPadded(el, q));
+    override visitFunctionType(functionType: JS.FunctionType, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(functionType, el => el.modifiers, el => el.id, el => this.visit(el, q));
+        q.getAndSend(functionType, el => el.constructorType, el => this.visitLeftPadded(el, q));
+        q.getAndSend(functionType, el => el.typeParameters, el => this.visit(el, q));
+        q.getAndSend(functionType, el => el.parameters, el => this.visitContainer(el, q));
+        q.getAndSend(functionType, el => el.returnType, el => this.visitLeftPadded(el, q));
         return functionType;
     }
 
-    override async visitInferType(inferType: JS.InferType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(inferType, el => el.typeParameter, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(inferType, el => asRef(el.type), el => this.visitType(el, q));
+    override visitInferType(inferType: JS.InferType, q: RpcSendQueue): J | undefined {
+        q.getAndSend(inferType, el => el.typeParameter, el => this.visitLeftPadded(el, q));
+        q.getAndSend(inferType, el => asRef(el.type), el => this.visitType(el, q));
         return inferType;
     }
 
-    override async visitImportType(importType: JS.ImportType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(importType, el => el.hasTypeof, el => this.visitRightPadded(el, q));
-        await q.getAndSend(importType, el => el.argumentAndAttributes, el => this.visitContainer(el, q));
-        await q.getAndSend(importType, el => el.qualifier, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(importType, el => el.typeArguments, el => this.visitContainer(el, q));
-        await q.getAndSend(importType, el => asRef(el.type), el => this.visitType(el, q));
+    override visitImportType(importType: JS.ImportType, q: RpcSendQueue): J | undefined {
+        q.getAndSend(importType, el => el.hasTypeof, el => this.visitRightPadded(el, q));
+        q.getAndSend(importType, el => el.argumentAndAttributes, el => this.visitContainer(el, q));
+        q.getAndSend(importType, el => el.qualifier, el => this.visitLeftPadded(el, q));
+        q.getAndSend(importType, el => el.typeArguments, el => this.visitContainer(el, q));
+        q.getAndSend(importType, el => asRef(el.type), el => this.visitType(el, q));
         return importType;
     }
 
-    override async visitImportDeclaration(jsImport: JS.Import, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(jsImport, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(jsImport, el => el.importClause, el => this.visit(el, q));
-        await q.getAndSend(jsImport, el => el.moduleSpecifier, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(jsImport, el => el.attributes, el => this.visit(el, q));
-        await q.getAndSend(jsImport, el => el.initializer, el => this.visitLeftPadded(el, q));
+    override visitImportDeclaration(jsImport: JS.Import, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(jsImport, el => el.modifiers, el => el.id, el => this.visit(el, q));
+        q.getAndSend(jsImport, el => el.importClause, el => this.visit(el, q));
+        q.getAndSend(jsImport, el => el.moduleSpecifier, el => this.visitLeftPadded(el, q));
+        q.getAndSend(jsImport, el => el.attributes, el => this.visit(el, q));
+        q.getAndSend(jsImport, el => el.initializer, el => this.visitLeftPadded(el, q));
         return jsImport;
     }
 
-    override async visitImportClause(jsImportClause: JS.ImportClause, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(jsImportClause, el => el.typeOnly);
-        await q.getAndSend(jsImportClause, el => el.name, el => this.visitRightPadded(el, q));
-        await q.getAndSend(jsImportClause, el => el.namedBindings, el => this.visit(el, q));
+    override visitImportClause(jsImportClause: JS.ImportClause, q: RpcSendQueue): J | undefined {
+        q.getAndSend(jsImportClause, el => el.typeOnly);
+        q.getAndSend(jsImportClause, el => el.name, el => this.visitRightPadded(el, q));
+        q.getAndSend(jsImportClause, el => el.namedBindings, el => this.visit(el, q));
         return jsImportClause;
     }
 
-    override async visitNamedImports(namedImports: JS.NamedImports, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(namedImports, el => el.elements, el => this.visitContainer(el, q));
-        await q.getAndSend(namedImports, el => asRef(el.type), el => this.visitType(el, q));
+    override visitNamedImports(namedImports: JS.NamedImports, q: RpcSendQueue): J | undefined {
+        q.getAndSend(namedImports, el => el.elements, el => this.visitContainer(el, q));
+        q.getAndSend(namedImports, el => asRef(el.type), el => this.visitType(el, q));
         return namedImports;
     }
 
-    override async visitImportSpecifier(jsImportSpecifier: JS.ImportSpecifier, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(jsImportSpecifier, el => el.importType, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(jsImportSpecifier, el => el.specifier, el => this.visit(el, q));
-        await q.getAndSend(jsImportSpecifier, el => asRef(el.type), el => this.visitType(el, q));
+    override visitImportSpecifier(jsImportSpecifier: JS.ImportSpecifier, q: RpcSendQueue): J | undefined {
+        q.getAndSend(jsImportSpecifier, el => el.importType, el => this.visitLeftPadded(el, q));
+        q.getAndSend(jsImportSpecifier, el => el.specifier, el => this.visit(el, q));
+        q.getAndSend(jsImportSpecifier, el => asRef(el.type), el => this.visitType(el, q));
         return jsImportSpecifier;
     }
 
-    override async visitImportAttributes(importAttributes: JS.ImportAttributes, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(importAttributes, el => el.token);
-        await q.getAndSend(importAttributes, el => el.elements, el => this.visitContainer(el, q));
+    override visitImportAttributes(importAttributes: JS.ImportAttributes, q: RpcSendQueue): J | undefined {
+        q.getAndSend(importAttributes, el => el.token);
+        q.getAndSend(importAttributes, el => el.elements, el => this.visitContainer(el, q));
         return importAttributes;
     }
 
-    override async visitImportTypeAttributes(importTypeAttributes: JS.ImportTypeAttributes, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(importTypeAttributes, el => el.token, el => this.visitRightPadded(el, q));
-        await q.getAndSend(importTypeAttributes, el => el.elements, el => this.visitContainer(el, q));
-        await q.getAndSend(importTypeAttributes, el => el.end, el => this.visitSpace(el, q));
+    override visitImportTypeAttributes(importTypeAttributes: JS.ImportTypeAttributes, q: RpcSendQueue): J | undefined {
+        q.getAndSend(importTypeAttributes, el => el.token, el => this.visitRightPadded(el, q));
+        q.getAndSend(importTypeAttributes, el => el.elements, el => this.visitContainer(el, q));
+        q.getAndSend(importTypeAttributes, el => el.end, el => this.visitSpace(el, q));
         return importTypeAttributes;
     }
 
-    override async visitImportAttribute(importAttribute: JS.ImportAttribute, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(importAttribute, el => el.name, el => this.visit(el, q));
-        await q.getAndSend(importAttribute, el => el.value, el => this.visitLeftPadded(el, q));
+    override visitImportAttribute(importAttribute: JS.ImportAttribute, q: RpcSendQueue): J | undefined {
+        q.getAndSend(importAttribute, el => el.name, el => this.visit(el, q));
+        q.getAndSend(importAttribute, el => el.value, el => this.visitLeftPadded(el, q));
         return importAttribute;
     }
 
-    override async visitBinaryExtensions(binary: JS.Binary, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(binary, el => el.left, el => this.visit(el, q));
-        await q.getAndSend(binary, el => el.operator, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(binary, el => el.right, el => this.visit(el, q));
-        await q.getAndSend(binary, el => asRef(el.type), el => this.visitType(el, q));
+    override visitBinaryExtensions(binary: JS.Binary, q: RpcSendQueue): J | undefined {
+        q.getAndSend(binary, el => el.left, el => this.visit(el, q));
+        q.getAndSend(binary, el => el.operator, el => this.visitLeftPadded(el, q));
+        q.getAndSend(binary, el => el.right, el => this.visit(el, q));
+        q.getAndSend(binary, el => asRef(el.type), el => this.visitType(el, q));
         return binary;
     }
 
-    override async visitLiteralType(literalType: JS.LiteralType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(literalType, el => el.literal, el => this.visit(el, q));
-        await q.getAndSend(literalType, el => asRef(el.type), el => this.visitType(el, q));
+    override visitLiteralType(literalType: JS.LiteralType, q: RpcSendQueue): J | undefined {
+        q.getAndSend(literalType, el => el.literal, el => this.visit(el, q));
+        q.getAndSend(literalType, el => asRef(el.type), el => this.visitType(el, q));
         return literalType;
     }
 
-    override async visitMappedType(mappedType: JS.MappedType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(mappedType, el => el.prefixToken, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(mappedType, el => el.hasReadonly, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(mappedType, el => el.keysRemapping, el => this.visit(el, q));
-        await q.getAndSend(mappedType, el => el.suffixToken, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(mappedType, el => el.hasQuestionToken, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(mappedType, el => el.valueType, el => this.visitContainer(el, q));
-        await q.getAndSend(mappedType, el => asRef(el.type), el => this.visitType(el, q));
+    override visitMappedType(mappedType: JS.MappedType, q: RpcSendQueue): J | undefined {
+        q.getAndSend(mappedType, el => el.prefixToken, el => this.visitLeftPadded(el, q));
+        q.getAndSend(mappedType, el => el.hasReadonly, el => this.visitLeftPadded(el, q));
+        q.getAndSend(mappedType, el => el.keysRemapping, el => this.visit(el, q));
+        q.getAndSend(mappedType, el => el.suffixToken, el => this.visitLeftPadded(el, q));
+        q.getAndSend(mappedType, el => el.hasQuestionToken, el => this.visitLeftPadded(el, q));
+        q.getAndSend(mappedType, el => el.valueType, el => this.visitContainer(el, q));
+        q.getAndSend(mappedType, el => asRef(el.type), el => this.visitType(el, q));
         return mappedType;
     }
 
-    override async visitMappedTypeKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(keysRemapping, el => el.typeParameter, el => this.visitRightPadded(el, q));
-        await q.getAndSend(keysRemapping, el => el.nameType, el => this.visitRightPadded(el, q));
+    override visitMappedTypeKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, q: RpcSendQueue): J | undefined {
+        q.getAndSend(keysRemapping, el => el.typeParameter, el => this.visitRightPadded(el, q));
+        q.getAndSend(keysRemapping, el => el.nameType, el => this.visitRightPadded(el, q));
         return keysRemapping;
     }
 
-    override async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.Parameter, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(mappedTypeParameter, el => el.name, el => this.visit(el, q));
-        await q.getAndSend(mappedTypeParameter, el => el.iterateType, el => this.visitLeftPadded(el, q));
+    override visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.Parameter, q: RpcSendQueue): J | undefined {
+        q.getAndSend(mappedTypeParameter, el => el.name, el => this.visit(el, q));
+        q.getAndSend(mappedTypeParameter, el => el.iterateType, el => this.visitLeftPadded(el, q));
         return mappedTypeParameter;
     }
 
-    override async visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(objectBindingPattern, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
-        await q.getAndSendList(objectBindingPattern, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(objectBindingPattern, el => el.typeExpression, el => this.visit(el, q));
-        await q.getAndSend(objectBindingPattern, el => el.bindings, el => this.visitContainer(el, q));
-        await q.getAndSend(objectBindingPattern, el => el.initializer, el => this.visitLeftPadded(el, q));
+    override visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(objectBindingPattern, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
+        q.getAndSendList(objectBindingPattern, el => el.modifiers, el => el.id, el => this.visit(el, q));
+        q.getAndSend(objectBindingPattern, el => el.typeExpression, el => this.visit(el, q));
+        q.getAndSend(objectBindingPattern, el => el.bindings, el => this.visitContainer(el, q));
+        q.getAndSend(objectBindingPattern, el => el.initializer, el => this.visitLeftPadded(el, q));
         return objectBindingPattern;
     }
 
-    override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(propertyAssignment, el => el.name, el => this.visitRightPadded(el, q));
-        await q.getAndSend(propertyAssignment, el => el.assigmentToken);
-        await q.getAndSend(propertyAssignment, el => el.initializer, el => this.visit(el, q));
+    override visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, q: RpcSendQueue): J | undefined {
+        q.getAndSend(propertyAssignment, el => el.name, el => this.visitRightPadded(el, q));
+        q.getAndSend(propertyAssignment, el => el.assigmentToken);
+        q.getAndSend(propertyAssignment, el => el.initializer, el => this.visit(el, q));
         return propertyAssignment;
     }
 
-    override async visitSatisfiesExpression(satisfiesExpression: JS.SatisfiesExpression, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(satisfiesExpression, el => el.expression, el => this.visit(el, q));
-        await q.getAndSend(satisfiesExpression, el => el.satisfiesType, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(satisfiesExpression, el => asRef(el.type), el => this.visitType(el, q));
+    override visitSatisfiesExpression(satisfiesExpression: JS.SatisfiesExpression, q: RpcSendQueue): J | undefined {
+        q.getAndSend(satisfiesExpression, el => el.expression, el => this.visit(el, q));
+        q.getAndSend(satisfiesExpression, el => el.satisfiesType, el => this.visitLeftPadded(el, q));
+        q.getAndSend(satisfiesExpression, el => asRef(el.type), el => this.visitType(el, q));
         return satisfiesExpression;
     }
 
-    override async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(scopedVariableDeclarations, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSendList(scopedVariableDeclarations, el => el.variables, el => el.element.id, el => this.visitRightPadded(el, q));
+    override visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(scopedVariableDeclarations, el => el.modifiers, el => el.id, el => this.visit(el, q));
+        q.getAndSendList(scopedVariableDeclarations, el => el.variables, el => el.element.id, el => this.visitRightPadded(el, q));
         return scopedVariableDeclarations;
     }
 
-    override async visitShebang(shebang: JS.Shebang, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(shebang, el => el.text);
+    override visitShebang(shebang: JS.Shebang, q: RpcSendQueue): J | undefined {
+        q.getAndSend(shebang, el => el.text);
         return shebang;
     }
 
-    override async visitSpread(spread: JS.Spread, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(spread, el => el.expression, el => this.visit(el, q));
-        await q.getAndSend(spread, el => asRef(el.type), el => this.visitType(el, q));
+    override visitSpread(spread: JS.Spread, q: RpcSendQueue): J | undefined {
+        q.getAndSend(spread, el => el.expression, el => this.visit(el, q));
+        q.getAndSend(spread, el => asRef(el.type), el => this.visitType(el, q));
         return spread;
     }
 
-    override async visitStatementExpression(statementExpression: JS.StatementExpression, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(statementExpression, el => el.statement, el => this.visit(el, q));
+    override visitStatementExpression(statementExpression: JS.StatementExpression, q: RpcSendQueue): J | undefined {
+        q.getAndSend(statementExpression, el => el.statement, el => this.visit(el, q));
         return statementExpression;
     }
 
-    override async visitTaggedTemplateExpression(taggedTemplateExpression: JS.TaggedTemplateExpression, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(taggedTemplateExpression, el => el.tag, el => this.visitRightPadded(el, q));
-        await q.getAndSend(taggedTemplateExpression, el => el.typeArguments, el => this.visitContainer(el, q));
-        await q.getAndSend(taggedTemplateExpression, el => el.templateExpression, el => this.visit(el, q));
-        await q.getAndSend(taggedTemplateExpression, el => asRef(el.type), el => this.visitType(el, q));
+    override visitTaggedTemplateExpression(taggedTemplateExpression: JS.TaggedTemplateExpression, q: RpcSendQueue): J | undefined {
+        q.getAndSend(taggedTemplateExpression, el => el.tag, el => this.visitRightPadded(el, q));
+        q.getAndSend(taggedTemplateExpression, el => el.typeArguments, el => this.visitContainer(el, q));
+        q.getAndSend(taggedTemplateExpression, el => el.templateExpression, el => this.visit(el, q));
+        q.getAndSend(taggedTemplateExpression, el => asRef(el.type), el => this.visitType(el, q));
         return taggedTemplateExpression;
     }
 
-    override async visitTemplateExpression(templateExpression: JS.TemplateExpression, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(templateExpression, el => el.head, el => this.visit(el, q));
-        await q.getAndSendList(templateExpression, el => el.spans, el => el.element.id, el => this.visitRightPadded(el, q));
-        await q.getAndSend(templateExpression, el => asRef(el.type), el => this.visitType(el, q));
+    override visitTemplateExpression(templateExpression: JS.TemplateExpression, q: RpcSendQueue): J | undefined {
+        q.getAndSend(templateExpression, el => el.head, el => this.visit(el, q));
+        q.getAndSendList(templateExpression, el => el.spans, el => el.element.id, el => this.visitRightPadded(el, q));
+        q.getAndSend(templateExpression, el => asRef(el.type), el => this.visitType(el, q));
         return templateExpression;
     }
 
-    override async visitTemplateExpressionSpan(span: JS.TemplateExpression.Span, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(span, el => el.expression, el => this.visit(el, q));
-        await q.getAndSend(span, el => el.tail, el => this.visit(el, q));
+    override visitTemplateExpressionSpan(span: JS.TemplateExpression.Span, q: RpcSendQueue): J | undefined {
+        q.getAndSend(span, el => el.expression, el => this.visit(el, q));
+        q.getAndSend(span, el => el.tail, el => this.visit(el, q));
         return span;
     }
 
-    override async visitTuple(tuple: JS.Tuple, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(tuple, el => el.elements, el => this.visitContainer(el, q));
-        await q.getAndSend(tuple, el => asRef(el.type), el => this.visitType(el, q));
+    override visitTuple(tuple: JS.Tuple, q: RpcSendQueue): J | undefined {
+        q.getAndSend(tuple, el => el.elements, el => this.visitContainer(el, q));
+        q.getAndSend(tuple, el => asRef(el.type), el => this.visitType(el, q));
         return tuple;
     }
 
-    override async visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(typeDeclaration, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(typeDeclaration, el => el.name, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(typeDeclaration, el => el.typeParameters, el => this.visit(el, q));
-        await q.getAndSend(typeDeclaration, el => el.initializer, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(typeDeclaration, el => asRef(el.type), el => this.visitType(el, q));
+    override visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(typeDeclaration, el => el.modifiers, el => el.id, el => this.visit(el, q));
+        q.getAndSend(typeDeclaration, el => el.name, el => this.visitLeftPadded(el, q));
+        q.getAndSend(typeDeclaration, el => el.typeParameters, el => this.visit(el, q));
+        q.getAndSend(typeDeclaration, el => el.initializer, el => this.visitLeftPadded(el, q));
+        q.getAndSend(typeDeclaration, el => asRef(el.type), el => this.visitType(el, q));
         return typeDeclaration;
     }
 
-    override async visitTypeOf(typeOf: JS.TypeOf, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(typeOf, el => el.expression, el => this.visit(el, q));
-        await q.getAndSend(typeOf, el => asRef(el.type), el => this.visitType(el, q));
+    override visitTypeOf(typeOf: JS.TypeOf, q: RpcSendQueue): J | undefined {
+        q.getAndSend(typeOf, el => el.expression, el => this.visit(el, q));
+        q.getAndSend(typeOf, el => asRef(el.type), el => this.visitType(el, q));
         return typeOf;
     }
 
-    override async visitTypeTreeExpression(typeTreeExpression: JS.TypeTreeExpression, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(typeTreeExpression, el => el.expression, el => this.visit(el, q));
+    override visitTypeTreeExpression(typeTreeExpression: JS.TypeTreeExpression, q: RpcSendQueue): J | undefined {
+        q.getAndSend(typeTreeExpression, el => el.expression, el => this.visit(el, q));
         return typeTreeExpression;
     }
 
-    override async visitAs(as_: JS.As, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(as_, el => el.left, el => this.visitRightPadded(el, q));
-        await q.getAndSend(as_, el => el.right, el => this.visit(el, q));
-        await q.getAndSend(as_, el => asRef(el.type), el => this.visitType(el, q));
+    override visitAs(as_: JS.As, q: RpcSendQueue): J | undefined {
+        q.getAndSend(as_, el => el.left, el => this.visitRightPadded(el, q));
+        q.getAndSend(as_, el => el.right, el => this.visit(el, q));
+        q.getAndSend(as_, el => asRef(el.type), el => this.visitType(el, q));
         return as_;
     }
 
-    override async visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(assignmentOperation, el => el.variable, el => this.visit(el, q));
-        await q.getAndSend(assignmentOperation, el => el.operator, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(assignmentOperation, el => el.assignment, el => this.visit(el, q));
-        await q.getAndSend(assignmentOperation, el => asRef(el.type), el => this.visitType(el, q));
+    override visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, q: RpcSendQueue): J | undefined {
+        q.getAndSend(assignmentOperation, el => el.variable, el => this.visit(el, q));
+        q.getAndSend(assignmentOperation, el => el.operator, el => this.visitLeftPadded(el, q));
+        q.getAndSend(assignmentOperation, el => el.assignment, el => this.visit(el, q));
+        q.getAndSend(assignmentOperation, el => asRef(el.type), el => this.visitType(el, q));
         return assignmentOperation;
     }
 
-    override async visitIndexedAccessType(indexedAccessType: JS.IndexedAccessType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(indexedAccessType, el => el.objectType, el => this.visit(el, q));
-        await q.getAndSend(indexedAccessType, el => el.indexType, el => this.visit(el, q));
-        await q.getAndSend(indexedAccessType, el => asRef(el.type), el => this.visitType(el, q));
+    override visitIndexedAccessType(indexedAccessType: JS.IndexedAccessType, q: RpcSendQueue): J | undefined {
+        q.getAndSend(indexedAccessType, el => el.objectType, el => this.visit(el, q));
+        q.getAndSend(indexedAccessType, el => el.indexType, el => this.visit(el, q));
+        q.getAndSend(indexedAccessType, el => asRef(el.type), el => this.visitType(el, q));
         return indexedAccessType;
     }
 
-    override async visitIndexedAccessTypeIndexType(indexType: JS.IndexedAccessType.IndexType, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(indexType, el => el.element, el => this.visitRightPadded(el, q));
-        await q.getAndSend(indexType, el => asRef(el.type), el => this.visitType(el, q));
+    override visitIndexedAccessTypeIndexType(indexType: JS.IndexedAccessType.IndexType, q: RpcSendQueue): J | undefined {
+        q.getAndSend(indexType, el => el.element, el => this.visitRightPadded(el, q));
+        q.getAndSend(indexType, el => asRef(el.type), el => this.visitType(el, q));
         return indexType;
     }
 
-    override async visitTypeQuery(typeQuery: JS.TypeQuery, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(typeQuery, el => el.typeExpression, el => this.visit(el, q));
-        await q.getAndSend(typeQuery, el => el.typeArguments, el => this.visitContainer(el, q));
-        await q.getAndSend(typeQuery, el => asRef(el.type), el => this.visitType(el, q));
+    override visitTypeQuery(typeQuery: JS.TypeQuery, q: RpcSendQueue): J | undefined {
+        q.getAndSend(typeQuery, el => el.typeExpression, el => this.visit(el, q));
+        q.getAndSend(typeQuery, el => el.typeArguments, el => this.visitContainer(el, q));
+        q.getAndSend(typeQuery, el => asRef(el.type), el => this.visitType(el, q));
         return typeQuery;
     }
 
-    override async visitTypeInfo(typeInfo: JS.TypeInfo, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(typeInfo, el => el.typeIdentifier, el => this.visit(el, q));
+    override visitTypeInfo(typeInfo: JS.TypeInfo, q: RpcSendQueue): J | undefined {
+        q.getAndSend(typeInfo, el => el.typeIdentifier, el => this.visit(el, q));
         return typeInfo;
     }
 
-    override async visitComputedPropertyName(computedPropertyName: JS.ComputedPropertyName, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(computedPropertyName, el => el.expression, el => this.visitRightPadded(el, q));
+    override visitComputedPropertyName(computedPropertyName: JS.ComputedPropertyName, q: RpcSendQueue): J | undefined {
+        q.getAndSend(computedPropertyName, el => el.expression, el => this.visitRightPadded(el, q));
         return computedPropertyName;
     }
 
-    override async visitTypeOperator(typeOperator: JS.TypeOperator, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(typeOperator, el => el.operator);
-        await q.getAndSend(typeOperator, el => el.expression, el => this.visitLeftPadded(el, q));
+    override visitTypeOperator(typeOperator: JS.TypeOperator, q: RpcSendQueue): J | undefined {
+        q.getAndSend(typeOperator, el => el.operator);
+        q.getAndSend(typeOperator, el => el.expression, el => this.visitLeftPadded(el, q));
         return typeOperator;
     }
 
-    override async visitTypePredicate(typePredicate: JS.TypePredicate, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(typePredicate, el => el.asserts, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(typePredicate, el => el.parameterName, el => this.visit(el, q));
-        await q.getAndSend(typePredicate, el => el.expression, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(typePredicate, el => asRef(el.type), el => this.visitType(el, q));
+    override visitTypePredicate(typePredicate: JS.TypePredicate, q: RpcSendQueue): J | undefined {
+        q.getAndSend(typePredicate, el => el.asserts, el => this.visitLeftPadded(el, q));
+        q.getAndSend(typePredicate, el => el.parameterName, el => this.visit(el, q));
+        q.getAndSend(typePredicate, el => el.expression, el => this.visitLeftPadded(el, q));
+        q.getAndSend(typePredicate, el => asRef(el.type), el => this.visitType(el, q));
         return typePredicate;
     }
 
-    override async visitUnion(union: JS.Union, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(union, el => el.types, el => el.element.id, el => this.visitRightPadded(el, q));
-        await q.getAndSend(union, el => asRef(el.type), el => this.visitType(el, q));
+    override visitUnion(union: JS.Union, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(union, el => el.types, el => el.element.id, el => this.visitRightPadded(el, q));
+        q.getAndSend(union, el => asRef(el.type), el => this.visitType(el, q));
         return union;
     }
 
-    override async visitIntersection(intersection: JS.Intersection, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(intersection, el => el.types, el => el.element.id, el => this.visitRightPadded(el, q));
-        await q.getAndSend(intersection, el => asRef(el.type), el => this.visitType(el, q));
+    override visitIntersection(intersection: JS.Intersection, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(intersection, el => el.types, el => el.element.id, el => this.visitRightPadded(el, q));
+        q.getAndSend(intersection, el => asRef(el.type), el => this.visitType(el, q));
         return intersection;
     }
 
-    override async visitVoid(void_: JS.Void, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(void_, el => el.expression, el => this.visit(el, q));
+    override visitVoid(void_: JS.Void, q: RpcSendQueue): J | undefined {
+        q.getAndSend(void_, el => el.expression, el => this.visit(el, q));
         return void_;
     }
 
-    override async visitWithStatement(withStatement: JS.WithStatement, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(withStatement, el => el.expression, el => this.visit(el, q));
-        await q.getAndSend(withStatement, el => el.body, el => this.visitRightPadded(el, q));
+    override visitWithStatement(withStatement: JS.WithStatement, q: RpcSendQueue): J | undefined {
+        q.getAndSend(withStatement, el => el.expression, el => this.visit(el, q));
+        q.getAndSend(withStatement, el => el.body, el => this.visitRightPadded(el, q));
         return withStatement;
     }
 
-    override async visitJsxTag(tag: JSX.Tag, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(tag, el => el.openName, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(tag, el => el.typeArguments, el => this.visitContainer(el, q));
-        await q.getAndSend(tag, el => el.afterName, space => this.visitSpace(space, q));
-        await q.getAndSendList(tag, el => el.attributes, attr => attr.element.id, attr => this.visitRightPadded(attr, q));
+    override visitJsxTag(tag: JSX.Tag, q: RpcSendQueue): J | undefined {
+        q.getAndSend(tag, el => el.openName, el => this.visitLeftPadded(el, q));
+        q.getAndSend(tag, el => el.typeArguments, el => this.visitContainer(el, q));
+        q.getAndSend(tag, el => el.afterName, space => this.visitSpace(space, q));
+        q.getAndSendList(tag, el => el.attributes, attr => attr.element.id, attr => this.visitRightPadded(attr, q));
 
-        await q.getAndSend(tag, el => el.selfClosing, space => this.visitSpace(space, q));
-        await q.getAndSendList(tag, el => el.children!, child => child.id, child => this.visit(child, q));
-        await q.getAndSend(tag, el => el.closingName, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(tag, el => el.afterClosingName, el => this.visitSpace(el, q));
+        q.getAndSend(tag, el => el.selfClosing, space => this.visitSpace(space, q));
+        q.getAndSendList(tag, el => el.children!, child => child.id, child => this.visit(child, q));
+        q.getAndSend(tag, el => el.closingName, el => this.visitLeftPadded(el, q));
+        q.getAndSend(tag, el => el.afterClosingName, el => this.visitSpace(el, q));
 
         return tag;
     }
 
-    override async visitJsxAttribute(attribute: JSX.Attribute, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(attribute, el => el.key, el => this.visit(el, q));
-        await q.getAndSend(attribute, el => el.value, el => this.visitLeftPadded(el, q));
+    override visitJsxAttribute(attribute: JSX.Attribute, q: RpcSendQueue): J | undefined {
+        q.getAndSend(attribute, el => el.key, el => this.visit(el, q));
+        q.getAndSend(attribute, el => el.value, el => this.visitLeftPadded(el, q));
         return attribute;
     }
 
-    override async visitJsxSpreadAttribute(spreadAttribute: JSX.SpreadAttribute, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(spreadAttribute, el => el.dots, space => this.visitSpace(space, q));
-        await q.getAndSend(spreadAttribute, el => el.expression, el => this.visitRightPadded(el, q));
+    override visitJsxSpreadAttribute(spreadAttribute: JSX.SpreadAttribute, q: RpcSendQueue): J | undefined {
+        q.getAndSend(spreadAttribute, el => el.dots, space => this.visitSpace(space, q));
+        q.getAndSend(spreadAttribute, el => el.expression, el => this.visitRightPadded(el, q));
         return spreadAttribute;
     }
 
-    override async visitJsxEmbeddedExpression(embeddedExpression: JSX.EmbeddedExpression, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(embeddedExpression, el => el.expression, el => this.visitRightPadded(el, q));
+    override visitJsxEmbeddedExpression(embeddedExpression: JSX.EmbeddedExpression, q: RpcSendQueue): J | undefined {
+        q.getAndSend(embeddedExpression, el => el.expression, el => this.visitRightPadded(el, q));
         return embeddedExpression;
     }
 
-    override async visitJsxNamespacedName(namespacedName: JSX.NamespacedName, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(namespacedName, el => el.namespace, el => this.visit(el, q));
-        await q.getAndSend(namespacedName, el => el.name, el => this.visitLeftPadded(el, q));
+    override visitJsxNamespacedName(namespacedName: JSX.NamespacedName, q: RpcSendQueue): J | undefined {
+        q.getAndSend(namespacedName, el => el.namespace, el => this.visit(el, q));
+        q.getAndSend(namespacedName, el => el.name, el => this.visitLeftPadded(el, q));
         return namespacedName;
     }
 
-    override async visitIndexSignatureDeclaration(indexSignatureDeclaration: JS.IndexSignatureDeclaration, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(indexSignatureDeclaration, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(indexSignatureDeclaration, el => el.parameters, el => this.visitContainer(el, q));
-        await q.getAndSend(indexSignatureDeclaration, el => el.typeExpression, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(indexSignatureDeclaration, el => asRef(el.type), el => this.visitType(el, q));
+    override visitIndexSignatureDeclaration(indexSignatureDeclaration: JS.IndexSignatureDeclaration, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(indexSignatureDeclaration, el => el.modifiers, el => el.id, el => this.visit(el, q));
+        q.getAndSend(indexSignatureDeclaration, el => el.parameters, el => this.visitContainer(el, q));
+        q.getAndSend(indexSignatureDeclaration, el => el.typeExpression, el => this.visitLeftPadded(el, q));
+        q.getAndSend(indexSignatureDeclaration, el => asRef(el.type), el => this.visitType(el, q));
         return indexSignatureDeclaration;
     }
 
-    override async visitComputedPropertyMethodDeclaration(computedPropMethod: JS.ComputedPropertyMethodDeclaration, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(computedPropMethod, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
-        await q.getAndSendList(computedPropMethod, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(computedPropMethod, el => el.typeParameters, el => this.visit(el, q));
-        await q.getAndSend(computedPropMethod, el => el.returnTypeExpression, el => this.visit(el, q));
-        await q.getAndSend(computedPropMethod, el => el.name, el => this.visit(el, q));
-        await q.getAndSend(computedPropMethod, el => el.parameters, el => this.visitContainer(el, q));
-        await q.getAndSend(computedPropMethod, el => el.body, el => this.visit(el, q));
-        await q.getAndSend(computedPropMethod, el => el.methodType, el => this.visitType(el, q));
+    override visitComputedPropertyMethodDeclaration(computedPropMethod: JS.ComputedPropertyMethodDeclaration, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(computedPropMethod, el => el.leadingAnnotations, el => el.id, el => this.visit(el, q));
+        q.getAndSendList(computedPropMethod, el => el.modifiers, el => el.id, el => this.visit(el, q));
+        q.getAndSend(computedPropMethod, el => el.typeParameters, el => this.visit(el, q));
+        q.getAndSend(computedPropMethod, el => el.returnTypeExpression, el => this.visit(el, q));
+        q.getAndSend(computedPropMethod, el => el.name, el => this.visit(el, q));
+        q.getAndSend(computedPropMethod, el => el.parameters, el => this.visitContainer(el, q));
+        q.getAndSend(computedPropMethod, el => el.body, el => this.visit(el, q));
+        q.getAndSend(computedPropMethod, el => el.methodType, el => this.visitType(el, q));
         return computedPropMethod;
     }
 
-    override async visitForOfLoop(forOfLoop: JS.ForOfLoop, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(forOfLoop, el => el.await, space => this.visitSpace(space, q));
-        await q.getAndSend(forOfLoop, el => el.loop, el => this.visit(el, q));
+    override visitForOfLoop(forOfLoop: JS.ForOfLoop, q: RpcSendQueue): J | undefined {
+        q.getAndSend(forOfLoop, el => el.await, space => this.visitSpace(space, q));
+        q.getAndSend(forOfLoop, el => el.loop, el => this.visit(el, q));
         return forOfLoop;
     }
 
-    override async visitForInLoop(forInLoop: JS.ForInLoop, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(forInLoop, el => el.control, el => this.visit(el, q));
-        await q.getAndSend(forInLoop, el => el.body, el => this.visitRightPadded(el, q));
+    override visitForInLoop(forInLoop: JS.ForInLoop, q: RpcSendQueue): J | undefined {
+        q.getAndSend(forInLoop, el => el.control, el => this.visit(el, q));
+        q.getAndSend(forInLoop, el => el.body, el => this.visitRightPadded(el, q));
         return forInLoop;
     }
 
-    override async visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(namespaceDeclaration, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(namespaceDeclaration, el => el.keywordType, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(namespaceDeclaration, el => el.name, el => this.visitRightPadded(el, q));
-        await q.getAndSend(namespaceDeclaration, el => el.body, el => this.visit(el, q));
+    override visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(namespaceDeclaration, el => el.modifiers, el => el.id, el => this.visit(el, q));
+        q.getAndSend(namespaceDeclaration, el => el.keywordType, el => this.visitLeftPadded(el, q));
+        q.getAndSend(namespaceDeclaration, el => el.name, el => this.visitRightPadded(el, q));
+        q.getAndSend(namespaceDeclaration, el => el.body, el => this.visit(el, q));
         return namespaceDeclaration;
     }
 
-    override async visitTypeLiteral(typeLiteral: JS.TypeLiteral, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(typeLiteral, el => el.members, el => this.visit(el, q));
-        await q.getAndSend(typeLiteral, el => asRef(el.type), el => this.visitType(el, q));
+    override visitTypeLiteral(typeLiteral: JS.TypeLiteral, q: RpcSendQueue): J | undefined {
+        q.getAndSend(typeLiteral, el => el.members, el => this.visit(el, q));
+        q.getAndSend(typeLiteral, el => asRef(el.type), el => this.visitType(el, q));
         return typeLiteral;
     }
 
-    override async visitArrayBindingPattern(arrayBindingPattern: JS.ArrayBindingPattern, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(arrayBindingPattern, el => el.elements, el => this.visitContainer(el, q));
-        await q.getAndSend(arrayBindingPattern, el => asRef(el.type), el => this.visitType(el, q));
+    override visitArrayBindingPattern(arrayBindingPattern: JS.ArrayBindingPattern, q: RpcSendQueue): J | undefined {
+        q.getAndSend(arrayBindingPattern, el => el.elements, el => this.visitContainer(el, q));
+        q.getAndSend(arrayBindingPattern, el => asRef(el.type), el => this.visitType(el, q));
         return arrayBindingPattern;
     }
 
-    override async visitBindingElement(bindingElement: JS.BindingElement, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(bindingElement, el => el.propertyName, el => this.visitRightPadded(el, q));
-        await q.getAndSend(bindingElement, el => el.name, el => this.visit(el, q));
-        await q.getAndSend(bindingElement, el => el.initializer, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(bindingElement, el => el.variableType, el => this.visitType(el, q));
+    override visitBindingElement(bindingElement: JS.BindingElement, q: RpcSendQueue): J | undefined {
+        q.getAndSend(bindingElement, el => el.propertyName, el => this.visitRightPadded(el, q));
+        q.getAndSend(bindingElement, el => el.name, el => this.visit(el, q));
+        q.getAndSend(bindingElement, el => el.initializer, el => this.visitLeftPadded(el, q));
+        q.getAndSend(bindingElement, el => el.variableType, el => this.visitType(el, q));
         return bindingElement;
     }
 
-    override async visitExportDeclaration(exportDeclaration: JS.ExportDeclaration, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(exportDeclaration, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSend(exportDeclaration, el => el.typeOnly, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(exportDeclaration, el => el.exportClause, el => this.visit(el, q));
-        await q.getAndSend(exportDeclaration, el => el.moduleSpecifier, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(exportDeclaration, el => el.attributes, el => this.visit(el, q));
+    override visitExportDeclaration(exportDeclaration: JS.ExportDeclaration, q: RpcSendQueue): J | undefined {
+        q.getAndSendList(exportDeclaration, el => el.modifiers, el => el.id, el => this.visit(el, q));
+        q.getAndSend(exportDeclaration, el => el.typeOnly, el => this.visitLeftPadded(el, q));
+        q.getAndSend(exportDeclaration, el => el.exportClause, el => this.visit(el, q));
+        q.getAndSend(exportDeclaration, el => el.moduleSpecifier, el => this.visitLeftPadded(el, q));
+        q.getAndSend(exportDeclaration, el => el.attributes, el => this.visit(el, q));
         return exportDeclaration;
     }
 
-    override async visitExportAssignment(exportAssignment: JS.ExportAssignment, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(exportAssignment, el => el.exportEquals);
-        await q.getAndSend(exportAssignment, el => el.expression, el => this.visitLeftPadded(el, q));
+    override visitExportAssignment(exportAssignment: JS.ExportAssignment, q: RpcSendQueue): J | undefined {
+        q.getAndSend(exportAssignment, el => el.exportEquals);
+        q.getAndSend(exportAssignment, el => el.expression, el => this.visitLeftPadded(el, q));
         return exportAssignment;
     }
 
-    override async visitNamedExports(namedExports: JS.NamedExports, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(namedExports, el => el.elements, el => this.visitContainer(el, q));
-        await q.getAndSend(namedExports, el => asRef(el.type), el => this.visitType(el, q));
+    override visitNamedExports(namedExports: JS.NamedExports, q: RpcSendQueue): J | undefined {
+        q.getAndSend(namedExports, el => el.elements, el => this.visitContainer(el, q));
+        q.getAndSend(namedExports, el => asRef(el.type), el => this.visitType(el, q));
         return namedExports;
     }
 
-    override async visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(exportSpecifier, el => el.typeOnly, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(exportSpecifier, el => el.specifier, el => this.visit(el, q));
-        await q.getAndSend(exportSpecifier, el => asRef(el.type), el => this.visitType(el, q));
+    override visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, q: RpcSendQueue): J | undefined {
+        q.getAndSend(exportSpecifier, el => el.typeOnly, el => this.visitLeftPadded(el, q));
+        q.getAndSend(exportSpecifier, el => el.specifier, el => this.visit(el, q));
+        q.getAndSend(exportSpecifier, el => asRef(el.type), el => this.visitType(el, q));
         return exportSpecifier;
     }
 
-    override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcSendQueue): Promise<J.RightPadded<T>> {
+    override visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcSendQueue): J.RightPadded<T> {
         return this.delegate.visitRightPadded(right, q);
     }
 
-    override async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): Promise<J.LeftPadded<T>> {
+    override visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): J.LeftPadded<T> {
         return this.delegate.visitLeftPadded(left, q);
     }
 
-    override async visitContainer<T extends J>(container: J.Container<T>, q: RpcSendQueue): Promise<J.Container<T>> {
+    override visitContainer<T extends J>(container: J.Container<T>, q: RpcSendQueue): J.Container<T> {
         return this.delegate.visitContainer(container, q);
     }
 
-    override async visitSpace(space: J.Space, q: RpcSendQueue): Promise<J.Space> {
+    override visitSpace(space: J.Space, q: RpcSendQueue): J.Space {
         return this.delegate.visitSpace(space, q);
     }
 
-    override async visitType(javaType: Type | undefined, q: RpcSendQueue): Promise<Type | undefined> {
+    override visitType(javaType: Type | undefined, q: RpcSendQueue): Type | undefined {
         return this.delegate.visitType(javaType, q);
     }
 }
@@ -546,7 +550,7 @@ class JavaScriptDelegateSender extends JavaSender {
         this.javascriptSender = javascriptSender;
     }
 
-    async visit<R extends J>(tree: Tree, p: RpcSendQueue, parent?: Cursor): Promise<R | undefined> {
+    visit<R extends J>(tree: Tree, p: RpcSendQueue, parent?: Cursor): R | undefined {
         // Delegate to JavaScript sender if this is a JavaScript element
         if (isJavaScript(tree)) {
             return this.javascriptSender.visit(tree, p, parent);
@@ -557,172 +561,48 @@ class JavaScriptDelegateSender extends JavaSender {
     }
 }
 
-class JavaScriptReceiver extends JavaReceiver {
-    public override visit<T extends J>(j: T | undefined, q: RpcReceiveQueue): T | undefined {
-        if (!j) return undefined;
+class JavaScriptDelegateReceiver extends JavaReceiver {
+    private javascriptReceiver: JavaScriptReceiver;
 
-        // If it's a JavaScript node, dispatch to JS-specific handlers
-        if (isJavaScript(j)) {
-            let result = this.preVisit(j as JS, q);
+    constructor(javascriptReceiver: JavaScriptReceiver) {
+        super();
+        this.javascriptReceiver = javascriptReceiver;
+    }
+
+    override visit<R extends J>(tree: Tree | undefined, q: RpcReceiveQueue, _parent?: Cursor): R | undefined {
+        if (!tree) return undefined;
+
+        // Delegate to JavaScript receiver if this is a JavaScript element
+        if (isJavaScript(tree)) {
+            return this.javascriptReceiver.visit(tree, q) as R | undefined;
+        }
+
+        // Otherwise handle as a Java element
+        return super.visit(tree as J, q) as R | undefined;
+    }
+}
+
+class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
+    private readonly _delegate: JavaScriptDelegateReceiver;
+
+    constructor() {
+        super();
+        this._delegate = new JavaScriptDelegateReceiver(this);
+    }
+
+    // Override visit() to skip cursor handling for performance
+    public override visit<R extends J>(tree: Tree | undefined, q: RpcReceiveQueue, _parent?: Cursor): R | undefined {
+        if (!tree) return undefined;
+
+        // Only call preVisit for JavaScript elements - Java elements are handled by the delegate
+        if (isJavaScript(tree)) {
+            let result = this.preVisit(tree as JS, q);
             if (result === undefined) return undefined;
-
-            result = this.visitJavaScriptNode(result as JS, q);
-            return result as T | undefined;
+            return this.accept(result as JS, q) as R | undefined;
         }
 
-        // Otherwise delegate to Java visitor
-        return super.visit(j, q);
-    }
-
-    // Helper to visit JS nodes - calls specific visitor method based on kind
-    protected visitJavaScriptNode(js: JS, q: RpcReceiveQueue): J | undefined {
-        switch (js.kind) {
-            case JS.Kind.CompilationUnit:
-                return this.visitJsCompilationUnit(js as JS.CompilationUnit, q);
-            case JS.Kind.Alias:
-                return this.visitAlias(js as JS.Alias, q);
-            case JS.Kind.ArrowFunction:
-                return this.visitArrowFunction(js as JS.ArrowFunction, q);
-            case JS.Kind.As:
-                return this.visitAs(js as JS.As, q);
-            case JS.Kind.AssignmentOperation:
-                return this.visitAssignmentOperationExtensions(js as JS.AssignmentOperation, q);
-            case JS.Kind.Await:
-                return this.visitAwait(js as JS.Await, q);
-            case JS.Kind.Binary:
-                return this.visitBinaryExtensions(js as JS.Binary, q);
-            case JS.Kind.BindingElement:
-                return this.visitBindingElement(js as JS.BindingElement, q);
-            case JS.Kind.ComputedPropertyMethodDeclaration:
-                return this.visitComputedPropertyMethodDeclaration(js as JS.ComputedPropertyMethodDeclaration, q);
-            case JS.Kind.ComputedPropertyName:
-                return this.visitComputedPropertyName(js as JS.ComputedPropertyName, q);
-            case JS.Kind.ConditionalType:
-                return this.visitConditionalType(js as JS.ConditionalType, q);
-            case JS.Kind.Delete:
-                return this.visitDelete(js as JS.Delete, q);
-            case JS.Kind.Export:
-            case JS.Kind.ExportDeclaration:
-                return this.visitExportDeclaration(js as JS.ExportDeclaration, q);
-            case JS.Kind.ExportAssignment:
-                return this.visitExportAssignment(js as JS.ExportAssignment, q);
-            case JS.Kind.ExportSpecifier:
-                return this.visitExportSpecifier(js as JS.ExportSpecifier, q);
-            case JS.Kind.ExpressionStatement:
-                return this.visitExpressionStatement(js as JS.ExpressionStatement, q);
-            case JS.Kind.ExpressionWithTypeArguments:
-                return this.visitExpressionWithTypeArguments(js as JS.ExpressionWithTypeArguments, q);
-            case JS.Kind.ForInLoop:
-                return this.visitForInLoop(js as JS.ForInLoop, q);
-            case JS.Kind.ForOfLoop:
-                return this.visitForOfLoop(js as JS.ForOfLoop, q);
-            case JS.Kind.FunctionCall:
-                return this.visitFunctionCall(js as JS.FunctionCall, q);
-            case JS.Kind.FunctionType:
-                return this.visitFunctionType(js as JS.FunctionType, q);
-            case JS.Kind.Import:
-                return this.visitImportDeclaration(js as JS.Import, q);
-            case JS.Kind.ImportAttribute:
-                return this.visitImportAttribute(js as JS.ImportAttribute, q);
-            case JS.Kind.ImportAttributes:
-                return this.visitImportAttributes(js as JS.ImportAttributes, q);
-            case JS.Kind.ImportClause:
-                return this.visitImportClause(js as JS.ImportClause, q);
-            case JS.Kind.ImportSpecifier:
-                return this.visitImportSpecifier(js as JS.ImportSpecifier, q);
-            case JS.Kind.ImportType:
-                return this.visitImportType(js as JS.ImportType, q);
-            case JS.Kind.ImportTypeAttributes:
-                return this.visitImportTypeAttributes(js as JS.ImportTypeAttributes, q);
-            case JS.Kind.IndexedAccessType:
-                return this.visitIndexedAccessType(js as JS.IndexedAccessType, q);
-            case JS.Kind.IndexedAccessTypeIndexType:
-                return this.visitIndexedAccessTypeIndexType(js as JS.IndexedAccessType.IndexType, q);
-            case JS.Kind.IndexSignatureDeclaration:
-                return this.visitIndexSignatureDeclaration(js as JS.IndexSignatureDeclaration, q);
-            case JS.Kind.InferType:
-                return this.visitInferType(js as JS.InferType, q);
-            case JS.Kind.Intersection:
-                return this.visitIntersection(js as JS.Intersection, q);
-            case JS.Kind.JsxAttribute:
-                return this.visitJsxAttribute(js as JSX.Attribute, q);
-            case JS.Kind.JsxEmbeddedExpression:
-                return this.visitJsxEmbeddedExpression(js as JSX.EmbeddedExpression, q);
-            case JS.Kind.JsxNamespacedName:
-                return this.visitJsxNamespacedName(js as JSX.NamespacedName, q);
-            case JS.Kind.JsxSpreadAttribute:
-                return this.visitJsxSpreadAttribute(js as JSX.SpreadAttribute, q);
-            case JS.Kind.JsxTag:
-                return this.visitJsxTag(js as JSX.Tag, q);
-            case JS.Kind.LiteralType:
-                return this.visitLiteralType(js as JS.LiteralType, q);
-            case JS.Kind.MappedType:
-                return this.visitMappedType(js as JS.MappedType, q);
-            case JS.Kind.MappedTypeKeysRemapping:
-                return this.visitMappedTypeKeysRemapping(js as JS.MappedType.KeysRemapping, q);
-            case JS.Kind.MappedTypeParameter:
-                return this.visitMappedTypeParameter(js as JS.MappedType.Parameter, q);
-            case JS.Kind.NamedExports:
-                return this.visitNamedExports(js as JS.NamedExports, q);
-            case JS.Kind.NamedImports:
-                return this.visitNamedImports(js as JS.NamedImports, q);
-            case JS.Kind.NamespaceDeclaration:
-                return this.visitNamespaceDeclaration(js as JS.NamespaceDeclaration, q);
-            case JS.Kind.ObjectBindingPattern:
-                return this.visitObjectBindingPattern(js as JS.ObjectBindingPattern, q);
-            case JS.Kind.PropertyAssignment:
-                return this.visitPropertyAssignment(js as JS.PropertyAssignment, q);
-            case JS.Kind.SatisfiesExpression:
-                return this.visitSatisfiesExpression(js as JS.SatisfiesExpression, q);
-            case JS.Kind.ScopedVariableDeclarations:
-                return this.visitScopedVariableDeclarations(js as JS.ScopedVariableDeclarations, q);
-            case JS.Kind.Shebang:
-                return this.visitShebang(js as JS.Shebang, q);
-            case JS.Kind.Spread:
-                return this.visitSpread(js as JS.Spread, q);
-            case JS.Kind.StatementExpression:
-                return this.visitStatementExpression(js as JS.StatementExpression, q);
-            case JS.Kind.TaggedTemplateExpression:
-                return this.visitTaggedTemplateExpression(js as JS.TaggedTemplateExpression, q);
-            case JS.Kind.TemplateExpression:
-                return this.visitTemplateExpression(js as JS.TemplateExpression, q);
-            case JS.Kind.TemplateExpressionSpan:
-                return this.visitTemplateExpressionSpan(js as JS.TemplateExpression.Span, q);
-            case JS.Kind.Tuple:
-                return this.visitTuple(js as JS.Tuple, q);
-            case JS.Kind.TypeDeclaration:
-                return this.visitTypeDeclaration(js as JS.TypeDeclaration, q);
-            case JS.Kind.TypeInfo:
-                return this.visitTypeInfo(js as JS.TypeInfo, q);
-            case JS.Kind.TypeLiteral:
-                return this.visitTypeLiteral(js as JS.TypeLiteral, q);
-            case JS.Kind.TypeOf:
-                return this.visitTypeOf(js as JS.TypeOf, q);
-            case JS.Kind.TypeOperator:
-                return this.visitTypeOperator(js as JS.TypeOperator, q);
-            case JS.Kind.TypePredicate:
-                return this.visitTypePredicate(js as JS.TypePredicate, q);
-            case JS.Kind.TypeQuery:
-                return this.visitTypeQuery(js as JS.TypeQuery, q);
-            case JS.Kind.TypeTreeExpression:
-                return this.visitTypeTreeExpression(js as JS.TypeTreeExpression, q);
-            case JS.Kind.Union:
-                return this.visitUnion(js as JS.Union, q);
-            case JS.Kind.Void:
-                return this.visitVoid(js as JS.Void, q);
-            case JS.Kind.WithStatement:
-                return this.visitWithStatement(js as JS.WithStatement, q);
-            case JS.Kind.ArrayBindingPattern:
-                return this.visitArrayBindingPattern(js as JS.ArrayBindingPattern, q);
-            default:
-                // Unknown JS kind - return as-is
-                return js;
-        }
-    }
-
-    // Helper method - same as visit but asserts the result is defined
-    protected visitDefined<T extends J>(j: T, q: RpcReceiveQueue): T {
-        return this.visit(j, q)!;
+        // Otherwise delegate to Java receiver (which handles its own preVisit)
+        return this._delegate.visit(tree, q) as R | undefined;
     }
 
     protected preVisit(j: JS, q: RpcReceiveQueue): J | undefined {
@@ -1342,7 +1222,26 @@ class JavaScriptReceiver extends JavaReceiver {
         return updateIfChanged(exportSpecifier, updates);
     }
 
-    // Inherited from JavaReceiver: visitRightPadded, visitLeftPadded, visitContainer, visitSpace, visitType
+    // Delegate helper methods to JavaReceiver
+    public override visitSpace(space: J.Space, q: RpcReceiveQueue): J.Space {
+        return this._delegate.visitSpace(space, q);
+    }
+
+    public visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): J.LeftPadded<T> {
+        return this._delegate.visitLeftPadded(left, q);
+    }
+
+    public visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcReceiveQueue): J.RightPadded<T> {
+        return this._delegate.visitRightPadded(right, q);
+    }
+
+    public visitContainer<T extends J>(container: J.Container<T>, q: RpcReceiveQueue): J.Container<T> {
+        return this._delegate.visitContainer(container, q);
+    }
+
+    protected override visitType(javaType: Type | undefined, q: RpcReceiveQueue): Type | undefined {
+        return this._delegate.visitType(javaType, q);
+    }
 }
 
 // Register codecs for JavaScript

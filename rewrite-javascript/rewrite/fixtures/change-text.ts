@@ -43,7 +43,7 @@ export class ChangeText extends Recipe {
         const toText = this.text;
         const replacedText = this.replacedText;
         return new class extends PlainTextVisitor<ExecutionContext> {
-            protected override async visitText(text: PlainText, ctx: ExecutionContext): Promise<PlainText | undefined> {
+            protected override visitText(text: PlainText, ctx: ExecutionContext): PlainText | undefined {
                 return this.produceTree(text, ctx, draft => {
                     if (draft.text != toText) {
                         replacedText.insertRow(ctx, new ReplacedText(text.sourcePath, draft.text));

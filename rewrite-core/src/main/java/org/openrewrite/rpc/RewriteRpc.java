@@ -186,10 +186,15 @@ public class RewriteRpc {
     }
 
     /**
-     * Resets all caches. Used for benchmarking to ensure a clean state between runs.
+     * Resets all cached state in both the local and remote RPC processes.
+     * This should be called between operations that don't share state (e.g., between tests)
+     * to prevent unbounded memory growth from accumulated objects.
      */
     public void reset() {
-        preparedRecipes.clear();
+        // Send reset to remote process
+        send("Reset", null, Boolean.class);
+
+        // Clear local caches
         remoteObjects.clear();
         localObjects.clear();
         localObjectIds.clear();
@@ -402,14 +407,17 @@ public class RewriteRpc {
     }
 
     public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
-        localObjects.put(tree.getId().toString(), tree);
+        String treeId = tree.getId().toString();
+        localObjects.put(treeId, tree);
         SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : parent.firstEnclosingOrThrow(SourceFile.class);
+        String sourceFileType = sourceFile.getClass().getName();
+
         return send(
                 "Print",
                 new Print(
-                        tree.getId().toString(),
+                        treeId,
                         sourceFile.getSourcePath(),
-                        sourceFile.getClass().getName(),
+                        sourceFileType,
                         markerPrinter
                 ),
                 String.class

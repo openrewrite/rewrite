@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
+import io.moderne.jsonrpc.formatter.MessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import io.moderne.jsonrpc.handler.MessageHandler;
 import io.moderne.jsonrpc.handler.TraceMessageHandler;
@@ -54,8 +55,9 @@ public class RewriteRpcProcess extends Thread {
     @Setter
     private @Nullable Path workingDirectory;
 
-    @Nullable
-    private Process process;
+    private @Nullable Process process;
+
+    private @Nullable MessageFormatter messageFormatter;
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     @Getter
@@ -71,6 +73,11 @@ public class RewriteRpcProcess extends Thread {
 
     public Map<String, String> environment() {
         return environment;
+    }
+
+    public RewriteRpcProcess messageFormatter(MessageFormatter messageFormatter) {
+        this.messageFormatter = messageFormatter;
+        return this;
     }
 
     public RewriteRpcProcess trace() {
@@ -130,16 +137,29 @@ public class RewriteRpcProcess extends Thread {
             }
         }
 
-        SimpleModule module = new SimpleModule();
-        module.addSerializer(Path.class, new PathSerializer());
-        module.addDeserializer(Path.class, new PathDeserializer());
-        JsonMessageFormatter formatter = new JsonMessageFormatter(module);
+        MessageFormatter formatter;
+        formatter = this.messageFormatter != null ? this.messageFormatter : new JsonMessageFormatter(createDefaultModule());
         MessageHandler handler = new HeaderDelimitedMessageHandler(formatter,
                 process.getInputStream(), process.getOutputStream());
         if (trace) {
             handler = new TraceMessageHandler("client", handler);
         }
-        this.rpcClient = new JsonRpc(handler);
+        this.rpcClient = new JsonRpc(handler, formatter);
+    }
+
+    /**
+     * Creates the default Jackson module with serializers/deserializers for
+     * types used in Rewrite RPC communication. This is useful for creating
+     * a {@link MessageFormatter} for replay mode or other scenarios where
+     * an instance of this class is not available.
+     *
+     * @return a Jackson module with Path serializers
+     */
+    public static SimpleModule createDefaultModule() {
+        SimpleModule module = new SimpleModule();
+        module.addSerializer(Path.class, new PathSerializer());
+        module.addDeserializer(Path.class, new PathDeserializer());
+        return module;
     }
 
     public void shutdown() {

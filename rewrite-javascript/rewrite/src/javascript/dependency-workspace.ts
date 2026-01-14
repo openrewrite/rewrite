@@ -78,7 +78,7 @@ export class DependencyWorkspace {
      * @param options Workspace options including dependencies or package.json content
      * @returns Path to the workspace directory
      */
-    static async getOrCreateWorkspace(options: WorkspaceOptions): Promise<string> {
+    static getOrCreateWorkspace(options: WorkspaceOptions): string {
         // Extract dependencies from package.json content if provided
         let dependencies: Record<string, string> | undefined = options.dependencies;
         let parsedPackageJson: Record<string, any> | undefined;
@@ -125,14 +125,14 @@ export class DependencyWorkspace {
     /**
      * Internal method that handles workspace creation.
      */
-    private static async createWorkspace(
+    private static createWorkspace(
         dependencies: Record<string, string>,
         parsedPackageJson: Record<string, any> | undefined,
         packageJsonContent: string | undefined,
         packageLockContent: string | undefined,
         targetDir: string | undefined,
         workspacePackages?: Record<string, string>
-    ): Promise<string> {
+    ): string {
         // Determine hash based on lock file (most precise) or dependencies
         // Note: We always hash dependencies (not packageJsonContent) because whitespace/formatting
         // differences in package.json shouldn't create different workspaces
@@ -164,7 +164,7 @@ export class DependencyWorkspace {
                     name: "openrewrite-template-workspace",
                     version: "1.0.0",
                     private: true,
-                    dependencies: dependencies
+                    dependencies
                 };
                 fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(packageJson, null, 2));
             }

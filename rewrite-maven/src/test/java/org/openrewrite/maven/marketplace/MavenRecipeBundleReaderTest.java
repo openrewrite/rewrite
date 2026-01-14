@@ -34,7 +34,8 @@ import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MavenRecipeBundleReaderTest {
-
+    // TODO: Figure out how to get this to work on Windows given it doesn't want to relinquish access
+    //  to the temp directories so they can be cleaned up
     @Issue("https://github.com/openrewrite/rewrite/issues/6487")
     @Test
     void canInstallRewriteCore(@TempDir Path tempDir) {

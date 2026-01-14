@@ -73,19 +73,19 @@ export class Detector {
     /**
      * Sample a source file to collect formatting statistics.
      */
-    async sample(sourceFile: SourceFile): Promise<void> {
+    sample(sourceFile: SourceFile): void {
         if (sourceFile.kind === JS.Kind.CompilationUnit) {
-            await this.sampleJavaScript(sourceFile as JS.CompilationUnit);
+            this.sampleJavaScript(sourceFile as JS.CompilationUnit);
         }
     }
 
     /**
      * Sample a JavaScript/TypeScript compilation unit.
      */
-    async sampleJavaScript(cu: JS.CompilationUnit): Promise<void> {
-        await new FindIndentVisitor(this.tabsAndIndentsStats).visit(cu, {});
-        await new FindSpacesVisitor(this.spacesStats).visit(cu, {});
-        await new FindWrappingAndBracesVisitor(this.wrappingAndBracesStats).visit(cu, {});
+    sampleJavaScript(cu: JS.CompilationUnit): void {
+        new FindIndentVisitor(this.tabsAndIndentsStats).visit(cu, {});
+        new FindSpacesVisitor(this.spacesStats).visit(cu, {});
+        new FindWrappingAndBracesVisitor(this.wrappingAndBracesStats).visit(cu, {});
     }
 
     /**
@@ -272,7 +272,7 @@ class FindIndentVisitor extends JavaScriptVisitor<any> {
         super();
     }
 
-    protected async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
+    protected visitBlock(block: J.Block, p: any): J | undefined {
         // Check indentation of statements in the block
         for (const stmt of block.statements) {
             const whitespace = stmt.element.prefix?.whitespace;
@@ -315,7 +315,7 @@ class FindSpacesVisitor extends JavaScriptVisitor<any> {
         super();
     }
 
-    protected async visitImportDeclaration(import_: JS.Import, p: any): Promise<J | undefined> {
+    protected visitImportDeclaration(import_: JS.Import, p: any): J | undefined {
         // Check ES6 import braces spacing: import { a } from 'x' vs import {a} from 'x'
         if (import_.importClause?.namedBindings?.kind === JS.Kind.NamedImports) {
             const namedImports = import_.importClause.namedBindings as JS.NamedImports;
@@ -336,7 +336,7 @@ class FindSpacesVisitor extends JavaScriptVisitor<any> {
         return super.visitImportDeclaration(import_, p);
     }
 
-    protected async visitExportDeclaration(export_: JS.ExportDeclaration, p: any): Promise<J | undefined> {
+    protected visitExportDeclaration(export_: JS.ExportDeclaration, p: any): J | undefined {
         // Check ES6 export braces spacing
         if (export_.exportClause?.kind === JS.Kind.NamedExports) {
             const namedExports = export_.exportClause as JS.NamedExports;
@@ -357,7 +357,7 @@ class FindSpacesVisitor extends JavaScriptVisitor<any> {
         return super.visitExportDeclaration(export_, p);
     }
 
-    protected async visitNewClass(newClass: J.NewClass, p: any): Promise<J | undefined> {
+    protected visitNewClass(newClass: J.NewClass, p: any): J | undefined {
         // Only handle object literals (NewClass with no class/constructor)
         if (!newClass.class && newClass.body && newClass.body.statements.length > 0) {
             const stmts = newClass.body.statements;
@@ -383,7 +383,7 @@ class FindSpacesVisitor extends JavaScriptVisitor<any> {
         return super.visitNewClass(newClass, p);
     }
 
-    protected async visitTypeLiteral(typeLiteral: JS.TypeLiteral, p: any): Promise<J | undefined> {
+    protected visitTypeLiteral(typeLiteral: JS.TypeLiteral, p: any): J | undefined {
         // Check type literal braces spacing: { foo: string } vs {foo: string}
         if (typeLiteral.members && typeLiteral.members.statements.length > 0) {
             const stmts = typeLiteral.members.statements;
@@ -418,7 +418,7 @@ class FindWrappingAndBracesVisitor extends JavaScriptVisitor<any> {
         super();
     }
 
-    protected async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
+    protected visitBlock(block: J.Block, p: any): J | undefined {
         // Check if this is a simple block (empty or contains only J.Empty)
         const isSimple = block.statements.length === 0 ||
             (block.statements.length === 1 && block.statements[0].element.kind === J.Kind.Empty);

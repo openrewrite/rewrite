@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {ExecutionContext, isSourceFile, Recipe, SourceFile, Tree, TreeVisitor} from "@openrewrite/rewrite";
+import {AsyncTreeVisitor, ExecutionContext, isSourceFile, Recipe, SourceFile, Tree} from "@openrewrite/rewrite";
 import {RewriteRpc} from "@openrewrite/rewrite/rpc";
 import {JS} from "@openrewrite/rewrite/javascript";
 
@@ -41,7 +41,7 @@ export class JavaChangeMethodName extends Recipe {
         super();
     }
 
-    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editor(): Promise<AsyncTreeVisitor<any, ExecutionContext>> {
         const rpc = RewriteRpc.get();
         if (!rpc) {
             throw new Error("RewriteRpc not available - cannot delegate to Java recipe");
@@ -59,7 +59,7 @@ export class JavaChangeMethodName extends Recipe {
         const javaEditor = await this.javaRecipe!.editor();
 
         // Wrap it to only apply to JavaScript/TypeScript files (not JSON)
-        return new class extends TreeVisitor<Tree, ExecutionContext> {
+        return new class extends AsyncTreeVisitor<Tree, ExecutionContext> {
             async isAcceptable(sourceFile: SourceFile, _ctx: ExecutionContext): Promise<boolean> {
                 // Only apply to JS/TS files, not JSON
                 return sourceFile.kind === JS.Kind.CompilationUnit;

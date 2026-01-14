@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openrewrite"
+description = "OpenRewrite automated refactoring for Python."
+version = "0.0.0"  # Updated dynamically during release
+authors = [{ name = "Moderne Inc.", email = "support@moderne.io" }]
+license = { text = "Moderne Source Available License" }
+readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Quality Assurance",
+    "Typing :: Typed",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "cbor2>=5.6.5",
+    "more_itertools>=10.0.0",
+    "pytype>=2024.1.1; python_version < '3.13'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "mypy>=1.0.0",
+    "black>=24.0.0",
+    "ruff>=0.1.0",
+]
+publish = [
+    "build>=1.0.0",
+    "twine>=5.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/openrewrite/rewrite"
+Repository = "https://github.com/openrewrite/rewrite.git"
+Documentation = "https://docs.openrewrite.org"
+Issues = "https://github.com/openrewrite/rewrite/issues"
+
+[project.entry-points."openrewrite.recipes"]
+openrewrite = "rewrite:activate"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["rewrite", "rewrite.*"]
+
+[tool.setuptools.package-data]
+"*" = ["py.typed", "*.pyi"]
+
+[tool.black]
+line-length = 120
+target-version = ["py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]

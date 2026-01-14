@@ -158,7 +158,7 @@ describe("UseObjectPropertyShorthand", () => {
             let foundShorthandProperty = false;
 
             await new class extends JavaScriptVisitor<void> {
-                protected async visitPropertyAssignment(prop: JS.PropertyAssignment, _: void): Promise<J | undefined> {
+                protected visitPropertyAssignment(prop: JS.PropertyAssignment, _: void): J | undefined {
                     // Find the shorthand property (no initializer means shorthand)
                     if (!prop.initializer) {
                         foundShorthandProperty = true;

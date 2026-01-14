@@ -68,29 +68,33 @@ export class JsonParser extends Parser {
 
     async *parse(...sourcePaths: ParserInput[]): AsyncGenerator<SourceFile> {
         for (const sourcePath of sourcePaths) {
-            try {
-                yield {
-                    ...new JsoncParserReader(parserInputRead(sourcePath)).parse(),
-                    sourcePath: this.relativePath(sourcePath)
-                };
-            } catch (e: any) {
-                // Return a ParseError for files that can't be parsed
-                const text = parserInputRead(sourcePath);
-                const parseError: ParseError = {
-                    kind: ParseErrorKind,
+            yield this.parseOne(sourcePath);
+        }
+    }
+
+    override parseOne(input: ParserInput): SourceFile {
+        const text = parserInputRead(input);
+        try {
+            return {
+                ...new JsoncParserReader(text).parse(),
+                sourcePath: this.relativePath(input)
+            };
+        } catch (e: any) {
+            // Return a ParseError for files that can't be parsed
+            const parseError: ParseError = {
+                kind: ParseErrorKind,
+                id: randomId(),
+                markers: markers({
+                    kind: MarkersKind.ParseExceptionResult,
                     id: randomId(),
-                    markers: markers({
-                        kind: MarkersKind.ParseExceptionResult,
-                        id: randomId(),
-                        parserType: "JsonParser",
-                        exceptionType: e.name || "Error",
-                        message: e.message || "Unknown parse error"
-                    } satisfies ParseExceptionResult as ParseExceptionResult),
-                    sourcePath: this.relativePath(sourcePath),
-                    text
-                };
-                yield parseError;
-            }
+                    parserType: "JsonParser",
+                    exceptionType: e.name || "Error",
+                    message: e.message || "Unknown parse error"
+                } satisfies ParseExceptionResult as ParseExceptionResult),
+                sourcePath: this.relativePath(input),
+                text
+            };
+            return parseError;
         }
     }
 }
