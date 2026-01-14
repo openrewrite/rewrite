@@ -54,10 +54,7 @@ public class ChangeType extends Recipe {
     @Nullable
     Boolean ignoreDefinition;
 
-    @Override
-    public String getDisplayName() {
-        return "Change type";
-    }
+    String displayName = "Change type";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -81,10 +78,7 @@ public class ChangeType extends Recipe {
         }
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a given type to another.";
-    }
+    String description = "Change a given type to another.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

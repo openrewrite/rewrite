@@ -2254,10 +2254,10 @@ class ChangeTypeTest implements RewriteTest {
             spec -> spec.beforeRecipe((source) -> {
                 TreeVisitor<?, ExecutionContext> visitor = new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor();
 
-                J.CompilationUnit cu = (J.CompilationUnit) visitor.visit(source, new InMemoryExecutionContext());
+                var cu = (J.CompilationUnit) visitor.visit(source, new InMemoryExecutionContext());
                 assertEquals("GoodbyeClass", cu.getClasses().getFirst().getSimpleName());
 
-                J.ClassDeclaration cd = (J.ClassDeclaration) visitor.visit(source.getClasses().getFirst(), new InMemoryExecutionContext());
+                var cd = (J.ClassDeclaration) visitor.visit(source.getClasses().getFirst(), new InMemoryExecutionContext());
                 assertEquals("GoodbyeClass", cd.getSimpleName());
             }))
         );

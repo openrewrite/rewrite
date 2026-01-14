@@ -149,15 +149,9 @@ class RecipeEstimatedEffortTest implements RewriteTest {
           description = "The text to be appended if the search term can found")
         String appendText;
 
-        @Override
-        public String getDisplayName() {
-            return "CustomEstimatedEffortRecipe";
-        }
+        String displayName = "CustomEstimatedEffortRecipe";
 
-        @Override
-        public String getDescription() {
-            return "NoArgRecipe.";
-        }
+        String description = "NoArgRecipe.";
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -206,15 +200,9 @@ class RecipeEstimatedEffortTest implements RewriteTest {
         @Nullable
         Boolean overwriteExisting;
 
-        @Override
-        public String getDisplayName() {
-            return "Create text file";
-        }
+        String displayName = "Create text file";
 
-        @Override
-        public String getDescription() {
-            return "Creates a new plain text file.";
-        }
+        String description = "Creates a new plain text file.";
 
         @Override
         public AtomicBoolean getInitialValue(ExecutionContext ctx) {
@@ -242,7 +230,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
             return new TreeVisitor<SourceFile, ExecutionContext>() {
                 @Override
                 public SourceFile visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                    var sourceFile = (SourceFile) requireNonNull(tree);
                     if (Boolean.TRUE.equals(overwriteExisting) && path.equals(sourceFile.getSourcePath())) {
                         if (sourceFile instanceof PlainText text) {
                             return text.withText(fileContents);

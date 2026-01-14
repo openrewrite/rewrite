@@ -205,16 +205,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     @RequiredArgsConstructor
     static class PreconditionBellwether extends Recipe {
 
-        @Override
-        public String getDisplayName() {
-            return "Precondition bellwether";
-        }
+        String displayName = "Precondition bellwether";
 
-        @Override
-        public String getDescription() {
-            return "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
+        String description = "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
                    "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends.";
-        }
 
         Supplier<TreeVisitor<?, ExecutionContext>> precondition;
 
@@ -454,15 +448,9 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     private static class LazyLoadedRecipe extends Recipe {
         String recipeFqn;
 
-        @Override
-        public String getDisplayName() {
-            return "Lazy loaded recipe";
-        }
+        String displayName = "Lazy loaded recipe";
 
-        @Override
-        public String getDescription() {
-            return "Recipe that is loaded lazily.";
-        }
+        String description = "Recipe that is loaded lazily.";
     }
 
     @Override

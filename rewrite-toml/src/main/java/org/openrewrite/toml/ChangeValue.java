@@ -41,20 +41,14 @@ public class ChangeValue extends Recipe {
             example = "\"2.0.0\"")
     String newValue;
 
-    @Override
-    public String getDisplayName() {
-        return "Change TOML value";
-    }
+    String displayName = "Change TOML value";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s` to `%s`", keyPath, newValue);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change the value of a TOML key.";
-    }
+    String description = "Change the value of a TOML key.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

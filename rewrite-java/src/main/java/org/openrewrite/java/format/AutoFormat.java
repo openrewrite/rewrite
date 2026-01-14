@@ -63,15 +63,9 @@ public class AutoFormat extends Recipe {
         this(style, null);
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Format Java code";
-    }
+    String displayName = "Format Java code";
 
-    @Override
-    public String getDescription() {
-        return "Format Java code using a standard comprehensive set of Java formatting recipes.";
-    }
+    String description = "Format Java code using a standard comprehensive set of Java formatting recipes.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

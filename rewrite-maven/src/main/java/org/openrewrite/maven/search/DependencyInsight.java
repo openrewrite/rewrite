@@ -100,21 +100,15 @@ public class DependencyInsight extends Recipe {
         return v;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Maven dependency insight";
-    }
+    String displayName = "Maven dependency insight";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupIdPattern, artifactIdPattern);
     }
 
-    @Override
-    public String getDescription() {
-        return "Find direct and transitive dependencies matching a group, artifact, and scope. " +
+    String description = "Find direct and transitive dependencies matching a group, artifact, and scope. " +
                "Results include dependencies that either directly match or transitively include a matching dependency.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

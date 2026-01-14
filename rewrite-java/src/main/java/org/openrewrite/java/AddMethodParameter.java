@@ -68,15 +68,9 @@ public class AddMethodParameter extends Recipe {
         return String.format("`%s %s` in methods `%s`", parameterType, parameterName, methodPattern);
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Add method parameter to a method declaration";
-    }
+    String displayName = "Add method parameter to a method declaration";
 
-    @Override
-    public String getDescription() {
-        return "Adds a new method parameter to an existing method declaration.";
-    }
+    String description = "Adds a new method parameter to an existing method declaration.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

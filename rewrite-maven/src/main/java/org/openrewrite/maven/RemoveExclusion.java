@@ -63,20 +63,14 @@ public class RemoveExclusion extends Recipe {
     @Nullable
     Boolean onlyIneffective;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove exclusion";
-    }
+    String displayName = "Remove exclusion";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", exclusionGroupId, exclusionArtifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Remove any matching exclusion from any matching dependency.";
-    }
+    String description = "Remove any matching exclusion from any matching dependency.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

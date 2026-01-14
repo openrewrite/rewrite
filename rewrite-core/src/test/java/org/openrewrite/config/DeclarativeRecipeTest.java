@@ -388,15 +388,9 @@ class DeclarativeRecipeTest implements RewriteTest {
             return maxCycles;
         }
 
-        @Override
-        public String getDisplayName() {
-            return "Executes recipes multiple times";
-        }
+        String displayName = "Executes recipes multiple times";
 
-        @Override
-        public String getDescription() {
-            return "Executes recipes multiple times.";
-        }
+        String description = "Executes recipes multiple times.";
     }
 
     @EqualsAndHashCode(callSuper = false)
@@ -411,22 +405,16 @@ class DeclarativeRecipeTest implements RewriteTest {
             return maxCycles;
         }
 
-        @Override
-        public String getDisplayName() {
-            return "Repeated find and replace";
-        }
+        String displayName = "Repeated find and replace";
 
-        @Override
-        public String getDescription() {
-            return "Find and replace repeatedly.";
-        }
+        String description = "Find and replace repeatedly.";
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<>() {
                 @Override
                 public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    PlainText text = ((PlainText) tree);
+                    var text = ((PlainText) tree);
                     assert text != null;
                     return text.withText(text.getText().replaceAll(find, replace));
                 }

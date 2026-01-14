@@ -41,10 +41,7 @@ import static java.util.Objects.requireNonNull;
 public class Find extends Recipe {
     transient TextMatches textMatches = new TextMatches(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Find text";
-    }
+    String displayName = "Find text";
 
     @Override
     public String getDescription() {

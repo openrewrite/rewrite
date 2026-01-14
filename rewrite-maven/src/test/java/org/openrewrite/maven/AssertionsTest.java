@@ -133,7 +133,7 @@ class AssertionsTest implements RewriteTest {
 
                 @Override
                 public Xml visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                    var sourceFile = (SourceFile) requireNonNull(tree);
                     filename = sourceFile.getSourcePath().getFileName().toString();
                     return (Xml) sourceFile;
                 }
@@ -163,7 +163,7 @@ class AssertionsTest implements RewriteTest {
             return new XmlIsoVisitor<>() {
                 @Override
                 public Xml visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                    var sourceFile = (SourceFile) requireNonNull(tree);
                     xmlCount.incrementAndGet();
                     return (Xml) sourceFile;
                 }

@@ -42,15 +42,9 @@ public class HasMethod extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
-    @Override
-    public String getDisplayName() {
-        return "Find files that have at least one use of a method";
-    }
+    String displayName = "Find files that have at least one use of a method";
 
-    @Override
-    public String getDescription() {
-        return "Marks files that have at least one occurrence of a method matching a pattern.";
-    }
+    String description = "Marks files that have at least one occurrence of a method matching a pattern.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

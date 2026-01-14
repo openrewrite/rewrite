@@ -131,20 +131,14 @@ public class ChangeDependency extends Recipe {
         this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, overrideManagedVersion, true);
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Change Gradle dependency";
-    }
+    String displayName = "Change Gradle dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", oldGroupId, oldArtifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a Gradle dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before.";
-    }
+    String description = "Change a Gradle dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before.";
 
     @Override
     public Validated<Object> validate() {
