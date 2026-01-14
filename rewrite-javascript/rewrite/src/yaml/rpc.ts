@@ -40,10 +40,18 @@ class YamlSender extends YamlVisitor<RpcSendQueue> {
     }
 
     protected async visitDocument(document: Yaml.Document, q: RpcSendQueue): Promise<Yaml | undefined> {
+        await q.getAndSendList(document, d => d.directives, dir => dir.id,
+            async dir => await this.visit(dir, q));
         await q.getAndSend(document, d => d.explicit);
         await q.getAndSend(document, d => d.block, async b => await this.visit(b, q));
         await q.getAndSend(document, d => d.end, async e => await this.visit(e, q));
         return document;
+    }
+
+    protected async visitDirective(directive: Yaml.Directive, q: RpcSendQueue): Promise<Yaml | undefined> {
+        await q.getAndSend(directive, d => d.value);
+        await q.getAndSend(directive, d => d.suffix);
+        return directive;
     }
 
     protected async visitDocumentEnd(end: Yaml.DocumentEnd, q: RpcSendQueue): Promise<Yaml | undefined> {
@@ -137,11 +145,20 @@ class YamlReceiver extends YamlVisitor<RpcReceiveQueue> {
 
     protected async visitDocument(document: Yaml.Document, q: RpcReceiveQueue): Promise<Yaml | undefined> {
         return updateIfChanged(document, {
+            directives: await q.receiveListDefined(document.directives,
+                async dir => await this.visit(dir, q) as Yaml.Directive),
             explicit: await q.receive(document.explicit),
             block: await q.receive(document.block,
                 async b => await this.visit(b, q) as Yaml.Block),
             end: await q.receive(document.end,
                 async e => await this.visit(e, q) as Yaml.DocumentEnd),
+        });
+    }
+
+    protected async visitDirective(directive: Yaml.Directive, q: RpcReceiveQueue): Promise<Yaml | undefined> {
+        return updateIfChanged(directive, {
+            value: await q.receive(directive.value),
+            suffix: await q.receive(directive.suffix),
         });
     }
 
