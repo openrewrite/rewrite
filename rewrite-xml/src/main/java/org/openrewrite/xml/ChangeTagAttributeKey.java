@@ -17,30 +17,20 @@ package org.openrewrite.xml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.xml.tree.Xml;
-
-import static org.openrewrite.internal.ListUtils.map;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangeTagAttributeKey extends Recipe {
 
     String displayName = "Change XML attribute key";
-    String description = "Change an attributes key on XML elements matching the given XPath expression.";
+    String description = "Change an attributes key on XML elements using an XPath expression.";
 
-    @Option(displayName = "Element XPath",
-            description = "XPath expression to match elements.",
-            example = "//a4j:ajax")
+    @Option(displayName = "Attribute XPath",
+            description = "XPath expression to match the attribute.",
+            example = "//a4j:ajax/@reRender")
     String elementXPath;
-
-    @Option(displayName = "Old attribute name",
-            description = "The current name of the attribute to rename.",
-            example = "reRender")
-    String oldAttributeName;
 
     @Option(displayName = "New attribute name",
             description = "The new name for the attribute.",
@@ -52,15 +42,14 @@ public class ChangeTagAttributeKey extends Recipe {
         XPathMatcher xPathMatcher = new XPathMatcher(elementXPath);
         return new XmlIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                Xml.Tag t = super.visitTag(tag, ctx);
+            public Xml.Attribute visitAttribute(Xml.Attribute attribute, ExecutionContext executionContext) {
+                Xml.Attribute a = super.visitAttribute(attribute, executionContext);
+
                 if (!xPathMatcher.matches(getCursor())) {
-                    return t;
+                    return a;
                 }
 
-                return t.withAttributes(map(t.getAttributes(),
-                        attr -> oldAttributeName.equals(attr.getKeyAsString()) ?
-                                attr.withKey(attr.getKey().withName(newAttributeName)) : attr));
+                return a.withKey(a.getKey().withName(newAttributeName));
             }
         };
     }

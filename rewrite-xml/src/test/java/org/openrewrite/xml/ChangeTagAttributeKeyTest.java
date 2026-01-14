@@ -28,8 +28,7 @@ class ChangeTagAttributeKeyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ChangeTagAttributeKey(
-          "/html/body/a4j:ajax",
-          "reRender",
+          "/html/body/a4j:ajax/@reRender",
           "render"
         ));
     }
@@ -126,6 +125,24 @@ class ChangeTagAttributeKeyTest implements RewriteTest {
                           <div>
                               <a4j:ajax render="form:output" event="change"/>
                           </div>
+                      </body>
+                  </html>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void whenOnOtherElement() {
+            rewriteRun(
+              //language=xml
+              xml(
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <html xmlns="http://www.w3.org/1999/xhtml"
+                        xmlns:a4j="http://richfaces.org/a4j">
+                      <body>
+                          <a4j:some reRender="form:output" event="change"/>
                       </body>
                   </html>
                   """
