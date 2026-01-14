@@ -44,7 +44,7 @@ import static org.openrewrite.maven.tree.Parent.DEFAULT_RELATIVE_PATH;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ChangeParentPom extends Recipe {
+public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator> {
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Old group ID",
@@ -171,25 +171,67 @@ public class ChangeParentPom extends Recipe {
         return validated;
     }
 
+    public static class Accumulator {
+        @Nullable MavenResolutionResult updatedParent;
+    }
+
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public Accumulator getInitialValue(ExecutionContext ctx) {
+        return new Accumulator();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
         assert versionComparator != null;
 
         return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                Parent parent = getResolutionResult().getPom().getRequested().getParent();
-                if (parent != null &&
-                    matchesGlob(parent.getArtifactId(), oldArtifactId) &&
-                    matchesGlob(parent.getGroupId(), oldGroupId)) {
-                    return SearchResult.found(document);
+                // Check if this pom or any of its ancestors in the parent hierarchy
+                // has the matching parent (spring-boot-starter-parent, etc.)
+                MavenResolutionResult mrr = getResolutionResult();
+                while (mrr != null) {
+                    Parent parent = mrr.getPom().getRequested().getParent();
+                    if (parent != null &&
+                        matchesGlob(parent.getArtifactId(), oldArtifactId) &&
+                        matchesGlob(parent.getGroupId(), oldGroupId)) {
+                        return SearchResult.found(document);
+                    }
+                    mrr = mrr.getParent();
                 }
                 return document;
             }
         }, new MavenIsoVisitor<ExecutionContext>() {
             @Nullable
             private Collection<String> availableVersions;
+
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml.Document d = super.visitDocument(document, ctx);
+
+                // Check if this is a child module that needs its parent marker updated
+                MavenResolutionResult mrr = d.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
+                if (mrr != null && mrr.getParent() != null && acc.updatedParent != null) {
+                    // Match by GAV to find if this module's parent is the updated parent
+                    ResolvedGroupArtifactVersion updatedGav = acc.updatedParent.getPom().getGav();
+                    ResolvedGroupArtifactVersion parentGav = mrr.getParent().getPom().getGav();
+                    if (updatedGav.getGroupId().equals(parentGav.getGroupId()) &&
+                        updatedGav.getArtifactId().equals(parentGav.getArtifactId()) &&
+                        updatedGav.getVersion().equals(parentGav.getVersion())) {
+                        // Update this module's marker to point to the updated parent
+                        MavenResolutionResult updatedMarker = mrr.withParent(acc.updatedParent);
+                        d = d.withMarkers(d.getMarkers().computeByType(mrr,
+                                (original, ignored) -> updatedMarker));
+                    }
+                }
+                return d;
+            }
 
             @SuppressWarnings("OptionalGetWithoutIsPresent")
             @Override
@@ -243,7 +285,7 @@ public class ChangeParentPom extends Recipe {
                             List<ResolvedManagedDependency> dependenciesWithoutExplicitVersions = getDependenciesUnmanagedByNewParent(mrr, newParent);
                             for (ResolvedManagedDependency dep : dependenciesWithoutExplicitVersions) {
                                 changeParentTagVisitors.add(new AddManagedDependencyVisitor(
-                                        dep.getGav().getGroupId(), dep.getGav().getArtifactId(), dep.getGav().getVersion(),
+                                        dep.getGroupId(), dep.getArtifactId(), dep.getVersion() == null ? "" : dep.getVersion(),
                                         dep.getScope() == null ? null : dep.getScope().toString().toLowerCase(), dep.getType(), dep.getClassifier(), null));
                             }
 
@@ -274,7 +316,6 @@ public class ChangeParentPom extends Recipe {
                                     relativePathTag = Xml.Tag.build("<relativePath>" + targetRelativePath + "</relativePath>");
                                 }
                                 doAfterVisit(new AddToTagVisitor<>(t, relativePathTag, new MavenTagInsertionComparator(t.getChildren())));
-                                maybeUpdateModel();
                             }
 
                             if (!changeParentTagVisitors.isEmpty()) {
@@ -282,6 +323,7 @@ public class ChangeParentPom extends Recipe {
                                     doAfterVisit(visitor);
                                 }
                                 maybeUpdateModel();
+                                doAfterVisit(new StoreUpdatedMarkerVisitor(acc));
                                 doAfterVisit(new RemoveRedundantDependencyVersions(null, null, GTE, except).getVisitor());
                             }
                         } catch (MavenDownloadingException e) {
@@ -331,6 +373,26 @@ public class ChangeParentPom extends Recipe {
                 return availableVersions.stream().filter(finalCurrentVersion::equals).findFirst();
             }
         });
+    }
+
+    /**
+     * Visitor that runs after UpdateMavenModel to store the updated marker in the accumulator.
+     * Used to update the models of other poms in the same repository with the new parent information.
+     */
+    private static class StoreUpdatedMarkerVisitor extends MavenVisitor<ExecutionContext> {
+        private final Accumulator acc;
+
+        StoreUpdatedMarkerVisitor(Accumulator acc) {
+            this.acc = acc;
+        }
+
+        @Override
+        public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
+            // Store the updated marker (after UpdateMavenModel has run)
+            document.getMarkers().findFirst(MavenResolutionResult.class)
+                    .ifPresent(mrr -> acc.updatedParent = mrr);
+            return document;
+        }
     }
 
     private static @Nullable String determineRelativePath(Xml.Tag tag, ResolvedPom resolvedPom) {
@@ -389,7 +451,7 @@ public class ChangeParentPom extends Recipe {
                         .noneMatch(it -> {
                             String groupId = resolvedPom.getValue(it.getGroupId());
                             String artifactId = resolvedPom.getValue(it.getArtifactId());
-                            return dep.getGroupId().equals(groupId) && dep.getArtifactId().equals(artifactId);
+                            return Objects.equals(dep.getGroupId(),groupId) && Objects.equals(dep.getArtifactId(), artifactId);
                         }))
                 .map(dep -> new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), null))
                 .collect(toCollection(LinkedHashSet::new));

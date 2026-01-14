@@ -418,7 +418,25 @@ class ChangeParentPomTest implements RewriteTest {
                     </parent>
                     <artifactId>module1</artifactId>
                   </project>
-                  """
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    MavenResolutionResult parentMrr = mrr.getParent();
+                    assertThat(parentMrr).isNotNull();
+                    assertThat(parentMrr.getPom().getRequested().getParent().getGav().getVersion())
+                        .isEqualTo("2.6.7");
+                })
               )),
             mavenProject("module2",
               pomXml(
@@ -432,7 +450,25 @@ class ChangeParentPomTest implements RewriteTest {
                     </parent>
                     <artifactId>module2</artifactId>
                   </project>
-                  """
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module2</artifactId>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    MavenResolutionResult parentMrr = mrr.getParent();
+                    assertThat(parentMrr).isNotNull();
+                    assertThat(parentMrr.getPom().getRequested().getParent().getGav().getVersion())
+                        .isEqualTo("2.6.7");
+                })
               )
             )
           )
@@ -1545,6 +1581,71 @@ class ChangeParentPomTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(recipe),
           mavenProject("parent",
+            mavenProject("module1",
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    MavenResolutionResult parentMrr = mrr.getParent();
+                    assertThat(parentMrr).isNotNull();
+                    assertThat(parentMrr.getPom().getRequested().getParent().getGav().getVersion())
+                        .isEqualTo("2.6.7");
+                })
+              )),
+            mavenProject("module2",
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module2</artifactId>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module2</artifactId>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    MavenResolutionResult parentMrr = mrr.getParent();
+                    assertThat(parentMrr).isNotNull();
+                    assertThat(parentMrr.getPom().getRequested().getParent().getGav().getVersion())
+                        .isEqualTo("2.6.7");
+                })
+              )
+            ),
             pomXml(
               """
                 <project>
@@ -1584,35 +1685,6 @@ class ChangeParentPomTest implements RewriteTest {
                   </modules>
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                      <groupId>org.sample</groupId>
-                      <artifactId>sample</artifactId>
-                      <version>1.0.0</version>
-                    </parent>
-                    <artifactId>module1</artifactId>
-                  </project>
-                  """
-              )),
-            mavenProject("module2",
-              pomXml(
-                """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                      <groupId>org.sample</groupId>
-                      <artifactId>sample</artifactId>
-                      <version>1.0.0</version>
-                    </parent>
-                    <artifactId>module2</artifactId>
-                  </project>
-                  """
-              )
             )
           )
         );
@@ -2092,6 +2164,17 @@ class ChangeParentPomTest implements RewriteTest {
             ),
             mavenProject("module1",
               pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """,
                 """
                   <project>
                     <modelVersion>4.0.0</modelVersion>
