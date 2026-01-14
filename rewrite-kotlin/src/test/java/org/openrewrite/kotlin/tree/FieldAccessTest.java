@@ -114,10 +114,10 @@ class FieldAccessTest implements RewriteTest {
               class Test(val id2 : Int) : @Suppress Super(1 + 3)
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.ClassDeclaration test = (J.ClassDeclaration) cu.getStatements().get(1);
+                var test = (J.ClassDeclaration) cu.getStatements().get(1);
                 assertThat(test.getImplements()).satisfiesExactly(
                   superType -> {
-                      K.ConstructorInvocation call = (K.ConstructorInvocation) superType;
+                      var call = (K.ConstructorInvocation) superType;
                       assertThat(((JavaType.FullyQualified) call.getType()).getFullyQualifiedName()).isEqualTo("Super");
                       assertThat(((J.Identifier) call.getTypeTree()).getSimpleName()).isEqualTo("Super");
                       assertThat(call.getArguments()).satisfiesExactly(
@@ -127,7 +127,7 @@ class FieldAccessTest implements RewriteTest {
                 );
                 assertThat(test.getBody().getStatements()).satisfiesExactly(
                   stmt -> {
-                      J.MethodDeclaration constr = (J.MethodDeclaration) stmt;
+                      var constr = (J.MethodDeclaration) stmt;
                       assertThat(constr.getParameters()).satisfiesExactly(
                         id2 -> assertThat(id2).isInstanceOf(J.VariableDeclarations.class)
                       );

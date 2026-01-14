@@ -428,7 +428,10 @@ class JdkParserBuilderCache {
             }
 
             // Try to find and cache appropriate parser
-            if (version > 21) {
+
+            // Java 23+ changed the return type of `DocCommentTable.getCommentTree` from `DCDocComment` to `DocCommentTree`
+            // That means Java 23 and above need the Java 25 parser, whereas Java 22 and below need the Java 21 parser
+            if (version > 22) {
                 supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java25Parser");
             }
 

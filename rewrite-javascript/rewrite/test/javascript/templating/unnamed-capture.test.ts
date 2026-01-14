@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,10 +29,10 @@ describe('unnamed capture', () => {
                 const right = capture();
 
                 //language=typescript
-                let m = await pattern`${left} + ${right}`.match(expr) ||
-                    await pattern`${left} * ${right}`.match(expr);
+                let m = await pattern`${left} + ${right}`.match(expr, this.cursor) ||
+                    await pattern`${left} * ${right}`.match(expr, this.cursor);
 
-                return m && await template`${right} + ${left}`.apply(this.cursor, expr, m) || expr;
+                return m && await template`${right} + ${left}`.apply(expr, this.cursor, {values: m}) || expr;
             }
         });
 

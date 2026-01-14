@@ -48,15 +48,9 @@ public class ChangeMethodAccessLevel extends Recipe {
         return String.format("`%s` to `%s`", methodPattern, newAccessLevel);
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Change method access level";
-    }
+    String displayName = "Change method access level";
 
-    @Override
-    public String getDescription() {
-        return "Change the access level (public, protected, private, package private) of a method.";
-    }
+    String description = "Change the access level (public, protected, private, package private) of a method.";
 
     @Override
     public Validated<Object> validate() {

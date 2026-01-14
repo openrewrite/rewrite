@@ -50,15 +50,9 @@ public class DeleteTableRow extends Recipe {
     @Nullable
     Boolean useRegex;
 
-    @Override
-    public String getDisplayName() {
-        return "Delete TOML table row";
-    }
+    String displayName = "Delete TOML table row";
 
-    @Override
-    public String getDescription() {
-        return "Delete a TOML table row when one of its values matches the specified matcher.";
-    }
+    String description = "Delete a TOML table row when one of its values matches the specified matcher.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

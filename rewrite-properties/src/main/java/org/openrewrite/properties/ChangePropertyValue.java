@@ -58,15 +58,9 @@ public class ChangePropertyValue extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
-    @Override
-    public String getDisplayName() {
-        return "Change property value";
-    }
+    String displayName = "Change property value";
 
-    @Override
-    public String getDescription() {
-        return "Change a property value leaving the key intact.";
-    }
+    String description = "Change a property value leaving the key intact.";
 
     @Override
     public Validated validate() {

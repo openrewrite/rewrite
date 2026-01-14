@@ -502,6 +502,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             if (ternary.getMarkers().findFirst(Elvis.class).isPresent()) {
                 visitSpace(ternary.getPadding().getTruePart().getBefore(), Space.Location.TERNARY_TRUE, p);
                 p.append("?:");
+                visitSpace(ternary.getPadding().getFalsePart().getBefore(), Space.Location.TERNARY_FALSE, p);
                 visit(ternary.getFalsePart(), p);
             } else {
                 visitLeftPadded("?", ternary.getPadding().getTruePart(), JLeftPadded.Location.TERNARY_TRUE, p);

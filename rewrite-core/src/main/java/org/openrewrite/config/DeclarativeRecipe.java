@@ -99,7 +99,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     @Deprecated
-    public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+    public void initialize(Collection<Recipe> availableRecipes,
+                           @SuppressWarnings("unused") Map<String, List<Contributor>> recipeToContributors) {
         this.initialize(availableRecipes);
     }
 
@@ -109,9 +110,9 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         initialize(uninitializedPreconditions, preconditions, availableRecipes, initializingRecipes);
     }
 
-    @SuppressWarnings("unused")
     @Deprecated
-    public void initialize(Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+    public void initialize(Function<String, @Nullable Recipe> availableRecipes,
+                           @SuppressWarnings("unused") Map<String, List<Contributor>> recipeToContributors) {
         this.initialize(availableRecipes);
     }
 
@@ -145,7 +146,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     private void initializeDeclarativeRecipe(DeclarativeRecipe declarativeRecipe, String recipeIdentifier,
-                                              Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
+                                             Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
         String recipeName = declarativeRecipe.getName();
         if (initializingRecipes.contains(recipeName)) {
             // Cycle detected - throw exception to fail fast
@@ -204,16 +205,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     @RequiredArgsConstructor
     static class PreconditionBellwether extends Recipe {
 
-        @Override
-        public String getDisplayName() {
-            return "Precondition bellwether";
-        }
+        String displayName = "Precondition bellwether";
 
-        @Override
-        public String getDescription() {
-            return "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
+        String description = "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
                    "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends.";
-        }
 
         Supplier<TreeVisitor<?, ExecutionContext>> precondition;
 
@@ -453,15 +448,9 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     private static class LazyLoadedRecipe extends Recipe {
         String recipeFqn;
 
-        @Override
-        public String getDisplayName() {
-            return "Lazy loaded recipe";
-        }
+        String displayName = "Lazy loaded recipe";
 
-        @Override
-        public String getDescription() {
-            return "Recipe that is loaded lazily.";
-        }
+        String description = "Recipe that is loaded lazily.";
     }
 
     @Override
@@ -473,7 +462,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription() != null ? getDescription() : "",
                 getTags(), getEstimatedEffortPerOccurrence(),
                 emptyList(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
-                getExamples(), null);
+                getExamples(), source);
     }
 
     @Override

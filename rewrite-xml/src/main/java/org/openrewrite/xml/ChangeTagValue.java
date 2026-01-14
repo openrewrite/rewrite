@@ -56,16 +56,10 @@ public class ChangeTagValue extends Recipe {
     @Nullable
     Boolean regex;
 
-    @Override
-    public String getDisplayName() {
-        return "Change XML tag value";
-    }
+    String displayName = "Change XML tag value";
 
-    @Override
-    public String getDescription() {
-        return "Alters the value of XML tags matching the provided expression. " +
+    String description = "Alters the value of XML tags matching the provided expression. " +
                 "When regex is enabled the replacement happens only for text nodes provided the pattern matches.";
-    }
 
     @Override
     public Validated<Object> validate(ExecutionContext ctx) {

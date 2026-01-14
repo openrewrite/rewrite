@@ -81,17 +81,11 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
     @Nullable
     String versionPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Update a Gradle plugin by id";
-    }
+    String displayName = "Update a Gradle plugin by id";
 
-    @Override
-    public String getDescription() {
-        return "Update a Gradle plugin by id to a later version defined by the plugins DSL. " +
+    String description = "Update a Gradle plugin by id to a later version defined by the plugins DSL. " +
                 "To upgrade a plugin dependency defined by `buildscript.dependencies`, use the `UpgradeDependencyVersion` " +
                 "recipe instead.";
-    }
 
     @Override
     public Validated<Object> validate() {

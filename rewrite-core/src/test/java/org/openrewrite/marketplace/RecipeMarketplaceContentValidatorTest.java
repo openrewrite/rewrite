@@ -16,165 +16,79 @@
 package org.openrewrite.marketplace;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Validated;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RecipeMarketplaceContentValidatorTest {
 
-    private final RecipeMarketplaceContentValidator validator = new RecipeMarketplaceContentValidator();
+    private static final String VALID_DISPLAY_NAME = "Remove unnecessary parentheses";
+    private static final String VALID_DESCRIPTION = "Removes unnecessary parentheses from code.";
 
-    @Test
-    void validRecipe() {
-        RecipeMarketplace marketplace = RecipeMarketplace.newEmpty();
-        marketplace.getRecipes().add(new RecipeOffering(
-          "org.example.TestRecipe",
-          "Test recipe",
-          "Test recipe",
-          "This is a valid description.",
-          emptySet(),
-          null,
-          emptyList(),
-          null
-        ));
+    @ParameterizedTest
+    @CsvSource({
+      VALID_DISPLAY_NAME  + ',' + VALID_DESCRIPTION,
+      VALID_DISPLAY_NAME  + ',' + "`Removes` unnecessary parentheses from code.",
+      VALID_DISPLAY_NAME  + ',' + "[Removes](link) unnecessary parentheses from code.",
+      VALID_DISPLAY_NAME  + ',' + " - Some list item." ,
+      VALID_DISPLAY_NAME  + ',' + " - `other` list item." ,
+      "`Remove` unnecessary parentheses"  + ',' + VALID_DESCRIPTION,
+      "[Remove](link) unnecessary parentheses"  + ',' + VALID_DESCRIPTION,
+    })
+    void validMarketplace(String displayName, String description) {
+         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,%s,%s,Java,maven,org.openrewrite:rewrite-java
+          """.formatted(displayName, description));
+        RecipeMarketplaceContentValidator validator = new RecipeMarketplaceContentValidator();
+        Validated<RecipeMarketplace> validation = validator.validate(marketplace);
 
-        Validated<RecipeMarketplace> result = validator.validate(marketplace);
-        assertThat(result.isValid()).isTrue();
+        assertThat(validation.isValid()).isTrue();
     }
 
     @Test
-    void descriptionMustEndWithPeriod() {
-        RecipeMarketplace marketplace = RecipeMarketplace.newEmpty();
-        marketplace.getRecipes().add(new RecipeOffering(
-          "org.example.TestRecipe",
-          "Test recipe",
-          "Test recipe",
-          "This description is missing a period",
-          emptySet(),
-          null,
-          emptyList(),
-          null
-        ));
+    void invalidDisplayName() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,remove unnecessary parentheses,Removes unnecessary parentheses from code.,Java,maven,org.openrewrite:rewrite-java
+          """);
 
-        Validated<RecipeMarketplace> result = validator.validate(marketplace);
-        assertThat(result.isInvalid()).isTrue();
-        assertThat(result.failures()).hasSize(1);
-        assertThat(result.failures().getFirst().getMessage()).contains("must end with a period");
+        RecipeMarketplaceContentValidator validator = new RecipeMarketplaceContentValidator();
+        Validated<RecipeMarketplace> validation = validator.validate(marketplace);
+
+        assertThat(validation.isInvalid()).isTrue();
+        assertThat(validation.failures()).hasSize(1);
+        assertThat(validation.failures().getFirst().getMessage()).contains("sentence cased");
     }
 
     @Test
-    void displayNameMustNotEndWithPeriod() {
-        RecipeMarketplace marketplace = RecipeMarketplace.newEmpty();
-        marketplace.getRecipes().add(new RecipeOffering(
-          "org.example.TestRecipe",
-          "Test recipe.",
-          "Test recipe.",
-          "Valid description.",
-          emptySet(),
-          null,
-          emptyList(),
-          null
-        ));
+    void invalidDescription() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove unnecessary parentheses,removes unnecessary parentheses from code,Java,maven,org.openrewrite:rewrite-java
+          """);
 
-        Validated<RecipeMarketplace> result = validator.validate(marketplace);
-        assertThat(result.isInvalid()).isTrue();
-        assertThat(result.failures()).hasSize(1);
-        assertThat(result.failures().getFirst().getMessage()).contains("must not end with a period");
+        RecipeMarketplaceContentValidator validator = new RecipeMarketplaceContentValidator();
+        Validated<RecipeMarketplace> validation = validator.validate(marketplace);
+
+        assertThat(validation.isInvalid()).isTrue();
+        assertThat(validation.failures()).hasSize(2);
     }
 
     @Test
-    void displayNameMustStartWithUppercase() {
-        RecipeMarketplace marketplace = RecipeMarketplace.newEmpty();
-        //noinspection DialogTitleCapitalization
-        marketplace.getRecipes().add(new RecipeOffering(
-          "org.example.TestRecipe",
-          "test recipe",
-          "Test recipe",
-          "Valid description.",
-          emptySet(),
-          null,
-          emptyList(),
-          null
-        ));
+    void displayNameEndsWithPeriod() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove unnecessary parentheses.,Removes unnecessary parentheses from code.,Java,maven,org.openrewrite:rewrite-java
+          """);
 
-        Validated<RecipeMarketplace> result = validator.validate(marketplace);
-        assertThat(result.isInvalid()).isTrue();
-        assertThat(result.failures()).hasSize(1);
-        assertThat(result.failures().getFirst().getMessage()).contains("must start with an uppercase letter");
-    }
+        RecipeMarketplaceContentValidator validator = new RecipeMarketplaceContentValidator();
+        Validated<RecipeMarketplace> validation = validator.validate(marketplace);
 
-    @Test
-    void emptyDescriptionIsAllowed() {
-        RecipeMarketplace marketplace = RecipeMarketplace.newEmpty();
-        marketplace.getRecipes().add(new RecipeOffering(
-          "org.example.TestRecipe",
-          "Test recipe",
-          "Test recipe",
-          "",
-          emptySet(),
-          null,
-          emptyList(),
-          null
-        ));
-
-        Validated<RecipeMarketplace> result = validator.validate(marketplace);
-        assertThat(result.isValid()).isTrue();
-    }
-
-    @Test
-    void multipleErrorsAreCollected() {
-        RecipeMarketplace marketplace = RecipeMarketplace.newEmpty();
-        marketplace.getRecipes().add(new RecipeOffering(
-          "org.example.TestRecipe1",
-          "Test recipe",
-          "Test recipe",
-          "Missing period",
-          emptySet(),
-          null,
-          emptyList(),
-          null
-        ));
-        //noinspection DialogTitleCapitalization
-        marketplace.getRecipes().add(new RecipeOffering(
-          "org.example.TestRecipe2",
-          "another recipe.",
-          "Another recipe",
-          "Valid description",
-          emptySet(),
-          null,
-          emptyList(),
-          null
-        ));
-
-        Validated<RecipeMarketplace> result = validator.validate(marketplace);
-        assertThat(result.isInvalid()).isTrue();
-        // TestRecipe1: missing period in description
-        // TestRecipe2: lowercase displayName, period in displayName, missing period in description
-        assertThat(result.failures()).hasSize(4);
-    }
-
-    @Test
-    void validatesRecipesInSubcategories() {
-        RecipeMarketplace root = RecipeMarketplace.newEmpty();
-        RecipeMarketplace category = new RecipeMarketplace("Java", "Java recipes.");
-        root.getCategories().add(category);
-
-        //noinspection DialogTitleCapitalization
-        category.getRecipes().add(new RecipeOffering(
-          "org.example.JavaRecipe",
-          "java recipe",
-          "Java recipe",
-          "Missing period",
-          emptySet(),
-          null,
-          emptyList(),
-          null
-        ));
-
-        Validated<RecipeMarketplace> result = validator.validate(root);
-        assertThat(result.isInvalid()).isTrue();
-        assertThat(result.failures()).hasSize(2); // lowercase displayName + missing period
+        assertThat(validation.isInvalid()).isTrue();
+        assertThat(validation.failures()).hasSize(1);
+        assertThat(validation.failures().getFirst().getMessage()).contains("must not end with a period");
     }
 }

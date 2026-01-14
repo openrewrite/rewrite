@@ -195,6 +195,7 @@ testing {
                 implementation(project(":rewrite-test"))
                 implementation(project(":rewrite-json"))
                 implementation(project(":rewrite-java-tck"))
+                implementation(project(":rewrite-yaml"))
                 implementation("org.assertj:assertj-core:latest.release")
                 implementation("org.junit.platform:junit-platform-suite-api")
                 runtimeOnly("org.junit.platform:junit-platform-suite-engine")

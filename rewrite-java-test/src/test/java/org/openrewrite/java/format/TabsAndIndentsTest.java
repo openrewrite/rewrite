@@ -2103,7 +2103,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignBlockPrefixes() {
         rewriteRun(
-          spec -> spec.recipe(new AutoFormat(null)),
+          spec -> spec.recipe(new AutoFormat(null, false)),
           java(
             """
               public class Test {
@@ -2511,7 +2511,7 @@ class TabsAndIndentsTest implements RewriteTest {
             class Test {
                 void method(String file1, String file2) {
                     try (
-                        FileInputStream fis1 = new FileInputStream(file1);
+                            FileInputStream fis1 = new FileInputStream(file1);
                     FileInputStream fis2 = new FileInputStream(file2);
                     BufferedInputStream bis = new BufferedInputStream(fis1)) {
                         // process files
@@ -2526,9 +2526,9 @@ class TabsAndIndentsTest implements RewriteTest {
             class Test {
                 void method(String file1, String file2) {
                     try (
-                        FileInputStream fis1 = new FileInputStream(file1);
-                        FileInputStream fis2 = new FileInputStream(file2);
-                        BufferedInputStream bis = new BufferedInputStream(fis1)) {
+                            FileInputStream fis1 = new FileInputStream(file1);
+                            FileInputStream fis2 = new FileInputStream(file2);
+                            BufferedInputStream bis = new BufferedInputStream(fis1)) {
                         // process files
                     } catch (IOException e) {
                         e.printStackTrace();

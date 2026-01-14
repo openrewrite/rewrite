@@ -62,15 +62,9 @@ public class DeleteMethodArgument extends Recipe {
         return String.format("%d in methods `%s`", argumentIndex, methodPattern);
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Delete method argument";
-    }
+    String displayName = "Delete method argument";
 
-    @Override
-    public String getDescription() {
-        return "Delete an argument from method invocations.";
-    }
+    String description = "Delete an argument from method invocations.";
 
     @Override
     public Validated<Object> validate() {

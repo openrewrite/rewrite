@@ -53,15 +53,9 @@ public class FindProperties extends Recipe {
 
     UUID searchId = randomId();
 
-    @Override
-    public String getDisplayName() {
-        return "Find Maven project properties";
-    }
+    String displayName = "Find Maven project properties";
 
-    @Override
-    public String getDescription() {
-        return "Finds the specified Maven project properties within a pom.xml.";
-    }
+    String description = "Finds the specified Maven project properties within a pom.xml.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -13,243 +13,660 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JavaScriptSemanticComparatorVisitor} from '../../src/javascript/comparator';
+import {fromVisitor, RecipeSpec} from '../../src/test';
+import {any, capture, JavaScriptVisitor, npm, packageJson, pattern, typescript} from '../../src/javascript';
 import {J} from '../../src/java';
-import {JavaScriptParser} from '../../src/javascript';
-import {DependencyWorkspace} from '../../src/javascript/dependency-workspace';
+import {withDir} from 'tmp-promise';
 
 describe('JavaScriptSemanticComparatorVisitor', () => {
-    const comparator = new JavaScriptSemanticComparatorVisitor();
+    const spec = new RecipeSpec();
 
-    // Helper function to parse code and get the AST
-    async function parse(code: string, dependencies?: Record<string, string>): Promise<J> {
-        let workspaceDir: string | undefined;
-        if (dependencies) {
-            workspaceDir = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
-        }
+    describe('lenient type matching', () => {
+        test('matches pattern with dependencies to source with same types', async () => {
+            await withDir(async (repo) => {
+                const tempDir = repo.path;
 
-        const parser = new JavaScriptParser(workspaceDir ? {relativeTo: workspaceDir} : undefined);
-        const parseGenerator = parser.parse({text: code, sourcePath: 'test.ts'});
-        return (await parseGenerator.next()).value as J;
-    }
+                // Pattern with namespace import and dependencies
+                const pat = pattern`util.isDate(${capture('arg')})`
+                    .configure({
+                        context: [`import * as util from 'util'`],
+                        dependencies: {'@types/node': '^20.0.0'}
+                    });
 
-    // Helper function to collect all method invocations by name from the AST
-    async function getMethodInvocations(ast: J, methodName: string): Promise<J.MethodInvocation[]> {
-        const found: J.MethodInvocation[] = [];
+                const matches: string[] = [];
 
-        const visitor = new class extends JavaScriptSemanticComparatorVisitor {
-            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
-                if (method.name.simpleName === methodName) {
-                    found.push(method);
-                }
-                return super.visitMethodInvocation(method, _p);
-            }
-        };
-
-        await visitor.visit(ast, ast);
-        return found;
-    }
-
-    describe('method invocations with module vs namespace imports', () => {
-        test('matches forwardRef() and React.forwardRef() when types are identical', async () => {
-            //language=typescript
-            const code = `
-                import { forwardRef } from 'react';
-                import * as React from 'react';
-
-                const c1 = forwardRef(() => null);
-                const c2 = React.forwardRef(() => null);
-            `;
-
-            const ast = await parse(code, { '@types/react': '^18.0.0' });
-
-            const methods = await getMethodInvocations(ast, 'forwardRef');
-
-            expect(methods.length).toBe(2);
-
-            // Both should match each other
-            expect(await comparator.compare(methods[0], methods[1])).toBe(true);
-        }, 60000);
-
-        test('matches isDate() and util.isDate() when types are identical', async () => {
-            //language=typescript
-            const code = `
-                import { isDate } from 'util';
-                import * as util from 'util';
-
-                const check1 = isDate(new Date());
-                const check2 = util.isDate(new Date());
-            `;
-
-            const ast = await parse(code, { '@types/node': '^20.0.0' });
-
-            const methods = await getMethodInvocations(ast, 'isDate');
-
-            expect(methods.length).toBe(2);
-
-            // Both should match each other
-            expect(await comparator.compare(methods[0], methods[1])).toBe(true);
-        }, 60000);
-
-        test('does not match methods from different modules with case-insensitive names', async () => {
-            //language=typescript
-            const code = `
-                import { isDate } from 'util';
-
-                class Custom {
-                    isDate(value: any) {
-                        return typeof value === 'string';
+                spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                    override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                        if ((methodInvocation.name as J.Identifier).simpleName === 'isDate') {
+                            const m = await pat.match(methodInvocation, this.cursor);
+                            if (m) {
+                                const importStyle = methodInvocation.select ? 'namespace' : 'named';
+                                matches.push(importStyle);
+                            }
+                        }
+                        return methodInvocation;
                     }
+                });
+
+                await spec.rewriteRun(
+                    npm(
+                        tempDir,
+                        //language=typescript
+                        typescript(
+                            `
+                                import { isDate } from 'util';
+                                import * as util from 'util';
+
+                                const check1 = isDate(new Date());
+                                const check2 = util.isDate(new Date());
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                            {
+                              "name": "test",
+                              "version": "1.0.0",
+                              "dependencies": {
+                                "@types/node": "^20.0.0"
+                              }
+                            }
+                            `
+                        )
+                    )
+                );
+
+                // Both import styles should match the pattern
+                expect(matches).toContain('named');
+                expect(matches).toContain('namespace');
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test('matches pattern without any imports or dependencies to typed source', async () => {
+            await withDir(async (repo) => {
+                const tempDir = repo.path;
+
+                // Pattern WITHOUT any context or dependencies
+                const pat = pattern`util.isArray(${capture('arg')})`;
+                // No configuration at all - completely bare pattern
+
+                let matchFound = false;
+
+                spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                    override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                        if ((methodInvocation.name as J.Identifier).simpleName === 'isArray') {
+                            const m = await pat.match(methodInvocation, this.cursor);
+                            if (m) {
+                                matchFound = true;
+                            }
+                        }
+                        return methodInvocation;
+                    }
+                });
+
+                await spec.rewriteRun(
+                    npm(
+                        tempDir,
+                        //language=typescript
+                        typescript(
+                            `
+                                import * as util from 'util';
+                                const x = [1, 2, 3];
+                                util.isArray(x);
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                            {
+                              "name": "test",
+                              "version": "1.0.0",
+                              "dependencies": {
+                                "@types/node": "^20.0.0"
+                              }
+                            }
+                            `
+                        )
+                    )
+                );
+
+                // Pattern with no imports should still match source with full type attribution
+                expect(matchFound).toBe(true);
+            }, {unsafeCleanup: true});
+        }, 60000);
+    });
+
+    describe('redundant parentheses', () => {
+        test('matches expression with redundant parentheses', async () => {
+            await withDir(async (repo) => {
+                const tempDir = repo.path;
+
+                // Pattern without parentheses
+                const pat = pattern`x + 1`;
+
+                let matchCount = 0;
+
+                spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                    override async visitBinary(binary: J.Binary, _p: any): Promise<J | undefined> {
+                        const m = await pat.match(binary, this.cursor);
+                        if (m) {
+                            matchCount++;
+                        }
+                        return binary;
+                    }
+                });
+
+                await spec.rewriteRun(
+                    npm(
+                        tempDir,
+                        //language=typescript
+                        typescript(
+                            `
+                                const x = 5;
+                                const a = x + 1;
+                                const b = (x + 1);
+                                const c = ((x + 1));
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                            {
+                              "name": "test",
+                              "version": "1.0.0"
+                            }
+                            `
+                        )
+                    )
+                );
+
+                // All three expressions should match
+                expect(matchCount).toBe(3);
+            }, {unsafeCleanup: true});
+        });
+
+        test('matches simple identifier with and without parentheses', async () => {
+            await withDir(async (repo) => {
+                const tempDir = repo.path;
+
+                // Pattern: simple identifier
+                const pat = pattern`x`;
+
+                let matchCount = 0;
+
+                spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                    override async visitIdentifier(identifier: J.Identifier, _p: any): Promise<J | undefined> {
+                        if (identifier.simpleName === 'x') {
+                            const m = await pat.match(identifier, this.cursor);
+                            if (m) {
+                                matchCount++;
+                            }
+                        }
+                        return identifier;
+                    }
+                });
+
+                await spec.rewriteRun(
+                    npm(
+                        tempDir,
+                        //language=typescript
+                        typescript(
+                            `
+                                const x = 5;
+                                const a = x;
+                                const b = (x);
+                                const c = ((x));
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                            {
+                              "name": "test",
+                              "version": "1.0.0"
+                            }
+                            `
+                        )
+                    )
+                );
+
+                // All three expressions AND declaration should match
+                expect(matchCount).toBe(4);
+            }, {unsafeCleanup: true});
+        });
+    });
+
+    describe('arrow function equivalence', () => {
+        test('matches expression body with block containing single return', async () => {
+            // Pattern: expression body
+            const pat = pattern`x => x + 1`;
+
+            let matchCount = 0;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitArrowFunction(arrow: any, _p: any): Promise<any> {
+                    const m = await pat.match(arrow, this.cursor);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return arrow;
+                }
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = x => x + 1;
+                        const b = x => { return x + 1; };
+                    `
+                )
+            );
+
+            // Both should match
+            expect(matchCount).toBe(2);
+        });
+
+        test('matches block with return to expression body', async () => {
+            // Pattern: block with return
+            const pat = pattern`(x, y) => { return x + y; }`;
+
+            let matchCount = 0;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitArrowFunction(arrow: any, _p: any): Promise<any> {
+                    const m = await pat.match(arrow, this.cursor);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return arrow;
+                }
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = (x, y) => x + y;
+                        const b = (x, y) => { return x + y; };
+                    `
+                )
+            );
+
+            // Both should match
+            expect(matchCount).toBe(2);
+        });
+
+        test('does not match block with multiple statements', async () => {
+            // Pattern: simple expression body
+            const pat = pattern`x => x + 1`;
+
+            let matchCount = 0;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitArrowFunction(arrow: any, _p: any): Promise<any> {
+                    const m = await pat.match(arrow, this.cursor);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return arrow;
+                }
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = x => x + 1;
+                        const b = x => {
+                            console.log(x);
+                            return x + 1;
+                        };
+                    `
+                )
+            );
+
+            // Only the first one should match
+            expect(matchCount).toBe(1);
+        });
+    });
+
+    describe('object property shorthand equivalence', () => {
+        test('matches shorthand with longhand when names match', async () => {
+            // Pattern: shorthand
+            const pat = pattern`const ${any()} = { x, y }`;
+
+            let matchCount = 0;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitVariableDeclarations(vd: any, _p: any): Promise<any> {
+                    const m = await pat.match(vd, this.cursor);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return vd;
+                }
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const x = 1;
+                        const y = 2;
+                        const a = { x, y };
+                        const b = { x: x, y: y };
+                    `
+                )
+            );
+
+            // Both should match
+            expect(matchCount).toBe(2);
+        });
+
+        test('matches longhand with shorthand when names match', async () => {
+            // Pattern: longhand
+            const pat = pattern`const ${any()} = { x: x, y: y }`;
+
+            let matchCount = 0;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitVariableDeclarations(vd: any, _p: any): Promise<any> {
+                    const m = await pat.match(vd, this.cursor);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return vd;
+                }
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const x = 1;
+                        const y = 2;
+                        const a = { x, y };
+                        const b = { x: x, y: y };
+                    `
+                )
+            );
+
+            // Both should match
+            expect(matchCount).toBe(2);
+        });
+
+        test('does not match when property value is different', async () => {
+            // Pattern: shorthand
+            const pat = pattern`const ${any()} = { x }`;
+
+            let matchCount = 0;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitVariableDeclarations(vd: any, _p: any): Promise<any> {
+                    const m = await pat.match(vd, this.cursor);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return vd;
+                }
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const x = 1;
+                        const y = 2;
+                        const a = { x };
+                        const b = { x: y };
+                    `
+                )
+            );
+
+            // Only the first one should match
+            expect(matchCount).toBe(1);
+        });
+    });
+
+    describe('arrow function parameter parentheses equivalence', () => {
+        test('matches single parameter with and without parentheses', async () => {
+            // Pattern: without parentheses
+            const pat = pattern`x => x + 1`;
+
+            let matchCount = 0;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitArrowFunction(arrow: any, _p: any): Promise<any> {
+                    const m = await pat.match(arrow, this.cursor);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return arrow;
+                }
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = x => x + 1;
+                        const b = (x) => x + 1;
+                    `
+                )
+            );
+
+            // Both should match
+            expect(matchCount).toBe(2);
+        });
+
+        test('matches with parentheses pattern to without parentheses', async () => {
+            // Pattern: with parentheses
+            const pat = pattern`(x) => x + 1`;
+
+            let matchCount = 0;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitArrowFunction(arrow: any, _p: any): Promise<any> {
+                    const m = await pat.match(arrow, this.cursor);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return arrow;
+                }
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = x => x + 1;
+                        const b = (x) => x + 1;
+                    `
+                )
+            );
+
+            // Both should match
+            expect(matchCount).toBe(2);
+        });
+
+        test('matches multi-parameter functions regardless of parentheses', async () => {
+            // Pattern: multi-parameter (always has parentheses)
+            const pat = pattern`(x, y) => x + y`;
+
+            let matchCount = 0;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitArrowFunction(arrow: any, _p: any): Promise<any> {
+                    const m = await pat.match(arrow, this.cursor);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return arrow;
+                }
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = (x, y) => x + y;
+                    `
+                )
+            );
+
+            // Should match
+            expect(matchCount).toBe(1);
+        });
+    });
+
+    describe('void expression equivalence', () => {
+        test('matches undefined with void expressions', async () => {
+            // Pattern: undefined
+            const pat = pattern`undefined`;
+
+            let matchCount = 0;
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitIdentifier(identifier: J.Identifier, _p: any): Promise<J.Identifier | undefined> {
+                    if (identifier.simpleName === 'undefined') {
+                        const m = await pat.match(identifier, this.cursor);
+                        if (m) {
+                            matchCount++;
+                        }
+                    }
+                    return identifier;
                 }
 
-                const validator = new Custom();
-                const check1 = isDate(new Date());
-                const check2 = validator.isDate(new Date());
-            `;
+                protected async visitVoid(voidExpr: any, _p: any): Promise<any> {
+                    const m = await pat.match(voidExpr, this.cursor);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return voidExpr;
+                }
+            });
 
-            const ast = await parse(code, { '@types/node': '^20.0.0' });
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = undefined;
+                        const b = void 0;
+                        const c = void(0);
+                        const d = void 1;
+                    `
+                )
+            );
 
-            const methods = await getMethodInvocations(ast, 'isDate');
+            // All four should match
+            expect(matchCount).toBe(4);
+        });
 
-            expect(methods.length).toBe(2);
+        test('matches void expression with undefined', async () => {
+            // Pattern: void 0
+            const pat = pattern`void 0`;
 
-            // Should NOT match - different declaring types
-            expect(await comparator.compare(methods[0], methods[1])).toBe(false);
-        }, 60000);
-    });
+            let matchCount = 0;
 
-    describe('method invocations without type attribution', () => {
-        test('falls back to structural comparison when no types present', async () => {
-            //language=typescript
-            const code = `
-                const obj1 = { foo: () => 'hello' };
-                const obj2 = { foo: () => 'world' };
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitIdentifier(identifier: J.Identifier, _p: any): Promise<J.Identifier | undefined> {
+                    if (identifier.simpleName === 'undefined') {
+                        const m = await pat.match(identifier, this.cursor);
+                        if (m) {
+                            matchCount++;
+                        }
+                    }
+                    return identifier;
+                }
 
-                obj1.foo();
-                obj2.foo();
-            `;
+                protected async visitVoid(voidExpr: any, _p: any): Promise<any> {
+                    const m = await pat.match(voidExpr, this.cursor);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return voidExpr;
+                }
+            });
 
-            const ast = await parse(code);
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = undefined;
+                        const b = void 0;
+                        const c = void(0);
+                    `
+                )
+            );
 
-            const methods = await getMethodInvocations(ast, 'foo');
-
-            expect(methods.length).toBe(2);
-
-            // Should NOT match - different receivers (obj1 vs obj2)
-            expect(await comparator.compare(methods[0], methods[1])).toBe(false);
+            // All three should match
+            expect(matchCount).toBe(3);
         });
     });
 
-    describe('method signature validation', () => {
-        test('matches same method from same module despite different arguments', async () => {
-            //language=typescript
-            const code1 = `
-                import { useState } from 'react';
-                const [state, setState] = useState('hello');
-            `;
+    describe('numeric literal equivalence', () => {
+        test('matches different representations of same numeric value', async () => {
+            // Pattern: 255
+            const pat = pattern`255`;
 
-            //language=typescript
-            const code2 = `
-                import { useState } from 'react';
-                const [state, setState] = useState('hello');
-            `;
+            let matchCount = 0;
 
-            const ast1 = await parse(code1, { '@types/react': '^18.0.0' });
-            const ast2 = await parse(code2, { '@types/react': '^18.0.0' });
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitLiteral(literal: J.Literal, _p: any): Promise<J.Literal | undefined> {
+                    const m = await pat.match(literal, this.cursor);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return literal;
+                }
+            });
 
-            const methods1 = await getMethodInvocations(ast1, 'useState');
-            const methods2 = await getMethodInvocations(ast2, 'useState');
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = 255;
+                        const b = 0xFF;
+                        const c = 0o377;
+                        const d = 0b11111111;
+                    `
+                )
+            );
 
-            expect(methods1.length).toBe(1);
-            expect(methods2.length).toBe(1);
-
-            // Should match - both are useState from react with same arguments
-            expect(await comparator.compare(methods1[0], methods2[0])).toBe(true);
-        }, 60000);
-    });
-
-    describe('receiver (select) comparison', () => {
-        test('does not match methods with different object receivers despite same method type', async () => {
-            //language=typescript
-            const code = `
-                const array1 = [1, 2, 3];
-                const array2 = [4, 5, 6];
-
-                array1.push(7);
-                array2.push(7);
-            `;
-
-            const ast = await parse(code);
-
-            const methods = await getMethodInvocations(ast, 'push');
-
-            expect(methods.length).toBe(2);
-
-            // Should NOT match - different receivers (array1 vs array2)
-            expect(await comparator.compare(methods[0], methods[1])).toBe(false);
+            // All four should match
+            expect(matchCount).toBe(4);
         });
 
-        test('does not match methods with different expressions as receivers', async () => {
-            //language=typescript
-            const code = `
-                function getArray1() { return [1, 2]; }
-                function getArray2() { return [3, 4]; }
+        test('matches scientific notation with integer', async () => {
+            // Pattern: 1000
+            const pat = pattern`1000`;
 
-                getArray1().push(5);
-                getArray2().push(5);
-            `;
+            let matchCount = 0;
 
-            const ast = await parse(code);
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitLiteral(literal: J.Literal, _p: any): Promise<J.Literal | undefined> {
+                    const m = await pat.match(literal, this.cursor);
+                    if (m) {
+                        matchCount++;
+                    }
+                    return literal;
+                }
+            });
 
-            const methods = await getMethodInvocations(ast, 'push');
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = 1000;
+                        const b = 1e3;
+                        const c = 1E3;
+                    `
+                )
+            );
 
-            expect(methods.length).toBe(2);
-
-            // Should NOT match - different receivers (getArray1() vs getArray2())
-            expect(await comparator.compare(methods[0], methods[1])).toBe(false);
-        });
-    });
-
-    describe('edge cases', () => {
-        test('handles methods with no declaring type', async () => {
-            //language=typescript
-            const code = `
-                function foo() { return 1; }
-                foo();
-                foo();
-            `;
-
-            const ast = await parse(code);
-
-            const methods = await getMethodInvocations(ast, 'foo');
-
-            expect(methods.length).toBe(2);
-
-            // Should match - both have no type information
-            expect(await comparator.compare(methods[0], methods[1])).toBe(true);
-        });
-
-        test('does not match when only one has type attribution', async () => {
-            //language=typescript
-            const code = `
-                import { isDate } from 'util';
-
-                function isDate2(value: any) { return value instanceof Date; }
-
-                isDate(new Date());
-                isDate2(new Date());
-            `;
-
-            const ast = await parse(code, { '@types/node': '^20.0.0' });
-
-            const methods1 = await getMethodInvocations(ast, 'isDate');
-            const methods2 = await getMethodInvocations(ast, 'isDate2');
-
-            expect(methods1.length).toBe(1);
-            expect(methods2.length).toBe(1);
-
-            // Should NOT match - one has type attribution, the other doesn't
-            expect(await comparator.compare(methods1[0], methods2[0])).toBe(false);
+            // All three should match
+            expect(matchCount).toBe(3);
         });
     });
 });

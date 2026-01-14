@@ -19,12 +19,23 @@ export * from "./assertions";
 export * from "./parser";
 export * from "./style";
 export * from "./markers";
+export * from "./node-resolution-result";
+export * from "./package-json-parser";
+export * from "./package-manager";
+export * from "./dependency-manager";
 export * from "./preconditions";
-export * from "./templating";
+export * from "./templating/index";
 export * from "./method-matcher";
+export * from "./format";
+export * from "./autodetect";
+export * from "./tree-debug";
+export * from "./project-parser";
 
 export * from "./add-import";
 export * from "./remove-import";
+export * from "./cleanup/index";
+export * from "./recipes/index";
+export * from "./search/index";
 
 import "./print";
 import "./rpc";

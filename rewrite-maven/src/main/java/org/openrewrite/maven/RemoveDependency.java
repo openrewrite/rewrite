@@ -47,20 +47,14 @@ public class RemoveDependency extends Recipe {
     @Nullable
     String scope;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove Maven dependency";
-    }
+    String displayName = "Remove Maven dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Removes a single dependency from the <dependencies> section of the pom.xml.";
-    }
+    String description = "Removes a single dependency from the <dependencies> section of the pom.xml.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

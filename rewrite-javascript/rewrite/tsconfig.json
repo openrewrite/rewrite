@@ -18,5 +18,8 @@
   "include": [
     "src/**/*",
     "test/**/*"
+  ],
+  "exclude": [
+    "fixtures/**/*"
   ]
 }

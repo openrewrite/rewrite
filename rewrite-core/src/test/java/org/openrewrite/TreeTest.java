@@ -16,14 +16,21 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.PlainText;
 
+import java.nio.file.Paths;
 import java.util.function.UnaryOperator;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class TreeTest implements RewriteTest {
@@ -48,5 +55,41 @@ class TreeTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "true, '\uFEFFHello World'",
+        "false, 'Hello World'"
+    })
+    void printBomHandling(boolean charsetBomMarked, String expected) {
+        PlainText sourceFile = new PlainText(
+            Tree.randomId(),
+            Paths.get("test.txt"),
+            Markers.EMPTY,
+            "UTF-8",
+            charsetBomMarked,
+            null,
+            null,
+            "Hello World",
+            null
+        );
+
+        String printed = sourceFile.printAll();
+
+        assertThat(printed).isEqualTo(expected);
+    }
+
+    @Test
+    void printQuarkDoesNotThrowOnBomRestoration() {
+        Quark quark = new Quark(
+            Tree.randomId(),
+            Paths.get("unknown.file"),
+            Markers.EMPTY,
+            null,
+            null
+        );
+
+        assertThatCode(quark::printAll).doesNotThrowAnyException();
     }
 }

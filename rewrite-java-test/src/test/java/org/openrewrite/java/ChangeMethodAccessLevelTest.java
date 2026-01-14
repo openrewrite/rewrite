@@ -447,8 +447,90 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
               package com.abc;
 
               class DatabaseConfiguration {
-                  @SuppressWarnings("ALL") // comments
+                  @SuppressWarnings("ALL")
+                  // comments
                   static void dataSource() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removePublicModifierFromBeanMethodsPreservesSpacing() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.DatabaseConfiguration dataSource(..)", "package", null)),
+          java(
+            """
+              package org.springframework.context.annotation;
+              public @interface Bean {}
+              """
+          ),
+          java(
+            """
+              package org.springframework.context.annotation;
+              public @interface Primary {}
+              """
+          ),
+          java(
+            """
+              package a.b.c;
+              public class DataSource {}
+              """
+          ),
+          java(
+            """
+              package com.abc;
+              
+              import a.b.c.DataSource;
+              import org.springframework.context.annotation.Bean;
+              import org.springframework.context.annotation.Primary;
+              
+              public class DatabaseConfiguration {
+                  // primary comments
+                  @Primary
+                  @Bean
+                  public DataSource dataSource() {
+                      return new DataSource();
+                  }
+
+                  @Bean // comments
+                  public final DataSource dataSource(Integer i) {
+                      return new DataSource();
+                  }
+
+                  @Bean
+                  // comments
+                  public static DataSource dataSource(Double i) {
+                      return new DataSource();
+                  }
+              }
+              """,
+            """
+              package com.abc;
+              
+              import a.b.c.DataSource;
+              import org.springframework.context.annotation.Bean;
+              import org.springframework.context.annotation.Primary;
+              
+              public class DatabaseConfiguration {
+                  // primary comments
+                  @Primary
+                  @Bean
+                  DataSource dataSource() {
+                      return new DataSource();
+                  }
+
+                  @Bean // comments
+                  final DataSource dataSource(Integer i) {
+                      return new DataSource();
+                  }
+
+                  @Bean
+                  // comments
+                  static DataSource dataSource(Double i) {
+                      return new DataSource();
                   }
               }
               """
