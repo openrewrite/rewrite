@@ -31,6 +31,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedPom;
+
 class ChangeParentPomTest implements RewriteTest {
 
     @DocumentExample
@@ -2025,6 +2028,106 @@ class ChangeParentPomTest implements RewriteTest {
                 </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6463")
+    @Test
+    void multiModuleDownstreamMavenResolutionResultUpdated() {
+        // This test verifies that when the root pom's parent is upgraded,
+        // the child modules' MavenResolutionResult markers are also updated
+        // to reflect the new parent information
+        ChangeParentPom recipe = new ChangeParentPom(
+          "org.springframework.boot",
+          null,
+          "spring-boot-starter-parent",
+          null,
+          "2.6.7",
+          null,
+          null,
+          null,
+          true,
+          null);
+        rewriteRun(
+          spec -> spec.recipe(recipe),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.0</version>
+                  </parent>
+
+                  <modules>
+                    <module>module1</module>
+                  </modules>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.6.7</version>
+                  </parent>
+
+                  <modules>
+                    <module>module1</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("module1",
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    // Verify that the child module's MavenResolutionResult has updated parent information
+                    MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+
+                    // The child module's parent should be the root pom (org.sample:sample:1.0.0)
+                    MavenResolutionResult parentMrr = mrr.getParent();
+                    assertThat(parentMrr).isNotNull();
+                    assertThat(parentMrr.getPom().getGav().getGroupId()).isEqualTo("org.sample");
+                    assertThat(parentMrr.getPom().getGav().getArtifactId()).isEqualTo("sample");
+
+                    // The root pom's parent (grandparent of module1) should be the upgraded version
+                    ResolvedPom parentPom = parentMrr.getPom();
+                    assertThat(parentPom.getRequested().getParent()).isNotNull();
+                    assertThat(parentPom.getRequested().getParent().getGav().getGroupId())
+                      .isEqualTo("org.springframework.boot");
+                    assertThat(parentPom.getRequested().getParent().getGav().getArtifactId())
+                      .isEqualTo("spring-boot-starter-parent");
+                    // This assertion checks that the parent version was properly updated
+                    // in the child module's MavenResolutionResult
+                    assertThat(parentPom.getRequested().getParent().getGav().getVersion())
+                      .describedAs("Child module's MavenResolutionResult should reflect the updated parent version")
+                      .isEqualTo("2.6.7");
+                })
+              )
+            )
           )
         );
     }

@@ -17,7 +17,6 @@ package org.openrewrite.maven;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
@@ -139,10 +138,30 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         }
 
         try {
-            MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
-                    resolutionResult.getProjectPoms());
-            return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
-                    (original, ignored) -> updated));
+            // Create a copy of projectPoms that we can modify during resolution
+            Map<Path, Pom> projectPoms = new java.util.HashMap<>(resolutionResult.getProjectPoms());
+
+            // Update the resolution result in place. We first update the requested pom on the
+            // resolutionResult, then call updateResult which will mutate all markers in the
+            // module tree in place.
+            ResolvedPom pomWithUpdatedRequested = resolutionResult.getPom().withRequested(requested);
+
+            // Temporarily set the pom so updateResult sees the new requested
+            resolutionResult.unsafeSet(
+                    resolutionResult.getId(),
+                    pomWithUpdatedRequested,
+                    resolutionResult.getModules(),
+                    resolutionResult.getParent(),
+                    resolutionResult.getDependencies()
+            );
+
+            // Now update the result (this mutates the marker in place)
+            updateResult(ctx, resolutionResult, projectPoms);
+
+            // Return the document with updated markers. Even though we mutated the marker
+            // in place, we need to trigger change detection by returning a new markers object.
+            return document.withMarkers(document.getMarkers().computeByType(resolutionResult,
+                    (original, ignored) -> resolutionResult));
         } catch (MavenDownloadingExceptions e) {
             return e.warn(document);
         }
@@ -165,27 +184,52 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
     }
 
     private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) throws MavenDownloadingExceptions {
+        // Update projectPoms with the current requested pom so that child modules
+        // will resolve against the updated parent when they look it up
+        Pom requested = resolutionResult.getPom().getRequested();
+        Path requestedPath = requested.getSourcePath();
+        if (requestedPath != null) {
+            projectPoms.put(requestedPath, requested);
+        }
+
         MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx, getResolutionResult().getMavenSettings(),
                 getResolutionResult().getActiveProfiles());
 
         AtomicReference<MavenDownloadingExceptions> exceptions = new AtomicReference<>();
         try {
             ResolvedPom resolved = resolutionResult.getPom().resolve(ctx, downloader);
-            MavenResolutionResult mrr = resolutionResult
+
+            // Recursively update modules IN PLACE so that child documents' markers
+            // (which reference these same module objects) see the updated values
+            for (MavenResolutionResult module : resolutionResult.getModules()) {
+                try {
+                    updateResult(ctx, module, projectPoms);
+                } catch (MavenDownloadingExceptions e) {
+                    exceptions.set(MavenDownloadingExceptions.append(exceptions.get(), e));
+                }
+            }
+
+            // Resolve dependencies
+            Map<Scope, List<ResolvedDependency>> dependencies = resolutionResult
                     .withPom(resolved)
-                    .withModules(ListUtils.map(resolutionResult.getModules(), module -> {
-                        try {
-                            return updateResult(ctx, module, projectPoms);
-                        } catch (MavenDownloadingExceptions e) {
-                            exceptions.set(MavenDownloadingExceptions.append(exceptions.get(), e));
-                            return module;
-                        }
-                    }))
-                    .resolveDependencies(downloader, ctx);
+                    .resolveDependencies(downloader, ctx)
+                    .getDependencies();
+
+            // Mutate the existing marker in place instead of creating a new one.
+            // This ensures that child documents' parent references (which point to this
+            // same marker object) will see the updated values.
+            resolutionResult.unsafeSet(
+                    resolutionResult.getId(),
+                    resolved,
+                    resolutionResult.getModules(),
+                    resolutionResult.getParent(),
+                    dependencies
+            );
+
             if (exceptions.get() != null) {
                 throw exceptions.get();
             }
-            return mrr;
+            return resolutionResult;
         } catch (MavenDownloadingExceptions e) {
             throw MavenDownloadingExceptions.append(exceptions.get(), e);
         } catch (MavenDownloadingException e) {
