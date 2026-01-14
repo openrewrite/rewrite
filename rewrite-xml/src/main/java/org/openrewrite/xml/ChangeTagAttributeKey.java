@@ -42,8 +42,8 @@ public class ChangeTagAttributeKey extends Recipe {
         XPathMatcher xPathMatcher = new XPathMatcher(elementXPath);
         return new XmlIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Attribute visitAttribute(Xml.Attribute attribute, ExecutionContext executionContext) {
-                Xml.Attribute a = super.visitAttribute(attribute, executionContext);
+            public Xml.Attribute visitAttribute(Xml.Attribute attribute, ExecutionContext ctx) {
+                Xml.Attribute a = super.visitAttribute(attribute, ctx);
 
                 if (!xPathMatcher.matches(getCursor())) {
                     return a;
