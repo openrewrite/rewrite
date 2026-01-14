@@ -15,188 +15,141 @@
  */
 package org.openrewrite.maven.graph;
 
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
+import static java.util.Collections.emptySet;
+
+@RequiredArgsConstructor
 public class DependencyGraph {
-
-    private final MavenDependencyGraphBuilder mavenBuilder = new MavenDependencyGraphBuilder();
-    private final GradleDependencyGraphBuilder gradleBuilder = new GradleDependencyGraphBuilder();
-
-    @Value
-    public static class DependencyPath {
-        List<DependencyNode> path;
-        String scope; // Maven scope or Gradle configuration
-    }
+    @Nullable Node root;
 
     @Getter
-    @AllArgsConstructor
-    public static class DependencyNode {
-        String groupId;
-        String artifactId;
-        String version;
-        String scope; // Maven scope or Gradle configuration
-    }
-
-    @Getter
-    @EqualsAndHashCode(callSuper = true)
-    public static class GradleDependencyNode extends DependencyNode {
-        ResolvedDependency resolvedDependency;
-
-        public GradleDependencyNode(String groupId, String artifactId, String version, String scope, ResolvedDependency resolvedDependency) {
-            super(groupId, artifactId, version, scope);
-            this.resolvedDependency = resolvedDependency;
-        }
-    }
+    int size = 0;
 
     /**
-     * Collects dependency paths for Maven dependencies.
+     * Append a leaf-to-root dependency path to this dependency graph.
      */
-    public void collectMavenDependencyPaths(List<ResolvedDependency> dependencies,
-                                           Map<ResolvedGroupArtifactVersion, List<DependencyPath>> paths,
-                                           String scope) {
-        mavenBuilder.collectDependencyPaths(dependencies, paths, scope);
-    }
-
-    /**
-     * Collects dependency paths for Gradle dependencies.
-     */
-    public void collectGradleDependencyPaths(List<ResolvedDependency> dependencies,
-                                            Map<ResolvedGroupArtifactVersion, List<DependencyPath>> paths,
-                                            String scope) {
-        gradleBuilder.collectDependencyPaths(dependencies, paths, scope);
-    }
-
-    /**
-     * Builds a complete dependency graph for the given GAV based on collected paths.
-     * Automatically determines whether to build a direct or inverse dependency tree.
-     *
-     * @param gav The dependency to build a graph for
-     * @param projectPaths Collected dependency paths
-     * @param minDepth Minimum depth of the dependency (0 for direct, >0 for transitive)
-     * @param scopeOrConfiguration Maven scope name or Gradle configuration name to use as fallback
-     */
-    public String buildDependencyGraph(ResolvedGroupArtifactVersion gav,
-                                      Map<ResolvedGroupArtifactVersion, List<DependencyPath>> projectPaths,
-                                      int minDepth,
-                                      String scopeOrConfiguration) {
-        if (projectPaths == null || !projectPaths.containsKey(gav)) {
-            // Fallback format
-            return formatDependency(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()) +
-                   "\n\\--- " + scopeOrConfiguration;
-        }
-
-        List<DependencyPath> paths = projectPaths.get(gav);
-        if (paths.isEmpty()) {
-            return formatDependency(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()) +
-                   "\n\\--- " + scopeOrConfiguration;
-        }
-
-        // Determine scope/configuration from the first path
-        String actualScopeOrConfig = determineScopeOrConfig(paths, scopeOrConfiguration);
-
-        if (minDepth == 0) {
-            // Direct dependency
-            return buildDirectDependencyGraph(gav, paths, actualScopeOrConfig);
-        }
-
-        // Transitive dependency - build inverse tree
-        return buildInverseDependencyTree(gav, projectPaths, actualScopeOrConfig);
-    }
-
-    private String determineScopeOrConfig(List<DependencyPath> paths, String defaultScopeOrConfig) {
-        if (!paths.isEmpty()) {
-            DependencyPath firstPath = paths.get(0);
-            if (firstPath.getScope() != null && !firstPath.getScope().isEmpty()) {
-                return firstPath.getScope();
-            }
-        }
-        return defaultScopeOrConfig;
-    }
-
-    private String buildDirectDependencyGraph(ResolvedGroupArtifactVersion gav,
-                                             List<DependencyPath> paths,
-                                             String scopeOrConfig) {
-        DependencyPath firstPath = paths.get(0);
-
-        // For Gradle direct dependencies with resolved dependency info
-        if (firstPath.getPath().size() == 1 && firstPath.getPath().get(0) instanceof GradleDependencyNode) {
-            GradleDependencyNode node = (GradleDependencyNode) firstPath.getPath().get(0);
-            if (node.getResolvedDependency() != null) {
-                return render(node.getResolvedDependency(), scopeOrConfig);
-            }
-        }
-
-        // Fallback to simple format
-        return formatDependency(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()) +
-               "\n\\--- " + scopeOrConfig;
-    }
-
-    /**
-     * Renders a direct dependency graph showing just the dependency and its configuration.
-     */
-    public String render(ResolvedDependency dependency, String configuration) {
-        return formatDependency(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion()) +
-               "\n\\--- " + configuration;
-    }
-
-    /**
-     * Builds an inverse dependency tree showing the path from a (potentially transitive) dependency
-     * up to the configuration that includes it.
-     */
-    public String buildInverseDependencyTree(ResolvedGroupArtifactVersion gav,
-                                            Map<ResolvedGroupArtifactVersion, List<DependencyPath>> projectPaths,
-                                            String scopeOrConfiguration) {
-        List<DependencyPath> paths = projectPaths.get(gav);
-        if (paths == null || paths.isEmpty()) {
-            return "";
-        }
-
-        StringBuilder tree = new StringBuilder();
-        tree.append(formatDependency(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()));
-
-        DependencyPath path = paths.get(0); // Use the first path if multiple exist
-
-        if (!path.getPath().isEmpty()) {
-            appendDependencyPath(tree, path.getPath(), scopeOrConfiguration);
-        }
-
-        return tree.toString();
-    }
-
-    private void appendDependencyPath(StringBuilder tree, List<DependencyNode> nodes, String scopeOrConfiguration) {
-        if (nodes.isEmpty()) {
-            appendIndentedLine(tree, 0, scopeOrConfiguration);
+    public void append(String configOrScope, Collection<ResolvedDependency> path) {
+        if (path.isEmpty()) {
             return;
         }
 
-        // The first node is always the dependency itself (already added to tree), skip it
-        // Add all parent dependencies
-        for (int i = 1; i < nodes.size(); i++) {
-            DependencyNode parent = nodes.get(i);
-            appendIndentedLine(tree, i - 1, formatDependency(parent.getGroupId(), parent.getArtifactId(), parent.getVersion()));
+        Iterator<ResolvedDependency> iterator = path.iterator();
+        ResolvedDependency dependency = iterator.next();
+        String id = formatDependency(dependency.getGav());
+        if (root == null) {
+            root = createEmptyNode(id);
+        } else if (!root.getId().equals(id)) {
+            throw new IllegalStateException("Dependency path is for a different root");
         }
 
-        // Add the configuration at the end
-        appendIndentedLine(tree, Math.max(0, nodes.size() - 1), scopeOrConfiguration);
-    }
+        size++;
 
-    private void appendIndentedLine(StringBuilder tree, int depth, String content) {
-        tree.append("\n");
-        for (int i = 0; i < depth; i++) {
-            tree.append("     ");
+        Node parent = root;
+        while (iterator.hasNext()) {
+            dependency = iterator.next();
+            id = formatDependency(dependency.getGav());
+            Node child = null;
+            for (Node node : parent.getChildren()) {
+                if (node.getId().equals(id)) {
+                    child = node;
+                    break;
+                }
+            }
+            if (child == null) {
+                child = createEmptyNode(id);
+                parent.getChildren().add(child);
+            }
+            parent = child;
         }
-        tree.append("\\--- ").append(content);
+        parent.getChildren().add(new ConfigurationNode(configOrScope));
     }
 
-    private String formatDependency(String groupId, String artifactId, String version) {
-        return groupId + ":" + artifactId + ":" + version;
+    public @Nullable String print() {
+        if (root == null) {
+            return null;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(root.getId()).append("\n");
+        Set<Node> visited = new HashSet<>();
+        int i = 0;
+        for (Node child : root.getChildren()) {
+            print0(sb, new StringBuilder(), child, visited, i++ == root.getChildren().size() - 1);
+        }
+        return sb.toString();
+    }
+
+    private void print0(StringBuilder sb, StringBuilder prefix, Node node, Set<Node> visited, boolean lastChild) {
+        boolean alreadySeen = !visited.add(node);
+
+        sb.append(prefix).append(lastChild ? "\\--- " : "+--- ").append(node.getId());
+        if (alreadySeen) {
+            sb.append(" (*)\n");
+            return;
+        }
+        sb.append("\n");
+
+        prefix.append(lastChild ? "     " : "|    ");
+        int i = 0;
+        for (Node child : node.getChildren()) {
+            print0(sb, prefix, child, visited, i++ == node.getChildren().size() - 1);
+        }
+        if (prefix.length() > 0) {
+            prefix.setLength(prefix.length() - 5);
+        }
+    }
+
+    public boolean isEmpty() {
+        return size == 0;
+    }
+
+    private static String formatDependency(ResolvedGroupArtifactVersion gav) {
+        return gav.getGroupId() + ":" + gav.getArtifactId() + ":" + gav.getVersion();
+    }
+
+    private DependencyNode createEmptyNode(String id) {
+        return new DependencyNode(id, new TreeSet<>());
+    }
+
+    private interface Node extends Comparable<Node> {
+        String getId();
+
+        Set<Node> getChildren();
+
+        @Override
+        default int compareTo(Node other) {
+            if (this instanceof ConfigurationNode && other instanceof ConfigurationNode) {
+                return getId().compareTo(other.getId());
+            } else if (this instanceof ConfigurationNode) {
+                return -1;
+            } else if (other instanceof ConfigurationNode) {
+                return 1;
+            }
+            return getId().compareTo(other.getId());
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    private static class DependencyNode implements Node {
+        @EqualsAndHashCode.Include
+        String id;
+        Set<Node> children;
+    }
+
+    @RequiredArgsConstructor
+    @Getter
+    private static class ConfigurationNode implements Node {
+        final String id;
+        Set<Node> children = emptySet();
     }
 }

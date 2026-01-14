@@ -40,20 +40,14 @@ public class RenamePropertyKey extends Recipe {
             example = "version.org.junit")
     String newKey;
 
-    @Override
-    public String getDisplayName() {
-        return "Rename Maven property key";
-    }
+    String displayName = "Rename Maven property key";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s` to `%s`", oldKey, newKey);
     }
 
-    @Override
-    public String getDescription() {
-        return "Rename the specified Maven project property key leaving the value unchanged.";
-    }
+    String description = "Rename the specified Maven project property key leaving the value unchanged.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

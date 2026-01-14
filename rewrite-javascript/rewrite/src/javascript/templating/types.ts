@@ -591,6 +591,33 @@ export interface RewriteRule {
 }
 
 /**
+ * Context for preMatch predicate - only has cursor, no captures yet.
+ */
+export interface PreMatchContext {
+    /**
+     * The cursor pointing to the node being considered for matching.
+     * Allows navigating the AST (parent, root, etc.).
+     */
+    cursor: Cursor;
+}
+
+/**
+ * Context for postMatch predicate - has cursor and captured values.
+ */
+export interface PostMatchContext {
+    /**
+     * The cursor pointing to the matched node.
+     * Allows navigating the AST (parent, root, etc.).
+     */
+    cursor: Cursor;
+
+    /**
+     * Values captured during pattern matching.
+     */
+    captures: CaptureMap;
+}
+
+/**
  * Configuration for a replacement rule.
  */
 export interface RewriteConfig {
@@ -598,55 +625,52 @@ export interface RewriteConfig {
     after: Template | ((match: MatchResult) => Template);
 
     /**
-     * Optional context predicate that must evaluate to true for the transformation to be applied.
-     * Evaluated after the pattern matches structurally but before applying the template.
-     * Provides access to both the matched node and the cursor for context inspection.
+     * Optional predicate evaluated BEFORE pattern matching.
+     * Use for efficient early filtering based on AST context when captures aren't needed.
+     * If this returns false, pattern matching is skipped entirely.
      *
-     * @param node The matched AST node
-     * @param cursor The cursor at the matched node, providing access to ancestors and context
-     * @returns true if the transformation should be applied, false otherwise
+     * @param node The AST node being considered for matching
+     * @param context Context providing cursor for AST navigation
+     * @returns true to proceed with pattern matching, false to skip this node
      *
      * @example
      * ```typescript
      * rewrite(() => ({
-     *     before: pattern`await ${_('promise')}`,
-     *     after: template`await ${_('promise')}.catch(handleError)`,
-     *     where: (node, cursor) => {
-     *         // Only apply inside async functions
-     *         const method = cursor.firstEnclosing((n: any): n is J.MethodDeclaration =>
-     *             n.kind === J.Kind.MethodDeclaration
-     *         );
-     *         return method?.modifiers.some(m => m.type === 'async') || false;
+     *     before: pattern`console.log(${_('msg')})`,
+     *     after: template`logger.info(${_('msg')})`,
+     *     preMatch: (node, {cursor}) => {
+     *         // Only attempt matching inside functions named 'handleError'
+     *         const method = cursor.firstEnclosing(isMethodDeclaration);
+     *         return method?.name.simpleName === 'handleError';
      *     }
      * }));
      * ```
      */
-    where?: (node: J, cursor: Cursor) => boolean | Promise<boolean>;
+    preMatch?: (node: J, context: PreMatchContext) => boolean | Promise<boolean>;
 
     /**
-     * Optional context predicate that must evaluate to false for the transformation to be applied.
-     * Evaluated after the pattern matches structurally but before applying the template.
-     * Provides access to both the matched node and the cursor for context inspection.
+     * Optional predicate evaluated AFTER pattern matching succeeds.
+     * Use when you need access to captured values to decide whether to apply the transformation.
+     * If this returns false, the transformation is not applied.
      *
      * @param node The matched AST node
-     * @param cursor The cursor at the matched node, providing access to ancestors and context
-     * @returns true if the transformation should NOT be applied, false if it should proceed
+     * @param context Context providing cursor for AST navigation and captured values
+     * @returns true to apply the transformation, false to skip
      *
      * @example
      * ```typescript
      * rewrite(() => ({
-     *     before: pattern`await ${_('promise')}`,
-     *     after: template`await ${_('promise')}.catch(handleError)`,
-     *     whereNot: (node, cursor) => {
-     *         // Don't apply inside try-catch blocks
-     *         return cursor.firstEnclosing((n: any): n is J.Try =>
-     *             n.kind === J.Kind.Try
-     *         ) !== undefined;
+     *     before: pattern`${_('a')} + ${_('b')}`,
+     *     after: template`${_('b')} + ${_('a')}`,
+     *     postMatch: (node, {cursor, captures}) => {
+     *         // Only swap if 'a' is a literal number
+     *         const a = captures.get('a');
+     *         return a?.kind === J.Kind.Literal && typeof a.value === 'number';
      *     }
      * }));
      * ```
      */
-    whereNot?: (node: J, cursor: Cursor) => boolean | Promise<boolean>;
+    postMatch?: (node: J, context: PostMatchContext) => boolean | Promise<boolean>;
 }
 
 /**
@@ -757,6 +781,14 @@ export interface MatchResult {
     get(capture: string): any;
 
     get<T>(capture: Capture<T>): T | undefined;
+
+    /**
+     * Checks if a capture has been matched.
+     *
+     * @param capture The capture name (string) or Capture object
+     * @returns true if the capture exists in the match result
+     */
+    has(capture: Capture | string): boolean;
 }
 
 /**

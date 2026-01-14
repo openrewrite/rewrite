@@ -77,4 +77,13 @@ class MavenRepositoryMirrorTest {
         assertThat(oneMirrored).extracting(MavenRepository::getId).isEqualTo("mirror");
         assertThat(oneMirrored).extracting(MavenRepository::getUri).isEqualTo("https://mirror");
     }
+
+    @Test
+    void localM2RepositoryIsNeverMirrored() {
+        MavenRepositoryMirror mirror = new MavenRepositoryMirror("mirror", "https://mirror", "*", true, true, null);
+
+        MavenRepository mirrored = mirror.apply(MavenRepository.MAVEN_LOCAL_DEFAULT);
+
+        assertThat(mirrored.getUri()).isEqualTo(MavenRepository.MAVEN_LOCAL_DEFAULT.getUri());
+    }
 }

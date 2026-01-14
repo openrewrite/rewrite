@@ -61,16 +61,10 @@ public class FindPlugins extends Recipe {
                 Validated.notBlank("pluginClass", pluginClass)));
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Find Gradle plugin";
-    }
+    String displayName = "Find Gradle plugin";
 
-    @Override
-    public String getDescription() {
-        return "Find a Gradle plugin by id and/or class name. " +
+    String description = "Find a Gradle plugin by id and/or class name. " +
                "For best results both should be specified, as one cannot automatically be used to infer the other.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

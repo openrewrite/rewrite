@@ -48,16 +48,10 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Add entries to `.gitignore`";
-    }
+    String displayName = "Add entries to `.gitignore`";
 
-    @Override
-    public String getDescription() {
-        return "Adds entries to the project's `.gitignore` file. If no `.gitignore` file exists, one will be created. " +
+    String description = "Adds entries to the project's `.gitignore` file. If no `.gitignore` file exists, one will be created. " +
                 "Existing entries that match will not be duplicated.";
-    }
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {

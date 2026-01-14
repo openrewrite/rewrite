@@ -35,16 +35,10 @@ import static org.openrewrite.PathUtils.separatorsToUnix;
 @EqualsAndHashCode(callSuper = false)
 public class EffectiveGradlePluginRepositories extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "List effective Gradle plugin repositories";
-    }
+    String displayName = "List effective Gradle plugin repositories";
 
-    @Override
-    public String getDescription() {
-        return "Lists the Gradle plugin repositories that would be used for plugin resolution, in order of precedence. " +
+    String description = "Lists the Gradle plugin repositories that would be used for plugin resolution, in order of precedence. " +
                "This includes Maven repositories defined in the settings.gradle pluginManagement section and build.gradle buildscript repositories as determined when the LST was produced.";
-    }
 
     @Option(displayName = "Use markers",
             description = "Whether to add markers for each effective Gradle plugin repository to the build or settings file. Default `false`.",

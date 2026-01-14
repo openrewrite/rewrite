@@ -15,13 +15,7 @@
  */
 import ts from "typescript";
 import {Type} from "../java";
-import {immerable} from "immer";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
-
-// Helper class to create Type objects that immer won't traverse
-class NonDraftableType {
-    [immerable] = false;
-}
 
 export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
@@ -65,6 +59,16 @@ export class JavaScriptTypeMapping {
     }
 
     type(node: ts.Node): Type | undefined {
+        // For identifiers, check if this references a variable
+        // This enables fieldType attribution for variable references
+        if (ts.isIdentifier(node)) {
+            const variableType = this.variableType(node);
+            if (variableType) {
+                return variableType;
+            }
+            // Fall through to regular type checking if not a variable
+        }
+
         let type: ts.Type | undefined;
         if (ts.isExpression(node)) {
             type = this.checker.getTypeAtLocation(node);
@@ -115,6 +119,14 @@ export class JavaScriptTypeMapping {
             return existing;
         }
 
+        // TypeScript represents `boolean` as a union of `false | true`, but the union
+        // type still has the Boolean flag set. Check this early to return Primitive.Boolean
+        // before we process it as a generic union type.
+        if (type.flags & ts.TypeFlags.Boolean) {
+            this.typeCache.set(signature, Type.Primitive.Boolean);
+            return Type.Primitive.Boolean;
+        }
+
         // Get symbol for later use in type detection
         const symbol = type.getSymbol?.();
 
@@ -162,7 +174,7 @@ export class JavaScriptTypeMapping {
                             }
 
                             // Create the parameterized type wrapper
-                            const parameterized = Object.assign(new NonDraftableType(), {
+                            const parameterized = {
                                 kind: Type.Kind.Parameterized,
                                 type: classType,
                                 typeParameters: typeParameters,
@@ -170,7 +182,7 @@ export class JavaScriptTypeMapping {
                                 toJSON: function () {
                                     return Type.signature(this);
                                 }
-                            }) as Type.Parameterized;
+                            } as Type.Parameterized;
 
                             // Cache the parameterized type
                             this.typeCache.set(signature, parameterized);
@@ -248,8 +260,7 @@ export class JavaScriptTypeMapping {
 
         // Check for union types (e.g., string | number)
         if (type.flags & ts.TypeFlags.Union) {
-            const unionType = type as ts.UnionType;
-            return this.createUnionType(unionType, signature);
+            return this.createUnionType(type as ts.UnionType, signature);
         }
 
         // Check for intersection types (e.g., A & B)
@@ -318,16 +329,229 @@ export class JavaScriptTypeMapping {
         return Type.isPrimitive(type) ? type : Type.Primitive.None;
     }
 
-    variableType(node: ts.NamedDeclaration): Type.Variable | undefined {
+    variableType(node: ts.Node): Type.Variable | undefined {
+        let symbol: ts.Symbol | undefined;
+        let location: ts.Node = node;
+
+        // Get the symbol depending on node type
         if (ts.isVariableDeclaration(node)) {
-            const symbol = this.checker.getSymbolAtLocation(node.name);
-            if (symbol) {
-                // TODO: Implement in Phase 6
-                // const type = this.checker.getTypeOfSymbolAtLocation(symbol, node);
-                // return JavaType.Variable with proper mapping
+            symbol = this.checker.getSymbolAtLocation(node.name);
+        } else if (ts.isParameter(node)) {
+            symbol = this.checker.getSymbolAtLocation(node.name);
+        } else if (ts.isIdentifier(node)) {
+            // For identifier references (like 'vi' in 'vi.fn()')
+            symbol = this.checker.getSymbolAtLocation(node);
+        } else if (ts.isPropertyDeclaration(node) || ts.isPropertySignature(node)) {
+            symbol = this.checker.getSymbolAtLocation(node.name);
+        } else {
+            // Not a variable/parameter/property we can handle
+            return undefined;
+        }
+
+        if (!symbol) {
+            return undefined;
+        }
+
+        // Get the variable declaration (resolve aliases if needed)
+        let actualSymbol = symbol;
+        if (symbol.flags & ts.SymbolFlags.Alias) {
+            actualSymbol = this.checker.getAliasedSymbol(symbol);
+        }
+
+        // Check if this symbol represents a variable, parameter, or property
+        // Exclude functions, classes, interfaces, namespaces, type aliases
+        const isExcluded = actualSymbol.flags & (
+            ts.SymbolFlags.Function |
+            ts.SymbolFlags.Class |
+            ts.SymbolFlags.Interface |
+            ts.SymbolFlags.Enum |
+            ts.SymbolFlags.ValueModule |
+            ts.SymbolFlags.NamespaceModule |
+            ts.SymbolFlags.TypeAlias |
+            ts.SymbolFlags.TypeParameter
+        );
+
+        if (isExcluded) {
+            // Not a variable - it's a type, function, class, namespace, etc.
+            return undefined;
+        }
+
+        const isVariable = actualSymbol.flags & (
+            ts.SymbolFlags.Variable |
+            ts.SymbolFlags.Property |
+            ts.SymbolFlags.FunctionScopedVariable |
+            ts.SymbolFlags.BlockScopedVariable
+        );
+
+        if (!isVariable) {
+            // Not a variable we recognize
+            return undefined;
+        }
+
+        // Get the type of the variable
+        const variableType = this.checker.getTypeOfSymbolAtLocation(actualSymbol, location);
+        const mappedType = this.getType(variableType);
+
+        // Get the owner (declaring type) for the variable
+        let ownerType: Type | undefined;
+
+        // Check if the variable is imported
+        if (symbol.flags & ts.SymbolFlags.Alias) {
+            // For imported variables, find the module specifier
+            const declarations = symbol.declarations;
+            if (declarations && declarations.length > 0) {
+                let importNode: ts.Node | undefined = declarations[0];
+
+                // Traverse up to find the ImportDeclaration
+                while (importNode && !ts.isImportDeclaration(importNode)) {
+                    importNode = importNode.parent;
+                }
+
+                if (importNode && ts.isImportDeclaration(importNode)) {
+                    const importDecl = importNode as ts.ImportDeclaration;
+                    if (ts.isStringLiteral(importDecl.moduleSpecifier)) {
+                        const moduleSpecifier = importDecl.moduleSpecifier.text;
+                        // Create a Type.Class representing the module
+                        ownerType = {
+                            kind: Type.Kind.Class,
+                            flags: 0,
+                            classKind: Type.Class.Kind.Interface,
+                            fullyQualifiedName: moduleSpecifier,
+                            typeParameters: [],
+                            annotations: [],
+                            interfaces: [],
+                            members: [],
+                            methods: [],
+                            toJSON: function () {
+                                return Type.signature(this);
+                            }
+                        } as Type.Class;
+                    }
+                }
+            }
+        } else {
+            // For non-imported variables, check if they belong to a class/interface/namespace
+            const parentSymbol = (actualSymbol as any).parent as ts.Symbol | undefined;
+            if (parentSymbol) {
+                const parentType = this.checker.getDeclaredTypeOfSymbol(parentSymbol);
+                if (parentType) {
+                    ownerType = this.getType(parentType);
+
+                    // If the parent is a namespace, try to find the module it came from
+                    // This handles cases like React.forwardRef where the namespace is React
+                    // but the module is "react"
+                    if (parentSymbol.flags & ts.SymbolFlags.ValueModule ||
+                        parentSymbol.flags & ts.SymbolFlags.NamespaceModule) {
+                        // Check if this namespace was imported
+                        const parentDeclarations = parentSymbol.declarations;
+                        if (parentDeclarations && parentDeclarations.length > 0) {
+                            const firstDecl = parentDeclarations[0];
+                            const sourceFile = firstDecl.getSourceFile();
+                            // If it's from node_modules or a .d.ts file, try to extract the module name
+                            if (sourceFile.isDeclarationFile) {
+                                const fileName = sourceFile.fileName;
+                                const moduleName = this.extractModuleNameFromPath(fileName);
+                                if (moduleName) {
+                                    // Store the module as the owningClass for now
+                                    // (This is a bit of a hack, but works with the current type system)
+                                    if (Type.isClass(ownerType)) {
+                                        (ownerType as any).owningClass = {
+                                            kind: Type.Kind.Class,
+                                            flags: 0,
+                                            classKind: Type.Class.Kind.Interface,
+                                            fullyQualifiedName: moduleName,
+                                            typeParameters: [],
+                                            annotations: [],
+                                            interfaces: [],
+                                            members: [],
+                                            methods: [],
+                                            toJSON: function () {
+                                                return Type.signature(this);
+                                            }
+                                        } as Type.Class;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
-        return undefined;
+
+        // Create the Type.Variable
+        const variable = {
+            kind: Type.Kind.Variable,
+            name: actualSymbol.getName(),
+            owner: ownerType,
+            type: mappedType,
+            annotations: [],
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        } as Type.Variable;
+
+        return variable;
+    }
+
+    /**
+     * Extract the npm module name from a file path.
+     * Handles various package manager layouts:
+     * - Standard: /path/node_modules/react/index.d.ts -> react
+     * - Scoped: /path/node_modules/@types/react/index.d.ts -> react
+     * - Scoped with __ encoding: /path/node_modules/@types/testing-library__react/index.d.ts -> @testing-library/react
+     * - Nested node_modules: /path/node_modules/pkg/node_modules/dep/index.d.ts -> dep
+     * - pnpm: /path/node_modules/.pnpm/react@18.2.0/node_modules/react/index.d.ts -> react
+     *
+     * @returns The module name, or undefined if not from node_modules
+     */
+    private extractModuleNameFromPath(fileName: string): string | undefined {
+        if (!fileName.includes('node_modules/')) {
+            return undefined;
+        }
+
+        // Find the last occurrence of node_modules/ to handle nested dependencies
+        // This also correctly handles pnpm's .pnpm structure
+        const lastNodeModulesIndex = fileName.lastIndexOf('node_modules/');
+        const afterNodeModules = fileName.substring(lastNodeModulesIndex + 'node_modules/'.length);
+
+        // Split by '/' to get path segments
+        const segments = afterNodeModules.split('/');
+        if (segments.length === 0) {
+            return undefined;
+        }
+
+        let moduleName: string;
+
+        // Handle scoped packages (@scope/package)
+        if (segments[0].startsWith('@') && segments.length > 1) {
+            moduleName = `${segments[0]}/${segments[1]}`;
+        } else {
+            moduleName = segments[0];
+        }
+
+        // Skip pnpm's .pnpm directory - it contains versioned package paths
+        // In pnpm, the actual package is in: .pnpm/pkg@version/node_modules/pkg
+        // So we already handled this by using lastIndexOf above
+        if (moduleName === '.pnpm') {
+            return undefined;
+        }
+
+        // Remove @types/ prefix and decode DefinitelyTyped scoped package encoding
+        // DefinitelyTyped encodes scoped packages using __ instead of /
+        // Example: @types/testing-library__react -> @testing-library/react
+        if (moduleName.startsWith('@types/')) {
+            moduleName = moduleName.substring('@types/'.length);
+            // Decode __ encoding for scoped packages
+            // testing-library__react -> @testing-library/react
+            if (moduleName.includes('__')) {
+                const parts = moduleName.split('__');
+                if (parts.length === 2) {
+                    moduleName = `@${parts[0]}/${parts[1]}`;
+                }
+            }
+        }
+
+        return moduleName;
     }
 
     /**
@@ -363,7 +587,7 @@ export class JavaScriptTypeMapping {
         }
 
         // Create the Type.Method object
-        const method = Object.assign(new NonDraftableType(), {
+        const method = {
             kind: Type.Kind.Method,
             flags: 0, // FIXME - determine flags
             declaringType: declaringType,
@@ -378,7 +602,7 @@ export class JavaScriptTypeMapping {
             toJSON: function () {
                 return Type.signature(this);
             }
-        }) as Type.Method;
+        } as Type.Method;
 
         this.methodCache.set(cacheKey, method);
         return method;
@@ -832,7 +1056,7 @@ export class JavaScriptTypeMapping {
         }
 
         // Create empty class type shell (no members yet to avoid recursion)
-        return Object.assign(new NonDraftableType(), {
+        return {
             kind: Type.Kind.Class,
             flags: 0, // TODO - determine flags
             classKind: classKind,
@@ -845,7 +1069,7 @@ export class JavaScriptTypeMapping {
             toJSON: function () {
                 return Type.signature(this);
             }
-        }) as Type.Class;
+        } as Type.Class;
     }
 
     /**
@@ -961,7 +1185,7 @@ export class JavaScriptTypeMapping {
             } else {
                 // Create Type.Variable for fields/properties
                 const propType = this.checker.getTypeOfSymbolAtLocation(prop, declaration);
-                const variable: Type.Variable = Object.assign(new NonDraftableType(), {
+                const variable: Type.Variable = {
                     kind: Type.Kind.Variable,
                     name: prop.getName(),
                     owner: classType,  // Cyclic reference to the containing class (already in cache)
@@ -970,7 +1194,7 @@ export class JavaScriptTypeMapping {
                     toJSON: function () {
                         return Type.signature(this);
                     }
-                }) as Type.Variable;
+                } as Type.Variable;
                 classType.members.push(variable);
             }
         }
@@ -1031,10 +1255,10 @@ export class JavaScriptTypeMapping {
      */
     private createUnionType(unionType: ts.UnionType, cacheKey: string | number): Type.Union {
         // Shell-cache FIRST to prevent infinite recursion (before resolving constituent types)
-        const union = Object.assign(new NonDraftableType(), {
+        const union = {
             kind: Type.Kind.Union,
             bounds: []
-        }) as Type.Union;
+        } as Type.Union;
 
         this.typeCache.set(cacheKey, union);
 
@@ -1056,10 +1280,10 @@ export class JavaScriptTypeMapping {
      */
     private createIntersectionType(intersectionType: ts.IntersectionType, cacheKey: string | number): Type.Intersection {
         // Shell-cache FIRST to prevent infinite recursion (before resolving constituent types)
-        const intersection = Object.assign(new NonDraftableType(), {
+        const intersection = {
             kind: Type.Kind.Intersection,
             bounds: []
-        }) as Type.Intersection;
+        } as Type.Intersection;
 
         this.typeCache.set(cacheKey, intersection);
 
@@ -1085,12 +1309,12 @@ export class JavaScriptTypeMapping {
         const name = symbol ? symbol.getName() : '?';
 
         // Shell-cache: Create stub, cache it, then populate (prevents cycles)
-        const gtv = Object.assign(new NonDraftableType(), {
+        const gtv = {
             kind: Type.Kind.GenericTypeVariable,
             name: name,
             variance: Type.GenericTypeVariable.Variance.Invariant,
             bounds: []
-        }) as Type.GenericTypeVariable;
+        } as Type.GenericTypeVariable;
 
         this.typeCache.set(cacheKey, gtv);
 
@@ -1120,7 +1344,7 @@ export class JavaScriptTypeMapping {
      * The shell will be populated later to handle circular references.
      */
     private createEmptyFunctionType(): Type.Class {
-        return Object.assign(new NonDraftableType(), {
+        return {
             kind: Type.Kind.Class,
             flags: 0,
             classKind: Type.Class.Kind.Interface,
@@ -1133,7 +1357,7 @@ export class JavaScriptTypeMapping {
             toJSON: function () {
                 return Type.signature(this);
             }
-        }) as Type.Class;
+        } as Type.Class;
     }
 
     /**
@@ -1164,27 +1388,27 @@ export class JavaScriptTypeMapping {
         const typeParameters: Type[] = [];
 
         // Return type parameter (covariant)
-        typeParameters.push(Object.assign(new NonDraftableType(), {
+        typeParameters.push({
             kind: Type.Kind.GenericTypeVariable,
             name: 'R',
             variance: Type.GenericTypeVariable.Variance.Covariant,
             bounds: [returnType]
-        }) as Type.GenericTypeVariable);
+        } as Type.GenericTypeVariable);
 
         // Parameter type variables (contravariant)
         parameterTypes.forEach((paramType, index) => {
-            typeParameters.push(Object.assign(new NonDraftableType(), {
+            typeParameters.push({
                 kind: Type.Kind.GenericTypeVariable,
                 name: `P${index + 1}`,
                 variance: Type.GenericTypeVariable.Variance.Contravariant,
                 bounds: [paramType]
-            }) as Type.GenericTypeVariable);
+            } as Type.GenericTypeVariable);
         });
 
         functionClass.typeParameters = typeParameters;
 
         // Create the apply() method
-        const applyMethod = Object.assign(new NonDraftableType(), {
+        const applyMethod = {
             kind: Type.Kind.Method,
             flags: 0,
             declaringType: functionClass,
@@ -1199,7 +1423,7 @@ export class JavaScriptTypeMapping {
             toJSON: function () {
                 return Type.signature(this);
             }
-        }) as Type.Method;
+        } as Type.Method;
 
         // Add the apply method to the function class
         functionClass.methods.push(applyMethod);

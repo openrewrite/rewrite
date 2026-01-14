@@ -52,10 +52,7 @@ public class AppendToSequence extends Recipe {
     @Nullable
     Boolean matchExistingSequenceValuesInAnyOrder;
 
-    @Override
-    public String getDisplayName() {
-        return "Append to sequence";
-    }
+    String displayName = "Append to sequence";
 
     @Override
     public String getInstanceName() {
@@ -63,10 +60,7 @@ public class AppendToSequence extends Recipe {
                 value, sequencePath);
     }
 
-    @Override
-    public String getDescription() {
-        return "Append item to YAML sequence.";
-    }
+    String description = "Append item to YAML sequence.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

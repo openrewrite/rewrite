@@ -442,7 +442,12 @@ public interface HttpSender {
             return new InputStream() {
                 @Override
                 public int read() throws IOException {
-                    return body == null ? 0 : body.read();
+                    return body == null ? -1 : body.read();
+                }
+
+                @Override
+                public int read(byte[] b, int off, int len) throws IOException {
+                    return body == null ? -1 : body.read(b, off, len);
                 }
 
                 @Override

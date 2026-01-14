@@ -99,7 +99,7 @@ class AutodetectTest implements RewriteTest {
             Autodetect.Detector detector = Autodetect.detector();
             sources.forEach(detector::sample);
 
-            TabsAndIndentsStyle tabsAndIndents = (TabsAndIndentsStyle) detector.build().getStyles().stream()
+            var tabsAndIndents = (TabsAndIndentsStyle) detector.build().getStyles().stream()
               .filter(TabsAndIndentsStyle.class::isInstance)
               .findAny().orElseThrow();
             assertThat(tabsAndIndents.getTabSize()).isEqualTo(1);

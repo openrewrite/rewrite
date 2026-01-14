@@ -22,6 +22,7 @@ import {SourceFile} from "../tree";
 import {Result, scheduleRun} from "../run";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {dedent, mapAsync, trimIndent} from "../util";
+export {dedent} from "../util";
 import {ParseErrorKind} from "../parse-error";
 import {MarkersKind, ParseExceptionResult} from "../markers";
 import {JavaScriptVisitor} from "../javascript";
@@ -90,18 +91,22 @@ export class RecipeSpec {
             return groups;
         }, {} as { [kind: string]: SourceSpec<any>[] });
 
+        const allParsed: [SourceSpec<any>, SourceFile][] = [];
         for (const kind in specsByKind) {
             const specs = specsByKind[kind];
             const parsed = await this.parse(specs);
             await this.expectNoParseFailures(parsed);
             await this.expectWhitespaceNotToContainNonwhitespaceCharacters(parsed);
             this.checkParsePrintIdempotence && await this.expectParsePrintIdempotence(parsed);
-            const changeset = (await scheduleRun(this.recipe,
-                parsed.map(([_, sourceFile]) => sourceFile),
-                this.recipeExecutionContext)).changeset;
-            await this.expectResultsToMatchAfter(specs, changeset, parsed);
-            await this.expectGeneratedFiles(specs, changeset);
+            allParsed.push(...parsed);
         }
+
+        const changeset = (await scheduleRun(this.recipe,
+            allParsed.map(([_, sourceFile]) => sourceFile),
+            this.recipeExecutionContext)).changeset;
+
+        await this.expectResultsToMatchAfter(flattenedSpecs, changeset, allParsed);
+        await this.expectGeneratedFiles(flattenedSpecs, changeset);
 
         // for (const [name, assertion] of Object.entries(this.dataTableAssertions)) {
         //     assertion(getRows(name, this.recipeExecutionContext));
@@ -249,7 +254,7 @@ export function dedentAfter(s?: AfterRecipeText): AfterRecipeText {
         if (typeof s === "function") {
             return (actual: string): string | undefined => {
                 const raw = s(actual);
-                return raw ? dedent(raw) : undefined;
+                return raw;
             };
         }
         return () => dedent(s);

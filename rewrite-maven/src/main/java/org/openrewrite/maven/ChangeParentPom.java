@@ -113,23 +113,17 @@ public class ChangeParentPom extends Recipe {
     @Nullable
     List<String> except;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven parent";
-    }
+    String displayName = "Change Maven parent";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", newGroupId, newArtifactId, newVersion);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change the parent pom of a Maven pom.xml by matching the existing parent via groupId and artifactId, " +
+    String description = "Change the parent pom of a Maven pom.xml by matching the existing parent via groupId and artifactId, " +
                 "and updating it to a new groupId, artifactId, version, and optional relativePath. " +
                 "Also updates the project to retain dependency management and properties previously inherited from the old parent that are no longer provided by the new parent. " +
                 "Removes redundant dependency versions already managed by the new parent.";
-    }
 
     @Deprecated
     public ChangeParentPom(String oldGroupId,
@@ -242,6 +236,8 @@ public class ChangeParentPom extends Recipe {
 
                             // Retain managed versions from the old parent that are not managed in the new parent
                             MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
+                            ResolvedPom oldParent = mpd.download(new GroupArtifactVersion(currentGroupId, currentArtifactId, oldVersion), null, resolvedPom, resolvedPom.getRepositories())
+                                    .resolve(emptyList(), mpd, ctx);
                             ResolvedPom newParent = mpd.download(new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()), null, resolvedPom, resolvedPom.getRepositories())
                                     .resolve(emptyList(), mpd, ctx);
                             List<ResolvedManagedDependency> dependenciesWithoutExplicitVersions = getDependenciesUnmanagedByNewParent(mrr, newParent);
@@ -251,9 +247,10 @@ public class ChangeParentPom extends Recipe {
                                         dep.getScope() == null ? null : dep.getScope().toString().toLowerCase(), dep.getType(), dep.getClassifier(), null));
                             }
 
-                            // Retain properties from the old parent that are not present in the new parent
-                            Map<String, String> propertiesInUse = getPropertiesInUse(getCursor().firstEnclosingOrThrow(Xml.Document.class), ctx);
+                            Map<String, String> oldParentProps = oldParent.getProperties();
                             Map<String, String> newParentProps = newParent.getProperties();
+                            // Retain properties from the old parent that are not present in the new parent
+                            Map<String, String> propertiesInUse = getPropertiesInUse(getCursor().firstEnclosingOrThrow(Xml.Document.class), oldParentProps, ctx);
                             for (Map.Entry<String, String> propInUse : propertiesInUse.entrySet()) {
                                 if (!newParentProps.containsKey(propInUse.getKey()) && propInUse.getValue() != null) {
                                     changeParentTagVisitors.add(new AddPropertyVisitor(propInUse.getKey(), propInUse.getValue(), false));
@@ -346,23 +343,23 @@ public class ChangeParentPom extends Recipe {
 
     private static final Pattern PROPERTY_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
-    private static Map<String, String> getPropertiesInUse(Xml.Document pomXml, ExecutionContext ctx) {
-        return new MavenIsoVisitor<Map<String, String>>() {
-            @Nullable
-            ResolvedPom resolvedPom = null;
+    private static Map<String, String> getPropertiesInUse(Xml.Document pomXml, Map<String, String> oldParentProps, ExecutionContext ctx) {
+        Map<String, String> cascadedProps = new HashMap<>(oldParentProps);
+        Set<String> referencedProps = new HashSet<>();
+        new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Tag visitTag(Xml.Tag tag, Map<String, String> properties) {
-                Xml.Tag t = super.visitTag(tag, properties);
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext context) {
+                Xml.Tag t = super.visitTag(tag, context);
                 if (t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
                     String text = ((Xml.CharData) t.getContent().get(0)).getText().trim();
+                    if (isPropertyTag()) {
+                        cascadedProps.put(t.getName(), text);
+                    }
                     Matcher m = PROPERTY_PATTERN.matcher(text);
                     while (m.find()) {
-                        if (resolvedPom == null) {
-                            resolvedPom = getResolutionResult().getPom();
-                        }
                         String propertyName = m.group(1).trim();
-                        if (resolvedPom.getProperties().containsKey(propertyName) && !isGlobalProperty(propertyName)) {
-                            properties.put(m.group(1).trim(), resolvedPom.getProperties().get(propertyName));
+                        if (!isGlobalProperty(propertyName)) {
+                            referencedProps.add(propertyName);
                         }
                     }
                 }
@@ -373,7 +370,10 @@ public class ChangeParentPom extends Recipe {
                 return propertyName.startsWith("project.") || propertyName.startsWith("env.") ||
                         propertyName.startsWith("settings.") || "basedir".equals(propertyName);
             }
-        }.reduce(pomXml, new HashMap<>());
+        }.visitNonNull(pomXml, ctx);
+        return referencedProps.stream()
+                .filter(cascadedProps::containsKey)
+                .collect(toMap(p -> p, cascadedProps::get));
     }
 
     private List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParent(MavenResolutionResult mrr, ResolvedPom newParent) {

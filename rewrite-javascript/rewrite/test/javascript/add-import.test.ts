@@ -15,22 +15,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {describe, test, expect} from "@jest/globals";
+import {describe, expect, test} from "@jest/globals";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     AddImport,
     ImportStyle,
+    IntelliJ,
     javascript,
     JavaScriptVisitor,
+    JS,
     maybeAddImport,
     npm,
     packageJson,
     RemoveImport,
+    SpacesStyle,
     Template,
     tsx,
     typescript
 } from "../../src/javascript";
 import {emptySpace, J} from "../../src/java";
+import {MarkersKind, NamedStyles, randomId} from "../../src";
+import {create as produce} from "mutative";
 import {withDir} from "tmp-promise";
 
 /**
@@ -61,6 +66,49 @@ function createRemoveThenAddImportVisitor(
             if (result) {
                 result = await addImport.visit(result, p);
             }
+            return result;
+        }
+    };
+}
+
+/**
+ * Helper function to create a visitor that:
+ * 1. Manually removes the first import statement (bypassing RemoveImport which may refuse)
+ * 2. Then adds a specific import back with onlyIfReferenced: true
+ *
+ * This is useful for testing type attribution when RemoveImport would refuse to remove
+ * an import that's still being used.
+ *
+ * @param module The module to import from (e.g., "vitest")
+ * @param member Optional member to import (e.g., "vi")
+ * @param alias Optional alias for the import
+ */
+function createForceRemoveFirstImportThenAddVisitor(
+    module: string,
+    member?: string,
+    alias?: string
+): JavaScriptVisitor<any> {
+    return new class extends JavaScriptVisitor<any> {
+        override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+            // First, manually remove the first statement (the import)
+            let result: any = await this.produceJavaScript(cu, p, async draft => {
+                if (draft.statements && draft.statements.length > 0) {
+                    draft.statements = draft.statements.slice(1);
+                    draft.statements[0].element.prefix = emptySpace;
+                }
+            });
+
+            // Then try to add the import back with onlyIfReferenced: true
+            if (result) {
+                const addImport = new AddImport({
+                    module,
+                    member,
+                    alias,
+                    onlyIfReferenced: true
+                });
+                result = await addImport.visit(result, p) as any;
+            }
+
             return result;
         }
     };
@@ -463,6 +511,31 @@ describe('AddImport visitor', () => {
             );
         });
 
+        test('should add named import to existing default-only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "useState", onlyIfReferenced: false }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import React from 'react';
+
+                        function example() {
+                            return <div>{React.version}</div>;
+                        }
+                    `,
+                    `
+                        import React, {useState} from 'react';
+
+                        function example() {
+                            return <div>{React.version}</div>;
+                        }
+                    `
+                )
+            );
+        });
+
         test('should preserve formatting when merging imports (forwardRef, memo example)', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({ module: "react", member: "memo", onlyIfReferenced: false }));
@@ -479,6 +552,83 @@ describe('AddImport visitor', () => {
                     `,
                     `
                         import { forwardRef, memo } from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should preserve spacing style when inserting import before existing ones', async () => {
+            const spec = new RecipeSpec();
+            // 'act' comes alphabetically before 'forwardRef', so it will be inserted first
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "act", onlyIfReferenced: false }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import { forwardRef } from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `,
+                    `
+                        import { act, forwardRef } from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should preserve no-spacing style when merging imports', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "memo", onlyIfReferenced: false }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import {forwardRef} from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `,
+                    `
+                        import {forwardRef, memo} from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should preserve no-spacing style when inserting import before existing ones', async () => {
+            const spec = new RecipeSpec();
+            // 'act' comes alphabetically before 'forwardRef', so it will be inserted first
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "act", onlyIfReferenced: false }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import {forwardRef} from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `,
+                    `
+                        import {act, forwardRef} from 'react';
 
                         function example() {
                             const MyComponent = forwardRef(() => <div/>);
@@ -690,19 +840,19 @@ describe('AddImport visitor', () => {
             await spec.rewriteRun(
                 typescript(
                     `
-                        import * as fs from 'fs';
+                    import * as fs from 'fs';
 
-                        function example() {
-                            placeholder();
-                        }
+                    function example() {
+                        placeholder();
+                    }
                     `,
                     `
-                        import * as fs from 'fs';
-                        import {promisify} from 'util';
+                    import * as fs from 'fs';
+                    import {promisify} from 'util';
 
-                        function example() {
-                            promisify(fs.readFile);
-                        }
+                    function example() {
+                        promisify(fs.readFile);
+                    }
                     `
                 )
             );
@@ -1302,6 +1452,674 @@ describe('AddImport visitor', () => {
                     `
                 )
             );
+        });
+    });
+
+    describe('object imports (non-function references)', () => {
+        test('should add import for zod z object when referenced', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("zod", "z"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {z} from 'zod';
+
+                                function example() {
+                                    const schema = z.string();
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should not add import for zod z when not referenced', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "zod", member: "z", onlyIfReferenced: true }));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                function example() {
+                                    console.log('test');
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should add import for zod z when used as standalone identifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("zod", "z"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {z} from 'zod';
+
+                                function example() {
+                                    const validator = z;
+                                    validator.string();
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should add import for zod z with object schema usage', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createRemoveThenAddImportVisitor("zod", "z"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {z} from 'zod';
+
+                                function example() {
+                                    const schema = z.object({name: z.string()});
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should add import for zod z when another zod import exists (with onlyIfReferenced)', async () => {
+            const spec = new RecipeSpec();
+            // This test manually removes the z import statement, then adds it back with onlyIfReferenced: true
+            // This tests that type attribution correctly detects usage of object types (not just methods).
+            // The AddImport visitor will merge the z import into the existing ZodError import from zod.
+            spec.recipe = fromVisitor(createForceRemoveFirstImportThenAddVisitor("zod", "z"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {z} from 'zod';
+                                import {ZodError} from 'zod';
+
+                                function example() {
+                                    const schema = z.string();
+                                }
+                            `,
+                            `
+                                import {z, ZodError} from 'zod';
+
+                                function example() {
+                                    const schema = z.string();
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should add import for React forwardRef when namespace owner has module info', async () => {
+            const spec = new RecipeSpec();
+            // This test verifies that when a namespace (e.g., React) owns an export (e.g., forwardRef),
+            // and the namespace has module information in owningClass, we can match it to the module name
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'forwardRef',
+                onlyIfReferenced: true
+            }));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                function MyComponent() {
+                                    return forwardRef(() => null);
+                                }
+                            `,
+                            `
+                                import {forwardRef} from 'react';
+
+                                function MyComponent() {
+                                    return forwardRef(() => null);
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "react": "^18.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should add import for zod z when code created via templating', async () => {
+            const spec = new RecipeSpec();
+            // This test simulates code created via templating where z.string() is used
+            // but the import doesn't exist. Tests that type attribution works with templated code.
+
+            // Create a visitor that logs what it finds
+            const addImportVisitor = new AddImport({
+                module: 'zod',
+                member: 'z',
+                onlyIfReferenced: true
+            });
+
+            spec.recipe = fromVisitor(addImportVisitor);
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                function example() {
+                                    const schema = z.string();
+                                }
+                            `,
+                            `
+                                import {z} from 'zod';
+
+                                function example() {
+                                    const schema = z.string();
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+    });
+
+    describe('multiple maybeAddImport calls for same module', () => {
+        test('should merge imports alphabetically (case-insensitive)', async () => {
+            const spec = new RecipeSpec();
+
+            // Visitor that adds imports in non-alphabetical order
+            const addImportsVisitor = new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: any, p: any): Promise<J | undefined> {
+                    maybeAddImport(this, {module: 'zod', member: 'ZodType', onlyIfReferenced: false});
+                    maybeAddImport(this, {module: 'zod', member: 'ZodError', onlyIfReferenced: false});
+                    maybeAddImport(this, {module: 'zod', member: 'z', onlyIfReferenced: false});
+                    return cu;
+                }
+            };
+            spec.recipe = fromVisitor(addImportsVisitor);
+
+            //language=typescript
+            await spec.rewriteRun(
+                // No existing import - creates one and merges in alphabetical order
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import {z, ZodError, ZodType} from 'zod';
+
+                        const x = 1;
+                    `
+                ),
+                // Existing import - inserts at correct alphabetical position
+                typescript(
+                    `
+                        import {ZodString} from 'zod';
+
+                        const x = 1;
+                    `,
+                    `
+                        import {z, ZodError, ZodString, ZodType} from 'zod';
+
+                        const x = 1;
+                    `
+                )
+            );
+        });
+    });
+
+    describe('style options', () => {
+        /**
+         * Helper function to create a visitor that:
+         * 1. Adds a NamedStyles marker to the compilation unit with es6ImportExportBraces: true
+         * 2. Then uses AddImport to add an import statement
+         */
+        function createAddImportWithBraceSpacingVisitor(
+            module: string,
+            member?: string,
+            alias?: string
+        ): JavaScriptVisitor<any> {
+            return new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    // Create a SpacesStyle with es6ImportExportBraces: true using produce
+                    const spacesStyle: SpacesStyle = produce(IntelliJ.TypeScript.spaces(), draft => {
+                        draft.within.es6ImportExportBraces = true;
+                    });
+
+                    // Create a NamedStyles marker
+                    const namedStyles: NamedStyles = {
+                        kind: MarkersKind.NamedStyles,
+                        id: randomId(),
+                        name: "test-style",
+                        displayName: "Test Style",
+                        tags: [],
+                        styles: [spacesStyle]
+                    };
+
+                    // Add the NamedStyles marker to the compilation unit
+                    let result: JS.CompilationUnit = {
+                        ...cu,
+                        markers: {
+                            ...cu.markers,
+                            markers: [...cu.markers.markers, namedStyles]
+                        }
+                    };
+
+                    // Then add the import
+                    const addImport = new AddImport({
+                        module,
+                        member,
+                        alias,
+                        onlyIfReferenced: false
+                    });
+                    result = await addImport.visit(result, p) as JS.CompilationUnit;
+
+                    return result;
+                }
+            };
+        }
+
+        test('should add spaces inside braces when es6ImportExportBraces style is true', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createAddImportWithBraceSpacingVisitor('fs', 'readFile'));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import { readFile } from 'fs';
+
+                        const x = 1;
+                    `
+                )
+            );
+        });
+    });
+
+    describe('type-only imports', () => {
+        test('should add type-only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'ReactNode',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type {ReactNode} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should not add type-only import if one already exists', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'ReactNode',
+                typeOnly: true
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import type {ReactNode} from 'react';
+
+                        function example(): ReactNode {
+                            return null;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add value import even when type-only import exists for same member', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'useState',
+                typeOnly: false,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import type {useState} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type {useState} from 'react';
+                        import {useState} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add type-only import even when value import exists for same member', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'useState',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {useState} from 'react';
+
+                        function example() {
+                            useState(0);
+                        }
+                    `,
+                    `
+                        import {useState} from 'react';
+                        import type {useState} from 'react';
+
+                        function example() {
+                            useState(0);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should not merge value import into type-only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'useEffect',
+                typeOnly: false,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import type {useState} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type {useState} from 'react';
+                        import {useEffect} from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should not merge type-only import into value import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'ReactNode',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {useState} from 'react';
+
+                        function example() {
+                            useState(0);
+                        }
+                    `,
+                    `
+                        import {useState} from 'react';
+                        import type {ReactNode} from 'react';
+
+                        function example() {
+                            useState(0);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should merge type-only imports from same module', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'ReactElement',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import type {ReactNode} from 'react';
+
+                        function example(): ReactNode {
+                            return null;
+                        }
+                    `,
+                    `
+                        import type {ReactElement, ReactNode} from 'react';
+
+                        function example(): ReactNode {
+                            return null;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add type-only default import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'default',
+                alias: 'React',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type React from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should add type-only namespace import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: '*',
+                alias: 'React',
+                typeOnly: true,
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function example() {
+                            console.log('test');
+                        }
+                    `,
+                    `
+                        import type * as React from 'react';
+
+                        function example() {
+                            console.log('test');
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should throw error when combining typeOnly with sideEffectOnly', async () => {
+            expect(() => {
+                new AddImport({ module: "react", sideEffectOnly: true, typeOnly: true });
+            }).toThrow("Cannot combine sideEffectOnly with typeOnly");
         });
     });
 });

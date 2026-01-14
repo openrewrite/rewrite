@@ -19,6 +19,49 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import {execSync} from 'child_process';
 
+interface BaseWorkspaceOptions {
+    /**
+     * Optional target directory. If provided, creates workspace in this directory
+     * instead of a hash-based temp directory. Caller is responsible for directory lifecycle.
+     */
+    targetDir?: string;
+}
+
+interface DependenciesWorkspaceOptions extends BaseWorkspaceOptions {
+    /**
+     * NPM dependencies (package name to version mapping).
+     */
+    dependencies: Record<string, string>;
+    packageJsonContent?: never;
+    packageLockContent?: never;
+}
+
+interface PackageJsonWorkspaceOptions extends BaseWorkspaceOptions {
+    /**
+     * package.json content as a string. Dependencies are extracted from it
+     * and the content is written to the workspace.
+     */
+    packageJsonContent: string;
+    dependencies?: never;
+    /**
+     * Optional package-lock.json content. If provided:
+     * - The lock file content is used as the cache key (more precise than dependency hash)
+     * - `npm ci` is used instead of `npm install` (faster, deterministic)
+     */
+    packageLockContent?: string;
+    /**
+     * Optional workspace member package.json files.
+     * Keys are relative paths (e.g., "packages/foo/package.json"), values are content.
+     */
+    workspacePackages?: Record<string, string>;
+}
+
+/**
+ * Options for creating a dependency workspace.
+ * Provide either `dependencies` or `packageJsonContent`, but not both.
+ */
+export type WorkspaceOptions = DependenciesWorkspaceOptions | PackageJsonWorkspaceOptions;
+
 /**
  * Manages workspace directories for TypeScript compilation with dependencies.
  * Creates temporary workspaces with package.json and installed node_modules
@@ -30,54 +73,180 @@ export class DependencyWorkspace {
 
     /**
      * Gets or creates a workspace directory for the given dependencies.
-     * Workspaces are cached by dependency hash to avoid repeated npm installs.
+     * Workspaces are cached by dependency hash (or lock file hash if provided) to avoid repeated npm installs.
      *
-     * @param dependencies NPM dependencies (package name to version mapping)
-     * @param targetDir Optional target directory. If provided, creates workspace in this directory
-     *                  instead of a hash-based temp directory. Caller is responsible for directory lifecycle.
+     * @param options Workspace options including dependencies or package.json content
      * @returns Path to the workspace directory
      */
-    static async getOrCreateWorkspace(dependencies: Record<string, string>, targetDir?: string): Promise<string> {
-        if (targetDir) {
-            // Use provided directory - check if it's already valid
-            if (this.isWorkspaceValid(targetDir, dependencies)) {
-                return targetDir;
+    static async getOrCreateWorkspace(options: WorkspaceOptions): Promise<string> {
+        // Extract dependencies from package.json content if provided
+        let dependencies: Record<string, string> | undefined = options.dependencies;
+        let parsedPackageJson: Record<string, any> | undefined;
+        let workspacePackages: Record<string, string> | undefined;
+
+        if (options.packageJsonContent) {
+            parsedPackageJson = JSON.parse(options.packageJsonContent);
+            dependencies = {
+                ...parsedPackageJson?.dependencies,
+                ...parsedPackageJson?.devDependencies
+            };
+            workspacePackages = options.workspacePackages;
+
+            // For workspaces, also collect dependencies from workspace members
+            if (workspacePackages) {
+                for (const content of Object.values(workspacePackages)) {
+                    const memberPkg = JSON.parse(content);
+                    dependencies = {
+                        ...dependencies,
+                        ...memberPkg?.dependencies,
+                        ...memberPkg?.devDependencies
+                    };
+                }
             }
+        }
 
-            // Create/update workspace in target directory
-            fs.mkdirSync(targetDir, {recursive: true});
+        // For workspaces without explicit dependencies in root, we still need to run install
+        const hasWorkspaces = parsedPackageJson?.workspaces && Array.isArray(parsedPackageJson.workspaces);
+        if ((!dependencies || Object.keys(dependencies).length === 0) && !hasWorkspaces) {
+            throw new Error('No dependencies provided');
+        }
 
-            try {
+        // Use the refactored internal method
+        return this.createWorkspace(
+            dependencies || {},
+            parsedPackageJson,
+            options.packageJsonContent,
+            options.packageLockContent,
+            options.targetDir,
+            workspacePackages
+        );
+    }
+
+    /**
+     * Internal method that handles workspace creation.
+     */
+    private static async createWorkspace(
+        dependencies: Record<string, string>,
+        parsedPackageJson: Record<string, any> | undefined,
+        packageJsonContent: string | undefined,
+        packageLockContent: string | undefined,
+        targetDir: string | undefined,
+        workspacePackages?: Record<string, string>
+    ): Promise<string> {
+        // Determine hash based on lock file (most precise) or dependencies
+        // Note: We always hash dependencies (not packageJsonContent) because whitespace/formatting
+        // differences in package.json shouldn't create different workspaces
+        // For workspaces, include workspace package paths in the hash
+        let hash: string;
+        if (packageLockContent) {
+            hash = this.hashContent(packageLockContent);
+        } else if (workspacePackages) {
+            // Include workspace package paths in hash for workspace setups
+            const workspacePaths = Object.keys(workspacePackages).sort().join(',');
+            hash = this.hashContent(this.hashDependencies(dependencies) + ':' + workspacePaths);
+        } else {
+            hash = this.hashDependencies(dependencies);
+        }
+
+        // Determine npm command: use `npm ci` when lock file is provided (faster, deterministic)
+        // Use --loglevel=error to suppress normal output but still capture errors in stderr
+        const npmCommand = packageLockContent ? 'npm ci --loglevel=error' : 'npm install --loglevel=error';
+
+        // Helper to write package files to a directory
+        const writePackageFiles = (dir: string) => {
+            // Write package.json (use provided content or generate from parsed/dependencies)
+            if (packageJsonContent) {
+                fs.writeFileSync(path.join(dir, 'package.json'), packageJsonContent);
+            } else if (parsedPackageJson) {
+                fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(parsedPackageJson, null, 2));
+            } else {
                 const packageJson = {
                     name: "openrewrite-template-workspace",
                     version: "1.0.0",
                     private: true,
                     dependencies: dependencies
                 };
+                fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(packageJson, null, 2));
+            }
 
-                fs.writeFileSync(
-                    path.join(targetDir, 'package.json'),
-                    JSON.stringify(packageJson, null, 2)
-                );
+            // Write package-lock.json if provided
+            if (packageLockContent) {
+                fs.writeFileSync(path.join(dir, 'package-lock.json'), packageLockContent);
+            }
 
-                // Run npm install
-                execSync('npm install --silent', {
+            // Write workspace member package.json files
+            if (workspacePackages) {
+                for (const [relativePath, content] of Object.entries(workspacePackages)) {
+                    const fullPath = path.join(dir, relativePath);
+                    const memberDir = path.dirname(fullPath);
+                    if (!fs.existsSync(memberDir)) {
+                        fs.mkdirSync(memberDir, {recursive: true});
+                    }
+                    fs.writeFileSync(fullPath, content);
+                }
+            }
+        };
+
+        // For workspaces, skip dependency validation (combined deps don't match root package.json)
+        const depsForValidation = workspacePackages ? undefined : dependencies;
+
+        if (targetDir) {
+            // Use provided directory - check if it's already valid
+            if (this.isWorkspaceValid(targetDir, depsForValidation)) {
+                return targetDir;
+            }
+
+            // Create/update workspace in target directory
+            fs.mkdirSync(targetDir, {recursive: true});
+
+            // Check if we can reuse a cached workspace by symlinking node_modules
+            const cachedWorkspaceDir = path.join(this.WORKSPACE_BASE, hash);
+            const cachedNodeModules = path.join(cachedWorkspaceDir, 'node_modules');
+
+            if (fs.existsSync(cachedNodeModules) && this.isWorkspaceValid(cachedWorkspaceDir, depsForValidation)) {
+                // Symlink node_modules from cached workspace
+                try {
+                    const targetNodeModules = path.join(targetDir, 'node_modules');
+
+                    // Remove existing node_modules if present (might be invalid)
+                    if (fs.existsSync(targetNodeModules)) {
+                        fs.rmSync(targetNodeModules, {recursive: true, force: true});
+                    }
+
+                    // Create symlink to cached node_modules
+                    fs.symlinkSync(cachedNodeModules, targetNodeModules, 'dir');
+
+                    // Write package files
+                    writePackageFiles(targetDir);
+
+                    return targetDir;
+                } catch (symlinkError) {
+                    // Symlink failed (e.g., cross-device, permissions) - fall through to npm install
+                }
+            }
+
+            try {
+                writePackageFiles(targetDir);
+
+                // Run npm install or npm ci
+                execSync(npmCommand, {
                     cwd: targetDir,
                     stdio: 'pipe' // Suppress output
                 });
 
                 return targetDir;
-            } catch (error) {
-                throw new Error(`Failed to create dependency workspace: ${error}`);
+            } catch (error: any) {
+                const stderr = error?.stderr?.toString()?.trim();
+                const errorMsg = stderr || error?.message || String(error);
+                throw new Error(`Failed to create dependency workspace: ${errorMsg}`);
             }
         }
 
         // Use hash-based cached workspace
-        const hash = this.hashDependencies(dependencies);
 
         // Check cache
         const cached = this.cache.get(hash);
-        if (cached && fs.existsSync(cached) && this.isWorkspaceValid(cached, dependencies)) {
+        if (cached && fs.existsSync(cached) && this.isWorkspaceValid(cached, depsForValidation)) {
             return cached;
         }
 
@@ -85,7 +254,7 @@ export class DependencyWorkspace {
         const workspaceDir = path.join(this.WORKSPACE_BASE, hash);
 
         // Check if valid workspace already exists on disk (cross-VM reuse)
-        if (fs.existsSync(workspaceDir) && this.isWorkspaceValid(workspaceDir, dependencies)) {
+        if (fs.existsSync(workspaceDir) && this.isWorkspaceValid(workspaceDir, depsForValidation)) {
             this.cache.set(hash, workspaceDir);
             return workspaceDir;
         }
@@ -105,21 +274,11 @@ export class DependencyWorkspace {
             // Create temporary workspace directory
             fs.mkdirSync(tempWorkspaceDir, {recursive: true});
 
-            // Create package.json
-            const packageJson = {
-                name: "openrewrite-template-workspace",
-                version: "1.0.0",
-                private: true,
-                dependencies: dependencies
-            };
+            // Write package files
+            writePackageFiles(tempWorkspaceDir);
 
-            fs.writeFileSync(
-                path.join(tempWorkspaceDir, 'package.json'),
-                JSON.stringify(packageJson, null, 2)
-            );
-
-            // Run npm install
-            execSync('npm install --silent', {
+            // Run npm install or npm ci
+            execSync(npmCommand, {
                 cwd: tempWorkspaceDir,
                 stdio: 'pipe' // Suppress output
             });
@@ -138,7 +297,7 @@ export class DependencyWorkspace {
                     if (error.code === 'EEXIST' || error.code === 'ENOTEMPTY' || error.code === 'EISDIR' ||
                         (error.code === 'EPERM' && fs.existsSync(workspaceDir))) {
                         // Target exists - check if it's valid
-                        if (this.isWorkspaceValid(workspaceDir, dependencies)) {
+                        if (this.isWorkspaceValid(workspaceDir, depsForValidation)) {
                             // Another process created a valid workspace - use theirs
                             moved = true; // Don't try again
                         } else {
@@ -158,7 +317,7 @@ export class DependencyWorkspace {
                             moved = true;
                         } catch (copyError) {
                             // Check if another process created it while we were copying
-                            if (this.isWorkspaceValid(workspaceDir, dependencies)) {
+                            if (this.isWorkspaceValid(workspaceDir, depsForValidation)) {
                                 moved = true;
                             } else {
                                 throw error;
@@ -181,7 +340,7 @@ export class DependencyWorkspace {
             }
 
             // Verify final workspace is valid (might be from another process)
-            if (!this.isWorkspaceValid(workspaceDir, dependencies)) {
+            if (!this.isWorkspaceValid(workspaceDir, depsForValidation)) {
                 throw new Error('Failed to create valid workspace due to concurrent modifications');
             }
 
@@ -189,7 +348,7 @@ export class DependencyWorkspace {
             this.cache.set(hash, workspaceDir);
 
             return workspaceDir;
-        } catch (error) {
+        } catch (error: any) {
             // Clean up temporary workspace on failure
             try {
                 if (fs.existsSync(tempWorkspaceDir)) {
@@ -198,7 +357,9 @@ export class DependencyWorkspace {
             } catch {
                 // Ignore cleanup errors
             }
-            throw new Error(`Failed to create dependency workspace: ${error}`);
+            const stderr = error?.stderr?.toString()?.trim();
+            const errorMsg = stderr || error?.message || String(error);
+            throw new Error(`Failed to create dependency workspace: ${errorMsg}`);
         }
     }
 
@@ -209,11 +370,19 @@ export class DependencyWorkspace {
         // Sort keys for consistent hashing
         const sorted = Object.keys(dependencies).sort();
         const content = sorted.map(key => `${key}:${dependencies[key]}`).join(',');
+        return this.hashContent(content);
+    }
+
+    /**
+     * Generates a hash from arbitrary content for caching.
+     */
+    private static hashContent(content: string): string {
         return crypto.createHash('sha256').update(content).digest('hex').substring(0, 16);
     }
 
     /**
      * Checks if a workspace is valid (has node_modules and matching package.json).
+     * Handles both real node_modules directories and symlinks to cached workspaces.
      *
      * @param workspaceDir Directory to check
      * @param expectedDependencies Optional dependencies to check against package.json
@@ -222,7 +391,22 @@ export class DependencyWorkspace {
         const nodeModules = path.join(workspaceDir, 'node_modules');
         const packageJsonPath = path.join(workspaceDir, 'package.json');
 
+        // Check node_modules exists (as directory or symlink)
         if (!fs.existsSync(nodeModules) || !fs.existsSync(packageJsonPath)) {
+            return false;
+        }
+
+        // If node_modules is a symlink, verify the target still exists
+        try {
+            const stats = fs.lstatSync(nodeModules);
+            if (stats.isSymbolicLink()) {
+                const target = fs.readlinkSync(nodeModules);
+                const absoluteTarget = path.isAbsolute(target) ? target : path.resolve(path.dirname(nodeModules), target);
+                if (!fs.existsSync(absoluteTarget)) {
+                    return false;
+                }
+            }
+        } catch {
             return false;
         }
 
@@ -230,7 +414,11 @@ export class DependencyWorkspace {
         if (expectedDependencies) {
             try {
                 const packageJsonContent = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-                const existingDeps = packageJsonContent.dependencies || {};
+                // Merge dependencies and devDependencies (same as getOrCreateWorkspace)
+                const existingDeps = {
+                    ...packageJsonContent.dependencies,
+                    ...packageJsonContent.devDependencies
+                };
 
                 // Check if all expected dependencies match
                 const expectedKeys = Object.keys(expectedDependencies).sort();

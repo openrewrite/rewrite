@@ -34,15 +34,9 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             example = "org.springframework.http.MediaType.APPLICATION_JSON_VALUE")
     String fullyQualifiedConstantName;
 
-    @Override
-    public String getDisplayName() {
-        return "Replace constant with another constant";
-    }
+    String displayName = "Replace constant with another constant";
 
-    @Override
-    public String getDescription() {
-        return "Replace a constant with another constant, adding/removing import on class if needed.";
-    }
+    String description = "Replace a constant with another constant, adding/removing import on class if needed.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

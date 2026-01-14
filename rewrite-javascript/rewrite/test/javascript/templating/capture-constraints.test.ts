@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Cursor } from "../../../src";
-import { and, capture, JavaScriptParser, not, or, pattern } from "../../../src/javascript";
-import { J } from "../../../src/java";
+import {Cursor} from "../../../src";
+import {and, capture, JavaScriptParser, not, or, pattern} from "../../../src/javascript";
+import {isBinary, J} from "../../../src/java";
 
 describe('Capture Constraints', () => {
     let parser: JavaScriptParser;
@@ -242,7 +242,7 @@ describe('Capture Constraints', () => {
                     constraintCalled = true;
                     // Check that cursor can navigate to parent
                     const parent = context.cursor.parent?.value;
-                    if (parent && parent.kind === J.Kind.Binary) {
+                    if (isBinary(parent)) {
                         parentIsBinary = true;
                     }
                     return typeof node.value === 'number';
@@ -472,9 +472,9 @@ describe('Capture Constraints', () => {
                 constraint: (node, context) => {
                     const aValue = context.captures.get(a) as J.Literal | undefined;
                     return typeof node.value === 'number' &&
-                           aValue !== undefined &&
-                           typeof aValue.value === 'number' &&
-                           node.value > aValue.value;
+                        aValue !== undefined &&
+                        typeof aValue.value === 'number' &&
+                        node.value > aValue.value;
                 }
             });
             const c = capture<J.Literal>({

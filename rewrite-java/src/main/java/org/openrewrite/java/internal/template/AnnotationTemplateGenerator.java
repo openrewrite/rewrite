@@ -48,11 +48,7 @@ public class AnnotationTemplateGenerator {
         } else if (j instanceof J.VariableDeclarations) {
             after.insert(0, " int $variable;");
         } else if (j instanceof J.ClassDeclaration) {
-            if (cursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
-                after.insert(0, "class $Clazz {}");
-            } else {
-                after.insert(0, "static class $Clazz {}");
-            }
+            addDummyClass(cursor, after);
         }
 
         if (cursor.getParentOrThrow().getValue() instanceof J.ClassDeclaration &&
@@ -92,14 +88,24 @@ public class AnnotationTemplateGenerator {
                     } else if (j instanceof J.ClassDeclaration || annotationParent instanceof J.ClassDeclaration) {
                         // Check if this is a top-level class or nested class
                         Cursor classCursor = j instanceof J.ClassDeclaration ? cursor : cursor.getParent(level);
-                        if (classCursor != null && classCursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
-                            after.insert(0, "class $Clazz {}");
-                        } else {
-                            after.insert(0, "static class $Clazz {}");
+                        if (classCursor != null) {
+                            addDummyClass(classCursor, after);
                         }
                     }
                     return before + "/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
                 });
+    }
+
+    protected void addDummyClass(Cursor cursor, StringBuilder after) {
+        if (cursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
+            after.insert(0, "class $Clazz {}");
+        } else {
+            after.insert(0, "static class $Clazz {}");
+        }
+    }
+
+    protected void addDummyAnnotationType(StringBuilder after) {
+        after.append("\n@interface $Placeholder {}");
     }
 
     public List<J.Annotation> listAnnotations(JavaSourceFile cu) {
@@ -145,7 +151,7 @@ public class AnnotationTemplateGenerator {
             }
             List<J.ClassDeclaration> classes = cu.getClasses();
             if (!"$Placeholder".equals(classes.get(classes.size() - 1).getName().getSimpleName())) {
-                after.append("\n@interface $Placeholder {}");
+                addDummyAnnotationType(after);
             }
             return;
         } else if (j instanceof J.ClassDeclaration) {

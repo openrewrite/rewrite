@@ -59,21 +59,15 @@ public class ChangeDependencyConfiguration extends Recipe {
     @Nullable
     String configuration;
 
-    @Override
-    public String getDisplayName() {
-        return "Change a Gradle dependency configuration";
-    }
+    String displayName = "Change a Gradle dependency configuration";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s` to `%s`", groupId, artifactId, newConfiguration);
     }
 
-    @Override
-    public String getDescription() {
-        return "A common example is the need to change `compile` to `api`/`implementation` as " +
+    String description = "A common example is the need to change `compile` to `api`/`implementation` as " +
                "[part of the move](https://docs.gradle.org/current/userguide/upgrading_version_6.html) to Gradle 7.x and later.";
-    }
 
     @Override
     public Validated<Object> validate() {

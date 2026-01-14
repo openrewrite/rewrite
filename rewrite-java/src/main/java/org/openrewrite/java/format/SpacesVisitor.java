@@ -16,1102 +16,729 @@
 package org.openrewrite.java.format;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.EmptyForInitializerPadStyle;
 import org.openrewrite.java.style.EmptyForIteratorPadStyle;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
+import java.util.function.Supplier;
 
 public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
+
+    protected final SpacesStyle spacesStyle;
     @Nullable
-    private final Tree stopAfter;
-
-    /*
-    TODO Finish support for SpacesStyle properties, from SpacesStyle.Within.groupingParentheses down
-     */
-
-    private final SpacesStyle style;
-
+    protected final EmptyForInitializerPadStyle emptyForInitializerPadStyle;
     @Nullable
-    private final EmptyForInitializerPadStyle emptyForInitializerPadStyle;
-
+    protected final EmptyForIteratorPadStyle emptyForIteratorPadStyle;
     @Nullable
-    private final EmptyForIteratorPadStyle emptyForIteratorPadStyle;
+    protected final Tree stopAfter;
+    protected final boolean removeCustomLineBreaks;
 
-    public SpacesVisitor(SpacesStyle style, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle) {
-        this(style, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null);
+    public SpacesVisitor(SourceFile sourceFile, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
+        this(sourceFile.getMarkers().findAll(NamedStyles.class), removeCustomLineBreaks, stopAfter);
     }
 
-    public SpacesVisitor(SpacesStyle style, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter) {
-        this.style = style;
+    public SpacesVisitor(List<NamedStyles> styles, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
+        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), stopAfter, removeCustomLineBreaks);
+    }
+
+    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable Tree stopAfter) {
+        this(spacesStyle, null, null, stopAfter, false);
+    }
+
+    public SpacesVisitor(SpacesStyle spacesStyle, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
+        this(spacesStyle, null, null, stopAfter, removeCustomLineBreaks);
+    }
+
+    @Deprecated
+    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter) {
+        this(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, stopAfter, false);
+    }
+
+    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter, boolean removeCustomLineBreaks) {
+        this.spacesStyle = spacesStyle;
         this.emptyForInitializerPadStyle = emptyForInitializerPadStyle;
         this.emptyForIteratorPadStyle = emptyForIteratorPadStyle;
         this.stopAfter = stopAfter;
+        this.removeCustomLineBreaks = removeCustomLineBreaks;
     }
 
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, P p) {
-        return sourceFile instanceof J.CompilationUnit;
-    }
-
-    <T extends J> T spaceBefore(T j, boolean spaceBefore) {
-        if (!j.getComments().isEmpty()) {
-            return j;
+    public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
+        if (right == null || !(right.getElement() instanceof J)) {
+            return super.visitRightPadded(right, loc, p);
         }
 
-        if (spaceBefore && notSingleSpace(j.getPrefix().getWhitespace())) {
-            return j.withPrefix(j.getPrefix().withWhitespace(" "));
-        } else if (!spaceBefore && onlySpacesAndNotEmpty(j.getPrefix().getWhitespace())) {
-            return j.withPrefix(j.getPrefix().withWhitespace(""));
-        } else {
-            return j;
-        }
-    }
+        Cursor cursor = getCursor();
+        Cursor parentTreeCursor = cursor.getParentTreeCursor();
+        J parent;
+        String before = null;
+        String after = null;
 
-    <T> JContainer<T> spaceBefore(JContainer<T> container, boolean spaceBefore) {
-        if (!container.getBefore().getComments().isEmpty()) {
-            // Perform the space rule for the suffix of the last comment only. Same as IntelliJ.
-            List<Comment> comments = spaceLastCommentSuffix(container.getBefore().getComments(), spaceBefore);
-            return container.withBefore(container.getBefore().withComments(comments));
-        }
+        ContainerPosition beforePosition;
+        ContainerPosition afterPosition;
+        JContainer.Location containerLocation = cursor.getMessage("location");
+        int index = -1;
+        int size = -1;
+        boolean emptyContainer = false;
 
-        if (spaceBefore && notSingleSpace(container.getBefore().getWhitespace())) {
-            return container.withBefore(container.getBefore().withWhitespace(" "));
-        } else if (!spaceBefore && onlySpacesAndNotEmpty(container.getBefore().getWhitespace())) {
-            return container.withBefore(container.getBefore().withWhitespace(""));
-        } else {
-            return container;
-        }
-    }
-
-    <T extends J> JLeftPadded<T> spaceBefore(JLeftPadded<T> container, boolean spaceBefore) {
-        if (!container.getBefore().getComments().isEmpty()) {
-            return container;
-        }
-
-        if (spaceBefore && notSingleSpace(container.getBefore().getWhitespace())) {
-            return container.withBefore(container.getBefore().withWhitespace(" "));
-        } else if (!spaceBefore && onlySpacesAndNotEmpty(container.getBefore().getWhitespace())) {
-            return container.withBefore(container.getBefore().withWhitespace(""));
-        } else {
-            return container;
-        }
-    }
-
-    <T extends J> JLeftPadded<T> spaceBeforeLeftPaddedElement(JLeftPadded<T> container, boolean spaceBefore) {
-        return container.withElement(spaceBefore(container.getElement(), spaceBefore));
-    }
-
-    <T extends J> JRightPadded<T> spaceBeforeRightPaddedElement(JRightPadded<T> container, boolean spaceBefore) {
-        return container.withElement(spaceBefore(container.getElement(), spaceBefore));
-    }
-
-    <T extends J> JRightPadded<T> spaceAfter(JRightPadded<T> container, boolean spaceAfter) {
-        if (!container.getAfter().getComments().isEmpty()) {
-            // Perform the space rule for the suffix of the last comment only. Same as IntelliJ.
-            List<Comment> comments = spaceLastCommentSuffix(container.getAfter().getComments(), spaceAfter);
-            return container.withAfter(container.getAfter().withComments(comments));
-        }
-
-        if (spaceAfter && notSingleSpace(container.getAfter().getWhitespace())) {
-            return container.withAfter(container.getAfter().withWhitespace(" "));
-        } else if (!spaceAfter && onlySpacesAndNotEmpty(container.getAfter().getWhitespace())) {
-            return container.withAfter(container.getAfter().withWhitespace(""));
-        } else {
-            return container;
-        }
-    }
-
-    private static List<Comment> spaceLastCommentSuffix(List<Comment> comments, boolean spaceSuffix) {
-        return ListUtils.mapLast(comments,
-                comment -> spaceSuffix(comment, spaceSuffix));
-    }
-
-    private static Comment spaceSuffix(Comment comment, boolean spaceSuffix) {
-        if (spaceSuffix && notSingleSpace(comment.getSuffix())) {
-            return comment.withSuffix(" ");
-        } else if (!spaceSuffix && onlySpacesAndNotEmpty(comment.getSuffix())) {
-            return comment.withSuffix("");
-        } else {
-            return comment;
-        }
-    }
-
-    Space updateSpace(Space s, boolean haveSpace) {
-        if (!s.getComments().isEmpty()) {
-            return s;
-        }
-
-        if (haveSpace && notSingleSpace(s.getWhitespace())) {
-            return s.withWhitespace(" ");
-        } else if (!haveSpace && onlySpacesAndNotEmpty(s.getWhitespace())) {
-            return s.withWhitespace("");
-        } else {
-            return s;
-        }
-    }
-
-    /**
-     * Checks if a string only contains spaces or tabs (excluding newline characters).
-     *
-     * @return true if contains spaces or tabs only, or true for empty string.
-     */
-    private static boolean onlySpaces(String s) {
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c != ' ' && c != '\t') {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static boolean onlySpacesAndNotEmpty(String s) {
-        return !StringUtils.isNullOrEmpty(s) && onlySpaces(s);
-    }
-
-    private static boolean notSingleSpace(String str) {
-        return onlySpaces(str) && !" ".equals(str);
-    }
-
-    private static List<J.Annotation> spaceBetweenAnnotations(List<J.Annotation> annotations) {
-        return ListUtils.map(annotations, (i, ann) -> {
-            if (i > 0 && ann.getPrefix().isEmpty()) {
-                return ann.withPrefix(Space.SINGLE_SPACE);
-            }
-            return ann;
-        });
-    }
-
-    @Override
-    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
-        J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
-        if (c.getLeadingAnnotations().size() > 1) {
-            c = c.withLeadingAnnotations(spaceBetweenAnnotations(c.getLeadingAnnotations()));
-        }
-        if (c.getBody() != null) {
-            c = c.withBody(spaceBefore(c.getBody(), style.getBeforeLeftBrace().getClassLeftBrace()));
-            if (c.getBody().getStatements().isEmpty()) {
-                if (c.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
-                    boolean withinCodeBraces = style.getWithin().getCodeBraces();
-                    c = c.withBody(c.getBody().withEnd(updateSpace(c.getBody().getEnd(), withinCodeBraces)));
+        switch (loc) {
+            case LANGUAGE_EXTENSION:
+            case CASE_LABEL:
+                break;
+            case MEMBER_REFERENCE_CONTAINING:
+                after = evaluate(() -> spacesStyle.getAroundOperators().getMethodReferenceDoubleColon(), false) ? " " : "";
+                break;
+            case PARENTHESES:
+                parent = parentTreeCursor.getValue();
+                if (parent instanceof J.If) {
+                    before = evaluate(() -> spacesStyle.getWithin().getIfParentheses(), false) ? " " : "";
+                } else if (parent instanceof J.WhileLoop || parent instanceof J.DoWhileLoop) {
+                    before = evaluate(() -> spacesStyle.getWithin().getWhileParentheses(), false) ? " " : "";
+                } else if (parent instanceof J.Switch || parent instanceof J.SwitchExpression) {
+                    before = evaluate(() -> spacesStyle.getWithin().getSwitchParentheses(), false) ? " " : "";
+                } else if (parent instanceof J.Try.Catch) {
+                    before = evaluate(() -> spacesStyle.getWithin().getCatchParentheses(), false) ? " " : "";
+                } else if (parent instanceof J.Synchronized) {
+                    before = evaluate(() -> spacesStyle.getWithin().getSynchronizedParentheses(), false) ? " " : "";
+                } else if (parent instanceof J.TypeCast) {
+                    before = evaluate(() -> spacesStyle.getWithin().getTypeCastParentheses(), false) ? " " : "";
+                } else if (parent instanceof J.ArrayAccess) {
+                    before = evaluate(() -> spacesStyle.getWithin().getBrackets(), false) ? " " : "";
+                } else if (parent instanceof J.NewArray) {
+                    before = evaluate(() -> spacesStyle.getWithin().getBrackets(), false) ? " " : "";
+                } else if (getCursor().getValue() instanceof J.Parentheses && ((J.Parentheses<?>) getCursor().getValue()).getTree() instanceof J.Binary) {
+                    before = evaluate(() -> spacesStyle.getWithin().getGroupingParentheses(), false) ? " " : "";
                 } else {
-                    boolean spaceInsideOneLineEnumBraces = style.getOther().getInsideOneLineEnumBraces();
-                    c = c.withBody(c.getBody().withEnd(updateSpace(c.getBody().getEnd(), spaceInsideOneLineEnumBraces)));
+                    break;
                 }
-            }
-        }
-        if (c.getPadding().getTypeParameters() != null) {
-            c = c.getPadding().withTypeParameters(
-                    spaceBefore(c.getPadding().getTypeParameters(),
-                            style.getTypeParameters().getBeforeOpeningAngleBracket())
-            );
-        }
-        if (c.getPadding().getTypeParameters() != null) {
-            boolean spaceWithinAngleBrackets = style.getWithin().getAngleBrackets();
-            int typeParametersSize = c.getPadding().getTypeParameters().getElements().size();
-            c = c.getPadding().withTypeParameters(
-                    c.getPadding().getTypeParameters().getPadding().withElements(
-                            ListUtils.map(c.getPadding().getTypeParameters().getPadding().getElements(),
-                                    (index, elemContainer) -> {
-                                        if (index == 0) {
-                                            elemContainer = elemContainer.withElement(
-                                                    spaceBefore(elemContainer.getElement(), spaceWithinAngleBrackets)
-                                            );
-                                        } else {
-                                            elemContainer = elemContainer.withElement(
-                                                    spaceBefore(elemContainer.getElement(),
-                                                            style.getOther().getAfterComma())
-                                            );
-                                        }
-                                        if (index == typeParametersSize - 1) {
-                                            elemContainer = spaceAfter(elemContainer, spaceWithinAngleBrackets);
-                                        }
-                                        return elemContainer;
-                                    }
-                            )
-                    )
-            );
-        }
-
-        if (c.getPrimaryConstructor() != null) {
-            c = c.withPrimaryConstructor(ListUtils.map(c.getPrimaryConstructor(), (ix, param) -> {
-                if (param.getPrefix().getWhitespace().contains("\n") || (!param.getPrefix().getComments().isEmpty() && param.getPrefix().getComments().stream().noneMatch(comment -> comment.getSuffix().contains("\n")))) {
-                    return param;
-                }
-                if (ix == 0 && param.getComments().isEmpty()) {
-                    if (!style.getWithin().getRecordHeader()) {
-                        return param.withPrefix(param.getPrefix().withWhitespace(""));
+                after = before;
+                break;
+            case FOR_INIT:
+                J.ForLoop.Control controlInit = getCursor().getValue();
+                if (controlInit.getInit().stream().allMatch(i -> i instanceof J.Empty)) {
+                    if (emptyForInitializerPadStyle != null) {
+                        before = evaluate(() -> emptyForInitializerPadStyle.getSpace(), false) ? " " : "";
+                    } else {
+                        before = evaluate(() -> spacesStyle.getWithin().getForParentheses(), evaluate(() -> spacesStyle.getOther().getBeforeForSemicolon(), false)) ? " " : "";
                     }
-                }
-                return param.withPrefix(param.getPrefix().withWhitespace(" "));
-            }));
-            JContainer.Padding<Statement> padding = c.getPadding().getPrimaryConstructor().getPadding();
-            c = c.getPadding().withPrimaryConstructor(
-                    padding.withElements(ListUtils.mapLast(padding.getElements(), last -> {
-                        if (!last.getAfter().getLastWhitespace().contains("\n")) {
-                            return last.withAfter(last.getAfter().withWhitespace(!style.getWithin().getRecordHeader() ? "" : " "));
-                        }
-                        return last;
-                    }
-                    )));
-        }
-
-        return c;
-    }
-
-    @Override
-    public J.Block visitBlock(J.Block block, P p) {
-        J.Block b = super.visitBlock(block, p);
-        return b.getPadding().withStatements(
-                ListUtils.map(b.getPadding().getStatements(), stmt -> spaceAfter(stmt, false))
-        );
-    }
-
-    @Override
-    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
-        J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
-        if (m.getLeadingAnnotations().size() > 1) {
-            m = m.withLeadingAnnotations(spaceBetweenAnnotations(m.getLeadingAnnotations()));
-        }
-        m = m.getPadding().withParameters(
-                spaceBefore(m.getPadding().getParameters(), style.getBeforeParentheses().getMethodDeclaration()));
-        if (m.getBody() != null) {
-            m = m.withBody(spaceBefore(m.getBody(), style.getBeforeLeftBrace().getMethodLeftBrace()));
-        }
-        if (m.getParameters().isEmpty() || m.getParameters().iterator().next() instanceof J.Empty) {
-            boolean useSpace = style.getWithin().getEmptyMethodDeclarationParentheses();
-            m = m.getPadding().withParameters(
-                    m.getPadding().getParameters().getPadding().withElements(
-                            ListUtils.map(m.getPadding().getParameters().getPadding().getElements(),
-                                    param -> param.withElement(spaceBefore(param.getElement(), useSpace))
-                            )
-                    )
-            );
-        } else {
-            final int paramsSize = m.getParameters().size();
-            boolean useSpace = style.getWithin().getMethodDeclarationParentheses();
-            m = m.getPadding().withParameters(
-                    m.getPadding().getParameters().getPadding().withElements(
-                            ListUtils.map(m.getPadding().getParameters().getPadding().getElements(),
-                                    (index, param) -> {
-                                        if (index == 0) {
-                                            param = param.withElement(spaceBefore(param.getElement(), useSpace));
-                                        } else {
-                                            param = param.withElement(
-                                                    spaceBefore(param.getElement(), style.getOther().getAfterComma())
-                                            );
-                                        }
-                                        if (index == paramsSize - 1) {
-                                            param = spaceAfter(param, useSpace);
-                                        } else {
-                                            param = spaceAfter(param, style.getOther().getBeforeComma());
-                                        }
-                                        return param;
-                                    }
-                            )
-                    )
-            );
-        }
-        if (m.getAnnotations().getTypeParameters() != null) {
-            boolean spaceWithinAngleBrackets = style.getWithin().getAngleBrackets();
-            int typeParametersSize = m.getAnnotations().getTypeParameters().getTypeParameters().size();
-            m = m.getAnnotations().withTypeParameters(
-                    m.getAnnotations().getTypeParameters().getPadding().withTypeParameters(
-                            ListUtils.map(m.getAnnotations().getTypeParameters().getPadding().getTypeParameters(),
-                                    (index, elemContainer) -> {
-                                        if (index == 0) {
-                                            elemContainer = elemContainer.withElement(
-                                                    spaceBefore(elemContainer.getElement(), spaceWithinAngleBrackets)
-                                            );
-                                        } else {
-                                            elemContainer = elemContainer.withElement(
-                                                    spaceBefore(elemContainer.getElement(),
-                                                            style.getOther().getAfterComma())
-                                            );
-                                        }
-                                        if (index == typeParametersSize - 1) {
-                                            elemContainer = spaceAfter(elemContainer, spaceWithinAngleBrackets);
-                                        }
-                                        return elemContainer;
-                                    })
-                    )
-            );
-        }
-        return m;
-    }
-
-    @Override
-    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
-        J.MethodInvocation m = super.visitMethodInvocation(method, p);
-        m = m.getPadding().withArguments(spaceBefore(m.getPadding().getArguments(), style.getBeforeParentheses().getMethodCall()));
-        if (m.getArguments().isEmpty() || m.getArguments().iterator().next() instanceof J.Empty) {
-            boolean useSpace = style.getWithin().getEmptyMethodCallParentheses();
-            m = m.getPadding().withArguments(
-                    m.getPadding().getArguments().getPadding().withElements(
-                            ListUtils.map(m.getPadding().getArguments().getPadding().getElements(),
-                                    arg -> arg.withElement(spaceBefore(arg.getElement(), useSpace))
-                            )
-                    )
-            );
-        } else {
-            final int argsSize = m.getArguments().size();
-            boolean useSpace = style.getWithin().getMethodCallParentheses();
-            m = m.getPadding().withArguments(
-                    m.getPadding().getArguments().getPadding().withElements(
-                            ListUtils.map(m.getPadding().getArguments().getPadding().getElements(),
-                                    (index, arg) -> {
-                                        if (index == 0) {
-                                            arg = arg.withElement(spaceBefore(arg.getElement(), useSpace));
-                                        } else {
-                                            arg = arg.withElement(
-                                                    spaceBefore(arg.getElement(), style.getOther().getAfterComma())
-                                            );
-                                        }
-                                        if (index == argsSize - 1) {
-                                            arg = spaceAfter(arg, useSpace);
-                                        } else {
-                                            arg = spaceAfter(arg, style.getOther().getBeforeComma());
-                                        }
-                                        return arg;
-                                    }
-                            )
-                    )
-            );
-        }
-        if (m.getPadding().getTypeParameters() != null) {
-            m = m.getPadding().withTypeParameters(
-                    spaceBefore(m.getPadding().getTypeParameters(),
-                            style.getTypeArguments().getBeforeOpeningAngleBracket())
-            );
-            m = m.withName(spaceBefore(m.getName(), style.getTypeArguments().getAfterClosingAngleBracket()));
-        }
-        if (m.getPadding().getTypeParameters() != null) {
-            m = m.getPadding().withTypeParameters(
-                    m.getPadding().getTypeParameters().getPadding().withElements(
-                            ListUtils.map(m.getPadding().getTypeParameters().getPadding().getElements(),
-                                    (index, elemContainer) -> {
-                                        if (index != 0) {
-                                            elemContainer = elemContainer.withElement(
-                                                    spaceBefore(elemContainer.getElement(),
-                                                            style.getTypeArguments().getAfterComma())
-                                            );
-                                        }
-                                        return elemContainer;
-                                    }
-                            )
-                    )
-            );
-        }
-        return m;
-    }
-
-    @Override
-    public J.MultiCatch visitMultiCatch(J.MultiCatch multiCatch, P p) {
-        J.MultiCatch mc = super.visitMultiCatch(multiCatch, p);
-        final int argsSize = mc.getAlternatives().size();
-        return mc.getPadding().withAlternatives(
-                ListUtils.map(mc.getPadding().getAlternatives(),
-                        (index, arg) -> {
-                            if (index > 0) {
-                                arg = arg.withElement(
-                                        spaceBefore(arg.getElement(), style.getAroundOperators().getBitwise())
-                                );
-                            }
-                            if (index != argsSize - 1) {
-                                arg = spaceAfter(arg, style.getAroundOperators().getBitwise());
-                            }
-                            return arg;
-                        }
-                )
-        );
-    }
-
-    @Override
-    public J.If visitIf(J.If iff, P p) {
-        J.If i = super.visitIf(iff, p);
-        i = i.withIfCondition(spaceBefore(i.getIfCondition(), style.getBeforeParentheses().getIfParentheses()));
-        i = i.getPadding().withThenPart(spaceAfter(spaceBeforeRightPaddedElement(i.getPadding().getThenPart(), style.getBeforeLeftBrace().getIfLeftBrace()), false));
-        boolean useSpaceWithinIfParentheses = style.getWithin().getIfParentheses();
-        return i.withIfCondition(
-                i.getIfCondition().getPadding().withTree(
-                        spaceAfter(
-                                i.getIfCondition().getPadding().getTree().withElement(
-                                        spaceBefore(i.getIfCondition().getPadding().getTree().getElement(), useSpaceWithinIfParentheses
-                                        )
-                                ),
-                                useSpaceWithinIfParentheses
-                        )
-                )
-        );
-    }
-
-    @Override
-    public J.If.Else visitElse(J.If.Else else_, P p) {
-        J.If.Else e = super.visitElse(else_, p);
-        e = e.getPadding().withBody(spaceBeforeRightPaddedElement(e.getPadding().getBody(), style.getBeforeLeftBrace().getElseLeftBrace()));
-        return spaceBefore(e, style.getBeforeKeywords().getElseKeyword());
-    }
-
-    @Override
-    public J.ForLoop visitForLoop(J.ForLoop forLoop, P p) {
-        J.ForLoop f = super.visitForLoop(forLoop, p);
-        J.ForLoop.Control control = f.getControl();
-        control = spaceBefore(control, style.getBeforeParentheses().getForParentheses());
-
-        Boolean padEmptyForInitializer = null;
-        if (emptyForInitializerPadStyle != null) {
-            padEmptyForInitializer = emptyForInitializerPadStyle.getSpace();
-        }
-        boolean spaceWithinForParens = style.getWithin().getForParentheses();
-        boolean shouldPutSpaceOnInit;
-        if (padEmptyForInitializer != null && f.getControl().getInit().get(0) instanceof J.Empty) {
-            shouldPutSpaceOnInit = padEmptyForInitializer;
-        } else {
-            shouldPutSpaceOnInit = spaceWithinForParens;
-        }
-        control = control.withInit(
-                ListUtils.mapFirst(f.getControl().getInit(), i -> spaceBefore(i, shouldPutSpaceOnInit))
-        );
-        boolean spaceBeforeSemicolon = style.getOther().getBeforeForSemicolon();
-        boolean spaceAfterSemicolon = style.getOther().getAfterForSemicolon();
-        control = control.getPadding().withInit(
-                ListUtils.mapFirst(control.getPadding().getInit(), i -> spaceAfter(i, spaceBeforeSemicolon))
-        );
-        control = control.getPadding().withCondition(
-                spaceAfter(control.getPadding().getCondition(), spaceBeforeSemicolon)
-        );
-        control = control.getPadding().withCondition(
-                control.getPadding().getCondition().withElement(
-                        spaceBefore(control.getPadding().getCondition().getElement(), spaceAfterSemicolon)
-                )
-        );
-        int updateStatementsSize = f.getControl().getUpdate().size();
-        Boolean padEmptyForIterator = (emptyForIteratorPadStyle == null) ? null : emptyForIteratorPadStyle.getSpace();
-        if (padEmptyForIterator != null && updateStatementsSize == 1 && f.getControl().getUpdate().get(0) instanceof J.Empty) {
-            control = control.getPadding().withUpdate(
-                    ListUtils.map(control.getPadding().getUpdate(), (index, elemContainer) -> {
-                        return elemContainer.withElement(
-                                spaceBefore(elemContainer.getElement(), padEmptyForIterator)
-                        );
-                    })
-            );
-        } else {
-            control = control.getPadding().withUpdate(
-                    ListUtils.map(control.getPadding().getUpdate(),
-                            (index, elemContainer) -> {
-                                if (index == 0) {
-                                    elemContainer = elemContainer.withElement(
-                                            spaceBefore(elemContainer.getElement(), spaceAfterSemicolon)
-                                    );
-                                } else {
-                                    elemContainer = elemContainer.withElement(
-                                            spaceBefore(elemContainer.getElement(), style.getOther().getAfterComma())
-                                    );
-                                }
-                                if (index == updateStatementsSize - 1) {
-                                    elemContainer = spaceAfter(elemContainer, spaceWithinForParens);
-                                } else {
-                                    elemContainer = spaceAfter(elemContainer, style.getOther().getBeforeComma());
-                                }
-                                return elemContainer;
-                            }
-                    )
-            );
-        }
-        f = f.withControl(control);
-        return f.getPadding().withBody(spaceBeforeRightPaddedElement(f.getPadding().getBody(), style.getBeforeLeftBrace().getForLeftBrace()));
-    }
-
-    @Override
-    public J.ForEachLoop visitForEachLoop(J.ForEachLoop forLoop, P p) {
-        J.ForEachLoop f = super.visitForEachLoop(forLoop, p);
-        f = f.withControl(spaceBefore(f.getControl(), style.getBeforeParentheses().getForParentheses()));
-        f = f.getPadding().withBody(spaceBeforeRightPaddedElement(f.getPadding().getBody(), style.getBeforeLeftBrace().getForLeftBrace()));
-        boolean spaceWithinForParens = style.getWithin().getForParentheses();
-        f = f.withControl(
-                f.getControl().withVariable(
-                        spaceBefore(f.getControl().getVariable(), spaceWithinForParens)
-                )
-        );
-        f = f.withControl(
-                f.getControl().getPadding().withIterable(
-                        spaceAfter(f.getControl().getPadding().getIterable(), spaceWithinForParens)
-                )
-        );
-        return f.withControl(
-                f.getControl().getPadding().withVariable(
-                        spaceAfter(f.getControl().getPadding().getVariable(), style.getOther().getBeforeColonInForEach())
-                )
-        );
-    }
-
-    @Override
-    public J.WhileLoop visitWhileLoop(J.WhileLoop whileLoop, P p) {
-        J.WhileLoop w = super.visitWhileLoop(whileLoop, p);
-        w = w.withCondition(spaceBefore(w.getCondition(), style.getBeforeParentheses().getWhileParentheses()));
-        w = w.getPadding().withBody(spaceBeforeRightPaddedElement(w.getPadding().getBody(), style.getBeforeLeftBrace().getWhileLeftBrace()));
-        boolean spaceWithinWhileParens = style.getWithin().getWhileParentheses();
-        w = w.withCondition(
-                w.getCondition().withTree(
-                        spaceBefore(w.getCondition().getTree(), spaceWithinWhileParens)
-                )
-        );
-        return w.withCondition(
-                w.getCondition().getPadding().withTree(
-                        spaceAfter(w.getCondition().getPadding().getTree(), spaceWithinWhileParens)
-                )
-        );
-    }
-
-    @Override
-    public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p) {
-        J.DoWhileLoop d = super.visitDoWhileLoop(doWhileLoop, p);
-        d = d.getPadding().withWhileCondition(spaceBefore(d.getPadding().getWhileCondition(), style.getBeforeKeywords().getWhileKeyword()));
-        d = d.getPadding().withWhileCondition(spaceBeforeLeftPaddedElement(d.getPadding().getWhileCondition(), style.getBeforeParentheses().getWhileParentheses()));
-        d = d.getPadding().withBody(spaceBeforeRightPaddedElement(d.getPadding().getBody(), style.getBeforeLeftBrace().getDoLeftBrace()));
-        boolean spaceWithinWhileParens = style.getWithin().getWhileParentheses();
-        d = d.withWhileCondition(
-                d.getWhileCondition().withTree(
-                        spaceBefore(d.getWhileCondition().getTree(), spaceWithinWhileParens)
-                )
-        );
-        return d.withWhileCondition(
-                d.getWhileCondition().getPadding().withTree(
-                        spaceAfter(d.getWhileCondition().getPadding().getTree(), spaceWithinWhileParens)
-                )
-        );
-    }
-
-    @Override
-    public J.Switch visitSwitch(J.Switch _switch, P p) {
-        J.Switch s = super.visitSwitch(_switch, p);
-        s = s.withSelector(spaceBefore(s.getSelector(), style.getBeforeParentheses().getSwitchParentheses()));
-        s = s.withCases(spaceBefore(s.getCases(), style.getBeforeLeftBrace().getSwitchLeftBrace()));
-        boolean spaceWithinSwitchParens = style.getWithin().getSwitchParentheses();
-        s = s.withSelector(
-                s.getSelector().withTree(
-                        spaceBefore(s.getSelector().getTree(), spaceWithinSwitchParens)
-                )
-        );
-        return s.withSelector(
-                s.getSelector().getPadding().withTree(
-                        spaceAfter(s.getSelector().getPadding().getTree(), spaceWithinSwitchParens)
-                )
-        );
-    }
-
-    @Override
-    public J.Try visitTry(J.Try _try, P p) {
-        J.Try t = super.visitTry(_try, p);
-        if (t.getPadding().getResources() != null) {
-            t = t.getPadding().withResources(spaceBefore(t.getPadding().getResources(), style.getBeforeParentheses().getTryParentheses()));
-        }
-        t = t.withBody(spaceBefore(t.getBody(), style.getBeforeLeftBrace().getTryLeftBrace()));
-        if (t.getPadding().getFinally() != null) {
-            JLeftPadded<J.Block> f = spaceBefore(t.getPadding().getFinally(), style.getBeforeKeywords().getFinallyKeyword());
-            f = spaceBeforeLeftPaddedElement(f, style.getBeforeLeftBrace().getFinallyLeftBrace());
-            t = t.getPadding().withFinally(f);
-        }
-        boolean spaceWithinTryParentheses = style.getWithin().getTryParentheses();
-        if (t.getResources() != null) {
-            t = t.withResources(ListUtils.mapFirst(t.getResources(), res -> spaceBefore(res, spaceWithinTryParentheses)));
-        }
-        if (t.getPadding().getResources() != null) {
-            t = t.getPadding().withResources(
-                    t.getPadding().getResources().getPadding().withElements(
-                            ListUtils.mapLast(t.getPadding().getResources().getPadding().getElements(),
-                                    res -> spaceAfter(res, spaceWithinTryParentheses)
-                            )
-                    )
-            );
-        }
-        return t;
-    }
-
-    @Override
-    public J.Try.Catch visitCatch(J.Try.Catch _catch, P p) {
-        J.Try.Catch c = super.visitCatch(_catch, p);
-        c = spaceBefore(c, style.getBeforeKeywords().getCatchKeyword());
-        c = c.withParameter(spaceBefore(c.getParameter(), style.getBeforeParentheses().getCatchParentheses()));
-        c = c.withBody(spaceBefore(c.getBody(), style.getBeforeLeftBrace().getCatchLeftBrace()));
-        boolean spaceWithinCatchParens = style.getWithin().getCatchParentheses();
-        c = c.withParameter(
-                c.getParameter().withTree(
-                        spaceBefore(c.getParameter().getTree(), spaceWithinCatchParens)
-                )
-        );
-        return c.withParameter(
-                c.getParameter().getPadding().withTree(
-                        spaceAfter(c.getParameter().getPadding().getTree(), spaceWithinCatchParens)
-                )
-        );
-    }
-
-    @Override
-    public J.Synchronized visitSynchronized(J.Synchronized sync, P p) {
-        J.Synchronized s = super.visitSynchronized(sync, p);
-        s = s.withLock(spaceBefore(s.getLock(), style.getBeforeParentheses().getSynchronizedParentheses()));
-        s = s.withBody(spaceBefore(s.getBody(), style.getBeforeLeftBrace().getSynchronizedLeftBrace()));
-        boolean spaceWithinSynchronizedParens = style.getWithin().getSynchronizedParentheses();
-        s = s.withLock(
-                s.getLock().withTree(
-                        spaceBefore(s.getLock().getTree(), spaceWithinSynchronizedParens)
-                )
-        );
-        return s.withLock(
-                s.getLock().getPadding().withTree(
-                        spaceAfter(s.getLock().getPadding().getTree(), spaceWithinSynchronizedParens)
-                )
-        );
-    }
-
-    @Override
-    public J.Annotation visitAnnotation(J.Annotation annotation, P p) {
-        J.Annotation a = super.visitAnnotation(annotation, p);
-        if (a.getPadding().getArguments() != null) {
-            a = a.getPadding().withArguments(spaceBefore(a.getPadding().getArguments(),
-                    style.getBeforeParentheses().getAnnotationParameters()));
-        }
-        boolean spaceWithinAnnotationParentheses = style.getWithin().getAnnotationParentheses();
-        if (a.getPadding().getArguments() != null) {
-            int argsSize = a.getPadding().getArguments().getElements().size();
-            a = a.getPadding().withArguments(
-                    a.getPadding().getArguments().getPadding().withElements(
-                            ListUtils.map(a.getPadding().getArguments().getPadding().getElements(),
-                                    (index, arg) -> {
-                                        if (index == 0) {
-                                            // don't overwrite changes made by before left brace annotation array
-                                            // initializer setting when space within annotation parens is false
-                                            if (spaceWithinAnnotationParentheses ||
-                                                    !style.getBeforeLeftBrace().getAnnotationArrayInitializerLeftBrace()) {
-                                                arg = arg.withElement(
-                                                        spaceBefore(arg.getElement(), spaceWithinAnnotationParentheses)
-                                                );
-                                            }
-                                        } else {
-                                            arg = arg.withElement(spaceBefore(arg.getElement(), style.getOther().getAfterComma()));
-                                        }
-                                        if (index == argsSize - 1) {
-                                            arg = spaceAfter(arg, spaceWithinAnnotationParentheses);
-                                        }
-                                        return arg;
-                                    }
-                            )
-                    )
-            );
-        }
-        return a;
-    }
-
-    @Override
-    public J.Assignment visitAssignment(J.Assignment assignment, P p) {
-        J.Assignment a = super.visitAssignment(assignment, p);
-        a = a.getPadding().withAssignment(spaceBefore(a.getPadding().getAssignment(), style.getAroundOperators().getAssignment()));
-        return a.getPadding().withAssignment(
-                a.getPadding().getAssignment().withElement(
-                        spaceBefore(a.getPadding().getAssignment().getElement(), style.getAroundOperators().getAssignment())
-                )
-        );
-    }
-
-    @Override
-    public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, P p) {
-        J.AssignmentOperation a = super.visitAssignmentOperation(assignOp, p);
-        J.AssignmentOperation.Padding padding = a.getPadding();
-        JLeftPadded<J.AssignmentOperation.Type> operator = padding.getOperator();
-        String operatorBeforeWhitespace = operator.getBefore().getWhitespace();
-        a = padding.withOperator(operator.withBefore(updateSpace(operator.getBefore(), style.getAroundOperators().getAssignment())));
-        return a.withAssignment(spaceBefore(a.getAssignment(), style.getAroundOperators().getAssignment()));
-    }
-
-    @Override
-    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
-        J.VariableDeclarations vd = super.visitVariableDeclarations(multiVariable, p);
-        if (vd.getLeadingAnnotations().size() > 1) {
-            vd = vd.withLeadingAnnotations(spaceBetweenAnnotations(vd.getLeadingAnnotations()));
-        }
-        return vd;
-    }
-
-    @Override
-    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
-        J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, p);
-        if (v.getPadding().getInitializer() != null) {
-            v = v.getPadding().withInitializer(spaceBefore(v.getPadding().getInitializer(), style.getAroundOperators().getAssignment()));
-        }
-        if (v.getPadding().getInitializer() != null) {
-            if (v.getPadding().getInitializer().getElement() != null) {
-                v = v.getPadding().withInitializer(
-                        v.getPadding().getInitializer().withElement(
-                                spaceBefore(v.getPadding().getInitializer().getElement(), style.getAroundOperators().getAssignment())
-                        )
-                );
-            }
-        }
-        return v;
-    }
-
-    @Override
-    public J.Binary visitBinary(J.Binary binary, P p) {
-        J.Binary b = super.visitBinary(binary, p);
-        J.Binary.Type operator = b.getOperator();
-        switch (operator) {
-            case And:
-            case Or:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().getLogical());
-                break;
-            case Equal:
-            case NotEqual:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().getEquality());
-                break;
-            case LessThan:
-            case LessThanOrEqual:
-            case GreaterThan:
-            case GreaterThanOrEqual:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().getRelational());
-                break;
-            case BitAnd:
-            case BitOr:
-            case BitXor:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().getBitwise());
-                break;
-            case Addition:
-            case Subtraction:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().getAdditive());
-                break;
-            case Multiplication:
-            case Division:
-            case Modulo:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().getMultiplicative());
-                break;
-            case LeftShift:
-            case RightShift:
-            case UnsignedRightShift:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().getShift());
-                break;
-        }
-        return b;
-    }
-
-    private J.Binary applyBinarySpaceAround(J.Binary binary, boolean useSpaceAround) {
-        J.Binary.Padding padding = binary.getPadding();
-        JLeftPadded<J.Binary.Type> operator = padding.getOperator();
-        binary = padding.withOperator(
-                operator.withBefore(updateSpace(operator.getBefore(), useSpaceAround))
-        );
-        return binary.withRight(spaceBefore(binary.getRight(), useSpaceAround));
-    }
-
-    @Override
-    public J.Unary visitUnary(J.Unary unary, P p) {
-        J.Unary u = super.visitUnary(unary, p);
-        switch (u.getOperator()) {
-            case PostIncrement:
-            case PostDecrement:
-                u = applyUnaryOperatorBeforeSpace(u, style.getAroundOperators().getUnary());
-                break;
-            case PreIncrement:
-            case PreDecrement:
-            case Negative:
-            case Positive:
-            case Not:
-            case Complement:
-                u = applyUnaryOperatorBeforeSpace(u, style.getAroundOperators().getUnary());
-                u = applyUnaryOperatorExprSpace(u, style.getAroundOperators().getUnary());
-                break;
-        }
-        return u;
-    }
-
-    private J.Unary applyUnaryOperatorExprSpace(J.Unary unary, boolean useAroundUnaryOperatorSpace) {
-        return unary.withExpression(spaceBefore(unary.getExpression(), useAroundUnaryOperatorSpace));
-    }
-
-    private J.Unary applyUnaryOperatorBeforeSpace(J.Unary u, boolean useAroundUnaryOperatorSpace) {
-        J.Unary.Padding padding = u.getPadding();
-        JLeftPadded<J.Unary.Type> operator = padding.getOperator();
-        return padding.withOperator(operator.withBefore(updateSpace(operator.getBefore(), useAroundUnaryOperatorSpace)));
-    }
-
-    @Override
-    public J.Lambda visitLambda(J.Lambda lambda, P p) {
-        J.Lambda l = super.visitLambda(lambda, p);
-        boolean useSpaceAroundLambdaArrow = style.getAroundOperators().getLambdaArrow();
-        l = l.withArrow(updateSpace(l.getArrow(), useSpaceAroundLambdaArrow));
-        l = l.withBody(spaceBefore(l.getBody(), style.getAroundOperators().getLambdaArrow()));
-        if (!(l.getParameters().getParameters().isEmpty() || l.getParameters().getParameters().iterator().next() instanceof J.Empty)) {
-            int parametersSize = l.getParameters().getParameters().size();
-            l = l.withParameters(
-                    l.getParameters().getPadding().withParameters(
-                            ListUtils.map(l.getParameters().getPadding().getParameters(),
-                                    (index, elemContainer) -> {
-                                        if (index != 0) {
-                                            elemContainer = elemContainer.withElement(
-                                                    spaceBefore(elemContainer.getElement(), style.getOther().getAfterComma())
-                                            );
-                                        }
-                                        if (index != parametersSize - 1) {
-                                            elemContainer = spaceAfter(elemContainer, style.getOther().getBeforeComma());
-                                        }
-                                        return elemContainer;
-                                    }
-                            )
-                    )
-            );
-        }
-        return l;
-    }
-
-    @Override
-    public J.MemberReference visitMemberReference(J.MemberReference memberRef, P p) {
-        J.MemberReference m = super.visitMemberReference(memberRef, p);
-        m = m.getPadding().withContaining(
-                spaceAfter(m.getPadding().getContaining(), style.getAroundOperators().getMethodReferenceDoubleColon())
-        );
-        if (m.getPadding().getTypeParameters() != null) {
-            m = m.getPadding().withTypeParameters(spaceBefore(m.getPadding().getTypeParameters(), style.getAroundOperators().getMethodReferenceDoubleColon()));
-        } else {
-            m = m.getPadding().withReference(
-                    spaceBefore(m.getPadding().getReference(), style.getAroundOperators().getMethodReferenceDoubleColon())
-            );
-        }
-        return m;
-    }
-
-    @Override
-    public J.NewArray visitNewArray(J.NewArray newArray, P p) {
-        J.NewArray n = super.visitNewArray(newArray, p);
-        if (getCursor().getParent() != null && getCursor().getParent().firstEnclosing(J.class) instanceof J.Annotation) {
-            /*
-             * IntelliJ IDEA setting
-             * Spaces -> Within -> Annotation parentheses
-             * when enabled supersedes
-             * Spaces -> Before left brace -> Annotation array initializer left brace
-             */
-            if (!style.getWithin().getAnnotationParentheses()) {
-                n = spaceBefore(n, style.getBeforeLeftBrace().getAnnotationArrayInitializerLeftBrace());
-            }
-        } else {
-            if (n.getPadding().getInitializer() != null) {
-                JContainer<Expression> initializer = spaceBefore(n.getPadding().getInitializer(), style.getBeforeLeftBrace().getArrayInitializerLeftBrace());
-                n = n.getPadding().withInitializer(initializer);
-            }
-        }
-        if (n.getPadding().getInitializer() != null) {
-            JContainer<Expression> i = n.getPadding().getInitializer();
-            if (style.getOther().getAfterComma()) {
-                i = JContainer.withElements(i, ListUtils.map(i.getElements(), (idx, elem) -> idx == 0 ? elem : spaceBefore(elem, true)));
-            }
-
-            if (i.getElements().isEmpty() || i.getElements().iterator().next() instanceof J.Empty) {
-                boolean useSpaceWithinEmptyArrayInitializerBraces = style.getWithin().getEmptyArrayInitializerBraces();
-                i = i.map(expr -> spaceBefore(expr, useSpaceWithinEmptyArrayInitializerBraces));
-            } else {
-                boolean useSpaceWithinArrayInitializerBraces = style.getWithin().getArrayInitializerBraces();
-                int initializerElementsSize = i.getElements().size();
-                i = i.getPadding().withElements(ListUtils.map(i.getPadding().getElements(), (index, elemContainer) -> {
+                    after = "";
+                } else {
+                    before = evaluate(() -> spacesStyle.getOther().getAfterComma(), true) ? " " : "";
+                    after = evaluate(() -> spacesStyle.getOther().getBeforeComma(), false) ? " " : "";
+                    index = controlInit.getInit().indexOf(right.getElement());
                     if (index == 0) {
-                        elemContainer = elemContainer.withElement(spaceBefore(elemContainer.getElement(), useSpaceWithinArrayInitializerBraces));
-                    } else {
-                        elemContainer = elemContainer.withElement(spaceBefore(elemContainer.getElement(), style.getOther().getAfterComma()));
+                        before = evaluate(() -> spacesStyle.getWithin().getForParentheses(), true) ? " " : "";
                     }
-                    if (index == initializerElementsSize - 1) {
-                        elemContainer = spaceAfter(elemContainer, useSpaceWithinArrayInitializerBraces);
-                    } else {
-                        elemContainer = spaceAfter(elemContainer, style.getOther().getBeforeComma());
+                    if (index == controlInit.getInit().size() - 1) {
+                        after = evaluate(() -> spacesStyle.getOther().getBeforeForSemicolon(), false) ? " " : "";
                     }
-                    return elemContainer;
-                }));
-            }
-            n = n.getPadding().withInitializer(i);
+                }
+                break;
+            case FOR_CONDITION:
+                before = evaluate(() -> spacesStyle.getOther().getAfterForSemicolon(), true) ? " " : "";
+                after = evaluate(() -> spacesStyle.getOther().getBeforeForSemicolon(), true) ? " " : "";
+                break;
+            case FOR_UPDATE:
+                J.ForLoop.Control controlUpdate = getCursor().getValue();
+                if (controlUpdate.getUpdate().stream().allMatch(i -> i instanceof J.Empty)) {
+                    if (emptyForIteratorPadStyle != null) {
+                        before = evaluate(() -> emptyForIteratorPadStyle.getSpace(), false) ? " " : "";
+                    } else {
+                        before = evaluate(() -> spacesStyle.getOther().getAfterForSemicolon(), evaluate(() -> spacesStyle.getWithin().getForParentheses(), true)) ? " " : "";
+                    }
+                    after = "";
+                } else {
+                    before = evaluate(() -> spacesStyle.getOther().getAfterComma(), true) ? " " : "";
+                    after = evaluate(() -> spacesStyle.getOther().getBeforeComma(), false) ? " " : "";
+                    index = controlUpdate.getUpdate().indexOf(right.getElement());
+                    if (index == 0) {
+                        before = evaluate(() -> spacesStyle.getOther().getAfterForSemicolon(), true) ? " " : "";
+                    }
+                    if (index == controlUpdate.getUpdate().size() - 1) {
+                        after = evaluate(() -> spacesStyle.getWithin().getForParentheses(), false) ? " " : "";
+                    }
+                }
+                break;
+            case FOREACH_ITERABLE:
+                before = " ";
+                after = evaluate(() -> spacesStyle.getWithin().getForParentheses(), false) ? " " : "";
+                break;
+            case FOREACH_VARIABLE:
+                before = evaluate(() -> spacesStyle.getWithin().getForParentheses(), false) ? " " : "";
+                after = evaluate(() -> spacesStyle.getOther().getBeforeColonInForEach(), true) ? " " : "";
+                break;
+            case ARRAY_INDEX:
+                before = evaluate(() -> spacesStyle.getWithin().getBrackets(), true) ? " " : "";
+                after = evaluate(() -> spacesStyle.getWithin().getBrackets(), true) ? " " : "";
+                break;
+            case CATCH_ALTERNATIVE:
+                J.MultiCatch multiCatch = cursor.getValue();
+                before = evaluate(() -> spacesStyle.getAroundOperators().getBitwise(), true) ? " " : "";
+                after = before;
+                index = multiCatch.getAlternatives().indexOf(right.getElement());
+                if (index == 0) {
+                    before = "";
+                }
+                if (index == multiCatch.getAlternatives().size() - 1) {
+                    after = "";
+                }
+                break;
+            case ENUM_VALUE:
+                Cursor classCursor = parentTreeCursor.getParentTreeCursor();
+                AtomicInteger atomicSize = new AtomicInteger(-1);
+                AtomicInteger atomicIndex = new AtomicInteger(-1);
+                new JavaIsoVisitor<J.EnumValue>() {
+                    @Override
+                    public J.EnumValueSet visitEnumValueSet(J.EnumValueSet enums, J.EnumValue ctx) {
+                        if (enums.getEnums().contains(ctx)) {
+                            atomicSize.set(enums.getEnums().size());
+                            atomicIndex.set(enums.getEnums().indexOf(ctx));
+                        }
+                        return enums;
+                    }
+                }.visit((J) classCursor.getValue(), (J.EnumValue) right.getElement());
+                if (classCursor.getMessage("singleLineEnum") == Boolean.TRUE) {
+                    if (atomicIndex.get() == 0) {
+                        before = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
+                    } else if (atomicIndex.get() > 0) {
+                        before = evaluate(() -> spacesStyle.getOther().getAfterComma(), true) ? " " : "";
+                    }
+                    if (atomicIndex.get() == atomicSize.get() - 1) {
+                        after = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
+                    } else if (atomicIndex.get() >= 0) {
+                        after = evaluate(() -> spacesStyle.getOther().getBeforeComma(), false) ? " " : "";
+                    }
+                } else {
+                    if (atomicIndex.get() > 0 && !hasLineBreakInSpace(((J) right.getElement()).getPrefix())) {
+                        before = " ";
+                    }
+                    after = "";
+                }
+                break;
+            case LAMBDA_PARAM:
+                parent = cursor.getValue();
+                index = ((J.Lambda.Parameters) parent).getParameters().indexOf(right.getElement());
+                size = ((J.Lambda.Parameters) parent).getParameters().size();
+                containerLocation = JContainer.Location.METHOD_DECLARATION_PARAMETERS;
+                break;
+            case TYPE_PARAMETER:
+                if (cursor.getValue() instanceof J.TypeParameters) {
+                    J.TypeParameters params = cursor.getValue();
+                    index = params.getTypeParameters().indexOf(right.getElement());
+                    size = params.getTypeParameters().size();
+                    containerLocation = JContainer.Location.TYPE_PARAMETERS;
+                    break;
+                }
+                //if not we can fall through to the container handling
+            case METHOD_DECLARATION_PARAMETER:
+            case RECORD_STATE_VECTOR:
+            case METHOD_INVOCATION_ARGUMENT:
+            case NEW_CLASS_ARGUMENTS:
+            case ANNOTATION_ARGUMENT:
+            case TYPE_BOUND:
+            case NEW_ARRAY_INITIALIZER:
+            case TRY_RESOURCE:
+                JContainer<J> container = cursor.getValue();
+                index = container.getElements().indexOf(right.getElement());
+                size = container.getElements().size();
+                emptyContainer = container.getElements().stream().allMatch(element -> element instanceof J.Empty);
+                break;
+            case METHOD_SELECT:
+                after = "";
+                break;
+            case INSTANCEOF:
+                after = " ";
+                break;
+            default:
+                if (hasLineBreakInSpace(right.getAfter())) {
+                    after = right.getAfter().getWhitespace();
+                    break;
+                }
+                after = "";
+                break;
         }
-        return n;
+
+        if (index >= 0 && containerLocation != null) {
+            if (emptyContainer) {
+                before = getMinimizedWhitespaceWithin(containerLocation, ContainerPosition.EMPTY);
+                after = "";
+            } else {
+                beforePosition = ContainerPosition.AFTER_SEPARATOR;
+                afterPosition = ContainerPosition.BEFORE_SEPARATOR;
+                if (index == 0) {
+                    beforePosition = ContainerPosition.OPEN;
+                }
+                if (index == size - 1) {
+                    afterPosition = ContainerPosition.CLOSE;
+                }
+
+                before = getMinimizedWhitespaceWithin(containerLocation, beforePosition);
+                after = getMinimizedWhitespaceWithin(containerLocation, afterPosition);
+            }
+        }
+
+        if (after != null) {
+            if (index != size - 1 && right.getElement() instanceof J.Try.Resource) {
+                //noinspection unchecked, ConstantConditions
+                right = right.withElement((T) new JavaIsoVisitor<String>() {
+
+                    @Override
+                    public @Nullable <B> JRightPadded<B> visitRightPadded(@Nullable JRightPadded<B> right, JRightPadded.Location loc, String p) {
+                        return right == null ? null : right.withAfter(minimizedLastComment(right.getAfter(), p));
+                    }
+                }.visit((Tree) right.getElement(), after));
+            } else {
+                right = right.withAfter(minimizedLastComment(right.getAfter(), after));
+            }
+        }
+
+        setCursor(new Cursor(getCursor(), right));
+        if (before != null) {
+            getCursor().putMessage("before", before);
+        }
+
+        T t = right.getElement();
+        if (t instanceof J) {
+            //noinspection unchecked
+            t = visitAndCast((J) right.getElement(), p);
+        }
+
+        setCursor(getCursor().getParent());
+        if (t == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+
+        Space afterSpace = right.getAfter();
+        if (after == null) {
+            afterSpace = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+        }
+        Markers markers = visitMarkers(right.getMarkers(), p);
+        return (afterSpace == right.getAfter() && t == right.getElement() && markers == right.getMarkers()) ? right : new JRightPadded<>(t, afterSpace, markers);
     }
 
     @Override
-    public J.ArrayAccess visitArrayAccess(J.ArrayAccess arrayAccess, P p) {
-        J.ArrayAccess a = super.visitArrayAccess(arrayAccess, p);
-        boolean useSpaceWithinBrackets = style.getWithin().getBrackets();
-        return a.withDimension(
-                a.getDimension().getPadding().withIndex(
-                        a.getDimension().getPadding().getIndex().withElement(
-                                a.getDimension().getPadding().getIndex().getElement().withPrefix(
-                                        updateSpace(a.getDimension().getPadding().getIndex().getElement().getPrefix(), useSpaceWithinBrackets)
-                                )
-                        ).withAfter(
-                                updateSpace(a.getDimension().getPadding().getIndex().getAfter(), useSpaceWithinBrackets)
-                        )
-                )
-        );
+    public <T> @Nullable JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
+        if (left == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+
+        setCursor(new Cursor(getCursor(), left));
+
+        String before = null;
+        String beforeElem = null;
+        switch (loc) {
+            case LANGUAGE_EXTENSION:
+                break;
+            case TERNARY_TRUE:
+                before = evaluate(() -> spacesStyle.getTernaryOperator().getBeforeQuestionMark(), true) ? " " : "";
+                beforeElem = evaluate(() -> spacesStyle.getTernaryOperator().getAfterQuestionMark(), true) ? " " : "";
+                break;
+            case TERNARY_FALSE:
+                before = evaluate(() -> spacesStyle.getTernaryOperator().getBeforeColon(), true) ? " " : "";
+                beforeElem = evaluate(() -> spacesStyle.getTernaryOperator().getAfterColon(), true) ? " " : "";
+                break;
+        }
+        if (before != null) {
+            getCursor().putMessage("before", before);
+        }
+        Space beforeSpace = visitSpace(left.getBefore(), loc.getBeforeLocation(), p);
+        if (beforeElem != null) {
+            getCursor().putMessage("before", beforeElem);
+        }
+        T t = left.getElement();
+
+        if (t instanceof J) {
+            //noinspection unchecked
+            t = visitAndCast((J) left.getElement(), p);
+        }
+
+        setCursor(getCursor().getParent());
+        // If nothing changed leave AST node the same
+        if (left.getElement() == t && beforeSpace == left.getBefore()) {
+            return left;
+        }
+
+        //noinspection ConstantConditions
+        return t == null ? null : new JLeftPadded<>(beforeSpace, t, left.getMarkers());
     }
 
     @Override
-    public <T extends J> J.Parentheses<T> visitParentheses(J.Parentheses<T> parens, P p) {
-        J.Parentheses<T> p2 = super.visitParentheses(parens, p);
-        return p2.getPadding().withTree(
-                p2.getPadding().getTree().withElement(
-                        p2.getPadding().getTree().getElement().withPrefix(
-                                updateSpace(p2.getPadding().getTree().getElement().getPrefix(), style.getWithin().getGroupingParentheses())
-                        )
-                ).withAfter(
-                        updateSpace(p2.getPadding().getTree().getAfter(), style.getWithin().getGroupingParentheses())
-                )
-        );
+    public Space visitSpace(@Nullable Space space, Space.Location loc, P ctx) {
+        if (space == null) {
+            return super.visitSpace(null, loc, ctx);
+        }
+        if (getCursor().getValue() instanceof JContainer) {
+            Arrays.stream(JContainer.Location.values()).filter(l -> l.getBeforeLocation() == loc).findFirst().ifPresent(l -> getCursor().computeMessageIfAbsent("location", __ -> l));
+        }
+        String whitespace = null;
+        String before = getCursor().pollNearestMessage("before");
+        if (before != null) {
+            return super.visitSpace(minimizedSkipComments(space, before), loc, ctx);
+        }
+        Cursor parentTreeCursor;
+        J parent;
+        BiFunction<Space, String, Space> minimized = this::minimizedLastComment;
+        switch (loc) {
+            case LANGUAGE_EXTENSION:
+                break;
+            case BLOCK_PREFIX:
+                parentTreeCursor = getCursor().getParentTreeCursor();
+                if (parentTreeCursor.getValue() instanceof J) {
+                    parent = parentTreeCursor.getValue();
+                    if (parent instanceof J.ClassDeclaration) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getClassLeftBrace(), true) ? " " : "";
+                    } else if (parent instanceof J.MethodDeclaration) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getMethodLeftBrace(), true) ? " " : "";
+                    } else if (parent instanceof J.If) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getIfLeftBrace(), true) ? " " : "";
+                    } else if (parent instanceof J.If.Else) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getElseLeftBrace(), true) ? " " : "";
+                    } else if (parent instanceof J.ForEachLoop || parent instanceof J.ForLoop) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getForLeftBrace(), true) ? " " : "";
+                    } else if (parent instanceof J.WhileLoop) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getWhileLeftBrace(), true) ? " " : "";
+                    } else if (parent instanceof J.DoWhileLoop) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getDoLeftBrace(), true) ? " " : "";
+                    } else if (parent instanceof J.Switch || parent instanceof J.SwitchExpression) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getSwitchLeftBrace(), true) ? " " : "";
+                    } else if (parent instanceof J.Try.Catch) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getCatchLeftBrace(), true) ? " " : "";
+                    } else if (parent instanceof J.Synchronized) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getSynchronizedLeftBrace(), true) ? " " : "";
+                    } else if (parent instanceof J.Try) {
+                        if (((J.Try) parent).getFinally() != null && ((J.Try) parent).getFinally().getId() == ((J.Block) getCursor().getValue()).getId()) {
+                            whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getFinallyLeftBrace(), true) ? " " : "";
+                        } else {
+                            whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getTryLeftBrace(), true) ? " " : "";
+                        }
+                    } else if (parent instanceof J.Lambda) {
+                        whitespace = evaluate(() -> spacesStyle.getAroundOperators().getLambdaArrow(), true) ? " " : "";
+                    }
+                }
+                break;
+            case LAMBDA_ARROW_PREFIX:
+                whitespace = evaluate(() -> spacesStyle.getAroundOperators().getLambdaArrow(), true) ? " " : "";
+                break;
+            case METHOD_DECLARATION_PARAMETERS:
+                whitespace = evaluate(() -> spacesStyle.getBeforeParentheses().getMethodDeclaration(), false) ? " " : "";
+                break;
+            case PRIMITIVE_PREFIX:
+                parentTreeCursor = getCursor().getParentTreeCursor();
+                if (parentTreeCursor.getValue() instanceof J) {
+                    parent = parentTreeCursor.getValue();
+                    TypeTree type;
+                    if (parent instanceof J.MethodDeclaration) {
+                        J.MethodDeclaration m = (J.MethodDeclaration) parent;
+                        type = m.getReturnTypeExpression();
+                        if (m.getModifiers().isEmpty() && type == getCursor().getValue()) {
+                            whitespace = space.getWhitespace();
+                        }
+                    } else if (parent instanceof J.VariableDeclarations) {
+                        J.VariableDeclarations v = (J.VariableDeclarations) parent;
+                        type = v.getTypeExpression();
+                        if (v.getModifiers().isEmpty() && type == getCursor().getValue()) {
+                            whitespace = space.getWhitespace();
+                        }
+                    }
+                }
+                if (whitespace == null && !space.getWhitespace().isEmpty()) {
+                    whitespace = " ";
+                }
+                break;
+            case IDENTIFIER_PREFIX:
+                if (getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation) {
+                    J.MethodInvocation mi = getCursor().getParentTreeCursor().getValue();
+                    if (mi.getName() == getCursor().getValue() && mi.getTypeParameters() != null) {
+                        whitespace = evaluate(() -> spacesStyle.getTypeArguments().getAfterClosingAngleBracket(), false) ? " " : "";
+                    } else {
+                        whitespace = "";
+                    }
+                } else if (!space.getWhitespace().isEmpty()) {
+                    whitespace = " ";
+                }
+                minimized = this::minimizedSkipComments;
+                break;
+            case MODIFIER_PREFIX:
+                parentTreeCursor = getCursor().getParentTreeCursor();
+                if (parentTreeCursor.getValue() instanceof J) {
+                    parent = parentTreeCursor.getValue();
+                    List<J.Modifier> modifiers = null;
+                    if (parent instanceof J.MethodDeclaration) {
+                        modifiers = ((J.MethodDeclaration) parent).getModifiers();
+                    } else if (parent instanceof J.ClassDeclaration) {
+                        modifiers = ((J.ClassDeclaration) parent).getModifiers();
+                    } else if (parent instanceof J.VariableDeclarations) {
+                        modifiers = ((J.VariableDeclarations) parent).getModifiers();
+                    }
+                    if (modifiers != null && modifiers.indexOf((J.Modifier) getCursor().getValue()) > 0) {
+                        whitespace = " ";
+                    }
+                    if (modifiers != null && modifiers.indexOf((J.Modifier) getCursor().getValue()) == 0) {
+                        if (!StringUtils.hasLineBreak(space.getWhitespace()) && !space.getWhitespace().isEmpty()) {
+                            whitespace = " ";
+                        }
+                    }
+                }
+                break;
+            case MEMBER_REFERENCE_NAME:
+                whitespace = evaluate(() -> spacesStyle.getAroundOperators().getMethodReferenceDoubleColon(), false) ? " " : "";
+                break;
+            case CATCH_PREFIX:
+                whitespace = evaluate(() -> spacesStyle.getBeforeKeywords().getCatchKeyword(), true) ? " " : "";
+                break;
+            case WHILE_CONDITION:
+                whitespace = evaluate(() -> spacesStyle.getBeforeKeywords().getWhileKeyword(), true) ? " " : "";
+                break;
+            case IF_PREFIX:
+                parentTreeCursor = getCursor().getParentTreeCursor();
+                if (parentTreeCursor.getValue() instanceof J.If.Else && space.getComments().isEmpty()) {
+                    space = space.withWhitespace(" ");
+                }
+                break;
+            case ELSE_PREFIX:
+                parentTreeCursor = getCursor().getParentTreeCursor();
+                parent = parentTreeCursor.getValue();
+                if (parent instanceof J.If && ((J.If) parent).getThenPart() instanceof J.Block && space.getComments().isEmpty()) {
+                    space = space.withWhitespace(evaluate(() -> spacesStyle.getBeforeKeywords().getElseKeyword(), true) ? " " : "");
+                }
+                break;
+            case TRY_FINALLY:
+                whitespace = evaluate(() -> spacesStyle.getBeforeKeywords().getFinallyKeyword(), true) ? " " : "";
+                break;
+            case RECORD_STATE_VECTOR_SUFFIX:
+            case METHOD_DECLARATION_PARAMETER_SUFFIX:
+            case METHOD_INVOCATION_ARGUMENT_SUFFIX:
+            case TYPE_PARAMETER_SUFFIX:
+                whitespace = evaluate(() -> spacesStyle.getOther().getBeforeComma(), false) ? " " : "";
+                break;
+            case ANNOTATION_ARGUMENTS:
+                whitespace = evaluate(() -> spacesStyle.getBeforeParentheses().getAnnotationParameters(), true) ? " " : "";
+                break;
+            case TRY_RESOURCES:
+                whitespace = evaluate(() -> spacesStyle.getBeforeParentheses().getTryParentheses(), true) ? " " : "";
+                break;
+            case FOR_CONTROL_PREFIX:
+            case FOR_EACH_CONTROL_PREFIX:
+                whitespace = evaluate(() -> spacesStyle.getBeforeParentheses().getForParentheses(), true) ? " " : "";
+                break;
+            case CONTROL_PARENTHESES_PREFIX:
+                parentTreeCursor = getCursor().getParentTreeCursor();
+                if (parentTreeCursor.getValue() instanceof J) {
+                    parent = parentTreeCursor.getValue();
+                    if (parent instanceof J.If) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeParentheses().getIfParentheses(), true) ? " " : "";
+                    } else if (parent instanceof J.WhileLoop) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeParentheses().getWhileParentheses(), true) ? " " : "";
+                    } else if (parent instanceof J.Switch) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeParentheses().getSwitchParentheses(), true) ? " " : "";
+                    } else if (parent instanceof J.Try.Catch) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeParentheses().getCatchParentheses(), true) ? " " : "";
+                    } else if (parent instanceof J.Synchronized) {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeParentheses().getSynchronizedParentheses(), true) ? " " : "";
+                    }
+                }
+                break;
+            case TYPE_PARAMETERS:
+            case TYPE_PARAMETERS_PREFIX:
+                parentTreeCursor = getCursor().getParentTreeCursor();
+                if (parentTreeCursor.getValue() instanceof J.MethodDeclaration) {
+                    whitespace = ((J.MethodDeclaration) parentTreeCursor.getValue()).getModifiers().isEmpty() ? "" : " ";
+                } else if (parentTreeCursor.getValue() instanceof J.ClassDeclaration) {
+                    whitespace = evaluate(() -> spacesStyle.getTypeParameters().getBeforeOpeningAngleBracket(), false) ? " " : "";
+                } else {
+                    whitespace = evaluate(() -> spacesStyle.getTypeArguments().getBeforeOpeningAngleBracket(), false) ? " " : "";
+                }
+                break;
+            case NEW_CLASS_ARGUMENTS:
+            case METHOD_INVOCATION_ARGUMENTS:
+                whitespace = evaluate(() -> spacesStyle.getBeforeParentheses().getMethodCall(), false) ? " " : "";
+                break;
+            case NEW_ARRAY_INITIALIZER:
+                whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getArrayInitializerLeftBrace(), false) ? " " : "";
+                break;
+            case UNARY_OPERATOR: //intelliJ does not format the i++ to i ++ when spacesStyle.getAroundOperators().getUnary() is true;
+            case METHOD_SELECT_SUFFIX:
+            case VARARGS:
+            case TYPE_BOUND_SUFFIX:
+                whitespace = "";
+                break;
+            case VARIABLE_PREFIX:
+            case LAMBDA_PARAMETERS_PREFIX:
+            case LAMBDA_PREFIX:
+                if (!space.getWhitespace().isEmpty()) {
+                    whitespace = " ";
+                }
+                break;
+            case TYPE_BOUNDS:
+                whitespace = " ";
+                break;
+            case BLOCK_END:
+                J.Block block = getCursor().getValue();
+                if (getCursor().dropParentWhile(v -> !(v instanceof J.ClassDeclaration) && !Cursor.ROOT_VALUE.equals(v)).getMessage("singleLineEnum") == Boolean.TRUE) {
+                    if (block.getStatements().isEmpty()) {
+                        whitespace = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
+                    } else {
+                        whitespace = "";
+                    }
+                    break;
+                } else if (block.getStatements().isEmpty() && block.getEnd().getComments().isEmpty()) {
+                    parentTreeCursor = getCursor().getParentTreeCursor();
+                    if (parentTreeCursor.getValue() instanceof J.ClassDeclaration || parentTreeCursor.getValue() instanceof J.MethodDeclaration) {
+                        whitespace = evaluate(() -> spacesStyle.getWithin().getCodeBraces(), false) ? " " : "";
+                    }
+                }
+                if (block.getStatements().isEmpty()) {
+                    if (StringUtils.countOccurrences(block.getEnd().getWhitespace(), "\n") > 3) {
+                        space = space.withWhitespace("\n\n\n" + block.getEnd().getWhitespace().substring(block.getEnd().getWhitespace().lastIndexOf("\n") + 1));
+                    }
+                    space = space.withComments(ListUtils.map(space.getComments(), comment -> {
+                        if (StringUtils.countOccurrences(comment.getSuffix(), "\n") > 3) {
+                            comment = comment.withSuffix("\n\n\n" + comment.getSuffix().substring(comment.getSuffix().lastIndexOf("\n") + 1));
+                        }
+                        return comment;
+                    }));
+                }
+                break;
+            case BINARY_OPERATOR:
+                J.Binary binary = getCursor().getParentTreeCursor().getValue();
+                whitespace = getWhitespaceAroundOperator(binary.getOperator());
+                break;
+            case ASSIGNMENT_OPERATION_OPERATOR:
+            case ASSIGNMENT:
+            case VARIABLE_INITIALIZER:
+                parentTreeCursor = getCursor().getParentTreeCursor().getParentTreeCursor();
+                if (parentTreeCursor.getValue() instanceof J.Annotation) {
+                    whitespace = evaluate(() -> spacesStyle.getOther().getAroundEqualInAnnotationValuePair(), true) ? " " : "";
+                } else {
+                    whitespace = evaluate(() -> spacesStyle.getAroundOperators().getAssignment(), true) ? " " : "";
+                }
+                break;
+            case ANNOTATION_PREFIX:
+                boolean firstAnnotation = true;
+                parentTreeCursor = getCursor().getParentTreeCursor();
+                if (parentTreeCursor.getValue() instanceof J.ClassDeclaration) {
+                    firstAnnotation = ((J.ClassDeclaration) parentTreeCursor.getValue()).getLeadingAnnotations().indexOf(getCursor().getValue()) <= 0;
+                } else if (parentTreeCursor.getValue() instanceof J.MethodDeclaration) {
+                    firstAnnotation = ((J.MethodDeclaration) parentTreeCursor.getValue()).getLeadingAnnotations().indexOf(getCursor().getValue()) <= 0;
+                } else if (parentTreeCursor.getValue() instanceof J.VariableDeclarations) {
+                    firstAnnotation = ((J.VariableDeclarations) parentTreeCursor.getValue()).getLeadingAnnotations().indexOf(getCursor().getValue()) <= 0;
+                }
+                if (!firstAnnotation && space.getWhitespace().isEmpty() && (space.getComments().isEmpty() || space.getComments().get(space.getComments().size() - 1).getSuffix().isEmpty())) {
+                    whitespace = " ";
+                }
+            default:
+                if (!StringUtils.hasLineBreak(space.getWhitespace()) && !space.getWhitespace().isEmpty()) {
+                    whitespace = " ";
+                }
+                break;
+        }
+        if (whitespace != null) {
+            return super.visitSpace(minimized.apply(space, whitespace), loc, ctx);
+        }
+        return super.visitSpace(space, loc, ctx);
     }
 
     @Override
     public J.TypeCast visitTypeCast(J.TypeCast typeCast, P p) {
-        J.TypeCast tc = super.visitTypeCast(typeCast, p);
-        boolean spaceWithinTypeCastParens = style.getWithin().getTypeCastParentheses();
-        tc = tc.withClazz(
-                tc.getClazz().withTree(
-                        spaceBefore(tc.getClazz().getTree(), spaceWithinTypeCastParens)
-                )
-        );
-        tc = tc.withClazz(
-                tc.getClazz().getPadding().withTree(
-                        spaceAfter(tc.getClazz().getPadding().getTree(), spaceWithinTypeCastParens)
-                )
-        );
-        return tc.withExpression(spaceBefore(tc.getExpression(), style.getOther().getAfterTypeCast()));
+        String afterTypeCast = evaluate(() -> spacesStyle.getOther().getAfterTypeCast(), true) ? " " : "";
+
+        return super.visitTypeCast(typeCast.withExpression(minimized(typeCast.getExpression(), afterTypeCast)), p);
     }
 
     @Override
-    public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, P p) {
-        J.ParameterizedType pt = super.visitParameterizedType(type, p);
-        boolean spaceWithinAngleBrackets = style.getWithin().getAngleBrackets();
-        if (pt.getPadding().getTypeParameters() != null) {
-            pt = pt.getPadding().withTypeParameters(
-                    spaceBefore(pt.getPadding().getTypeParameters(),
-                            style.getTypeArguments().getBeforeOpeningAngleBracket())
-            );
-        }
-        if (pt.getPadding().getTypeParameters() != null &&
-                !(pt.getPadding().getTypeParameters().getElements().isEmpty() || pt.getPadding().getTypeParameters().getElements().iterator().next() instanceof J.Empty)) {
-            int typeParametersSize = pt.getPadding().getTypeParameters().getElements().size();
-            pt = pt.getPadding().withTypeParameters(
-                    pt.getPadding().getTypeParameters().getPadding().withElements(
-                            ListUtils.map(pt.getPadding().getTypeParameters().getPadding().getElements(),
-                                    (index, elemContainer) -> {
-                                        if (index == 0) {
-                                            elemContainer = elemContainer.withElement(
-                                                    spaceBefore(elemContainer.getElement(), spaceWithinAngleBrackets)
-                                            );
-                                        } else {
-                                            elemContainer = elemContainer.withElement(
-                                                    spaceBefore(elemContainer.getElement(),
-                                                            style.getTypeArguments().getAfterComma())
-                                            );
-                                        }
-                                        if (index == typeParametersSize - 1) {
-                                            elemContainer = spaceAfter(elemContainer, spaceWithinAngleBrackets);
-                                        }
-                                        return elemContainer;
-                                    }
-                            )
-                    )
-            );
-        }
-        return pt;
+    public J.Lambda visitLambda(J.Lambda lambda, P p) {
+        String afterArrow = evaluate(() -> spacesStyle.getAroundOperators().getLambdaArrow(), true) ? " " : "";
+        return super.visitLambda(lambda.withBody(minimized(lambda.getBody(), afterArrow)), p);
     }
 
     @Override
-    public J.Ternary visitTernary(J.Ternary ternary, P p) {
-        J.Ternary t = super.visitTernary(ternary, p);
-        SpacesStyle.TernaryOperator ternaryOperatorSettings = style.getTernaryOperator();
-        t = t.getPadding().withTruePart(spaceBefore(t.getPadding().getTruePart(), ternaryOperatorSettings.getBeforeQuestionMark()));
-        t = t.withTruePart(spaceBefore(t.getTruePart(), ternaryOperatorSettings.getAfterQuestionMark()));
-        t = t.getPadding().withFalsePart(spaceBefore(t.getPadding().getFalsePart(), ternaryOperatorSettings.getBeforeColon()));
-        return t.withFalsePart(spaceBefore(t.getFalsePart(), ternaryOperatorSettings.getAfterColon()));
+    public J.Unary visitUnary(J.Unary unary, P p) {
+        switch (unary.getOperator()) {
+            case PreIncrement:
+            case PreDecrement:
+            case Positive:
+            case Negative:
+            case Complement:
+            case Not:
+                unary = unary.withExpression(minimized(unary.getExpression(), evaluate(() -> spacesStyle.getAroundOperators().getUnary(), false) ? " " : ""));
+                break;
+        }
+        return super.visitUnary(unary, p);
     }
 
     @Override
-    public J.NewClass visitNewClass(J.NewClass newClass, P p) {
-        J.NewClass nc = super.visitNewClass(newClass, p);
-        if (nc.getPadding().getArguments() != null) {
-            nc = nc.getPadding().withArguments(spaceBefore(nc.getPadding().getArguments(), style.getBeforeParentheses().getMethodCall()));
-            int argsSize = nc.getPadding().getArguments().getElements().size();
-            nc = nc.getPadding().withArguments(
-                    nc.getPadding().getArguments().getPadding().withElements(
-                            ListUtils.map(nc.getPadding().getArguments().getPadding().getElements(),
-                                    (index, elemContainer) -> {
-                                        if (index != 0) {
-                                            elemContainer = elemContainer.withElement(
-                                                    spaceBefore(elemContainer.getElement(), style.getOther().getAfterComma())
-                                            );
-                                        }
-                                        if (index != argsSize - 1) {
-                                            elemContainer = spaceAfter(elemContainer, style.getOther().getBeforeComma());
-                                        }
-                                        return elemContainer;
-                                    }
-                            )
-                    )
-            );
-        }
-        return nc;
+    public J.Binary visitBinary(J.Binary binary, P p) {
+        return super.visitBinary(binary.withRight(minimized(binary.getRight(), getWhitespaceAroundOperator(binary.getOperator()))), p);
     }
 
     @Override
-    public J.EnumValue visitEnumValue(J.EnumValue _enum, P p) {
-        J.EnumValue e = super.visitEnumValue(_enum, p);
-        if (e.getInitializer() != null && e.getInitializer().getPadding().getArguments() != null) {
-            int initializerArgumentsSize = e.getInitializer().getPadding().getArguments().getPadding().getElements().size();
-            e = e.withInitializer(
-                    e.getInitializer().getPadding().withArguments(
-                            e.getInitializer().getPadding().getArguments().getPadding().withElements(
-                                    ListUtils.map(e.getInitializer().getPadding().getArguments().getPadding().getElements(),
-                                            (index, elemContainer) -> {
-                                                if (index != 0) {
-                                                    elemContainer = elemContainer.withElement(
-                                                            spaceBefore(elemContainer.getElement(),
-                                                                    style.getOther().getAfterComma())
-                                                    );
-                                                }
-                                                if (index != initializerArgumentsSize - 1) {
-                                                    elemContainer = spaceAfter(elemContainer,
-                                                            style.getOther().getBeforeComma());
-                                                }
-                                                return elemContainer;
-                                            }
-                                    )
-                            )
-                    )
-            );
+    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
+        if (variable.getInitializer() != null) {
+            String afterOperator = evaluate(() -> spacesStyle.getAroundOperators().getAssignment(), true) ? " " : "";
+            variable = variable.withInitializer(minimized(variable.getInitializer(), afterOperator));
         }
-        return e;
+        return super.visitVariable(variable, p);
     }
 
     @Override
-    public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, P p) {
-        J.TypeParameter tp = super.visitTypeParameter(typeParam, p);
-        if (tp.getPadding().getBounds() != null) {
-            boolean spaceAroundTypeBounds = style.getTypeParameters().getAroundTypeBounds();
-            int typeBoundsSize = tp.getPadding().getBounds().getPadding().getElements().size();
-            tp = tp.getPadding().withBounds(
-                    tp.getPadding().getBounds().getPadding().withElements(
-                            ListUtils.map(tp.getPadding().getBounds().getPadding().getElements(),
-                                    (index, elemContainer) -> {
-                                        if (index != 0) {
-                                            elemContainer = elemContainer.withElement(spaceBefore(elemContainer.getElement(), spaceAroundTypeBounds));
-                                        }
-                                        if (index != typeBoundsSize - 1) {
-                                            elemContainer = spaceAfter(elemContainer, spaceAroundTypeBounds);
-                                        }
-                                        return elemContainer;
-                                    }
-                            )
-                    )
-            );
+    public J.Assignment visitAssignment(J.Assignment assignment, P p) {
+        String afterOperator;
+        if (getCursor().getParentTreeCursor().getValue() instanceof J.Annotation) {
+            afterOperator = evaluate(() -> spacesStyle.getOther().getAroundEqualInAnnotationValuePair(), true) ? " " : "";
+        } else {
+            afterOperator = evaluate(() -> spacesStyle.getAroundOperators().getAssignment(), true) ? " " : "";
         }
-        return tp;
+        return super.visitAssignment(assignment.withAssignment(minimized(assignment.getAssignment(), afterOperator)), p);
+    }
+
+    @Override
+    public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, P p) {
+        String afterOperator = evaluate(() -> spacesStyle.getAroundOperators().getAssignment(), true) ? " " : "";
+        return super.visitAssignmentOperation(assignOp.withAssignment(minimized(assignOp.getAssignment(), afterOperator)), p);
+    }
+
+    @Override
+    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
+        if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Enum) {
+            boolean singleLineEnum = !hasLineBreakInSpace(classDecl.getBody().getPrefix()) && !hasLineBreakInSpace(classDecl.getBody().getEnd());
+            if (classDecl.getBody().getStatements().size() == 1 && classDecl.getBody().getStatements().get(0) instanceof J.EnumValueSet) {
+                J.EnumValueSet enumValueSet = (J.EnumValueSet) classDecl.getBody().getStatements().get(0);
+                if (hasLineBreakInSpace(enumValueSet.getPrefix()) || enumValueSet.getEnums().stream().map(J.EnumValue::getPrefix).anyMatch(this::hasLineBreakInSpace)) {
+                    singleLineEnum = false;
+                }
+            } else if (!classDecl.getBody().getStatements().isEmpty()) {
+                singleLineEnum = false;
+            }
+            getCursor().putMessage("singleLineEnum", singleLineEnum);
+        }
+        return super.visitClassDeclaration(classDecl, p);
+    }
+
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, P p) {
+        if (getCursor().getNearestMessage("stop") != null) {
+            return (J) tree;
+        }
+        return super.visit(tree, p);
     }
 
     @Override
@@ -1122,11 +749,189 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         return super.postVisit(tree, p);
     }
 
-    @Override
-    public @Nullable J visit(@Nullable Tree tree, P p) {
-        if (getCursor().getNearestMessage("stop") != null) {
-            return (J) tree;
+    private <T extends Expression> T minimized(T j, String whitespace) {
+        return j.withPrefix(minimizedSkipComments(j.getPrefix(), whitespace));
+    }
+
+    private J minimized(J j, String whitespace) {
+        return j.withPrefix(minimizedSkipComments(j.getPrefix(), whitespace));
+    }
+
+    private Space minimizedSkipComments(Space space, String whitespace) {
+        if (space.getComments().isEmpty()) {
+            if (!removeCustomLineBreaks && StringUtils.hasLineBreak(space.getWhitespace())) {
+                return space;
+            }
+            if (StringUtils.hasLineBreak(whitespace)) {
+                //Reduce to single new line
+                return space.withWhitespace(whitespace.substring(whitespace.lastIndexOf('\n')));
+            }
+            return space.withWhitespace(whitespace);
         }
-        return super.visit(tree, p);
+        return space;
+    }
+
+    private Space minimizedLastComment(Space space, String whitespace) {
+        //IntelliJ only formats last comments suffix.
+        return minimizedSkipComments(space, whitespace).withComments(
+                ListUtils.mapLast(space.getComments(), comment -> {
+                    if (!StringUtils.hasLineBreak(comment.getSuffix())) {
+                        return comment.withSuffix(whitespace);
+                    }
+                    if (removeCustomLineBreaks) {
+                        if (comment.isMultiline()) {
+                            Object parent = getCursor().getParentTreeCursor().getValue();
+                            if (!(parent instanceof J.Block || parent instanceof J.Case)) {
+                                return comment.withSuffix(whitespace);
+                            }
+                        }
+                        //Reduce to single new line
+                        return comment.withSuffix(comment.getSuffix().substring(comment.getSuffix().lastIndexOf('\n')));
+                    }
+                    return comment;
+                })
+        );
+    }
+
+    private @Nullable String getMinimizedWhitespaceWithin(JContainer.Location loc, ContainerPosition containerPosition) {
+        if (loc != JContainer.Location.TYPE_BOUNDS && loc != JContainer.Location.TRY_RESOURCES && loc != JContainer.Location.TYPE_PARAMETERS && containerPosition == ContainerPosition.AFTER_SEPARATOR) {
+            return evaluate(() -> spacesStyle.getOther().getAfterComma(), true) ? " " : "";
+        }
+        if (loc != JContainer.Location.TYPE_BOUNDS && loc != JContainer.Location.TRY_RESOURCES && loc != JContainer.Location.TYPE_PARAMETERS && containerPosition == ContainerPosition.BEFORE_SEPARATOR) {
+            return evaluate(() -> spacesStyle.getOther().getBeforeComma(), true) ? " " : "";
+        }
+        switch (loc) {
+            case RECORD_STATE_VECTOR:
+                if (containerPosition == ContainerPosition.EMPTY) {
+                    return ""; // there is no intelliJ style existing for this
+                }
+                return evaluate(() -> spacesStyle.getWithin().getRecordHeader(), false) ? " " : "";
+            case METHOD_DECLARATION_PARAMETERS:
+                if (containerPosition == ContainerPosition.EMPTY) {
+                    return evaluate(() -> spacesStyle.getWithin().getEmptyMethodDeclarationParentheses(), false) ? " " : "";
+                }
+                return evaluate(() -> spacesStyle.getWithin().getMethodDeclarationParentheses(), false) ? " " : "";
+            case METHOD_INVOCATION_ARGUMENTS:
+            case NEW_CLASS_ARGUMENTS:
+                if (containerPosition == ContainerPosition.EMPTY) {
+                    return evaluate(() -> spacesStyle.getWithin().getEmptyMethodCallParentheses(), false) ? " " : "";
+                }
+                return evaluate(() -> spacesStyle.getWithin().getMethodCallParentheses(), false) ? " " : "";
+            case ANNOTATION_ARGUMENTS:
+                return evaluate(() -> spacesStyle.getWithin().getAnnotationParentheses(), false) ? " " : "";
+            case TRY_RESOURCES:
+                if (containerPosition == ContainerPosition.AFTER_SEPARATOR) {
+                    return evaluate(() -> spacesStyle.getOther().getAfterForSemicolon(), true) ? " " : "";
+                }
+                if (containerPosition == ContainerPosition.BEFORE_SEPARATOR) {
+                    JContainer<J.Try.Resource> resources = getCursor().getValue();
+                    if (!resources.getElements().isEmpty() && resources.getElements().get(0).isTerminatedWithSemicolon()) {
+                        return evaluate(() -> spacesStyle.getOther().getBeforeForSemicolon(), false) ? " " : "";
+                    }
+                    return "";
+                }
+                return evaluate(() -> spacesStyle.getWithin().getTryParentheses(), false) ? " " : "";
+            case NEW_ARRAY_INITIALIZER:
+                if (containerPosition == ContainerPosition.EMPTY) {
+                    return evaluate(() -> spacesStyle.getWithin().getEmptyArrayInitializerBraces(), false) ? " " : "";
+                }
+                return evaluate(() -> spacesStyle.getWithin().getArrayInitializerBraces(), false) ? " " : "";
+            case TYPE_PARAMETERS:
+                if (containerPosition == ContainerPosition.AFTER_SEPARATOR) {
+                    Object value = getCursor().getParentTreeCursor().getValue();
+                    if (value instanceof J.MethodDeclaration || value instanceof J.ClassDeclaration) {
+                        return evaluate(() -> spacesStyle.getOther().getAfterComma(), true) ? " " : "";
+                    }
+                    return evaluate(() -> spacesStyle.getTypeArguments().getAfterComma(), true) ? " " : "";
+                }
+                if (containerPosition == ContainerPosition.BEFORE_SEPARATOR || containerPosition == ContainerPosition.EMPTY) {
+                    return ""; // there is no intelliJ style existing for this
+                }
+                return evaluate(() -> spacesStyle.getWithin().getAngleBrackets(), false) ? " " : "";
+            case TYPE_BOUNDS:
+                if (containerPosition == ContainerPosition.AFTER_SEPARATOR || containerPosition == ContainerPosition.BEFORE_SEPARATOR) {
+                    return evaluate(() -> spacesStyle.getTypeParameters().getAroundTypeBounds(), true) ? " " : "";
+                }
+                if (containerPosition == ContainerPosition.OPEN) {
+                    return " ";
+                }
+                return "";
+        }
+        return null;
+    }
+
+    private String getWhitespaceAroundOperator(J.Binary.Type operator) {
+        switch (operator) {
+            case Addition:
+            case Subtraction:
+                return evaluate(() -> spacesStyle.getAroundOperators().getAdditive(), true) ? " " : "";
+            case Multiplication:
+            case Division:
+            case Modulo:
+                return evaluate(() -> spacesStyle.getAroundOperators().getMultiplicative(), true) ? " " : "";
+            case LessThan:
+            case GreaterThan:
+            case LessThanOrEqual:
+            case GreaterThanOrEqual:
+                return evaluate(() -> spacesStyle.getAroundOperators().getRelational(), true) ? " " : "";
+            case Equal:
+            case NotEqual:
+                return evaluate(() -> spacesStyle.getAroundOperators().getEquality(), true) ? " " : "";
+            case BitAnd:
+            case BitOr:
+            case BitXor:
+                return evaluate(() -> spacesStyle.getAroundOperators().getBitwise(), true) ? " " : "";
+            case LeftShift:
+            case RightShift:
+            case UnsignedRightShift:
+                return evaluate(() -> spacesStyle.getAroundOperators().getShift(), true) ? " " : "";
+            case Or:
+            case And:
+            default:
+                return evaluate(() -> spacesStyle.getAroundOperators().getLogical(), true) ? " " : "";
+        }
+    }
+
+    private boolean evaluate(Supplier<Boolean> supplier, boolean defaultValue) {
+        try {
+            return supplier.get();
+        } catch (NoSuchMethodError e) {
+            // Handle newly introduced method calls on style that are not part of lst yet
+            return defaultValue;
+        }
+    }
+
+    private boolean hasLineBreakInSpace(Space space) {
+        if (StringUtils.hasLineBreak(space.getWhitespace())) {
+            return true;
+        }
+        for (Comment comment : space.getComments()) {
+            if (StringUtils.hasLineBreak(comment.getSuffix())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private enum ContainerPosition {
+        OPEN, CLOSE, BEFORE_SEPARATOR, AFTER_SEPARATOR, EMPTY
+    }
+
+    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles) {
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return (S) style.applyDefaults();
+        }
+        return null;
+    }
+
+    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return StyleHelper.merge(defaultStyle.get(), style);
+        }
+        return defaultStyle.get();
     }
 }

@@ -174,7 +174,7 @@ public class Markers implements RpcCodec<Markers> {
     @Override
     public void rpcSend(Markers after, RpcSendQueue q) {
         q.getAndSend(this, Markers::getId);
-        q.getAndSendList(this, Markers::getMarkers, Marker::getId, null);
+        q.getAndSendListAsRef(this, Markers::getMarkers, Marker::getId, null);
     }
 
     @Override

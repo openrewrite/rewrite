@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.semver.Semver;
 
 import static org.openrewrite.Validated.notBlank;
 
@@ -37,6 +38,15 @@ public class DoesNotIncludeDependency extends Recipe {
             example = "guava")
     String artifactId;
 
+    @Option(displayName = "Version",
+            description = "Match only dependencies with the specified resolved version. " +
+                    "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used. " +
+                    "All versions are searched by default.",
+            example = "1.x",
+            required = false)
+    @Nullable
+    String version;
+
     @Option(displayName = "Scope",
             description = "Match dependencies with the specified scope. If not specified, all configurations will be searched.",
             example = "compileClasspath",
@@ -44,33 +54,31 @@ public class DoesNotIncludeDependency extends Recipe {
     @Nullable
     String configuration;
 
-    @Override
-    public String getDisplayName() {
-        return "Does not include Gradle dependency";
-    }
+    String displayName = "Does not include Gradle dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "A precondition which returns false if visiting a Gradle file which includes the specified dependency in the classpath of some scope. " +
+    String description = "A precondition which returns false if visiting a Gradle file which includes the specified dependency in the classpath of some scope. " +
                 "For compatibility with multimodule projects, this should most often be applied as a precondition.";
-    }
 
     @Override
     public Validated<Object> validate() {
-        return super.validate()
+        Validated<Object> validated = super.validate()
                 .and(notBlank("groupId", groupId))
                 .and(notBlank("artifactId", artifactId));
+        if (version != null) {
+            validated = validated.and(Semver.validate(version, null));
+        }
+        return validated;
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
-            final TreeVisitor<?, ExecutionContext> di = new DependencyInsight(groupId, artifactId, null, configuration).getVisitor();
+            final TreeVisitor<?, ExecutionContext> di = new DependencyInsight(groupId, artifactId, version, configuration).getVisitor();
 
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {

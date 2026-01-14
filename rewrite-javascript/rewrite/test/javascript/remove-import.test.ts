@@ -1112,7 +1112,9 @@ describe('RemoveImport visitor', () => {
 
                         console.log('test');
                     `,
-                    `console.log('test');`
+                    `
+                        console.log('test');
+                    `
                 )
             );
         });
@@ -1175,7 +1177,8 @@ describe('RemoveImport visitor', () => {
                     `,
                     `
                         const foo = 1;
-                        console.log(foo);`
+                        console.log(foo);
+                        `
                 )
             );
         });
@@ -1201,6 +1204,362 @@ describe('RemoveImport visitor', () => {
                     `
                 )
             );
+        });
+    });
+
+    describe('type declarations', () => {
+        test('should not remove React import when used in type alias declaration', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "default"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        tsx(
+                            `
+                                import React from 'react';
+
+                                type Props = {
+                                    children: React.ReactNode;
+                                };
+
+                                function App({ children }: Props) {
+                                    return <div>{children}</div>;
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/react": "^19.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
+
+        test('should remove React import when not used in type alias declaration', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "default"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        tsx(
+                            `
+                                import React from 'react';
+
+                                type Props = {
+                                    children: string;
+                                };
+
+                                function App({ children }: Props) {
+                                    return <div>{children}</div>;
+                                }
+                            `,
+                            `
+                                type Props = {
+                                    children: string;
+                                };
+
+                                function App({ children }: Props) {
+                                    return <div>{children}</div>;
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/react": "^19.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
+    });
+
+    describe('object imports (non-function references)', () => {
+        test('should not remove vitest vi import when used with method call', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("vitest", "vi"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {vi} from 'vitest';
+
+                                function example() {
+                                    const mock = vi.fn();
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should remove vitest vi import when not used', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("vitest", "vi"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {vi} from 'vitest';
+
+                                function example() {
+                                    console.log('test');
+                                }
+                            `,
+                            `
+                                function example() {
+                                    console.log('test');
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should not remove vitest vi import when used as standalone identifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("vitest", "vi"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {vi} from 'vitest';
+
+                                function example() {
+                                    const mockUtils = vi;
+                                    mockUtils.fn();
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should not remove vitest vi import when used with spyOn', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("vitest", "vi"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {vi} from 'vitest';
+
+                                function example() {
+                                    const spy = vi.spyOn(console, 'log');
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should remove vi but keep describe when only describe is used', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("vitest", "vi"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {vi, describe} from 'vitest';
+
+                                describe('test', () => {
+                                    console.log('test');
+                                });
+                            `,
+                            `
+                                import {describe} from 'vitest';
+
+                                describe('test', () => {
+                                    console.log('test');
+                                });
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "vitest": "^2.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should not remove React forwardRef import when used', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "forwardRef"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {forwardRef} from 'react';
+
+                                const MyComponent = forwardRef(() => null);
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/react": "^18.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should remove React forwardRef import when not used', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "forwardRef"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {forwardRef, useState} from 'react';
+
+                                function MyComponent() {
+                                    const [count] = useState(0);
+                                    return count;
+                                }
+                            `,
+                            `
+                                import {useState} from 'react';
+
+                                function MyComponent() {
+                                    const [count] = useState(0);
+                                    return count;
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/react": "^18.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
         });
     });
 });

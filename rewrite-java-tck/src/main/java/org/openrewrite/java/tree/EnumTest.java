@@ -193,7 +193,7 @@ class EnumTest implements RewriteTest {
              }
              """,
             spec -> spec.afterRecipe( cu -> {
-                J.EnumValueSet enumValueStatement = (J.EnumValueSet) cu.getClasses().get(0).getBody().getStatements().get(0);
+                var enumValueStatement = (J.EnumValueSet) cu.getClasses().get(0).getBody().getStatements().get(0);
                 assert enumValueStatement.getEnums().isEmpty();
                 assert enumValueStatement.isTerminatedWithSemicolon();
             })
@@ -219,8 +219,8 @@ class EnumTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(1).getBody().getStatements().get(0);
-                JavaType.Class colorEnumType = (JavaType.Class) requireNonNull(md.getReturnTypeExpression()).getType();
+                var md = (J.MethodDeclaration) cu.getClasses().get(1).getBody().getStatements().get(0);
+                var colorEnumType = (JavaType.Class) requireNonNull(md.getReturnTypeExpression()).getType();
 
                 assertEquals(JavaType.FullyQualified.Kind.Enum, requireNonNull(colorEnumType).getKind());
                 assertFalse(colorEnumType.getMembers().get(0).hasFlags(Flag.Enum)); // GREEN
