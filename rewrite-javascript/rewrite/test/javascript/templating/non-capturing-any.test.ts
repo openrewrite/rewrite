@@ -16,9 +16,10 @@
 import {Cursor} from "../../../src";
 import {
     any,
-    JavaScriptVisitor,
-    capture,
+    capture, isExpressionStatement,
     JavaScriptParser,
+    JavaScriptVisitor,
+    JS,
     pattern,
     rewrite,
     template,
@@ -34,24 +35,17 @@ describe('Non-Capturing any() Function', () => {
         parser = new JavaScriptParser();
     });
 
-    async function parseExpression(code: string): Promise<J> {
-        const gen = parser.parse({text: code, sourcePath: 'test.ts'});
-        const cu = (await gen.next()).value;
-        // @ts-ignore
+    function parseExpression(code: string): J {
+        const cu = parser.parseOne({text: code, sourcePath: 'test.ts'}) as JS.CompilationUnit;
         const statement = cu.statements[0].element;
-        // Handle expression statements
-        if (statement.expression) {
-            return statement.expression;
-        }
-        // Return statement itself for other cases
-        return statement;
+        return isExpressionStatement(statement) ? statement.expression : statement;
     }
 
     describe('Basic non-capturing matching', () => {
         test('matches any single argument', async () => {
             const pat = pattern`foo(${any()})`;
 
-            const expr = await parseExpression('foo(42)');
+            const expr = parseExpression('foo(42)');
             const match = pat.match(expr, new Cursor(expr, undefined));
 
             expect(match).toBeDefined();
@@ -63,17 +57,17 @@ describe('Non-Capturing any() Function', () => {
             const pat = pattern`bar(${any()})`;
 
             // Match with number
-            const expr1 = await parseExpression('bar(100)');
+            const expr1 = parseExpression('bar(100)');
             const match1 = pat.match(expr1, new Cursor(expr1, undefined));
             expect(match1).toBeDefined();
 
             // Match with string
-            const expr2 = await parseExpression('bar("text")');
+            const expr2 = parseExpression('bar("text")');
             const match2 = pat.match(expr2, new Cursor(expr2, undefined));
             expect(match2).toBeDefined();
 
             // Match with identifier
-            const expr3 = await parseExpression('bar(x)');
+            const expr3 = parseExpression('bar(x)');
             const match3 = pat.match(expr3, new Cursor(expr3, undefined));
             expect(match3).toBeDefined();
         });
@@ -81,7 +75,7 @@ describe('Non-Capturing any() Function', () => {
         test('matches in binary expression', async () => {
             const pat = pattern`${any()} + ${any()}`;
 
-            const expr = await parseExpression('10 + 20');
+            const expr = parseExpression('10 + 20');
             const match = pat.match(expr, new Cursor(expr, undefined));
 
             expect(match).toBeDefined();
@@ -95,7 +89,7 @@ describe('Non-Capturing any() Function', () => {
             });
             const pat = pattern`process(${numericArg})`;
 
-            const expr = await parseExpression('process(50)');
+            const expr = parseExpression('process(50)');
             const match = pat.match(expr, new Cursor(expr, undefined));
 
             expect(match).toBeDefined();
@@ -107,7 +101,7 @@ describe('Non-Capturing any() Function', () => {
             });
             const pat = pattern`process(${numericArg})`;
 
-            const expr = await parseExpression('process(5)');
+            const expr = parseExpression('process(5)');
             const match = pat.match(expr, new Cursor(expr, undefined));
 
             expect(match).toBeUndefined();
@@ -119,7 +113,7 @@ describe('Non-Capturing any() Function', () => {
             });
             const pat = pattern`log(${stringArg})`;
 
-            const expr = await parseExpression('log("hello world")');
+            const expr = parseExpression('log("hello world")');
             const match = pat.match(expr, new Cursor(expr, undefined));
 
             expect(match).toBeDefined();
@@ -131,7 +125,7 @@ describe('Non-Capturing any() Function', () => {
             const rest = any({ variadic: true });
             const pat = pattern`foo(${rest})`;
 
-            const expr = await parseExpression('foo()');
+            const expr = parseExpression('foo()');
             const match = pat.match(expr, new Cursor(expr, undefined));
 
             expect(match).toBeDefined();
@@ -141,7 +135,7 @@ describe('Non-Capturing any() Function', () => {
             const rest = any({ variadic: true });
             const pat = pattern`foo(${rest})`;
 
-            const expr = await parseExpression('foo(1, 2, 3)');
+            const expr = parseExpression('foo(1, 2, 3)');
             const match = pat.match(expr, new Cursor(expr, undefined));
 
             expect(match).toBeDefined();
@@ -156,17 +150,17 @@ describe('Non-Capturing any() Function', () => {
             const pat = pattern`bar(${rest})`;
 
             // Should match: 2 arguments within range
-            const expr1 = await parseExpression('bar(1, 2)');
+            const expr1 = parseExpression('bar(1, 2)');
             const match1 = pat.match(expr1, new Cursor(expr1, undefined));
             expect(match1).toBeDefined();
 
             // Should not match: 0 arguments (below min)
-            const expr2 = await parseExpression('bar()');
+            const expr2 = parseExpression('bar()');
             const match2 = pat.match(expr2, new Cursor(expr2, undefined));
             expect(match2).toBeUndefined();
 
             // Should not match: 4 arguments (above max)
-            const expr3 = await parseExpression('bar(1, 2, 3, 4)');
+            const expr3 = parseExpression('bar(1, 2, 3, 4)');
             const match3 = pat.match(expr3, new Cursor(expr3, undefined));
             expect(match3).toBeUndefined();
         });
@@ -177,7 +171,7 @@ describe('Non-Capturing any() Function', () => {
             const important = capture('important');
             const pat = pattern`compute(${any()}, ${important}, ${any()})`;
 
-            const expr = await parseExpression('compute(10, 20, 30)');
+            const expr = parseExpression('compute(10, 20, 30)');
             const match = pat.match(expr, new Cursor(expr, undefined));
 
             expect(match).toBeDefined();
@@ -195,7 +189,7 @@ describe('Non-Capturing any() Function', () => {
             const rest = any({ variadic: true });
             const pat = pattern`foo(${first}, ${rest})`;
 
-            const expr = await parseExpression('foo(1, 2, 3, 4)');
+            const expr = parseExpression('foo(1, 2, 3, 4)');
             const match = pat.match(expr, new Cursor(expr, undefined));
 
             expect(match).toBeDefined();
@@ -262,12 +256,12 @@ describe('Non-Capturing any() Function', () => {
             const pat = pattern`sum(${numericArgs})`;
 
             // Should match: all numbers
-            const expr1 = await parseExpression('sum(1, 2, 3)');
+            const expr1 = parseExpression('sum(1, 2, 3)');
             const match1 = pat.match(expr1, new Cursor(expr1, undefined));
             expect(match1).toBeDefined();
 
             // Should not match: contains string
-            const expr2 = await parseExpression('sum(1, "text", 3)');
+            const expr2 = parseExpression('sum(1, "text", 3)');
             const match2 = pat.match(expr2, new Cursor(expr2, undefined));
             expect(match2).toBeUndefined();
         });

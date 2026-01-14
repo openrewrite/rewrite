@@ -45,15 +45,14 @@ describe('variadic pattern matching in containers', () => {
     const parser = new JavaScriptParser();
     const parseCache = new Map<string, any>();
 
-    async function parse(code: string) {
+    function parse(code: string): J {
         // Check cache first
         if (parseCache.has(code)) {
             return parseCache.get(code)!;
         }
 
         // Parse and cache
-        const parseGen = parser.parse({text: code, sourcePath: 'test.ts'});
-        const cu = (await parseGen.next()).value as JS.CompilationUnit;
+        const cu = parser.parseOne({text: code, sourcePath: 'test.ts'}) as JS.CompilationUnit;
         const result = cu.statements[0].element;
         parseCache.set(code, result);
         return result;
@@ -67,21 +66,21 @@ describe('variadic pattern matching in containers', () => {
         // This demonstrates the length mismatch issue in visitContainer
 
         // Should match function with multiple properties (pattern: 1 elem, target: 2 elems)
-        const result2 = pat.match(await parse('function foo({a, b}) {}'), undefined!);
+        const result2 = pat.match(parse('function foo({a, b}) {}'), undefined!);
         expect(result2).toBeDefined();
         const captured2 = result2!.get(props);
         expect(Array.isArray(captured2)).toBe(true);
         expect((captured2 as any[]).length).toBe(2);
 
         // Should match function with even more properties (pattern: 1 elem, target: 3 elems)
-        const result3 = pat.match(await parse('function foo({a, b, c}) {}'), undefined!);
+        const result3 = pat.match(parse('function foo({a, b, c}) {}'), undefined!);
         expect(result3).toBeDefined();
         const captured3 = result3!.get(props);
         expect(Array.isArray(captured3)).toBe(true);
         expect((captured3 as any[]).length).toBe(3);
 
         // Should also match with single property (lengths match)
-        const result1 = pat.match(await parse('function foo({a}) {}'), undefined!);
+        const result1 = pat.match(parse('function foo({a}) {}'), undefined!);
         expect(result1).toBeDefined();
         const captured1 = result1!.get(props);
         expect(Array.isArray(captured1)).toBe(true);
@@ -97,7 +96,7 @@ describe('variadic pattern matching in containers', () => {
         // This demonstrates the length mismatch: pattern=2, target=3
 
         // Should match function with multiple properties (pattern: 2 elems, target: 3 elems)
-        const result3 = pat.match(await parse('function foo({a, b, c}) {}'), undefined!);
+        const result3 = pat.match(parse('function foo({a, b, c}) {}'), undefined!);
         expect(result3).toBeDefined();
         const rest3 = result3!.get(rest);
         expect(Array.isArray(rest3)).toBe(true);
@@ -105,14 +104,14 @@ describe('variadic pattern matching in containers', () => {
 
         // Should also match when lengths are equal (pattern: 2 elems, target: 2 elems)
         // In this case the variadic captures zero elements
-        const result2 = pat.match(await parse('function foo({a, b}) {}'), undefined!);
+        const result2 = pat.match(parse('function foo({a, b}) {}'), undefined!);
         expect(result2).toBeDefined();
         const rest2 = result2!.get(rest);
         expect(Array.isArray(rest2)).toBe(true);
         expect((rest2 as any[]).length).toBe(1);
 
         // Should NOT match function with no properties - missing required first
-        expect(pat.match(await parse('function foo({}) {}'), undefined!)).toBeUndefined();
+        expect(pat.match(parse('function foo({}) {}'), undefined!)).toBeUndefined();
     });
 
     test('variadic capture in array destructuring pattern', async () => {
@@ -123,21 +122,21 @@ describe('variadic pattern matching in containers', () => {
         // This demonstrates the length mismatch issue in visitContainer
 
         // Should match function with multiple elements (pattern: 1 elem, target: 2 elems)
-        const result2 = pat.match(await parse('function foo([a, b]) {}'), undefined!);
+        const result2 = pat.match(parse('function foo([a, b]) {}'), undefined!);
         expect(result2).toBeDefined();
         const captured2 = result2!.get(elements);
         expect(Array.isArray(captured2)).toBe(true);
         expect((captured2 as any[]).length).toBe(2);
 
         // Should match function with even more elements (pattern: 1 elem, target: 3 elems)
-        const result3 = pat.match(await parse('function foo([a, b, c]) {}'), undefined!);
+        const result3 = pat.match(parse('function foo([a, b, c]) {}'), undefined!);
         expect(result3).toBeDefined();
         const captured3 = result3!.get(elements);
         expect(Array.isArray(captured3)).toBe(true);
         expect((captured3 as any[]).length).toBe(3);
 
         // Should also match with single element (lengths match)
-        const result1 = pat.match(await parse('function foo([a]) {}'), undefined!);
+        const result1 = pat.match(parse('function foo([a]) {}'), undefined!);
         expect(result1).toBeDefined();
         const captured1 = result1!.get(elements);
         expect(Array.isArray(captured1)).toBe(true);
@@ -149,18 +148,18 @@ describe('variadic pattern matching in containers', () => {
         const props1 = capture({ variadic: { min: 2 } });
         const pat1 = pattern`function foo({${props1}}) {}`;
 
-        expect(await pat1.match(await parse('function foo({}) {}'), undefined!)).toBeUndefined();  // min not satisfied
-        expect(await pat1.match(await parse('function foo({a}) {}'), undefined!)).toBeUndefined();  // min not satisfied
-        expect(await pat1.match(await parse('function foo({a, b}) {}'), undefined!)).toBeDefined();    // exactly min
-        expect(await pat1.match(await parse('function foo({a, b, c}) {}'), undefined!)).toBeDefined();    // more than min
+        expect(pat1.match(parse('function foo({}) {}'), undefined!)).toBeUndefined();  // min not satisfied
+        expect(pat1.match(parse('function foo({a}) {}'), undefined!)).toBeUndefined();  // min not satisfied
+        expect(pat1.match(parse('function foo({a, b}) {}'), undefined!)).toBeDefined();    // exactly min
+        expect(pat1.match(parse('function foo({a, b, c}) {}'), undefined!)).toBeDefined();    // more than min
 
         // Test max constraint
         const props2 = capture({ variadic: { max: 2 } });
         const pat2 = pattern`function foo({${props2}}) {}`;
 
-        expect(await pat2.match(await parse('function foo({}) {}'), undefined!)).toBeDefined();    // within max
-        expect(await pat2.match(await parse('function foo({a, b}) {}'), undefined!)).toBeDefined();    // exactly max
-        expect(await pat2.match(await parse('function foo({a, b, c}) {}'), undefined!)).toBeUndefined();  // exceeds max
+        expect(pat2.match(parse('function foo({}) {}'), undefined!)).toBeDefined();    // within max
+        expect(pat2.match(parse('function foo({a, b}) {}'), undefined!)).toBeDefined();    // exactly max
+        expect(pat2.match(parse('function foo({a, b, c}) {}'), undefined!)).toBeUndefined();  // exceeds max
     });
 
     test('variadic capture with custom constraint function in containers', async () => {
@@ -186,11 +185,11 @@ describe('variadic pattern matching in containers', () => {
         const pat = pattern`function foo({${props}}) {}`;
 
         // Should NOT match with 1 element - constraint requires exactly 2
-        expect(pat.match(await parse('function foo({a}) {}'), undefined!)).toBeUndefined();
+        expect(pat.match(parse('function foo({a}) {}'), undefined!)).toBeUndefined();
 
         // Should match with 2 elements - constraint satisfied
         receivedCursor = null;
-        const result2 = pat.match(await parse('function foo({a, b}) {}'), undefined!);
+        const result2 = pat.match(parse('function foo({a, b}) {}'), undefined!);
         expect(result2).toBeDefined();
 
         // Verify cursor was provided
@@ -202,7 +201,7 @@ describe('variadic pattern matching in containers', () => {
         expect((captured2 as unknown as any[]).length).toBe(2);
 
         // Should NOT match with 3 elements - constraint requires exactly 2
-        expect(pat.match(await parse('function foo({a, b, c}) {}'), undefined!)).toBeUndefined();
+        expect(pat.match(parse('function foo({a, b, c}) {}'), undefined!)).toBeUndefined();
     });
 
     test('variadic replacement in object destructuring pattern', () => {

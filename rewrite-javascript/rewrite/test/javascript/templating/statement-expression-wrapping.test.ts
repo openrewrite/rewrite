@@ -37,8 +37,7 @@ describe('Statement Expression Wrapping', () => {
     it('should wrap function declaration in StatementExpression when replacing an expression', async () => {
         // Parse: const c = x
         const sourceCode = 'const c = x';
-        const gen = parser.parse({text: sourceCode, sourcePath: 'test.ts'});
-        const cu = (await gen.next()).value as JS.CompilationUnit;
+        const cu = parser.parseOne({text: sourceCode, sourcePath: 'test.ts'}) as JS.CompilationUnit;
         const varDecl = cu.statements[0].element as J.VariableDeclarations;
         const initializer = varDecl.variables[0].element.initializer?.element as J.Identifier;
 
@@ -68,8 +67,7 @@ describe('Statement Expression Wrapping', () => {
     it('should not wrap when replacing a statement with a statement', async () => {
         // Parse a statement: x;
         const sourceCode = 'x;';
-        const gen = parser.parse({text: sourceCode, sourcePath: 'test.ts'});
-        const cu = (await gen.next()).value as JS.CompilationUnit;
+        const cu = parser.parseOne({text: sourceCode, sourcePath: 'test.ts'}) as JS.CompilationUnit;
         const exprStmt = cu.statements[0].element as JS.ExpressionStatement;
 
         // Create a cursor with parent context
@@ -96,8 +94,7 @@ describe('Statement Expression Wrapping', () => {
     it('should not wrap when replacing expression with another expression', async () => {
         // Parse: const c = x
         const sourceCode = 'const c = x';
-        const gen = parser.parse({text: sourceCode, sourcePath: 'test.ts'});
-        const cu = (await gen.next()).value as JS.CompilationUnit;
+        const cu = parser.parseOne({text: sourceCode, sourcePath: 'test.ts'}) as JS.CompilationUnit;
         const varDecl = cu.statements[0].element as J.VariableDeclarations;
         const initializer = varDecl.variables[0].element.initializer?.element as J.Identifier;
 
@@ -124,8 +121,7 @@ describe('Statement Expression Wrapping', () => {
         // Parse: const c = foo()
         // MethodInvocation is both Statement and Expression, but here it's in expression context
         const sourceCode = 'const c = foo()';
-        const gen = parser.parse({text: sourceCode, sourcePath: 'test.ts'});
-        const cu = (await gen.next()).value as JS.CompilationUnit;
+        const cu = parser.parseOne({text: sourceCode, sourcePath: 'test.ts'}) as JS.CompilationUnit;
         const varDecl = cu.statements[0].element as J.VariableDeclarations;
         const initializer = varDecl.variables[0].element.initializer?.element as J.MethodInvocation;
 

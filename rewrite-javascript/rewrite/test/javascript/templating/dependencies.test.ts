@@ -46,8 +46,7 @@ describe('template dependencies integration', () => {
         // Parse some code with the parser (to trigger template parsing internally)
         const parser = new JavaScriptParser();
         const source = `const x = 1;`; // dummy code
-        const parseGenerator = parser.parse({text: source, sourcePath: 'test.ts'});
-        await parseGenerator.next();
+        parser.parseOne({text: source, sourcePath: 'test.ts'});
 
         // Now try to match against a method invocation we create
         // The pattern's internal AST should have type attribution
@@ -57,8 +56,7 @@ describe('template dependencies integration', () => {
         `;
 
         const testParser = new JavaScriptParser();
-        const testGen = testParser.parse({text: testCode, sourcePath: 'test.ts'});
-        const cu = (await testGen.next()).value;
+        const cu = testParser.parseOne({text: testCode, sourcePath: 'test.ts'});
 
         // Find the v4() call and verify pattern can match it
         let foundMatch = false;
@@ -86,12 +84,11 @@ describe('template dependencies integration', () => {
         // Parse some test code to get a cursor context
         const testCode = `const x = 1;`;
         const parser = new JavaScriptParser();
-        const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
-        const cu = (await parseGen.next()).value;
+        const cu = parser.parseOne({text: testCode, sourcePath: 'test.ts'});
 
         // Apply the template in a visitor
         let replacementFound = false;
-        const result = await (new class extends JavaScriptVisitor<any> {
+        const result = (new class extends JavaScriptVisitor<any> {
             override visitVariable(variable: any, p: any): any {
                 if (!replacementFound) {
                     // Apply the template to replace the initializer
@@ -132,12 +129,11 @@ describe('template dependencies integration', () => {
         `;
 
         const parser = new JavaScriptParser();
-        const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
-        const cu = (await parseGen.next()).value;
+        const cu = parser.parseOne({text: testCode, sourcePath: 'test.ts'});
 
         // All patterns should successfully match (proving they all parsed correctly)
         let matchCount = 0;
-        await (new class extends JavaScriptVisitor<any> {
+        (new class extends JavaScriptVisitor<any> {
             override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
                 if (method.name.simpleName === 'v4') {
                     // Try all three patterns
@@ -174,15 +170,14 @@ describe('template dependencies integration', () => {
         const workspaceDir = DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
 
         const parser = new JavaScriptParser({relativeTo: workspaceDir});
-        const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
-        const cu = (await parseGen.next()).value;
+        const cu = parser.parseOne({text: testCode, sourcePath: 'test.ts'});
 
         // Create MethodMatcher to verify type attribution
         const matcher = new MethodMatcher('uuid v1(..)');
 
         // Verify the pattern can match and the method has type attribution
         let checkedMethodType = false;
-        await (new class extends JavaScriptVisitor<any> {
+        (new class extends JavaScriptVisitor<any> {
             override visitMethodInvocation(method: J.MethodInvocation, _p: any): J | undefined {
                 if (method.name.simpleName === 'v1') {
                     // The pattern should match (which implicitly uses its typed internal AST)
@@ -228,13 +223,12 @@ describe('template dependencies integration', () => {
         const workspaceDir = DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
 
         const parser = new JavaScriptParser({relativeTo: workspaceDir});
-        const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
-        const cu = (await parseGen.next()).value;
+        const cu = parser.parseOne({text: testCode, sourcePath: 'test.ts'});
 
         // Verify the pattern does NOT match the custom v1() call
         let foundV1Call = false;
         let patternMatched = false;
-        await (new class extends JavaScriptVisitor<any> {
+        (new class extends JavaScriptVisitor<any> {
             override visitMethodInvocation(method: J.MethodInvocation, _p: any): J | undefined {
                 if (method.name.simpleName === 'v1') {
                     foundV1Call = true;
@@ -271,13 +265,12 @@ describe('template dependencies integration', () => {
         const workspaceDir = DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
 
         const parser = new JavaScriptParser({relativeTo: workspaceDir});
-        const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
-        const cu = (await parseGen.next()).value;
+        const cu = parser.parseOne({text: testCode, sourcePath: 'test.ts'});
 
         // Verify the pattern DOES match the uuid v1() call
         let foundV1Call = false;
         let patternMatched = false;
-        await (new class extends JavaScriptVisitor<any> {
+        (new class extends JavaScriptVisitor<any> {
             override visitMethodInvocation(method: J.MethodInvocation, _p: any): J | undefined {
                 if (method.name.simpleName === 'v1') {
                     foundV1Call = true;

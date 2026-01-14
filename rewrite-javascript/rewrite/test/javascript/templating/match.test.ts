@@ -166,12 +166,11 @@ describe('match extraction', () => {
         // Create dummy code to trigger pattern parsing (which requires workspace creation)
         const testCode = 'const result = 1 + 2;';
         const parser = new JavaScriptParser();
-        const parseGen = parser.parse({ text: testCode, sourcePath: 'test.ts' });
-        const cu = (await parseGen.next()).value;
+        const cu = parser.parseOne({ text: testCode, sourcePath: 'test.ts' });
 
         // Try to match - this should fail because npm install will fail for non-existent package
         await expect(async () => {
-            await (new class extends JavaScriptVisitor<any> {
+            (new class extends JavaScriptVisitor<any> {
                 override visitBinary(binary: J.Binary, _p: any): J | undefined {
                     // This should throw when trying to create workspace
                     pat.match(binary, new Cursor(binary, undefined));
