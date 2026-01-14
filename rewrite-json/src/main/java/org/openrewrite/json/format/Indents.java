@@ -15,6 +15,7 @@
  */
 package org.openrewrite.json.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -27,15 +28,11 @@ import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
 
 public class Indents extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "JSON indent";
-    }
+    @Getter
+    final String displayName = "JSON indent";
 
-    @Override
-    public String getDescription() {
-        return "Format tabs and indents in JSON.";
-    }
+    @Getter
+    final String description = "Format tabs and indents in JSON.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

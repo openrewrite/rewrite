@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.plugins;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
@@ -37,15 +38,11 @@ public class RemoveDevelocityConfiguration extends Recipe {
 
     protected static final MethodMatcher BUILD_CACHE_MATCHER = new MethodMatcher("*..* buildCache(..)");
 
-    @Override
-    public String getDisplayName() {
-        return "Remove Develocity configuration";
-    }
+    @Getter
+    final String displayName = "Remove Develocity configuration";
 
-    @Override
-    public String getDescription() {
-        return "Remove the Develocity Gradle plugin and associated configuration.";
-    }
+    @Getter
+    final String description = "Remove the Develocity Gradle plugin and associated configuration.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
