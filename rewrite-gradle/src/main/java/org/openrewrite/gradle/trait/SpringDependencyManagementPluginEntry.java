@@ -243,17 +243,15 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                 }
                 // If version is blank, check if there's a version variable in the method invocation
                 if (StringUtils.isBlank(version)) {
-                    if (methodInvocation.getArguments().isEmpty()) {
-                        return null;
+                    if (!methodInvocation.getArguments().isEmpty()) {
+                        // Handle Groovy GString: "group:artifact:$version" or "group:artifact:${...}"
+                        String versionVar = extractVersionVariable(methodInvocation.getArguments().get(0));
+                        if (versionVar != null) {
+                            // Use the variable name as a placeholder for the version
+                            return new SpringDependencyManagementPluginEntry(cursor, group, artifacts, "${" + versionVar + "}");
+                        }
                     }
-                    // Handle Groovy GString: "group:artifact:$version" or "group:artifact:${...}"
-                    String versionVar = extractVersionVariable(methodInvocation.getArguments().get(0));
-                    if (versionVar != null) {
-                        // Use the variable name as a placeholder for the version
-                        version = "${" + versionVar + "}";
-                    } else {
-                        return null;
-                    }
+                    return null;
                 }
 
                 return new SpringDependencyManagementPluginEntry(cursor, group, artifacts, version);
