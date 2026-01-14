@@ -1657,7 +1657,7 @@ class MergeYamlTest implements RewriteTest {
                 null,
                 null
               ),
-              new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null))
+              new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null, null))
             .expectedCyclesThatMakeChanges(2),
           yaml(
             """

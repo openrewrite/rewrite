@@ -26,11 +26,11 @@ import org.openrewrite.style.Style;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 
 /**
  * Auto-detected styles for JavaScript/TypeScript code.
@@ -48,7 +48,7 @@ public class Autodetect extends NamedStyles implements RpcCodec<Autodetect> {
 
     @JsonCreator
     public Autodetect(UUID id, Collection<Style> styles) {
-        super(id, NAME, DISPLAY_NAME, DESCRIPTION, Collections.emptySet(), styles);
+        super(id, NAME, DISPLAY_NAME, DESCRIPTION, emptySet(), styles);
     }
 
     @Override

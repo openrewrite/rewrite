@@ -79,10 +79,7 @@ public class FindManagedDependency extends Recipe {
         return ds;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Find Maven dependency management entry";
-    }
+    String displayName = "Find Maven dependency management entry";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -90,10 +87,7 @@ public class FindManagedDependency extends Recipe {
         return String.format("`%s:%s%s`", groupId, artifactId, maybeVersionSuffix);
     }
 
-    @Override
-    public String getDescription() {
-        return "Finds first-order dependency management entries, i.e. dependencies that are defined directly in a project.";
-    }
+    String description = "Finds first-order dependency management entries, i.e. dependencies that are defined directly in a project.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

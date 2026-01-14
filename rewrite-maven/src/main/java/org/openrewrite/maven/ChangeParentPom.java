@@ -113,23 +113,17 @@ public class ChangeParentPom extends Recipe {
     @Nullable
     List<String> except;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven parent";
-    }
+    String displayName = "Change Maven parent";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", newGroupId, newArtifactId, newVersion);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change the parent pom of a Maven pom.xml by matching the existing parent via groupId and artifactId, " +
+    String description = "Change the parent pom of a Maven pom.xml by matching the existing parent via groupId and artifactId, " +
                 "and updating it to a new groupId, artifactId, version, and optional relativePath. " +
                 "Also updates the project to retain dependency management and properties previously inherited from the old parent that are no longer provided by the new parent. " +
                 "Removes redundant dependency versions already managed by the new parent.";
-    }
 
     @Deprecated
     public ChangeParentPom(String oldGroupId,

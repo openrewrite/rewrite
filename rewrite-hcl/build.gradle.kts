@@ -2,8 +2,9 @@ plugins {
     id("org.openrewrite.build.language-library")
 }
 
-// run manually with `./gradlew rewrite-hcl:generateAntlrSources` when you need to regenerate
-// be sure to use `implementation("org.antlr:antlr4:4.13.2")` below when generating
+val antlrGeneration by configurations.creating {
+    extendsFrom(configurations.implementation.get())
+}
 tasks.register<JavaExec>("generateAntlrSources") {
     mainClass.set("org.antlr.v4.Tool")
 
@@ -13,7 +14,7 @@ tasks.register<JavaExec>("generateAntlrSources") {
             "-visitor"
     ) + fileTree("src/main/antlr").matching { include("**/*.g4") }.map { it.path }
 
-    classpath = sourceSets["main"].runtimeClasspath
+    classpath = antlrGeneration
 
     finalizedBy("licenseFormat")
 }
@@ -28,6 +29,10 @@ dependencies {
     implementation("org.antlr:antlr4-runtime:4.13.2")
     implementation("org.antlr:antlr4:4.13.2")
     implementation("io.micrometer:micrometer-core:1.9.+")
+
+    antlrGeneration("org.antlr:antlr4:4.13.2"){
+        exclude(group = "com.ibm.icu", module = "icu4j")
+    }
 
     testImplementation(project(":rewrite-test"))
     testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")

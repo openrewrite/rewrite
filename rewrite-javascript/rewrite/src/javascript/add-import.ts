@@ -483,21 +483,28 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         });
                         if (insertIndex === -1) insertIndex = existingElements.length;
 
+                        // Detect spacing style from existing elements:
+                        // - firstElementPrefix: space after { (from first element's prefix)
+                        // - trailingSpace: space before } (from last element's after)
+                        const firstElementPrefix = existingElements[0]?.element?.prefix ?? emptySpace;
+                        const lastIndex = existingElements.length - 1;
+                        const trailingSpace = existingElements[lastIndex].after;
+
                         // Build the new elements array with proper spacing
                         const updatedNamedImports: JS.NamedImports = await this.produceJavaScript(
                             namedImports, p, async namedDraft => {
-                                const lastIndex = existingElements.length - 1;
-                                const trailingSpace = existingElements[lastIndex].after;
                                 const newSpecifier = this.createImportSpecifier();
 
                                 const newElements = existingElements.flatMap((elem, j) => {
                                     const results: J.RightPadded<JS.ImportSpecifier>[] = [];
                                     if (j === insertIndex) {
-                                        // Insert new element here; first element gets no prefix, others get space
-                                        const prefix = j === 0 ? emptySpace : singleSpace;
+                                        // Insert new element here
+                                        // First element gets the same prefix as the original first element
+                                        // Other positions get a single space (separator after comma)
+                                        const prefix = j === 0 ? firstElementPrefix : singleSpace;
                                         results.push(rightPadded({...newSpecifier, prefix}, emptySpace));
                                     }
-                                    // Adjust existing element: first after insertion gets space prefix
+                                    // Adjust existing element: if inserting before first, give it space prefix
                                     let adjusted = elem;
                                     if (j === 0 && insertIndex === 0 && elem.element) {
                                         adjusted = {...elem, element: {...elem.element, prefix: singleSpace}};
@@ -543,7 +550,12 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     return this.produceJavaScript(compilationUnit, p, async draft => {
                         const newSpecifier = this.createImportSpecifier();
 
+                        // Get the spaces style for brace spacing
+                        const spacesStyle = getStyle(StyleKind.SpacesStyle, compilationUnit) as SpacesStyle;
+                        const braceSpace = spacesStyle.within.es6ImportExportBraces ? singleSpace : emptySpace;
+
                         // Create new NamedImports with a single element
+                        // Apply brace spacing: space after { is in specifier's prefix, space before } is in after
                         const namedImports: JS.NamedImports = {
                             id: randomId(),
                             kind: JS.Kind.NamedImports,
@@ -552,7 +564,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                             elements: {
                                 kind: J.Kind.Container,
                                 before: emptySpace,
-                                elements: [rightPadded(newSpecifier, emptySpace)],
+                                elements: [rightPadded({...newSpecifier, prefix: braceSpace}, braceSpace)],
                                 markers: emptyMarkers
                             }
                         };

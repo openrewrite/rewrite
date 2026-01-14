@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -30,15 +31,11 @@ import static java.util.Collections.singleton;
 
 public class FindEmptyClasses extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Find empty classes";
-    }
+    @Getter
+    final String displayName = "Find empty classes";
 
-    @Override
-    public String getDescription() {
-        return "Find empty classes without annotations that do not implement an interface or extend a class.";
-    }
+    @Getter
+    final String description = "Find empty classes without annotations that do not implement an interface or extend a class.";
 
     @Override
     public Set<String> getTags() {

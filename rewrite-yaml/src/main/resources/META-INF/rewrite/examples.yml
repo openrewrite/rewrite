@@ -15,7 +15,7 @@
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.AppendToSequence
 examples:
-- description: ''
+- description: '`AppendToSequenceTest#appendToSequenceHasDashTrue`'
   parameters:
   - $.things.fruit
   - strawberry
@@ -38,7 +38,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.ChangeKey
 examples:
-- description: ''
+- description: '`ChangeKeyTest#changeNestedKey`'
   parameters:
   - $.metadata.name
   - name2
@@ -58,18 +58,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.ChangePropertyKey
 examples:
-- description: ''
-  parameters:
-  - management.metrics.binders.*.enabled
-  - management.metrics.enable.process.files
-  - 'null'
-  - 'null'
-  - 'null'
-  sources:
-  - before: 'management.metrics.binders.files.enabled: true'
-    after: 'management.metrics.enable.process.files: true'
-    language: yaml
-- description: ''
+- description: '`AvoidsRegenerativeChangesTest#changePathToOnePathShorter`'
   parameters:
   - a.b.c.d
   - a.b.c
@@ -80,20 +69,18 @@ examples:
   - before: 'a.b.c.d: true'
     after: 'a.b.c: true'
     language: yaml
-- description: ''
+- description: '`ChangePropertyKeyTest#singleEntry`'
   parameters:
-  - spring.profiles
-  - spring.config.activate.on-profile
+  - management.metrics.binders.*.enabled
+  - management.metrics.enable.process.files
   - 'null'
   - 'null'
   - 'null'
   sources:
-  - before: |
-      spring.profiles.group.prod: proddb,prodmq,prodmetrics
-    after: |
-      spring.config.activate.on-profile.group.prod: proddb,prodmq,prodmetrics
+  - before: 'management.metrics.binders.files.enabled: true'
+    after: 'management.metrics.enable.process.files: true'
     language: yaml
-- description: ''
+- description: '`ExceptTest#multipleExcludedEntries`'
   parameters:
   - spring.profiles
   - spring.config.activate.on-profile
@@ -119,11 +106,24 @@ examples:
         config.activate.on-profile:
           foo: bar
     language: yaml
+- description: '`WhenOldPropertyKeyIsPrefixOfDotSeparatedKeyTest#scalarValue`'
+  parameters:
+  - spring.profiles
+  - spring.config.activate.on-profile
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      spring.profiles.group.prod: proddb,prodmq,prodmetrics
+    after: |
+      spring.config.activate.on-profile.group.prod: proddb,prodmq,prodmetrics
+    language: yaml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.ChangePropertyValue
 examples:
-- description: ''
+- description: '`ChangePropertyValueTest#simpleDotSeparated`'
   parameters:
   - my.prop
   - bar
@@ -141,7 +141,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.ChangeValue
 examples:
-- description: ''
+- description: '`ChangeValueTest#changeNestedKeyValue`'
   parameters:
   - $.metadata.name
   - monitoring
@@ -162,22 +162,25 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.CoalesceProperties
 examples:
-- description: ''
+- description: '`CoalescePropertiesTest#fold`'
+  parameters:
+  - 'null'
+  - 'null'
   sources:
-  - before: |2
-          management:
-              metrics:
-                  enable.process.files: true
-              endpoint:
-                  health:
-                      show-components: always
-                      show-details: always
-    after: |2
-          management:
-              metrics.enable.process.files: true
-              endpoint.health:
+  - before: |
+      management:
+          metrics:
+              enable.process.files: true
+          endpoint:
+              health:
                   show-components: always
                   show-details: always
+    after: |
+      management:
+          metrics.enable.process.files: true
+          endpoint.health:
+              show-components: always
+              show-details: always
     language: yaml
 ---
 type: specs.openrewrite.org/v1beta/example
@@ -207,107 +210,11 @@ examples:
               - propertyB: fieldB
             scalar: value
     language: yaml
-- description: comment out entire sequence
-  parameters:
-  - foo.bar.sequence
-  - Some comments
-  - 'null'
-  sources:
-  - before: |
-      foo:
-        bar:
-          sequence:
-            - name: name
-            - propertyA: fieldA
-            - propertyB: fieldB
-          scalar: value
-    after: |
-      foo:
-        bar:
-          # Some comments
-          # sequence:
-          #   - name: name
-          #   - propertyA: fieldA
-          #   - propertyB: fieldB
-          scalar: value
-    language: yaml
-- description: comment out a map entry
-  parameters:
-  - foo.bar.sequence.propertyA
-  - Some comments
-  - 'false'
-  sources:
-  - before: |2
-        foo:
-          bar:
-            sequence:
-              - name: name
-              - propertyA: fieldA
-              - propertyB: fieldB
-            scalar: value
-    after: |2
-        foo:
-          bar:
-            sequence:
-              - name: name
-              # Some comments
-              - propertyA: fieldA
-              - propertyB: fieldB
-            scalar: value
-    language: yaml
-- description: comment out a map entry
-  parameters:
-  - foo.bar.sequence.name
-  - Some comments
-  - 'false'
-  sources:
-  - before: |2
-        foo:
-          bar:
-            sequence:
-              - name: name
-              - propertyA: fieldA
-              - propertyB: fieldB
-            scalar: value
-    after: |2
-        foo:
-          bar:
-            sequence:
-              # Some comments
-              - name: name
-              - propertyA: fieldA
-              - propertyB: fieldB
-            scalar: value
-    language: yaml
-- description: comment out entire sequence
-  parameters:
-  - foo.bar.sequence
-  - Some comments
-  - 'false'
-  sources:
-  - before: |
-      foo:
-        bar:
-          sequence:
-            - name: name
-            - propertyA: fieldA
-            - propertyB: fieldB
-          scalar: value
-    after: |
-      foo:
-        bar:
-          # Some comments
-          sequence:
-            - name: name
-            - propertyA: fieldA
-            - propertyB: fieldB
-          scalar: value
-    language: yaml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.CopyValue
 examples:
-- description: ''
+- description: '`CopyValueTest#changeCurrentFileWhenNull`'
   parameters:
   - $.source
   - 'null'
@@ -320,26 +227,13 @@ examples:
     after: |
       source: value
       destination: value
-    language: yaml
----
-type: specs.openrewrite.org/v1beta/example
-recipeName: org.openrewrite.yaml.CreateYamlFile
-examples:
-- description: ''
-  parameters:
-  - test/test.yaml
-  - 'after: true'
-  - 'null'
-  - 'true'
-  sources:
-  - before: 'before: true'
-    after: 'after: true'
+    path: a.yml
     language: yaml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.DeleteKey
 examples:
-- description: ''
+- description: '`DeleteKeyTest#deleteNestedKey`'
   parameters:
   - $.metadata.name
   - 'null'
@@ -358,7 +252,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.DeleteProperty
 examples:
-- description: ''
+- description: '`DeletePropertyKeyTest#singleEntry`'
   parameters:
   - management.metrics.binders.files.enabled
   - 'null'
@@ -371,7 +265,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.MergeYaml
 examples:
-- description: ''
+- description: '`MergeYamlTest#nonExistentBlock`'
   parameters:
   - $.spec
   - |
@@ -407,7 +301,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.UnfoldProperties
 examples:
-- description: ''
+- description: '`UnfoldPropertiesTest#unfold`'
   parameters:
   - List.of("$..[logging.level][?(@property.match(/.*/))]", "$..[enable.process.files]")
   - 'null'
@@ -442,7 +336,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.cleanup.RemoveUnused
 examples:
-- description: ''
+- description: '`RemoveUnusedVisitorTest#unusedMappings`'
   sources:
   - before: |2
         root:
@@ -457,7 +351,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.search.FindKey
 examples:
-- description: ''
+- description: '`FindKeyTest#findKey`'
   parameters:
   - $.metadata.name
   sources:
@@ -476,7 +370,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.search.FindProperty
 examples:
-- description: ''
+- description: '`FindPropertyTest#findProperty`'
   parameters:
   - management.metrics.binders.files.enabled
   - 'null'

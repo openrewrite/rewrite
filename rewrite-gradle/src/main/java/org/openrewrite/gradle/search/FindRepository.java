@@ -55,15 +55,9 @@ public class FindRepository extends Recipe {
     @Nullable
     Purpose purpose;
 
-    @Override
-    public String getDisplayName() {
-        return "Find Gradle repository";
-    }
+    String displayName = "Find Gradle repository";
 
-    @Override
-    public String getDescription() {
-        return "Find a Gradle repository by url.";
-    }
+    String description = "Find a Gradle repository by url.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -27,15 +28,11 @@ public class FindCompileErrors extends Recipe {
 
     transient CompileErrors report = new CompileErrors(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Find compile errors";
-    }
+    @Getter
+    final String displayName = "Find compile errors";
 
-    @Override
-    public String getDescription() {
-        return "Compile errors result in a particular LST structure that can be searched for.";
-    }
+    @Getter
+    final String description = "Compile errors result in a particular LST structure that can be searched for.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

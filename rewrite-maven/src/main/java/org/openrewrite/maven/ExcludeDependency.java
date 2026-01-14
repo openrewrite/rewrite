@@ -69,20 +69,14 @@ public class ExcludeDependency extends Recipe {
         }));
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Exclude Maven dependency";
-    }
+    String displayName = "Exclude Maven dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Exclude specified dependency from any dependency that transitively includes it.";
-    }
+    String description = "Exclude specified dependency from any dependency that transitively includes it.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

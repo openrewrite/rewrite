@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml.security;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -24,15 +25,11 @@ import org.openrewrite.xml.tree.Xml;
 
 public class IsOwaspSuppressionsFile extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Find OWASP vulnerability suppression XML files";
-    }
+    @Getter
+    final String displayName = "Find OWASP vulnerability suppression XML files";
 
-    @Override
-    public String getDescription() {
-        return "These files are used to suppress false positives in OWASP [Dependency Check](https://jeremylong.github.io/DependencyCheck).";
-    }
+    @Getter
+    final String description = "These files are used to suppress false positives in OWASP [Dependency Check](https://jeremylong.github.io/DependencyCheck).";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

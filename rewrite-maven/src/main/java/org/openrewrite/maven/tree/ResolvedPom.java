@@ -42,6 +42,7 @@ import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.*;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -1014,7 +1015,7 @@ public class ResolvedPom {
         int depth = 0;
         Collection<DependencyAndDependent> dependenciesAtDepth = rootDependencies.values();
         while (!dependenciesAtDepth.isEmpty()) {
-            Map<GroupArtifact, DependencyAndDependent> dependenciesAtNextDepthMap = new LinkedHashMap<>();
+            Map<GroupArtifactClassifierType, DependencyAndDependent> dependenciesAtNextDepthMap = new LinkedHashMap<>();
 
             for (DependencyAndDependent dd : dependenciesAtDepth) {
                 // First get the dependency (relative to the pom it was defined in)
@@ -1081,19 +1082,32 @@ public class ResolvedPom {
                     MavenPomCache cache = MavenExecutionContextView.view(ctx).getPomCache();
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
                     if (resolvedPom == null) {
-                        resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
-                                emptyList(), true, initialRepositories, emptyList(), emptyList(),
-                                emptyList(), emptyList(), emptyList(), emptyList());
+                        resolvedPom = new ResolvedPom(
+                                dPom,
+                                getActiveProfiles(),
+                                emptyMap(),
+                                emptyList(),
+                                true,
+                                initialRepositories,
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }
 
-                    ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
-                            resolvedPom.getGav(), dd.getDependency(), emptyList(),
+                    ResolvedDependency resolved = new ResolvedDependency(
+                            dPom.getRepository(),
+                            resolvedPom.getGav(),
+                            dd.getDependency(),
+                            emptyList(),
                             resolvedPom.getRequested().getLicenses(),
-                            resolvedPom.getValue(dd.getDependency().getType()),
-                            resolvedPom.getValue(dd.getDependency().getClassifier()),
-                            Boolean.valueOf(resolvedPom.getValue(dd.getDependency().getOptional())),
+                            dd.getDependency().getType(),
+                            dd.getDependency().getClassifier(),
+                            Boolean.valueOf(dd.getDependency().getOptional()),
                             depth,
                             emptyList());
 
@@ -1123,6 +1137,16 @@ public class ResolvedPom {
                             d2 = d2.withGav(d2.getGav().withGroupId(resolvedPom.getGroupId()));
                         }
 
+                        d2 = d2
+                                .withGav(d2.getGav()
+                                        .withGroupId(resolvedPom.getValue(d2.getGroupId()))
+                                        .withArtifactId(requireNonNull(resolvedPom.getValue(d2.getArtifactId())))
+                                        .withVersion(resolvedPom.getValue(d2.getVersion()))
+                                )
+                                .withClassifier(resolvedPom.getValue(d2.getClassifier()))
+                                .withScope(resolvedPom.getValue(d2.getScope()))
+                                .withType(resolvedPom.getValue(d2.getType()));
+
                         if (d.getExclusions() != null) {
                             d2 = d2.withExclusions(ListUtils.concatAll(d2.getExclusions(), d.getExclusions()));
                             for (GroupArtifact exclusion : d.getExclusions()) {
@@ -1145,8 +1169,13 @@ public class ResolvedPom {
                         Scope d2Scope = getDependencyScope(d2, resolvedPom);
                         if (d2Scope.isInClasspathOf(dd.getScope())) {
                             // For transitive dependencies at same depth, first parent declaration wins
-                            GroupArtifact d2Ga = new GroupArtifact(d2.getGroupId() == null ? "" : d2.getGroupId(), d2.getArtifactId());
-                            dependenciesAtNextDepthMap.putIfAbsent(d2Ga, new DependencyAndDependent(d2, d2Scope, resolved, dd.getRootDependent(), resolvedPom));
+                            GroupArtifactClassifierType d2Gact = new GroupArtifactClassifierType(
+                                    d2.getGroupId(), // will not be null based on check higher up
+                                    d2.getArtifactId(),
+                                    d2.getClassifier(),
+                                    d2.getType()
+                            );
+                            dependenciesAtNextDepthMap.putIfAbsent(d2Gact, new DependencyAndDependent(d2, d2Scope, resolved, dd.getRootDependent(), resolvedPom));
                         }
                     }
                 } catch (MavenDownloadingException e) {
@@ -1179,17 +1208,26 @@ public class ResolvedPom {
         Scope scopeInContainingPom;
         //noinspection ConstantConditions
         if (d2.getScope() != null) {
-            scopeInContainingPom = Scope.fromName(getValue(d2.getScope()));
+            scopeInContainingPom = Scope.fromName(d2.getScope());
         } else {
-            scopeInContainingPom = containingPom.getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
-                    getValue(d2.getClassifier()));
+            scopeInContainingPom = containingPom.getManagedScope(
+                    requireNonNull(d2.getGroupId()),
+                    d2.getArtifactId(),
+                    d2.getType(),
+                    d2.getClassifier()
+            );
             if (scopeInContainingPom == null) {
                 scopeInContainingPom = Scope.Compile;
             }
         }
+
         //noinspection ConstantConditions
-        Scope scopeInThisProject = getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
-                getValue(d2.getClassifier()));
+        Scope scopeInThisProject = getManagedScope(
+                getValue(d2.getGroupId()),
+                getValue(d2.getArtifactId()),
+                getValue(d2.getType()),
+                getValue(d2.getClassifier())
+        );
         // project POM's dependency management overrules the containingPom's dependencyManagement
         // IFF the dependency is in the runtime classpath of the containingPom;
         // if the dependency was not already in the classpath of the containingPom, then project POM cannot override scope / "promote" it into the classpath

@@ -43,20 +43,14 @@ public class ChangeValue extends Recipe {
     @Language("json")
     String value;
 
-    @Override
-    public String getDisplayName() {
-        return "Change value";
-    }
+    String displayName = "Change value";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s` to `%s`", oldKeyPath, value);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a JSON mapping entry value leaving the key intact.";
-    }
+    String description = "Change a JSON mapping entry value leaving the key intact.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

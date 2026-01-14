@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,8 @@ public class HCLParser extends Parser {
 		OR=27, NEQ=28, GT=29, QUESTION=30, RBRACK=31, RPAREN=32, MUL=33, NOT=34, 
 		LEQ=35, DOT=36, DIV=37, GEQ=38, ARROW=39, COMMA=40, MOD=41, ELLIPSIS=42, 
 		TILDE=43, TEMPLATE_INTERPOLATION_START=44, TemplateStringLiteral=45, TemplateStringLiteralChar=46, 
-		HP_WS=47, HP_COMMENT=48, HP_LINE_COMMENT=49, HTemplateLiteral=50, HTemplateLiteralChar=51;
+		HP_WS=47, HP_COMMENT=48, HP_LINE_COMMENT=49, HTemplateLiteral=50, HTemplateLiteralChar=51, 
+		H_NEWLINE=52;
 	public static final int
 		RULE_configFile = 0, RULE_body = 1, RULE_bodyContent = 2, RULE_attribute = 3, 
 		RULE_block = 4, RULE_blockLabel = 5, RULE_identifierLike = 6, RULE_expression = 7, 
@@ -74,7 +75,8 @@ public class HCLParser extends Parser {
 			null, null, null, null, null, null, null, null, "'+'", "'&&'", "'=='", 
 			"'<'", "'::'", "':'", "'['", "'('", "'-'", "'||'", "'!='", "'>'", "'?'", 
 			"']'", "')'", "'*'", "'!'", "'<='", "'.'", "'/'", "'>='", "'=>'", "','", 
-			"'%'", "'...'", "'~'"
+			"'%'", "'...'", "'~'", null, null, null, null, null, null, null, null, 
+			"'\\n'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
@@ -87,7 +89,7 @@ public class HCLParser extends Parser {
 			"NEQ", "GT", "QUESTION", "RBRACK", "RPAREN", "MUL", "NOT", "LEQ", "DOT", 
 			"DIV", "GEQ", "ARROW", "COMMA", "MOD", "ELLIPSIS", "TILDE", "TEMPLATE_INTERPOLATION_START", 
 			"TemplateStringLiteral", "TemplateStringLiteralChar", "HP_WS", "HP_COMMENT", 
-			"HP_LINE_COMMENT", "HTemplateLiteral", "HTemplateLiteralChar"
+			"HP_LINE_COMMENT", "HTemplateLiteral", "HTemplateLiteralChar", "H_NEWLINE"
 		};
 	}
 	private static final String[] _SYMBOLIC_NAMES = makeSymbolicNames();
@@ -3577,7 +3579,7 @@ public class HCLParser extends Parser {
 	}
 
 	public static final String _serializedATN =
-		"\u0004\u00013\u018e\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
+		"\u0004\u00014\u018e\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
 		"\u0002\u0007\u0002\u0002\u0003\u0007\u0003\u0002\u0004\u0007\u0004\u0002"+
 		"\u0005\u0007\u0005\u0002\u0006\u0007\u0006\u0002\u0007\u0007\u0007\u0002"+
 		"\b\u0007\b\u0002\t\u0007\t\u0002\n\u0007\n\u0002\u000b\u0007\u000b\u0002"+

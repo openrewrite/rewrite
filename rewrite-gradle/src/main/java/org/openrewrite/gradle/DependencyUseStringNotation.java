@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
@@ -42,18 +43,14 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 public class DependencyUseStringNotation extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Use `String` notation for Gradle dependency declarations";
-    }
+    @Getter
+    final String displayName = "Use `String` notation for Gradle dependency declarations";
 
-    @Override
-    public String getDescription() {
-        return "In Gradle, dependencies can be expressed as a `String` like `\"groupId:artifactId:version\"`, " +
-                "or equivalently as a `Map` like `group: 'groupId', name: 'artifactId', version: 'version'`. " +
-                "This recipe replaces dependencies represented as `Maps` with an equivalent dependency represented as a `String`, " +
-                "as recommended per the [Gradle best practices for dependencies to use a single GAV](https://docs.gradle.org/8.14.2/userguide/best_practices_dependencies.html#single-gav-string).";
-    }
+    @Getter
+    final String description = "In Gradle, dependencies can be expressed as a `String` like `\"groupId:artifactId:version\"`, " +
+        "or equivalently as a `Map` like `group: 'groupId', name: 'artifactId', version: 'version'`. " +
+        "This recipe replaces dependencies represented as `Maps` with an equivalent dependency represented as a `String`, " +
+        "as recommended per the [Gradle best practices for dependencies to use a single GAV](https://docs.gradle.org/8.14.2/userguide/best_practices_dependencies.html#single-gav-string).";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
