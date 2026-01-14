@@ -155,6 +155,13 @@ public interface Yaml extends Tree {
 
         String prefix;
         Markers markers;
+
+        /**
+         * Optional list of directives that precede this document.
+         * Directives include %YAML and %TAG.
+         */
+        List<Directive> directives;
+
         boolean explicit;
         Block block;
         End end;
@@ -170,6 +177,7 @@ public interface Yaml extends Tree {
                     randomId(),
                     prefix,
                     Markers.EMPTY,
+                    directives.stream().map(Directive::copyPaste).collect(toList()),
                     explicit,
                     block.copyPaste(),
                     end.copyPaste()
@@ -206,6 +214,54 @@ public interface Yaml extends Tree {
             public End copyPaste() {
                 return new End(randomId(), prefix, Markers.EMPTY, explicit);
             }
+        }
+    }
+
+    /**
+     * Represents a YAML directive, such as %YAML or %TAG.
+     * <p>
+     * Examples:
+     * <pre>
+     * %YAML 1.2
+     * %TAG !yaml! tag:yaml.org,2002:
+     * </pre>
+     *
+     * @see <a href="https://yaml.org/spec/1.2/spec.html#id2781553">YAML Directives</a>
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Directive implements Yaml {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        String prefix;
+        Markers markers;
+
+        /**
+         * The content of the directive after the '%' character.
+         * For example, "YAML 1.2" or "TAG !yaml! tag:yaml.org,2002:".
+         */
+        String value;
+
+        /**
+         * Whitespace/content after the directive value, typically a newline.
+         */
+        String suffix;
+
+        @Override
+        public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
+            return v.visitDirective(this, p);
+        }
+
+        @Override
+        public Directive copyPaste() {
+            return new Directive(randomId(), prefix, Markers.EMPTY, value, suffix);
+        }
+
+        @Override
+        public String toString() {
+            return "Yaml.Directive(%" + value + ")";
         }
     }
 
