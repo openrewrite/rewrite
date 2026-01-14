@@ -98,7 +98,7 @@ public class IntelliJ extends NamedStyles {
     public static WrappingAndBracesStyle wrappingAndBraces() {
         return new WrappingAndBracesStyle(
                 120,
-                new WrappingAndBracesStyle.KeepWhenFormatting(true, true, true, true, false, false, false, false),
+                new WrappingAndBracesStyle.KeepWhenFormatting(true, true, true, false, false, false, false, false),
                 new WrappingAndBracesStyle.ExtendsImplementsPermitsList(LineWrapSetting.DoNotWrap, false),
                 new WrappingAndBracesStyle.ExtendsImplementsPermitsKeyword(LineWrapSetting.DoNotWrap),
                 new WrappingAndBracesStyle.ThrowsList(LineWrapSetting.DoNotWrap, false, false),
@@ -108,7 +108,7 @@ public class IntelliJ extends NamedStyles {
                 new WrappingAndBracesStyle.MethodParentheses(false, false),
                 new WrappingAndBracesStyle.ChainedMethodCalls(LineWrapSetting.DoNotWrap, false, false, emptyList(), false, false),
                 new WrappingAndBracesStyle.IfStatement(WrappingAndBracesStyle.ForceBraces.DoNotForce, false, true),
-                new WrappingAndBracesStyle.ForStatement(LineWrapSetting.DoNotWrap, false, false, false, WrappingAndBracesStyle.ForceBraces.DoNotForce),
+                new WrappingAndBracesStyle.ForStatement(LineWrapSetting.DoNotWrap, true, false, false, WrappingAndBracesStyle.ForceBraces.DoNotForce),
                 new WrappingAndBracesStyle.WhileStatement(WrappingAndBracesStyle.ForceBraces.DoNotForce),
                 new WrappingAndBracesStyle.DoWhileStatement(WrappingAndBracesStyle.ForceBraces.DoNotForce, false),
                 new WrappingAndBracesStyle.SwitchStatement(LineWrapSetting.DoNotWrap, true, true), // should be WrapIfTooLong
