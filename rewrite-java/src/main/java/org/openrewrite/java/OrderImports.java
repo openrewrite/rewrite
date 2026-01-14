@@ -80,6 +80,7 @@ public class OrderImports extends Recipe {
             required = false)
     @Nullable
     String style;
+
     String displayName = "Order imports";
 
     String description = "Groups and orders import statements. If a [style has been defined](https://docs.openrewrite.org/concepts-and-explanations/styles), this recipe will order the imports " +
