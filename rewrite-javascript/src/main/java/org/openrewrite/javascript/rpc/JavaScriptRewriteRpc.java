@@ -15,6 +15,16 @@
  */
 package org.openrewrite.javascript.rpc;
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
+import io.moderne.jsonrpc.formatter.MessageFormatter;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -26,6 +36,7 @@ import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -329,6 +340,13 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        private MessageFormatter createMessageFormatter() {
+            SimpleModule module = RewriteRpcProcess.createDefaultModule();
+            module.addSerializer(RpcObjectData.class, new RpcObjectDataCompactArraySerializer());
+            module.addDeserializer(RpcObjectData.class, new RpcObjectDataCompactArrayDeserializer());
+            return new JsonMessageFormatter(module);
+        }
+
         @Override
         public JavaScriptRewriteRpc get() {
             Stream<@Nullable String> cmd;
@@ -364,7 +382,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             }
 
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
-            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
+            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr)
+                    .messageFormatter(createMessageFormatter());
 
             // Set working directory if specified
             if (workingDirectory != null) {
@@ -399,6 +418,99 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
+        }
+    }
+
+    /**
+     * Custom serializer that outputs RpcObjectData as a compact array.
+     * Format: [state, valueType?, value?, ref?, trace?]
+     * Trailing null elements are omitted to minimize payload size.
+     * E.g., NO_CHANGE becomes just [0] instead of [0, null, null]
+     */
+    static class RpcObjectDataCompactArraySerializer extends JsonSerializer<RpcObjectData> {
+        @Override
+        public void serialize(RpcObjectData data, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            // Determine minimum array size by finding last non-null element
+            int size;
+            if (data.getTrace() != null) {
+                size = 5;
+            } else if (data.getRef() != null) {
+                size = 4;
+            } else if (data.getValue() != null) {
+                size = 3;
+            } else if (data.getValueType() != null) {
+                size = 2;
+            } else {
+                size = 1;  // Just state - common for NO_CHANGE, DELETE, CHANGE (with codec)
+            }
+
+            gen.writeStartArray(data, size);
+            gen.writeNumber(data.getState().ordinal());
+
+            if (size >= 2) {
+                gen.writeString(data.getValueType());
+            }
+            if (size >= 3) {
+                gen.writeObject(data.getValue());
+            }
+            if (size >= 4) {
+                if (data.getRef() != null) {
+                    gen.writeNumber(data.getRef());
+                } else {
+                    gen.writeNull();
+                }
+            }
+            if (size == 5) {
+                gen.writeString(data.getTrace());
+            }
+            gen.writeEndArray();
+        }
+    }
+
+    /**
+     * Custom deserializer that reads RpcObjectData from a compact array.
+     * Format: [state, valueType?, value?, ref?, trace?]
+     * Trailing null elements may be omitted, so arrays can be 1-5 elements.
+     */
+    static class RpcObjectDataCompactArrayDeserializer extends JsonDeserializer<RpcObjectData> {
+        @Override
+        public RpcObjectData deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            if (p.currentToken() != JsonToken.START_ARRAY) {
+                throw new IOException("Expected array start, got: " + p.currentToken());
+            }
+
+            // Read state (required, always present)
+            p.nextToken();
+            RpcObjectData.State state = RpcObjectData.State.from(p.getIntValue());
+
+            // All other fields default to null if not present
+            String valueType = null;
+            Object value = null;
+            Integer ref = null;
+            String trace = null;
+
+            // Read valueType if present
+            if (p.nextToken() != JsonToken.END_ARRAY) {
+                valueType = p.currentToken() == JsonToken.VALUE_NULL ? null : p.getText();
+
+                // Read value if present
+                if (p.nextToken() != JsonToken.END_ARRAY) {
+                    value = p.currentToken() == JsonToken.VALUE_NULL ? null : p.readValueAs(Object.class);
+
+                    // Read ref if present
+                    if (p.nextToken() != JsonToken.END_ARRAY) {
+                        ref = p.currentToken() == JsonToken.VALUE_NULL ? null : p.getIntValue();
+
+                        // Read trace if present
+                        if (p.nextToken() != JsonToken.END_ARRAY) {
+                            trace = p.currentToken() == JsonToken.VALUE_NULL ? null : p.getText();
+                            p.nextToken(); // consume END_ARRAY
+                        }
+                    }
+                }
+            }
+
+            return RpcObjectData.create(state, valueType, value, ref, trace);
         }
     }
 }

@@ -543,18 +543,19 @@ const enum RpcField {
 /**
  * Compact array format matching serialization format of Java's RpcObjectData.
  * This is the wire format - we access it directly via indices to avoid object creation.
+ * Trailing null elements are omitted to minimize payload size (1-5 elements).
  */
-export type RpcRawMessage = [
-    state: RpcObjectState,
-    valueType: string | null,
-    value: any,
-    ref?: number | null,
-    trace?: string | null
-];
+export type RpcRawMessage =
+    | [state: RpcObjectState]
+    | [state: RpcObjectState, valueType: string | null]
+    | [state: RpcObjectState, valueType: string | null, value: any]
+    | [state: RpcObjectState, valueType: string | null, value: any, ref: number | null]
+    | [state: RpcObjectState, valueType: string | null, value: any, ref: number | null, trace: string | null];
 
 /**
  * Construct a compact RpcRawMessage array.
- * Only includes ref/trace slots when needed to minimize array size.
+ * Trailing null elements are omitted to minimize payload size.
+ * E.g., NO_CHANGE becomes just [0] instead of [0, null, null]
  */
 function rpcMsg(
     state: RpcObjectState,
@@ -563,15 +564,16 @@ function rpcMsg(
     ref?: number | null,
     trace?: string | null
 ): RpcRawMessage {
-    const msg: RpcRawMessage = [state, valueType ?? null, value ?? null];
-    if (ref !== undefined && ref !== null) {
-        msg.push(ref);
-        if (trace !== undefined && trace !== null) {
-            msg.push(trace);
-        }
-    } else if (trace !== undefined && trace !== null) {
-        msg.push(null); // ref slot
-        msg.push(trace);
+    // Determine minimum array size by finding last non-null element
+    if (trace != null) {
+        return [state, valueType ?? null, value ?? null, ref ?? null, trace];
+    } else if (ref != null) {
+        return [state, valueType ?? null, value ?? null, ref];
+    } else if (value != null) {
+        return [state, valueType ?? null, value];
+    } else if (valueType != null) {
+        return [state, valueType];
+    } else {
+        return [state];
     }
-    return msg;
 }

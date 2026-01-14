@@ -283,8 +283,8 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
             return this.kindMismatch();
         }
 
-        // Iterate over all properties
-        for (const key of Object.keys(j)) {
+        // Iterate over all properties using for...in (avoids Object.keys() allocation)
+        for (const key in j) {
             // Skip internal/private properties, id property, and markers property
             if (key.startsWith('_') || key === 'kind'  || key === 'id' || key === 'markers') {
                 continue;

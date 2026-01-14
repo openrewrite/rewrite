@@ -18,6 +18,11 @@ import {RpcObjectState, RpcRawMessage, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../../reference";
 import {extractSourcePath, withMetrics} from "./metrics";
 
+interface PendingObjectData {
+    data: RpcRawMessage[];
+    index: number;
+}
+
 export class GetObject {
     constructor(private readonly id: string,
                 private readonly sourceFileType?: string) {
@@ -32,7 +37,7 @@ export class GetObject {
         trace: () => boolean,
         metricsCsv?: string,
     ): void {
-        const pendingData = new Map<string, RpcRawMessage[]>();
+        const pendingData = new Map<string, PendingObjectData>();
 
         connection.onRequest(
             new rpc.RequestType<GetObject, any, Error>("GetObject"),
@@ -59,22 +64,27 @@ export class GetObject {
                     const obj = localObjects.get(objId);
                     context.target = extractSourcePath(obj);
 
-                    let allData = pendingData.get(objId);
-                    if (!allData) {
+                    let pending = pendingData.get(objId);
+                    if (!pending) {
                         const after = obj;
                         const before = remoteObjects.get(objId);
 
-                        allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace())
+                        const data = await new RpcSendQueue(localRefs, request.sourceFileType, trace())
                             .generate(after, before);
-                        pendingData.set(objId, allData);
+                        pending = {data, index: 0};
+                        pendingData.set(objId, pending);
 
                         remoteObjects.set(objId, after);
                     }
 
-                    const batch = allData.splice(0, batchSize);
+                    // Use index-based slicing instead of splice to avoid O(n²) behavior
+                    const startIndex = pending.index;
+                    const endIndex = Math.min(startIndex + batchSize, pending.data.length);
+                    const batch = pending.data.slice(startIndex, endIndex);
+                    pending.index = endIndex;
 
                     // If we've sent all data, remove from pending
-                    if (allData.length === 0) {
+                    if (pending.index >= pending.data.length) {
                         pendingData.delete(objId);
                     }
 
