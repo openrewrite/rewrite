@@ -84,7 +84,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
     /**
      * Gets the version variable name if the dependency's version is specified via a variable reference
      * in a GString or Kotlin StringTemplate.
-     * 
+     *
      * @return The variable name used for the version, or null if the version is a literal or cannot be determined
      */
     public @Nullable String getVersionVariable() {
@@ -92,9 +92,10 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
         if (m.getArguments().isEmpty()) {
             return null;
         }
+        return extractVersionVariable(m.getArguments().get(0));
+    }
 
-        Expression arg = m.getArguments().get(0);
-
+    private static @Nullable String extractVersionVariable(Expression arg) {
         // Handle Groovy GString: "group:artifact:$version" or "group:artifact:${...}"
         if (arg instanceof G.GString) {
             List<J> strings = ((G.GString) arg).getStrings();
@@ -242,7 +243,11 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                 }
                 // If version is blank, check if there's a version variable in the method invocation
                 if (StringUtils.isBlank(version)) {
-                    String versionVar = extractVersionVariable(methodInvocation);
+                    if (methodInvocation.getArguments().isEmpty()) {
+                        return null;
+                    }
+                    // Handle Groovy GString: "group:artifact:$version" or "group:artifact:${...}"
+                    String versionVar = extractVersionVariable(methodInvocation.getArguments().get(0));
                     if (versionVar != null) {
                         // Use the variable name as a placeholder for the version
                         version = "${" + versionVar + "}";
@@ -252,54 +257,6 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                 }
 
                 return new SpringDependencyManagementPluginEntry(cursor, group, artifacts, version);
-            }
-
-            return null;
-        }
-
-        /**
-         * Extracts the version variable name from a method invocation's arguments.
-         * Handles GString and Kotlin StringTemplate patterns including:
-         * - Simple variable: $version, ${version}
-         * - Property methods: ${property('version')}, ${findProperty('version')}
-         * - Project property methods: ${project.property('version')}, ${project.findProperty('version')}
-         * - Properties map access: ${project.properties['version']}
-         */
-        private static @Nullable String extractVersionVariable(J.MethodInvocation methodInvocation) {
-            if (methodInvocation.getArguments().isEmpty()) {
-                return null;
-            }
-
-            Expression arg = methodInvocation.getArguments().get(0);
-
-            // Handle Groovy GString: "group:artifact:$version" or "group:artifact:${...}"
-            if (arg instanceof G.GString) {
-                List<J> strings = ((G.GString) arg).getStrings();
-                if (strings.size() == 2 && strings.get(0) instanceof J.Literal && strings.get(1) instanceof G.GString.Value) {
-                    Object versionTree = ((G.GString.Value) strings.get(1)).getTree();
-                    if (versionTree instanceof J.Identifier) {
-                        return ((J.Identifier) versionTree).getSimpleName();
-                    } else if (versionTree instanceof J.FieldAccess) {
-                        return ((J.FieldAccess) versionTree).getSimpleName();
-                    } else if (versionTree instanceof J.MethodInvocation) {
-                        // Handle property('version') or findProperty('version')
-                        return extractPropertyNameFromMethodInvocation((J.MethodInvocation) versionTree);
-                    } else if (versionTree instanceof G.Binary) {
-                        // Handle project.properties['version']
-                        return extractPropertyNameFromGBinary((G.Binary) versionTree);
-                    }
-                }
-            }
-
-            // Handle Kotlin StringTemplate: "group:artifact:$version"
-            if (arg instanceof K.StringTemplate) {
-                List<J> strings = ((K.StringTemplate) arg).getStrings();
-                if (strings.size() == 2 && strings.get(0) instanceof J.Literal && strings.get(1) instanceof K.StringTemplate.Expression) {
-                    Object versionTree = ((K.StringTemplate.Expression) strings.get(1)).getTree();
-                    if (versionTree instanceof J.Identifier) {
-                        return ((J.Identifier) versionTree).getSimpleName();
-                    }
-                }
             }
 
             return null;

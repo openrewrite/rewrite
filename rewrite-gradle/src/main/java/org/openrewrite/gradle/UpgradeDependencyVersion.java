@@ -215,6 +215,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     }
                 }
             }
+
             /**
              * Scans a single dependency and records its information for later processing.
              */
