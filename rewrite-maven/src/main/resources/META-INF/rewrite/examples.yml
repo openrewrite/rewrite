@@ -15,7 +15,7 @@
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddAnnotationProcessor
 examples:
-- description: ''
+- description: '`AddAnnotationProcessorTest#addAnnotationProcessor`'
   parameters:
   - org.projectlombok
   - lombok-mapstruct-binding
@@ -86,7 +86,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddCommentToMavenDependency
 examples:
-- description: ''
+- description: '`AddCommentToMavenDependencyTest#addCommentToMavenDependency`'
   parameters:
   - /project/dependencies/dependency
   - com.google.guava
@@ -144,7 +144,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddDependency
 examples:
-- description: ''
+- description: '`AddDependencyTest#addDependenciesOnEmptyProject`'
   parameters:
   - com.google.guava
   - guava
@@ -180,7 +180,7 @@ examples:
       </project>
     path: pom.xml
     language: xml
-- description: ''
+- description: '`UpdateMavenModelTest#mavenUserPropertiesExistAfterUpdateMavenModel`'
   parameters:
   - com.fasterxml.jackson.module
   - jackson-module-afterburner
@@ -225,7 +225,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddDevelocityMavenExtension
 examples:
-- description: ''
+- description: '`AddDevelocityMavenExtensionTest#addGradleEnterpriseMavenExtensionToExistingExtensionsXmlFile`'
   parameters:
   - '1.17'
   - https://foo
@@ -240,6 +240,7 @@ examples:
           <url>https://foo</url>
         </server>
       </gradleEnterprise>
+    path: .mvn/gradle-enterprise.xml
     language: xml
   - before: |
       <?xml version="1.0" encoding="UTF-8"?>
@@ -254,6 +255,7 @@ examples:
           <version>1.17</version>
         </extension>
       </extensions>
+    path: .mvn/extensions.xml
     language: xml
   - before: |
       <project>
@@ -267,7 +269,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddManagedDependency
 examples:
-- description: ''
+- description: '`AddManagedDependencyTest#onlyAddedWhenUsing`'
   parameters:
   - org.apache.logging.log4j
   - log4j-bom
@@ -319,59 +321,11 @@ examples:
       </project>
     path: pom.xml
     language: xml
-- description: ''
-  parameters:
-  - ${quarkus.platform.group-id}
-  - ${quarkus.platform.artifact-id}
-  - ${quarkus.platform.version}
-  - import
-  - pom
-  - 'null'
-  - 'null'
-  - 'null'
-  - 'null'
-  - 'null'
-  sources:
-  - before: |
-      <project>
-        <groupId>com.mycompany.app</groupId>
-        <artifactId>core</artifactId>
-        <version>1</version>
-        <properties>
-          <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
-          <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-          <quarkus.platform.version>3.2.3.Final</quarkus.platform.version>
-        </properties>
-      </project>
-    after: |
-      <project>
-        <groupId>com.mycompany.app</groupId>
-        <artifactId>core</artifactId>
-        <version>1</version>
-        <properties>
-          <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
-          <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-          <quarkus.platform.version>3.2.3.Final</quarkus.platform.version>
-        </properties>
-        <dependencyManagement>
-          <dependencies>
-            <dependency>
-              <groupId>${quarkus.platform.group-id}</groupId>
-              <artifactId>${quarkus.platform.artifact-id}</artifactId>
-              <version>${quarkus.platform.version}</version>
-              <type>pom</type>
-              <scope>import</scope>
-            </dependency>
-          </dependencies>
-        </dependencyManagement>
-      </project>
-    path: pom.xml
-    language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddParentPom
 examples:
-- description: ''
+- description: '`AddParentPomTest#addParent`'
   parameters:
   - org.springframework.boot
   - spring-boot-starter-parent
@@ -406,7 +360,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddPlugin
 examples:
-- description: ''
+- description: '`AddPluginTest#addPluginWithConfiguration`'
   parameters:
   - org.openrewrite.maven
   - rewrite-maven-plugin
@@ -448,7 +402,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddPluginDependency
 examples:
-- description: ''
+- description: '`AddPluginDependencyTest#addWithNoExistingDependencies`'
   parameters:
   - org.openrewrite.maven
   - rewrite-maven-plugin
@@ -501,7 +455,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddProfile
 examples:
-- description: ''
+- description: '`AddProfileTest#addProfileToPom`'
   parameters:
   - myprofile
   - <activation><foo>foo</foo></activation>
@@ -540,7 +494,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddProperty
 examples:
-- description: ''
+- description: '`AddPropertyTest#addFirstProperty`'
   parameters:
   - key
   - value
@@ -574,7 +528,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddRepository
 examples:
-- description: ''
+- description: '`AddRepositoryTest#addSimpleRepo`'
   parameters:
   - myRepo
   - http://myrepo.maven.com/repo
@@ -612,7 +566,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ChangeDependencyClassifier
 examples:
-- description: ''
+- description: '`ChangeDependencyClassifierTest#noClassifierToClassifier`'
   parameters:
   - org.ehcache
   - ehcache
@@ -678,7 +632,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ChangeDependencyGroupIdAndArtifactId
 examples:
-- description: ''
+- description: '`ChangeDependencyGroupIdAndArtifactIdTest#changeDependencyGroupIdAndArtifactId`'
   parameters:
   - javax.activation
   - javax.activation-api
@@ -686,6 +640,8 @@ examples:
   - jakarta.activation-api
   - 'null'
   - 'null'
+  - 'false'
+  - 'false'
   sources:
   - before: |
       <project>
@@ -747,7 +703,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ChangeDependencyScope
 examples:
-- description: ''
+- description: '`ChangeDependencyScopeTest#noScopeToScope`'
   parameters:
   - com.google.guava
   - guava
@@ -792,7 +748,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ChangeManagedDependencyGroupIdAndArtifactId
 examples:
-- description: ''
+- description: '`ChangeManagedDependencyGroupIdAndArtifactIdTest#changeManagedDependencyGroupIdAndArtifactId`'
   parameters:
   - javax.activation
   - javax.activation-api
@@ -838,7 +794,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ChangePackaging
 examples:
-- description: ''
+- description: '`ChangePackagingTest#addPackaging`'
   parameters:
   - '*'
   - '*'
@@ -864,7 +820,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ChangeParentPom
 examples:
-- description: ''
+- description: '`ChangeParentPomTest#changeParent`'
   parameters:
   - org.springframework.boot
   - com.fasterxml.jackson
@@ -875,6 +831,7 @@ examples:
   - 'null'
   - 'null'
   - 'false'
+  - 'null'
   sources:
   - before: |
       <project>
@@ -906,7 +863,7 @@ examples:
       </project>
     path: pom.xml
     language: xml
-- description: ''
+- description: '`RetainVersions#dependencyWithExplicitVersionRemovedFromDepMgmt`'
   parameters:
   - org.springframework.cloud
   - 'null'
@@ -917,10 +874,10 @@ examples:
   - 'null'
   - 'null'
   - 'null'
+  - 'null'
   sources:
   - before: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+      <project>
         <modelVersion>4.0.0</modelVersion>
         <groupId>org.sample</groupId>
         <artifactId>sample</artifactId>
@@ -941,8 +898,7 @@ examples:
         </dependencies>
       </project>
     after: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+      <project>
         <modelVersion>4.0.0</modelVersion>
         <groupId>org.sample</groupId>
         <artifactId>sample</artifactId>
@@ -968,7 +924,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ChangePluginConfiguration
 examples:
-- description: ''
+- description: '`ChangePluginConfigurationTest#removeConfiguration`'
   parameters:
   - org.openrewrite.maven
   - rewrite-maven-plugin
@@ -1017,7 +973,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ChangePluginDependencies
 examples:
-- description: ''
+- description: '`ChangePluginDependenciesTest#removeDependencies`'
   parameters:
   - org.openrewrite.maven
   - rewrite-maven-plugin
@@ -1068,7 +1024,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ChangePluginExecutions
 examples:
-- description: ''
+- description: '`ChangePluginExecutionsTest#removeExecutions`'
   parameters:
   - org.openrewrite.maven
   - rewrite-maven-plugin
@@ -1118,7 +1074,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ChangePluginGroupIdAndArtifactId
 examples:
-- description: ''
+- description: '`ChangePluginGroupIdAndArtifactIdTest#changePluginGroupIdAndArtifactId`'
   parameters:
   - io.quarkus
   - quarkus-bootstrap-maven-plugin
@@ -1188,53 +1144,11 @@ examples:
       </project>
     path: pom.xml
     language: xml
-- description: ''
-  parameters:
-  - io.quarkus
-  - quarkus-bootstrap-maven-plugin
-  - 'null'
-  - quarkus-extension-maven-plugin
-  - 4.0.0
-  sources:
-  - before: |
-      <project>
-          <modelVersion>4.0.0</modelVersion>
-          <groupId>com.mycompany.app</groupId>
-          <artifactId>my-app</artifactId>
-          <version>1</version>
-          <build>
-              <plugins>
-                  <plugin>
-                      <groupId>io.quarkus</groupId>
-                      <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
-                      <version>3.0.0.Beta1</version>
-                  </plugin>
-              </plugins>
-          </build>
-      </project>
-    after: |
-      <project>
-          <modelVersion>4.0.0</modelVersion>
-          <groupId>com.mycompany.app</groupId>
-          <artifactId>my-app</artifactId>
-          <version>1</version>
-          <build>
-              <plugins>
-                  <plugin>
-                      <groupId>io.quarkus</groupId>
-                      <artifactId>quarkus-extension-maven-plugin</artifactId>
-                      <version>4.0.0</version>
-                  </plugin>
-              </plugins>
-          </build>
-      </project>
-    path: pom.xml
-    language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ChangeProjectVersion
 examples:
-- description: ''
+- description: '`ChangeProjectVersionTest#changeProjectVersion`'
   parameters:
   - org.openrewrite
   - rewrite-maven
@@ -1259,7 +1173,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ChangePropertyValue
 examples:
-- description: ''
+- description: '`ChangePropertyValueTest#property`'
   parameters:
   - guava.version
   - 29.0-jre
@@ -1296,7 +1210,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.EnableDevelocityBuildCache
 examples:
-- description: ''
+- description: '`EnableDevelocityBuildCacheTest#addBuildCacheAllConfigWithOptions`'
   parameters:
   - 'true'
   - 'true'
@@ -1317,12 +1231,13 @@ examples:
           </remote>
         </buildCache>
       </develocity>
+    path: .mvn/develocity.xml
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ExcludeDependency
 examples:
-- description: ''
+- description: '`ExcludeDependencyTest#excludeJUnitVintageEngineSpringBoot2_3`'
   parameters:
   - org.junit.vintage
   - junit-vintage-engine
@@ -1388,7 +1303,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.IncrementProjectVersion
 examples:
-- description: ''
+- description: '`IncrementProjectVersionTest#changeProjectVersion`'
   parameters:
   - '*'
   - '*'
@@ -1412,7 +1327,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ManageDependencies
 examples:
-- description: ''
+- description: '`ManageDependenciesTest#createDependencyManagementWithDependencyWhenNoneExists`'
   parameters:
   - org.junit.jupiter
   - '*'
@@ -1459,9 +1374,208 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.ManagedToRuntimeDependencies
+examples:
+- description: '`ManagedToRuntimeDependenciesTest#convertNonImportManagedDependencies`'
+  sources:
+  - before: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>com.mycompany.app</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1</version>
+          <dependencyManagement>
+              <dependencies>
+                  <dependency>
+                      <groupId>com.fasterxml.jackson</groupId>
+                      <artifactId>jackson-bom</artifactId>
+                      <version>2.15.2</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                  </dependency>
+                  <dependency>
+                      <groupId>org.slf4j</groupId>
+                      <artifactId>slf4j-api</artifactId>
+                      <version>1.7.36</version>
+                  </dependency>
+                  <dependency>
+                      <groupId>commons-lang</groupId>
+                      <artifactId>commons-lang</artifactId>
+                      <version>2.6</version>
+                  </dependency>
+              </dependencies>
+          </dependencyManagement>
+      </project>
+    after: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>com.mycompany.app</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1</version>
+          <dependencyManagement>
+              <dependencies>
+                  <dependency>
+                      <groupId>com.fasterxml.jackson</groupId>
+                      <artifactId>jackson-bom</artifactId>
+                      <version>2.15.2</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                  </dependency>
+              </dependencies>
+          </dependencyManagement>
+          <dependencies>
+              <dependency>
+                  <groupId>org.slf4j</groupId>
+                  <artifactId>slf4j-api</artifactId>
+                  <version>1.7.36</version>
+                  <scope>runtime</scope>
+              </dependency>
+              <dependency>
+                  <groupId>commons-lang</groupId>
+                  <artifactId>commons-lang</artifactId>
+                  <version>2.6</version>
+                  <scope>runtime</scope>
+              </dependency>
+          </dependencies>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.MigrateToMaven4
+examples:
+- description: '`MigrateToMaven4Test#comprehensiveMigration`'
+  sources:
+  - before: |
+      <project xmlns="http://maven.apache.org/POM/4.0.0"
+               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>com.example</groupId>
+          <artifactId>parent</artifactId>
+          <version>1.0.0</version>
+          <packaging>pom</packaging>
+
+          <modules>
+              <module>child-a</module>
+              <module>child-b</module>
+          </modules>
+
+          <properties>
+              <project.root>${executionRootDirectory}</project.root>
+              <multi.root>${multiModuleProjectDirectory}</multi.root>
+              <my.version>${version}</my.version>
+              <my.basedir>${basedir}</my.basedir>
+          </properties>
+
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.1</version>
+                  </plugin>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.1</version>
+                  </plugin>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-antrun-plugin</artifactId>
+                      <executions>
+                          <execution>
+                              <id>pre-clean-task</id>
+                              <phase>pre-clean</phase>
+                              <goals>
+                                  <goal>run</goal>
+                              </goals>
+                          </execution>
+                          <execution>
+                              <id>pre-integration-test-task</id>
+                              <phase>pre-integration-test</phase>
+                              <goals>
+                                  <goal>run</goal>
+                              </goals>
+                          </execution>
+                          <execution>
+                              <id>post-integration-test-task</id>
+                              <phase>post-integration-test</phase>
+                              <goals>
+                                  <goal>run</goal>
+                              </goals>
+                          </execution>
+                      </executions>
+                  </plugin>
+              </plugins>
+          </build>
+      </project>
+    after: |
+      <project xmlns="http://maven.apache.org/POM/4.1.0"
+               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xsi:schemaLocation="http://maven.apache.org/POM/4.1.0 http://maven.apache.org/xsd/maven-4.1.0.xsd">
+          <modelVersion>4.1.0</modelVersion>
+          <groupId>com.example</groupId>
+          <artifactId>parent</artifactId>
+          <version>1.0.0</version>
+          <packaging>pom</packaging>
+
+          <subprojects>
+              <subproject>child-a</subproject>
+              <subproject>child-b</subproject>
+          </subprojects>
+
+          <properties>
+              <project.root>${session.rootDirectory}</project.root>
+              <multi.root>${project.rootDirectory}</multi.root>
+              <my.version>${project.version}</my.version>
+              <my.basedir>${project.basedir}</my.basedir>
+          </properties>
+
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.1</version>
+                  </plugin>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-antrun-plugin</artifactId>
+                      <executions>
+                          <execution>
+                              <id>pre-clean-task</id>
+                              <phase>before:clean</phase>
+                              <goals>
+                                  <goal>run</goal>
+                              </goals>
+                          </execution>
+                          <execution>
+                              <id>pre-integration-test-task</id>
+                              <phase>before:integration-test</phase>
+                              <goals>
+                                  <goal>run</goal>
+                              </goals>
+                          </execution>
+                          <execution>
+                              <id>post-integration-test-task</id>
+                              <phase>after:integration-test</phase>
+                              <goals>
+                                  <goal>run</goal>
+                              </goals>
+                          </execution>
+                      </executions>
+                  </plugin>
+              </plugins>
+          </build>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.ModernizeObsoletePoms
 examples:
-- description: ''
+- description: '`ModernizeObsoletePomsTest#oldPom`'
   sources:
   - before: |
       <project>
@@ -1531,7 +1645,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.OrderPomElements
 examples:
-- description: ''
+- description: '`OrderPomElementsTest#updatePluginChildTagOrder`'
   sources:
   - before: |
       <project>
@@ -1579,7 +1693,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.RemoveDependency
 examples:
-- description: ''
+- description: '`RemoveDependencyTest#removeDependency`'
   parameters:
   - junit
   - junit
@@ -1629,7 +1743,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.RemoveDuplicateDependencies
 examples:
-- description: ''
+- description: '`RemoveDuplicateDependenciesTest#removeSingleDuplicate`'
   sources:
   - before: |
       <project>
@@ -1684,9 +1798,62 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.RemoveDuplicatePluginDeclarations
+examples:
+- description: '`RemoveDuplicatePluginDeclarationsTest#removeDuplicatePlugin`'
+  sources:
+  - before: |
+      <project>
+          <groupId>com.example</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1.0.0</version>
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.1</version>
+                  </plugin>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-surefire-plugin</artifactId>
+                      <version>2.22.2</version>
+                  </plugin>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.11.0</version>
+                  </plugin>
+              </plugins>
+          </build>
+      </project>
+    after: |
+      <project>
+          <groupId>com.example</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1.0.0</version>
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.1</version>
+                  </plugin>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-surefire-plugin</artifactId>
+                      <version>2.22.2</version>
+                  </plugin>
+              </plugins>
+          </build>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.RemoveExclusion
 examples:
-- description: ''
+- description: '`RemoveExclusionTest#removeUnusedExclusions`'
   parameters:
   - com.google.guava
   - guava
@@ -1732,7 +1899,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.RemoveManagedDependency
 examples:
-- description: ''
+- description: '`RemoveManagedDependencyTest#removeManagedDependency`'
   parameters:
   - javax.activation
   - javax.activation-api
@@ -1781,7 +1948,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.RemovePlugin
 examples:
-- description: ''
+- description: '`RemovePluginTest#removePluginFromBuild`'
   parameters:
   - org.apache.avro
   - avro-maven-plugin
@@ -1841,7 +2008,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.RemovePluginDependency
 examples:
-- description: ''
+- description: '`RemovePluginDependencyTest#removeDependency`'
   parameters:
   - org.apache.maven.plugins
   - maven-surefire-plugin
@@ -1849,8 +2016,7 @@ examples:
   - surefire-junit*
   sources:
   - before: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+      <project>
         <modelVersion>4.0.0</modelVersion>
         <groupId>org.sample</groupId>
         <artifactId>sample</artifactId>
@@ -1879,8 +2045,7 @@ examples:
         </build>
       </project>
     after: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+      <project>
         <modelVersion>4.0.0</modelVersion>
         <groupId>org.sample</groupId>
         <artifactId>sample</artifactId>
@@ -1909,7 +2074,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.RemoveProperty
 examples:
-- description: ''
+- description: '`RemovePropertyTest#removeProperty`'
   parameters:
   - bla.version
   sources:
@@ -1944,11 +2109,11 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.RemoveRedundantDependencyVersions
 examples:
-- description: ''
+- description: '`RemoveRedundantDependencyVersionsTest#matchesOwnDmThenRemoveIt`'
   parameters:
   - 'null'
   - 'null'
-  - (RemoveRedundantDependencyVersions.Comparator) null
+  - 'null'
   - 'null'
   sources:
   - before: |
@@ -1998,9 +2163,65 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.RemoveRedundantProperties
+examples:
+- description: '`RemoveRedundantPropertiesTest#removeRedundantPropertyFromChild`'
+  parameters:
+  - 'null'
+  - 'null'
+  sources:
+  - before: child
+    language: mavenProject
+  - before: parent
+    language: mavenProject
+  - before: |
+      <project>
+        <groupId>com.example</groupId>
+        <artifactId>parent</artifactId>
+        <version>1.0.0</version>
+        <packaging>pom</packaging>
+        <properties>
+          <junit.version>5.9.1</junit.version>
+          <spring.version>6.0.0</spring.version>
+        </properties>
+        <modules>
+          <module>child</module>
+        </modules>
+      </project>
+    path: pom.xml
+    language: xml
+  - before: |
+      <project>
+        <parent>
+          <groupId>com.example</groupId>
+          <artifactId>parent</artifactId>
+          <version>1.0.0</version>
+        </parent>
+        <artifactId>child</artifactId>
+        <properties>
+          <junit.version>5.9.1</junit.version>
+          <custom.property>value</custom.property>
+        </properties>
+      </project>
+    after: |
+      <project>
+        <parent>
+          <groupId>com.example</groupId>
+          <artifactId>parent</artifactId>
+          <version>1.0.0</version>
+        </parent>
+        <artifactId>child</artifactId>
+        <properties>
+          <custom.property>value</custom.property>
+        </properties>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.RemoveRepository
 examples:
-- description: ''
+- description: '`RemoveRepositoryTest#removesRepoAndIdCombination`'
   parameters:
   - myRepo
   - https://myrepo.maven.com/repo
@@ -2059,13 +2280,12 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.RemoveUnusedProperties
 examples:
-- description: ''
+- description: '`RemoveUnusedPropertiesTest#removesWholePropertiesSection`'
   parameters:
   - 'null'
   sources:
   - before: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+      <project>
         <modelVersion>4.0.0</modelVersion>
         <groupId>org.sample</groupId>
         <artifactId>sample</artifactId>
@@ -2078,8 +2298,7 @@ examples:
 
       </project>
     after: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+      <project>
         <modelVersion>4.0.0</modelVersion>
         <groupId>org.sample</groupId>
         <artifactId>sample</artifactId>
@@ -2092,7 +2311,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.RenamePropertyKey
 examples:
-- description: ''
+- description: '`RenamePropertyKeyTest#propertyInDependency`'
   parameters:
   - guava.version
   - version.com.google.guava
@@ -2143,7 +2362,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.UpdateMavenProjectPropertyJavaVersion
 examples:
-- description: ''
+- description: '`UpdateMavenProjectPropertyJavaVersionTest#basic`'
   parameters:
   - '17'
   sources:
@@ -2185,9 +2404,150 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.UpdateMavenWrapper
+examples:
+- description: Add a new Maven wrapper
+  parameters:
+  - 3.1.x
+  - 'null'
+  - 3.8.x
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      <project>
+        <groupId>com.example</groupId>
+        <artifactId>demo</artifactId>
+        <version>1.0.0</version>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.UpdateScmFromGitOrigin
+examples:
+- description: Add SCM section when missing
+  parameters:
+  - 'true'
+  sources:
+  - before: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+      </project>
+    after: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+        <scm>
+          <url>https://server.example.com/org/repo</url>
+          <connection>scm:git:https://server.example.com/org/repo.git</connection>
+          <developerConnection>scm:git:git@server.example.com:org/repo.git</developerConnection>
+        </scm>
+      </project>
+    path: pom.xml
+    language: xml
+- description: '`UpdateScmFromGitOriginTest#updatesScmFromGitOriginUsingHttps`'
+  parameters:
+  - 'null'
+  sources:
+  - before: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+        <scm>
+          <url>https://old-server.example.com/org/repo</url>
+          <connection>scm:git:https://old-server.example.com/org/repo.git</connection>
+          <developerConnection>scm:git:git@old-server.example.com:org/repo.git</developerConnection>
+        </scm>
+      </project>
+    after: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+        <scm>
+          <url>https://new-server.example.com/username/repo</url>
+          <connection>scm:git:https://new-server.example.com/username/repo.git</connection>
+          <developerConnection>scm:git:git@new-server.example.com:username/repo.git</developerConnection>
+        </scm>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.UpgradeDependencyVersion
 examples:
-- description: ''
+- description: '`RetainVersions#dependencyWithExplicitVersionRemovedFromDepMgmt`'
+  parameters:
+  - org.springframework.cloud
+  - spring-cloud-config-dependencies
+  - 3.1.4
+  - 'null'
+  - 'true'
+  - singletonList("com.jcraft:jsch")
+  sources:
+  - before: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>org.sample</groupId>
+        <artifactId>sample</artifactId>
+        <version>1.0.0</version>
+        <dependencyManagement>
+          <dependencies>
+            <dependency>
+              <groupId>org.springframework.cloud</groupId>
+              <artifactId>spring-cloud-config-dependencies</artifactId>
+              <version>3.1.2</version>
+              <type>pom</type>
+              <scope>import</scope>
+            </dependency>
+          </dependencies>
+        </dependencyManagement>
+        <dependencies>
+          <dependency>
+            <groupId>com.jcraft</groupId>
+            <artifactId>jsch</artifactId>
+            <version>0.1.55</version>
+          </dependency>
+        </dependencies>
+      </project>
+    after: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>org.sample</groupId>
+        <artifactId>sample</artifactId>
+        <version>1.0.0</version>
+        <dependencyManagement>
+          <dependencies>
+            <dependency>
+              <groupId>org.springframework.cloud</groupId>
+              <artifactId>spring-cloud-config-dependencies</artifactId>
+              <version>3.1.4</version>
+              <type>pom</type>
+              <scope>import</scope>
+            </dependency>
+          </dependencies>
+        </dependencyManagement>
+        <dependencies>
+          <dependency>
+            <groupId>com.jcraft</groupId>
+            <artifactId>jsch</artifactId>
+            <version>0.1.55</version>
+          </dependency>
+        </dependencies>
+      </project>
+    path: pom.xml
+    language: xml
+- description: '`UpgradeDependencyVersionTest#updateManagedDependencyVersion`'
   parameters:
   - org.junit.jupiter
   - junit-jupiter-api
@@ -2230,104 +2590,11 @@ examples:
       </project>
     path: pom.xml
     language: xml
-- description: ''
-  parameters:
-  - org.springframework.cloud
-  - spring-cloud-config-dependencies
-  - 3.1.4
-  - 'null'
-  - 'true'
-  - Collections.singletonList("com.jcraft:jsch")
-  sources:
-  - before: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-        <modelVersion>4.0.0</modelVersion>
-        <groupId>org.sample</groupId>
-        <artifactId>sample</artifactId>
-        <version>1.0.0</version>
-        <dependencyManagement>
-          <dependencies>
-            <dependency>
-              <groupId>org.springframework.cloud</groupId>
-              <artifactId>spring-cloud-config-dependencies</artifactId>
-              <version>3.1.2</version>
-              <type>pom</type>
-              <scope>import</scope>
-            </dependency>
-          </dependencies>
-        </dependencyManagement>
-        <dependencies>
-          <dependency>
-            <groupId>com.jcraft</groupId>
-            <artifactId>jsch</artifactId>
-            <version>0.1.55</version>
-          </dependency>
-        </dependencies>
-      </project>
-    after: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-        <modelVersion>4.0.0</modelVersion>
-        <groupId>org.sample</groupId>
-        <artifactId>sample</artifactId>
-        <version>1.0.0</version>
-        <dependencyManagement>
-          <dependencies>
-            <dependency>
-              <groupId>org.springframework.cloud</groupId>
-              <artifactId>spring-cloud-config-dependencies</artifactId>
-              <version>3.1.4</version>
-              <type>pom</type>
-              <scope>import</scope>
-            </dependency>
-          </dependencies>
-        </dependencyManagement>
-        <dependencies>
-          <dependency>
-            <groupId>com.jcraft</groupId>
-            <artifactId>jsch</artifactId>
-            <version>0.1.55</version>
-          </dependency>
-        </dependencies>
-      </project>
-    path: pom.xml
-    language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.UpgradeParentVersion
 examples:
-- description: ''
-  parameters:
-  - org.jenkins-ci
-  - jenkins
-  - '1.125'
-  - 'null'
-  - 'null'
-  sources:
-  - before: |
-      <project>
-          <parent>
-              <groupId>org.jenkins-ci</groupId>
-              <artifactId>jenkins</artifactId>
-              <version>1.124</version>
-          </parent>
-          <artifactId>example</artifactId>
-          <version>1.0.0</version>
-      </project>
-    after: |
-      <project>
-          <parent>
-              <groupId>org.jenkins-ci</groupId>
-              <artifactId>jenkins</artifactId>
-              <version>1.125</version>
-          </parent>
-          <artifactId>example</artifactId>
-          <version>1.0.0</version>
-      </project>
-    path: pom.xml
-    language: xml
-- description: ''
+- description: '`MavenDependencyFailuresTest#unresolvableParent`'
   parameters:
   - '*'
   - '*'
@@ -2360,11 +2627,41 @@ examples:
       </project>
     path: pom.xml
     language: xml
+- description: '`UpgradeParentVersionTest#nonMavenCentralRepository`'
+  parameters:
+  - org.jenkins-ci
+  - jenkins
+  - '1.125'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      <project>
+          <parent>
+              <groupId>org.jenkins-ci</groupId>
+              <artifactId>jenkins</artifactId>
+              <version>1.124</version>
+          </parent>
+          <artifactId>example</artifactId>
+          <version>1.0.0</version>
+      </project>
+    after: |
+      <project>
+          <parent>
+              <groupId>org.jenkins-ci</groupId>
+              <artifactId>jenkins</artifactId>
+              <version>1.125</version>
+          </parent>
+          <artifactId>example</artifactId>
+          <version>1.0.0</version>
+      </project>
+    path: pom.xml
+    language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.UpgradePluginVersion
 examples:
-- description: ''
+- description: '`UpgradePluginVersionTest#upgradeToExactVersion`'
   parameters:
   - io.quarkus
   - quarkus-maven-plugin
@@ -2415,11 +2712,12 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.UpgradeTransitiveDependencyVersion
 examples:
-- description: ''
+- description: '`UpgradeTransitiveDependencyVersionTest#singleProject`'
   parameters:
   - com.fasterxml*
   - jackson-core
   - 2.12.5
+  - 'null'
   - 'null'
   - 'null'
   - 'null'
@@ -2471,13 +2769,12 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.UseMavenCompilerPluginReleaseConfiguration
 examples:
-- description: ''
+- description: '`UseMavenCompilerPluginReleaseConfigurationTest#replacesSourceAndTargetConfig`'
   parameters:
   - '11'
   sources:
   - before: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+      <project>
         <modelVersion>4.0.0</modelVersion>
         <groupId>org.sample</groupId>
         <artifactId>sample</artifactId>
@@ -2499,8 +2796,7 @@ examples:
 
       </project>
     after: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+      <project>
         <modelVersion>4.0.0</modelVersion>
         <groupId>org.sample</groupId>
         <artifactId>sample</artifactId>
@@ -2524,9 +2820,65 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.UseParentInference
+examples:
+- description: '`UseParentInferenceTest#useParentInferenceWithDefaultRelativePath`'
+  sources:
+  - before: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>com.example</groupId>
+          <artifactId>parent</artifactId>
+          <version>1.0.0</version>
+          <packaging>pom</packaging>
+      </project>
+    path: pom.xml
+    language: xml
+  - before: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <parent>
+              <groupId>com.example</groupId>
+              <artifactId>parent</artifactId>
+              <version>1.0.0</version>
+              <relativePath>..</relativePath>
+          </parent>
+          <artifactId>child</artifactId>
+      </project>
+    after: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <parent/>
+          <artifactId>child</artifactId>
+      </project>
+    path: child/pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.cleanup.ExplicitDependencyVersion
+examples:
+- description: '`ExplicitDependencyVersionTest#shouldReplaceLatestWithExplicitVersion`'
+  sources:
+  - before: |
+      <project>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+        <dependencies>
+          <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>LATEST</version>
+          </dependency>
+        </dependencies>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.cleanup.ExplicitPluginVersion
 examples:
-- description: ''
+- description: '`ExplicitPluginVersionTest#shouldAddLatest`'
   sources:
   - before: |
       <project>
@@ -2552,16 +2904,16 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.cleanup.PrefixlessExpressions
 examples:
-- description: ''
+- description: '`PrefixlessExpressionsTest#renamePrefixlessExpressions`'
   sources:
   - before: |
       <project>
         <modelVersion>4.0.0</modelVersion>
         <groupId>com.mycompany.app</groupId>
         <artifactId>my-app</artifactId>
-        <version>1.0</version>
+        <version>1.0.0</version>
         <properties>
-          <other.version>1.0.0</other.version>
+          <other.version>1.0</other.version>
         </properties>
         <dependencies>
           <dependency>
@@ -2591,9 +2943,9 @@ examples:
         <modelVersion>4.0.0</modelVersion>
         <groupId>com.mycompany.app</groupId>
         <artifactId>my-app</artifactId>
-        <version>1.0</version>
+        <version>1.0.0</version>
         <properties>
-          <other.version>1.0.0</other.version>
+          <other.version>1.0</other.version>
         </properties>
         <dependencies>
           <dependency>
@@ -2624,7 +2976,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.plugin.DependencyPluginGoalResolveSources
 examples:
-- description: ''
+- description: '`DependencyPluginGoalResolveSourcesTest#sourcesToResolveSources`'
   sources:
   - before: foo
     language: mavenProject
@@ -2680,7 +3032,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.search.DependencyInsight
 examples:
-- description: ''
+- description: '`DependencyInsightTest#findDependency`'
   parameters:
   - '*guava*'
   - '*'
@@ -2707,7 +3059,7 @@ examples:
         <artifactId>my-app</artifactId>
         <version>1</version>
         <dependencies>
-          <!--~~>--><dependency>
+          <!--~~(com.google.guava:failureaccess:1.0.1,com.google.guava:guava:29.0-jre,com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava)~~>--><dependency>
               <groupId>com.google.guava</groupId>
               <artifactId>guava</artifactId>
               <version>29.0-jre</version>
@@ -2718,9 +3070,51 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.search.DoesNotIncludeDependency
+examples:
+- description: '`DoesNotIncludeDependencyTest#dependencyPresentTransitivelyWithoutScopeOrDesiredScopeSpecifiedButDirectOnlyMarked`'
+  parameters:
+  - org.springframework
+  - spring-beans
+  - 'null'
+  - 'true'
+  - 'null'
+  sources:
+  - before: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>org.sample</groupId>
+        <artifactId>sample</artifactId>
+        <version>1.0.0</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+            <version>3.0.0</version>
+          </dependency>
+        </dependencies>
+      </project>
+    after: |
+      <!--~~>--><project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>org.sample</groupId>
+        <artifactId>sample</artifactId>
+        <version>1.0.0</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+            <version>3.0.0</version>
+          </dependency>
+        </dependencies>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.search.EffectiveMavenRepositories
 examples:
-- description: ''
+- description: '`EffectiveMavenRepositoriesTest#emptyRepositories`'
   parameters:
   - 'true'
   sources:
@@ -2742,7 +3136,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.search.FindDependency
 examples:
-- description: ''
+- description: '`FindDependencyTest#simple`'
   parameters:
   - jakarta.activation
   - jakarta.activation-api
@@ -2750,8 +3144,7 @@ examples:
   - 'null'
   sources:
   - before: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+      <project>
         <modelVersion>4.0.0</modelVersion>
         <groupId>org.sample</groupId>
         <artifactId>sample</artifactId>
@@ -2765,8 +3158,7 @@ examples:
         </dependencies>
       </project>
     after: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+      <project>
         <modelVersion>4.0.0</modelVersion>
         <groupId>org.sample</groupId>
         <artifactId>sample</artifactId>
@@ -2785,7 +3177,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.search.FindManagedDependency
 examples:
-- description: ''
+- description: '`FindManagedDependencyTest#simple`'
   parameters:
   - jakarta.activation
   - jakarta.activation-api
@@ -2793,8 +3185,7 @@ examples:
   - 'null'
   sources:
   - before: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+      <project>
         <modelVersion>4.0.0</modelVersion>
         <groupId>org.sample</groupId>
         <artifactId>sample</artifactId>
@@ -2810,8 +3201,7 @@ examples:
         </dependencyManagement>
       </project>
     after: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+      <project>
         <modelVersion>4.0.0</modelVersion>
         <groupId>org.sample</groupId>
         <artifactId>sample</artifactId>
@@ -2832,7 +3222,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.search.FindMavenProject
 examples:
-- description: ''
+- description: '`FindMavenProjectTest#isMavenProject`'
   sources:
   - before: |
       <project>
@@ -2854,7 +3244,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.search.FindPlugin
 examples:
-- description: ''
+- description: '`FindPluginTest#findProperty`'
   parameters:
   - org.openrewrite.maven
   - rewrite-maven-plugin
@@ -2913,7 +3303,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.search.FindProperties
 examples:
-- description: ''
+- description: '`FindPropertiesTest#findProperty`'
   parameters:
   - guava.*
   - 'null'
@@ -2958,7 +3348,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.search.FindRepositoryOrder
 examples:
-- description: ''
+- description: '`FindRepositoryOrderTest#findRepositoryOrder`'
   sources:
   - before: |
       <project>
@@ -3001,9 +3391,37 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.search.FindScm
+examples:
+- description: '`FindScmTest#findsScmTag`'
+  sources:
+  - before: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.example</groupId>
+        <artifactId>demo</artifactId>
+        <version>1.0</version>
+        <scm>
+          <url>https://github.com/example/demo</url>
+        </scm>
+      </project>
+    after: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.example</groupId>
+        <artifactId>demo</artifactId>
+        <version>1.0</version>
+        <!--~~>--><scm>
+          <url>https://github.com/example/demo</url>
+        </scm>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.search.ModuleHasDependency
 examples:
-- description: ''
+- description: '`ModuleHasDependencyTest#findDependency`'
   parameters:
   - org.openrewrite
   - rewrite-maven
@@ -3074,7 +3492,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.search.ModuleHasPlugin
 examples:
-- description: ''
+- description: '`ModuleHasPluginTest#findPlugin`'
   parameters:
   - org.openrewrite.maven
   - rewrite-maven-plugin
@@ -3146,7 +3564,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.search.ParentPomInsight
 examples:
-- description: ''
+- description: '`ParentPomInsightTest#findParent`'
   parameters:
   - org.springframework.boot
   - spring-boot-starter-parent
@@ -3155,29 +3573,23 @@ examples:
   sources:
   - before: demo
     language: mavenProject
-  - before: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\
-      \ xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n\txsi:schemaLocation=\"\
-      http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd\"\
-      >\n\t<modelVersion>4.0.0</modelVersion>\n\t<parent>\n\t\t<groupId>org.springframework.boot</groupId>\n\
+  - before: "<project>\n\t<modelVersion>4.0.0</modelVersion>\n\t<parent>\n\t\t<groupId>org.springframework.boot</groupId>\n\
       \t\t<artifactId>spring-boot-starter-parent</artifactId>\n\t\t<version>3.1.4</version>\n\
       \t\t<relativePath/> <!-- lookup parent from repository -->\n\t</parent>\n\t\
       <groupId>com.example</groupId>\n\t<artifactId>demo</artifactId>\n\t<version>0.0.1-SNAPSHOT</version>\n\
       </project>\n"
-    after: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\
-      \ xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n\txsi:schemaLocation=\"\
-      http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd\"\
-      >\n\t<modelVersion>4.0.0</modelVersion>\n\t<!--~~>--><parent>\n\t\t<groupId>org.springframework.boot</groupId>\n\
-      \t\t<artifactId>spring-boot-starter-parent</artifactId>\n\t\t<version>3.1.4</version>\n\
-      \t\t<relativePath/> <!-- lookup parent from repository -->\n\t</parent>\n\t\
-      <groupId>com.example</groupId>\n\t<artifactId>demo</artifactId>\n\t<version>0.0.1-SNAPSHOT</version>\n\
-      </project>\n"
+    after: "<project>\n\t<modelVersion>4.0.0</modelVersion>\n\t<!--~~>--><parent>\n\
+      \t\t<groupId>org.springframework.boot</groupId>\n\t\t<artifactId>spring-boot-starter-parent</artifactId>\n\
+      \t\t<version>3.1.4</version>\n\t\t<relativePath/> <!-- lookup parent from repository\
+      \ -->\n\t</parent>\n\t<groupId>com.example</groupId>\n\t<artifactId>demo</artifactId>\n\
+      \t<version>0.0.1-SNAPSHOT</version>\n</project>\n"
     path: pom.xml
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.security.UseHttpsForRepositories
 examples:
-- description: ''
+- description: '`UseHttpsForRepositoriesTest#replaceHttpInRepositoryBlock`'
   sources:
   - before: |
       <project>
@@ -3209,14 +3621,13 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.utilities.PrintMavenAsDot
 examples:
-- description: ''
+- description: '`PrintMavenAsDotTest#dot`'
   sources:
   - before: |
       <project>
         <groupId>com.mycompany.app</groupId>
         <artifactId>my-app</artifactId>
         <version>1</version>
-
         <dependencies>
           <dependency>
               <groupId>org.yaml</groupId>
@@ -3258,7 +3669,6 @@ examples:
         <groupId>com.mycompany.app</groupId>
         <artifactId>my-app</artifactId>
         <version>1</version>
-
         <dependencies>
           <dependency>
               <groupId>org.yaml</groupId>

@@ -48,15 +48,9 @@ public class MoveFile extends Recipe {
             example = "../yamls/")
     String moveTo;
 
-    @Override
-    public String getDisplayName() {
-        return "Move a file";
-    }
+    String displayName = "Move a file";
 
-    @Override
-    public String getDescription() {
-        return "Move a file to a different directory. The file name will remain the same.";
-    }
+    String description = "Move a file to a different directory. The file name will remain the same.";
 
     @Override
     public Validated<Object> validate() {

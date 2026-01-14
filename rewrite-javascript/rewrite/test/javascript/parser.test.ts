@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../src/test";
-import {JavaScriptVisitor, JS, typescript} from "../../src/javascript";
+import {JavaScriptParser, JavaScriptVisitor, JS, typescript} from "../../src/javascript";
 import {J} from "../../src/java";
+import {ParseErrorKind} from "../../src/parse-error";
 
 
 test("comments", () =>
@@ -43,3 +44,65 @@ test("comments", () =>
             expect(commentCount).toBe(8);
         }
     }));
+
+describe('parseOnly', () => {
+    test('parses basic TypeScript code', async () => {
+        const parser = new JavaScriptParser();
+        const result = await parser.parseOnly({
+            sourcePath: 'test.ts',
+            text: 'const x: number = 1 + 2;'
+        });
+
+        expect(result.kind).toBe(JS.Kind.CompilationUnit);
+        const cu = result as JS.CompilationUnit;
+        expect(cu.statements.length).toBe(1);
+    });
+
+    test('parses JSX code', async () => {
+        const parser = new JavaScriptParser();
+        const result = await parser.parseOnly({
+            sourcePath: 'test.tsx',
+            text: 'const element = <div className="test">Hello</div>;'
+        });
+
+        expect(result.kind).toBe(JS.Kind.CompilationUnit);
+    });
+
+    test('returns ParseExceptionResult for syntax errors', async () => {
+        const parser = new JavaScriptParser();
+        const result = await parser.parseOnly({
+            sourcePath: 'test.ts',
+            text: 'const x = {;'  // Invalid syntax
+        });
+
+        expect(result.kind).toBe(ParseErrorKind);
+    });
+
+    test('parses without type attribution', async () => {
+        const parser = new JavaScriptParser();
+        const result = await parser.parseOnly({
+            sourcePath: 'test.ts',
+            text: `
+                interface User { name: string; }
+                const user: User = { name: "test" };
+            `
+        });
+
+        expect(result.kind).toBe(JS.Kind.CompilationUnit);
+        const cu = result as JS.CompilationUnit;
+        // Types are not attributed in parseOnly
+        expect(cu.statements.length).toBe(2);
+    });
+
+    test('preserves source path', async () => {
+        const parser = new JavaScriptParser();
+        const result = await parser.parseOnly({
+            sourcePath: 'src/components/Button.tsx',
+            text: 'export const Button = () => <button />;'
+        });
+
+        expect(result.kind).toBe(JS.Kind.CompilationUnit);
+        const cu = result as JS.CompilationUnit;
+        expect(cu.sourcePath).toBe('src/components/Button.tsx');
+    });
+});

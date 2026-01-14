@@ -145,31 +145,19 @@ class RecipeLifecycleTest implements RewriteTest {
             };
         }
 
-        @Override
-        public String getDisplayName() {
-            return "Throw exception";
-        }
+        String displayName = "Throw exception";
 
-        @Override
-        public String getDescription() {
-            return "Throws an exception in the scanning phase.";
-        }
+        String description = "Throws an exception in the scanning phase.";
     }
 
     @EqualsAndHashCode(callSuper = false)
     @Value
     static class DeleteFirst extends Recipe {
 
-        @Override
-        public String getDisplayName() {
-            return "Delete a file";
-        }
+        String displayName = "Delete a file";
 
-        @Override
-        public String getDescription() {
-            return "Deletes a file early on in the recipe pipeline. " +
+        String description = "Deletes a file early on in the recipe pipeline. " +
                    "Subsequent recipes should not be passed a null source file.";
-        }
 
         @Override
         public List<Recipe> getRecipeList() {

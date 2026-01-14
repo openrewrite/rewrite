@@ -58,15 +58,9 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
     @Nullable
     Boolean overwriteExisting;
 
-    @Override
-    public String getDisplayName() {
-        return "Create XML file";
-    }
+    String displayName = "Create XML file";
 
-    @Override
-    public String getDescription() {
-        return "Create a new XML file.";
-    }
+    String description = "Create a new XML file.";
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {

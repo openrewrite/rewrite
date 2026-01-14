@@ -73,7 +73,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -107,21 +107,15 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
         this.changeManagedDependency = changeManagedDependency;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven dependency";
-    }
+    String displayName = "Change Maven dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", oldGroupId, oldArtifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before. " +
-               "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided.";
-    }
+    String description = "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before. " +
+                "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided.";
 
     @Override
     public Validated<Object> validate() {
@@ -154,7 +148,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 isNewDependencyPresent = checkIfNewDependencyPresents(newGroupId, newArtifactId, newVersion);
-                if (changeManagedDependency == null || changeManagedDependency) {
+                if (!oldGroupId.contains("*") && !oldArtifactId.contains("*") &&
+                        (changeManagedDependency == null || changeManagedDependency)) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
                             oldGroupId, oldArtifactId,
                             Optional.ofNullable(newGroupId).orElse(oldGroupId),

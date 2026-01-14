@@ -223,4 +223,48 @@ class SearchResultsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void descriptionReported() {
+        rewriteRun(
+          spec -> spec
+            .recipeFromYaml(
+              //language=yml
+              """
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.SearchMarkerScraping
+                displayName: Find text and add the results to the global datatable
+                description: Hello world.
+                recipeList:
+                  - org.openrewrite.text.Find:
+                      find: SOME OTHER TEXT
+                  - org.openrewrite.text.Find:
+                      find: ([A-Z])\\w+
+                      regex: true
+                      caseSensitive: true
+                      description: true
+                """,
+              "test.SearchMarkerScraping"
+            ).dataTable(SearchResults.Row.class, rows -> assertThat(rows).extracting(
+                SearchResults.Row::getSourcePath,
+                SearchResults.Row::getDescription,
+                SearchResults.Row::getRecipe)
+              .containsExactlyInAnyOrder(
+                tuple("description-reported", "We", "Find text `([A-Z])\\w+`"),
+                tuple("description-reported", "SearchMarkers", "Find text `([A-Z])\\w+`"),
+                tuple("description-reported", null, "Find text `SOME OTHER TEXT`")
+              )),
+          text(
+            """
+              We add all SearchMarkers that are found during recipe run.
+              file contains some other text somewhere in the middle resulting in 2 different recipes matches.
+              """,
+            """
+              ~~(We)~~>We add all ~~(SearchMarkers)~~>SearchMarkers that are found during recipe run.
+              file contains ~~>some other text somewhere in the middle resulting in 2 different recipes matches.
+              """,
+            spec -> spec.path("description-reported")
+          )
+        );
+    }
 }

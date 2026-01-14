@@ -60,20 +60,14 @@ public class ChangeDependencyGroupId extends Recipe {
     @Nullable
     String configuration;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Gradle dependency group";
-    }
+    String displayName = "Change Gradle dependency group";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change the group of a specified Gradle dependency.";
-    }
+    String description = "Change the group of a specified Gradle dependency.";
 
     @Override
     public Validated<Object> validate() {

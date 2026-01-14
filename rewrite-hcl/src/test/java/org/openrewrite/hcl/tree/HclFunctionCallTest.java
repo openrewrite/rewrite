@@ -52,9 +52,9 @@ class HclFunctionCallTest implements RewriteTest {
               }
               """,
              spec -> spec.afterRecipe(configFile -> {
-                 Hcl.Block locals = (Hcl.Block) configFile.getBody().getLast();
-                 Hcl.Attribute result = (Hcl.Attribute) locals.getBody().getFirst();
-                 Hcl.FunctionCall countE = (Hcl.FunctionCall) result.getValue();
+                 var locals = (Hcl.Block) configFile.getBody().getLast();
+                 var result = (Hcl.Attribute) locals.getBody().getFirst();
+                 var countE = (Hcl.FunctionCall) result.getValue();
                  assertThat(countE.getName().getName()).isEqualTo("provider::test::count_e");
              })
           )

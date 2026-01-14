@@ -64,16 +64,10 @@ public class DeleteProperty extends Recipe {
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Delete property";
-    }
+    String displayName = "Delete property";
 
-    @Override
-    public String getDescription() {
-        return "Delete a YAML property. Nested YAML mappings are interpreted as dot separated property names, i.e. " +
+    String description = "Delete a YAML property. Nested YAML mappings are interpreted as dot separated property names, i.e. " +
                 "as Spring Boot interprets application.yml files like `a.b.c.d` or `a.b.c:d`.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

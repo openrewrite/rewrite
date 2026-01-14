@@ -500,17 +500,6 @@ class XmlParserTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1382")
-    @Test
-    void utf8BOM() {
-        rewriteRun(
-          xml(
-            """
-              %s<?xml version="1.0" encoding="UTF-8"?><test></test>
-              """.formatted("\uFEFF")
-          )
-        );
-    }
-
     @ParameterizedTest
     @MethodSource
     void testUtf8WithAndWithoutBom(@Language("xml") String xml, boolean hasBom) {
@@ -527,6 +516,8 @@ class XmlParserTest implements RewriteTest {
 
         assertThat(checked).isNotInstanceOf(ParseError.class);
         assertThat(checked).isSameAs(parsed);
+
+        rewriteRun(xml(xml));
     }
 
     static Stream<Arguments> testUtf8WithAndWithoutBom() {
@@ -536,6 +527,12 @@ class XmlParserTest implements RewriteTest {
               """, false),
             Arguments.of("""
               \uFEFF<?xml version="1.0" encoding="UTF-8"?><a />
+              """, true),
+            Arguments.of("""
+              <?xml version="1.0" encoding="UTF-8"?><test></test>
+              """, false),
+            Arguments.of("""
+              \uFEFF<?xml version="1.0" encoding="UTF-8"?><test></test>
               """, true)
         );
     }

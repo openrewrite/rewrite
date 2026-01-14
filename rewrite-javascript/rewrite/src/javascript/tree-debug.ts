@@ -22,21 +22,29 @@ import * as fs from "fs";
 
 /**
  * Options for controlling LST debug output.
+ *
+ * @example
+ * // Output to a file instead of console
+ * const options: LstDebugOptions = { output: '/tmp/debug.txt' };
+ *
+ * @example
+ * // Minimal output - just the tree structure
+ * const options: LstDebugOptions = { includeCursorMessages: false };
  */
 export interface LstDebugOptions {
-    /** Include cursor messages in output. Default: true */
+    /** Include cursor messages (like indentContext) in output. Default: true */
     includeCursorMessages?: boolean;
     /** Include markers in output. Default: false */
     includeMarkers?: boolean;
-    /** Include IDs in output. Default: false */
+    /** Include node IDs in output. Default: false */
     includeIds?: boolean;
-    /** Maximum depth to traverse. Default: unlimited (-1) */
+    /** Maximum depth to traverse (for print/recursive methods). Default: unlimited (-1) */
     maxDepth?: number;
-    /** Properties to always exclude (in addition to defaults). */
+    /** Properties to always exclude (in addition to defaults like 'type'). */
     excludeProperties?: string[];
     /** Output destination: 'console' or a file path. Default: 'console' */
     output?: 'console' | string;
-    /** Indent string for nested output. Default: '  ' */
+    /** Indent string for nested output. Default: '  ' (2 spaces) */
     indent?: string;
 }
 
@@ -233,6 +241,10 @@ export function formatCursorMessages(cursor: Cursor | undefined): string {
         let valueStr: string;
         if (Array.isArray(value)) {
             valueStr = `[${value.map(v => JSON.stringify(v)).join(', ')}]`;
+        } else if (value instanceof Set) {
+            // Handle Set - convert to array notation
+            const items = Array.from(value).map(v => JSON.stringify(v)).join(', ');
+            valueStr = `{${items}}`;
         } else if (typeof value === 'object' && value !== null) {
             valueStr = JSON.stringify(value);
         } else {
@@ -253,6 +265,19 @@ function shortTypeName(kind: string | undefined): string {
     // Extract the last part after the last dot
     const lastDot = kind.lastIndexOf('.');
     return lastDot >= 0 ? kind.substring(lastDot + 1) : kind;
+}
+
+/**
+ * Format markers for debug output.
+ * Returns empty string if no markers, otherwise returns ' markers=[Name1, Name2]'
+ */
+function formatMarkers(node: any): string {
+    const markers = node?.markers?.markers;
+    if (!markers || !Array.isArray(markers) || markers.length === 0) {
+        return '';
+    }
+    const names = markers.map((m: any) => shortTypeName(m.kind));
+    return ` markers=[${names.join(', ')}]`;
 }
 
 /**
@@ -381,16 +406,30 @@ export function findPropertyPath(cursor: Cursor | undefined, child?: any): strin
 }
 
 /**
+ * Escape special characters in a string for display.
+ */
+function escapeString(str: string): string {
+    return str
+        .replace(/\\/g, '\\\\')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+}
+
+/**
  * Format a literal value for inline display.
  */
 function formatLiteralValue(lit: J.Literal): string {
+    let value: string;
     if (lit.valueSource !== undefined) {
-        // Truncate long literals
-        return lit.valueSource.length > 20
-            ? lit.valueSource.substring(0, 17) + '...'
-            : lit.valueSource;
+        value = lit.valueSource;
+    } else {
+        value = String(lit.value);
     }
-    return String(lit.value);
+    // Escape special characters
+    value = escapeString(value);
+    // Truncate long literals
+    return value.length > 20 ? value.substring(0, 17) + '...' : value;
 }
 
 /**
@@ -486,34 +525,10 @@ export class LstDebugPrinter {
 
     constructor(options: LstDebugOptions = {}) {
         this.options = {...DEFAULT_OPTIONS, ...options};
-    }
-
-    /**
-     * Calculate the depth of the cursor by counting parent chain length.
-     * Uses caching to avoid repeated traversals.
-     */
-    private calculateDepth(cursor: Cursor | undefined): number {
-        if (!cursor) {
-            return 0;
+        // Truncate output file at start of session
+        if (this.options.output !== 'console') {
+            fs.writeFileSync(this.options.output, '');
         }
-
-        // Check cache first
-        const cached = this.depthCache.get(cursor);
-        if (cached !== undefined) {
-            return cached;
-        }
-
-        // Count depth by walking parent chain
-        let depth = 0;
-        for (let c: Cursor | undefined = cursor; c; c = c.parent) {
-            depth++;
-        }
-        // Subtract 2 to skip root cursor and start CompilationUnit at depth 0
-        depth = Math.max(0, depth - 2);
-
-        // Cache the result
-        this.depthCache.set(cursor, depth);
-        return depth;
     }
 
     /**
@@ -553,7 +568,9 @@ export class LstDebugPrinter {
         let line = indent;
 
         // Find property path from cursor
-        const propPath = findPropertyPath(cursor, node);
+        // When node === cursor.value, don't pass node - we want to find cursor.value in cursor.parent.value
+        // When node !== cursor.value (e.g., for RightPadded/LeftPadded/Container), pass node to find it in cursor.value
+        const propPath = findPropertyPath(cursor, node === cursor?.value ? undefined : node);
         if (propPath) {
             line += `${propPath}: `;
         }
@@ -561,7 +578,7 @@ export class LstDebugPrinter {
         if (this.isContainer(node)) {
             const container = node as J.Container<any>;
             const before = formatSpace(container.before);
-            line += `Container<${container.elements?.length ?? 0}>{before=${before}}`;
+            line += `Container<${container.elements?.length ?? 0}>{before=${before}${formatMarkers(container)}}`;
         } else if (this.isLeftPadded(node)) {
             const lp = node as J.LeftPadded<any>;
             const before = formatSpace(lp.before);
@@ -573,7 +590,7 @@ export class LstDebugPrinter {
                     line += ` element=${JSON.stringify(lp.element)}`;
                 }
             }
-            line += '}';
+            line += `${formatMarkers(lp)}}`;
         } else if (this.isRightPadded(node)) {
             const rp = node as J.RightPadded<any>;
             const after = formatSpace(rp.after);
@@ -585,7 +602,7 @@ export class LstDebugPrinter {
                     line += ` element=${JSON.stringify(rp.element)}`;
                 }
             }
-            line += '}';
+            line += `${formatMarkers(rp)}}`;
         } else if (isJava(node)) {
             const jNode = node as J;
             const typeName = shortTypeName(jNode.kind);
@@ -594,7 +611,7 @@ export class LstDebugPrinter {
             if (summary) {
                 line += `${summary} `;
             }
-            line += `prefix=${formatSpace(jNode.prefix)}}`;
+            line += `prefix=${formatSpace(jNode.prefix)}${formatMarkers(jNode)}}`;
         } else {
             line += `<unknown: ${typeof node}>`;
         }
@@ -655,6 +672,34 @@ export class LstDebugPrinter {
         }
 
         this.flush();
+    }
+
+    /**
+     * Calculate the depth of the cursor by counting parent chain length.
+     * Uses caching to avoid repeated traversals.
+     */
+    private calculateDepth(cursor: Cursor | undefined): number {
+        if (!cursor) {
+            return 0;
+        }
+
+        // Check cache first
+        const cached = this.depthCache.get(cursor);
+        if (cached !== undefined) {
+            return cached;
+        }
+
+        // Count depth by walking parent chain
+        let depth = 0;
+        for (let c: Cursor | undefined = cursor; c; c = c.parent) {
+            depth++;
+        }
+        // Subtract 2 to skip root cursor and start CompilationUnit at depth 0
+        depth = Math.max(0, depth - 2);
+
+        // Cache the result
+        this.depthCache.set(cursor, depth);
+        return depth;
     }
 
     private printNode(
@@ -969,45 +1014,6 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
         this.printPostVisit = config.printPostVisit ?? false;
     }
 
-    protected async preVisit(tree: J, _p: P): Promise<J | undefined> {
-        if (this.printPreVisit) {
-            const typeName = shortTypeName(tree.kind);
-            const indent = '  '.repeat(this.depth);
-            const messages = formatCursorMessages(this.cursor);
-            const prefix = formatSpace(tree.prefix);
-            const summary = getNodeSummary(tree);
-            const propPath = findPropertyPath(this.cursor);
-
-            let line = indent;
-            if (propPath) {
-                line += `${propPath}: `;
-            }
-            line += `${typeName}{`;
-            if (summary) {
-                line += `${summary} `;
-            }
-            line += `prefix=${prefix}}`;
-
-            // Append cursor messages on same line to avoid empty line issues
-            if (messages !== '<no messages>') {
-                line += ` ${messages}`;
-            }
-            console.info(line);
-        }
-        this.depth++;
-        return tree;
-    }
-
-    protected async postVisit(tree: J, _p: P): Promise<J | undefined> {
-        this.depth--;
-        if (this.printPostVisit) {
-            const typeName = shortTypeName(tree.kind);
-            const indent = '  '.repeat(this.depth);
-            console.info(`${indent}← ${typeName}`);
-        }
-        return tree;
-    }
-
     public async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
         if (this.printPreVisit) {
             const indent = '  '.repeat(this.depth);
@@ -1020,7 +1026,7 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
             if (propPath) {
                 line += `${propPath}: `;
             }
-            line += `Container<${container.elements.length}>{before=${before}}`;
+            line += `Container<${container.elements.length}>{before=${before}${formatMarkers(container)}}`;
 
             // Append cursor messages on same line to avoid empty line issues
             if (messages !== '<no messages>') {
@@ -1058,7 +1064,7 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
                     line += ` element=${JSON.stringify(left.element)}`;
                 }
             }
-            line += '}';
+            line += `${formatMarkers(left)}}`;
 
             // Append cursor messages on same line to avoid empty line issues
             if (messages !== '<no messages>') {
@@ -1096,7 +1102,7 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
                     line += ` element=${JSON.stringify(right.element)}`;
                 }
             }
-            line += '}';
+            line += `${formatMarkers(right)}}`;
 
             // Append cursor messages on same line to avoid empty line issues
             if (messages !== '<no messages>') {
@@ -1108,6 +1114,45 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
         const result = await super.visitRightPadded(right, p);
         this.depth--;
         return result;
+    }
+
+    protected async preVisit(tree: J, _p: P): Promise<J | undefined> {
+        if (this.printPreVisit) {
+            const typeName = shortTypeName(tree.kind);
+            const indent = '  '.repeat(this.depth);
+            const messages = formatCursorMessages(this.cursor);
+            const prefix = formatSpace(tree.prefix);
+            const summary = getNodeSummary(tree);
+            const propPath = findPropertyPath(this.cursor);
+
+            let line = indent;
+            if (propPath) {
+                line += `${propPath}: `;
+            }
+            line += `${typeName}{`;
+            if (summary) {
+                line += `${summary} `;
+            }
+            line += `prefix=${prefix}${formatMarkers(tree)}}`;
+
+            // Append cursor messages on same line to avoid empty line issues
+            if (messages !== '<no messages>') {
+                line += ` ${messages}`;
+            }
+            console.info(line);
+        }
+        this.depth++;
+        return tree;
+    }
+
+    protected async postVisit(tree: J, _p: P): Promise<J | undefined> {
+        this.depth--;
+        if (this.printPostVisit) {
+            const typeName = shortTypeName(tree.kind);
+            const indent = '  '.repeat(this.depth);
+            console.info(`${indent}← ${typeName}`);
+        }
+        return tree;
     }
 }
 
@@ -1142,4 +1187,45 @@ export function debugPrint(tree: Tree, cursor?: Cursor, label?: string, options?
  */
 export function debugPrintCursorPath(cursor: Cursor, options?: LstDebugOptions): void {
     new LstDebugPrinter(options).printCursorPath(cursor);
+}
+
+/**
+ * Create a debug printer if debugging is enabled, otherwise return undefined.
+ *
+ * This is useful for visitors that want to optionally enable debugging via
+ * constructor parameters or configuration.
+ *
+ * @param enabled Whether debugging is enabled
+ * @param options Debug options (including output file path)
+ * @returns LstDebugPrinter if enabled, undefined otherwise
+ *
+ * @example
+ * class MyVisitor extends JavaScriptVisitor<P> {
+ *     private debug?: LstDebugPrinter;
+ *
+ *     constructor(enableDebug?: boolean | LstDebugOptions) {
+ *         super();
+ *         this.debug = createDebugPrinter(enableDebug);
+ *     }
+ *
+ *     async visitBlock(block: J.Block, p: P) {
+ *         this.debug?.log(block, this.cursor);
+ *         return super.visitBlock(block, p);
+ *     }
+ * }
+ *
+ * // Usage:
+ * new MyVisitor(true);                              // Enable with defaults
+ * new MyVisitor({ output: '/tmp/debug.txt' });      // Enable with options
+ * new MyVisitor(false);                             // Disabled
+ * new MyVisitor();                                  // Disabled (default)
+ */
+export function createDebugPrinter(enabled?: boolean | LstDebugOptions): LstDebugPrinter | undefined {
+    if (enabled === undefined || enabled === false) {
+        return undefined;
+    }
+    if (enabled === true) {
+        return new LstDebugPrinter();
+    }
+    return new LstDebugPrinter(enabled);
 }

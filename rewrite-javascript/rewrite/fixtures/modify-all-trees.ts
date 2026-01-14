@@ -15,10 +15,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {ExecutionContext, marker, Marker, randomId, Recipe, RecipeRegistry, Tree, TreeVisitor} from "../src";
+import {
+    ExecutionContext,
+    JavaScript,
+    marker,
+    Marker,
+    randomId,
+    Recipe,
+    RecipeMarketplace,
+    Tree,
+    TreeVisitor
+} from "@openrewrite/rewrite";
 
-export function activate(registry: RecipeRegistry) {
-    registry.register(ModifyAllTrees);
+export async function activate(marketplace: RecipeMarketplace) {
+    await marketplace.install(ModifyAllTrees, JavaScript);
 }
 
 const changed: Marker = marker(randomId());

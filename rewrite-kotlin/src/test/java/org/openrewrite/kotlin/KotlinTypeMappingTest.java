@@ -170,13 +170,13 @@ class KotlinTypeMappingTest {
 
     @Test
     void className() {
-        JavaType.Class clazz = (JavaType.Class) this.firstMethodParameter("clazz");
+        var clazz = (JavaType.Class) this.firstMethodParameter("clazz");
         assertThat(TypeUtils.asFullyQualified(clazz).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
     }
 
     @Test
     void interfacesContainImplicitAbstractFlag() {
-        JavaType.Class clazz = (JavaType.Class) firstMethodParameter("clazz");
+        var clazz = (JavaType.Class) firstMethodParameter("clazz");
         JavaType.Method methodType = methodType("clazz");
         assertThat(clazz.getFlags()).contains(Flag.Abstract);
         assertThat(methodType.getFlags()).contains(Flag.Abstract);
@@ -190,7 +190,7 @@ class KotlinTypeMappingTest {
 
     @Test
     void parameterized() {
-        JavaType.Parameterized parameterized = (JavaType.Parameterized) firstMethodParameter("parameterized");
+        var parameterized = (JavaType.Parameterized) firstMethodParameter("parameterized");
         assertThat(parameterized.getType().getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.PT");
         assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
 
@@ -199,7 +199,7 @@ class KotlinTypeMappingTest {
           .map(J.MethodDeclaration.class::cast).findFirst().orElseThrow();
         assertThat(md.getMethodType().toString())
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=parameterized,return=org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>,parameters=[org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>]}");
-        J.VariableDeclarations vd = (J.VariableDeclarations) md.getParameters().getFirst();
+        var vd = (J.VariableDeclarations) md.getParameters().getFirst();
         assertThat(vd.getTypeExpression().getType().toString())
           .isEqualTo("org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>");
         assertThat(((J.ParameterizedType) vd.getTypeExpression()).getClazz().getType().toString())
@@ -208,13 +208,13 @@ class KotlinTypeMappingTest {
 
     @Test
     void primitive() {
-        JavaType.Class kotlinPrimitive = (JavaType.Class) firstMethodParameter("primitive");
+        var kotlinPrimitive = (JavaType.Class) firstMethodParameter("primitive");
         assertThat(kotlinPrimitive.getFullyQualifiedName()).isEqualTo("kotlin.Int");
     }
 
     @Test
     void generic() {
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("generic")).getTypeParameters().getFirst();
+        var generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("generic")).getTypeParameters().getFirst();
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
@@ -222,7 +222,7 @@ class KotlinTypeMappingTest {
 
     @Test
     void genericContravariant() {
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericContravariant")).getTypeParameters().getFirst();
+        var generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericContravariant")).getTypeParameters().getFirst();
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(CONTRAVARIANT);
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().getFirst()).getFullyQualifiedName()).
@@ -232,7 +232,7 @@ class KotlinTypeMappingTest {
     @Test
     void genericMultipleBounds() {
         List<JavaType> typeParameters = goatType.getTypeParameters();
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) typeParameters.getLast();
+        var generic = (JavaType.GenericTypeVariable) typeParameters.getLast();
         assertThat(generic.getName()).isEqualTo("S");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.PT");
@@ -242,7 +242,7 @@ class KotlinTypeMappingTest {
 
     @Test
     void genericUnbounded() {
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericUnbounded")).getTypeParameters().getFirst();
+        var generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericUnbounded")).getTypeParameters().getFirst();
         assertThat(generic.getName()).isEqualTo("U");
         assertThat(generic.getVariance()).isEqualTo(INVARIANT);
         assertThat(generic.getBounds()).isEmpty();
@@ -250,14 +250,14 @@ class KotlinTypeMappingTest {
 
     @Test
     void genericRecursive() {
-        JavaType.Parameterized param = (JavaType.Parameterized) firstMethodParameter("genericRecursive");
+        var param = (JavaType.Parameterized) firstMethodParameter("genericRecursive");
         JavaType typeParam = param.getTypeParameters().getFirst();
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) typeParam;
+        var generic = (JavaType.GenericTypeVariable) typeParam;
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
         assertThat(TypeUtils.asParameterized(generic.getBounds().getFirst())).isNotNull();
 
-        JavaType.GenericTypeVariable elemType = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(generic.getBounds().getFirst()).getTypeParameters().getFirst();
+        var elemType = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(generic.getBounds().getFirst()).getTypeParameters().getFirst();
         assertThat(elemType.getName()).isEqualTo("U");
         assertThat(elemType.getVariance()).isEqualTo(COVARIANT);
         assertThat(elemType.getBounds()).hasSize(1);
@@ -271,7 +271,7 @@ class KotlinTypeMappingTest {
 
     @Test
     void inheritedJavaTypeGoat() {
-        JavaType.Parameterized clazz = (JavaType.Parameterized) firstMethodParameter("inheritedKotlinTypeGoat");
+        var clazz = (JavaType.Parameterized) firstMethodParameter("inheritedKotlinTypeGoat");
         assertThat(clazz.getTypeParameters().getFirst().toString()).isEqualTo("Generic{T}");
         assertThat(clazz.getTypeParameters().get(1).toString()).isEqualTo("Generic{U extends org.openrewrite.kotlin.PT<Generic{U}> & org.openrewrite.kotlin.C}");
         assertThat(clazz.toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$InheritedKotlinTypeGoat<Generic{T}, Generic{U extends org.openrewrite.kotlin.PT<Generic{U}> & org.openrewrite.kotlin.C}>");
@@ -279,7 +279,7 @@ class KotlinTypeMappingTest {
 
     @Test
     void genericIntersectionType() {
-        JavaType.GenericTypeVariable clazz = (JavaType.GenericTypeVariable) firstMethodParameter("genericIntersection");
+        var clazz = (JavaType.GenericTypeVariable) firstMethodParameter("genericIntersection");
         assertThat(clazz.getBounds().getFirst().toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$TypeA");
         assertThat(clazz.getBounds().get(1).toString()).isEqualTo("org.openrewrite.kotlin.PT<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat$TypeA & org.openrewrite.kotlin.C}>");
         assertThat(clazz.getBounds().get(2).toString()).isEqualTo("org.openrewrite.kotlin.C");
@@ -288,7 +288,7 @@ class KotlinTypeMappingTest {
 
     @Test
     void enumTypeA() {
-        JavaType.Class clazz = (JavaType.Class) firstMethodParameter("enumTypeA");
+        var clazz = (JavaType.Class) firstMethodParameter("enumTypeA");
         JavaType.Method type = clazz.getMethods().stream()
           .filter(m -> "<constructor>".equals(m.getName()))
           .findFirst()
@@ -302,7 +302,7 @@ class KotlinTypeMappingTest {
 
     @Test
     void enumTypeB() {
-        JavaType.Class clazz = (JavaType.Class) firstMethodParameter("enumTypeB");
+        var clazz = (JavaType.Class) firstMethodParameter("enumTypeB");
         JavaType.Method type = clazz.getMethods().stream()
           .filter(m -> "<constructor>".equals(m.getName()))
           .findFirst()
@@ -340,7 +340,7 @@ class KotlinTypeMappingTest {
     @Test
     void javaLangObject() {
         // These assertions are all based on the JavaTypeMapper.
-        JavaType.Class c = (JavaType.Class) firstMethodParameter("javaType");
+        var c = (JavaType.Class) firstMethodParameter("javaType");
         assertThat(c.getFullyQualifiedName()).isEqualTo("java.lang.Object");
         assertThat(c.getSupertype()).isNull();
         assertThat(c.getMethods()).hasSize(13);
@@ -350,7 +350,7 @@ class KotlinTypeMappingTest {
         assertThat(method).isNotNull();
         assertThat(method.toString()).isEqualTo("java.lang.Object{name=getClass,return=java.lang.Class<Generic{?}>,parameters=[]}");
 
-        JavaType.Parameterized returnType = (JavaType.Parameterized) method.getReturnType();
+        var returnType = (JavaType.Parameterized) method.getReturnType();
         // Assert the type of the parameterized type contains the type parameter from the source.
         assertThat(returnType.getType().getTypeParameters().getFirst().toString()).isEqualTo("Generic{T}");
     }
@@ -590,8 +590,8 @@ class KotlinTypeMappingTest {
                   """,
                     spec -> spec.afterRecipe(cu -> {
                         J.VariableDeclarations.NamedVariable foo = ((J.VariableDeclarations) cu.getStatements().get(0)).getVariables().get(0);
-                        J.Identifier random = (J.Identifier) ((J.MethodInvocation) foo.getInitializer()).getSelect();
-                        JavaType.Class randomType = (JavaType.Class) random.getType();
+                        var random = (J.Identifier) ((J.MethodInvocation) foo.getInitializer()).getSelect();
+                        var randomType = (JavaType.Class) random.getType();
                         assertThat(randomType.getFullyQualifiedName()).isEqualTo("kotlin.random.Random");
                         assertThat(randomType.getSupertype().toString()).isEqualTo("kotlin.Any");
                     })
@@ -637,7 +637,7 @@ class KotlinTypeMappingTest {
 
                         @Override
                         public J.Binary visitBinary(J.Binary binary, AtomicBoolean b) {
-                            JavaType.Class mt = (JavaType.Class) binary.getType();
+                            var mt = (JavaType.Class) binary.getType();
                             if (p2.equals(mt.toString())) {
                                 found.set(true);
                             }
