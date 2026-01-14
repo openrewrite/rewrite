@@ -25,7 +25,7 @@ describe("jsx mapping", () => {
                             `
                         ),
                         afterRecipe: async cu => {
-                            await (new class extends JavaScriptVisitor<any> {
+                            (new class extends JavaScriptVisitor<any> {
                                 protected visitJsxTag(tag: JSX.Tag, _: any): J | undefined {
                                     const ident = tag.openName.element as J.Identifier;
                                     expect(Type.isClass(ident.type)).toBeTruthy();
@@ -80,7 +80,7 @@ describe("jsx mapping", () => {
                         ),
                         afterRecipe: async cu => {
                             let foundButton = false;
-                            await (new class extends JavaScriptVisitor<any> {
+                            (new class extends JavaScriptVisitor<any> {
                                 visitIdentifier(identifier: J.Identifier, _: any): J | undefined {
                                     if (identifier.simpleName === 'Button' && identifier.type) {
                                         foundButton = true;

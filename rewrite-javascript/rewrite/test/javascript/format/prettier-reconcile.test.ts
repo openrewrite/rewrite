@@ -30,7 +30,7 @@ describe('WhitespaceReconciler', () => {
 
     it('should reconcile whitespace from formatted tree to original', async () => {
         // Original code with types
-        const original = await parse('const x=1');
+        const original = parse('const x=1');
 
         // Formatted code (no types for speed)
         const formatted = parseOnly('const x = 1');
@@ -50,7 +50,7 @@ describe('WhitespaceReconciler', () => {
 
     it('should handle mismatched structure gracefully', async () => {
         // Original: variable declaration
-        const original = await parse('const x = 1');
+        const original = parse('const x = 1');
 
         // Formatted: different structure (function call)
         const formatted = parseOnly('foo()');
@@ -66,7 +66,7 @@ describe('WhitespaceReconciler', () => {
 
     it('should preserve markers from original tree', async () => {
         // For this test we just verify the structure is preserved
-        const original = await parse('const x = 1; const y = 2');
+        const original = parse('const x = 1; const y = 2');
         const formatted = parseOnly('const x = 1;\nconst y = 2');
 
         const reconciler = new WhitespaceReconciler();
@@ -77,7 +77,7 @@ describe('WhitespaceReconciler', () => {
     });
 
     it('parseOnly should produce AST that prints identically to parse', async () => {
-        const withTypes = await parse('const x: number = 1');
+        const withTypes = parse('const x: number = 1');
         const withoutTypes = parseOnly('const x: number = 1');
 
         // Both should parse and print the same
@@ -87,7 +87,7 @@ describe('WhitespaceReconciler', () => {
     });
 
     it('should reconcile multi-line formatting', async () => {
-        const original = await parse('const fn = () => { return 1 }');
+        const original = parse('const fn = () => { return 1 }');
         const formatted = parseOnly(`const fn = () => {
   return 1;
 };
@@ -102,7 +102,7 @@ describe('WhitespaceReconciler', () => {
     });
 
     it('should reconcile binary expression spacing', async () => {
-        const original = await parse('const x=1+2');
+        const original = parse('const x=1+2');
         const formatted = parseOnly('const x = 1 + 2');
 
         const reconciler = new WhitespaceReconciler();
@@ -122,9 +122,9 @@ describe('prettierFormat', () => {
     const print = (cu: JS.CompilationUnit) => TreePrinters.print(cu);
 
     it('should format code using Prettier and preserve types', async () => {
-        const original = await parse('const x=1+2');
+        const original = parse('const x=1+2');
 
-        const result = await prettierFormat(original, {
+        const result = prettierFormat(original, {
             tabWidth: 2,
             semi: true
         });
@@ -135,9 +135,9 @@ describe('prettierFormat', () => {
     });
 
     it('should format multiline code', async () => {
-        const original = await parse('const fn=()=>{return 1}');
+        const original = parse('const fn=()=>{return 1}');
 
-        const result = await prettierFormat(original, {
+        const result = prettierFormat(original, {
             tabWidth: 2,
             semi: true
         });

@@ -40,7 +40,7 @@ test("comments", () =>
                     return ret;
                 }
             }
-            await checkSpaces.visit(cu, undefined);
+            checkSpaces.visit(cu, undefined);
             expect(commentCount).toBe(8);
         }
     }));
@@ -48,7 +48,7 @@ test("comments", () =>
 describe('parseOnly', () => {
     test('parses basic TypeScript code', async () => {
         const parser = new JavaScriptParser();
-        const result = await parser.parseOnly({
+        const result = parser.parseOnly({
             sourcePath: 'test.ts',
             text: 'const x: number = 1 + 2;'
         });
@@ -60,7 +60,7 @@ describe('parseOnly', () => {
 
     test('parses JSX code', async () => {
         const parser = new JavaScriptParser();
-        const result = await parser.parseOnly({
+        const result = parser.parseOnly({
             sourcePath: 'test.tsx',
             text: 'const element = <div className="test">Hello</div>;'
         });
@@ -70,7 +70,7 @@ describe('parseOnly', () => {
 
     test('returns ParseExceptionResult for syntax errors', async () => {
         const parser = new JavaScriptParser();
-        const result = await parser.parseOnly({
+        const result = parser.parseOnly({
             sourcePath: 'test.ts',
             text: 'const x = {;'  // Invalid syntax
         });
@@ -80,7 +80,7 @@ describe('parseOnly', () => {
 
     test('parses without type attribution', async () => {
         const parser = new JavaScriptParser();
-        const result = await parser.parseOnly({
+        const result = parser.parseOnly({
             sourcePath: 'test.ts',
             text: `
                 interface User { name: string; }
@@ -96,7 +96,7 @@ describe('parseOnly', () => {
 
     test('preserves source path', async () => {
         const parser = new JavaScriptParser();
-        const result = await parser.parseOnly({
+        const result = parser.parseOnly({
             sourcePath: 'src/components/Button.tsx',
             text: 'export const Button = () => <button />;'
         });

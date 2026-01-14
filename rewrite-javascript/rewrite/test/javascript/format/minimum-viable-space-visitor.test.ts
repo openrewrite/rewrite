@@ -59,7 +59,7 @@ describe('MinimumViableSpacingVisitor', () => {
                 const removeSpaces = new JavaScriptParserWithSpacesRemoved.RemoveSpaces();
 
                 for await (const file of super.parse(...inputs)) {
-                    yield (await removeSpaces.visit<JS.CompilationUnit>(file, undefined))!;
+                    yield removeSpaces.visit<JS.CompilationUnit>(file, undefined)!;
                 }
             }
         }

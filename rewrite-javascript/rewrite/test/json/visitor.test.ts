@@ -38,7 +38,7 @@ describe('visiting JSON', () => {
                 });
             }
         }
-        expect((await visitor.visit(partialDocument as Tree, 0))?.id).toBeDefined();
+        expect((visitor.visit(partialDocument as Tree, 0))?.id).toBeDefined();
     });
 
     test('calls super', async () => {
@@ -59,7 +59,7 @@ describe('visiting JSON', () => {
             eof: emptySpace,
         }
 
-        const after = await new SetEmptySpace().visit<Json.Document>(json, 0)
+        const after = new SetEmptySpace().visit<Json.Document>(json, 0)
         expect(after!.value.prefix.whitespace).toBe(' ')
     });
 });

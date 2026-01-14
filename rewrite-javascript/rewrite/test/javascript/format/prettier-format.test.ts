@@ -255,7 +255,7 @@ describe('Prettier eof handling', () => {
         expect(sourceFile.eof.whitespace).toBe('');
 
         // Format with Prettier
-        const formatted = await prettierFormat(sourceFile, { semi: true });
+        const formatted = prettierFormat(sourceFile, { semi: true });
 
         // Prettier adds trailing newline - this is stored in eof
         expect(formatted.eof.whitespace).toBe('\n');
@@ -278,7 +278,7 @@ describe('Prettier eof handling', () => {
         expect(sourceFile.eof.whitespace).toBe('\n');
 
         // Format with Prettier
-        const formatted = await prettierFormat(sourceFile, { semi: true });
+        const formatted = prettierFormat(sourceFile, { semi: true });
 
         // Formatted eof still has just one newline
         expect(formatted.eof.whitespace).toBe('\n');
@@ -306,7 +306,7 @@ describe('Prettier marker reconciliation', () => {
         expect(originalHasSemicolon).toBe(false);
 
         // Format with Prettier (semi: true by default adds semicolons)
-        const formatted = await prettierFormat(sourceFile, { semi: true });
+        const formatted = prettierFormat(sourceFile, { semi: true });
 
         // Check if the formatted tree has the Semicolon marker
         const formattedStatements = (formatted as any).statements as J.RightPadded<Statement>[];
@@ -333,7 +333,7 @@ describe('Prettier marker reconciliation', () => {
         expect(originalHasSemicolon).toBe(true);
 
         // Format with Prettier
-        const formatted = await prettierFormat(sourceFile, { semi: true });
+        const formatted = prettierFormat(sourceFile, { semi: true });
 
         // Semicolon marker should still be present
         const formattedStatements = (formatted as any).statements as J.RightPadded<Statement>[];
