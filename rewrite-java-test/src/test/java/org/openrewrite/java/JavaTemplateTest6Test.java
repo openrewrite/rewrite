@@ -500,4 +500,54 @@ class JavaTemplateTest6Test implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6520")
+    @Test
+    void annotateMethodInAnonymousClassWithMultipleArgs() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
+                  if (m.getSimpleName().equals("toString") && m.getLeadingAnnotations().stream().noneMatch(
+                    a -> a.getSimpleName().equals("SuppressWarnings"))) {
+                      return JavaTemplate.builder("@SuppressWarnings(\"all\")")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              class A {
+                  A(Object o, String name) {}
+              }
+              class B {
+                  void test() {
+                      new A(new Object() {
+                          @Override
+                          public String toString() { return null; }
+                      }, "Elvar Fridriksson");
+                  }
+              }
+              """,
+            """
+              class A {
+                  A(Object o, String name) {}
+              }
+              class B {
+                  void test() {
+                      new A(new Object() {
+                          @Override
+                          @SuppressWarnings("all")
+                          public String toString() { return null; }
+                      }, "Elvar Fridriksson");
+                  }
+              }
+              """
+          )
+        );
+    }
 }

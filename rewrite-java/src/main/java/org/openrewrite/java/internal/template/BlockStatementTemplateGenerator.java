@@ -280,6 +280,9 @@ public class BlockStatementTemplateGenerator {
             if (parent instanceof J.ClassDeclaration) {
                 J.ClassDeclaration c = (J.ClassDeclaration) parent;
                 classDeclaration(prior, c, before, after, cursor, mode);
+            } else if (parent instanceof J.NewClass) {
+                J.NewClass n = (J.NewClass) parent;
+                anonymousClassDeclaration(prior, n, before, after, cursor, mode);
             } else if (parent instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) parent;
 
@@ -370,7 +373,11 @@ public class BlockStatementTemplateGenerator {
             } else {
                 throw new IllegalStateException("Unable to template a J.NewClass instance having a null clazz and constructor type.");
             }
-            if (n.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
+            if (n.getBody() != null && referToSameElement(prior, n.getBody())) {
+                // prior is the body of this anonymous class - already handled by J.Block case
+                // just need to close the anonymous class properly
+                after.append(";");
+            } else if (n.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
                 StringBuilder beforeSegments = new StringBuilder();
                 StringBuilder afterSegments = new StringBuilder();
                 beforeSegments.append(newClassString).append("(");
@@ -657,6 +664,65 @@ public class BlockStatementTemplateGenerator {
                 // setting prior to null will cause them all to be written.
                 classDeclaration(null, (J.ClassDeclaration) statement, before, appendBuffer, cursor, REPLACEMENT);
                 appendBuffer.append('}');
+            }
+        }
+
+        if (beforeBuffer != null) {
+            before.insert(0, beforeBuffer);
+        }
+    }
+
+    private void anonymousClassDeclaration(@Nullable J prior, J.NewClass nc, StringBuilder before, StringBuilder after, Cursor cursor, JavaCoordinates.Mode mode) {
+        StringBuilder beforeBuffer = prior == null ? null : new StringBuilder();
+        StringBuilder appendBuffer = prior == null ? after : beforeBuffer;
+
+        // Generate the anonymous class instantiation stub
+        String newClassString;
+        JavaType.Class constructorTypeClass = nc.getConstructorType() != null ? TypeUtils.asClass(nc.getConstructorType().getReturnType()) : null;
+        if (nc.getClazz() != null) {
+            newClassString = "new " + nc.getClazz().printTrimmed(cursor);
+        } else if (constructorTypeClass != null) {
+            newClassString = "new " + constructorTypeClass.getFullyQualifiedName();
+        } else {
+            throw new IllegalStateException("Unable to template inside a J.NewClass instance having a null clazz and constructor type.");
+        }
+
+        // Build stub arguments to make it parseable
+        StringBuilder stubArgs = new StringBuilder("(");
+        List<Expression> arguments = nc.getArguments();
+        for (int i = 0; i < arguments.size(); i++) {
+            if (i > 0) {
+                stubArgs.append(", ");
+            }
+            stubArgs.append(valueOfType(arguments.get(i).getType()));
+        }
+        stubArgs.append(")");
+
+        appendBuffer.append(newClassString).append(stubArgs).append('{');
+
+        J.Block body = nc.getBody();
+        if (body != null) {
+            List<Statement> statements = body.getStatements();
+            for (Statement statement : statements) {
+                if (referToSameElement(statement, prior)) {
+                    if (mode != AFTER) {
+                        appendBuffer = after;
+                        if (mode == REPLACEMENT) {
+                            continue;
+                        }
+                    }
+                }
+
+                if (statement instanceof J.VariableDeclarations) {
+                    String variable = variable((J.VariableDeclarations) statement, false, cursor);
+                    appendBuffer.append(variable).append(";\n");
+                } else if (statement instanceof J.MethodDeclaration) {
+                    String m = method((J.MethodDeclaration) statement, cursor);
+                    appendBuffer.append(m);
+                } else if (statement instanceof J.ClassDeclaration) {
+                    classDeclaration(null, (J.ClassDeclaration) statement, before, appendBuffer, cursor, REPLACEMENT);
+                    appendBuffer.append('}');
+                }
             }
         }
 
