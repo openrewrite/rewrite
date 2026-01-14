@@ -83,20 +83,14 @@ public class AddPlugin extends Recipe {
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Maven plugin";
-    }
+    String displayName = "Add Maven plugin";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, version);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add the specified Maven plugin to the pom.xml.";
-    }
+    String description = "Add the specified Maven plugin to the pom.xml.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -108,6 +108,7 @@ PLUS                            : '+';
 AND                             : '&&';
 EQ                              : '==';
 LT                              : '<';
+DOUBLE_COLON                    : '::';
 COLON                           : ':';
 LBRACK                          : '[';
 LPAREN                          : '(';

@@ -60,20 +60,14 @@ public class ChangeDependencyArtifactId extends Recipe {
     @Nullable
     String configuration;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Gradle dependency artifact";
-    }
+    String displayName = "Change Gradle dependency artifact";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change the artifact of a specified Gradle dependency.";
-    }
+    String description = "Change the artifact of a specified Gradle dependency.";
 
     @Override
     public Validated<Object> validate() {

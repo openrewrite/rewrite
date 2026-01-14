@@ -52,15 +52,9 @@ public class ChangePropertyKey extends Recipe {
     @Nullable
     Boolean regex;
 
-    @Override
-    public String getDisplayName() {
-        return "Change property key";
-    }
+    String displayName = "Change property key";
 
-    @Override
-    public String getDescription() {
-        return "Change a property key leaving the value intact.";
-    }
+    String description = "Change a property key leaving the value intact.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -84,15 +84,9 @@ public class UpdateJavaCompatibility extends Recipe {
     private static final String TARGET_COMPATIBILITY_FOUND = "TARGET_COMPATIBILITY_FOUND";
     private static final String JAVA_TOOLCHAIN_FOUND = "JAVA_TOOLCHAIN_FOUND";
 
-    @Override
-    public String getDisplayName() {
-        return "Update Gradle project Java compatibility";
-    }
+    String displayName = "Update Gradle project Java compatibility";
 
-    @Override
-    public String getDescription() {
-        return "Find and updates the Java compatibility for the Gradle project.";
-    }
+    String description = "Find and updates the Java compatibility for the Gradle project.";
 
     @Override
     public Validated<Object> validate() {
@@ -398,10 +392,13 @@ public class UpdateJavaCompatibility extends Recipe {
             List<Expression> args = m.getArguments();
 
             if (args.size() == 1) {
-                if (args.get(0) instanceof J.Literal || ("jvmToolchain".equals(m.getSimpleName()) && args.get(0) instanceof J.Lambda)) {
+                if (args.get(0) instanceof J.Literal || args.get(0) instanceof J.FieldAccess ||
+                        ("jvmToolchain".equals(m.getSimpleName()) && args.get(0) instanceof J.Lambda)) {
+                    DeclarationStyle currentStyle = getCurrentStyle(m.getArguments().get(0));
                     Integer currentMajor = getMajorVersion(args.get(0));
-                    if (shouldUpdateVersion(currentMajor)) {
-                        return m.withArguments(ListUtils.mapFirst(m.getArguments(), it -> changeJavaVersion(it, null)));
+                    if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(declarationStyle)) {
+                        DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
+                        return m.withArguments(ListUtils.mapFirst(m.getArguments(), it -> changeJavaVersion(it, actualStyle)));
                     }
                     return m;
                 }
@@ -460,6 +457,9 @@ public class UpdateJavaCompatibility extends Recipe {
         } else if (expression instanceof J.FieldAccess) {
             J.FieldAccess field = (J.FieldAccess) expression;
             J.Identifier identifier = field.getName();
+            if (field.getTarget() instanceof J.FieldAccess && "majorVersion".equals(identifier.getSimpleName())) {
+                identifier = ((J.FieldAccess) field.getTarget()).getName();
+            }
             return getMajorVersion(identifier.getSimpleName());
         } else if (isMethodInvocation(expression, "JavaVersion", "toVersion")) {
             J.MethodInvocation method = (J.MethodInvocation) expression;
@@ -542,7 +542,11 @@ public class UpdateJavaCompatibility extends Recipe {
             if (style == DeclarationStyle.String) {
                 expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), newJavaVersion, "'" + newJavaVersion + "'", emptyList(), JavaType.Primitive.String);
             } else if (style == DeclarationStyle.Enum) {
-                expression = fieldAccess.withName(fieldAccess.getName().withSimpleName(newJavaVersionEnum));
+                if (((J.FieldAccess) expression).getTarget() instanceof J.FieldAccess && "majorVersion".equals(((J.FieldAccess) expression).getName().getSimpleName())) {
+                    expression = fieldAccess.withTarget(changeJavaVersion(fieldAccess.getTarget(), style));
+                } else {
+                    expression = fieldAccess.withName(fieldAccess.getName().withSimpleName(newJavaVersionEnum));
+                }
             } else if (style == DeclarationStyle.Number) {
                 expression = changeJavaVersion(newJavaVersionDouble, fieldAccess.getPrefix(), fieldAccess.getMarkers());
             }

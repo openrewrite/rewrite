@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.search;
 
+import org.assertj.core.api.Condition;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.maven.table.DependenciesInUse;
+import org.openrewrite.maven.table.ExplainDependenciesInUse;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
@@ -443,12 +445,14 @@ class DependencyInsightTest implements RewriteTest {
           spec -> spec.recipe(new DependencyInsight("org.springframework.boot", "*", null, null))
             .dataTable(DependenciesInUse.Row.class, rows -> {
                 assertThat(rows).isNotEmpty();
-                DependenciesInUse.Row row = rows.getFirst();
-                assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-web");
-                assertThat(row.getDepth()).isEqualTo(0);
-                row = rows.get(4);
-                assertThat(row.getArtifactId()).isEqualTo("spring-boot");
-                assertThat(row.getDepth()).isEqualTo(4);
+                assertThat(rows).anyMatch(row ->
+                    "compileClasspath".equals(row.getScope()) &&
+                    "spring-boot-starter-web".equals(row.getArtifactId()) &&
+                    row.getCount() == 1);
+                assertThat(rows).anyMatch(row ->
+                    "compileClasspath".equals(row.getScope()) &&
+                    "spring-boot".equals(row.getArtifactId()) &&
+                    row.getCount() == 10);
             }),
           buildGradle(
             """
@@ -506,8 +510,8 @@ class DependencyInsightTest implements RewriteTest {
               }
 
               dependencies {
-                  /*~~(org.springframework.boot:spring-boot-starter-web:2.6.6,org.springframework.boot:spring-boot-starter:2.6.6,org.springframework.boot:spring-boot-autoconfigure:2.6.6,org.springframework.boot:spring-boot-starter-json:2.6.6,org.springframework.boot:spring-boot:2.6.6,org.springframework.boot:spring-boot-starter-tomcat:2.6.6,org.springframework.boot:spring-boot-starter-logging:2.6.6)~~>*/implementation 'org.springframework.boot:spring-boot-starter-web'
-                  /*~~(org.springframework.boot:spring-boot-starter-actuator:2.6.4,org.springframework.boot:spring-boot-starter:2.6.6,org.springframework.boot:spring-boot-autoconfigure:2.6.6,org.springframework.boot:spring-boot:2.6.6,org.springframework.boot:spring-boot-actuator-autoconfigure:2.6.6,org.springframework.boot:spring-boot-starter-logging:2.6.6,org.springframework.boot:spring-boot-actuator:2.6.6)~~>*/implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
+                  /*~~(org.springframework.boot:spring-boot-autoconfigure:2.6.6,org.springframework.boot:spring-boot-starter-json:2.6.6,org.springframework.boot:spring-boot-starter-logging:2.6.6,org.springframework.boot:spring-boot-starter-tomcat:2.6.6,org.springframework.boot:spring-boot-starter-web:2.6.6,org.springframework.boot:spring-boot-starter:2.6.6,org.springframework.boot:spring-boot:2.6.6)~~>*/implementation 'org.springframework.boot:spring-boot-starter-web'
+                  /*~~(org.springframework.boot:spring-boot-actuator-autoconfigure:2.6.6,org.springframework.boot:spring-boot-actuator:2.6.6,org.springframework.boot:spring-boot-autoconfigure:2.6.6,org.springframework.boot:spring-boot-starter-actuator:2.6.4,org.springframework.boot:spring-boot-starter-logging:2.6.6,org.springframework.boot:spring-boot-starter:2.6.6,org.springframework.boot:spring-boot:2.6.6)~~>*/implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
                   /*~~(org.springframework.boot:spring-boot-dependencies:2.6.15,org.springframework.boot:spring-boot:2.6.6)~~>*/implementation 'io.pivotal.cfenv:java-cfenv-boot:2.5.0'
               }
               """
@@ -521,14 +525,45 @@ class DependencyInsightTest implements RewriteTest {
           spec -> spec.recipe(new DependencyInsight("com.fasterxml.jackson.*", "*", null, null))
             .dataTable(DependenciesInUse.Row.class, rows -> {
                 assertThat(rows).isNotEmpty();
-                DependenciesInUse.Row row = rows.getFirst();
-                assertThat(row.getGroupId()).isEqualTo("com.fasterxml.jackson.datatype");
-                assertThat(row.getArtifactId()).isEqualTo("jackson-datatype-jsr310");
-                assertThat(row.getDepth()).isEqualTo(2);
-                row = rows.get(4);
-                assertThat(row.getGroupId()).isEqualTo("com.fasterxml.jackson.core");
-                assertThat(row.getArtifactId()).isEqualTo("jackson-core");
-                assertThat(row.getDepth()).isEqualTo(3);
+                assertThat(rows).anyMatch(row ->
+                  "compileClasspath".equals(row.getScope()) &&
+                    "com.fasterxml.jackson.datatype".equals(row.getGroupId()) &&
+                    "jackson-datatype-jsr310".equals(row.getArtifactId()) &&
+                    row.getCount() == 1);
+                assertThat(rows).anyMatch(row ->
+                  "compileClasspath".equals(row.getScope()) &&
+                    "com.fasterxml.jackson.core".equals(row.getGroupId()) &&
+                    "jackson-core".equals(row.getArtifactId()) &&
+                    row.getCount() == 11);
+            })
+            .dataTable(ExplainDependenciesInUse.Row.class, rows -> {
+                assertThat(rows).isNotEmpty();
+                assertThat(rows).haveExactly(1, new Condition<>(row ->
+                  "com.fasterxml.jackson.core".equals(row.getGroupId()) &&
+                    "jackson-core".equals(row.getArtifactId()) &&
+                    "compileClasspath".equals(row.getScope()) &&
+                    """
+                      com.fasterxml.jackson.core:jackson-core:2.13.2
+                      +--- com.fasterxml.jackson.core:jackson-databind:2.13.2.2
+                      |    +--- com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2
+                      |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6
+                      |    |         \\--- org.springframework.boot:spring-boot-starter-web:2.6.6
+                      |    |              \\--- compileClasspath
+                      |    +--- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2
+                      |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
+                      |    +--- com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2
+                      |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
+                      |    +--- io.pivotal.cfenv:java-cfenv:2.5.0
+                      |    |    +--- io.pivotal.cfenv:java-cfenv-boot:2.5.0
+                      |    |    |    \\--- compileClasspath
+                      |    |    \\--- io.pivotal.cfenv:java-cfenv-jdbc:2.5.0
+                      |    |         \\--- io.pivotal.cfenv:java-cfenv-boot:2.5.0 (*)
+                      |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
+                      +--- com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2 (*)
+                      +--- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2 (*)
+                      +--- com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2 (*)
+                      \\--- io.pivotal.cfenv:java-cfenv:2.5.0 (*)
+                      """.equals(row.getDependencyGraph()), "jackson-core dependency graph"));
             }),
           buildGradle(
             """
@@ -586,9 +621,9 @@ class DependencyInsightTest implements RewriteTest {
               }
 
               dependencies {
-                  /*~~(com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2,com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2,com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2)~~>*/implementation 'org.springframework.boot:spring-boot-starter-web'
-                  /*~~(com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2)~~>*/implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
-                  /*~~(com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2)~~>*/implementation 'io.pivotal.cfenv:java-cfenv-boot:2.5.0'
+                  /*~~(com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2,com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2,com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2)~~>*/implementation 'org.springframework.boot:spring-boot-starter-web'
+                  /*~~(com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2)~~>*/implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
+                  /*~~(com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2)~~>*/implementation 'io.pivotal.cfenv:java-cfenv-boot:2.5.0'
               }
               """
           )

@@ -15,7 +15,11 @@
  */
 package org.openrewrite.groovy;
 
+import java.util.stream.Stream;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -139,8 +143,118 @@ class GroovyParserTest implements RewriteTest {
               System.out.println("Hello World with space before comma" ,)
               System.out.println("Hello World with space after comma", )
               System.out.println("Hello World with space before & after comma" , )
+              System.out.println("Hello World with space before and new line after comma" ,
+              )
               """
           )
+        );
+    }
+
+    @Test
+    void trailingCommaInMethodCallAndClosures() {
+        rewriteRun(
+          groovy(
+            """
+              foo('bar',) {}
+              foo('bar', {} , )
+              foo('bar', {} , ) {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInMethodCallWithNamedParametersAndClosures() {
+        rewriteRun(
+          groovy(
+            """
+              foo(a: 'bar',) {}
+              foo(a: 'bar', {} , )
+              foo(a: 'bar', b: {} , )
+              foo('bar', b: {} , )
+              foo(a: 'bar', {} , ) {}
+              foo(a: 'bar', b: {} , ) {}
+              foo('bar', b: {} , ) {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void noTrailingCommaInMethodCallWithNamedParametersAndClosures() {
+        rewriteRun(
+          groovy(
+            """
+              foo(a: 'bar') {}
+              foo(a: 'bar', {})
+              foo(a: 'bar', b: {})
+              foo('bar', b: {})
+              foo(a: 'bar', {} )
+              foo(a: 'bar', b: {} )
+              foo('bar', b: {} )
+              foo(a: 'bar', {} ) {}
+              foo(a: 'bar', b: {} ) {}
+              foo('bar', b: {} ) {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInMethodCallWithNamedParameters() {
+        rewriteRun(
+          groovy(
+            """
+              foo(a: "Hello World with no extra space",)
+              foo(a: "Hello World with space before comma" ,)
+              foo(a: "Hello World with space after comma", )
+              foo(a: "Hello World with space before & after comma" , )
+              foo(a: "Hello World with space before and new line after comma" ,
+              )
+              """
+          )
+        );
+    }
+
+    @Test
+    void noTrailingCommaInMethodCallWithNamedParameters() {
+        rewriteRun(
+          groovy(
+            """
+              foo(a: "Hello World with no extra space")
+              foo(a: "Hello World with space after parameter" )
+              foo(a: "Hello World with new line after parameter"
+              )
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("escapedBackslashesAndInterpolationInGStringParams")
+    void escapedBackslashesAndInterpolationInGString(@Language("groovy") String groovy) {
+        rewriteRun(groovy(groovy));
+    }
+
+    /**
+     * Produces a stream of test expressions like `def a = "\\${System.getProperty('user.name')}"`
+     */
+    static Stream<String> escapedBackslashesAndInterpolationInGStringParams() {
+        return Stream.of(
+            "1 + 1",
+            "System.getProperty('user.name')"
+        ).flatMap(exp ->
+            """
+            %s
+            "%s"
+            "${%s}"
+            "\\${%s}"
+            "\\\\${%s}"
+            "\\\\\\${%s}"
+            "${%s}\\\\"
+            "\\t${%s}"
+            "${%s}\\t"
+            """.lines().map(s -> ("def a = " + s).formatted(exp))
         );
     }
 

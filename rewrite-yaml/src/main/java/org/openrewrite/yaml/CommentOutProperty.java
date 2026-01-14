@@ -51,20 +51,14 @@ public class CommentOutProperty extends Recipe {
     @Nullable
     Boolean commentOutProperty;
 
-    @Override
-    public String getDisplayName() {
-        return "Comment out property";
-    }
+    String displayName = "Comment out property";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s`", propertyKey);
     }
 
-    @Override
-    public String getDescription() {
-        return "Comment out a YAML property and add a comment in front.";
-    }
+    String description = "Comment out a YAML property and add a comment in front.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

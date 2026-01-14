@@ -1,0 +1,3 @@
+ecosystem,packageName,name,displayName,description,recipeCount,category1
+maven,org.openrewrite:rewrite-test,org.openrewrite.test.AdHocRecipe,Ad hoc recipe,An ad hoc recipe used in RewriteTest.,1,Test
+maven,org.openrewrite:rewrite-test,org.openrewrite.test.AdHocScanningRecipe,Ad hoc recipe,An ad hoc recipe used in RewriteTest.,1,Test

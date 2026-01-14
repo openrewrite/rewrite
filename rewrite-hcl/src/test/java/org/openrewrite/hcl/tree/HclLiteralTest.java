@@ -33,8 +33,8 @@ class HclLiteralTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(conf -> {
-                Hcl.Block block = (Hcl.Block) conf.getBody().getFirst();
-                Hcl.Attribute default_ = (Hcl.Attribute) block.getBody().getFirst();
+                var block = (Hcl.Block) conf.getBody().getFirst();
+                var default_ = (Hcl.Attribute) block.getBody().getFirst();
                 Expression val = default_.getValue();
                 assertThat(val).isInstanceOf(Hcl.Literal.class);
                 assertThat(((Hcl.Literal) val).getValueSource()).isEqualTo("null");

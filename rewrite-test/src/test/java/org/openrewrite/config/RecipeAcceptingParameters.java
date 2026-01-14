@@ -30,13 +30,7 @@ public class RecipeAcceptingParameters extends Recipe {
     @Option(displayName = "bar")
     Integer bar;
 
-    @Override
-    public String getDisplayName() {
-        return "Recipe accepting parameters";
-    }
+    String displayName = "Recipe accepting parameters";
 
-    @Override
-    public String getDescription() {
-        return "A recipe with parameters, used in EnvironmentTest";
-    }
+    String description = "A recipe with parameters, used in EnvironmentTest";
 }

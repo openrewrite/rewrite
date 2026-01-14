@@ -64,20 +64,14 @@ public class ParentPomInsight extends Recipe {
     @Nullable
     Boolean recursive;
 
-    @Override
-    public String getDisplayName() {
-        return "Maven parent insight";
-    }
+    String displayName = "Maven parent insight";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("for `%s:%s`", groupIdPattern, artifactIdPattern);
     }
 
-    @Override
-    public String getDescription() {
-        return "Find Maven parents matching a `groupId` and `artifactId`.";
-    }
+    String description = "Find Maven parents matching a `groupId` and `artifactId`.";
 
     @Override
     public Validated<Object> validate() {

@@ -60,16 +60,9 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
     @Nullable
     String version;
 
-    @Override
-    public String getDisplayName() {
-        //noinspection DialogTitleCapitalization
-        return "Migrate from Gradle Enterprise to Develocity";
-    }
+    String displayName = "Migrate from Gradle Enterprise to Develocity";
 
-    @Override
-    public String getDescription() {
-        return "Migrate from the Gradle Enterprise Gradle plugin to the Develocity Gradle plugin.";
-    }
+    String description = "Migrate from the Gradle Enterprise Gradle plugin to the Develocity Gradle plugin.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

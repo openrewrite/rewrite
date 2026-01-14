@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -38,15 +39,11 @@ import static java.util.Collections.singleton;
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
 public class EmptyNewlineAtEndOfFile extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "End files with a single newline";
-    }
+    @Getter
+    final String displayName = "End files with a single newline";
 
-    @Override
-    public String getDescription() {
-        return "Some tools work better when files end with an empty line.";
-    }
+    @Getter
+    final String description = "Some tools work better when files end with an empty line.";
 
     @Override
     public Set<String> getTags() {

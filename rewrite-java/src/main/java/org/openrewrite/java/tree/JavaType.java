@@ -166,6 +166,11 @@ public interface JavaType {
             this.throwableTypes = ListUtils.nullIfEmpty(throwableTypes);
             return this;
         }
+
+        @Override
+        public String toString() {
+            return new DefaultJavaTypeSignatureBuilder().signature(this);
+        }
     }
 
     class Intersection implements JavaType {
@@ -206,6 +211,11 @@ public interface JavaType {
         public Intersection unsafeSet(JavaType[] bounds) {
             this.bounds = ListUtils.nullIfEmpty(bounds);
             return this;
+        }
+
+        @Override
+        public String toString() {
+            return new DefaultJavaTypeSignatureBuilder().signature(this);
         }
     }
 
@@ -339,9 +349,12 @@ public interface JavaType {
          * @return The class name without package qualification. If an inner class, outer/inner classes are separated by '.'.
          */
         public String getClassName() {
+            return TypeUtils.toFullyQualifiedName(getRawClassName());
+        }
+
+        public String getRawClassName() {
             String fqn = getFullyQualifiedName();
-            String className = fqn.substring(fqn.lastIndexOf('.') + 1);
-            return TypeUtils.toFullyQualifiedName(className);
+            return fqn.substring(fqn.lastIndexOf('.') + 1);
         }
 
         public String getPackageName() {

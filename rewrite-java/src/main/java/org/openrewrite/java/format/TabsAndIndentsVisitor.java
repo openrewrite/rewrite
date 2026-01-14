@@ -17,16 +17,25 @@ package org.openrewrite.java.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.service.SourcePositionService;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
+import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.java.format.ColumnPositionCalculator.computeColumnPosition;
@@ -37,14 +46,28 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
     private final TabsAndIndentsStyle style;
     private final SpacesStyle spacesStyle;
+    private final WrappingAndBracesStyle wrappingStyle;
 
-    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, SpacesStyle spacesStyle) {
-        this(style, spacesStyle, null);
+    public TabsAndIndentsVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        this(sourceFile.getMarkers().findAll(NamedStyles.class), stopAfter);
     }
 
-    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, SpacesStyle spacesStyle,  @Nullable Tree stopAfter) {
+    public TabsAndIndentsVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
+        this(getStyle(TabsAndIndentsStyle.class, styles, IntelliJ::tabsAndIndents),
+                getStyle(SpacesStyle.class, styles, IntelliJ::spaces),
+                getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces),
+                stopAfter);
+    }
+
+    @Deprecated
+    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingStyle) {
+        this(style, spacesStyle, wrappingStyle, null);
+    }
+
+    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingStyle, @Nullable Tree stopAfter) {
         this.style = style;
         this.spacesStyle = spacesStyle;
+        this.wrappingStyle = wrappingStyle;
         this.stopAfter = stopAfter;
     }
 
@@ -131,7 +154,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
         }
 
-        if (space.getComments().isEmpty() && !space.getLastWhitespace().contains("\n") || parent == null) {
+        if (space.getComments().isEmpty() && !space.getLastWhitespace().contains("\n") || parent == null || loc == Space.Location.TRY_RESOURCE) {
             return space;
         }
 
@@ -248,7 +271,14 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                                 if ((loc == JRightPadded.Location.METHOD_DECLARATION_PARAMETER && style.getMethodDeclarationParameters().getAlignWhenMultiple()) ||
                                         (loc == JRightPadded.Location.RECORD_STATE_VECTOR && style.getRecordComponents().getAlignWhenMultiple())) {
                                     if (tree != null) {
-                                        int alignTo = computeFirstParameterColumn(tree);
+                                        JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                                        int alignTo;
+                                        try {
+                                            alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
+                                        } catch (UnsupportedOperationException e) {
+                                            // Sourcefile$service(...) might give UnsupportedOperationException depending on the runtime, the lst build date... we use deprecated behavior in that case
+                                            alignTo = computeFirstParameterColumn(tree);
+                                        }
                                         if (alignTo != -1) {
                                             getCursor().getParentOrThrow().putMessage("lastIndent", alignTo - style.getContinuationIndent());
                                             elem = visitAndCast(elem, p);
@@ -271,7 +301,14 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             }
                         } else {
                             if (elem.getPrefix().getLastWhitespace().contains("\n") && tree != null) {
-                                int alignTo = computeFirstParameterColumn(tree);
+                                JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                                int alignTo;
+                                try {
+                                    alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
+                                } catch (UnsupportedOperationException error) {
+                                    // Sourcefile$service(...) might give UnsupportedOperationException depending on the runtime, the lst build date... we use deprecated behavior in that case
+                                    alignTo = computeFirstParameterColumn(tree);
+                                }
                                 if (alignTo != -1) {
                                     getCursor().getParentTreeCursor().putMessage("lastIndent", alignTo - style.getContinuationIndent());
                                     elem = visitAndCast(elem, p);
@@ -361,7 +398,23 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         break;
                     default:
                         elem = visitAndCast(elem, p);
-                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        if (right.getAfter().getLastWhitespace().contains("\n") && alignWhenMultiple(loc)) {
+                            JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                            int alignTo;
+                            try {
+                                alignTo = sourceFile.service(SourcePositionService.class).computeColumnToAlignTo(new Cursor(getCursor(), elem), style.getContinuationIndent());
+                            } catch (UnsupportedOperationException e) {
+                                // Sourcefile$service(...) might give UnsupportedOperationException depending on the runtime, the lst build date... we do not align in that case.
+                                alignTo = -1;
+                            }
+                            if (alignTo != -1) {
+                                after = indentTo(right.getAfter(), alignTo, loc.getAfterLocation());
+                            } else {
+                                after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                            }
+                        } else {
+                            after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        }
                 }
             } else {
                 switch (loc) {
@@ -419,6 +472,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         return (after == right.getAfter() && t == right.getElement()) ? right : new JRightPadded<>(t, after, right.getMarkers());
     }
 
+    @Deprecated
     private int computeFirstParameterColumn(J tree) {
         List<JRightPadded<Statement>> arguments;
         if (tree instanceof J.MethodDeclaration) {
@@ -438,9 +492,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             int declPrefixLength = getLengthOfWhitespace(tree.getPrefix().getLastWhitespace());
 
             return declPrefixLength + style.getContinuationIndent();
-        } else {
-            return computeColumnPosition(tree, firstArg, getCursor());
         }
+        return computeColumnPosition(tree, firstArg, getCursor());
     }
 
     @Override
@@ -491,6 +544,39 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         return js == container.getPadding().getElements() && before == container.getBefore() ?
                 container :
                 JContainer.build(before, js, container.getMarkers());
+    }
+
+    private boolean alignWhenMultiple(JRightPadded.Location loc) {
+        Supplier<@Nullable Boolean> isAlignedWhenMultipleFromStyle;
+        boolean intelliJDefault;
+        switch (loc) {
+            case FOR_CONDITION:
+            case FOR_UPDATE:
+            case METHOD_DECLARATION_PARAMETER:
+            case RECORD_STATE_VECTOR:
+            case TRY_RESOURCE:
+                isAlignedWhenMultipleFromStyle = () -> null;
+                intelliJDefault = true;
+                break;
+            case METHOD_SELECT:
+                //noinspection ConstantConditions
+                isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getChainedMethodCalls() != null && wrappingStyle.getChainedMethodCalls().getAlignWhenMultiline();
+                intelliJDefault = false;
+                break;
+            default:
+                isAlignedWhenMultipleFromStyle = () -> null;
+                intelliJDefault = false;
+        }
+        //Using this way as it allows is later to easily add new alignment booleans on different styles without risk of NoSuchMethodError.
+        try {
+            Boolean aligned = isAlignedWhenMultipleFromStyle.get();
+            if (aligned != null) {
+                return aligned;
+            }
+        } catch (NoSuchMethodError ignored) {
+            // some style.get...()  or style.get...().get...() might give NoSuchMethodError depending on the runtime, the lst build date... In that case we return intelliJ's default;
+        }
+        return intelliJDefault;
     }
 
     private Space indentTo(Space space, int column, Space.Location spaceLocation) {
@@ -731,5 +817,14 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         ALIGN,
         INDENT,
         CONTINUATION_INDENT
+    }
+
+    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return StyleHelper.merge(defaultStyle.get(), style);
+        }
+        return defaultStyle.get();
     }
 }
