@@ -134,7 +134,7 @@ public class RpcObjectData {
         return (V) value;
     }
 
-    @JsonFormat(shape = JsonFormat.Shape.NUMBER)
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
     public enum State {
         NO_CHANGE,
         ADD,
