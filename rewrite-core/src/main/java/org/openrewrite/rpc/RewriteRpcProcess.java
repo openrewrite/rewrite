@@ -21,9 +21,7 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.moderne.jsonrpc.JsonRpc;
-import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import io.moderne.jsonrpc.handler.MessageHandler;
 import io.moderne.jsonrpc.handler.TraceMessageHandler;
@@ -130,11 +128,7 @@ public class RewriteRpcProcess extends Thread {
             }
         }
 
-        SimpleModule module = new SimpleModule();
-        module.addSerializer(Path.class, new PathSerializer());
-        module.addDeserializer(Path.class, new PathDeserializer());
-        JsonMessageFormatter formatter = new JsonMessageFormatter(module);
-        MessageHandler handler = new HeaderDelimitedMessageHandler(formatter,
+        MessageHandler handler = new HeaderDelimitedMessageHandler(
                 process.getInputStream(), process.getOutputStream());
         if (trace) {
             handler = new TraceMessageHandler("client", handler);
