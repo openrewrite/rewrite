@@ -881,7 +881,6 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void forLoop() {
         rewriteRun(
