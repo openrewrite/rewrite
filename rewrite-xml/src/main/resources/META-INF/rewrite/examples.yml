@@ -141,10 +141,8 @@ recipeName: org.openrewrite.xmlChangeTagAttributeKey
 examples:
   - description: '`ChangeXmlAttributeTest#renameReRenderToRender`'
     parameters:
-      - //a4j:ajax
-      - reRender
+      - //a4j:ajax/@reRender
       - render
-      - '**/*.xhtml'
     sources:
       - before: |
           <?xml version="1.0" encoding="UTF-8"?>

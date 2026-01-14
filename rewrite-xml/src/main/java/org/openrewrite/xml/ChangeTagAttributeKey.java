@@ -30,7 +30,7 @@ public class ChangeTagAttributeKey extends Recipe {
     @Option(displayName = "Attribute XPath",
             description = "XPath expression to match the attribute.",
             example = "//a4j:ajax/@reRender")
-    String elementXPath;
+    String xPath;
 
     @Option(displayName = "New attribute name",
             description = "The new name for the attribute.",
@@ -39,7 +39,7 @@ public class ChangeTagAttributeKey extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        XPathMatcher xPathMatcher = new XPathMatcher(elementXPath);
+        XPathMatcher xPathMatcher = new XPathMatcher(xPath);
         return new XmlIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Attribute visitAttribute(Xml.Attribute attribute, ExecutionContext ctx) {
