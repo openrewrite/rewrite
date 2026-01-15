@@ -48,8 +48,8 @@ class AnnotationTest implements RewriteTest {
               """,
                 spec -> spec.afterRecipe(cu -> {
                             J.ClassDeclaration c = cu.getClasses().get(0);
-                            JavaType.Class type = (JavaType.Class) c.getType();
-                            JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().get(0);
+                            var type = (JavaType.Class) c.getType();
+                            var a = (JavaType.Annotation) type.getAnnotations().get(0);
                             assertThat(a.getValues()).hasSize(1);
                             assertThat(a.getValues().get(0).getValue()).isEqualTo(singletonList("ALL"));
                         }
@@ -312,23 +312,23 @@ class AnnotationTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 AnnotationService service = cu.service(AnnotationService.class);
-                J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+                var field = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
                 assertThat(service.getAllAnnotations(new Cursor(null, field))).satisfiesExactly(
                   leading -> assertThat(leading.getSimpleName()).isEqualTo("Leading")
                 );
-                J.ParameterizedType fieldType = (J.ParameterizedType) field.getTypeExpression();
+                var fieldType = (J.ParameterizedType) field.getTypeExpression();
                 assertThat(fieldType).isNotNull();
-                J.AnnotatedType annotatedType = (J.AnnotatedType) fieldType.getClazz();
+                var annotatedType = (J.AnnotatedType) fieldType.getClazz();
                 assertThat(service.getAllAnnotations(new Cursor(null, annotatedType))).satisfiesExactly(
                   multi1 -> assertThat(multi1.getSimpleName()).isEqualTo("Multi1"),
                   multi2 -> assertThat(multi2.getSimpleName()).isEqualTo("Multi2")
                 );
 
-                J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(1);
+                var method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(1);
                 assertThat(service.getAllAnnotations(new Cursor(null, method))).satisfiesExactly(
                   leading -> assertThat(leading.getSimpleName()).isEqualTo("Leading")
                 );
-                J.ParameterizedType returnType = (J.ParameterizedType) method.getReturnTypeExpression();
+                var returnType = (J.ParameterizedType) method.getReturnTypeExpression();
                 assertThat(returnType).isNotNull();
                 annotatedType = (J.AnnotatedType) returnType.getClazz();
                 assertThat(service.getAllAnnotations(new Cursor(null, annotatedType))).satisfiesExactly(
@@ -450,8 +450,8 @@ class AnnotationTest implements RewriteTest {
               """,
                 spec -> spec.afterRecipe(cu -> {
                     J.ClassDeclaration c = cu.getClasses().get(1);
-                    JavaType.Class type = (JavaType.Class) c.getType();
-                    JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().get(0);
+                    var type = (JavaType.Class) c.getType();
+                    var a = (JavaType.Annotation) type.getAnnotations().get(0);
                     assertThat(a.getValues()).satisfiesExactly(
                             v -> {
                                 assertThat(v.getElement()).isIn(a.getMethods());
@@ -501,11 +501,11 @@ class AnnotationTest implements RewriteTest {
           }
           """
         ).toList();
-        J.CompilationUnit cu = (J.CompilationUnit) sourceFiles.get(1);
+        var cu = (J.CompilationUnit) sourceFiles.get(1);
 
-        J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-        J.MethodInvocation mi = (J.MethodInvocation) md.getBody().getStatements().get(0);
-        JavaType.Annotation annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
+        var md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+        var mi = (J.MethodInvocation) md.getBody().getStatements().get(0);
+        var annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
 
         // Thread.currentThread().stop();
         assertEquals("java.lang.Deprecated", annotation.getType().getFullyQualifiedName());
@@ -540,13 +540,13 @@ class AnnotationTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 J.ClassDeclaration c = cu.getClasses().get(0);
-                JavaType.Class type = (JavaType.Class) c.getType();
-                JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().get(0);
+                var type = (JavaType.Class) c.getType();
+                var a = (JavaType.Annotation) type.getAnnotations().get(0);
                 assertThat(a.getValues()).hasSize(1);
-                JavaType.Annotation.SingleElementValue v = (JavaType.Annotation.SingleElementValue) a.getValues().get(0);
+                var v = (JavaType.Annotation.SingleElementValue) a.getValues().get(0);
                 assertThat(v.getElement()).isSameAs(a.getMethods().get(0));
                 assertThat(v.getValue()).isInstanceOf(JavaType.Array.class);
-                JavaType.Array array = (JavaType.Array) v.getValue();
+                var array = (JavaType.Array) v.getValue();
                 assertThat(array.getElemType()).isInstanceOf(JavaType.Primitive.class);
                 assertThat(((JavaType.Primitive) array.getElemType()).getKeyword()).isEqualTo("int");
             })

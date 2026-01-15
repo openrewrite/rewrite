@@ -54,20 +54,14 @@ public class ChangePluginExecutions extends Recipe {
     @Nullable
     String executions;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven plugin executions";
-    }
+    String displayName = "Change Maven plugin executions";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("for `%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Apply the specified executions to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
-    }
+    String description = "Apply the specified executions to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

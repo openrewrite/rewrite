@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
@@ -27,16 +28,12 @@ import org.openrewrite.style.Style;
 import static java.util.Objects.requireNonNull;
 
 public class NoWhitespaceBefore extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "No whitespace before";
-    }
+    @Getter
+    final String displayName = "No whitespace before";
 
-    @Override
-    public String getDescription() {
-        return "Removes unnecessary whitespace preceding a token. " +
-                "A linebreak before a token will be removed unless `allowLineBreaks` is set to `true`.";
-    }
+    @Getter
+    final String description = "Removes unnecessary whitespace preceding a token. " +
+        "A linebreak before a token will be removed unless `allowLineBreaks` is set to `true`.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

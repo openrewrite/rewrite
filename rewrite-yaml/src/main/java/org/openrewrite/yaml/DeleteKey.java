@@ -40,15 +40,9 @@ public class DeleteKey extends Recipe {
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Delete key";
-    }
+    String displayName = "Delete key";
 
-    @Override
-    public String getDescription() {
-        return "Delete a YAML mapping entry key.";
-    }
+    String description = "Delete a YAML mapping entry key.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

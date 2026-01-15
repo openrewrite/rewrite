@@ -42,15 +42,9 @@ public class ResultOfMethodCallIgnored extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
-    @Override
-    public String getDisplayName() {
-        return "Result of method call ignored";
-    }
+    String displayName = "Result of method call ignored";
 
-    @Override
-    public String getDescription() {
-        return "Find locations where the result of the method call is being ignored.";
-    }
+    String description = "Find locations where the result of the method call is being ignored.";
 
     @Override
     public Validated<Object> validate() {

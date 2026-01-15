@@ -176,7 +176,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J preVisit(J tree, ExecutionContext ctx) {
-                  SourceFile t = (SourceFile) modifyAll.getVisitor().visitNonNull(tree, ctx);
+                  var t = (SourceFile) modifyAll.getVisitor().visitNonNull(tree, ctx);
                   assertThat(t.printAll()).isEqualTo(java.trim());
                   stopAfterPreVisit();
                   return tree;
@@ -429,6 +429,52 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         assertThat(paths)
           .containsExactlyInAnyOrder("package.json", "index.js")
           .noneMatch(p -> p.contains("vendor"));
+    }
+
+    /**
+     * Tests that a JavaScript recipe can delegate to a Java recipe via RPC.
+     * This validates the "npm ecosystem" use case where JS code can invoke Java recipes.
+     * Flow: Java test -> JS recipe (JavaChangeMethodName) -> Java recipe (ChangeMethodName) -> result
+     */
+    @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
+    @Test
+    void jsRecipeDelegatingToJavaRecipe(@TempDir Path projectDir) {
+        installRecipes();
+        rewriteRun(
+          spec -> spec.recipe(client().prepareRecipe(
+            "org.openrewrite.example.java.change-method-name",
+            Map.of(
+              "methodPattern", "_.LoDashStatic max(..)",
+              "newMethodName", "maximum"
+            ))),
+          npm(
+            projectDir,
+            typescript(
+              """
+                import _ from 'lodash';
+                const result = _.max(1, 2);
+                """,
+              """
+                import _ from 'lodash';
+                const result = _.maximum(1, 2);
+                """
+            ),
+            packageJson(
+              """
+                {
+                  "name": "test-project",
+                  "version": "1.0.0",
+                  "dependencies": {
+                    "lodash": "^4.17.21"
+                  },
+                  "devDependencies": {
+                    "@types/lodash": "^4.14.195"
+                  }
+                }
+                """
+            )
+          )
+        );
     }
 
     private void installRecipes() {

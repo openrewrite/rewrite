@@ -118,20 +118,14 @@ public class MergeYaml extends Recipe {
                 .and(Validated.test("insertProperty", "Insert property must be filed when `insert mode` is either `BeforeProperty` or `AfterProperty`.", insertProperty,
                         s -> insertMode == null || insertMode == Last || !isBlank(s)));
     }
-    @Override
-    public String getDisplayName() {
-        return "Merge YAML snippet";
-    }
+    String displayName = "Merge YAML snippet";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("at `%s`", key);
     }
 
-    @Override
-    public String getDescription() {
-        return "Merge a YAML snippet with an existing YAML document.";
-    }
+    String description = "Merge a YAML snippet with an existing YAML document.";
 
     final static String FOUND_MATCHING_ELEMENT = "FOUND_MATCHING_ELEMENT";
     final static String REMOVE_PREFIX = "REMOVE_PREFIX";

@@ -50,15 +50,9 @@ public class FindTypes extends Recipe {
     @Nullable
     Boolean checkAssignability;
 
-    @Override
-    public String getDisplayName() {
-        return "Find types";
-    }
+    String displayName = "Find types";
 
-    @Override
-    public String getDescription() {
-        return "Find type references by name.";
-    }
+    String description = "Find type references by name.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

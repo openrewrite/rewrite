@@ -560,6 +560,83 @@ describe('AddImport visitor', () => {
                 )
             );
         });
+
+        test('should preserve spacing style when inserting import before existing ones', async () => {
+            const spec = new RecipeSpec();
+            // 'act' comes alphabetically before 'forwardRef', so it will be inserted first
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "act", onlyIfReferenced: false }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import { forwardRef } from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `,
+                    `
+                        import { act, forwardRef } from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should preserve no-spacing style when merging imports', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "memo", onlyIfReferenced: false }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import {forwardRef} from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `,
+                    `
+                        import {forwardRef, memo} from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('should preserve no-spacing style when inserting import before existing ones', async () => {
+            const spec = new RecipeSpec();
+            // 'act' comes alphabetically before 'forwardRef', so it will be inserted first
+            spec.recipe = fromVisitor(new AddImport({ module: "react", member: "act", onlyIfReferenced: false }));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import {forwardRef} from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `,
+                    `
+                        import {act, forwardRef} from 'react';
+
+                        function example() {
+                            const MyComponent = forwardRef(() => <div/>);
+                        }
+                    `
+                )
+            );
+        });
     });
 
     describe('CommonJS require detection', () => {

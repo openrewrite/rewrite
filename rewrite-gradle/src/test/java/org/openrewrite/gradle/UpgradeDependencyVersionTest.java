@@ -2230,4 +2230,82 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "$springCloudVersion",
+      "${springCloudVersion}",
+      "${property('springCloudVersion')}",
+      "${project.property('springCloudVersion')}",
+      "${findProperty('springCloudVersion')}",
+      "${project.findProperty('springCloudVersion')}",
+      "${project.properties['springCloudVersion']}"
+    })
+    void upgradesSpringDependencyManagementPluginMavenBomVersionPropertyWithGroovyDSL(String versionRef) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2023.0.x", null)),
+          buildGradle(
+            //language=groovy
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+              repositories { mavenCentral() }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom "org.springframework.cloud:spring-cloud-dependencies:%s"
+                  }
+              }
+              """.formatted(versionRef)
+          ),
+          properties(
+            """
+              springCloudVersion=2021.0.8
+              """,
+            """
+              springCloudVersion=2023.0.6
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "$springCloudVersion",
+      "${springCloudVersion}"
+    })
+    void upgradesSpringDependencyManagementPluginMavenBomVersionPropertyWithKotlinDSL(String versionRef) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2023.0.x", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+                  id("io.spring.dependency-management") version "1.1.7"
+              }
+              repositories { mavenCentral() }
+
+              val springCloudVersion: String by project
+
+              dependencyManagement {
+                  imports {
+                      mavenBom("org.springframework.cloud:spring-cloud-dependencies:%s")
+                  }
+              }
+              """.formatted(versionRef)
+          ),
+          properties(
+            """
+              springCloudVersion=2021.0.8
+              """,
+            """
+              springCloudVersion=2023.0.6
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
 }

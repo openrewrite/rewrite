@@ -49,15 +49,9 @@ public class SimplifyMethodChain extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
-    @Override
-    public String getDisplayName() {
-        return "Simplify a call chain";
-    }
+    String displayName = "Simplify a call chain";
 
-    @Override
-    public String getDescription() {
-        return "Simplify `a.b().c()` to `a.d()`.";
-    }
+    String description = "Simplify `a.b().c()` to `a.d()`.";
 
     @Override
     public Validated<Object> validate() {

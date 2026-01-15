@@ -1470,15 +1470,9 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     @EqualsAndHashCode(callSuper = false)
     @Value
     public static class ScanningAccumulatedUpgradeRecipe extends ScanningRecipe<UpgradeTransitiveDependencyVersion.DependencyVersionState> {
-        @Override
-        public String getDisplayName() {
-            return "Accumulation-scanned recipe";
-        }
+        String displayName = "Accumulation-scanned recipe";
 
-        @Override
-        public String getDescription() {
-            return "Some recipes hava loop to determine all updates and add them to the scanner. This cycle/recipe only can update for the provided dependency.";
-        }
+        String description = "Some recipes hava loop to determine all updates and add them to the scanner. This cycle/recipe only can update for the provided dependency.";
 
         private final UpgradeTransitiveDependencyVersion scanAlsoFor;
         private final UpgradeTransitiveDependencyVersion upgradeDependency;

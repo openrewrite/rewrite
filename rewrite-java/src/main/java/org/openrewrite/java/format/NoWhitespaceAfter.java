@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -26,16 +27,12 @@ import org.openrewrite.style.Style;
 import static java.util.Objects.requireNonNull;
 
 public class NoWhitespaceAfter extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "No whitespace after";
-    }
+    @Getter
+    final String displayName = "No whitespace after";
 
-    @Override
-    public String getDescription() {
-        return "Removes unnecessary whitespace appearing after a token. " +
-               "A linebreak after a token is allowed unless `allowLineBreaks` is set to `false`, in which case it will be removed.";
-    }
+    @Getter
+    final String description = "Removes unnecessary whitespace appearing after a token. " +
+        "A linebreak after a token is allowed unless `allowLineBreaks` is set to `false`, in which case it will be removed.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
