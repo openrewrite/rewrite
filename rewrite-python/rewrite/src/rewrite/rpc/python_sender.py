@@ -817,15 +817,11 @@ class PythonRpcSender:
         q.get_and_send(space, lambda x: x.whitespace)
 
     def _visit_comment(self, comment, q: 'RpcSendQueue') -> None:
-        """Visit a Comment object."""
-        from rewrite.python.support_types import PyComment
+        """Visit a Comment object (TextComment for Python)."""
         q.get_and_send(comment, lambda x: x.multiline)
         q.get_and_send(comment, lambda x: x.text)
         q.get_and_send(comment, lambda x: x.suffix)
         q.get_and_send(comment, lambda x: x.markers)
-        # PyComment has an additional field
-        if isinstance(comment, PyComment):
-            q.get_and_send(comment, lambda x: x.aligned_to_indent)
 
     def _visit_right_padded(self, rp: JRightPadded, q: 'RpcSendQueue') -> None:
         """Visit a JRightPadded wrapper."""

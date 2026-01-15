@@ -16,7 +16,7 @@ from rewrite.java import Space, JRightPadded, JContainer, JLeftPadded, JavaType,
 from rewrite.java import tree as j
 from . import tree as py
 from .markers import KeywordArguments, KeywordOnlyArguments, Quoted
-from .support_types import PyComment
+from rewrite.java.support_types import TextComment
 from .type_mapping import PythonTypeMapping
 
 T = TypeVar('T')
@@ -2196,8 +2196,8 @@ class ParserVisitor(ast.NodeVisitor):
                 while offset < source_len and source[offset] not in ['\r', '\n']:
                     comment.append(source[offset])
                     offset += 1
-                comments.append(PyComment(''.join(comment), '',
-                                          False, Markers.EMPTY))
+                comments.append(TextComment(False, ''.join(comment), '',
+                                            Markers.EMPTY))
                 continue
             else:
                 break

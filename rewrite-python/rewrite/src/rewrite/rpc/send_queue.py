@@ -48,7 +48,7 @@ def to_java_type_name(py_type: type) -> Optional[str]:
     if module.startswith('rewrite.python.tree'):
         return f"org.openrewrite.python.tree.Py${java_name}"
     elif module.startswith('rewrite.python.support_types'):
-        # PyComment is in support_types but maps to tree package
+        # Python support types (PySpace, etc.) map to the tree package
         return f"org.openrewrite.python.tree.{java_name}"
     elif module.startswith('rewrite.python.markers'):
         return f"org.openrewrite.python.marker.{java_name}"

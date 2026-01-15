@@ -638,12 +638,15 @@ def main():
             except Exception as e:
                 logger.error(f"Error handling request: {e}")
                 traceback.print_exc()
+                # Include full stack trace in error response for debugging
+                tb_str = traceback.format_exc()
                 response = {
                     'jsonrpc': '2.0',
                     'id': request_id,
                     'error': {
                         'code': -32603,
-                        'message': str(e)
+                        'message': str(e),
+                        'data': tb_str
                     }
                 }
 
