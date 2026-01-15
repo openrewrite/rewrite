@@ -700,6 +700,117 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
+    void doesNotAddVersionNumberTagToDirectDependencyIfAbleToOnParentManagedDependency() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeDependencyGroupIdAndArtifactId(
+              "com.fasterxml.jackson.core",
+              "jackson-core",
+              "org.apache.commons",
+              "commons-csv",
+              "1.14.1",
+              null,
+              null,
+              true
+            )
+          ),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>project</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.fasterxml.jackson</groupId>
+                    <artifactId>jackson-bom</artifactId>
+                    <version>2.20.0</version>
+                  </parent>
+                  <modules>
+                    <module>child-project</module>
+                  </modules>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-core</artifactId>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>project</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.fasterxml.jackson</groupId>
+                    <artifactId>jackson-bom</artifactId>
+                    <version>2.20.0</version>
+                  </parent>
+                  <modules>
+                    <module>child-project</module>
+                  </modules>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.apache.commons</groupId>
+                        <artifactId>commons-csv</artifactId>
+                        <version>1.14.1</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """
+            ),
+            mavenProject("child-project",
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>child-project</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>project</artifactId>
+                      <version>1</version>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-core</artifactId>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>child-project</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>project</artifactId>
+                      <version>1</version>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.apache.commons</groupId>
+                        <artifactId>commons-csv</artifactId>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
     void changeProfileManagedDependencyGroupIdAndArtifactId() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
