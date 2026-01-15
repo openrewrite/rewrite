@@ -253,16 +253,16 @@ public class ChangePackage extends Recipe {
                     String path = ((SourceFile) sf).getSourcePath().toString().replace('\\', '/');
                     String changingFrom = getCursor().getMessage(RENAME_FROM_KEY);
                     assert changingFrom != null;
-                    final String oldPathPart = changingFrom.replace('.', '/');
-                    final String newPathPart = changingTo.replace('.', '/');
-                    final String newPath;
+                    String oldPathPart = changingFrom.replace('.', '/');
+                    String newPathPart = changingTo.replace('.', '/');
+                    String newPath;
                     if (path.startsWith(oldPathPart)) {
                         newPath = newPathPart + path.substring(oldPathPart.length());
                     } else {
-                        final int dirIdx = path.indexOf('/');
-                        final String prefix = dirIdx == -1 ? null : path.substring(0, dirIdx);
-                        final String pathNoPrefix = dirIdx == -1 ? path : path.substring(dirIdx);
-                        final String newPath1 = pathNoPrefix.replaceFirst(
+                        int dirIdx = path.indexOf('/');
+                        String prefix = dirIdx == -1 ? null : path.substring(0, dirIdx);
+                        String pathNoPrefix = dirIdx == -1 ? path : path.substring(dirIdx);
+                        String newPath1 = pathNoPrefix.replaceFirst(
                                     oldPathPart,
                                     newPathPart
                                 );
