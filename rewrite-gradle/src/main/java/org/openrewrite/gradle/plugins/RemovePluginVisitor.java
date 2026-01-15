@@ -47,56 +47,54 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
     public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
         J.Block b = super.visitBlock(block, executionContext);
 
-        J.MethodInvocation m = getCursor().firstEnclosing(J.MethodInvocation.class);
-        if (m == null) {
+        J.MethodInvocation enclosingMethod = getCursor().firstEnclosing(J.MethodInvocation.class);
+        if (enclosingMethod == null) {
             return b;
         }
 
         boolean isKotlin = getCursor().firstEnclosing(K.CompilationUnit.class) != null;
         boolean isPluginsBlock = isKotlin ?
-                "plugins".equals(m.getSimpleName()) :
-                buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m);
+                "plugins".equals(enclosingMethod.getSimpleName()) :
+                buildPluginsContainerMatcher.matches(enclosingMethod) || settingsPluginsContainerMatcher.matches(enclosingMethod);
         if (!isPluginsBlock) {
             return b;
         }
 
         return b.withStatements(ListUtils.map(b.getStatements(), statement -> {
-            if (!(statement instanceof J.MethodInvocation ||
-                    (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation))) {
+            J.MethodInvocation m;
+            if (statement instanceof J.MethodInvocation) {
+                m = (J.MethodInvocation) statement;
+            } else if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation) {
+                m = (J.MethodInvocation) ((J.Return) statement).getExpression();
+            } else {
                 return statement;
             }
 
-            J.MethodInvocation m2 = (J.MethodInvocation) (statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement);
-
             // Check for id("pluginId")
-            if (matchesIdCall(m2, isKotlin)) {
-                if (m2.getArguments().get(0) instanceof J.Literal &&
-                        pluginId.equals(((J.Literal) m2.getArguments().get(0)).getValue())) {
+            if (isIdMethodInvocation(m, isKotlin)) {
+                if (isPlugin(m.getArguments().get(0))) {
                     return null;
                 }
             }
             // Check for id("pluginId").version("...")
-            else if (matchesVersionCall(m2, isKotlin)) {
-                if (m2.getSelect() instanceof J.MethodInvocation &&
-                        ((J.MethodInvocation) m2.getSelect()).getArguments().get(0) instanceof J.Literal &&
-                        pluginId.equals(((J.Literal) ((J.MethodInvocation) m2.getSelect()).getArguments().get(0)).getValue())) {
+            else if (isVersionMethodInvocation(m, isKotlin)) {
+                if (m.getSelect() instanceof J.MethodInvocation &&
+                        isPlugin(((J.MethodInvocation) m.getSelect()).getArguments().get(0))) {
                     return null;
                 }
             }
             // Check for id("pluginId").apply(...) or id("pluginId").version("...").apply(...)
-            else if (matchesApplyCall(m2, isKotlin)) {
-                if (matchesIdCall(m2.getSelect(), isKotlin)) {
-                    if (m2.getSelect() instanceof J.MethodInvocation &&
-                            ((J.MethodInvocation) m2.getSelect()).getArguments().get(0) instanceof J.Literal &&
-                            pluginId.equals(((J.Literal) ((J.MethodInvocation) m2.getSelect()).getArguments().get(0)).getValue())) {
+            else if (isApplyMethodInvocation(m, isKotlin)) {
+                if (isIdMethodInvocation(m.getSelect(), isKotlin)) {
+                    if (m.getSelect() instanceof J.MethodInvocation &&
+                            isPlugin(((J.MethodInvocation) m.getSelect()).getArguments().get(0))) {
                         return null;
                     }
-                } else if (matchesVersionCall(m2.getSelect(), isKotlin)) {
-                    if (m2.getSelect() instanceof J.MethodInvocation &&
-                            matchesIdCall(((J.MethodInvocation) m2.getSelect()).getSelect(), isKotlin)) {
-                        if (((J.MethodInvocation) m2.getSelect()).getSelect() instanceof J.MethodInvocation &&
-                                ((J.MethodInvocation) ((J.MethodInvocation) m2.getSelect()).getSelect()).getArguments().get(0) instanceof J.Literal &&
-                                pluginId.equals(((J.Literal) ((J.MethodInvocation) ((J.MethodInvocation) m2.getSelect()).getSelect()).getArguments().get(0)).getValue())) {
+                } else if (isVersionMethodInvocation(m.getSelect(), isKotlin)) {
+                    if (m.getSelect() instanceof J.MethodInvocation &&
+                            isIdMethodInvocation(((J.MethodInvocation) m.getSelect()).getSelect(), isKotlin)) {
+                        if (((J.MethodInvocation) m.getSelect()).getSelect() instanceof J.MethodInvocation &&
+                                isPlugin(((J.MethodInvocation) ((J.MethodInvocation) m.getSelect()).getSelect()).getArguments().get(0))) {
                             return null;
                         }
                     }
@@ -107,7 +105,12 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
         }));
     }
 
-    private boolean matchesIdCall(Expression expr, boolean isKotlin) {
+    private boolean isPlugin(Expression expression) {
+        return expression instanceof J.Literal &&
+                pluginId.equals(((J.Literal) expression).getValue());
+    }
+
+    private boolean isIdMethodInvocation(@Nullable Expression expr, boolean isKotlin) {
         if (!(expr instanceof J.MethodInvocation)) {
             return false;
         }
@@ -117,7 +120,7 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
                 (buildPluginMatcher.matches(m) || settingsPluginMatcher.matches(m));
     }
 
-    private boolean matchesVersionCall(Expression expr, boolean isKotlin) {
+    private boolean isVersionMethodInvocation(@Nullable Expression expr, boolean isKotlin) {
         if (!(expr instanceof J.MethodInvocation)) {
             return false;
         }
@@ -127,7 +130,7 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
                 (buildPluginWithVersionMatcher.matches(m) || settingsPluginWithVersionMatcher.matches(m));
     }
 
-    private boolean matchesApplyCall(Expression expr, boolean isKotlin) {
+    private boolean isApplyMethodInvocation(@Nullable Expression expr, boolean isKotlin) {
         if (!(expr instanceof J.MethodInvocation)) {
             return false;
         }
