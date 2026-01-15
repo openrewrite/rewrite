@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven.internal;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
@@ -40,6 +42,9 @@ public class RawRepositories {
         String id;
 
         @With
+        String name;
+
+        @With
         String url;
 
         @Nullable
@@ -47,6 +52,19 @@ public class RawRepositories {
 
         @Nullable
         ArtifactPolicy snapshots;
+
+        @JsonCreator
+        public Repository(@JsonProperty("id") @Nullable String id,
+                          @JsonProperty("name") @Nullable String name,
+                          @JsonProperty("url") String url,
+                          @JsonProperty("releases") RawRepositories.ArtifactPolicy releases,
+                          @JsonProperty("snapshots") RawRepositories.ArtifactPolicy snapshots) {
+            this.id = id;
+            this.name = name;
+            this.url = url;
+            this.releases = releases;
+            this.snapshots = snapshots;
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

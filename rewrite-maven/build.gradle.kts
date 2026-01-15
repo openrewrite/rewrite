@@ -18,6 +18,8 @@ dependencies {
 
     implementation("org.antlr:antlr4-runtime:4.13.2")
     implementation("dev.failsafe:failsafe:latest.release")
+    //implementation(platform("com.fasterxml.jackson:jackson-bom:2.20.1"))
+    implementation(platform("com.fasterxml.jackson:jackson-bom:2.17.3"))
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
     implementation("com.fasterxml.jackson.module:jackson-module-jaxb-annotations")

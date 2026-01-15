@@ -17,7 +17,7 @@ package org.openrewrite.maven;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
@@ -52,36 +52,38 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 @JacksonXmlRootElement(localName = "settings")
 public class MavenSettings {
     @Nullable
-    String localRepository;
+    public String localRepository;
 
     @Nullable
     @NonFinal
     @JsonIgnore
-    MavenRepository mavenLocal;
+    public MavenRepository mavenLocal;
 
     @Nullable
-    Profiles profiles;
+    public Profiles profiles;
 
     @Nullable
-    ActiveProfiles activeProfiles;
+    public ActiveProfiles activeProfiles;
 
     @Nullable
-    Mirrors mirrors;
+    public Mirrors mirrors;
 
     @Nullable
     @With
-    Servers servers;
+    public Servers servers;
 
-    @JsonCreator
-    public MavenSettings(@Nullable String localRepository, @Nullable Profiles profiles,
-                         @Nullable ActiveProfiles activeProfiles, @Nullable Mirrors mirrors,
-                         @Nullable Servers servers) {
-        this.localRepository = localRepository;
-        this.profiles = profiles;
-        this.activeProfiles = activeProfiles;
-        this.mirrors = mirrors;
-        this.servers = servers;
-    }
+	@JsonCreator
+	public MavenSettings(@JsonProperty("localRepository") @Nullable String localRepository,
+			@JsonProperty("profiles") @Nullable Profiles profiles,
+			@JsonProperty("activeProfiles") @Nullable ActiveProfiles activeProfiles,
+			@JsonProperty("mirrors") @Nullable Mirrors mirrors,
+			@JsonProperty("servers") @Nullable Servers servers) {
+		this.localRepository = localRepository;
+		this.profiles = profiles;
+		this.activeProfiles = activeProfiles;
+		this.mirrors = mirrors;
+		this.servers = servers;
+	}
 
     public static @Nullable MavenSettings parse(Parser.Input source, ExecutionContext ctx) {
         try {
@@ -358,9 +360,18 @@ public class MavenSettings {
         @Nullable
         RawRepositories repositories;
 
-        public boolean isActive(Iterable<String> activeProfiles) {
-            return ProfileActivation.isActive(id, activeProfiles, activation);
-        }
+		@JsonCreator
+		public Profile(@JsonProperty("id") @Nullable String id,
+					   @JsonProperty("activation") @Nullable ProfileActivation activation,
+					   @JsonProperty("repositories") @Nullable RawRepositories repositories) {
+			this.id = id;
+			this.activation = activation;
+			this.repositories = repositories;
+		}
+
+		public boolean isActive(Iterable<String> activeProfiles) {
+			return ProfileActivation.isActive(id, activeProfiles, activation);
+		}
 
         @SuppressWarnings("unused")
         public boolean isActive(String... activeProfiles) {
@@ -441,19 +452,28 @@ public class MavenSettings {
         String username;
         String password;
 
-        @Nullable
-        ServerConfiguration configuration;
-    }
+		public ServerConfiguration configuration;
+
+		@JsonCreator
+		public Server(@JsonProperty("id") String id,
+					  @JsonProperty("username") String username,
+					  @JsonProperty("password") String password,
+					  @JsonProperty("configuration") ServerConfiguration configuration) {
+			this.id = id;
+			this.username = username;
+			this.password = password;
+			this.configuration = configuration;
+		}
+	}
 
     @SuppressWarnings("DefaultAnnotationParam")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     @With
-    @JsonIgnoreProperties("httpHeaders")
     public static class ServerConfiguration {
         @JacksonXmlProperty(localName = "property")
         @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true)
-        // wrapping is disabled by default on MavenXmlMapper
+        @JsonIgnore
         @Nullable
         List<HttpHeader> httpHeaders;
 
@@ -462,6 +482,13 @@ public class MavenSettings {
          */
         @Nullable
         Long timeout;
+
+        @JsonCreator
+        public ServerConfiguration(@JsonProperty("httpHeaders") @Nullable List<HttpHeader> httpHeaders,
+                                   @JsonProperty("timeout") @Nullable Long timeout) {
+            this.httpHeaders = httpHeaders;
+            this.timeout = timeout;
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -470,5 +497,12 @@ public class MavenSettings {
     public static class HttpHeader {
         String name;
         String value;
+
+        @JsonCreator
+        public HttpHeader(@JsonProperty("name") String name,
+                          @JsonProperty("value") String value) {
+            this.name = name;
+            this.value = value;
+        }
     }
 }
