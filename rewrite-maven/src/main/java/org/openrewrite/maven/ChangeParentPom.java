@@ -184,6 +184,9 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
         // Flag to track if we've built the marker hierarchy
         boolean hierarchyBuilt = false;
 
+        // Cached available versions for version resolution
+        @Nullable Collection<String> availableVersions;
+
         /**
          * Build the complete marker hierarchy. This should be called once at the start of the visitor phase.
          * It propagates marker updates from the root down through all descendants.
@@ -236,15 +239,35 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
         return new Accumulator();
     }
 
+    private Optional<String> findAcceptableVersion(
+            Accumulator acc, VersionComparator versionComparator, String groupId, String artifactId, String currentVersion,
+            MavenIsoVisitor<?> visitor, ExecutionContext ctx) throws MavenDownloadingException {
+        String finalCurrentVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
+
+        if (acc.availableVersions == null) {
+            MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> visitor.downloadMetadata(groupId, artifactId, ctx));
+            acc.availableVersions = mavenMetadata.getVersioning().getVersions().stream()
+                    .filter(v -> versionComparator.isValid(finalCurrentVersion, v))
+                    .filter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(null, finalCurrentVersion, v) <= 0)
+                    .collect(toList());
+        }
+        if (Boolean.TRUE.equals(allowVersionDowngrades)) {
+            return acc.availableVersions.stream()
+                    .max((v1, v2) -> versionComparator.compare(finalCurrentVersion, v1, v2));
+        }
+        Optional<String> upgradedVersion = versionComparator.upgrade(finalCurrentVersion, acc.availableVersions);
+        if (upgradedVersion.isPresent()) {
+            return upgradedVersion;
+        }
+        return acc.availableVersions.stream().filter(finalCurrentVersion::equals).findFirst();
+    }
+
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
         assert versionComparator != null;
 
         return new MavenIsoVisitor<ExecutionContext>() {
-            @Nullable
-            private Collection<String> availableVersions;
-
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 MavenResolutionResult mrr = getResolutionResult();
@@ -267,7 +290,8 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                     String targetArtifactId = newArtifactId != null ? newArtifactId : parent.getGav().getArtifactId();
 
                     try {
-                        Optional<String> targetVersion = findAcceptableVersion(targetGroupId == null ? "" : targetGroupId, targetArtifactId, currentVersion, ctx);
+                        Optional<String> targetVersion = findAcceptableVersion(acc, versionComparator,
+                                targetGroupId == null ? "" : targetGroupId, targetArtifactId, currentVersion, this, ctx);
                         if (targetVersion.isPresent()) {
                             String currentRelativePath = parent.getRelativePath();
                             String targetRelativePath = newRelativePath != null ? newRelativePath :
@@ -297,28 +321,6 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                     }
                 }
                 return document;
-            }
-
-            private Optional<String> findAcceptableVersion(String groupId, String artifactId, String currentVersion,
-                                                           ExecutionContext ctx) throws MavenDownloadingException {
-                String finalCurrentVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
-
-                if (availableVersions == null) {
-                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                            .filter(v -> versionComparator.isValid(finalCurrentVersion, v))
-                            .filter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(null, finalCurrentVersion, v) <= 0)
-                            .collect(toList());
-                }
-                if (Boolean.TRUE.equals(allowVersionDowngrades)) {
-                    return availableVersions.stream()
-                            .max((v1, v2) -> versionComparator.compare(finalCurrentVersion, v1, v2));
-                }
-                Optional<String> upgradedVersion = versionComparator.upgrade(finalCurrentVersion, availableVersions);
-                if (upgradedVersion.isPresent()) {
-                    return upgradedVersion;
-                }
-                return availableVersions.stream().filter(finalCurrentVersion::equals).findFirst();
             }
         };
     }
@@ -352,9 +354,6 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                 return document;
             }
         }, new MavenIsoVisitor<ExecutionContext>() {
-            @Nullable
-            private Collection<String> availableVersions;
-
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
 
@@ -392,7 +391,8 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                         String targetArtifactId = newArtifactId == null ? currentArtifactId : newArtifactId;
                         String targetRelativePath = newRelativePath == null ? tag.getChildValue("relativePath").orElse(oldRelativePath) : newRelativePath;
                         try {
-                            Optional<String> targetVersion = findAcceptableVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
+                            Optional<String> targetVersion = findAcceptableVersion(acc, versionComparator,
+                                    targetGroupId, targetArtifactId, oldVersion, this, ctx);
                             if (!targetVersion.isPresent() ||
                                 (Objects.equals(targetGroupId, currentGroupId) &&
                                  Objects.equals(targetArtifactId, currentArtifactId) &&
@@ -433,6 +433,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                             // Retain properties from the old parent that are not present in the new parent
                             Map<String, String> propertiesInUse = getPropertiesInUse(getCursor().firstEnclosingOrThrow(Xml.Document.class), oldParentProps, ctx);
                             for (Map.Entry<String, String> propInUse : propertiesInUse.entrySet()) {
+                                //noinspection ConstantValue
                                 if (!newParentProps.containsKey(propInUse.getKey()) && propInUse.getValue() != null) {
                                     changeParentTagVisitors.add(new AddPropertyVisitor(propInUse.getKey(), propInUse.getValue(), false));
                                 }
@@ -486,29 +487,6 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                     return !StringUtils.isBlank(targetRelativePath);
                 }
                 return !relativePathValue.equals(targetRelativePath);
-            }
-
-            private Optional<String> findAcceptableVersion(String groupId, String artifactId, String currentVersion,
-                                                                ExecutionContext ctx) throws MavenDownloadingException {
-                String finalCurrentVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
-
-                if (availableVersions == null) {
-                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    //noinspection EqualsWithItself
-                    availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                            .filter(v -> versionComparator.isValid(finalCurrentVersion, v))
-                            .filter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(finalCurrentVersion, finalCurrentVersion, v) <= 0)
-                            .collect(toList());
-                }
-                if (Boolean.TRUE.equals(allowVersionDowngrades)) {
-                    return availableVersions.stream()
-                            .max((v1, v2) -> versionComparator.compare(finalCurrentVersion, v1, v2));
-                }
-                Optional<String> upgradedVersion = versionComparator.upgrade(finalCurrentVersion, availableVersions);
-                if (upgradedVersion.isPresent()) {
-                    return upgradedVersion;
-                }
-                return availableVersions.stream().filter(finalCurrentVersion::equals).findFirst();
             }
         });
     }
