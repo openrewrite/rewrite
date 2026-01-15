@@ -98,7 +98,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         Set<String> seenDeclarativeRecipeNames = new HashSet<>();
         seenDeclarativeRecipeNames.add(name);
         initialize(uninitializedRecipes, recipeList, recipeMap::get, initializingRecipes, seenDeclarativeRecipeNames);
-        initialize(uninitializedPreconditions, preconditions, recipeMap::get, initializingRecipes, seenDeclarativeRecipeNames);
+        // Preconditions get their own seenDeclarativeRecipeNames to avoid deduplicating across preconditions and recipe list
+        Set<String> seenPreconditionNames = new HashSet<>();
+        seenPreconditionNames.add(name);
+        initialize(uninitializedPreconditions, preconditions, recipeMap::get, initializingRecipes, seenPreconditionNames);
         initializingRecipes.remove(name);
     }
 
@@ -114,7 +117,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         Set<String> seenDeclarativeRecipeNames = new HashSet<>();
         seenDeclarativeRecipeNames.add(name);
         initialize(uninitializedRecipes, recipeList, availableRecipes, initializingRecipes, seenDeclarativeRecipeNames);
-        initialize(uninitializedPreconditions, preconditions, availableRecipes, initializingRecipes, seenDeclarativeRecipeNames);
+        // Preconditions get their own seenDeclarativeRecipeNames to avoid deduplicating across preconditions and recipe list
+        Set<String> seenPreconditionNames = new HashSet<>();
+        seenPreconditionNames.add(name);
+        initialize(uninitializedPreconditions, preconditions, availableRecipes, initializingRecipes, seenPreconditionNames);
         initializingRecipes.remove(name);
     }
 
@@ -200,7 +206,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         childSeenDeclarativeRecipeNames.add(recipeName);
         // These will return early if already initialized (uninitialized lists empty)
         declarativeRecipe.initialize(declarativeRecipe.uninitializedRecipes, declarativeRecipe.recipeList, availableRecipes, initializingRecipes, childSeenDeclarativeRecipeNames);
-        declarativeRecipe.initialize(declarativeRecipe.uninitializedPreconditions, declarativeRecipe.preconditions, availableRecipes, initializingRecipes, childSeenDeclarativeRecipeNames);
+        // Preconditions get their own seenDeclarativeRecipeNames to avoid deduplicating across preconditions and recipe list
+        Set<String> childSeenPreconditionNames = new HashSet<>();
+        childSeenPreconditionNames.add(recipeName);
+        declarativeRecipe.initialize(declarativeRecipe.uninitializedPreconditions, declarativeRecipe.preconditions, availableRecipes, initializingRecipes, childSeenPreconditionNames);
         initializingRecipes.remove(recipeName);
     }
 
