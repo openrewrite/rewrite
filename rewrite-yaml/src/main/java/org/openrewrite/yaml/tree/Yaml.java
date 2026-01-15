@@ -160,6 +160,7 @@ public interface Yaml extends Tree {
          * Optional list of directives that precede this document.
          * Directives include %YAML and %TAG.
          */
+        @Nullable
         List<Directive> directives;
 
         boolean explicit;
@@ -177,7 +178,7 @@ public interface Yaml extends Tree {
                     randomId(),
                     prefix,
                     Markers.EMPTY,
-                    directives.stream().map(Directive::copyPaste).collect(toList()),
+                    directives == null ? null : directives.stream().map(Directive::copyPaste).collect(toList()),
                     explicit,
                     block.copyPaste(),
                     end.copyPaste()
