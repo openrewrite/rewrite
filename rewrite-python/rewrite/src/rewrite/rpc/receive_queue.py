@@ -284,6 +284,8 @@ class RpcReceiveQueue:
 # Codec registry
 _codecs: Dict[str, Dict[str, Callable[[Any, RpcReceiveQueue], Any]]] = {}
 _codec_factories: Dict[str, Dict[str, Callable[[], Any]]] = {}
+# Reverse mapping: Python class -> Java type name (used by sender)
+_python_to_java_type: Dict[type, str] = {}
 
 
 def register_receive_codec(
@@ -368,6 +370,17 @@ def register_codec_with_both_names(java_type: str, python_class: type, codec, fa
     # Register by Python class name (for _get_codec lookup)
     python_name = python_class.__qualname__
     register_receive_codec(python_name, codec, factory)
+    # Register reverse mapping for sender
+    _python_to_java_type[python_class] = java_type
+
+
+def get_java_type_name(python_class: type) -> Optional[str]:
+    """Get the Java type name for a Python class.
+
+    This uses the codec registry populated during initialization.
+    Returns None if the class is not registered.
+    """
+    return _python_to_java_type.get(python_class)
 
 
 def get_all_tree_classes(module, module_name: str):

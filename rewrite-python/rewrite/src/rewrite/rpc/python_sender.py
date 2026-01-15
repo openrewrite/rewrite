@@ -31,7 +31,8 @@ class PythonRpcSender:
 
     def send(self, after: Any, before: Any, q: 'RpcSendQueue') -> None:
         """Entry point for sending an object."""
-        from rewrite.rpc.send_queue import RpcObjectState, to_java_type_name
+        from rewrite.rpc.send_queue import RpcObjectState
+        from rewrite.rpc.receive_queue import get_java_type_name
 
         if before is after:
             q.put({'state': RpcObjectState.NO_CHANGE})
@@ -43,13 +44,13 @@ class PythonRpcSender:
 
         if before is None:
             # ADD for new object
-            value_type = to_java_type_name(type(after)) if hasattr(after, '__class__') else None
+            value_type = get_java_type_name(type(after)) if hasattr(after, '__class__') else None
             q.put({'state': RpcObjectState.ADD, 'valueType': value_type})
             q._before = None
             self._visit(after, q)
         else:
             # CHANGE for existing object
-            value_type = to_java_type_name(type(after)) if hasattr(after, '__class__') else None
+            value_type = get_java_type_name(type(after)) if hasattr(after, '__class__') else None
             q.put({'state': RpcObjectState.CHANGE, 'valueType': value_type})
             q._before = before
             self._visit(after, q)
