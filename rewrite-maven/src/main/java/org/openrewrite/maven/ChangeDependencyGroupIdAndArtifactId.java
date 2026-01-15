@@ -168,7 +168,9 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                     maybeUpdateModel();
                     return t;
                 }
-                if (isOldDependencyTag || isPluginDependencyTag(oldGroupId, oldArtifactId) || isAnnotationProcessorPathTag(oldGroupId, oldArtifactId)) {
+                boolean isPluginDependency = isPluginDependencyTag(oldGroupId, oldArtifactId);
+                boolean isAnnotationProcessorPath = isAnnotationProcessorPathTag(oldGroupId, oldArtifactId);
+                if (isOldDependencyTag || isPluginDependency || isAnnotationProcessorPath) {
                     String groupId = newGroupId;
                     if (groupId != null) {
                         t = changeChildTagValue(t, "groupId", groupId, ctx);
@@ -181,6 +183,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                     } else {
                         artifactId = t.getChildValue("artifactId").orElseThrow(NoSuchElementException::new);
                     }
+
                     String currentVersion = t.getChildValue("version").orElse(null);
                     if (newVersion != null) {
                         try {
@@ -193,8 +196,9 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency; // True by default
 
                             boolean versionTagPresent = versionTag.isPresent();
-                            boolean oldDependencyManaged = isDependencyManaged(scope, oldGroupId, oldArtifactId);
-                            boolean newDependencyManaged = isDependencyManaged(scope, groupId, artifactId);
+                            // dependencyManagement does not apply to plugin dependencies or annotation processor paths
+                            boolean oldDependencyManaged = isOldDependencyTag && isDependencyManaged(scope, oldGroupId, oldArtifactId);
+                            boolean newDependencyManaged = isOldDependencyTag && isDependencyManaged(scope, groupId, artifactId);
                             if (versionTagPresent) {
                                 // If the previous dependency had a version but the new artifact is managed, removed the version tag.
                                 if (!configuredToOverrideManageVersion && newDependencyManaged || (oldDependencyManaged && configuredToChangeManagedDependency)) {
@@ -213,6 +217,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             return e.warn(tag);
                         }
                     }
+
                     if (t != tag) {
                         maybeUpdateModel();
                     }
