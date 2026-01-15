@@ -135,17 +135,11 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
         }
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Add the Develocity Maven extension";
-    }
+    String displayName = "Add the Develocity Maven extension";
 
-    @Override
-    public String getDescription() {
-        return "To integrate the Develocity Maven extension into Maven projects, ensure that the " +
+    String description = "To integrate the Develocity Maven extension into Maven projects, ensure that the " +
                "`develocity-maven-extension` is added to the `.mvn/extensions.xml` file if not already present. " +
                "Additionally, configure the extension by adding the `.mvn/develocity.xml` configuration file.";
-    }
 
     @Data
     public static class Accumulator {

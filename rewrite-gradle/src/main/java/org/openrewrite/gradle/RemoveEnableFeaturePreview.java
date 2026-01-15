@@ -31,15 +31,9 @@ public class RemoveEnableFeaturePreview extends Recipe {
             example = "ONE_LOCKFILE_PER_PROJECT")
     String previewFeatureName;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove an enabled Gradle preview feature";
-    }
+    String displayName = "Remove an enabled Gradle preview feature";
 
-    @Override
-    public String getDescription() {
-        return "Remove an enabled Gradle preview feature from `settings.gradle`.";
-    }
+    String description = "Remove an enabled Gradle preview feature from `settings.gradle`.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

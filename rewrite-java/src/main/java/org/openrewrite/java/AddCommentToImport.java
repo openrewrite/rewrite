@@ -36,15 +36,9 @@ import static java.lang.System.lineSeparator;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddCommentToImport extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Add comment to import statement";
-    }
+    String displayName = "Add comment to import statement";
 
-    @Override
-    public String getDescription() {
-        return "Add a comment to an import statement in a Java source file.";
-    }
+    String description = "Add a comment to an import statement in a Java source file.";
 
     @Option(displayName = "Comment",
             description = "The comment to add.",

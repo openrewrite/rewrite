@@ -36,15 +36,9 @@ import static org.openrewrite.Tree.randomId;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindProperties extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Find property";
-    }
+    String displayName = "Find property";
 
-    @Override
-    public String getDescription() {
-        return "Finds occurrences of a property key.";
-    }
+    String description = "Finds occurrences of a property key.";
 
     @Option(displayName = "Property key",
             description = "The property key to look for.",

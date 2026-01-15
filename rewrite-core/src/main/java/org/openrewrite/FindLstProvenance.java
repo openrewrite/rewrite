@@ -26,15 +26,9 @@ import static java.time.ZoneOffset.UTC;
 @EqualsAndHashCode(callSuper = false)
 public class FindLstProvenance extends ScanningRecipe<FindLstProvenance.Accumulator> {
 
-    @Override
-    public String getDisplayName() {
-        return "Find LST provenance";
-    }
+    String displayName = "Find LST provenance";
 
-    @Override
-    public String getDescription() {
-        return "Produces a data table showing what versions of OpenRewrite/Moderne tooling was used to produce a given LST.";
-    }
+    String description = "Produces a data table showing what versions of OpenRewrite/Moderne tooling was used to produce a given LST.";
 
     transient LstProvenanceTable provenanceTable = new LstProvenanceTable(this);
 

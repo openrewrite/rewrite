@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -112,7 +113,7 @@ class RecipeSchedulerTest implements RewriteTest {
               @Override
               public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                   assert tree != null;
-                  PlainText plainText = (PlainText) tree;
+                  var plainText = (PlainText) tree;
                   Path workingDirectory = WorkingDirectoryExecutionContextView.view(ctx)
                     .getWorkingDirectory();
                   assertThat(workingDirectory).hasParent(path);
@@ -168,15 +169,11 @@ class RecipeSchedulerTest implements RewriteTest {
 
 @AllArgsConstructor
 class BoomRecipe extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "We go boom";
-    }
+    @Getter
+    final String displayName = "We go boom";
 
-    @Override
-    public String getDescription() {
-        return "Test recipe.";
-    }
+    @Getter
+    final String description = "Test recipe.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -195,15 +192,9 @@ class BoomGenerateRecipe extends ScanningRecipe<Integer> {
 
     boolean wrapAsRecipeRunException;
 
-    @Override
-    public String getDisplayName() {
-        return "Boom generate";
-    }
+    String displayName = "Boom generate";
 
-    @Override
-    public String getDescription() {
-        return "Throws a boom exception during ScanningRecipe.generate().";
-    }
+    String description = "Throws a boom exception during ScanningRecipe.generate().";
 
     @Override
     public Integer getInitialValue(ExecutionContext ctx) {
@@ -242,15 +233,11 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
 
     final int position;
 
-    @Override
-    public String getDisplayName() {
-        return "Write text to a file";
-    }
+    @Getter
+    final String displayName = "Write text to a file";
 
-    @Override
-    public String getDescription() {
-        return "Writes text to a file.";
-    }
+    @Getter
+    final String description = "Writes text to a file.";
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {

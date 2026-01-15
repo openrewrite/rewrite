@@ -60,6 +60,7 @@ public class MavenResolutionResult implements Marker {
     List<MavenResolutionResult> modules;
 
     @Nullable
+    @With
     MavenResolutionResult parent;
 
     @With

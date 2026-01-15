@@ -1349,7 +1349,7 @@ class MavenPomDownloaderTest implements RewriteTest {
 
     @Test
     void resolveDependencies() throws Exception {
-        Xml.Document doc = (Xml.Document) MavenParser.builder().build().parse("""
+        var doc = (Xml.Document) MavenParser.builder().build().parse("""
           <project>
               <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -1382,7 +1382,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         // `azure-spring-data-cosmos` brings in `azure-core-http-netty`, which uses property `<boring-ssl-classifier/>`
         // https://repo1.maven.org/maven2/com/azure/azure-spring-data-cosmos/3.45.0/azure-spring-data-cosmos-3.45.0.pom
         // https://repo1.maven.org/maven2/com/azure/azure-core-http-netty/1.16.2/azure-core-http-netty-1.16.2.pom
-        Xml.Document doc = (Xml.Document) MavenParser.builder().build().parse("""
+        var doc = (Xml.Document) MavenParser.builder().build().parse("""
           <project>
               <groupId>com.example</groupId>
               <artifactId>demo</artifactId>

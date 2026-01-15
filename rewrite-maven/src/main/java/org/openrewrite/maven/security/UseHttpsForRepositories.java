@@ -16,6 +16,7 @@
 package org.openrewrite.maven.security;
 
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -35,15 +36,11 @@ public class UseHttpsForRepositories extends Recipe {
     private static final XPathMatcher DISTRIBUTION_MANAGEMENT_REPOSITORY_URL_MATCHER = new XPathMatcher("/project/distributionManagement/repository/url");
     private static final XPathMatcher DISTRIBUTION_MANAGEMENT_SNAPSHOT_REPOSITORY_URL_MATCHER = new XPathMatcher("/project/distributionManagement/snapshotRepository/url");
 
-    @Override
-    public String getDisplayName() {
-        return "Use HTTPS for repositories";
-    }
+    @Getter
+    final String displayName = "Use HTTPS for repositories";
 
-    @Override
-    public String getDescription() {
-        return "Use HTTPS for repository URLs.";
-    }
+    @Getter
+    final String description = "Use HTTPS for repository URLs.";
 
     @Override
     public Duration getEstimatedEffortPerOccurrence() {

@@ -45,16 +45,10 @@ import static org.openrewrite.java.tree.TypeUtils.toFullyQualifiedName;
 @EqualsAndHashCode(callSuper = false)
 public class RemoveUnusedImports extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Remove unused imports";
-    }
+    String displayName = "Remove unused imports";
 
-    @Override
-    public String getDescription() {
-        return "Remove imports for types that are not referenced. As a precaution against incorrect changes no imports " +
+    String description = "Remove imports for types that are not referenced. As a precaution against incorrect changes no imports " +
                "will be removed from any source where unknown types are referenced.";
-    }
 
     @Override
     public Set<String> getTags() {

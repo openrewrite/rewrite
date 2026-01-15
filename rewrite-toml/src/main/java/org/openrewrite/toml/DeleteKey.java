@@ -32,15 +32,9 @@ public class DeleteKey extends Recipe {
             example = "package.keywords")
     String keyPath;
 
-    @Override
-    public String getDisplayName() {
-        return "Delete TOML key";
-    }
+    String displayName = "Delete TOML key";
 
-    @Override
-    public String getDescription() {
-        return "Delete a TOML key-value pair.";
-    }
+    String description = "Delete a TOML key-value pair.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

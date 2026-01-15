@@ -80,9 +80,9 @@ class HelmTemplateParsingTest implements RewriteTest {
                     targetPort: {{ .Values.service.targetPort }}
               """,
             spec -> spec.afterRecipe(docs -> {
-                Yaml.Mapping root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
-                Yaml.Mapping metadata = (Yaml.Mapping) root.getEntries().get(2).getValue();
-                Yaml.Scalar name = (Yaml.Scalar) metadata.getEntries().getFirst().getValue();
+                var root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                var metadata = (Yaml.Mapping) root.getEntries().get(2).getValue();
+                var name = (Yaml.Scalar) metadata.getEntries().getFirst().getValue();
                 assertThat(name.getValue()).contains("{{ .Release.Name }}-service");
             })
           )

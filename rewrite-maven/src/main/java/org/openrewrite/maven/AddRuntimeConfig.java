@@ -85,15 +85,9 @@ public class AddRuntimeConfig extends ScanningRecipe<AddRuntimeConfig.Accumulato
         }
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Add a configuration option for the Maven runtime";
-    }
+    String displayName = "Add a configuration option for the Maven runtime";
 
-    @Override
-    public String getDescription() {
-        return "Add a new configuration option for the Maven runtime if not already present.";
-    }
+    String description = "Add a new configuration option for the Maven runtime if not already present.";
 
     @Data
     @RequiredArgsConstructor

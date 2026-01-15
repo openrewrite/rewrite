@@ -49,20 +49,14 @@ public class FindFields extends Recipe {
             example = "QUOTE_FIELD_NAMES")
     String fieldName;
 
-    @Override
-    public String getDisplayName() {
-        return "Find fields";
-    }
+    String displayName = "Find fields";
 
     @Override
     public String getInstanceNameSuffix() {
         return "on types `" + fullyQualifiedTypeName + "`";
     }
 
-    @Override
-    public String getDescription() {
-        return "Find uses of a field.";
-    }
+    String description = "Find uses of a field.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

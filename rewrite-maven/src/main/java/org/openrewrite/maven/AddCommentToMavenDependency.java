@@ -55,15 +55,9 @@ public class AddCommentToMavenDependency extends Recipe {
             example = "This is excluded due to CVE <X> and will be removed when we upgrade the next version is available.")
     String commentText;
 
-    @Override
-    public String getDisplayName() {
-        return "Add a comment to a `Maven` dependency or plugin";
-    }
+    String displayName = "Add a comment to a `Maven` dependency or plugin";
 
-    @Override
-    public String getDescription() {
-        return "Adds a comment as the first element in a `Maven` dependency or plugin.";
-    }
+    String description = "Adds a comment as the first element in a `Maven` dependency or plugin.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

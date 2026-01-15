@@ -149,18 +149,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         }));
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Upgrade transitive Gradle dependencies";
-    }
+    String displayName = "Upgrade transitive Gradle dependencies";
 
-    @Override
-    public String getDescription() {
-        return "Upgrades the version of a transitive dependency in a Gradle build file. " +
+    String description = "Upgrades the version of a transitive dependency in a Gradle build file. " +
                "There are many ways to do this in Gradle, so the mechanism for upgrading a " +
                "transitive dependency must be considered carefully depending on your style " +
                "of dependency management.";
-    }
 
     @Override
     public Validated<Object> validate() {

@@ -45,15 +45,9 @@ public class FindEmptyMethods extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
-    @Override
-    public String getDisplayName() {
-        return "Find methods with empty bodies";
-    }
+    String displayName = "Find methods with empty bodies";
 
-    @Override
-    public String getDescription() {
-        return "Find methods with empty bodies and single public no arg constructors.";
-    }
+    String description = "Find methods with empty bodies and single public no arg constructors.";
 
     @Override
     public Set<String> getTags() {
