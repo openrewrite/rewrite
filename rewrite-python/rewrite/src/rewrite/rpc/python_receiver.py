@@ -891,7 +891,7 @@ def _register_marker_codecs():
     """Register receive codecs for Java marker types."""
     from rewrite.java.markers import Semicolon, TrailingComma, OmitParentheses
     from rewrite.java.support_types import Space
-    from rewrite.rpc.receive_queue import register_receive_codec
+    from rewrite.rpc.receive_queue import register_codec_with_both_names
 
     def _receive_semicolon(semicolon: Semicolon, q: RpcReceiveQueue) -> Semicolon:
         new_id = q.receive(semicolon.id)
@@ -919,18 +919,22 @@ def _register_marker_codecs():
 
     from uuid import uuid4
 
-    register_receive_codec(
+    # Use register_codec_with_both_names to ensure the sender can look up Java type names
+    register_codec_with_both_names(
         'org.openrewrite.java.marker.Semicolon',
+        Semicolon,
         _receive_semicolon,
         lambda: Semicolon(uuid4())
     )
-    register_receive_codec(
+    register_codec_with_both_names(
         'org.openrewrite.java.marker.TrailingComma',
+        TrailingComma,
         _receive_trailing_comma,
         lambda: TrailingComma(uuid4(), Space.EMPTY)
     )
-    register_receive_codec(
+    register_codec_with_both_names(
         'org.openrewrite.java.marker.OmitParentheses',
+        OmitParentheses,
         _receive_omit_parentheses,
         lambda: OmitParentheses(uuid4())
     )
