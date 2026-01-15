@@ -2,101 +2,149 @@ import ast
 import sys
 import token
 from argparse import ArgumentError
-from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
 from tokenize import tokenize, TokenInfo
-from typing import Optional, TypeVar, cast, Callable, List, Tuple, Dict, Type, Sequence, Union, Iterator
+from typing import Optional, TypeVar, cast, Callable, List, Tuple, Dict, Type, Sequence, Union, Iterable
 
-from more_itertools import peekable
-
-from rewrite import random_id, Markers, list_map_last
+from rewrite import random_id, Markers
 from rewrite.java import Space, JRightPadded, JContainer, JLeftPadded, JavaType, J, Statement, Semicolon, TrailingComma, \
     NameTree, OmitParentheses, Expression, TypeTree, TypedTree, Comment
 from rewrite.java import tree as j
+from rewrite.java.support_types import TextComment
 from . import tree as py
 from .markers import KeywordArguments, KeywordOnlyArguments, Quoted
-from rewrite.java.support_types import TextComment
 from .type_mapping import PythonTypeMapping
 
 T = TypeVar('T')
 J2 = TypeVar('J2', bound=J)
 
+# Custom token type for whitespace gaps between tokens
+WHITESPACE_TOKEN = -1
+
 
 class ParserVisitor(ast.NodeVisitor):
     _source: str
-    _cursor: int
     _parentheses_stack: List[Tuple[Callable[[T, Space], T], int, int, ast.AST, Space]]
     _tokens: List[TokenInfo]
-    _line_starts: List[int]
+    _token_idx: int
     _paren_pairs: Dict[int, int]
-
-    @property
-    def _source_after_cursor(self) -> str:
-        return self._slow_source_after_cursor(self._source, self._cursor)
-
-    @staticmethod
-    @lru_cache
-    def _slow_source_after_cursor(source: str, cursor: int) -> str:
-        return source[cursor:]
 
     def __init__(self, source: str):
         super().__init__()
         self._source = source
-        self._cursor = 0
         self._parentheses_stack = []
         self._type_mapping = PythonTypeMapping(source)
 
-        # Token infrastructure for reliable parentheses matching
-        self._tokens = list(tokenize(BytesIO(source.encode('utf-8')).readline))
+        # Token infrastructure - _token_idx is the primary position tracker
+        self._tokens, self._paren_pairs = self._build_tokens(
+            tokenize(BytesIO(source.encode('utf-8')).readline)
+        )
         self._token_idx = 1  # Skip ENCODING token
-        self._line_starts = self._compute_line_starts()
-        self._paren_pairs = self._compute_paren_pairs()
 
-    def _compute_line_starts(self) -> List[int]:
-        """Compute byte offset where each line starts (1-indexed for tokenizer compatibility)."""
-        starts = [0]  # Line 1 starts at offset 0
-        for i, c in enumerate(self._source):
-            if c == '\n':
-                starts.append(i + 1)
-        return starts
+    def _build_tokens(self, raw_tokens: Iterable[TokenInfo]) -> Tuple[List[TokenInfo], Dict[int, int]]:
+        """Build token list with whitespace tokens and compute paren pairs in one pass."""
+        result: List[TokenInfo] = []
+        paren_pairs: Dict[int, int] = {}
+        paren_stack: List[int] = []
+        prev_end = 0  # character offset where previous token ended
+        row = 1       # current row (1-based like tokenize)
+        col = 0       # current column (0-based like tokenize)
+        in_from_import = False  # track if we're between 'from' and 'import' keywords
 
-    def _compute_paren_pairs(self) -> Dict[int, int]:
-        """Map each '(' byte offset to its matching ')' byte offset."""
-        pairs = {}
-        stack = []
-        for tok in self._tokens:
+        for tok in raw_tokens:
+            # ENCODING token is virtual (doesn't consume source text)
+            if tok.type == token.ENCODING:
+                result.append(tok)
+                continue
+
+            target_row, target_col = tok.start
+
+            # Scan from prev_end to find tok_start by tracking row/col
+            scan = prev_end
+            while scan < len(self._source) and (row < target_row or (row == target_row and col < target_col)):
+                if self._source[scan] == '\n':
+                    row += 1
+                    col = 0
+                else:
+                    col += 1
+                scan += 1
+
+            tok_start = scan
+
+            # Insert whitespace token if there's a gap
+            if tok_start > prev_end:
+                ws_text = self._source[prev_end:tok_start]
+                ws_tok = TokenInfo(
+                    WHITESPACE_TOKEN,
+                    ws_text,
+                    (0, prev_end),
+                    (0, tok_start),
+                    ''
+                )
+                result.append(ws_tok)
+
+            # Track paren pairs
             if tok.type == token.OP:
-                pos = self._token_to_offset(tok)
                 if tok.string == '(':
-                    stack.append(pos)
-                elif tok.string == ')' and stack:
-                    open_pos = stack.pop()
-                    pairs[open_pos] = pos
-        return pairs
+                    paren_stack.append(len(result))
+                elif tok.string == ')' and paren_stack:
+                    paren_pairs[paren_stack.pop()] = len(result)
 
-    def _token_to_offset(self, tok: TokenInfo) -> int:
-        """Convert token's (row, col) to byte offset."""
-        row, col = tok.start
-        if row <= len(self._line_starts):
-            return self._line_starts[row - 1] + col
-        return len(self._source)
+            # Normalize ellipsis '...' into three '.' tokens only in relative imports
+            # (between 'from' and 'import' keywords). Elsewhere '...' is the Ellipsis literal.
+            if tok.string == '...' and in_from_import:
+                for i in range(3):
+                    dot_tok = TokenInfo(
+                        token.OP,
+                        '.',
+                        (tok.start[0], tok.start[1] + i),
+                        (tok.start[0], tok.start[1] + i + 1),
+                        tok.line
+                    )
+                    result.append(dot_tok)
+            else:
+                result.append(tok)
 
-    def _tokens_from_idx(self) -> peekable:
-        """Get a peekable iterator of tokens starting at the current _token_idx.
+            # Track from/import context for ellipsis normalization
+            if tok.type == token.NAME:
+                if tok.string == 'from':
+                    in_from_import = True
+                else:
+                    # Any other identifier (module name or 'import') ends the context
+                    in_from_import = False
 
-        This allows visit_Constant and visit_JoinedStr to iterate through the global
-        token stream without scanning from the beginning. We also filter by _cursor
-        to handle cases where _token_idx hasn't been fully synchronized.
-        """
-        cursor = self._cursor
-        def token_generator():
-            for tok in self._tokens[self._token_idx:]:
-                tok_offset = self._token_to_offset(tok)
-                if tok_offset >= cursor:
-                    yield tok
+            # Update row/col for token content
+            for c in tok.string:
+                if c == '\n':
+                    row += 1
+                    col = 0
+                else:
+                    col += 1
+            prev_end = tok_start + len(tok.string)
 
-        return peekable(token_generator())
+        return result, paren_pairs
+
+    def _advance_token(self) -> TokenInfo:
+        """Advance _token_idx and return the new current token."""
+        self._token_idx += 1
+        return self._tokens[self._token_idx]
+
+    def _next_token(self) -> TokenInfo:
+        """Get the current token and advance _token_idx."""
+        tok = self._tokens[self._token_idx]
+        self._token_idx += 1
+        return tok
+
+    def _skip_whitespace_tokens(self) -> TokenInfo:
+        """Skip whitespace tokens and return the next non-whitespace token."""
+        while self._token_idx < len(self._tokens):
+            tok = self._tokens[self._token_idx]
+            if tok.type not in (token.NL, token.NEWLINE, token.INDENT, token.DEDENT,
+                                token.COMMENT, token.ENCODING, token.ENDMARKER, WHITESPACE_TOKEN):
+                return tok
+            self._token_idx += 1
+        return self._tokens[-1]
 
     def generic_visit(self, node):
         return super().generic_visit(node)
@@ -283,11 +331,10 @@ class ParserVisitor(ast.NodeVisitor):
         decorators = [self.__map_decorator(d) for d in node.decorator_list]
         kind_prefix = self.__source_before('class')
         name = self.__convert_name(node.name)
-        save_cursor = self._cursor
+        save_token_idx = self._token_idx
         interfaces_prefix = self.__whitespace()
-        if (node.bases or node.keywords) and self.__cursor_at('('):
+        if (node.bases or node.keywords) and self.__skip('('):
             all = node.bases + node.keywords
-            self.__skip('(')
             interfaces = JContainer(
                 interfaces_prefix,
                 [
@@ -295,8 +342,7 @@ class ParserVisitor(ast.NodeVisitor):
                     enumerate(all)],
                 Markers.EMPTY
             )
-        elif self.__cursor_at('('):
-            self.__skip('(')
+        elif self.__skip('('):
             interfaces = JContainer(
                 interfaces_prefix,
                 [self.__pad_right(j.Empty(random_id(), self.__source_before(')'), Markers.EMPTY), Space.EMPTY)],
@@ -304,7 +350,7 @@ class ParserVisitor(ast.NodeVisitor):
             )
         else:
             interfaces = None
-            self._cursor = save_cursor
+            self._token_idx = save_token_idx
         return j.ClassDeclaration(
             random_id(),
             prefix,
@@ -489,20 +535,24 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_If(self, node):
-        prefix = self.__source_before('if')
+        # Handle both 'if' and 'elif' keywords - elif is used when this If is nested in an else clause
+        if self.__at_token('elif'):
+            prefix = self.__source_before('elif')
+        else:
+            prefix = self.__source_before('if')
         condition = j.ControlParentheses(random_id(), self.__whitespace(), Markers.EMPTY,
                                          self.__pad_right(self.__convert(node.test), Space.EMPTY))
         then = self.__pad_right(self.__convert_block(node.body), Space.EMPTY)
         elze = None
         if len(node.orelse) > 0:
             else_prefix = self.__whitespace()
-            if len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If) and self._source.startswith('elif',
-                                                                                                        self._cursor):
+            # Check if this is an elif (token will be 'elif') vs else (token will be 'else')
+            if len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If) and self.__at_token('elif'):
                 is_elif = True
-                self._cursor += 2
+                # Don't skip 'elif' here - the recursive visit_If will handle it
             else:
                 is_elif = False
-                self._cursor += 4
+                self.__skip('else')
 
             elze = j.If.Else(
                 random_id(),
@@ -525,14 +575,14 @@ class ParserVisitor(ast.NodeVisitor):
         prefix = self.__source_before('with')
         items_prefix = self.__whitespace()
 
-        parenthesized = self.__cursor_at('(')
-        parens_handler = self.__push_parentheses(node, items_prefix, self._cursor) if parenthesized else None
+        parenthesized = self.__at_token('(')
+        parens_handler = self.__push_parentheses(node, items_prefix, self._token_idx) if parenthesized else None
 
         resources = [self.__pad_list_element(self.__convert(r), i == len(node.items) - 1) for i, r in
                      enumerate(node.items)]
 
         if parenthesized and self._parentheses_stack and self._parentheses_stack[-1] is parens_handler:
-            self._cursor += 1
+            self._token_idx += 1  # consume ')'
             resources_container = self._parentheses_stack.pop()[0](
                 JContainer(items_prefix, resources, Markers.EMPTY),
                 Space.EMPTY
@@ -661,7 +711,7 @@ class ParserVisitor(ast.NodeVisitor):
         from_ = self.__pad_right(self.__convert_name(('.' * node.level) + (node.module if node.module else '')),
                                  self.__source_before('import'))
         names_prefix = self.__whitespace()
-        if parenthesized := self._source[self._cursor] == '(':
+        if parenthesized := self.__at_token('('):
             self.__skip('(')
         multi_import = py.MultiImport(
             random_id(),
@@ -702,8 +752,7 @@ class ParserVisitor(ast.NodeVisitor):
                 self._type_mapping.type(node)
             )
         prefix = self.__whitespace()
-        if self._source.startswith('**', self._cursor):
-            self.__skip('**')
+        if self.__skip('**'):
             return py.Star(
                 random_id(),
                 prefix,
@@ -772,34 +821,38 @@ class ParserVisitor(ast.NodeVisitor):
         prefix = self.__whitespace()
         parenthesized = False
 
-        if self._source[self._cursor] == '(':
+        if self.__at_token('('):
             # Use paren map to determine if this '(' is for a parenthesized generator
             # or for a sub-expression within the generator element.
             # If the '(' closes BEFORE the 'for' keyword, it's a sub-expression.
-            open_paren_pos = self._cursor
-            close_paren_pos = self._paren_pairs.get(open_paren_pos)
+            open_paren_idx = self._token_idx
+            close_paren_idx = self._paren_pairs.get(open_paren_idx)
 
-            # Find position of 'for' keyword by searching from current position
-            for_pos = self._source.find(' for ', self._cursor)
+            # Find token index of 'for' keyword
+            for_token_idx = None
+            for idx in range(self._token_idx, len(self._tokens)):
+                if self._tokens[idx].type == token.NAME and self._tokens[idx].string == 'for':
+                    for_token_idx = idx
+                    break
 
-            if close_paren_pos is not None and for_pos != -1 and close_paren_pos < for_pos:
+            if close_paren_idx is not None and for_token_idx is not None and close_paren_idx < for_token_idx:
                 # The '(' closes before 'for', so it's a sub-expression parenthesis.
                 # Don't consume it here - let normal parentheses handling deal with it.
                 result = self.__convert(node.elt)
                 parenthesized = False
             else:
                 # Original logic for potentially parenthesized generator
-                save_cursor = self._cursor
-                self._cursor += 1
+                save_token_idx = self._token_idx
+                self._token_idx += 1  # consume '('
                 try:
                     result = self.__convert(node.elt)
-                    save_cursor_2 = self._cursor
+                    save_token_idx_2 = self._token_idx
                     self.__whitespace()
-                    assert self._source[self._cursor] != ')'
-                    self._cursor = save_cursor_2
+                    assert not self.__at_token(')')
+                    self._token_idx = save_token_idx_2
                     parenthesized = True
                 except:
-                    self._cursor = save_cursor
+                    self._token_idx = save_token_idx
                     result = self.__convert(node.elt)
                     parenthesized = False
         else:
@@ -959,13 +1012,11 @@ class ParserVisitor(ast.NodeVisitor):
     def visit_MatchSequence(self, node):
         prefix = self.__whitespace()
         end_delim = None
-        if self._source[self._cursor] == '[':
+        if self.__skip('['):
             kind = py.MatchCase.Pattern.Kind.SEQUENCE_LIST
-            self._cursor += 1
             end_delim = ']'
-        elif self._source[self._cursor] == '(':
+        elif self.__skip('('):
             kind = py.MatchCase.Pattern.Kind.SEQUENCE_TUPLE
-            self._cursor += 1
             end_delim = ')'
         else:
             kind = py.MatchCase.Pattern.Kind.SEQUENCE
@@ -1005,9 +1056,52 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_MatchMapping(self, node):
+        prefix = self.__whitespace()
+        has_rest = node.rest is not None
+
+        # Consume '{' FIRST before iterating over patterns
+        brace_prefix = self.__source_before('{')
+
+        # Handle key-value patterns
+        elements = []
+        for i in range(len(node.patterns)):
+            is_last = (i == len(node.patterns) - 1) and not has_rest
+            kv_pattern = py.MatchCase.Pattern(
+                random_id(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                py.MatchCase.Pattern.Kind.KEY_VALUE,
+                JContainer(
+                    Space.EMPTY,
+                    [
+                        self.__pad_right(self.__convert(node.keys[i]), self.__source_before(':')),
+                        self.__pad_right(self.__convert(node.patterns[i]), Space.EMPTY),
+                    ],
+                    Markers.EMPTY
+                ),
+                None
+            )
+            elements.append(self.__pad_list_element(kv_pattern, last=is_last, end_delim='}'))
+
+        # Handle **rest pattern
+        if has_rest:
+            rest_pattern = py.MatchCase.Pattern(
+                random_id(),
+                self.__source_before('**'),
+                Markers.EMPTY,
+                py.MatchCase.Pattern.Kind.DOUBLE_STAR,
+                JContainer(
+                    Space.EMPTY,
+                    [self.__pad_right(self.__convert_name(node.rest), Space.EMPTY)],
+                    Markers.EMPTY
+                ),
+                None
+            )
+            elements.append(self.__pad_list_element(rest_pattern, last=True, end_delim='}'))
+
         return py.MatchCase(
             random_id(),
-            self.__whitespace(),
+            prefix,
             Markers.EMPTY,
             py.MatchCase.Pattern(
                 random_id(),
@@ -1015,23 +1109,8 @@ class ParserVisitor(ast.NodeVisitor):
                 Markers.EMPTY,
                 py.MatchCase.Pattern.Kind.MAPPING,
                 JContainer(
-                    self.__source_before('{'),
-                    [self.__pad_list_element(py.MatchCase.Pattern(
-                        random_id(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        py.MatchCase.Pattern.Kind.KEY_VALUE,
-                        JContainer(
-                            Space.EMPTY,
-                            [
-                                self.__pad_right(self.__convert(node.keys[i]), self.__source_before(':')),
-                                self.__pad_right(self.__convert(node.patterns[i]), Space.EMPTY),
-                            ],
-                            Markers.EMPTY
-                        ),
-                        None
-                    ), last=i == len(node.patterns) - 1, end_delim='}') for i, e in
-                        enumerate(node.patterns)] if node.patterns else [],
+                    brace_prefix,
+                    elements,
                     Markers.EMPTY
                 ),
                 None
@@ -1286,9 +1365,9 @@ class ParserVisitor(ast.NodeVisitor):
                 self._type_mapping.type(node),
                 None
             )
-            save_cursor = self._cursor
+            save_token_idx = self._token_idx
             parens_right_padding = self.__whitespace()
-            if self.__cursor_at(')'):
+            if self.__at_token(')'):
                 name = j.FieldAccess(
                     random_id(),
                     Space.EMPTY,
@@ -1297,12 +1376,11 @@ class ParserVisitor(ast.NodeVisitor):
                     JLeftPadded(select.after, name, Markers.EMPTY),
                     None
                 )
-                while len(self._parentheses_stack) > 0 and self.__cursor_at(')'):
-                    self._cursor += 1
+                while len(self._parentheses_stack) > 0 and self.__skip(')'):
                     name = self._parentheses_stack.pop()[0](name, parens_right_padding)
-                    save_cursor = self._cursor
+                    save_token_idx = self._token_idx
                     parens_right_padding = self.__whitespace()
-            self._cursor = save_cursor
+            self._token_idx = save_token_idx
         else:
             select = self.__pad_right(cast(Expression, self.__convert(node.func)), self.__whitespace())
             # printer handles empty name by not printing `.` before it
@@ -1415,13 +1493,20 @@ class ParserVisitor(ast.NodeVisitor):
         return self.__pad_left(self.__source_before(op_str), op)
 
     def visit_Constant(self, node):
-        tokens = self._tokens_from_idx()
-        tok = next(tokens)
-        while tok.type in (token.NL, token.NEWLINE, token.INDENT, token.DEDENT, token.COMMENT):
-            tok = next(tokens)
-
+        # For non-string constants, use traditional cursor-based parsing without token positioning
         if not isinstance(node.value, (str, bytes)):
-            return self.__map_literal(node, tok, tokens)[0]
+            return self.__map_literal_simple(node)
+
+        # For strings/fstrings, find the next STRING/FSTRING_START token without advancing _token_idx
+        # __map_literal will call __whitespace() to extract whitespace and advance past whitespace tokens
+        idx = self._token_idx
+        while idx < len(self._tokens):
+            tok = self._tokens[idx]
+            if tok.type not in (token.NL, token.NEWLINE, token.INDENT, token.DEDENT,
+                                token.COMMENT, token.ENCODING, token.ENDMARKER, WHITESPACE_TOKEN):
+                break
+            idx += 1
+        tok = self._tokens[idx]
 
         is_byte_string = tok.string.startswith(('b', "B"))
         res = None
@@ -1430,9 +1515,9 @@ class ParserVisitor(ast.NodeVisitor):
         while tok.type in (token.STRING, token.FSTRING_START) and is_byte_string == tok.string.startswith(('b', "B")):
             if tok.type == token.FSTRING_START:
                 prefix = self.__whitespace()
-                current, tok, _ = self.__map_fstring(node, prefix, tok, tokens)
+                current, tok, _ = self.__map_fstring_direct(node, prefix, tok)
             else:
-                current, tok = self.__map_literal(node, tok, tokens)
+                current, tok = self.__map_literal(node, tok)
                 end_seen = current.value.endswith(node.value)
 
             if res is None:
@@ -1452,28 +1537,84 @@ class ParserVisitor(ast.NodeVisitor):
             if end_seen:
                 break
 
-            while tok.type in (token.NL, token.NEWLINE, token.INDENT, token.DEDENT, token.COMMENT):
-                try:
-                    tok = next(tokens)
-                except IndentationError:
+            # Peek at next non-whitespace token for loop condition, but DON'T advance _token_idx
+            # __map_literal will extract whitespace and advance properly
+            idx = self._token_idx
+            while idx < len(self._tokens):
+                tok = self._tokens[idx]
+                if tok.type not in (token.NL, token.NEWLINE, token.INDENT, token.DEDENT,
+                                    token.COMMENT, token.ENCODING, token.ENDMARKER, WHITESPACE_TOKEN):
                     break
+                idx += 1
+            if idx < len(self._tokens):
+                tok = self._tokens[idx]
+            else:
+                break
 
         return res
 
-    def __map_literal(self, node, tok, tokens):
+    def __map_literal_simple(self, node):
+        """Map a non-string constant using cursor-based parsing only.
+
+        This method doesn't use token-based logic, preserving whitespace handling
+        for numeric literals and other non-string constants.
+        """
         prefix = self.__whitespace()
-        start = self._cursor
-        self._cursor += len(tok.string)
+
+        # Determine literal value and source representation
+        if node.value is None:
+            source_repr = 'None'
+            value = None
+        elif node.value is True:
+            source_repr = 'True'
+            value = True
+        elif node.value is False:
+            source_repr = 'False'
+            value = False
+        elif node.value is Ellipsis:
+            source_repr = '...'
+            value = None
+        else:
+            # For numbers, extract from source using the current token
+            tok = self._tokens[self._token_idx]
+            source_repr = tok.string
+            value = node.value
+            self._token_idx += 1  # consume the number token
+            return j.Literal(
+                random_id(),
+                prefix,
+                Markers.EMPTY,
+                value,
+                source_repr,
+                None,
+                self._type_mapping.type(node),
+            )
+
+        # Handle None, True, False, Ellipsis
+        self._token_idx += 1  # consume the keyword token
+        return j.Literal(
+            random_id(),
+            prefix,
+            Markers.EMPTY,
+            value,
+            source_repr,
+            None,
+            self._type_mapping.type(node),
+        )
+
+    def __map_literal(self, node, tok):
+        prefix = self.__whitespace()
+        next_tok = self._advance_token()
 
         return (j.Literal(
             random_id(),
             prefix,
             Markers.EMPTY,
             self.__map_literal_value(node, tok),
-            self._source[start:self._cursor],
+            tok.string,  # Use token string directly instead of extracting from source
             None,
             self._type_mapping.type(node),
-        ), next(tokens))
+        ), next_tok)
 
     def __map_literal_value(self, node, tok):
         if node.value is Ellipsis:
@@ -1481,6 +1622,13 @@ class ParserVisitor(ast.NodeVisitor):
         elif isinstance(node.value, (str, bytes)):
             return ast.literal_eval(ast.parse(tok.string, mode='eval').body)
         return node.value
+
+    def __map_fstring_direct(self, node, prefix: Space, tok: TokenInfo, value_idx: int = 0):
+        """Wrapper for __map_fstring.
+
+        Now that __map_fstring uses _token_idx directly, this is a simple pass-through.
+        """
+        return self.__map_fstring(node, prefix, tok, value_idx)
 
     def visit_Dict(self, node):
         return py.DictLiteral(
@@ -1643,20 +1791,65 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_JoinedStr(self, node):
-        tokens = self._tokens_from_idx()
-        while (tok := next(tokens)).type not in (token.FSTRING_START, token.STRING):
-            pass
+        leading_prefix = self.__whitespace()
+
+        tok = self._skip_whitespace_tokens()
+        while tok.type not in (token.FSTRING_START, token.STRING):
+            tok = self._advance_token()
 
         value_idx = 0
         res = None
-        while tok.type in (token.FSTRING_START, token.STRING):
-            if tok.type == token.STRING:
-                current, tok = self.__map_literal(node.values[value_idx], tok, tokens)
-                if current.value.endswith(node.values[value_idx].value):
-                    value_idx += 1
+        is_first = True
+        # Loop while we have STRING or FSTRING_START tokens to process
+        # Note: AST merges adjacent strings, so we may have more tokens than AST values
+        while True:
+            # For first element, use leading_prefix. For subsequent elements, peek ahead
+            # to check if there's another string/fstring before consuming whitespace.
+            if is_first:
+                prefix = leading_prefix
+                tok = self._skip_whitespace_tokens()
             else:
+                # Peek at next token to check for string concatenation
+                # String concatenation only applies within the same statement
+                # NEWLINE (type 4) terminates a statement - break on NEWLINE
+                # NL (type 65) is a non-terminating newline inside parens - allow concatenation
+                save_idx = self._token_idx
+                saw_statement_end = False
+                while self._token_idx < len(self._tokens):
+                    peek_tok = self._tokens[self._token_idx]
+                    if peek_tok.type == token.NEWLINE:
+                        saw_statement_end = True
+                        self._token_idx += 1
+                    elif peek_tok.type in (token.NL, token.INDENT, token.DEDENT, token.COMMENT,
+                                           token.ENCODING, token.ENDMARKER, WHITESPACE_TOKEN):
+                        self._token_idx += 1
+                    else:
+                        break
+                if saw_statement_end or peek_tok.type not in (token.STRING, token.FSTRING_START):
+                    # NEWLINE means end of statement, not concatenation
+                    self._token_idx = save_idx
+                    break
+                # There's another string (concatenated) - now consume whitespace properly
+                self._token_idx = save_idx
                 prefix = self.__whitespace()
-                current, tok, value_idx = self.__map_fstring(node, prefix, tok, tokens, value_idx)
+                tok = self._skip_whitespace_tokens()
+
+            if tok.type == token.STRING:
+                # Use AST value if available, otherwise create a synthetic node for the token
+                ast_value = node.values[value_idx] if value_idx < len(node.values) else ast.Constant(value=ast.literal_eval(tok.string))
+                current, tok = self.__map_literal(ast_value, tok)
+                # Always apply our captured prefix (overrides __map_literal's internal whitespace call)
+                current = current.replace(prefix=prefix)
+                if value_idx < len(node.values) and isinstance(node.values[value_idx], ast.Constant):
+                    # Check if we've consumed all content for this AST value
+                    expected_value = cast(ast.Constant, node.values[value_idx]).value
+                    if isinstance(expected_value, str) and current.value == expected_value:
+                        value_idx += 1
+            elif tok.type == token.FSTRING_START:
+                current, tok, value_idx = self.__map_fstring_direct(node, prefix, tok, value_idx)
+            else:
+                # No more f-strings or strings to process (should only happen for first element)
+                break
 
             if res is None:
                 res = current
@@ -1672,14 +1865,7 @@ class ParserVisitor(ast.NodeVisitor):
                     self._type_mapping.type(node)
                 )
 
-            if value_idx >= len(node.values):
-                break
-
-            while tok.type in (token.NL, token.NEWLINE, token.INDENT, token.DEDENT, token.COMMENT):
-                try:
-                    tok = next(tokens)
-                except IndentationError:
-                    break
+            is_first = False
 
         return res
 
@@ -1776,7 +1962,7 @@ class ParserVisitor(ast.NodeVisitor):
                 self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY)],
             self.__whitespace()
         )
-        # assert self._cursor == len(self._source)
+        # Parsing complete - all tokens should be consumed
         return cu
 
     def visit_Name(self, node):
@@ -1844,14 +2030,13 @@ class ParserVisitor(ast.NodeVisitor):
         lower_expr = self.__convert(node.lower) if node.lower else None
         right_padding = self.__whitespace(':') if node.lower else Space.EMPTY
         lower = self.__pad_right(lower_expr, right_padding) if lower_expr else None
-        self._cursor += 1
+        self._token_idx += 1  # consume first ':'
 
         upper_expr = self.__convert(node.upper) if node.upper else None
         right_padding = self.__whitespace()
         upper = self.__pad_right(upper_expr if node.upper else j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), right_padding)
-        has_step = self.__cursor_at(':')
+        has_step = self.__skip(':')
         if has_step:
-            self._cursor += 1
             step = self.__pad_right(
                 self.__convert(node.step) if node.step else j.Empty(random_id(), Space.EMPTY, Markers.EMPTY),
                 self.__whitespace(']')) if node.step or has_step else Space.EMPTY
@@ -1894,19 +2079,24 @@ class ParserVisitor(ast.NodeVisitor):
 
     def visit_Tuple(self, node):
         prefix = self.__whitespace()
-        save_cursor = self._cursor
-        maybe_parens = self.__cursor_at('(')
+        save_token_idx = self._token_idx
+
+        # Check if '(' at cursor actually belongs to the tuple or to the first element
+        # If tuple starts at same position as first element, the '(' belongs to the first element
+        maybe_parens = self.__at_token('(')
+        if maybe_parens and node.elts and node.col_offset == node.elts[0].col_offset:
+            maybe_parens = False
 
         if maybe_parens:
-            self._cursor += 1
+            self._token_idx += 1  # consume '('
             omit_parens = False
         else:
-            self._cursor = save_cursor
             omit_parens = True
 
+        # For implicit tuples (no parens), don't include trailing whitespace on last element
         elements = JContainer(
             Space.EMPTY,
-            [self.__pad_list_element(self.__convert(e), last=i == len(node.elts) - 1) for i, e in enumerate(node.elts)],
+            [self.__pad_list_element(self.__convert(e), last=i == len(node.elts) - 1, pad_last=maybe_parens) for i, e in enumerate(node.elts)],
             Markers.EMPTY
         ) if node.elts else JContainer(
             Space.EMPTY,
@@ -1914,22 +2104,16 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY
         )
 
-        if len(self._parentheses_stack) > 0 and self.__cursor_at(')'):
-            self._cursor += 1
+        # Use _is_closing_paren to verify the ')' matches a '(' pushed at our scope level
+        if self._is_closing_paren(save_token_idx):
+            self._token_idx += 1  # consume ')'
             elements = self._parentheses_stack.pop()[0](elements, Space.EMPTY)
             omit_parens = False
         elif maybe_parens and len(self._parentheses_stack) > 0 and self._parentheses_stack[-1][3] == node:
             elements = self._parentheses_stack.pop()
+        elif maybe_parens and self.__skip(')'):
+            pass
         else:
-            if elements.padding.elements:
-                # remove the last element's right padding so that if becomes the prefix of the next LST element
-                padding = elements.padding.elements[-1].after
-                padding_len = len(padding.whitespace) if padding.whitespace else 0
-                for c in padding.comments:
-                    padding_len += len(c.text) + 1 + len(c.suffix)
-                unpadded_last = elements.padding.elements[-1].replace(after=Space.EMPTY)
-                elements = elements.padding.replace(elements=list_map_last(lambda last: unpadded_last, elements.padding.elements))
-                self._cursor -= padding_len
             omit_parens = True
 
         return py.CollectionLiteral(
@@ -2047,21 +2231,21 @@ class ParserVisitor(ast.NodeVisitor):
         if not node or not isinstance(node, ast.expr) or isinstance(node, ast.GeneratorExp):
             return self.visit(cast(ast.AST, node)) if node else None
 
-        save_cursor = self._cursor
+        save_token_idx = self._token_idx
         prefix = self.__whitespace()
 
         # Handle normal expression or parenthesized expression
-        result = self.__parse_expr(node, mapping or self.visit, recursion, save_cursor, prefix)
+        result = self.__parse_expr(node, mapping or self.visit, recursion, save_token_idx, prefix)
 
-        save_cursor_2 = self._cursor
+        save_token_idx_2 = self._token_idx
         suffix = self.__whitespace()
 
         # Process closing parentheses if any
-        while self._is_closing_paren(save_cursor):
-            self._cursor += 1
-            transformer, save_cursor, _, _, _, _ = self._parentheses_stack.pop()
+        while self._is_closing_paren(save_token_idx):
+            self._token_idx += 1  # consume ')'
+            transformer, save_token_idx, _, _, _, _ = self._parentheses_stack.pop()
             result = transformer(result, suffix)
-            save_cursor_2 = self._cursor
+            save_token_idx_2 = self._token_idx
             suffix = self.__whitespace()
 
         # Clean up unmatched parentheses for this node
@@ -2069,22 +2253,59 @@ class ParserVisitor(ast.NodeVisitor):
                 self._parentheses_stack[-2][3] is not node:
             self._parentheses_stack.pop()
 
-        self._cursor = save_cursor_2
+        self._token_idx = save_token_idx_2
         return result
 
-    def __parse_expr(self, node, mapping, recursion, save_cursor: int, prefix: Space) -> J:
+    def __parse_expr(self, node, mapping, recursion, save_token_idx: int, prefix: Space) -> J:
         """Parse either a normal expression or a parenthesized expression."""
-        if not (self._cursor < len(self._source) and self._source[self._cursor] == '('):
-            self._cursor = save_cursor
+        if not self.__at_token('('):
+            self._token_idx = save_token_idx
             return mapping(cast(ast.AST, node))
 
-        self.__push_parentheses(node, prefix, save_cursor)
+        # Tuples handle their own parentheses in visit_Tuple
+        if isinstance(node, ast.Tuple):
+            self._token_idx = save_token_idx
+            return mapping(cast(ast.AST, node))
 
+        # Check if closing paren comes before node ends (paren wraps inner expression, not this node)
+        close_paren_idx = self._paren_pairs.get(self._token_idx)
+        if close_paren_idx is not None and hasattr(node, 'end_lineno') and hasattr(node, 'end_col_offset'):
+            close_tok = self._tokens[close_paren_idx]
+            close_line, close_col = close_tok.start
+            # If closing paren is before node's end, it wraps an inner expression
+            if close_line < node.end_lineno or (close_line == node.end_lineno and close_col < node.end_col_offset):
+                self._token_idx = save_token_idx
+                return mapping(cast(ast.AST, node))
+
+        # For non-Tuples: push to stack and process
+        self.__push_parentheses(node, prefix, save_token_idx)
         return recursion(node)
 
-    def __push_parentheses(self, node, prefix: Space, save_cursor):
-        open_paren_pos = self._cursor  # Position of '(' before incrementing
-        self._cursor += 1
+    def _get_first_child(self, node: ast.expr) -> Optional[ast.expr]:
+        """Get the first child expression of a node in source order."""
+        if isinstance(node, (ast.Compare, ast.BinOp)):
+            return node.left
+        elif isinstance(node, ast.UnaryOp):
+            return node.operand
+        elif isinstance(node, ast.BoolOp):
+            return node.values[0] if node.values else None
+        elif isinstance(node, ast.IfExp):
+            return node.body  # 'body if test else orelse' - body comes first in source
+        elif isinstance(node, ast.Call):
+            return node.func
+        elif isinstance(node, ast.Subscript):
+            return node.value
+        elif isinstance(node, ast.Attribute):
+            return node.value
+        elif isinstance(node, ast.Starred):
+            return node.value
+        elif isinstance(node, ast.Await):
+            return node.value
+        return None
+
+    def __push_parentheses(self, node, prefix: Space, save_token_idx: int):
+        open_paren_idx = self._token_idx  # Token index of '(' before incrementing
+        self._token_idx += 1  # consume '('
         expr_prefix = self.__whitespace()
         handler = (
             lambda e, r: (
@@ -2100,44 +2321,40 @@ class ParserVisitor(ast.NodeVisitor):
                     self.__pad_right(e.replace(prefix=expr_prefix), r)
                 )
             ),
-            save_cursor,
-            self._cursor,
+            save_token_idx,
+            self._token_idx,
             node,
             prefix,
-            open_paren_pos  # Position of the '(' for paren map lookup
+            open_paren_idx  # Token index of the '(' for paren map lookup
         )
         self._parentheses_stack.append(handler)
         return handler
 
-    def _is_closing_paren(self, save_cursor: int) -> bool:
+    def _is_closing_paren(self, save_token_idx: int) -> bool:
         """Check if current position has a valid closing parenthesis.
 
-        This uses both:
-        1. The original scope check (content between push cursor and current save_cursor)
-        2. The paren map for definitive position matching
-
-        Both checks must pass to ensure we're at the right nesting level.
+        Uses both scope checking and paren map for definitive matching.
+        A child expression should not pop parentheses pushed by an ancestor.
         """
-        if (not self._parentheses_stack or
-                self._cursor >= len(self._source) or
-                self._source[self._cursor] != ')'):
+        if not self._parentheses_stack or not self.__at_token(')'):
             return False
 
-        # Original scope check: verify we haven't moved far from where we pushed
-        stack_cursor = self._parentheses_stack[-1][2]
-        slice_content = self._source[stack_cursor:save_cursor]
-        scope_check = stack_cursor == save_cursor or slice_content.isspace() or slice_content == '('
-
-        if not scope_check:
+        # First check scope - we can only close parens pushed at our scope level
+        # This prevents child expressions from popping parentheses belonging to ancestors
+        # stack_token_idx is where we were at push time (at the '(')
+        # save_token_idx is where we were at the start of __convert_internal (before whitespace)
+        # Allow stack_token_idx to be slightly ahead of save_token_idx (due to whitespace consumption)
+        stack_token_idx = self._parentheses_stack[-1][2]
+        if stack_token_idx < save_token_idx or stack_token_idx > save_token_idx + 2:
             return False
 
-        # Additional paren map check for definitive matching
-        open_paren_pos = self._parentheses_stack[-1][5]  # Position of '('
-        expected_close = self._paren_pairs.get(open_paren_pos)
-        if expected_close is not None:
-            return self._cursor == expected_close
+        # Then verify position using paren map (token indices)
+        open_paren_idx = self._parentheses_stack[-1][5]  # Token index of '('
+        expected_close_idx = self._paren_pairs.get(open_paren_idx)
+        if expected_close_idx is not None:
+            return self._token_idx == expected_close_idx
 
-        # If paren map doesn't have this position (shouldn't happen), fall back to scope check alone
+        # If not in paren map, scope check already passed
         return True
 
     def __convert_name(self, name: str, name_type: Optional[JavaType] = None) -> NameTree:
@@ -2162,12 +2379,6 @@ class ParserVisitor(ast.NodeVisitor):
 
         return ident_or_field(name.split('.'))
 
-    def __next_lexer_token(self, tokens: Iterator[TokenInfo]) -> TokenInfo:
-        tok = next(tokens)
-        value_source = tok.string
-        self._cursor += len(value_source)
-        return tok
-
     def __convert_all(self, trees: Sequence) -> List[J2]:
         return [self.__convert(tree) for tree in trees]
 
@@ -2191,8 +2402,7 @@ class ParserVisitor(ast.NodeVisitor):
         # use whitespace until end of line as padding; what follows will be the prefix of next element
         # This includes trailing comments on the same line
         padding = self.__whitespace('\n')
-        if self._cursor < len(self._source) and self._source[self._cursor] == ';':
-            self._cursor += 1
+        if self.__skip(';'):
             markers = Markers.build(random_id(), [Semicolon(random_id())])
         else:
             markers = Markers.EMPTY
@@ -2200,23 +2410,22 @@ class ParserVisitor(ast.NodeVisitor):
 
     def __pad_list_element(self, element: J2, last: bool = False, pad_last: bool = True, delim: str = ',',
                            end_delim: Optional[str] = None) -> JRightPadded[J2]:
-        save_cursor = self._cursor
+        save_token_idx = self._token_idx
         padding = self.__whitespace() if pad_last or not last else Space.EMPTY
         markers = Markers.EMPTY
-        if last and self._cursor < len(self._source):
-            if self._source[self._cursor] == delim and end_delim != delim:
-                self._cursor += len(delim)
+        if last and self._token_idx < len(self._tokens):
+            if end_delim != delim and self.__skip(delim):
                 markers = markers.replace(markers=[TrailingComma(random_id(), self.__whitespace())])
-            elif self._source[self._cursor] != end_delim:
+            elif not self.__at_token(end_delim) if end_delim else True:
                 if not pad_last:
-                    self._cursor = save_cursor
-            if end_delim and self._source[self._cursor] == end_delim:
-                self._cursor += len(end_delim)
+                    self._token_idx = save_token_idx
+            if end_delim and self.__skip(end_delim):
+                pass
         elif last:
             padding = Space.EMPTY
-            self._cursor = save_cursor
+            self._token_idx = save_token_idx
         elif not last:
-            self._cursor += len(delim)
+            self._token_idx += 1  # consume delimiter
             markers = Markers.EMPTY
         return JRightPadded(element, padding, markers)
 
@@ -2229,106 +2438,86 @@ class ParserVisitor(ast.NodeVisitor):
         return JLeftPadded(space, tree, Markers.EMPTY)
 
     def __source_before(self, until_delim: Optional[str], stop: Optional[str] = None) -> Space:
+        """Extract whitespace before a delimiter, then consume the delimiter token."""
         if not until_delim:
             return Space.EMPTY
 
-        if self._source.startswith(until_delim, self._cursor):
-            self._cursor += len(until_delim)
-            return Space.EMPTY
+        # Get whitespace (this also advances past whitespace tokens)
+        space = self.__whitespace(stop)
 
-        save_cursor = self._cursor
-        space = self.__whitespace()
-        if self._source.startswith(until_delim, self._cursor):
-            self._cursor += len(until_delim)
-            return space
-        else:
-            self._cursor = save_cursor
+        # Consume the delimiter token
+        if self._token_idx < len(self._tokens):
+            tok = self._tokens[self._token_idx]
+            if tok.string == until_delim or (tok.type == token.NAME and tok.string == until_delim):
+                self._token_idx += 1
 
-        delim_index = self.__position_of_next(until_delim, stop)
-        if delim_index == -1:
-            return Space.EMPTY
-
-        if delim_index == self._cursor:
-            self._cursor += len(until_delim)
-            return Space.EMPTY
-
-        space = self.__whitespace()
-        self._cursor = delim_index + len(until_delim)
         return space
 
     def __skip(self, tok: Optional[str]) -> Optional[str]:
+        """Skip the current token if it matches the given string."""
         if tok is None:
             return None
-        if self._source.startswith(tok, self._cursor):
-            self._cursor += len(tok)
-        return tok
+        if self._token_idx < len(self._tokens):
+            curr = self._tokens[self._token_idx]
+            if curr.string == tok:
+                self._token_idx += 1
+                return tok
+        return None
 
     def __whitespace(self, stop: Optional[str] = None) -> Space:
-        space, self._cursor = self.__format(self._source, self._cursor, stop)
-        return space
-
-    def __format(self, source: str, offset: int, stop: Optional[str] = None) -> Tuple[Space, int]:
-        prefix = None
-        whitespace = []
+        """Consume whitespace tokens and return the whitespace as a Space."""
+        prefix: Optional[str] = None
+        whitespace: List[str] = []
         comments: List[Comment] = []
-        source_len = len(source)
-        while offset < source_len:
-            char = source[offset]
-            if stop is not None and char == stop:
-                break
-            if char.isspace() or char == '\\':
-                whitespace.append(char)
-            elif char == '#':
+
+        while self._token_idx < len(self._tokens):
+            tok = self._tokens[self._token_idx]
+
+            # Skip virtual tokens with no source representation
+            if tok.type in (token.DEDENT, token.ENCODING, token.ENDMARKER):
+                self._token_idx += 1
+                continue
+
+            # Handle whitespace tokens
+            if tok.type in (WHITESPACE_TOKEN, token.NEWLINE, token.NL, token.INDENT):
+                text = tok.string
+                # Check for stop character
+                if stop is not None and stop in text:
+                    # For NEWLINE/NL tokens containing stop, don't split (treat \r\n as unit)
+                    if tok.type in (token.NEWLINE, token.NL):
+                        break
+                    stop_idx = text.index(stop)
+                    whitespace.append(text[:stop_idx])
+                    break
+                whitespace.append(text)
+                self._token_idx += 1
+
+            # Handle comments
+            elif tok.type == token.COMMENT:
+                # Save current whitespace as prefix or previous comment's suffix
                 if comments:
                     comments[-1] = comments[-1].replace(suffix=''.join(whitespace))
                 else:
                     prefix = ''.join(whitespace)
                 whitespace = []
-                comment = []
-                offset += 1
-                while offset < source_len and source[offset] not in ['\r', '\n']:
-                    comment.append(source[offset])
-                    offset += 1
-                comments.append(TextComment(False, ''.join(comment), '',
-                                            Markers.EMPTY))
-                continue
+                # Create comment (strip leading '#')
+                comment_text = tok.string[1:] if tok.string.startswith('#') else tok.string
+                comments.append(TextComment(False, comment_text, '', Markers.EMPTY))
+                self._token_idx += 1
+
             else:
+                # Non-whitespace token, stop
                 break
-            if offset < source_len:
-                offset += 1
 
         if not whitespace and not comments:
-            return Space.EMPTY, offset
+            return Space.EMPTY
 
         if not comments:
             prefix = ''.join(whitespace)
         elif whitespace:
             comments[-1] = comments[-1].replace(suffix=''.join(whitespace))
-        return Space(comments, prefix), offset
 
-    def __position_of_next(self, until_delim: str, stop: Optional[str] = None) -> int:
-        in_single_line_comment = False
-
-        delim_index = self._cursor
-        end_index = len(self._source) - len(until_delim) + 1
-        while delim_index < end_index:
-            if in_single_line_comment:
-                if self._source[delim_index] == '\n':
-                    in_single_line_comment = False
-            else:
-                if self._source[delim_index] == '#':
-                    in_single_line_comment = True
-
-            if not in_single_line_comment:
-                if stop is not None and self._source.startswith(stop, delim_index):
-                    return -1  # reached stop word before finding the delimiter
-
-                if self._source.startswith(until_delim, delim_index):
-                    break  # found it!
-
-            delim_index += 1
-
-        return -1 if delim_index > len(self._source) - len(until_delim) else delim_index
+        return Space(comments, prefix if prefix is not None else '')
 
     def _map_unary_operator(self, op) -> Tuple[j.Unary.Type, str]:
         operation_map: Dict[Type[ast], Tuple[j.Unary.Type, str]] = {
@@ -2361,56 +2550,90 @@ class ParserVisitor(ast.NodeVisitor):
             raise ValueError(f"Unsupported operator: {op}")
         return self.__pad_left(self.__source_before(op_str), op)
 
-    def __map_fstring(self, node: ast.JoinedStr, prefix: Space, tok: TokenInfo, tokens: peekable, value_idx: int = 0) -> \
+    def __map_fstring(self, node: ast.JoinedStr, prefix: Space, tok: TokenInfo, value_idx: int = 0) -> \
             Tuple[J, TokenInfo, int]:
+        """Map an f-string to a FormattedString AST node.
+
+        Uses _token_idx directly to iterate through tokens.
+        """
         if tok.type != token.FSTRING_START:
             if len(node.values) == 1 and isinstance(node.values[0], ast.Constant):
                 # format specifiers are stored as f-strings in the AST; e.g. `f'{1:n}'`
-                format = cast(ast.Constant, node.values[0]).value
-                self._cursor += len(format)
+                format_val = cast(ast.Constant, node.values[0]).value
+                self._token_idx += 1  # consume the format token
                 return (j.Literal(
                     random_id(),
                     self.__whitespace(),
                     Markers.EMPTY,
-                    format,
-                    format,
+                    format_val,
+                    format_val,
                     None,
                     JavaType.Primitive.String
-                ), next(tokens), 0)
+                ), self._tokens[self._token_idx], 0)
             else:
                 delimiter = ''
             consume_end_delim = False
         else:
             delimiter = tok.string
-            self._cursor += len(delimiter)
-            tok = next(tokens)
+            tok = self._advance_token()  # consume FSTRING_START, get next
             consume_end_delim = True
 
         # tokenizer tokens: FSTRING_START, FSTRING_MIDDLE, OP, ..., OP, FSTRING_MIDDLE, FSTRING_END
         parts = []
+        prev_token_idx = -1
         while tok.type != token.FSTRING_END and value_idx < len(node.values):
+            # Safety check: ensure loop is making progress
+            if self._token_idx == prev_token_idx:
+                raise RuntimeError(
+                    f"F-string parsing stuck at token_idx={self._token_idx}, "
+                    f"tok.type={tok.type}, tok.string={repr(tok.string)}, "
+                    f"value_idx={value_idx}, node.values={[type(v).__name__ for v in node.values]}"
+                )
+            prev_token_idx = self._token_idx
+
+            # Skip synthetic whitespace tokens injected between f-string tokens
+            if tok.type == WHITESPACE_TOKEN:
+                tok = self._advance_token()
+                continue
+
+            # Handle nested FSTRING_START - this indicates nested f-string concatenation
+            # which is not fully supported. Skip to prevent infinite loop.
+            if tok.type == token.FSTRING_START:
+                # Skip until we find the matching FSTRING_END
+                depth = 1
+                while depth > 0 and self._token_idx < len(self._tokens):
+                    tok = self._advance_token()
+                    if tok.type == token.FSTRING_START:
+                        depth += 1
+                    elif tok.type == token.FSTRING_END:
+                        depth -= 1
+                tok = self._advance_token() if self._token_idx < len(self._tokens) - 1 else tok
+                continue
+
             value = node.values[value_idx]
             if tok.type == token.FSTRING_MIDDLE:
-                save_cursor = self._cursor
-                while True:
-                    self._cursor += len(tok.string) + (1 if tok.string.endswith('{') or tok.string.endswith('}') else 0)
-                    if (tok := next(tokens)).type != token.FSTRING_MIDDLE:
-                        break
-                s = self._source[save_cursor:self._cursor]
+                # Accumulate text from consecutive FSTRING_MIDDLE tokens
+                s = tok.string
+                tok = self._advance_token()  # consume first FSTRING_MIDDLE, get next
+                while tok.type == token.FSTRING_MIDDLE:
+                    s += tok.string
+                    tok = self._advance_token()  # consume and get next
+                # For value_source, escape braces so the printer outputs them correctly
+                # In f-strings, {{ becomes { and }} becomes }, so we reverse that
+                value_source = s.replace('{', '{{').replace('}', '}}')
                 parts.append(j.Literal(
                     random_id(),
                     Space.EMPTY,
                     Markers.EMPTY,
                     s,
-                    s,
+                    value_source,
                     None,
                     JavaType.Primitive.String
                 ))
                 if cast(ast.Constant, value).value == s:
                     value_idx += 1
             elif tok.type == token.OP and tok.string == '{':
-                self._cursor += 1
-                tok = next(tokens)
+                tok = self._advance_token()  # consume '{', get next
                 if not isinstance(value, ast.FormattedValue):
                     # this is the case when using the `=` "debug specifier"
                     value_idx += 1
@@ -2418,7 +2641,7 @@ class ParserVisitor(ast.NodeVisitor):
 
                 if isinstance(cast(ast.FormattedValue, value).value, ast.JoinedStr):
                     nested, tok, _ = self.__map_fstring(cast(ast.JoinedStr, cast(ast.FormattedValue, value).value),
-                                                        Space.EMPTY, tok, tokens)
+                                                        Space.EMPTY, tok)
                     expr = self.__pad_right(
                         nested,
                         Space.EMPTY
@@ -2428,47 +2651,50 @@ class ParserVisitor(ast.NodeVisitor):
                         self.__convert(cast(ast.FormattedValue, value).value),
                         self.__whitespace()
                     )
-                    try:
-                        while (tokens.peek()).type not in (token.FSTRING_END, token.FSTRING_MIDDLE):
-                            tok = next(tokens)
-                            if tok.type == token.OP and tok.string in ('!'):
-                                break
-                            la_tok = tokens.peek()
-                            if tok.type == token.OP and tok.string == '}' and (
-                                    la_tok.type in (token.FSTRING_END, token.FSTRING_MIDDLE) or (
-                                    la_tok.type == token.OP and la_tok.string == '{')):
-                                break
-                            if tok.type == token.OP and tok.string == '=' and la_tok.string in ('!', ':', '}'):
-                                break
-                            if tok.type == token.OP and tok.string == ':' and la_tok.string in ('{'):
-                                break
-                    except StopIteration:
-                        pass
+
+                # Scan for specifiers (debug, conversion, format) - applies to both nested f-string and regular expressions
+                while self._token_idx < len(self._tokens) and self._tokens[self._token_idx].type not in (token.FSTRING_END, token.FSTRING_MIDDLE):
+                    tok = self._next_token()  # get current and advance (we need to examine current token)
+                    if tok.type == token.OP and tok.string in ('!'):
+                        break
+                    la_tok = self._tokens[self._token_idx]
+                    if tok.type == token.OP and tok.string == '}' and (
+                            la_tok.type in (token.FSTRING_END, token.FSTRING_MIDDLE) or (
+                            la_tok.type == token.OP and la_tok.string == '{')):
+                        break
+                    # Debug specifier '=' - break regardless of what follows (whitespace is valid after '=')
+                    if tok.type == token.OP and tok.string == '=':
+                        break
+                    if tok.type == token.OP and tok.string == ':' and la_tok.string in ('{'):
+                        break
 
                 # debug specifier
                 if tok.type == token.OP and tok.string == '=':
-                    self._cursor += len(tok.string)
-                    tok = next(tokens)
                     debug = self.__pad_right(True, self.__whitespace('\n'))
+                    tok = self._tokens[self._token_idx]  # get token after whitespace
                 else:
                     debug = None
 
                 # conversion specifier
                 if tok.type == token.OP and tok.string == '!':
-                    self._cursor += len(tok.string)
-                    tok = next(tokens)
+                    # If we came from debug specifier handling, _token_idx points to '!'
+                    # If we came from the while loop directly (no debug), _token_idx already points to conversion char
+                    if debug is not None:
+                        self._token_idx += 1  # advance past '!' (only needed after debug specifier)
+                    tok = self._tokens[self._token_idx]  # get conversion char
                     conv = py.FormattedString.Value.Conversion.ASCII if tok.string == 'a' else py.FormattedString.Value.Conversion.STR if tok.string == 's' else py.FormattedString.Value.Conversion.REPR
-                    self._cursor += len(tok.string)
-                    tok = next(tokens)
+                    tok = self._advance_token()  # consume conversion char, get next
                 else:
                     conv = None
 
                 # format specifier
                 if tok.type == token.OP and tok.string == ':':
-                    self._cursor += len(tok.string)
+                    # After conversion handling: _token_idx points to ':' (need to advance)
+                    # After scanning loop only: _token_idx already points past ':' (don't advance)
+                    if conv is not None:
+                        self._token_idx += 1  # advance past ':' (only needed after conversion)
                     format_spec, tok, _ = self.__map_fstring(
-                        cast(ast.JoinedStr, cast(ast.FormattedValue, value).format_spec), Space.EMPTY, next(tokens),
-                        tokens)
+                        cast(ast.JoinedStr, cast(ast.FormattedValue, value).format_spec), Space.EMPTY, self._tokens[self._token_idx])
                 else:
                     format_spec = None
 
@@ -2482,16 +2708,18 @@ class ParserVisitor(ast.NodeVisitor):
                     format_spec
                 ))
                 value_idx += 1
-                self._cursor += len(tok.string)
-                tok = next(tokens)
+                # After format spec: _token_idx points to '}', need to advance
+                # After scanning loop without format spec: _token_idx already past '}'
+                if format_spec is not None and self._tokens[self._token_idx].string == '}':
+                    self._token_idx += 1
+                tok = self._tokens[self._token_idx]
             elif tok.type == token.FSTRING_END:
                 raise NotImplementedError("Unsupported: String concatenation with f-strings")
 
         if consume_end_delim:
-            self._cursor += len(tok.string)  # FSTRING_END token
-            tok = next(tokens)
+            tok = self._advance_token()  # consume FSTRING_END, get next
         elif tok.type == token.FSTRING_MIDDLE and len(tok.string) == 0:
-            tok = next(tokens)
+            tok = self._advance_token()  # consume empty FSTRING_MIDDLE, get next
 
         return (py.FormattedString(
             random_id(),
@@ -2501,6 +2729,8 @@ class ParserVisitor(ast.NodeVisitor):
             parts
         ), tok, value_idx)
 
-    def __cursor_at(self, s: str):
-        return self._cursor < len(self._source) and (
-                len(s) == 1 and self._source[self._cursor] == s or self._source.startswith(s, self._cursor))
+    def __at_token(self, s: str) -> bool:
+        """Check if the current token matches the given string."""
+        if self._token_idx >= len(self._tokens):
+            return False
+        return self._tokens[self._token_idx].string == s
