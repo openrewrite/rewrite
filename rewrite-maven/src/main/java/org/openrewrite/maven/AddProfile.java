@@ -58,15 +58,9 @@ public class AddProfile extends Recipe {
     @Nullable
     String build;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Maven profile";
-    }
+    String displayName = "Add Maven profile";
 
-    @Override
-    public String getDescription() {
-        return "Add a maven profile to a `pom.xml` file.";
-    }
+    String description = "Add a maven profile to a `pom.xml` file.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

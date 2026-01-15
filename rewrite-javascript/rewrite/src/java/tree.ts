@@ -37,6 +37,7 @@ export namespace J {
 }
 
 export interface Expression extends J {
+    readonly type?: Type;
 }
 
 export interface MethodCall extends Expression {
@@ -834,9 +835,21 @@ export interface DocComment extends Comment {
     // TODO implement me!
 }
 
-export function isLiteral(tree: any): tree is J.Literal {
-    return tree["kind"] === J.Kind.Literal;
-}
+export const isBinary = (n: any): n is J.Binary => n.kind === J.Kind.Binary;
+export const isBlock = (n: any): n is J.Block => n.kind === J.Kind.Block;
+export const isClassDeclaration = (n: any): n is J.ClassDeclaration => n.kind === J.Kind.ClassDeclaration;
+export const isFieldAccess = (n: any): n is J.FieldAccess => n.kind === J.Kind.FieldAccess;
+export const isIdentifier = (tree: any): tree is J.Identifier => tree["kind"] === J.Kind.Identifier;
+export const isIf = (tree: any): tree is J.If => tree["kind"] === J.Kind.If;
+export const isImport = (tree: any): tree is J.Import => tree["kind"] === J.Kind.Import;
+export const isLambda = (tree: any): tree is J.Lambda => tree["kind"] === J.Kind.Lambda;
+export const isLiteral = (tree: any): tree is J.Literal => tree["kind"] === J.Kind.Literal;
+export const isMethodDeclaration = (n: any): n is J.MethodDeclaration => n.kind === J.Kind.MethodDeclaration;
+export const isMethodInvocation = (n: any): n is J.MethodInvocation => n.kind === J.Kind.MethodInvocation;
+export const isNamedVariable = (n: any): n is J.VariableDeclarations.NamedVariable => n.kind === J.Kind.NamedVariable;
+export const isNewClass = (n: any): n is J.NewClass => n.kind === J.Kind.NewClass;
+export const isReturn = (n: any): n is J.Return => n.kind === J.Kind.Return;
+export const isVariableDeclarations = (n: any): n is J.VariableDeclarations => n.kind === J.Kind.VariableDeclarations;
 
 export function rightPadded<T extends J | boolean>(t: T, trailing: J.Space, markers?: Markers): J.RightPadded<T> {
     return {

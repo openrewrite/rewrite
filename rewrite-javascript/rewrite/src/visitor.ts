@@ -15,27 +15,24 @@
  */
 import {emptyMarkers, Marker, Markers} from "./markers";
 import {Cursor, isSourceFile, rootCursor, SourceFile, Tree} from "./tree";
-import {createDraft, Draft, finishDraft, Objectish} from "immer";
-import {mapAsync} from "./util";
+import {create, Draft} from "mutative";
+import {mapAsync, updateIfChanged} from "./util";
 
-/* Not exported beyond the internal immer module */
-export type ValidImmerRecipeReturnType<State> =
-    | State
-    | void
-    | undefined
+type Objectish = Record<string, any> | Array<any>;
+
+export type ValidRecipeReturnType<State> = State | void | undefined;
 
 export async function produceAsync<Base extends Objectish>(
     before: Promise<Base> | Base,
-    recipe: (draft: Draft<Base>) => ValidImmerRecipeReturnType<Draft<Base>> |
-        PromiseLike<ValidImmerRecipeReturnType<Draft<Base>>>
-): Promise<Base> {
+    recipe: (draft: Draft<Base>) => ValidRecipeReturnType<Draft<Base>> |
+        PromiseLike<ValidRecipeReturnType<Draft<Base>>>
+): Promise<Base | undefined> {
     const b: Base = await before;
-    const draft = createDraft(b);
-    await recipe(draft);
-    return finishDraft(draft) as Base;
+    // Mutative's create(base, recipe) supports async recipes and rawReturn(undefined)
+    return create(b, recipe as any) as Base | undefined;
 }
 
-const stopAfterPreVisit = Symbol("STOP_AFTER_PRE_VISIT")
+const stopAfterPreVisit = Symbol.for("STOP_AFTER_PRE_VISIT")
 
 export abstract class TreeVisitor<T extends Tree, P> {
     protected cursor: Cursor = rootCursor();
@@ -128,8 +125,8 @@ export abstract class TreeVisitor<T extends Tree, P> {
         } else if ((markers.markers?.length || 0) === 0) {
             return markers;
         }
-        return produceAsync<Markers>(markers, async (draft) => {
-            draft.markers = await mapAsync(markers.markers, m => this.visitMarker(m, p))
+        return updateIfChanged(markers, {
+            markers: await mapAsync(markers.markers, m => this.visitMarker(m, p))
         });
     }
 
@@ -141,15 +138,25 @@ export abstract class TreeVisitor<T extends Tree, P> {
         before: T,
         p: P,
         recipe?:
-            ((draft: Draft<T>) => ValidImmerRecipeReturnType<Draft<T>>) |
-            ((draft: Draft<T>) => Promise<ValidImmerRecipeReturnType<Draft<T>>>)
-    ): Promise<T> {
-        return produceAsync(before, async draft => {
-            draft.markers = await this.visitMarkers(before.markers, p);
-            if (recipe) {
-                await recipe(draft);
+            ((draft: Draft<T>) => ValidRecipeReturnType<Draft<T>>) |
+            ((draft: Draft<T>) => Promise<ValidRecipeReturnType<Draft<T>>>)
+    ): Promise<T | undefined> {
+        // Visit markers separately to avoid Mutative drafting cyclic marker structures
+        const newMarkers = await this.visitMarkers(before.markers, p);
+
+        if (recipe) {
+            // Remove markers before Mutative drafting to avoid cycles, then restore after
+            const withoutMarkers = { ...before, markers: emptyMarkers };
+            const result = await produceAsync(withoutMarkers, recipe);
+            if (result === undefined) {
+                return undefined;
             }
-        });
+            // Restore markers (use newMarkers since we visited them)
+            return { ...result, markers: newMarkers } as T;
+        }
+
+        // No recipe - just update markers if changed
+        return updateIfChanged(before, { markers: newMarkers } as Partial<T>);
     }
 }
 

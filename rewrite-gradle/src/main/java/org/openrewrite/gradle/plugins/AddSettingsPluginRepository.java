@@ -59,15 +59,9 @@ public class AddSettingsPluginRepository extends Recipe {
     @Nullable
     String url;
 
-    @Override
-    public String getDisplayName() {
-        return "Add a Gradle settings repository";
-    }
+    String displayName = "Add a Gradle settings repository";
 
-    @Override
-    public String getDescription() {
-        return "Add a Gradle settings repository to `settings.gradle(.kts)`.";
-    }
+    String description = "Add a Gradle settings repository to `settings.gradle(.kts)`.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -157,7 +151,10 @@ public class AddSettingsPluginRepository extends Recipe {
                     }));
                     statements.set(0, m);
                 } else {
-                    statements.add(0, pluginManagement instanceof J.Block ? (J.Block) pluginManagement : (J.MethodInvocation) pluginManagement);
+                    Statement pluginManagementStatement = pluginManagement instanceof J.Block ?
+                            ((J.Block) pluginManagement).getStatements().get(0) :
+                            (J.MethodInvocation) pluginManagement;
+                    statements.add(0, pluginManagementStatement);
                     statements.set(1, statements.get(1).withPrefix(Space.format("\n\n")));
                 }
                 return statements;

@@ -20,6 +20,8 @@ export interface Type {
 }
 
 export namespace Type {
+    export const FUNCTION_TYPE_NAME = '𝑓';
+
     export const Kind = {
         Annotation: "org.openrewrite.java.tree.JavaType$Annotation",
         AnnotationElementValue: "org.openrewrite.java.tree.JavaType$Annotation$ElementValue",
@@ -128,9 +130,9 @@ export namespace Type {
 
     export namespace GenericTypeVariable {
         export const enum Variance {
-            Covariant,
-            Contravariant,
-            Invariant
+            Covariant = "Covariant",
+            Contravariant = "Contravariant",
+            Invariant = "Invariant",
         }
     }
 
@@ -230,12 +232,28 @@ export namespace Type {
         kind: Type.Kind.Unknown
     });
 
+    /**
+     * Type guard that checks if an unknown value is a JavaType.
+     * All JavaType kinds start with 'org.openrewrite.java.tree.JavaType$'.
+     */
+    export function isType(value: unknown): value is Type {
+        return value !== null &&
+            typeof value === 'object' &&
+            'kind' in value &&
+            typeof (value as { kind: unknown }).kind === 'string' &&
+            (value as { kind: string }).kind.startsWith('org.openrewrite.java.tree.JavaType$');
+    }
+
     export function isPrimitive(type?: Type): type is Type.Primitive {
         return type?.kind === Type.Kind.Primitive;
     }
 
     export function isClass(type?: Type): type is Type.Class {
         return type?.kind === Type.Kind.Class;
+    }
+
+    export function isFunctionType(type?: Type): type is Type.Class {
+        return type?.kind === Type.Kind.Class && (type as Type.Class).fullyQualifiedName === FUNCTION_TYPE_NAME;
     }
 
     export function isMethod(type?: Type): type is Type.Method {
@@ -248,6 +266,18 @@ export namespace Type {
 
     export function isParameterized(type?: Type): type is Type.Parameterized {
         return type?.kind === Type.Kind.Parameterized;
+    }
+
+    export function isGenericTypeVariable(type?: Type): type is Type.GenericTypeVariable {
+        return type?.kind === Type.Kind.GenericTypeVariable;
+    }
+
+    export function isUnion(type?: Type): type is Type.Union {
+        return type?.kind === Type.Kind.Union;
+    }
+
+    export function isIntersection(type?: Type): type is Type.Intersection {
+        return type?.kind === Type.Kind.Intersection;
     }
 
     export function isFullyQualified(type?: Type): type is Type.FullyQualified {
@@ -284,6 +314,8 @@ export namespace Type {
     // Track type variable names and parameterized types to prevent infinite recursion
     let typeVariableNameStack: Set<string> | null = null;
     let parameterizedStack: Set<Type> | null = null;
+    let unionStack: Set<Type> | null = null;
+    let intersectionStack: Set<Type> | null = null;
 
     export function signature(type: Type | undefined | null): string {
         if (!type) {
@@ -343,7 +375,26 @@ export namespace Type {
             }
             case Type.Kind.Intersection: {
                 const intersection = type as Type.Intersection;
-                return (intersection.bounds || []).map(b => signature(b)).join(" & ");
+
+                // Initialize stack if needed
+                if (intersectionStack === null) {
+                    intersectionStack = new Set<Type>();
+                }
+
+                // Check for recursion
+                if (intersectionStack.has(intersection)) {
+                    return "<cyclic intersection>";
+                }
+
+                // Add to stack to track cycles
+                intersectionStack.add(intersection);
+
+                try {
+                    return (intersection.bounds || []).map(b => signature(b)).join(" & ");
+                } finally {
+                    // Remove from stack when done
+                    intersectionStack.delete(intersection);
+                }
             }
             case Type.Kind.Method: {
                 const method = type as Type.Method;
@@ -380,7 +431,26 @@ export namespace Type {
             }
             case Type.Kind.Union: {
                 const union = type as Type.Union;
-                return (union.bounds || []).map(b => signature(b)).join(" | ");
+
+                // Initialize stack if needed
+                if (unionStack === null) {
+                    unionStack = new Set<Type>();
+                }
+
+                // Check for recursion
+                if (unionStack.has(union)) {
+                    return "<cyclic union>";
+                }
+
+                // Add to stack to track cycles
+                unionStack.add(union);
+
+                try {
+                    return (union.bounds || []).map(b => signature(b)).join(" | ");
+                } finally {
+                    // Remove from stack when done
+                    unionStack.delete(union);
+                }
             }
             case Type.Kind.Unknown: {
                 return "<unknown>";

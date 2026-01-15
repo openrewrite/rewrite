@@ -98,7 +98,8 @@ public class MavenPomDownloader {
      * @param activeProfiles The active profiles to use, if any. This argument overrides any active profiles
      *                       set on the execution context.
      */
-    public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx,
+    public MavenPomDownloader(Map<Path, Pom> projectPoms,
+                              ExecutionContext ctx,
                               @Nullable MavenSettings mavenSettings,
                               @Nullable List<String> activeProfiles) {
         this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
@@ -176,8 +177,8 @@ public class MavenPomDownloader {
             List<Pom> ancestryWithinProject = getAncestryWithinProject(projectPom, projectPoms);
             Map<String, String> mergedProperties = mergeProperties(ancestryWithinProject);
             GroupArtifactVersion gav = new GroupArtifactVersion(
-                    projectPom.getGroupId(),
-                    projectPom.getArtifactId(),
+                    ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getGroupId(), mergedProperties::get),
+                    ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getArtifactId(), mergedProperties::get),
                     ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getVersion(), mergedProperties::get)
             );
             result.put(gav, projectPom);
@@ -189,7 +190,10 @@ public class MavenPomDownloader {
         Map<String, String> mergedProperties = new HashMap<>();
         for (Pom pom : pomAncestry) {
             for (Map.Entry<String, String> property : pom.getProperties().entrySet()) {
-                mergedProperties.putIfAbsent(property.getKey(), property.getValue());
+                mergedProperties.putIfAbsent(
+                        property.getKey(),
+                        // null property values like `<sha1 />` are treated as empty strings to avoid showing in URLs
+                        Objects.toString(property.getValue(), ""));
             }
         }
         return mergedProperties;
@@ -296,7 +300,7 @@ public class MavenPomDownloader {
                         if (derivedMeta != null) {
                             Counter.builder("rewrite.maven.derived.metadata")
                                     .tag("repositoryUri", repo.getUri())
-                                    .tag("group", gav.getGroupId())
+                                    .tag("group", gav.getGroupId() == null ? "" : gav.getGroupId())
                                     .tag("artifact", gav.getArtifactId())
                                     .register(Metrics.globalRegistry)
                                     .increment();
@@ -412,7 +416,7 @@ public class MavenPomDownloader {
                 break;
             }
             String href = responseBody.substring(start, end).trim();
-            if (href.endsWith("/")) {
+            if (!href.startsWith("../") && href.endsWith("/")) {
                 //Only look for hrefs that have directories (the directory names are the versions)
                 versions.add(hrefToVersion(href, uri));
             }
@@ -516,7 +520,7 @@ public class MavenPomDownloader {
             !StringUtils.isBlank(relativePath) && !relativePath.contains(":")) {
             Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
             if (folderContainingPom != null) {
-                Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
+                Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath).resolve("pom.xml"))
                         .normalize());
                 // Even poms published to remote repositories still contain relative paths to their parent poms
                 // So double check that the GAV coordinates match so that we don't get a relative path from a remote
@@ -632,13 +636,23 @@ public class MavenPomDownloader {
                                 String line;
                                 while ((line = reader.readLine()) != null) {
                                     if (line.contains("published-with-gradle-metadata")) {
-                                        // as some artifacts do not have the bom as dependency listed, we need to add it by fetching the gradle metadata module.
+                                        // Some artifacts do not have the bom as dependency listed, we need to add it by fetching the gradle metadata module.
+                                        // It isn't strictly correct to do this from a maven standpoint, but helps with emulating Gradle dependency resolution
                                         pomResponseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString().replaceFirst(".pom$", ".module"));
                                         RawGradleModule module = RawGradleModule.parse(new ByteArrayInputStream(pomResponseBody));
-                                        for (Dependency dependency : module.getDependencies("apiElements", "platform")) {
-                                            rawPom.getDependencies().getDependencies().add(
-                                                    new RawPom.Dependency(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), null, "bom", null, null, null)
-                                            );
+                                        for (Dependency dependency : module.getDependencies("apiElements", "platform", "enforcedPlatform")) {
+                                            String category = dependency.getAttributes().get("org.gradle.category");
+                                            // Platform and enforcedPlatform dependencies are BOMs that should be in dependencyManagement,
+                                            // not regular dependencies - they only provide version constraints
+                                            if ("platform".equalsIgnoreCase(category) || "enforcedPlatform".equalsIgnoreCase(category)) {
+                                                if (rawPom.getDependencyManagement() == null) {
+                                                    rawPom.setDependencyManagement(new RawPom.DependencyManagement(new RawPom.Dependencies()));
+                                                }
+                                                assert rawPom.getDependencyManagement().getDependencies() != null;
+                                                rawPom.getDependencyManagement().getDependencies().getDependencies().add(
+                                                        new RawPom.Dependency(dependency.getGroupId() == null ? "" : dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), "import", "pom", null, null, null)
+                                                );
+                                            }
                                         }
                                         break;
                                     }
@@ -995,7 +1009,7 @@ public class MavenPomDownloader {
     enum Reachability {
         SUCCESS,
         ERROR,
-        UNREACHABLE;
+        UNREACHABLE
     }
 
     private ReachabilityResult reachable(HttpSender.Request.Builder request) {

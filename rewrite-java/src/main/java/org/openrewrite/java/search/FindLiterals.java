@@ -34,15 +34,9 @@ public class FindLiterals extends Recipe {
             example = "file://")
     String pattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Find literals";
-    }
+    String displayName = "Find literals";
 
-    @Override
-    public String getDescription() {
-        return "Find literals matching a pattern.";
-    }
+    String description = "Find literals matching a pattern.";
 
     @Override
     public Validated<Object> validate() {

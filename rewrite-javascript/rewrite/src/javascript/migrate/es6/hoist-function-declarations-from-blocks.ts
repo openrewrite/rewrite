@@ -17,12 +17,12 @@
 import {Recipe} from "../../../recipe";
 import {TreeVisitor} from "../../../visitor";
 import {ExecutionContext} from "../../../execution";
-import {IntelliJ, JavaScriptVisitor, JS, template} from "../../../javascript";
+import {IntelliJ, JavaScriptVisitor, JS, template, raw} from "../../../javascript";
 import {emptySpace, J} from "../../../java";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 import {randomId} from "../../../uuid";
 import {Tree} from "../../../tree";
-import {emptyMarkers, setMarkerByKind} from "../../../markers";
+import {emptyMarkers, replaceMarkerByKind} from "../../../markers";
 import {TabsAndIndentsVisitor} from "../../format";
 
 export class HoistFunctionDeclarationsFromBlocks extends Recipe {
@@ -143,7 +143,7 @@ export class HoistFunctionDeclarationsFromBlocks extends Recipe {
                         hoistedFunctions.get(scopeId)!.add(funcName);
 
                         // Use template to create the assignment properly
-                        const tempAssignment = await template`${funcName} = function() {};`.apply(this.cursor, methodDecl) as J.Assignment;
+                        const tempAssignment = await template`${raw(funcName)} = function() {};`.apply(methodDecl, this.cursor) as J.Assignment;
                         return produce(tempAssignment, assignDraft => {
                             const funcExpr = assignDraft.assignment.element;
                             if (funcExpr.kind === JS.Kind.StatementExpression) {
@@ -165,14 +165,14 @@ export class HoistFunctionDeclarationsFromBlocks extends Recipe {
                         // Check if child set message to add semicolon
                         if (this.cursor.messages.get("ADD_SEMICOLON")) {
                             return produce(result, draft => {
-                                draft.markers = setMarkerByKind(draft.markers, {
+                                draft!.markers = replaceMarkerByKind(draft!.markers, {
                                     kind: J.Markers.Semicolon,
                                     id: randomId()
                                 });
-                            });
+                            })!;
                         }
 
-                        return result;
+                        return result!;
                     }
 
                     async visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): Promise<J | undefined> {
@@ -252,7 +252,7 @@ export class HoistFunctionDeclarationsFromBlocks extends Recipe {
                             // Template all declarations
                             const declarations: J[] = [];
                             for (const funcName of funcNames) {
-                                const decl = await template`let ${funcName};`.apply(this.cursor, statements[0].element) as J;
+                                const decl = await template`let ${raw(funcName)};`.apply(statements[0].element, this.cursor) as J;
                                 if (decl) {
                                     declarations.push(decl);
                                 }
@@ -278,7 +278,7 @@ export class HoistFunctionDeclarationsFromBlocks extends Recipe {
                                     kind: J.Kind.RightPadded,
                                     element: wrappedDecl,
                                     after: emptySpace,
-                                    markers: setMarkerByKind(emptyMarkers, {
+                                    markers: replaceMarkerByKind(emptyMarkers, {
                                         kind: J.Markers.Semicolon,
                                         id: randomId()
                                     })

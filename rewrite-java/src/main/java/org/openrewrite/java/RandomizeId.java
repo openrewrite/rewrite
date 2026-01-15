@@ -15,22 +15,19 @@
  */
 package org.openrewrite.java;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 
 public class RandomizeId extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Randomize tree IDs";
-    }
+    @Getter
+    final String displayName = "Randomize tree IDs";
 
-    @Override
-    public String getDescription() {
-        return "Scramble the IDs. This was intended as a utility to test _en masse_ " +
-                "different techniques for UUID generation and compare their relative performance " +
-                "outside a microbenchmark.";
-    }
+    @Getter
+    final String description = "Scramble the IDs. This was intended as a utility to test _en masse_ " +
+        "different techniques for UUID generation and compare their relative performance " +
+        "outside a microbenchmark.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

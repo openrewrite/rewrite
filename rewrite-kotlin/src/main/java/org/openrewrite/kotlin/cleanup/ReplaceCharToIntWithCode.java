@@ -31,17 +31,11 @@ import org.openrewrite.kotlin.KotlinVisitor;
 public class ReplaceCharToIntWithCode extends Recipe {
     private static final MethodMatcher CHAR_TO_INT_METHOD_MATCHER = new MethodMatcher("kotlin.Char toInt()");
 
-    @Override
-    public String getDisplayName() {
-        return "Replace `Char#toInt()` with `Char#code`";
-    }
+    String displayName = "Replace `Char#toInt()` with `Char#code`";
 
-    @Override
-    public String getDescription() {
-        return "Replace the usage of the deprecated `Char#toInt()` with `Char#code`. " +
+    String description = "Replace the usage of the deprecated `Char#toInt()` with `Char#code`. " +
                "Please ensure that your Kotlin version is 1.5 or later to support the `Char#code` property. " +
                "Note that the current implementation does not perform a Kotlin version check.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

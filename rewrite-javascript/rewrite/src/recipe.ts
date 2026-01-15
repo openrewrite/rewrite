@@ -102,7 +102,8 @@ export abstract class Recipe {
                 value: (this as any)[key],
                 required: descriptor.required ?? true,
                 ...descriptor
-            }))
+            })),
+            dataTables: this.dataTables
         }
     }
 
@@ -121,9 +122,9 @@ export abstract class Recipe {
      * recipe to perform any cleanup or finalization tasks. This method is guaranteed to be called
      * only once per run.
      *
-     * @param ctx The recipe run execution context.
+     * @param _ctx The recipe run execution context.
      */
-    async onComplete(ctx: ExecutionContext): Promise<void> {
+    async onComplete(_ctx: ExecutionContext): Promise<void> {
     }
 }
 
@@ -136,6 +137,7 @@ export interface RecipeDescriptor {
     readonly estimatedEffortPerOccurrence: Minutes
     readonly recipeList: RecipeDescriptor[]
     readonly options: ({ name: string, value?: any } & OptionDescriptor)[]
+    readonly dataTables: DataTableDescriptor[]
 }
 
 export interface OptionDescriptor {
@@ -171,12 +173,12 @@ export abstract class ScanningRecipe<P> extends Recipe {
             }
 
             async visit<R extends Tree>(tree: Tree, ctx: ExecutionContext, parent?: Cursor): Promise<R | undefined> {
-                return (await this.delegateForCtx(ctx)).visit(tree, ctx, parent);
+                return (await this.delegateForCtx(ctx, parent)).visit(tree, ctx, parent);
             }
 
-            private async delegateForCtx(ctx: ExecutionContext) {
+            private async delegateForCtx(ctx: ExecutionContext, parent?: Cursor) {
                 if (!this.delegate) {
-                    this.delegate = await editorWithContext(this.cursor, ctx);
+                    this.delegate = await editorWithContext(parent ?? this.cursor, ctx);
                 }
                 return this.delegate;
             }
@@ -200,22 +202,6 @@ export abstract class ScanningRecipe<P> extends Recipe {
  * Do not permit overriding of editor()
  */
 Object.freeze(ScanningRecipe.prototype.editor);
-
-export class RecipeRegistry {
-    /**
-     * The registry map stores recipe constructors keyed by their name.
-     */
-    all = new Map<string, new (options?: any) => Recipe>();
-
-    public register<T extends Recipe>(recipeClass: new (options?: any) => T): void {
-        try {
-            const r = new recipeClass({});
-            this.all.set(r.name, recipeClass);
-        } catch (e) {
-            throw new Error(`Failed to register recipe. Ensure the constructor can be called without any arguments.`);
-        }
-    }
-}
 
 export function Option(descriptor: OptionDescriptor) {
     return function (target: any, propertyKey: string) {

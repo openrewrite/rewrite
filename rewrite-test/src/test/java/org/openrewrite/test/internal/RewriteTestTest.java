@@ -17,6 +17,7 @@ package org.openrewrite.test.internal;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -34,7 +35,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.SourceSpecs.text;
 
 @SuppressWarnings("UnnecessarySemicolon")
@@ -141,21 +141,6 @@ class RewriteTestTest implements RewriteTest {
           text("foo")
         );
     }
-
-    @Test
-    void allowNonWhitespaceInWhitespace() {
-        rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
-          java(
-            """
-              import java.util.List;;
-              interface A {
-                  List<String> getList();
-              }
-              """
-          )
-        );
-    }
 }
 
 @EqualsAndHashCode(callSuper = false)
@@ -163,15 +148,9 @@ class RewriteTestTest implements RewriteTest {
 @Value
 class ScannerEdit extends ScanningRecipe<AtomicBoolean> {
 
-    @Override
-    public String getDisplayName() {
-        return "Attempts mutation during getScanner()";
-    }
+    String displayName = "Attempts mutation during getScanner()";
 
-    @Override
-    public String getDescription() {
-        return "Any changes attempted by a visitor returned from getScanner() should be an error during test execution.";
-    }
+    String description = "Any changes attempted by a visitor returned from getScanner() should be an error during test execution.";
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {
@@ -194,15 +173,9 @@ class ScannerEdit extends ScanningRecipe<AtomicBoolean> {
 @Value
 class MutateExecutionContext extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Mutate execution context";
-    }
+    String displayName = "Mutate execution context";
 
-    @Override
-    public String getDescription() {
-        return "Mutates the execution context to trigger a validation failure.";
-    }
+    String description = "Mutates the execution context to trigger a validation failure.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -221,15 +194,9 @@ class MutateExecutionContext extends Recipe {
 @Value
 class ImproperCursorUsage extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Uses cursor improperly";
-    }
+    String displayName = "Uses cursor improperly";
 
-    @Override
-    public String getDescription() {
-        return "LST elements are acyclic. So a cursor which indicates an element is its own parent is invalid.";
-    }
+    String description = "LST elements are acyclic. So a cursor which indicates an element is its own parent is invalid.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -249,16 +216,10 @@ class ImproperCursorUsage extends Recipe {
 @Value
 class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
 
-    @Override
-    public String getDisplayName() {
-        return "Creates two source files with the same path";
-    }
+    String displayName = "Creates two source files with the same path";
 
-    @Override
-    public String getDescription() {
-        return "A source file's path must be unique. " +
+    String description = "A source file's path must be unique. " +
           "This recipe creates two source files with the same path to show that the test framework helps protect against this mistake.";
-    }
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {
@@ -309,63 +270,47 @@ class RecipeWithNameOption extends Recipe {
         this.name = name;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Recipe with name option";
-    }
+    @Getter
+    final String displayName = "Recipe with name option";
 
-    @Override
-    public String getDescription() {
-        return "A fancy description.";
-    }
+    @Getter
+    final String description = "A fancy description.";
 }
 
 @NullMarked
 class RecipeWithDescriptionListOfLinks extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Recipe with name option";
-    }
+    @Getter
+    final String displayName = "Recipe with name option";
 
-    @Override
-    public String getDescription() {
-        return """
+    @Getter
+    final String description = """
           A fancy description.
           For more information, see:
             - [link 1](https://example.com/link1)
             - [link 2](https://example.com/link2)""";
-    }
 }
 
 @NullMarked
 class RecipeWithDescriptionListOfDescribedLinks extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Recipe with name option";
-    }
+    @Getter
+    final String displayName = "Recipe with name option";
 
-    @Override
-    public String getDescription() {
-        return """
+    @Getter
+    final String description = """
           A fancy description.
           For more information, see:
             - First Resource [link 1](https://example.com/link1).
             - Second Resource [link 2](https://example.com/link2).""";
-    }
 }
 
 @NullMarked
 class RecipeWithDescriptionNotEndingWithPeriod extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Recipe with name option";
-    }
+    @Getter
+    final String displayName = "Recipe with name option";
 
-    @Override
-    public String getDescription() {
-        return "A fancy description";
-    }
+    @Getter
+    final String description = "A fancy description";
 }

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.search;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -25,15 +26,11 @@ import org.openrewrite.xml.tree.Xml;
 
 public class FindMavenProject extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Find Maven projects";
-    }
+    @Getter
+    final String displayName = "Find Maven projects";
 
-    @Override
-    public String getDescription() {
-        return "Maven projects are `pom.xml` files with a `MavenResolutionResult` marker.";
-    }
+    @Getter
+    final String description = "Maven projects are `pom.xml` files with a `MavenResolutionResult` marker.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

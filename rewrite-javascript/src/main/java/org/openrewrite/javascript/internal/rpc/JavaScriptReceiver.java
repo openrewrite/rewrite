@@ -285,6 +285,19 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitShebang(JS.Shebang shebang, RpcReceiveQueue q) {
+        return shebang
+                .withText(q.receive(shebang.getText()));
+    }
+
+    @Override
+    public J visitSpread(JS.Spread spread, RpcReceiveQueue q) {
+        return spread
+                .withExpression(q.receive(spread.getExpression(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(spread.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
     public J visitStatementExpression(JS.StatementExpression statementExpression, RpcReceiveQueue q) {
         return statementExpression
                 .withStatement(q.receive(statementExpression.getStatement(), stmt -> (Statement) visitNonNull(stmt, q)));

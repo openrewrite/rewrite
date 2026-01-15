@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -28,15 +29,11 @@ import org.openrewrite.style.Style;
 
 public class Spaces extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Spaces";
-    }
+    @Getter
+    final String displayName = "Spaces";
 
-    @Override
-    public String getDescription() {
-        return "Format whitespace in Java code.";
-    }
+    @Getter
+    final String description = "Format whitespace in Java code.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -53,7 +50,8 @@ public class Spaces extends Recipe {
                     return new SpacesVisitor<>(
                             Style.from(SpacesStyle.class, cu, IntelliJ::spaces),
                             Style.from(EmptyForInitializerPadStyle.class, cu),
-                            Style.from(EmptyForIteratorPadStyle.class, cu))
+                            Style.from(EmptyForIteratorPadStyle.class, cu),
+                            null, false)
                             .visit(cu, ctx);
                 }
                 return super.visit(tree, ctx);
@@ -67,6 +65,8 @@ public class Spaces extends Recipe {
         //noinspection unchecked
         return (J2) new SpacesVisitor<>(style == null ? IntelliJ.spaces() : style,
                 Style.from(EmptyForInitializerPadStyle.class, cu),
-                Style.from(EmptyForIteratorPadStyle.class, cu)).visitNonNull(j, 0, cursor);
+                Style.from(EmptyForIteratorPadStyle.class, cu),
+                null,
+                false).visitNonNull(j, 0, cursor);
     }
 }

@@ -41,7 +41,7 @@ describe("hoist-function-declarations-from-blocks", () => {
                 `
                 let helper;
                 if (true) {
-                    helper = function() {
+                    helper = function () {
                         return 42;
                     };
                 }
@@ -82,7 +82,7 @@ describe("hoist-function-declarations-from-blocks", () => {
                 `
                 let process;
                 while (condition) {
-                    process = function() {
+                    process = function () {
                         return data;
                     };
                 }
@@ -114,12 +114,12 @@ describe("hoist-function-declarations-from-blocks", () => {
                 let helper1;
                 let helper2;
                 if (condition1) {
-                    helper1 = function() {
+                    helper1 = function () {
                         return 1;
                     };
                 }
                 if (condition2) {
-                    helper2 = function() {
+                    helper2 = function () {
                         return 2;
                     };
                 }
@@ -162,7 +162,7 @@ describe("hoist-function-declarations-from-blocks", () => {
                 let helper;
                 if (condition1) {
                     if (condition2) {
-                        helper = function() {
+                        helper = function () {
                             return 42;
                         };
                     }
@@ -191,7 +191,7 @@ describe("hoist-function-declarations-from-blocks", () => {
                 let helper;
                 if (condition1) {
                     if (condition2) {
-                        helper = function() {
+                        helper = function () {
                             return 42;
                         };
                     }
@@ -221,7 +221,7 @@ describe("hoist-function-declarations-from-blocks", () => {
                 if (condition) {
                     console.log('then');
                 } else {
-                    helper = function() {
+                    helper = function () {
                         return 42;
                     };
                 }
@@ -245,7 +245,7 @@ describe("hoist-function-declarations-from-blocks", () => {
                 `
                 let helper;
                 if (true)
-                    helper = function() {
+                    helper = function () {
                         return 42;
                     };
                 const result = helper();
@@ -272,7 +272,7 @@ describe("hoist-function-declarations-from-blocks", () => {
                 function outer() {
                     let helper;
                     if (condition) {
-                        helper = function(n) {
+                        helper = function (n) {
                             return 42 + n;
                         };
                     }
@@ -305,7 +305,7 @@ describe("hoist-function-declarations-from-blocks", () => {
                     function inner() {
                         let helper;
                         if (condition) {
-                            helper = function() {
+                            helper = function () {
                                 return 42;
                             };
                         }
@@ -338,12 +338,12 @@ describe("hoist-function-declarations-from-blocks", () => {
                 `
                 let helper;
                 if (condition1) {
-                    helper = function() {
+                    helper = function () {
                         return 1;
                     };
                 }
                 if (condition2) {
-                    helper = function() {
+                    helper = function () {
                         return 2;
                     };
                 }
@@ -373,7 +373,7 @@ describe("hoist-function-declarations-from-blocks", () => {
                 function outer() {
                     let helper;
                     if (condition1) {
-                        helper = function() {
+                        helper = function () {
                             return 1;
                         };
                     }
@@ -401,7 +401,7 @@ describe("hoist-function-declarations-from-blocks", () => {
                 `
                 let helper;
                 if (true) {
-                    helper = function(a, b) {
+                    helper = function (a, b) {
                         return a + b;
                     };
                 }
@@ -487,7 +487,7 @@ describe("hoist-function-declarations-from-blocks", () => {
                 let helper;
                 const fn = function() { return 99;};
                 if (true) {
-                    helper = function() {
+                    helper = function () {
                         return 42;
                     };
                 }
@@ -530,7 +530,7 @@ describe("hoist-function-declarations-from-blocks", () => {
                 `
                 let helper;
                 if (true) {
-                    helper = function(): number {
+                    helper = function (): number {
                         return 42;
                     };
                 }

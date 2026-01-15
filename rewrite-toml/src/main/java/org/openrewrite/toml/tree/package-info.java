@@ -13,9 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@CheckReturnValue
 @NullMarked
 @NonNullFields
 package org.openrewrite.toml.tree;
 
 import org.jspecify.annotations.NullMarked;
 import org.openrewrite.internal.lang.NonNullFields;
+
+import javax.annotation.CheckReturnValue;

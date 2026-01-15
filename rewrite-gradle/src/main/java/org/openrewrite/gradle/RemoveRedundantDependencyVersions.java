@@ -76,17 +76,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     public enum Comparator {ANY, EQ, LT, LTE, GT, GTE}
 
-    @Override
-    public String getDisplayName() {
-        return "Remove redundant explicit dependencies and versions";
-    }
+    String displayName = "Remove redundant explicit dependencies and versions";
 
-    @Override
-    public String getDescription() {
-        return "Remove explicitly-specified dependency versions that are managed by a Gradle `platform`, `enforcedPlatform` " +
+    String description = "Remove explicitly-specified dependency versions that are managed by a Gradle `platform`, `enforcedPlatform` " +
                "or the `io.spring.dependency-management` plugin. Also removes redundant " +
                "direct dependencies and dependency constraints that are already satisfied by transitive dependencies.";
-    }
 
     private static final List<String> DEPENDENCY_MANAGEMENT_METHODS = Arrays.asList(
             "api",

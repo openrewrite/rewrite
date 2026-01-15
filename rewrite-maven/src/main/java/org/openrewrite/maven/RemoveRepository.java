@@ -42,20 +42,14 @@ public class RemoveRepository extends Recipe {
             description = "The URL of the repository.")
     String url;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove repository";
-    }
+    String displayName = "Remove repository";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s`", url);
     }
 
-    @Override
-    public String getDescription() {
-        return "Removes a matching Maven repository.";
-    }
+    String description = "Removes a matching Maven repository.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

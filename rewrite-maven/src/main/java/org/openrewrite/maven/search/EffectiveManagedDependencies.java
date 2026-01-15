@@ -31,15 +31,9 @@ import org.openrewrite.xml.tree.Xml;
 public class EffectiveManagedDependencies extends Recipe {
     transient ManagedDependencyGraph dependencyGraph = new ManagedDependencyGraph(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Effective managed dependencies";
-    }
+    String displayName = "Effective managed dependencies";
 
-    @Override
-    public String getDescription() {
-        return "Emit the data of binary dependency relationships.";
-    }
+    String description = "Emit the data of binary dependency relationships.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

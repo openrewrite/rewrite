@@ -150,6 +150,7 @@ public class SpacesStyle implements JavaStyle {
         Boolean afterTypeCast;
         Boolean beforeColonInForEach;
         Boolean insideOneLineEnumBraces;
+        Boolean aroundEqualInAnnotationValuePair;
     }
 
     @Value

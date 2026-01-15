@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RewriteRpc} from "../rpc";
+import {RewriteRpc} from "../rpc/rewrite-rpc";
 import {UsesMethod, UsesType} from "./search";
 import {ExecutionContext} from "../execution";
 import {TreeVisitor} from "../visitor";

@@ -41,16 +41,10 @@ import static org.openrewrite.marker.Markers.EMPTY;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddOrUpdateAnnotationAttribute extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Add or update annotation attribute";
-    }
+    String displayName = "Add or update annotation attribute";
 
-    @Override
-    public String getDescription() {
-        return "Some annotations accept arguments. This recipe sets an existing argument to the specified value, " +
+    String description = "Some annotations accept arguments. This recipe sets an existing argument to the specified value, " +
                 "or adds the argument if it is not already set.";
-    }
 
     @Option(displayName = "Annotation type",
             description = "The fully qualified name of the annotation.",

@@ -152,7 +152,7 @@ public class RewriteRpcProcess extends Thread {
                     process.waitFor(2, TimeUnit.SECONDS);
                 }
                 int exitCode = process.exitValue();
-                if (exitCode != 0 && exitCode != 143) { // 143 = SIGTERM
+                if (exitCode != 0 && exitCode != 1 && exitCode != 143) { // 143 = SIGTERM
                     throw new RuntimeException("JavaScript Rewrite RPC process crashed with exit code: " + exitCode);
                 }
             } catch (InterruptedException e) {

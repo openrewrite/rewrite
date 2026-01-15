@@ -15,6 +15,7 @@
  */
 package org.openrewrite.text;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
@@ -25,17 +26,13 @@ import static java.util.Objects.requireNonNull;
 
 public class EndOfLineAtEndOfFile extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "End of Line @ End of File (EOL @ EOF)";
-    }
+    @Getter
+    final String displayName = "End of Line @ End of File (EOL @ EOF)";
 
-    @Override
-    public String getDescription() {
-        return "Ensure that the file ends with the newline character.\n\n" +
-                "*Note*: If this recipe modifies a file, it converts the file into plain text. " +
-                "As such, this recipe should be run after any recipe that modifies the language-specific LST.";
-    }
+    @Getter
+    final String description = "Ensure that the file ends with the newline character.\n\n" +
+        "*Note*: If this recipe modifies a file, it converts the file into plain text. " +
+        "As such, this recipe should be run after any recipe that modifies the language-specific LST.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -20,7 +20,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.java.InlineMe;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
@@ -74,7 +73,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -92,7 +91,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
     @Nullable
     Boolean changeManagedDependency;
 
-    @InlineMe(replacement = "this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, false, true)")
     public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
         this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, false, true);
     }
@@ -109,21 +107,15 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
         this.changeManagedDependency = changeManagedDependency;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven dependency";
-    }
+    String displayName = "Change Maven dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", oldGroupId, oldArtifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before. " +
-               "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided.";
-    }
+    String description = "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before. " +
+                "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided.";
 
     @Override
     public Validated<Object> validate() {
@@ -156,7 +148,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 isNewDependencyPresent = checkIfNewDependencyPresents(newGroupId, newArtifactId, newVersion);
-                if (changeManagedDependency == null || changeManagedDependency) {
+                if (!oldGroupId.contains("*") && !oldArtifactId.contains("*") &&
+                        (changeManagedDependency == null || changeManagedDependency)) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
                             oldGroupId, oldArtifactId,
                             Optional.ofNullable(newGroupId).orElse(oldGroupId),
@@ -175,7 +168,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                     maybeUpdateModel();
                     return t;
                 }
-                if (isOldDependencyTag || isPluginDependencyTag(oldGroupId, oldArtifactId)) {
+                if (isOldDependencyTag || isPluginDependencyTag(oldGroupId, oldArtifactId) || isAnnotationProcessorPathTag(oldGroupId, oldArtifactId)) {
                     String groupId = newGroupId;
                     if (groupId != null) {
                         t = changeChildTagValue(t, "groupId", groupId, ctx);
@@ -188,6 +181,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                     } else {
                         artifactId = t.getChildValue("artifactId").orElseThrow(NoSuchElementException::new);
                     }
+
                     String currentVersion = t.getChildValue("version").orElse(null);
                     if (newVersion != null) {
                         try {
@@ -220,6 +214,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             return e.warn(tag);
                         }
                     }
+
                     if (t != tag) {
                         maybeUpdateModel();
                     }
@@ -236,7 +231,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 List<ResolvedDependency> dependencies = findDependencies(groupId, artifactId);
                 return dependencies.stream()
                         .filter(ResolvedDependency::isDirect)
-                        .anyMatch(rd -> (version == null) || version.equals(rd.getVersion()));
+                        .anyMatch(rd -> version == null ||
+                                versionComparator != null && versionComparator.compare(null, version, rd.getVersion()) <= 0);
             }
 
             private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {

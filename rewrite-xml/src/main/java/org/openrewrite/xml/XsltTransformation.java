@@ -56,16 +56,10 @@ public class XsltTransformation extends Recipe {
             example = "**/*.xml")
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "XSLT transformation";
-    }
+    String displayName = "XSLT transformation";
 
-    @Override
-    public String getDescription() {
-        return "Apply the specified XSLT transformation on matching files. " +
+    String description = "Apply the specified XSLT transformation on matching files. " +
                "Note that there are no format matching guarantees when running this recipe.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

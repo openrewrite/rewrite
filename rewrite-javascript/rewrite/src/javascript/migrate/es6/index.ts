@@ -14,7 +14,12 @@
  * limitations under the License.
  */
 
+import {Migrate} from "../index";
+import {CategoryDescriptor} from "../../../marketplace";
+
 export {HoistFunctionDeclarationsFromBlocks} from "./hoist-function-declarations-from-blocks";
 export {ModernizeOctalEscapeSequences} from "./modernize-octal-escape-sequences";
 export {ModernizeOctalLiterals} from "./modernize-octal-literals";
 export {RemoveDuplicateObjectKeys} from "./remove-duplicate-object-keys";
+
+export const MigrateES6: CategoryDescriptor[] = [...Migrate, {displayName: "ES6 (JavaScript 2015)"}]

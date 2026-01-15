@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -24,15 +25,11 @@ import org.openrewrite.xml.style.TabsAndIndentsStyle;
 import org.openrewrite.xml.tree.Xml;
 
 public class TabsAndIndents extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Tabs and indents";
-    }
+    @Getter
+    final String displayName = "Tabs and indents";
 
-    @Override
-    public String getDescription() {
-        return "Format tabs and indents in XML code.";
-    }
+    @Getter
+    final String description = "Format tabs and indents in XML code.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

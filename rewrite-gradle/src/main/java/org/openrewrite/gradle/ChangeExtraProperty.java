@@ -29,19 +29,13 @@ import java.util.Objects;
 @EqualsAndHashCode(callSuper = false)
 public class ChangeExtraProperty extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Change Extra Property";
-    }
+    String displayName = "Change Extra Property";
 
-    @Override
-    public String getDescription() {
-        return "Gradle's [ExtraPropertiesExtension](https://docs.gradle.org/current/dsl/org.gradle.api.plugins.ExtraPropertiesExtension.html) " +
+    String description = "Gradle's [ExtraPropertiesExtension](https://docs.gradle.org/current/dsl/org.gradle.api.plugins.ExtraPropertiesExtension.html) " +
                "is a commonly used mechanism for setting arbitrary key/value pairs on a project. " +
                "This recipe will change the value of a property with the given key name if that key can be found. " +
                "It assumes that the value being set is a String literal. " +
                "Does not add the value if it does not already exist.";
-    }
 
     @Option(displayName = "Key",
             description = "The key of the property to change.",
