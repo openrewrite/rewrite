@@ -72,14 +72,14 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
 
             // Check for id("pluginId")
             if (isIdMethodInvocation(m, isKotlin)) {
-                if (isPlugin(m.getArguments().get(0))) {
+                if (isPluginLiteral(m.getArguments().get(0))) {
                     return null;
                 }
             }
             // Check for id("pluginId").version("...")
             else if (isVersionMethodInvocation(m, isKotlin)) {
                 if (m.getSelect() instanceof J.MethodInvocation &&
-                        isPlugin(((J.MethodInvocation) m.getSelect()).getArguments().get(0))) {
+                        isPluginLiteral(((J.MethodInvocation) m.getSelect()).getArguments().get(0))) {
                     return null;
                 }
             }
@@ -87,14 +87,14 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
             else if (isApplyMethodInvocation(m, isKotlin)) {
                 if (isIdMethodInvocation(m.getSelect(), isKotlin)) {
                     if (m.getSelect() instanceof J.MethodInvocation &&
-                            isPlugin(((J.MethodInvocation) m.getSelect()).getArguments().get(0))) {
+                            isPluginLiteral(((J.MethodInvocation) m.getSelect()).getArguments().get(0))) {
                         return null;
                     }
                 } else if (isVersionMethodInvocation(m.getSelect(), isKotlin)) {
                     if (m.getSelect() instanceof J.MethodInvocation &&
                             isIdMethodInvocation(((J.MethodInvocation) m.getSelect()).getSelect(), isKotlin)) {
                         if (((J.MethodInvocation) m.getSelect()).getSelect() instanceof J.MethodInvocation &&
-                                isPlugin(((J.MethodInvocation) ((J.MethodInvocation) m.getSelect()).getSelect()).getArguments().get(0))) {
+                                isPluginLiteral(((J.MethodInvocation) ((J.MethodInvocation) m.getSelect()).getSelect()).getArguments().get(0))) {
                             return null;
                         }
                     }
@@ -105,7 +105,7 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
         }));
     }
 
-    private boolean isPlugin(Expression expression) {
+    private boolean isPluginLiteral(Expression expression) {
         return expression instanceof J.Literal &&
                 pluginId.equals(((J.Literal) expression).getValue());
     }
@@ -163,17 +163,14 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
             for (Expression arg : m.getArguments()) {
                 if (arg instanceof G.MapEntry) {
                     G.MapEntry me = (G.MapEntry) arg;
-                    if (me.getKey() instanceof J.Literal && me.getValue() instanceof J.Literal) {
-                        J.Literal pluginLiteral = (J.Literal) me.getKey();
-                        J.Literal pluginIdLiteral = (J.Literal) me.getValue();
-                        if ("plugin".equals(pluginLiteral.getValue()) && pluginId.equals(pluginIdLiteral.getValue())) {
-                            return null;
-                        }
+                    if (me.getKey() instanceof J.Literal && "plugin".equals(((J.Literal) me.getKey()).getValue()) &&
+                            me.getValue() instanceof J.Literal && pluginId.equals(((J.Literal) me.getValue()).getValue())) {
+                        return null;
                     }
                 } else if (arg instanceof J.Assignment) {
-                    J.Assignment assignment = (J.Assignment) arg;
-                    if (assignment.getVariable() instanceof J.Identifier && "plugin".equals(((J.Identifier) assignment.getVariable()).getSimpleName()) &&
-                            assignment.getAssignment() instanceof J.Literal && pluginId.equals(((J.Literal) assignment.getAssignment()).getValue())) {
+                    J.Assignment as = (J.Assignment) arg;
+                    if (as.getVariable() instanceof J.Identifier && "plugin".equals(((J.Identifier) as.getVariable()).getSimpleName()) &&
+                            as.getAssignment() instanceof J.Literal && pluginId.equals(((J.Literal) as.getAssignment()).getValue())) {
                         return null;
                     }
                 }
