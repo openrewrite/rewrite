@@ -47,12 +47,15 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
     public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
         J.Block b = super.visitBlock(block, executionContext);
 
-        boolean isKotlin = getCursor().firstEnclosing(K.CompilationUnit.class) != null;
         J.MethodInvocation m = getCursor().firstEnclosing(J.MethodInvocation.class);
+        if (m == null) {
+            return b;
+        }
 
+        boolean isKotlin = getCursor().firstEnclosing(K.CompilationUnit.class) != null;
         boolean isPluginsBlock = isKotlin ?
-                (m != null && "plugins".equals(m.getSimpleName())) :
-                (m != null && (buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m)));
+                "plugins".equals(m.getSimpleName()) :
+                buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m);
 
         if (isPluginsBlock) {
             b = b.withStatements(ListUtils.map(b.getStatements(), statement -> {
