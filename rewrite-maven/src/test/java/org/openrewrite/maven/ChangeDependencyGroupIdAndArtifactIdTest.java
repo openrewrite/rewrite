@@ -2090,4 +2090,89 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6533")
+    @Test
+    void pluginDependencyShouldNotUseManagedVersion() {
+        // Plugin dependencies should always have an explicit version since dependencyManagement
+        // does not apply to plugin dependencies in Maven
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.1.0",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.test</groupId>
+                  <artifactId>test-app</artifactId>
+                  <version>1.0.0</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>2.1.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>kotlin-maven-plugin</artifactId>
+                              <groupId>org.jetbrains.kotlin</groupId>
+                              <version>1.9.0</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>javax.activation</groupId>
+                                      <artifactId>javax.activation-api</artifactId>
+                                      <version>1.2.0</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.test</groupId>
+                  <artifactId>test-app</artifactId>
+                  <version>1.0.0</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>2.1.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>kotlin-maven-plugin</artifactId>
+                              <groupId>org.jetbrains.kotlin</groupId>
+                              <version>1.9.0</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>jakarta.activation</groupId>
+                                      <artifactId>jakarta.activation-api</artifactId>
+                                      <version>2.1.0</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
 }
