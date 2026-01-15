@@ -223,6 +223,8 @@ class RpcSendQueue:
 
     def _get_value_type(self, obj: Any) -> Optional[str]:
         """Get the Java type name for an object, or None for primitives."""
+        # Import python_receiver to ensure codecs are registered before get_java_type_name
+        from rewrite.rpc import python_receiver  # noqa: F401 - triggers codec registration
         from rewrite.rpc.receive_queue import get_java_type_name
 
         if obj is None:

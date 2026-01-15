@@ -401,8 +401,8 @@ def get_all_tree_classes(module, module_name: str):
         for name, nested in inspect.getmembers(cls, inspect.isclass):
             if nested.__module__ != module_name:
                 continue
-            # Skip helper classes and enum types
-            if 'Helper' in name or name in ('Type', 'Kind', 'Conversion'):
+            # Skip padding helper classes
+            if name == 'PaddingHelper':
                 continue
             full_name = f'{prefix}.{name}'
             if is_dataclass(nested):

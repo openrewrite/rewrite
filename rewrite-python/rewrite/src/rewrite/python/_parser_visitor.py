@@ -1487,7 +1487,7 @@ class ParserVisitor(ast.NodeVisitor):
             j.Modifier.Type.Default,
             []
         ))
-        name = j.MethodDeclaration.IdentifierWithAnnotations(j.Identifier(
+        name_identifier = j.Identifier(
             random_id(),
             self.__source_before(node.name),
             Markers.EMPTY,
@@ -1495,7 +1495,7 @@ class ParserVisitor(ast.NodeVisitor):
             node.name,
             None,
             None
-        ), [])
+        )
 
         params = JContainer(self.__source_before('('), self.visit_arguments(node.args), Markers.EMPTY)
         if node.returns is None:
@@ -1518,7 +1518,8 @@ class ParserVisitor(ast.NodeVisitor):
             modifiers,
             None,
             return_type,
-            name,
+            [],  # name_annotations
+            name_identifier,
             params,
             None,
             body,

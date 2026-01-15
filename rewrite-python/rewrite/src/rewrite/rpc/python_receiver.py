@@ -54,15 +54,26 @@ class PythonRpcReceiver:
             return None
 
         # First handle common J fields via pre_visit
-        # ExpressionStatement and StatementExpression delegate prefix/markers to their child
+        # Java's preVisit always sends id, prefix, markers for all J elements.
+        # ExpressionStatement and StatementExpression delegate prefix/markers to their child,
+        # but we still need to receive them to stay in sync with the queue.
         if isinstance(tree, J):
             if isinstance(tree, ExpressionStatement):
-                # Only receive id; prefix/markers are part of expression
+                # Java sends id, prefix, markers even though prefix/markers delegate to expression
+                # We must receive them to stay in sync, but only use the id
+                # Note: tree.prefix/markers would fail on fresh instances since _expression is None,
+                # so we pass None as the before value - the RPC data contains the actual values anyway.
                 new_id = q.receive(tree.id)
+                q.receive(None)    # Receive but discard prefix - delegated to expression
+                q.receive(None)    # Receive but discard markers - delegated to expression
                 tree = tree.replace(id=new_id) if new_id is not tree.id else tree
             elif isinstance(tree, StatementExpression):
-                # Only receive id; prefix/markers are part of statement
+                # Java sends id, prefix, markers even though prefix/markers delegate to statement
+                # We must receive them to stay in sync, but only use the id
+                # Note: tree.prefix/markers would fail on fresh instances since _statement is None
                 new_id = q.receive(tree.id)
+                q.receive(None)    # Receive but discard prefix - delegated to statement
+                q.receive(None)    # Receive but discard markers - delegated to statement
                 tree = tree.replace(id=new_id) if new_id is not tree.id else tree
             else:
                 tree = self._pre_visit(tree, q)
@@ -384,7 +395,7 @@ class PythonRpcReceiver:
             AssignmentOperation, Unary, Ternary, Lambda, Empty, Throw,
             Assert, Break, Continue, WhileLoop, ForEachLoop, Switch, Case,
             Annotation, Import, Binary as JBinary, Parentheses, ControlParentheses,
-            NewArray, Modifier, Yield
+            NewArray, Modifier, Yield, ParameterizedType
         )
 
         if isinstance(j, Identifier):
@@ -471,6 +482,8 @@ class PythonRpcReceiver:
             return self._visit_j_modifier(j, q)
         elif isinstance(j, Yield):
             return self._visit_j_yield(j, q)
+        elif isinstance(j, ParameterizedType):
+            return self._visit_j_parameterized_type(j, q)
 
         return j
 
@@ -684,6 +697,7 @@ class PythonRpcReceiver:
                                   permits=permits, body=body)
 
     def _visit_j_class_declaration_kind(self, kind, q: RpcReceiveQueue):
+        # Note: _pre_visit is already called by _visit before this method
         annotations = q.receive_list(kind.annotations)
         type_ = q.receive(kind.type)  # Enum type
         return replace_if_changed(kind, annotations=annotations, type=type_)
@@ -696,10 +710,9 @@ class PythonRpcReceiver:
             lambda el: self._visit(el, q) if el else None
         )
         return_type_expression = q.receive(method.return_type_expression)
-        name_annotations = q.receive_list(
-            method.annotations.name.annotations if hasattr(method.annotations.name, 'annotations') else []
-        )
-        name = q.receive(method.annotations.name.identifier)
+        # Simplified model: nameAnnotations and name are separate fields (like TypeScript)
+        name_annotations = q.receive_list(method.name_annotations if method.name_annotations else [])
+        name = q.receive(method.name)
         parameters = q.receive(method.padding.parameters, lambda c: self._receive_container(c, q) if c else None)
         throws = q.receive(
             method.padding.throws if hasattr(method.padding, 'throws') else None,
@@ -713,6 +726,7 @@ class PythonRpcReceiver:
         method_type = q.receive(method.method_type)
         return replace_if_changed(method, leading_annotations=leading_annotations, modifiers=modifiers,
                                   type_parameters=type_parameters, return_type_expression=return_type_expression,
+                                  name_annotations=name_annotations, name=name,
                                   parameters=parameters, throws=throws, body=body, default_value=default_value,
                                   method_type=method_type)
 
@@ -775,6 +789,15 @@ class PythonRpcReceiver:
         implicit = q.receive(yield_stmt.implicit)
         value = q.receive(yield_stmt.value)
         return replace_if_changed(yield_stmt, implicit=implicit, value=value)
+
+    def _visit_j_parameterized_type(self, param_type, q: RpcReceiveQueue):
+        clazz = q.receive(param_type.clazz)
+        type_parameters = q.receive(
+            param_type.padding.type_parameters if hasattr(param_type.padding, 'type_parameters') else None,
+            lambda c: self._receive_container(c, q) if c else None
+        )
+        type_ = q.receive(param_type.type)
+        return replace_if_changed(param_type, clazz=clazz, type_parameters=type_parameters, type=type_)
 
     # Helper methods for Space, JRightPadded, JLeftPadded, JContainer
 
@@ -971,6 +994,75 @@ def _receive_style(style, q: RpcReceiveQueue):
     return style
 
 
+def _receive_java_type_primitive(primitive, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Primitive - consumes the keyword message.
+
+    The sender sends an ADD with valueType='JavaType$Primitive', then sends
+    the keyword as a primitive string value. We need to consume both and
+    return the appropriate JavaType.Primitive enum value.
+    """
+    from rewrite.java.support_types import JavaType as JT
+
+    # Consume the keyword message that the sender sends
+    keyword = q.receive(None)
+
+    # Map keyword back to JavaType.Primitive enum
+    keyword_to_primitive = {
+        'boolean': JT.Primitive.Boolean,
+        'byte': JT.Primitive.Byte,
+        'char': JT.Primitive.Char,
+        'double': JT.Primitive.Double,
+        'float': JT.Primitive.Float,
+        'int': JT.Primitive.Int,
+        'long': JT.Primitive.Long,
+        'short': JT.Primitive.Short,
+        'void': JT.Primitive.Void,
+        'String': JT.Primitive.String,
+        '': JT.Primitive.None_,
+        'null': JT.Primitive.Null,
+    }
+
+    return keyword_to_primitive.get(keyword, primitive)
+
+
+def _receive_java_type_unknown(unknown, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Unknown - no additional fields to consume.
+
+    JavaType.Unknown is a marker type used when type information is not available.
+    The Java sender doesn't send any additional fields for Unknown types.
+    """
+    # No additional fields to consume - just return the unknown object
+    return unknown
+
+
+def _register_java_type_codecs():
+    """Register codecs for JavaType classes."""
+    from rewrite.java.support_types import JavaType as JT
+    from rewrite.rpc.receive_queue import register_codec_with_both_names, register_receive_codec
+
+    # JavaType.Primitive - special handling to consume keyword
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Primitive',
+        JT.Primitive,
+        _receive_java_type_primitive,
+        lambda: JT.Primitive.None_  # Default factory returns None_ primitive
+    )
+
+    # JavaType.Unknown - no additional fields
+    # Note: JavaType.Unknown is a nested class inside JavaType, not a standalone type
+    # in Python's support_types.py, so we register by Java type name and Python name separately
+    register_receive_codec(
+        'org.openrewrite.java.tree.JavaType$Unknown',
+        _receive_java_type_unknown,
+        lambda: JT.Unknown()  # Factory creates a new Unknown instance
+    )
+    register_receive_codec(
+        'Unknown',  # Python class name for _get_codec lookup
+        _receive_java_type_unknown,
+        lambda: JT.Unknown()
+    )
+
+
 def _register_tree_codecs():
     """Register codecs for all AST types using reflection."""
     from rewrite.python import tree as py_tree
@@ -1076,5 +1168,6 @@ def _register_style_codecs():
 _register_marker_codecs()  # Existing marker codecs with full deserialization
 _register_tree_codecs()
 _register_support_type_codecs()
+_register_java_type_codecs()  # JavaType.Primitive handling
 _register_core_marker_codecs()
 _register_style_codecs()
