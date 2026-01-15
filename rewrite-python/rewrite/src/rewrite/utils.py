@@ -12,6 +12,9 @@ def replace_if_changed(obj: T, **kwargs) -> T:
     Handles the convention where properties use public names (e.g., 'prefix')
     but dataclass fields use private names (e.g., '_prefix').
 
+    Also handles Python keyword conflicts where parameters use trailing underscore
+    (e.g., 'from_' maps to field '_from').
+
     This is critical for performance - visitor traversals call replace() on every
     node, and returning the same object when nothing changes avoids unnecessary
     allocations and GC pressure.
@@ -31,7 +34,9 @@ def replace_if_changed(obj: T, **kwargs) -> T:
     changed = False
     for key, value in kwargs.items():
         if not key.startswith('_'):
-            private_key = f'_{key}'
+            # Handle Python keyword conflicts: from_ -> _from
+            base_key = key.rstrip('_')
+            private_key = f'_{base_key}'
             if hasattr(obj, private_key):
                 mapped_kwargs[private_key] = value
                 # Use 'or' for short-circuit evaluation - skips getattr() once changed is True
