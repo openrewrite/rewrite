@@ -110,21 +110,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return validated;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Upgrade Maven dependency version";
-    }
+    String displayName = "Upgrade Maven dependency version";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, newVersion);
     }
 
-    @Override
-    public String getDescription() {
-        return "Upgrade the version of a dependency by specifying a group and (optionally) an artifact using Node Semver " +
+    String description = "Upgrade the version of a dependency by specifying a group and (optionally) an artifact using Node Semver " +
                "advanced range selectors, allowing more precise control over version updates to patch or minor releases.";
-    }
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {

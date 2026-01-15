@@ -36,20 +36,14 @@ public class ChangeKey extends Recipe {
             example = "kind")
     String newKey;
 
-    @Override
-    public String getDisplayName() {
-        return "Change key";
-    }
+    String displayName = "Change key";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s` to `%s`", oldKeyPath, newKey);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a YAML mapping entry key while leaving the value intact.";
-    }
+    String description = "Change a YAML mapping entry key while leaving the value intact.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -1803,7 +1802,7 @@ class ChangePackageTest implements RewriteTest {
           ).parser(JavaParser.fromJavaVersion().dependsOn(
             """
               package com.demo;
-              
+
               public class A {
                   public static class B {}
               }
@@ -1812,7 +1811,7 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package app;
-              
+
               import com.demo.A.B;
 
               interface Test {
@@ -1821,7 +1820,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               package app;
-              
+
               import some.thing.X.Y;
 
               interface Test {
@@ -1866,6 +1865,50 @@ class ChangePackageTest implements RewriteTest {
                 .extracting(NameTree::getType)
                 .matches(type-> TypeUtils.isAssignableTo("com.after.A", type), "Assignable to updated type")
             )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6513")
+    @Test
+    void changePackageUpdatesNestedClassImport() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "dev.nipafx.rewrite_bug",
+            "dev.nipafx.rewrite_changepackage_bug",
+            null
+          )),
+          java(
+            """
+              package dev.nipafx.rewrite_bug;
+              public class Outer {
+                  public static class Inner {
+                  }
+              }
+              """,
+            """
+              package dev.nipafx.rewrite_changepackage_bug;
+              public class Outer {
+                  public static class Inner {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package dev.nipafx.rewrite_bug;
+              import dev.nipafx.rewrite_bug.Outer.Inner;
+              public class Importer {
+                  Inner inner;
+              }
+              """,
+            """
+              package dev.nipafx.rewrite_changepackage_bug;
+              import dev.nipafx.rewrite_changepackage_bug.Outer.Inner;
+              public class Importer {
+                  Inner inner;
+              }
+              """
           )
         );
     }

@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marketplace.RecipeMarketplace;
@@ -166,6 +167,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 index++;
 
                 SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
+                // for status update messages
+                parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
                 action.accept(sourceFile);
                 return true;
             }

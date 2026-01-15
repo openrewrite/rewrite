@@ -78,20 +78,14 @@ public class ChangePlugin extends Recipe {
     @Nullable
     String newVersion;
 
-    @Override
-    public String getDisplayName() {
-        return "Change a Gradle plugin";
-    }
+    String displayName = "Change a Gradle plugin";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s` to `%s`", pluginId, newPluginId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Changes the selected Gradle plugin to the new plugin.";
-    }
+    String description = "Changes the selected Gradle plugin to the new plugin.";
 
     @Override
     public Validated<Object> validate() {

@@ -48,19 +48,13 @@ public class DependencyConstraintToRule extends Recipe {
     private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
     private static final String CONSTRAINT_MATCHER = "org.gradle.api.artifacts.dsl.DependencyHandler *(..)";
 
-    @Override
-    public String getDisplayName() {
-        return "Dependency constraint to resolution rule";
-    }
+    String displayName = "Dependency constraint to resolution rule";
 
-    @Override
-    public String getDescription() {
-        return "Gradle [dependency constraints](https://docs.gradle.org/current/userguide/dependency_constraints.html#dependency-constraints) " +
+    String description = "Gradle [dependency constraints](https://docs.gradle.org/current/userguide/dependency_constraints.html#dependency-constraints) " +
                 "are useful for managing the versions of transitive dependencies. " +
                 "Some plugins, such as the Spring Dependency Management plugin, do not respect these constraints. " +
                 "This recipe converts constraints into [resolution rules](https://docs.gradle.org/current/userguide/resolution_rules.html), " +
                 "which can achieve similar effects to constraints but are harder for plugins to ignore.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

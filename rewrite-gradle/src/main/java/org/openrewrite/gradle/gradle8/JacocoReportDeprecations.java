@@ -44,16 +44,10 @@ public class JacocoReportDeprecations extends Recipe {
 
     private static final String JACOCO_SETTINGS_INDEX = "JACOCO_SETTINGS_INDEX";
 
-    @Override
-    public String getDisplayName() {
-        return "Replace Gradle 8 introduced deprecations in JaCoCo report task";
-    }
+    String displayName = "Replace Gradle 8 introduced deprecations in JaCoCo report task";
 
-    @Override
-    public String getDescription() {
-        return "Set the `enabled` to `required` and the `destination` to `outputLocation` for Reports deprecations that were removed in gradle 8. " +
+    String description = "Set the `enabled` to `required` and the `destination` to `outputLocation` for Reports deprecations that were removed in gradle 8. " +
                 "See [the gradle docs on this topic](https://docs.gradle.org/current/userguide/upgrading_version_7.html#report_and_testreport_api_cleanup).";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

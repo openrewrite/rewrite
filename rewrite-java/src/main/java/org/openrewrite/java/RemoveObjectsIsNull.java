@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.Getter;
 import org.openrewrite.*;
 import org.openrewrite.java.cleanup.SimplifyBooleanExpressionVisitor;
 import org.openrewrite.java.cleanup.UnnecessaryParenthesesVisitor;
@@ -29,16 +30,12 @@ public class RemoveObjectsIsNull extends Recipe {
     private static final MethodMatcher IS_NULL = new MethodMatcher("java.util.Objects isNull(..)");
     private static final MethodMatcher NON_NULL = new MethodMatcher("java.util.Objects nonNull(..)");
 
-    @Override
-    public String getDisplayName() {
-        return "Transform calls to `Objects.isNull(..)` and `Objects.nonNull(..)`";
-    }
+    @Getter
+    final String displayName = "Transform calls to `Objects.isNull(..)` and `Objects.nonNull(..)`";
 
-    @Override
-    public String getDescription() {
-        return "Replace calls to `Objects.isNull(..)` and `Objects.nonNull(..)` with a simple null check. " +
-               "Using these methods outside of stream predicates is not idiomatic.";
-    }
+    @Getter
+    final String description = "Replace calls to `Objects.isNull(..)` and `Objects.nonNull(..)` with a simple null check. " +
+        "Using these methods outside of stream predicates is not idiomatic.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

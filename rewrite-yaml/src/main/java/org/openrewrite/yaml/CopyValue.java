@@ -19,13 +19,15 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
 
-@SuppressWarnings("LanguageMismatch")
+import static java.util.Collections.singletonList;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
@@ -61,10 +63,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     @Nullable
     Boolean createNewKeys;
 
-    @Override
-    public String getDisplayName() {
-        return "Copy YAML value";
-    }
+    String displayName = "Copy YAML value";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -75,13 +74,10 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
                 newKey);
     }
 
-    @Override
-    public String getDescription() {
-        return "Copies a YAML value from one key to another. " +
+    String description = "Copies a YAML value from one key to another. " +
                "The existing key/value pair remains unaffected by this change. " +
                "Attempts to merge the copied value into the new key if it already exists. " +
                "By default, attempts to create the new key if it does not exist.";
-    }
 
     @JsonCreator
     public CopyValue(String oldKeyPath, @Nullable String oldFilePath, String newKey, @Nullable String newFilePath, @Nullable Boolean createNewKeys) {
@@ -99,6 +95,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
 
     @Data
     public static class Accumulator {
+        @Language("yml")
         @Nullable
         String snippet;
 
@@ -146,7 +143,16 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
         if (acc.snippet == null) {
             return TreeVisitor.noop();
         }
-        return Preconditions.check(new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
-                new MergeYaml(newKey, acc.snippet, false, null, null, null, null, createNewKeys).getVisitor());
+        return Preconditions.check(
+                new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
+                new YamlIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
+                        doAfterVisit(new UnfoldProperties(null, singletonList(newKey)).getVisitor());
+                        return (Yaml.Documents) new MergeYaml(newKey, acc.snippet, false, null, null, null, null, createNewKeys)
+                                .getVisitor()
+                                .visitNonNull(documents, ctx);
+                    }
+                });
     }
 }

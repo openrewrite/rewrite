@@ -74,15 +74,9 @@ public class AddLiteralMethodArgument extends Recipe {
         return String.format("%d in methods `%s`", argumentIndex, methodPattern);
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Add a literal method argument";
-    }
+    String displayName = "Add a literal method argument";
 
-    @Override
-    public String getDescription() {
-        return "Add a literal `String` or primitive argument to method invocations.";
-    }
+    String description = "Add a literal `String` or primitive argument to method invocations.";
 
     @Override
     public Validated<Object> validate() {

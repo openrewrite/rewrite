@@ -84,4 +84,51 @@ class AddCommentToMavenDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addCommentToMavenPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToMavenDependency(
+            "/project/build/plugins/plugin",
+            "org.apache.maven.plugins",
+            "maven-resources-plugin",
+            " Comment text "
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-resources-plugin</artifactId>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <!-- Comment text -->
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-resources-plugin</artifactId>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
 }

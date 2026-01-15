@@ -40,16 +40,16 @@ class YamlParserTest implements RewriteTest {
         List<SourceFile> yamlSources = YamlParser.builder().build().parse("a: b\n").toList();
         assertThat(yamlSources).singleElement().isInstanceOf(Yaml.Documents.class);
 
-        Yaml.Documents documents = (Yaml.Documents) yamlSources.getFirst();
+        var documents = (Yaml.Documents) yamlSources.getFirst();
         Yaml.Document document = documents.getDocuments().getFirst();
 
         // Assert that end is parsed correctly
         assertThat(document.getEnd().getPrefix()).isEqualTo("\n");
 
         // Assert that the title is parsed correctly
-        Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
+        var mapping = (Yaml.Mapping) document.getBlock();
         Yaml.Mapping.Entry entry = mapping.getEntries().getFirst();
-        Yaml.Scalar title = (Yaml.Scalar) entry.getValue();
+        var title = (Yaml.Scalar) entry.getValue();
         assertThat(title.getValue()).isEqualTo("b");
     }
 
@@ -122,13 +122,13 @@ class YamlParserTest implements RewriteTest {
         SourceFile sourceFile = yamlSources.findFirst().get();
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
 
-        Yaml.Documents documents = (Yaml.Documents) sourceFile;
+        var documents = (Yaml.Documents) sourceFile;
         Yaml.Document document = documents.getDocuments().getFirst();
 
         // Assert that end is parsed correctly
-        Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
+        var mapping = (Yaml.Mapping) document.getBlock();
         Yaml.Mapping.Entry entry = mapping.getEntries().getFirst();
-        Yaml.Scalar title = (Yaml.Scalar) entry.getValue();
+        var title = (Yaml.Scalar) entry.getValue();
         assertThat(title.getValue()).isEqualTo(input.trim());
     }
 
@@ -325,14 +325,14 @@ class YamlParserTest implements RewriteTest {
           """;
 
         // when
-        Yaml.Documents parsed = (Yaml.Documents) YamlParser.builder().build().parse(code).toList().getFirst();
+        var parsed = (Yaml.Documents) YamlParser.builder().build().parse(code).toList().getFirst();
 
         // test
         Yaml.Document document = parsed.getDocuments().getFirst();
-        Yaml.Mapping topMapping = (Yaml.Mapping) document.getBlock();
+        var topMapping = (Yaml.Mapping) document.getBlock();
         Yaml.Mapping.Entry person = topMapping.getEntries().getFirst();
         assertEquals("person", person.getKey().getValue());
-        Yaml.Mapping withinPerson = (Yaml.Mapping) person.getValue();
+        var withinPerson = (Yaml.Mapping) person.getValue();
         assertEquals("map", withinPerson.getTag().getName());
         assertEquals(Yaml.Tag.Kind.IMPLICIT_GLOBAL, withinPerson.getTag().getKind());
     }
@@ -488,8 +488,8 @@ class YamlParserTest implements RewriteTest {
                 a: b
               """,
             spec -> spec.afterRecipe(docs -> {
-                Yaml.Sequence sequence = (Yaml.Sequence) docs.getDocuments().getFirst().getBlock();
-                Yaml.Mapping mapping = (Yaml.Mapping) sequence.getEntries().getFirst().getBlock();
+                var sequence = (Yaml.Sequence) docs.getDocuments().getFirst().getBlock();
+                var mapping = (Yaml.Mapping) sequence.getEntries().getFirst().getBlock();
                 assertThat(mapping.getTag().getName()).isEqualTo("SOMETAG");
             })
           )

@@ -15,9 +15,16 @@
  */
 package org.openrewrite.rpc.request;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Value;
 
 @Value
 public class VisitResponse {
     boolean modified;
+
+    @JsonCreator
+    public VisitResponse(@JsonProperty("modified") boolean modified) {
+        this.modified = modified;
+    }
 }

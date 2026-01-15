@@ -51,19 +51,15 @@ import static org.openrewrite.internal.StringUtils.isBlank;
 @EqualsAndHashCode(callSuper = false)
 public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.GradleWrapperState> {
 
-    @Override
-    public String getDisplayName() {
-        return "Update Gradle wrapper";
-    }
+    @Getter
+    final String displayName = "Update Gradle wrapper";
 
-    @Override
-    public String getDescription() {
-        return "Update the version of Gradle used in an existing Gradle wrapper. " +
-               "Queries services.gradle.org to determine the available releases, but prefers the artifact repository URL " +
-               "which already exists within the wrapper properties file. " +
-               "If your artifact repository does not contain the same Gradle distributions as services.gradle.org, " +
-               "then the recipe may suggest a version which is not available in your artifact repository.";
-    }
+    @Getter
+    final String description = "Update the version of Gradle used in an existing Gradle wrapper. " +
+        "Queries services.gradle.org to determine the available releases, but prefers the artifact repository URL " +
+        "which already exists within the wrapper properties file. " +
+        "If your artifact repository does not contain the same Gradle distributions as services.gradle.org, " +
+        "then the recipe may suggest a version which is not available in your artifact repository.";
 
     @Getter
     @Option(displayName = "New version",

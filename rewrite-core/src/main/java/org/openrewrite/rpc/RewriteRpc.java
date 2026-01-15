@@ -185,6 +185,24 @@ public class RewriteRpc {
         jsonRpc.shutdown();
     }
 
+    /**
+     * Resets all cached state in both the local and remote RPC processes.
+     * This should be called between operations that don't share state (e.g., between tests)
+     * to prevent unbounded memory growth from accumulated objects.
+     */
+    public void reset() {
+        // Send reset to remote process
+        send("Reset", null, Boolean.class);
+
+        // Clear local caches
+        remoteObjects.clear();
+        localObjects.clear();
+        localObjectIds.clear();
+        remoteRefs.clear();
+        localRefs.clear();
+        remoteLanguages = null;
+    }
+
     public <P> @Nullable Tree visit(SourceFile sourceFile, String visitorName, P p) {
         return visit(sourceFile, visitorName, p, null);
     }
@@ -389,14 +407,17 @@ public class RewriteRpc {
     }
 
     public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
-        localObjects.put(tree.getId().toString(), tree);
+        String treeId = tree.getId().toString();
+        localObjects.put(treeId, tree);
         SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : parent.firstEnclosingOrThrow(SourceFile.class);
+        String sourceFileType = sourceFile.getClass().getName();
+
         return send(
                 "Print",
                 new Print(
-                        tree.getId().toString(),
+                        treeId,
                         sourceFile.getSourcePath(),
-                        sourceFile.getClass().getName(),
+                        sourceFileType,
                         markerPrinter
                 ),
                 String.class

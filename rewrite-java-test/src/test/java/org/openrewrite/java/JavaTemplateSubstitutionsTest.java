@@ -537,9 +537,9 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
         // Modelled after org.openrewrite.staticanalysis.BigDecimalRoundingConstantsToEnums.BIG_DECIMAL_SET_SCALE
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+            var m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
             if ("setScale".equals(m.getName().getSimpleName())) {
-                J.FieldAccess secondArgument = (J.FieldAccess) m.getArguments().get(1);
+                var secondArgument = (J.FieldAccess) m.getArguments().get(1);
                 if ("ROUND_DOWN".equals(secondArgument.getName().getSimpleName())) {
                     maybeAddImport("java.math.RoundingMode");
                     return JavaTemplate.builder("#{any(int)}, #{}")
