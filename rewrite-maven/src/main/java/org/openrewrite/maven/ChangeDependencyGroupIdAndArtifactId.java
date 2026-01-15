@@ -34,7 +34,6 @@ import static java.util.Collections.max;
 import static org.openrewrite.Validated.required;
 import static org.openrewrite.Validated.test;
 import static org.openrewrite.internal.StringUtils.isBlank;
-import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -92,22 +91,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
     @Nullable
     Boolean changeManagedDependency;
 
-    @Option(displayName = "Process exclusions",
-            description = "Also update the exclusions. The default for this flag is `false`.",
-            required = false)
-    @Nullable
-    Boolean processExclusions;
-
     public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
-        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, false, true, false);
-    }
-
-    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, @Nullable Boolean changeManagedDependency) {
-        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, overrideManagedVersion, changeManagedDependency, false);
+        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, false, true);
     }
 
     @JsonCreator
-    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, @Nullable Boolean changeManagedDependency, @Nullable Boolean processExclusions) {
+    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, @Nullable Boolean changeManagedDependency) {
         this.oldGroupId = oldGroupId;
         this.oldArtifactId = oldArtifactId;
         this.newGroupId = newGroupId;
@@ -116,7 +105,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
         this.versionPattern = versionPattern;
         this.overrideManagedVersion = overrideManagedVersion;
         this.changeManagedDependency = changeManagedDependency;
-        this.processExclusions = processExclusions;
     }
 
     @Override
@@ -234,19 +222,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
                     if (t != tag) {
                         maybeUpdateModel();
-                    }
-                }
-
-                // Handle exclusions in any dependency
-                if ((processExclusions != null && processExclusions) && t != null && "exclusion".equals(t.getName())) {
-                    if (matchesGlob(t.getChildValue("groupId").orElse(null), oldGroupId) &&
-                        matchesGlob(t.getChildValue("artifactId").orElse(null), oldArtifactId)) {
-                        if (newGroupId != null) {
-                            t = changeChildTagValue(t, "groupId", newGroupId, ctx);
-                        }
-                        if (newArtifactId != null) {
-                            t = changeChildTagValue(t, "artifactId", newArtifactId, ctx);
-                        }
                     }
                 }
 
