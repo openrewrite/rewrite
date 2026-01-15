@@ -78,11 +78,13 @@ public interface RewriteTest extends SourceSpecs {
     default void assertRecipesConfigure(String packageName) {
         // soft assertions allow the entire stack trace to be displayed for each
         // recipe that fails to configure
-        SoftAssertions softly = new SoftAssertions();
-        for (Recipe recipe : Environment.builder()
+        List<Recipe> recipes = Environment.builder()
                 .scanRuntimeClasspath(packageName)
                 .build()
-                .listRecipes()) {
+                .listRecipes();
+        assertThat(recipes).as("No recipes found in %s", packageName).isNotEmpty();
+        SoftAssertions softly = new SoftAssertions();
+        for (Recipe recipe : recipes) {
             // scanRuntimeClasspath picks up all recipes in META-INF/rewrite regardless of whether their
             // names start with the package we intend to filter on here
             if (recipe.getName().startsWith(packageName)) {
@@ -314,10 +316,24 @@ public interface RewriteTest extends SourceSpecs {
                 for (Parser.Input input : inputs.values()) {
                     if (j++ == i && !(sourceFile instanceof Quark)) {
                         if (beforeValidations.parseAndPrintEquality()) {
+                            // EncodingDetectingInputStream strips BOM from expected
+                            String expected = StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx));
+                            String actual = sourceFile.printAll(out.clone());
+
+                            // Strip BOM from actual for comparison, but verify it matches charsetBomMarked flag
+                            boolean actualHasBom = actual.startsWith("\uFEFF");
+                            if (actualHasBom) {
+                                actual = actual.substring(1);
+                            }
+                            if (sourceFile.isCharsetBomMarked() && !actualHasBom) {
+                                fail("Source file was parsed with a BOM (charsetBomMarked=true) but printing did not restore it.");
+                            } else if (!sourceFile.isCharsetBomMarked() && actualHasBom) {
+                                fail("Source file was parsed without a BOM (charsetBomMarked=false) but printing added one.");
+                            }
                             assertContentEquals(
                                     sourceFile,
-                                    StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx)),
-                                    sourceFile.printAll(out.clone()),
+                                    expected,
+                                    actual,
                                     "When parsing and printing the source code back to text without modifications, " +
                                     "the printed source didn't match the original source code. This means there is a bug in the " +
                                     "parser implementation itself. Please open an issue to report this, providing a sample of the " +
@@ -647,8 +663,7 @@ public interface RewriteTest extends SourceSpecs {
             }
             fail("Failed to parse sources or run recipe", t);
         });
-        ParsingExecutionContextView.view(ctx).setCharset(StandardCharsets.UTF_8);
-        return ctx;
+        return ParsingExecutionContextView.view(ctx).setCharset(StandardCharsets.UTF_8);
     }
 
     @Override

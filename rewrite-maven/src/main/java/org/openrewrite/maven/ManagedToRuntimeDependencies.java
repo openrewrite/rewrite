@@ -34,18 +34,12 @@ import static java.util.Collections.emptyList;
 @EqualsAndHashCode(callSuper = false)
 public class ManagedToRuntimeDependencies extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Convert managed dependencies to runtime dependencies";
-    }
+    String displayName = "Convert managed dependencies to runtime dependencies";
 
-    @Override
-    public String getDescription() {
-        return "This recipe processes Maven POMs, converting all `<dependencyManagement>` entries into runtime scoped `<dependencies>` entries. " +
+    String description = "This recipe processes Maven POMs, converting all `<dependencyManagement>` entries into runtime scoped `<dependencies>` entries. " +
                "Import scoped BOMs (like jackson-bom) are left unmodified in `<dependencyManagement>`. " +
                "Some style guidelines prefer that `<dependencyManagement>` be used only for BOMs. " +
                "This maintain that style while avoiding introducing new symbols onto the compile classpath unintentionally.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

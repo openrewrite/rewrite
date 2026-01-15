@@ -66,4 +66,17 @@ class JRightPaddedTest {
         assertThat(JRightPadded.withElements(trees, List.of(t.withPrefix(Space.format(" ")))))
             .isNotSameAs(trees);
     }
+
+    @Test
+    void withElementsBeforeIsNull() {
+        // given
+        var t = new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY);
+        List<J.Empty> ts = List.of(t);
+
+        // when
+        List<JRightPadded<J.Empty>> rps = JRightPadded.withElements(null, ts);
+
+        // test
+        assertThat(rps.size()).isEqualTo(1);
+    }
 }

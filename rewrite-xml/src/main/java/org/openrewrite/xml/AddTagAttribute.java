@@ -31,15 +31,9 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = false)
 public class AddTagAttribute extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Add new XML attribute for an Element";
-    }
+    String displayName = "Add new XML attribute for an Element";
 
-    @Override
-    public String getDescription() {
-        return "Add new XML attribute with value on a specified element.";
-    }
+    String description = "Add new XML attribute with value on a specified element.";
 
     @Option(displayName = "Element name",
             description = "The name of the element whose attribute's value is to be added. Interpreted as an XPath expression.",

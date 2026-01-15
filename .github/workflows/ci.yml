@@ -11,6 +11,8 @@ on:
     branches:
       - main
   workflow_dispatch: {}
+  schedule:
+    - cron: 0 16 * * *
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -31,3 +33,4 @@ jobs:
       ossrh_signing_password: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
       OPS_GITHUB_ACTIONS_WEBHOOK: ${{ secrets.OPS_GITHUB_ACTIONS_WEBHOOK }}
       node_auth_token: ${{ secrets.NPM_TOKEN }}
+      pypi_token: ${{ secrets.PYPI_OPENREWRITE_PUBLISH }}

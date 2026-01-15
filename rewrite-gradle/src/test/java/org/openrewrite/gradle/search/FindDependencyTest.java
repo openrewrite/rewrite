@@ -31,7 +31,7 @@ class FindDependencyTest implements RewriteTest {
     @Test
     void findDependency() {
         rewriteRun(
-          spec -> spec.recipe(new FindDependency("org.openrewrite", "rewrite-core", "api")),
+          spec -> spec.recipe(new FindDependency("org.openrewrite", "rewrite-core", "api", null, null)),
           buildGradle(
             //language=gradle
             """
@@ -64,7 +64,7 @@ class FindDependencyTest implements RewriteTest {
     void findDependencyKotlin() {
         rewriteRun(spec -> spec
             .beforeRecipe(withToolingApi())
-            .recipe(new FindDependency("org.openrewrite", "rewrite-core", "api")),
+            .recipe(new FindDependency("org.openrewrite", "rewrite-core", "api", null, null)),
           buildGradleKts(
             //language=gradle
             """
@@ -96,7 +96,7 @@ class FindDependencyTest implements RewriteTest {
     @Test
     void findDependencyByGlob() {
         rewriteRun(
-          spec -> spec.recipe(new FindDependency("org.*", "*", "")),
+          spec -> spec.recipe(new FindDependency("org.*", "*", "", null, null)),
           buildGradle(
             //language=gradle
             """
@@ -131,7 +131,7 @@ class FindDependencyTest implements RewriteTest {
         @Test
         void withCurly() {
             rewriteRun(
-              spec -> spec.recipe(new FindDependency("org.*", "rewrite-core", "api")),
+              spec -> spec.recipe(new FindDependency("org.*", "rewrite-core", "api", null, null)),
               buildGradle(
                 //language=gradle
                 """
@@ -191,7 +191,7 @@ class FindDependencyTest implements RewriteTest {
         @Test
         void dontMigrate() {
             rewriteRun(
-              spec -> spec.recipe(new FindDependency("org.*", "rewrite-core", "api")),
+              spec -> spec.recipe(new FindDependency("org.*", "rewrite-core", "api", null, null)),
               buildGradle(
                 //language=gradle
                 """
@@ -222,7 +222,7 @@ class FindDependencyTest implements RewriteTest {
     @Test
     void ignoreConstraints() {
         rewriteRun(
-          spec -> spec.recipe(new FindDependency("com.fasterxml.jackson.core", "jackson-databind", "implementation")),
+          spec -> spec.recipe(new FindDependency("com.fasterxml.jackson.core", "jackson-databind", "implementation", null, null)),
           buildGradle(
             //language=gradle
             """
@@ -238,11 +238,149 @@ class FindDependencyTest implements RewriteTest {
           ));
     }
 
+    @Test
+    void findDependencyByVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()).recipe(new FindDependency("org.openrewrite", "rewrite-core", "api", "8.28.0", null)),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  api "org.openrewrite:rewrite-core:8.28.0"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  /*~~>*/api "org.openrewrite:rewrite-core:8.28.0"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findDependencyByVersionRange() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()).recipe(new FindDependency("org.openrewrite", "rewrite-core", "api", "^8", null)),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  api "org.openrewrite:rewrite-core:8.28.0"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  /*~~>*/api "org.openrewrite:rewrite-core:8.28.0"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findDependencyWrongVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()).recipe(new FindDependency("org.openrewrite", "rewrite-core", "api", "7.0.0", null)),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  api "org.openrewrite:rewrite-core:8.28.0"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findDependencyByVersionPattern() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()).recipe(new FindDependency("org.openrewrite", "rewrite-core", "api", "8.28.0", "-jre")),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  api "org.openrewrite:rewrite-core:8.28.0-jre"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  /*~~>*/api "org.openrewrite:rewrite-core:8.28.0-jre"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findDependencyByVersionPatternNoMatch() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()).recipe(new FindDependency("org.openrewrite", "rewrite-core", "api", "8.28.0", "-android")),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  api "org.openrewrite:rewrite-core:8.28.0-jre"
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5599")
     @Test
     void constraintsVsRegularDependencies() {
         rewriteRun(
-          spec -> spec.recipe(new FindDependency("com.fasterxml.jackson.core", "jackson-databind", null)),
+          spec -> spec.recipe(new FindDependency("com.fasterxml.jackson.core", "jackson-databind", null, null, null)),
           buildGradle(
             //language=gradle
             """

@@ -26,11 +26,11 @@ import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.time.LocalDate;
-import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddOwaspDateBoundSuppressions extends Recipe {
+    private static final XPathMatcher SUPPRESS_WITHOUT_UNTIL = new XPathMatcher("/suppressions/suppress[not(@until)]");
 
     @Option(displayName = "Until date",
             required = false,
@@ -39,17 +39,11 @@ public class AddOwaspDateBoundSuppressions extends Recipe {
     @Nullable
     String untilDate;
 
-    @Override
-    public String getDisplayName() {
-        return "Add date bounds to OWASP suppressions";
-    }
+    String displayName = "Add date bounds to OWASP suppressions";
 
-    @Override
-    public String getDescription() {
-        return "Adds an expiration date to all OWASP suppressions in order to ensure that they are periodically reviewed. " +
-               "For use with the OWASP `dependency-check` tool. " +
-               "More details: https://jeremylong.github.io/DependencyCheck/general/suppression.html.";
-    }
+    String description = "Adds an expiration date to all OWASP suppressions in order to ensure that they are periodically reviewed. " +
+                "For use with the OWASP `dependency-check` tool. " +
+                "More details: https://jeremylong.github.io/DependencyCheck/general/suppression.html.";
 
     @Override
     public Validated<Object> validate() {
@@ -71,23 +65,14 @@ public class AddOwaspDateBoundSuppressions extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                if (new XPathMatcher("/suppressions/suppress").matches(getCursor())) {
-                    boolean hasUntil = false;
-                    List<Xml.Attribute> attributes = t.getAttributes();
-                    for (Xml.Attribute attribute : attributes) {
-                        if ("until".equals(attribute.getKeyAsString())) {
-                            hasUntil = true;
-                        }
-                    }
-                    if (!hasUntil) {
-                        String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plusDays(30).toString();
-                        return t.withAttributes(ListUtils.concat(attributes, autoFormat(new Xml.Attribute(Tree.randomId(), "", Markers.EMPTY,
-                                new Xml.Ident(Tree.randomId(), "", Markers.EMPTY, "until"),
-                                "",
-                                autoFormat(new Xml.Attribute.Value(Tree.randomId(), "", Markers.EMPTY,
-                                        Xml.Attribute.Value.Quote.Double,
-                                        date + "Z"), ctx)), ctx)));
-                    }
+                if (SUPPRESS_WITHOUT_UNTIL.matches(getCursor())) {
+                    String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plusDays(30).toString();
+                    return t.withAttributes(ListUtils.concat(t.getAttributes(), autoFormat(new Xml.Attribute(Tree.randomId(), "", Markers.EMPTY,
+                            new Xml.Ident(Tree.randomId(), "", Markers.EMPTY, "until"),
+                            "",
+                            autoFormat(new Xml.Attribute.Value(Tree.randomId(), "", Markers.EMPTY,
+                                    Xml.Attribute.Value.Quote.Double,
+                                    date + "Z"), ctx)), ctx)));
                 }
                 return t;
             }

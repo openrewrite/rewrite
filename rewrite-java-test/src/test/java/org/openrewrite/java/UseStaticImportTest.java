@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -420,6 +421,79 @@ class UseStaticImportTest implements RewriteTest {
                   void sample() {
                       fail();
                       fail("Test failed");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6275")
+    @Test
+    void shouldNotRemoveUsedStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.Collections *(..)"))
+            .typeValidationOptions(TypeValidation.all().identifiers(false).methodInvocations(false)),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.Set;
+
+              class Test extends TypeNotFound {
+                  void test() {
+                      Set<String> set = Collections.unmodifiableSet(newHashSetFromSuperType());
+                  }
+              }
+              """,
+            """
+              import java.util.Set;
+
+              import static java.util.Collections.unmodifiableSet;
+
+              class Test extends TypeNotFound {
+                  void test() {
+                      Set<String> set = unmodifiableSet(newHashSetFromSuperType());
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/798")
+    @Test
+    void shouldAddStaticImportForSamePackageMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("de..* *(..)")),
+          java(
+            """
+              package de;
+
+              public class ClassB {
+                  public static String getSomething() {
+                      return "something";
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package de;
+
+              public class ClassA {
+                  static void methodA() {
+                      System.out.println(ClassB.getSomething());
+                  }
+              }
+              """,
+            """
+              package de;
+
+              import static de.ClassB.getSomething;
+
+              public class ClassA {
+                  static void methodA() {
+                      System.out.println(getSomething());
                   }
               }
               """

@@ -126,7 +126,8 @@ public class Assertions {
                 "javax",
                 "io.quarkus",
                 "org.eclipse",
-                "org.jetbrains"
+                "org.jetbrains",
+                "tools.jackson"
         ));
 
         java.util.List<Path> publishedFiles = new java.util.ArrayList<>();

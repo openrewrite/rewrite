@@ -15,7 +15,7 @@
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.json.AddKeyValue
 examples:
-- description: ''
+- description: '`AddKeyValueTest#shouldAppendSimpleValue`'
   parameters:
   - $.
   - key
@@ -38,7 +38,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.json.ChangeKey
 examples:
-- description: ''
+- description: '`ChangeKeyTest#simpleChangeRootKey`'
   parameters:
   - $.description
   - '"newDescription"'
@@ -60,7 +60,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.json.ChangeValue
 examples:
-- description: ''
+- description: '`ChangeValueTest#changeNestedValue`'
   parameters:
   - $.metadata.name
   - '"monitoring"'
@@ -84,9 +84,32 @@ examples:
     language: json
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.json.CopyValue
+examples:
+- description: '`CopyValueTest#changeCurrentFileWhenNull`'
+  parameters:
+  - $.source
+  - 'null'
+  - $.
+  - copiedValue
+  - 'null'
+  sources:
+  - before: |
+      {
+        "source": "value"
+      }
+    after: |
+      {
+        "source": "value",
+        "copiedValue": "value"
+      }
+    path: a.json
+    language: json
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.json.DeleteKey
 examples:
-- description: ''
+- description: '`DeleteKeyTest#deleteNestedKey`'
   parameters:
   - $.metadata.name
   sources:
@@ -110,7 +133,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.json.format.AutoFormat
 examples:
-- description: ''
+- description: '`AutoFormatTest#simple`'
   sources:
   - before: |
       {   "a": 3,
@@ -127,7 +150,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.json.format.Indents
 examples:
-- description: ''
+- description: '`TabsAndIndentsVisitorTest#simple`'
   sources:
   - before: |
       {
@@ -144,7 +167,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.json.format.WrappingAndBraces
 examples:
-- description: ''
+- description: '`WrappingAndBracesVisitorTest#simple`'
   sources:
   - before: |
       {"a": 3,"b": 5}
@@ -158,7 +181,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.json.search.FindKey
 examples:
-- description: ''
+- description: '`FindKeyTest#findKey`'
   parameters:
   - $.metadata.name
   sources:

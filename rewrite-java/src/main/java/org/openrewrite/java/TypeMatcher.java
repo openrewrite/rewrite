@@ -97,6 +97,10 @@ public class TypeMatcher implements Reference.Matcher {
             );
         }
 
+        if (type instanceof JavaType.Primitive && typeNameMatcher.matches(type.toString())) {
+            return true;
+        }
+
         return false;
     }
 

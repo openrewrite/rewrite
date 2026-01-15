@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.yaml.search.FindIndentYamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
@@ -57,22 +58,19 @@ public class UnfoldProperties extends Recipe {
         this.applyTo = applyTo == null ? emptyList() : applyTo;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Unfold YAML properties";
-    }
+    String displayName = "Unfold YAML properties";
 
-    @Override
-    public String getDescription() {
-        return "Transforms dot-separated property keys in YAML files into nested map hierarchies to enhance clarity and readability, or for compatibility with tools expecting structured YAML.";
-    }
+    String description = "Transforms dot-separated property keys in YAML files into nested map hierarchies to enhance clarity and readability, or for compatibility with tools expecting structured YAML.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         List<JsonPathMatcher> exclusionMatchers = exclusions.stream().map(JsonPathMatcher::new).collect(toList());
         return new YamlIsoVisitor<ExecutionContext>() {
+            private final FindIndentYamlVisitor<ExecutionContext> findIndent = new FindIndentYamlVisitor<>();
+
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                findIndent.visit(document, ctx);
                 Yaml.Document doc = super.visitDocument(document, ctx);
                 doAfterVisit(new MergeDuplicateSectionsVisitor<>(doc));
                 return doc;
@@ -106,7 +104,10 @@ public class UnfoldProperties extends Recipe {
                                 if (!hasLineBreak(entry.getPrefix()) && hasLineBreak(newEntry.getPrefix())) {
                                     newEntry = newEntry.withPrefix(substringOfAfterFirstLineBreak(entry.getPrefix()));
                                 } else if (identLevel == 0 && hasLineBreak(newEntry.getPrefix())) {
-                                    identLevel = 2; // autFormat indents the entire block by 2 spaces though it is a root level entry -> shift by 2 later
+                                    // Use the detected indentation from the document, defaulting to 2 if none detected
+                                    int mostCommonIndent = findIndent.getMostCommonIndent();
+                                    // autoFormat indents the entire block by detected spaces though it is a root level entry -> shift by detected amount later
+                                    identLevel = 0 < mostCommonIndent ? mostCommonIndent : 2;
                                 }
                                 doAfterVisit(new ShiftFormatLeftVisitor<>(newEntry, identLevel));
                             }

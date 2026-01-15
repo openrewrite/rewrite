@@ -110,21 +110,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return validated;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Upgrade Maven dependency version";
-    }
+    String displayName = "Upgrade Maven dependency version";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, newVersion);
     }
 
-    @Override
-    public String getDescription() {
-        return "Upgrade the version of a dependency by specifying a group and (optionally) an artifact using Node Semver " +
+    String description = "Upgrade the version of a dependency by specifying a group and (optionally) an artifact using Node Semver " +
                "advanced range selectors, allowing more precise control over version updates to patch or minor releases.";
-    }
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
@@ -255,7 +249,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency = upgradeManagedDependency(tag, ctx, t);
                             if (upgradeManagedDependency != null) {
                                 doAfterVisit(upgradeManagedDependency);
-                                maybeUpdateModel();
                             }
                         }
                     } else if (isPluginDependencyTag(groupId, artifactId) || isAnnotationProcessorPathTag(groupId, artifactId)) {
@@ -437,17 +430,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     throws MavenDownloadingException {
                 return MavenDependency.findNewerVersion(groupId, artifactId, version, getResolutionResult(), metadataFailures,
                         versionComparator, ctx);
-            }
-
-            private boolean isAnnotationProcessorPathTag(String groupId, String artifactId) {
-                // Runtime might still have a private version of this class parent-loaded -> remove this once we have had a few releases.
-//                if (!isTag("path") || !ANNOTATION_PROCESSORS_PATH_MATCHER.matches(getCursor())) {
-                if (!(getCursor().getValue() instanceof Xml.Tag && "path".equals(getCursor().<Xml.Tag>getValue().getName())) || !new XPathMatcher("//annotationProcessorPaths/path").matches(getCursor())) {
-                    return false;
-                }
-                Xml.Tag tag = getCursor().getValue();
-                return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
-                        matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
             }
 
             private Xml.Document attemptBomUpgrade(Xml.Document document, ResolvedManagedDependency managedDep,

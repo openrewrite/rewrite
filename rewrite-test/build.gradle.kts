@@ -3,12 +3,11 @@ plugins {
 }
 
 dependencies {
-    api(platform("org.junit:junit-bom:5.13.3"))
+    api(platform("org.junit:junit-bom:5.14.0"))
     api(project(":rewrite-core"))
     compileOnly("io.micrometer:micrometer-core:latest.release")
     api("org.junit.jupiter:junit-jupiter-api")
     api("org.junit.jupiter:junit-jupiter-params")
-    api("org.junit.platform:junit-platform-launcher")
 
     implementation("org.assertj:assertj-core:3.+")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv")
@@ -17,5 +16,4 @@ dependencies {
 
     testImplementation(project(":rewrite-groovy"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
-    testRuntimeOnly(project(":rewrite-java-21"))
 }

@@ -53,21 +53,15 @@ public class AddProperty extends Recipe {
     @Nullable
     Boolean trustParent;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Maven project property";
-    }
+    String displayName = "Add Maven project property";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s=%s`", key, value);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add a new property to the Maven project property. " +
+    String description = "Add a new property to the Maven project property. " +
                "Prefers to add the property to the parent if the project has multiple modules.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

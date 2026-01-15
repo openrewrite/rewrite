@@ -20,7 +20,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.java.InlineMe;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.Semver;
@@ -38,18 +37,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Upgrade transitive Maven dependencies";
-    }
+    String displayName = "Upgrade transitive Maven dependencies";
 
-    @Override
-    public String getDescription() {
-        return "Upgrades the version of a transitive dependency in a Maven pom file. " +
+    String description = "Upgrades the version of a transitive dependency in a Maven pom file. " +
                "Leaves direct dependencies unmodified. " +
                "Can be paired with the regular Upgrade Dependency Version recipe to upgrade a dependency everywhere, " +
                "regardless of whether it is direct or transitive.";
-    }
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.apache.logging.log4j:ARTIFACT_ID:VERSION'.",
@@ -124,7 +117,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
     String because;
 
     @Deprecated
-    @InlineMe(replacement = "this(groupId, artifactId, version, scope, type, classifier, versionPattern, releasesOnly, onlyIfUsing, addToRootPom, null)")
     public UpgradeTransitiveDependencyVersion(String groupId,
                                               String artifactId,
                                               String version,

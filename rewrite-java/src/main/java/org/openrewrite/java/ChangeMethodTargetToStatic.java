@@ -68,7 +68,6 @@ public class ChangeMethodTargetToStatic extends Recipe {
     @Nullable
     Boolean matchUnknownTypes;
 
-    @InlineMe(replacement = "this(methodPattern, fullyQualifiedTargetTypeName, returnType, matchOverrides, false)")
     public ChangeMethodTargetToStatic(String methodPattern, String fullyQualifiedTargetTypeName,
                                       @Nullable String returnType, @Nullable Boolean matchOverrides) {
         this(methodPattern, fullyQualifiedTargetTypeName, returnType, matchOverrides, false);
@@ -83,15 +82,9 @@ public class ChangeMethodTargetToStatic extends Recipe {
         this.matchUnknownTypes = matchUnknownTypes;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Change method target to static";
-    }
+    String displayName = "Change method target to static";
 
-    @Override
-    public String getDescription() {
-        return "Change method invocations to static method calls.";
-    }
+    String description = "Change method invocations to static method calls.";
 
     @Override
     public Validated<Object> validate() {

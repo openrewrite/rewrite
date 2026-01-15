@@ -32,23 +32,23 @@ class AddOwaspDateBoundSuppressionsTest implements RewriteTest {
     @Test
     void addsUntilIfNotPresent() {
         rewriteRun(
-                spec -> spec.recipe(new AddOwaspDateBoundSuppressions("2020-01-01")),
-                xml("""
-                                <?xml version="1.0" encoding="UTF-8" ?>
-                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-                                    <suppress>
-                                        <notes>
-                                        </notes>
-                                    </suppress>
-                                </suppressions>""", """
-                                <?xml version="1.0" encoding="UTF-8" ?>
-                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-                                    <suppress until="2020-01-01Z">
-                                        <notes>
-                                        </notes>
-                                    </suppress>
-                                </suppressions>""",
-                        spec -> spec.path("suppressions.xml"))
+          spec -> spec.recipe(new AddOwaspDateBoundSuppressions("2020-01-01")),
+          xml("""
+              <?xml version="1.0" encoding="UTF-8" ?>
+              <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                  <suppress>
+                      <notes>
+                      </notes>
+                  </suppress>
+              </suppressions>""", """
+              <?xml version="1.0" encoding="UTF-8" ?>
+              <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                  <suppress until="2020-01-01Z">
+                      <notes>
+                      </notes>
+                  </suppress>
+              </suppressions>""",
+            spec -> spec.path("suppressions.xml"))
         );
     }
 
@@ -58,25 +58,25 @@ class AddOwaspDateBoundSuppressionsTest implements RewriteTest {
         LocalDate thirtyDaysFromNow = today.plusDays(30);
         String thirtyDaysFromNowString = thirtyDaysFromNow + "Z";
         rewriteRun(
-                spec -> spec.recipe(new AddOwaspDateBoundSuppressions(null)),
-                xml("""
-                                <?xml version="1.0" encoding="UTF-8" ?>
-                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-                                    <suppress>
-                                        <notes>
-                                        </notes>
-                                    </suppress>
-                                </suppressions>""",
-                        """
-                                <?xml version="1.0" encoding="UTF-8" ?>
-                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-                                    <suppress until="%s">
-                                        <notes>
-                                        </notes>
-                                    </suppress>
-                                </suppressions>"""
-                                .formatted(thirtyDaysFromNowString),
-                        spec -> spec.path("suppressions.xml"))
+          spec -> spec.recipe(new AddOwaspDateBoundSuppressions(null)),
+          xml("""
+              <?xml version="1.0" encoding="UTF-8" ?>
+              <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                  <suppress>
+                      <notes>
+                      </notes>
+                  </suppress>
+              </suppressions>""",
+            """
+              <?xml version="1.0" encoding="UTF-8" ?>
+              <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                  <suppress until="%s">
+                      <notes>
+                      </notes>
+                  </suppress>
+              </suppressions>"""
+              .formatted(thirtyDaysFromNowString),
+            spec -> spec.path("suppressions.xml"))
         );
     }
 
@@ -86,31 +86,31 @@ class AddOwaspDateBoundSuppressionsTest implements RewriteTest {
         LocalDate thirtyDaysFromNow = today.plusDays(30);
         String thirtyDaysFromNowString = thirtyDaysFromNow + "Z";
         rewriteRun(
-                spec -> spec.recipe(new AddOwaspDateBoundSuppressions("")),
-                xml("""
-                                <?xml version="1.0" encoding="UTF-8" ?>
-                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-                                    <suppress>
-                                        <notes>
-                                        </notes>
-                                    </suppress>
-                                </suppressions>""",
-                        """
-                                <?xml version="1.0" encoding="UTF-8" ?>
-                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-                                    <suppress until="%s">
-                                        <notes>
-                                        </notes>
-                                    </suppress>
-                                </suppressions>"""
-                                .formatted(thirtyDaysFromNowString),
-                        spec -> spec.path("suppressions.xml"))
+          spec -> spec.recipe(new AddOwaspDateBoundSuppressions("")),
+          xml("""
+              <?xml version="1.0" encoding="UTF-8" ?>
+              <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                  <suppress>
+                      <notes>
+                      </notes>
+                  </suppress>
+              </suppressions>""",
+            """
+              <?xml version="1.0" encoding="UTF-8" ?>
+              <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                  <suppress until="%s">
+                      <notes>
+                      </notes>
+                  </suppress>
+              </suppressions>"""
+              .formatted(thirtyDaysFromNowString),
+            spec -> spec.path("suppressions.xml"))
         );
     }
 
     @CsvSource({"abcd,false",
-            "2022,false",
-            "2022-01-01,true"})
+      "2022,false",
+      "2022-01-01,true"})
     @ParameterizedTest
     void valid(String untilDate, boolean valid) {
         assertThat(new AddOwaspDateBoundSuppressions(untilDate).validate().isValid()).isEqualTo(valid);

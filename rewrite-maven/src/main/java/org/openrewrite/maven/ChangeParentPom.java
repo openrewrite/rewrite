@@ -21,7 +21,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.InlineMe;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -45,7 +44,7 @@ import static org.openrewrite.maven.tree.Parent.DEFAULT_RELATIVE_PATH;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ChangeParentPom extends Recipe {
+public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator> {
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Old group ID",
@@ -114,26 +113,19 @@ public class ChangeParentPom extends Recipe {
     @Nullable
     List<String> except;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven parent";
-    }
+    String displayName = "Change Maven parent";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", newGroupId, newArtifactId, newVersion);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change the parent pom of a Maven pom.xml by matching the existing parent via groupId and artifactId, " +
+    String description = "Change the parent pom of a Maven pom.xml by matching the existing parent via groupId and artifactId, " +
                 "and updating it to a new groupId, artifactId, version, and optional relativePath. " +
                 "Also updates the project to retain dependency management and properties previously inherited from the old parent that are no longer provided by the new parent. " +
                 "Removes redundant dependency versions already managed by the new parent.";
-    }
 
     @Deprecated
-    @InlineMe(replacement = "this(oldGroupId, newGroupId, oldArtifactId, newArtifactId, newVersion, oldRelativePath, newRelativePath, versionPattern, allowVersionDowngrades, null)")
     public ChangeParentPom(String oldGroupId,
                            @Nullable String newGroupId,
                            String oldArtifactId,
@@ -179,25 +171,193 @@ public class ChangeParentPom extends Recipe {
         return validated;
     }
 
+    public static class Accumulator {
+        @Nullable MavenResolutionResult updatedRootMarker;
+        final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> gavToOriginalMarker = new HashMap<>();
+        final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> gavToNewMarker = new HashMap<>();
+
+        /**
+         * Build the complete marker hierarchy. This should be called once at the start of the visitor phase.
+         * It propagates marker updates from the root down through all descendants.
+         * Note: The root pom's marker is NOT stored in updatedMarkers because it gets updated
+         * by UpdateMavenModel after XML changes are made. Only descendant pom markers are stored.
+         */
+        void buildMarkerHierarchy() {
+            if (updatedRootMarker == null) {
+                return;
+            }
+            // Propagate marker updates to all descendants
+            Queue<MavenResolutionResult> queue = new LinkedList<>();
+            queue.add(updatedRootMarker);
+
+            while (!queue.isEmpty()) {
+                MavenResolutionResult parentMarker = queue.poll();
+                ResolvedGroupArtifactVersion parentGav = parentMarker.getPom().getGav();
+
+                // Find all poms whose parent GAV matches this parent's GAV
+                for (Map.Entry<ResolvedGroupArtifactVersion, MavenResolutionResult> entry : gavToOriginalMarker.entrySet()) {
+                    ResolvedGroupArtifactVersion childGav = entry.getKey();
+                    MavenResolutionResult childMarker = entry.getValue();
+
+                    // Skip if already processed
+                    if (gavToNewMarker.containsKey(childGav)) {
+                        continue;
+                    }
+
+                    // Check if this child's parent matches the current parent's GAV
+                    if (childMarker.getParent() != null) {
+                        ResolvedGroupArtifactVersion childParentGav = childMarker.getParent().getPom().getGav();
+                        if (parentGav.getGroupId().equals(childParentGav.getGroupId()) &&
+                            parentGav.getArtifactId().equals(childParentGav.getArtifactId()) &&
+                            parentGav.getVersion().equals(childParentGav.getVersion())) {
+                            // Create updated marker for this child with updated parent reference
+                            MavenResolutionResult updatedChildMarker = childMarker.withParent(parentMarker);
+                            gavToNewMarker.put(childGav, updatedChildMarker);
+                            queue.add(updatedChildMarker);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public Accumulator getInitialValue(ExecutionContext ctx) {
+        return new Accumulator();
+    }
+
+    private Optional<String> findAcceptableVersion(
+            List<String> availableVersions, VersionComparator versionComparator,
+            String groupId, String artifactId, String currentVersion,
+            MavenIsoVisitor<?> visitor, ExecutionContext ctx) throws MavenDownloadingException {
+        String finalCurrentVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
+
+        if (availableVersions.isEmpty()) {
+            MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> visitor.downloadMetadata(groupId, artifactId, ctx));
+            mavenMetadata.getVersioning().getVersions().stream()
+                    .filter(v -> versionComparator.isValid(finalCurrentVersion, v))
+                    .filter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(null, finalCurrentVersion, v) <= 0)
+                    .forEach(availableVersions::add);
+        }
+        if (Boolean.TRUE.equals(allowVersionDowngrades)) {
+            return availableVersions.stream()
+                    .max((v1, v2) -> versionComparator.compare(finalCurrentVersion, v1, v2));
+        }
+        Optional<String> upgradedVersion = versionComparator.upgrade(finalCurrentVersion, availableVersions);
+        if (upgradedVersion.isPresent()) {
+            return upgradedVersion;
+        }
+        return availableVersions.stream().filter(finalCurrentVersion::equals).findFirst();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+        VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
+        assert versionComparator != null;
+
+        return new MavenIsoVisitor<ExecutionContext>() {
+            final List<String> availableVersions = new ArrayList<>();
+
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                MavenResolutionResult mrr = getResolutionResult();
+                acc.gavToOriginalMarker.put(mrr.getPom().getGav(), mrr);
+
+                Parent parent = mrr.getPom().getRequested().getParent();
+                if (parent != null &&
+                    matchesGlob(parent.getArtifactId(), oldArtifactId) &&
+                    matchesGlob(parent.getGroupId(), oldGroupId) &&
+                    (oldRelativePath == null || matchesGlob(parent.getRelativePath(), oldRelativePath))) {
+
+                    String currentVersion = parent.getGav().getVersion();
+                    if (currentVersion == null) {
+                        return document;
+                    }
+
+                    String targetGroupId = newGroupId != null ? newGroupId : parent.getGav().getGroupId();
+                    String targetArtifactId = newArtifactId != null ? newArtifactId : parent.getGav().getArtifactId();
+
+                    try {
+                        Optional<String> targetVersion = findAcceptableVersion(availableVersions, versionComparator,
+                                targetGroupId == null ? "" : targetGroupId, targetArtifactId, currentVersion, this, ctx);
+                        if (targetVersion.isPresent()) {
+                            String currentRelativePath = parent.getRelativePath();
+                            String targetRelativePath = newRelativePath != null ? newRelativePath :
+                                    (currentRelativePath != null ? currentRelativePath : oldRelativePath);
+
+                            // Skip if nothing is actually changing
+                            // Note: treat null and empty string as equivalent for relativePath
+                            if (Objects.equals(targetGroupId, parent.getGav().getGroupId()) &&
+                                Objects.equals(targetArtifactId, parent.getGav().getArtifactId()) &&
+                                Objects.equals(targetVersion.get(), currentVersion) &&
+                                (Objects.equals(targetRelativePath, currentRelativePath) ||
+                                 (StringUtils.isBlank(targetRelativePath) && StringUtils.isBlank(currentRelativePath)))) {
+                                return document;
+                            }
+
+                            // Pre-compute the updated MavenResolutionResult with the new parent info
+                            Parent updatedParentRef = new Parent(
+                                    new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()),
+                                    targetRelativePath
+                            );
+                            Pom updatedPom = mrr.getPom().getRequested().withParent(updatedParentRef);
+                            ResolvedPom updatedResolvedPom = mrr.getPom().withRequested(updatedPom);
+                            acc.updatedRootMarker = mrr.withPom(updatedResolvedPom);
+                        }
+                    } catch (MavenDownloadingException e) {
+                        // Version resolution failed, will be handled in visitor phase
+                    }
+                }
+                return document;
+            }
+        };
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
+        acc.buildMarkerHierarchy();
+        return emptyList();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
         assert versionComparator != null;
 
         return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                Parent parent = getResolutionResult().getPom().getRequested().getParent();
-                if (parent != null &&
-                    matchesGlob(parent.getArtifactId(), oldArtifactId) &&
-                    matchesGlob(parent.getGroupId(), oldGroupId)) {
-                    return SearchResult.found(document);
+                MavenResolutionResult mrr = getResolutionResult();
+                while (mrr != null) {
+                    Parent parent = mrr.getPom().getRequested().getParent();
+                    if (parent != null &&
+                        matchesGlob(parent.getArtifactId(), oldArtifactId) &&
+                        matchesGlob(parent.getGroupId(), oldGroupId)) {
+                        return SearchResult.found(document);
+                    }
+                    mrr = mrr.getParent();
                 }
                 return document;
             }
         }, new MavenIsoVisitor<ExecutionContext>() {
-            @Nullable
-            private Collection<String> availableVersions;
+            final List<String> availableVersions = new ArrayList<>();
+
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+
+                Xml.Document d = super.visitDocument(document, ctx);
+
+                // Check if this pom has a pre-computed updated marker
+                MavenResolutionResult mrr = d.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
+                if (mrr != null) {
+                    MavenResolutionResult updatedMarker = acc.gavToNewMarker.get(mrr.getPom().getGav());
+                    if (updatedMarker != null) {
+                        d = d.withMarkers(d.getMarkers().computeByType(mrr,
+                                (original, ignored) -> updatedMarker));
+                    }
+                }
+                return d;
+            }
 
             @SuppressWarnings("OptionalGetWithoutIsPresent")
             @Override
@@ -219,7 +379,8 @@ public class ChangeParentPom extends Recipe {
                         String targetArtifactId = newArtifactId == null ? currentArtifactId : newArtifactId;
                         String targetRelativePath = newRelativePath == null ? tag.getChildValue("relativePath").orElse(oldRelativePath) : newRelativePath;
                         try {
-                            Optional<String> targetVersion = findAcceptableVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
+                            Optional<String> targetVersion = findAcceptableVersion(availableVersions, versionComparator,
+                                    targetGroupId, targetArtifactId, oldVersion, this, ctx);
                             if (!targetVersion.isPresent() ||
                                 (Objects.equals(targetGroupId, currentGroupId) &&
                                  Objects.equals(targetArtifactId, currentArtifactId) &&
@@ -244,19 +405,23 @@ public class ChangeParentPom extends Recipe {
 
                             // Retain managed versions from the old parent that are not managed in the new parent
                             MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
+                            ResolvedPom oldParent = mpd.download(new GroupArtifactVersion(currentGroupId, currentArtifactId, oldVersion), null, resolvedPom, resolvedPom.getRepositories())
+                                    .resolve(emptyList(), mpd, ctx);
                             ResolvedPom newParent = mpd.download(new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()), null, resolvedPom, resolvedPom.getRepositories())
                                     .resolve(emptyList(), mpd, ctx);
                             List<ResolvedManagedDependency> dependenciesWithoutExplicitVersions = getDependenciesUnmanagedByNewParent(mrr, newParent);
                             for (ResolvedManagedDependency dep : dependenciesWithoutExplicitVersions) {
                                 changeParentTagVisitors.add(new AddManagedDependencyVisitor(
-                                        dep.getGav().getGroupId(), dep.getGav().getArtifactId(), dep.getGav().getVersion(),
+                                        dep.getGroupId(), dep.getArtifactId(), dep.getVersion() == null ? "" : dep.getVersion(),
                                         dep.getScope() == null ? null : dep.getScope().toString().toLowerCase(), dep.getType(), dep.getClassifier(), null));
                             }
 
-                            // Retain properties from the old parent that are not present in the new parent
-                            Map<String, String> propertiesInUse = getPropertiesInUse(getCursor().firstEnclosingOrThrow(Xml.Document.class), ctx);
+                            Map<String, String> oldParentProps = oldParent.getProperties();
                             Map<String, String> newParentProps = newParent.getProperties();
+                            // Retain properties from the old parent that are not present in the new parent
+                            Map<String, String> propertiesInUse = getPropertiesInUse(getCursor().firstEnclosingOrThrow(Xml.Document.class), oldParentProps, ctx);
                             for (Map.Entry<String, String> propInUse : propertiesInUse.entrySet()) {
+                                //noinspection ConstantValue
                                 if (!newParentProps.containsKey(propInUse.getKey()) && propInUse.getValue() != null) {
                                     changeParentTagVisitors.add(new AddPropertyVisitor(propInUse.getKey(), propInUse.getValue(), false));
                                 }
@@ -279,7 +444,6 @@ public class ChangeParentPom extends Recipe {
                                     relativePathTag = Xml.Tag.build("<relativePath>" + targetRelativePath + "</relativePath>");
                                 }
                                 doAfterVisit(new AddToTagVisitor<>(t, relativePathTag, new MavenTagInsertionComparator(t.getChildren())));
-                                maybeUpdateModel();
                             }
 
                             if (!changeParentTagVisitors.isEmpty()) {
@@ -312,29 +476,6 @@ public class ChangeParentPom extends Recipe {
                 }
                 return !relativePathValue.equals(targetRelativePath);
             }
-
-            private Optional<String> findAcceptableVersion(String groupId, String artifactId, String currentVersion,
-                                                                ExecutionContext ctx) throws MavenDownloadingException {
-                String finalCurrentVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
-
-                if (availableVersions == null) {
-                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    //noinspection EqualsWithItself
-                    availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                            .filter(v -> versionComparator.isValid(finalCurrentVersion, v))
-                            .filter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(finalCurrentVersion, finalCurrentVersion, v) <= 0)
-                            .collect(toList());
-                }
-                if (Boolean.TRUE.equals(allowVersionDowngrades)) {
-                    return availableVersions.stream()
-                            .max((v1, v2) -> versionComparator.compare(finalCurrentVersion, v1, v2));
-                }
-                Optional<String> upgradedVersion = versionComparator.upgrade(finalCurrentVersion, availableVersions);
-                if (upgradedVersion.isPresent()) {
-                    return upgradedVersion;
-                }
-                return availableVersions.stream().filter(finalCurrentVersion::equals).findFirst();
-            }
         });
     }
 
@@ -348,23 +489,23 @@ public class ChangeParentPom extends Recipe {
 
     private static final Pattern PROPERTY_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
-    private static Map<String, String> getPropertiesInUse(Xml.Document pomXml, ExecutionContext ctx) {
-        return new MavenIsoVisitor<Map<String, String>>() {
-            @Nullable
-            ResolvedPom resolvedPom = null;
+    private static Map<String, String> getPropertiesInUse(Xml.Document pomXml, Map<String, String> oldParentProps, ExecutionContext ctx) {
+        Map<String, String> cascadedProps = new HashMap<>(oldParentProps);
+        Set<String> referencedProps = new HashSet<>();
+        new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Tag visitTag(Xml.Tag tag, Map<String, String> properties) {
-                Xml.Tag t = super.visitTag(tag, properties);
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext context) {
+                Xml.Tag t = super.visitTag(tag, context);
                 if (t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
                     String text = ((Xml.CharData) t.getContent().get(0)).getText().trim();
+                    if (isPropertyTag()) {
+                        cascadedProps.put(t.getName(), text);
+                    }
                     Matcher m = PROPERTY_PATTERN.matcher(text);
                     while (m.find()) {
-                        if (resolvedPom == null) {
-                            resolvedPom = getResolutionResult().getPom();
-                        }
                         String propertyName = m.group(1).trim();
-                        if (resolvedPom.getProperties().containsKey(propertyName) && !isGlobalProperty(propertyName)) {
-                            properties.put(m.group(1).trim(), resolvedPom.getProperties().get(propertyName));
+                        if (!isGlobalProperty(propertyName)) {
+                            referencedProps.add(propertyName);
                         }
                     }
                 }
@@ -375,7 +516,10 @@ public class ChangeParentPom extends Recipe {
                 return propertyName.startsWith("project.") || propertyName.startsWith("env.") ||
                         propertyName.startsWith("settings.") || "basedir".equals(propertyName);
             }
-        }.reduce(pomXml, new HashMap<>());
+        }.visitNonNull(pomXml, ctx);
+        return referencedProps.stream()
+                .filter(cascadedProps::containsKey)
+                .collect(toMap(p -> p, cascadedProps::get));
     }
 
     private List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParent(MavenResolutionResult mrr, ResolvedPom newParent) {
@@ -391,7 +535,7 @@ public class ChangeParentPom extends Recipe {
                         .noneMatch(it -> {
                             String groupId = resolvedPom.getValue(it.getGroupId());
                             String artifactId = resolvedPom.getValue(it.getArtifactId());
-                            return dep.getGroupId().equals(groupId) && dep.getArtifactId().equals(artifactId);
+                            return Objects.equals(dep.getGroupId(),groupId) && Objects.equals(dep.getArtifactId(), artifactId);
                         }))
                 .map(dep -> new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), null))
                 .collect(toCollection(LinkedHashSet::new));

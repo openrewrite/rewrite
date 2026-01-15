@@ -2167,6 +2167,55 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6168")
+    @Test
+    void malformedQualifiedNamesInJavadoc() {
+        rewriteRun(
+          // The parser should be able to parse malformed qualified names without issues
+          java(
+            """
+              public class Test {
+                  /**
+                   * @see Test#methodC(java.lang .String)
+                   */
+                  public void methodA() {
+
+                  }
+
+                  /**
+                   * @see Test#methodC(java.lang
+                   *     .String)
+                   */
+                  public void methodB(String aString) {
+
+                  }
+
+
+                  public void methodC(String aString) {
+
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void redundantSpacing() {
+        rewriteRun(
+          java(
+            """
+            /**
+            * <p>Some text.
+            *\s
+            * <p>More text.
+            */
+            class SomeClass {}
+            """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5855")
     @Nested
     class GenericWildcard {

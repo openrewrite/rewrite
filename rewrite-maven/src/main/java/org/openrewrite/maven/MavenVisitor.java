@@ -219,6 +219,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
     }
 
+    public boolean isAnnotationProcessorPathTag(String groupId, String artifactId) {
+        if (!isTag("path") || !ANNOTATION_PROCESSORS_PATH_MATCHER.matches(getCursor())) {
+            return false;
+        }
+        Xml.Tag tag = getCursor().getValue();
+        return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
+                matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+    }
+
     public void maybeUpdateModel() {
         for (TreeVisitor<?, P> afterVisit : getAfterVisit()) {
             if (afterVisit instanceof UpdateMavenModel) {

@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.resolved
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
+import org.jetbrains.kotlin.fir.resolve.dfa.symbol
 import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
@@ -149,7 +150,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             return typeMapping.type(typeMap[parent], owner)
         }
         val fir = primary(psiElement)
-        if (psiElement != null && fir is FirResolvedQualifier && fir.source != null && fir.source.psi is KtDotQualifiedExpression) {
+        if (psiElement != null && fir is FirResolvedQualifier && fir.source != null && (fir.source.psi is KtDotQualifiedExpression || fir.source.psi is KtNameReferenceExpression)) {
             if (fir.symbol is FirRegularClassSymbol) {
                 val classId = (fir.symbol as FirRegularClassSymbol).classId
                 return if (isPackage(psiElement, classId)) {

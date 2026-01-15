@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.semver.Semver;
 
 import static org.openrewrite.Validated.notBlank;
 
@@ -38,6 +39,15 @@ public class DoesNotIncludeDependency extends Recipe {
             example = "guava")
     String artifactId;
 
+    @Option(displayName = "Version",
+            description = "Match only dependencies with the specified version. " +
+                    "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used. " +
+                    "All versions are searched by default.",
+            example = "1.x",
+            required = false)
+    @Nullable
+    String version;
+
     @Option(displayName = "Only direct dependencies",
             description = "Default false. If enabled, transitive dependencies will not be considered.",
             required = false,
@@ -53,34 +63,32 @@ public class DoesNotIncludeDependency extends Recipe {
     @Nullable
     String scope;
 
-    @Override
-    public String getDisplayName() {
-        return "Does not include Maven dependency";
-    }
+    String displayName = "Does not include Maven dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "A precondition which returns false if visiting a Maven pom which includes the specified dependency in the classpath of some scope. " +
+    String description = "A precondition which returns false if visiting a Maven pom which includes the specified dependency in the classpath of some scope. " +
                 "For compatibility with multimodule projects, this should most often be applied as a precondition.";
-    }
 
     @Override
     public Validated<Object> validate() {
-        return super.validate()
+        Validated<Object> validated = super.validate()
                 .and(notBlank("groupId", groupId).and(notBlank("artifactId", artifactId)))
                 .and(Validated.test("scope", "scope is a valid Maven scope", scope,
                         s -> Scope.fromName(s) != Scope.Invalid));
+        if (version != null) {
+            validated = validated.and(Semver.validate(version, null));
+        }
+        return validated;
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
-            final TreeVisitor<?, ExecutionContext> di = new DependencyInsight(groupId, artifactId, scope, null, onlyDirect).getVisitor();
+            final TreeVisitor<?, ExecutionContext> di = new DependencyInsight(groupId, artifactId, scope, version, onlyDirect).getVisitor();
 
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {

@@ -76,15 +76,9 @@ public class ChangePluginVersion extends Recipe {
     @Nullable
     String versionPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Change a Gradle plugin version by id";
-    }
+    String displayName = "Change a Gradle plugin version by id";
 
-    @Override
-    public String getDescription() {
-        return "Change a Gradle plugin by id to a later version.";
-    }
+    String description = "Change a Gradle plugin by id to a later version.";
 
     @Override
     public Validated<Object> validate() {
