@@ -1928,8 +1928,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "1.2.x",
             null
           )),
-          //language=xml
           pomXml(
+            //language=xml
             """
               <project>
                 <groupId>com.mycompany.app</groupId>
@@ -1945,6 +1945,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                 </modules>
               </project>
               """,
+            //language=xml
             """
               <project>
                 <groupId>com.mycompany.app</groupId>
@@ -1961,8 +1962,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               </project>
               """
           ),
-          //language=xml
           pomXml(
+            //language=xml
             """
               <project>
                 <groupId>com.mycompany.app</groupId>

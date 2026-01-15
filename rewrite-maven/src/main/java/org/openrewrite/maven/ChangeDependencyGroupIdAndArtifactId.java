@@ -181,6 +181,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                     } else {
                         artifactId = t.getChildValue("artifactId").orElseThrow(NoSuchElementException::new);
                     }
+
                     String currentVersion = t.getChildValue("version").orElse(null);
                     if (newVersion != null) {
                         try {
@@ -213,6 +214,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             return e.warn(tag);
                         }
                     }
+
                     if (t != tag) {
                         maybeUpdateModel();
                     }
