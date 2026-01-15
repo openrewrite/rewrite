@@ -34,6 +34,7 @@ import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.LinkedHashMap;
@@ -41,6 +42,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.openrewrite.internal.StringUtils.readFully;
+import static org.openrewrite.internal.StringUtils.readFullyWithoutClosing;
 
 /**
  * A client for spawning and communicating with a subprocess that implements Rewrite RPC.
@@ -95,18 +97,16 @@ public class RewriteRpcProcess extends Thread {
     public @Nullable RuntimeException getLivenessCheck() {
         if (process != null && !process.isAlive()) {
             int exitCode = process.exitValue();
-            String errorOutput = "", stdOutput = "";
+            String message = "JavaScript RPC process shut down early with exit code " + exitCode;
 
-            // Read any remaining output from the process
-            try (InputStream errorStream = process.getErrorStream();
-                 InputStream inputStream = process.getInputStream()) {
-                errorOutput = readFully(errorStream);
-                stdOutput = readFully(inputStream);
-            } catch (IOException | UnsupportedOperationException e) {
-                // Ignore errors reading final output
+            String errorOutput = "", stdOutput = "";
+            try {
+                errorOutput = readFullyWithoutClosing(process.getErrorStream(), StandardCharsets.UTF_8);
+                stdOutput = readFullyWithoutClosing(process.getInputStream(), StandardCharsets.UTF_8);
+            } catch (UnsupportedOperationException e) {
+                message += "\nError retrieving output/error stream: " + e.getMessage();
             }
 
-            String message = "JavaScript RPC process shut down early with exit code " + exitCode;
             if (!stdOutput.isEmpty()) {
                 message += "\nStandard output:\n  " + stdOutput.replace("\n", "\n  ");
             }
