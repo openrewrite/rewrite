@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,23 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml.format;
+package org.openrewrite.java.marker;
 
-import lombok.Getter;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.marker.Marker;
 
-public class AutoFormat extends Recipe {
+import java.util.UUID;
 
-    @Getter
-    final String displayName = "Format XML";
-
-    @Getter
-    final String description = "Indents XML using the most common indentation size and tabs or space choice in use in the file.";
-
-    @Override
-    public AutoFormatVisitor<ExecutionContext> getVisitor() {
-        return new AutoFormatVisitor<>();
-    }
-
+@Value
+@With
+public class CompactSourceFile implements Marker {
+    UUID id;
 }

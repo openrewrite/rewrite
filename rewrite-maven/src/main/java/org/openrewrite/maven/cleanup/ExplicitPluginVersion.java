@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.cleanup;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -25,15 +26,11 @@ import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.tree.Xml;
 
 public class ExplicitPluginVersion extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Add explicit plugin versions";
-    }
+    @Getter
+    final String displayName = "Add explicit plugin versions";
 
-    @Override
-    public String getDescription() {
-        return "Add explicit plugin versions to POMs for reproducibility, as [MNG-4173](https://issues.apache.org/jira/browse/MNG-4173) removes automatic version resolution for POM plugins.";
-    }
+    @Getter
+    final String description = "Add explicit plugin versions to POMs for reproducibility, as [MNG-4173](https://issues.apache.org/jira/browse/MNG-4173) removes automatic version resolution for POM plugins.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

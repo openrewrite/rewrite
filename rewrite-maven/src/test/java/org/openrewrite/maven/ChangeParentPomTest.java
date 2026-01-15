@@ -27,9 +27,13 @@ import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
+
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedPom;
 
 class ChangeParentPomTest implements RewriteTest {
 
@@ -415,7 +419,25 @@ class ChangeParentPomTest implements RewriteTest {
                     </parent>
                     <artifactId>module1</artifactId>
                   </project>
-                  """
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    MavenResolutionResult parentMrr = mrr.getParent();
+                    assertThat(parentMrr).isNotNull();
+                    assertThat(requireNonNull(parentMrr.getPom().getRequested().getParent()).getGav().getVersion())
+                        .isEqualTo("2.6.7");
+                })
               )),
             mavenProject("module2",
               pomXml(
@@ -429,7 +451,25 @@ class ChangeParentPomTest implements RewriteTest {
                     </parent>
                     <artifactId>module2</artifactId>
                   </project>
-                  """
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module2</artifactId>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    MavenResolutionResult parentMrr = mrr.getParent();
+                    assertThat(parentMrr).isNotNull();
+                    assertThat(requireNonNull(parentMrr.getPom().getRequested().getParent()).getGav().getVersion())
+                        .isEqualTo("2.6.7");
+                })
               )
             )
           )
@@ -1433,8 +1473,8 @@ class ChangeParentPomTest implements RewriteTest {
                 false,
                 null
               )).parser(MavenParser.builder().property("maven.repo.local", "C:/blah")),
-              //language=xml
               pomXml(
+                //language=xml
                 """
                   <project>
                     <groupId>org.sample</groupId>
@@ -1542,6 +1582,71 @@ class ChangeParentPomTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(recipe),
           mavenProject("parent",
+            mavenProject("module1",
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    MavenResolutionResult parentMrr = mrr.getParent();
+                    assertThat(parentMrr).isNotNull();
+                    assertThat(requireNonNull(parentMrr.getPom().getRequested().getParent()).getVersion())
+                        .isEqualTo("2.6.7");
+                })
+              )),
+            mavenProject("module2",
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module2</artifactId>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module2</artifactId>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    MavenResolutionResult parentMrr = mrr.getParent();
+                    assertThat(parentMrr).isNotNull();
+                    assertThat(requireNonNull(parentMrr.getPom().getRequested().getParent()).getGav().getVersion())
+                        .isEqualTo("2.6.7");
+                })
+              )
+            ),
             pomXml(
               """
                 <project>
@@ -1581,35 +1686,6 @@ class ChangeParentPomTest implements RewriteTest {
                   </modules>
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                      <groupId>org.sample</groupId>
-                      <artifactId>sample</artifactId>
-                      <version>1.0.0</version>
-                    </parent>
-                    <artifactId>module1</artifactId>
-                  </project>
-                  """
-              )),
-            mavenProject("module2",
-              pomXml(
-                """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                      <groupId>org.sample</groupId>
-                      <artifactId>sample</artifactId>
-                      <version>1.0.0</version>
-                    </parent>
-                    <artifactId>module2</artifactId>
-                  </project>
-                  """
-              )
             )
           )
         );
@@ -2025,6 +2101,271 @@ class ChangeParentPomTest implements RewriteTest {
                 </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6463")
+    @Test
+    void multiModuleDownstreamMavenResolutionResultUpdated() {
+        // This test verifies that when the root pom's parent is upgraded,
+        // the child modules' MavenResolutionResult markers are also updated
+        // to reflect the new parent information
+        ChangeParentPom recipe = new ChangeParentPom(
+          "org.springframework.boot",
+          null,
+          "spring-boot-starter-parent",
+          null,
+          "2.6.7",
+          null,
+          null,
+          null,
+          true,
+          null);
+        rewriteRun(
+          spec -> spec.recipe(recipe),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.0</version>
+                  </parent>
+
+                  <modules>
+                    <module>module1</module>
+                  </modules>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.6.7</version>
+                  </parent>
+
+                  <modules>
+                    <module>module1</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("module1",
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    // Verify that the child module's MavenResolutionResult has updated parent information
+                    MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+
+                    // The child module's parent should be the root pom (org.sample:sample:1.0.0)
+                    MavenResolutionResult parentMrr = mrr.getParent();
+                    assertThat(parentMrr).isNotNull();
+                    assertThat(parentMrr.getPom().getGav().getGroupId()).isEqualTo("org.sample");
+                    assertThat(parentMrr.getPom().getGav().getArtifactId()).isEqualTo("sample");
+
+                    // The root pom's parent (grandparent of module1) should be the upgraded version
+                    ResolvedPom parentPom = parentMrr.getPom();
+                    assertThat(parentPom.getRequested().getParent()).isNotNull();
+                    assertThat(parentPom.getRequested().getParent().getGav().getGroupId())
+                      .isEqualTo("org.springframework.boot");
+                    assertThat(parentPom.getRequested().getParent().getGav().getArtifactId())
+                      .isEqualTo("spring-boot-starter-parent");
+                    // This assertion checks that the parent version was properly updated
+                    // in the child module's MavenResolutionResult
+                    assertThat(parentPom.getRequested().getParent().getGav().getVersion())
+                      .describedAs("Child module's MavenResolutionResult should reflect the updated parent version")
+                      .isEqualTo("2.6.7");
+                })
+              )
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6463")
+    @RepeatedTest(10)
+    void multiModuleChainOfParentPoms() {
+        // This test verifies that marker updates propagate through a chain of parent poms:
+        // - root pom has spring-boot-starter-parent as its parent (upgraded from 2.5.0 to 2.6.7)
+        // - intermediate module has root pom as its parent
+        // - leaf module has intermediate module as its parent
+        // All modules should have their MavenResolutionResult markers updated
+        ChangeParentPom recipe = new ChangeParentPom(
+          "org.springframework.boot",
+          null,
+          "spring-boot-starter-parent",
+          null,
+          "2.6.7",
+          null,
+          null,
+          null,
+          true,
+          null);
+        rewriteRun(
+          spec -> spec.recipe(recipe),
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>root</artifactId>
+                  <version>1.0.0</version>
+
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.0</version>
+                  </parent>
+
+                  <modules>
+                    <module>intermediate</module>
+                  </modules>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>root</artifactId>
+                  <version>1.0.0</version>
+
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.6.7</version>
+                  </parent>
+
+                  <modules>
+                    <module>intermediate</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("intermediate",
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>root</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>intermediate</artifactId>
+
+                    <modules>
+                      <module>leaf</module>
+                    </modules>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>root</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>intermediate</artifactId>
+
+                    <modules>
+                      <module>leaf</module>
+                    </modules>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    // Verify intermediate module's parent (root) has updated grandparent info
+                    MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    MavenResolutionResult parentMrr = mrr.getParent();
+                    assertThat(parentMrr).isNotNull();
+                    assertThat(parentMrr.getPom().getGav().getArtifactId()).isEqualTo("root");
+                    // The root pom's parent should be the upgraded spring-boot-starter-parent
+                    assertThat(requireNonNull(parentMrr.getPom().getRequested().getParent()).getGav().getVersion())
+                      .describedAs("Intermediate module's parent marker should reflect updated grandparent version")
+                      .isEqualTo("2.6.7");
+                })
+              ),
+              mavenProject("leaf",
+                pomXml(
+                  """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                        <groupId>org.sample</groupId>
+                        <artifactId>intermediate</artifactId>
+                        <version>1.0.0</version>
+                      </parent>
+                      <artifactId>leaf</artifactId>
+                    </project>
+                    """,
+                  """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                        <groupId>org.sample</groupId>
+                        <artifactId>intermediate</artifactId>
+                        <version>1.0.0</version>
+                      </parent>
+                      <artifactId>leaf</artifactId>
+                    </project>
+                    """,
+                  spec -> spec.afterRecipe(doc -> {
+                      // Verify the leaf module has the entire updated hierarchy
+                      MavenResolutionResult mrr = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+
+                      // Leaf's parent is intermediate
+                      MavenResolutionResult intermediateMrr = mrr.getParent();
+                      assertThat(intermediateMrr).isNotNull();
+                      assertThat(intermediateMrr.getPom().getGav().getArtifactId()).isEqualTo("intermediate");
+
+                      // Intermediate's parent is root
+                      MavenResolutionResult rootMrr = intermediateMrr.getParent();
+                      assertThat(rootMrr).isNotNull();
+                      assertThat(rootMrr.getPom().getGav().getArtifactId()).isEqualTo("root");
+
+                      // Root's parent should be the upgraded spring-boot-starter-parent
+                      assertThat(requireNonNull(rootMrr.getPom().getRequested().getParent()).getGav().getVersion())
+                        .describedAs("Leaf module's grandparent marker should reflect updated great-grandparent version")
+                        .isEqualTo("2.6.7");
+                  })
+                )
+              )
+            )
           )
         );
     }

@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
@@ -90,15 +91,11 @@ public abstract class Recipe implements Cloneable {
     }
 
     static class Noop extends Recipe {
-        @Override
-        public String getDisplayName() {
-            return "Do nothing";
-        }
+        @Getter
+        final String displayName = "Do nothing";
 
-        @Override
-        public String getDescription() {
-            return "Default no-op test, does nothing.";
-        }
+        @Getter
+        final String description = "Default no-op test, does nothing.";
     }
 
     /**

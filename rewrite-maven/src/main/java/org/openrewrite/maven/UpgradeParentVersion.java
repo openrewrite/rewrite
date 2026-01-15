@@ -21,9 +21,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.semver.Semver;
 
+import java.util.Collection;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UpgradeParentVersion extends Recipe {
+public class UpgradeParentVersion extends ScanningRecipe<ChangeParentPom.Accumulator> {
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.springframework.boot:spring-boot-parent:VERSION'.",
@@ -74,8 +76,7 @@ public class UpgradeParentVersion extends Recipe {
         return validated;
     }
 
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    private ChangeParentPom getChangeParentPom() {
         return new ChangeParentPom(
                 groupId,
                 null,
@@ -86,7 +87,26 @@ public class UpgradeParentVersion extends Recipe {
                 null,
                 versionPattern,
                 false,
-                null)
-                .getVisitor();
+                null);
+    }
+
+    @Override
+    public ChangeParentPom.Accumulator getInitialValue(ExecutionContext ctx) {
+        return getChangeParentPom().getInitialValue(ctx);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(ChangeParentPom.Accumulator acc) {
+        return getChangeParentPom().getScanner(acc);
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(ChangeParentPom.Accumulator acc, ExecutionContext ctx) {
+        return getChangeParentPom().generate(acc, ctx);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(ChangeParentPom.Accumulator acc) {
+        return getChangeParentPom().getVisitor(acc);
     }
 }

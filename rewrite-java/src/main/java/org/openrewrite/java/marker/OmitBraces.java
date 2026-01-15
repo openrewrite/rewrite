@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,22 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy.format;
+package org.openrewrite.java.marker;
 
-import lombok.Getter;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.marker.Marker;
 
-public class AutoFormat extends Recipe {
-    @Getter
-    final String displayName = "Format Groovy code";
+import java.util.UUID;
 
-    @Getter
-    final String description = "Format Groovy code using a standard comprehensive set of Groovy formatting recipes.";
+@Value
+@With
+public class OmitBraces implements Marker {
+    UUID id;
 
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new AutoFormatVisitor<>(null);
+    public OmitBraces(UUID id) {
+        this.id = id;
     }
 }

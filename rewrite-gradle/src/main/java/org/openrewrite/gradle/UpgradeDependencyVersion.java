@@ -27,6 +27,7 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
+import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -170,8 +171,51 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         .get(getCursor())
                         .ifPresent(multiDependency ->
                                 multiDependency.forEach(dep -> scanDependency(dep, ctx)));
+
+                new SpringDependencyManagementPluginEntry.Matcher()
+                        .groupId(groupId)
+                        .artifactId(artifactId)
+                        .get(getCursor())
+                        .ifPresent(entry -> scanSpringDependencyManagementEntry(entry, ctx));
                 return m;
             }
+
+            private void scanSpringDependencyManagementEntry(SpringDependencyManagementPluginEntry entry, ExecutionContext ctx) {
+                String entryGroup = entry.getGroup();
+                for (String entryArtifact : entry.getArtifacts()) {
+                    if (!shouldResolveVersion(entryGroup, entryArtifact)) {
+                        continue;
+                    }
+
+                    GroupArtifact ga = new GroupArtifact(entryGroup, entryArtifact);
+
+                    // Track version variable if present
+                    String versionVar = entry.getVersionVariable();
+                    if (versionVar != null) {
+                        acc.versionPropNameToGA
+                                .computeIfAbsent(versionVar, k -> new HashMap<>())
+                                .computeIfAbsent(ga, k -> new HashSet<>())
+                                .add("dependencyManagement");
+
+                        acc.variableNames
+                                .computeIfAbsent(versionVar, k -> new HashMap<>())
+                                .computeIfAbsent(ga, k -> new HashSet<>())
+                                .add("dependencyManagement");
+                    }
+
+                    // Resolve the new version if needed
+                    if (!acc.gaToNewVersion.containsKey(ga)) {
+                        try {
+                            String newVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                    .select(ga, "dependencyManagement", UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
+                            acc.gaToNewVersion.put(ga, newVersion);
+                        } catch (MavenDownloadingException e) {
+                            acc.gaToNewVersion.put(ga, e);
+                        }
+                    }
+                }
+            }
+
             /**
              * Scans a single dependency and records its information for later processing.
              */

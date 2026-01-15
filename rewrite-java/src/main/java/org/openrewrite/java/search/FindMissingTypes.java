@@ -21,6 +21,7 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.*;
@@ -220,6 +221,14 @@ public class FindMissingTypes extends Recipe {
                 md = SearchResult.found(md, "MethodDeclaration#name#type is not the same instance as the MethodType of MethodDeclaration.");
             }
             return super.visitMethodDeclaration(md, ctx);
+        }
+
+        @Override
+        public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
+            J.Package p = pkg.withAnnotations(ListUtils.map(pkg.getAnnotations(),
+                    a -> isWellFormedType(a.getType(), seenTypes) ? a :
+                            SearchResult.found(a, "Annotation type is missing or malformed")));
+            return p == pkg ? super.visitPackage(pkg, ctx) : p;
         }
 
         @Override
