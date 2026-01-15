@@ -133,7 +133,7 @@ class RemoveBuildPluginTest implements RewriteTest {
     }
 
     @Test
-    void removePluginKts() {
+    void removePluginWithVersionKts() {
         rewriteRun(
           spec -> spec.recipe(new RemoveBuildPlugin("com.jfrog.bintray")),
           buildGradleKts(
