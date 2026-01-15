@@ -27,6 +27,9 @@ class ParserVisitor(ast.NodeVisitor):
     _source: str
     _cursor: int
     _parentheses_stack: List[Tuple[Callable[[T, Space], T], int, int, ast.AST, Space]]
+    _tokens: List[TokenInfo]
+    _line_starts: List[int]
+    _paren_pairs: Dict[int, int]
 
     @property
     def _source_after_cursor(self) -> str:
@@ -43,6 +46,57 @@ class ParserVisitor(ast.NodeVisitor):
         self._cursor = 0
         self._parentheses_stack = []
         self._type_mapping = PythonTypeMapping(source)
+
+        # Token infrastructure for reliable parentheses matching
+        self._tokens = list(tokenize(BytesIO(source.encode('utf-8')).readline))
+        self._token_idx = 1  # Skip ENCODING token
+        self._line_starts = self._compute_line_starts()
+        self._paren_pairs = self._compute_paren_pairs()
+
+    def _compute_line_starts(self) -> List[int]:
+        """Compute byte offset where each line starts (1-indexed for tokenizer compatibility)."""
+        starts = [0]  # Line 1 starts at offset 0
+        for i, c in enumerate(self._source):
+            if c == '\n':
+                starts.append(i + 1)
+        return starts
+
+    def _compute_paren_pairs(self) -> Dict[int, int]:
+        """Map each '(' byte offset to its matching ')' byte offset."""
+        pairs = {}
+        stack = []
+        for tok in self._tokens:
+            if tok.type == token.OP:
+                pos = self._token_to_offset(tok)
+                if tok.string == '(':
+                    stack.append(pos)
+                elif tok.string == ')' and stack:
+                    open_pos = stack.pop()
+                    pairs[open_pos] = pos
+        return pairs
+
+    def _token_to_offset(self, tok: TokenInfo) -> int:
+        """Convert token's (row, col) to byte offset."""
+        row, col = tok.start
+        if row <= len(self._line_starts):
+            return self._line_starts[row - 1] + col
+        return len(self._source)
+
+    def _tokens_from_idx(self) -> peekable:
+        """Get a peekable iterator of tokens starting at the current _token_idx.
+
+        This allows visit_Constant and visit_JoinedStr to iterate through the global
+        token stream without scanning from the beginning. We also filter by _cursor
+        to handle cases where _token_idx hasn't been fully synchronized.
+        """
+        cursor = self._cursor
+        def token_generator():
+            for tok in self._tokens[self._token_idx:]:
+                tok_offset = self._token_to_offset(tok)
+                if tok_offset >= cursor:
+                    yield tok
+
+        return peekable(token_generator())
 
     def generic_visit(self, node):
         return super().generic_visit(node)
@@ -716,20 +770,38 @@ class ParserVisitor(ast.NodeVisitor):
     def visit_GeneratorExp(self, node):
         # this weird logic is here to deal with the case of generator expressions appearing as the argument to a call
         prefix = self.__whitespace()
+        parenthesized = False
+
         if self._source[self._cursor] == '(':
-            save_cursor = self._cursor
-            self._cursor += 1
-            try:
-                result = self.__convert(node.elt)
-                save_cursor_2 = self._cursor
-                self.__whitespace()
-                assert self._source[self._cursor] != ')'
-                self._cursor = save_cursor_2
-                parenthesized = True
-            except:
-                self._cursor = save_cursor
+            # Use paren map to determine if this '(' is for a parenthesized generator
+            # or for a sub-expression within the generator element.
+            # If the '(' closes BEFORE the 'for' keyword, it's a sub-expression.
+            open_paren_pos = self._cursor
+            close_paren_pos = self._paren_pairs.get(open_paren_pos)
+
+            # Find position of 'for' keyword by searching from current position
+            for_pos = self._source.find(' for ', self._cursor)
+
+            if close_paren_pos is not None and for_pos != -1 and close_paren_pos < for_pos:
+                # The '(' closes before 'for', so it's a sub-expression parenthesis.
+                # Don't consume it here - let normal parentheses handling deal with it.
                 result = self.__convert(node.elt)
                 parenthesized = False
+            else:
+                # Original logic for potentially parenthesized generator
+                save_cursor = self._cursor
+                self._cursor += 1
+                try:
+                    result = self.__convert(node.elt)
+                    save_cursor_2 = self._cursor
+                    self.__whitespace()
+                    assert self._source[self._cursor] != ')'
+                    self._cursor = save_cursor_2
+                    parenthesized = True
+                except:
+                    self._cursor = save_cursor
+                    result = self.__convert(node.elt)
+                    parenthesized = False
         else:
             result = self.__convert(node.elt)
             parenthesized = False
@@ -1343,10 +1415,9 @@ class ParserVisitor(ast.NodeVisitor):
         return self.__pad_left(self.__source_before(op_str), op)
 
     def visit_Constant(self, node):
-        tokens = peekable(tokenize(BytesIO(self._source[self._cursor:].encode('utf-8')).readline))
-        tok = next(tokens)  # skip ENCODING token
-        tok = next(tokens)  # skip ENCODING token
-        while tok.type in (token.ENCODING, token.NL, token.NEWLINE, token.INDENT, token.DEDENT, token.COMMENT):
+        tokens = self._tokens_from_idx()
+        tok = next(tokens)
+        while tok.type in (token.NL, token.NEWLINE, token.INDENT, token.DEDENT, token.COMMENT):
             tok = next(tokens)
 
         if not isinstance(node.value, (str, bytes)):
@@ -1572,8 +1643,7 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_JoinedStr(self, node):
-        tokens = peekable(tokenize(BytesIO(self._source[self._cursor:].encode('utf-8')).readline))
-        next(tokens)  # skip ENCODING token
+        tokens = self._tokens_from_idx()
         while (tok := next(tokens)).type not in (token.FSTRING_START, token.STRING):
             pass
 
@@ -1989,7 +2059,7 @@ class ParserVisitor(ast.NodeVisitor):
         # Process closing parentheses if any
         while self._is_closing_paren(save_cursor):
             self._cursor += 1
-            transformer, save_cursor, _, _, _ = self._parentheses_stack.pop()
+            transformer, save_cursor, _, _, _, _ = self._parentheses_stack.pop()
             result = transformer(result, suffix)
             save_cursor_2 = self._cursor
             suffix = self.__whitespace()
@@ -2013,6 +2083,7 @@ class ParserVisitor(ast.NodeVisitor):
         return recursion(node)
 
     def __push_parentheses(self, node, prefix: Space, save_cursor):
+        open_paren_pos = self._cursor  # Position of '(' before incrementing
         self._cursor += 1
         expr_prefix = self.__whitespace()
         handler = (
@@ -2032,21 +2103,42 @@ class ParserVisitor(ast.NodeVisitor):
             save_cursor,
             self._cursor,
             node,
-            prefix
+            prefix,
+            open_paren_pos  # Position of the '(' for paren map lookup
         )
         self._parentheses_stack.append(handler)
         return handler
 
     def _is_closing_paren(self, save_cursor: int) -> bool:
-        """Check if current position has a valid closing parenthesis."""
+        """Check if current position has a valid closing parenthesis.
+
+        This uses both:
+        1. The original scope check (content between push cursor and current save_cursor)
+        2. The paren map for definitive position matching
+
+        Both checks must pass to ensure we're at the right nesting level.
+        """
         if (not self._parentheses_stack or
                 self._cursor >= len(self._source) or
                 self._source[self._cursor] != ')'):
             return False
 
+        # Original scope check: verify we haven't moved far from where we pushed
         stack_cursor = self._parentheses_stack[-1][2]
         slice_content = self._source[stack_cursor:save_cursor]
-        return stack_cursor == save_cursor or slice_content.isspace() or slice_content == '('
+        scope_check = stack_cursor == save_cursor or slice_content.isspace() or slice_content == '('
+
+        if not scope_check:
+            return False
+
+        # Additional paren map check for definitive matching
+        open_paren_pos = self._parentheses_stack[-1][5]  # Position of '('
+        expected_close = self._paren_pairs.get(open_paren_pos)
+        if expected_close is not None:
+            return self._cursor == expected_close
+
+        # If paren map doesn't have this position (shouldn't happen), fall back to scope check alone
+        return True
 
     def __convert_name(self, name: str, name_type: Optional[JavaType] = None) -> NameTree:
         def ident_or_field(parts: List[str]) -> NameTree:
