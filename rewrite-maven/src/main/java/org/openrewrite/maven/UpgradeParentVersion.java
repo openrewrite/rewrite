@@ -21,6 +21,8 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.semver.Semver;
 
+import java.util.Collection;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpgradeParentVersion extends ScanningRecipe<ChangeParentPom.Accumulator> {
@@ -96,6 +98,11 @@ public class UpgradeParentVersion extends ScanningRecipe<ChangeParentPom.Accumul
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(ChangeParentPom.Accumulator acc) {
         return getChangeParentPom().getScanner(acc);
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(ChangeParentPom.Accumulator acc, ExecutionContext ctx) {
+        return getChangeParentPom().generate(acc, ctx);
     }
 
     @Override

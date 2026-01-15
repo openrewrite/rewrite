@@ -172,20 +172,9 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
     }
 
     public static class Accumulator {
-        // The updated marker for the pom that directly has the matching parent (e.g., spring-boot-starter-parent)
         @Nullable MavenResolutionResult updatedRootMarker;
-
-        // All project pom markers: GAV -> original MavenResolutionResult
-        final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> projectMarkers = new HashMap<>();
-
-        // Pre-computed updated markers for the entire hierarchy
-        final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> updatedMarkers = new HashMap<>();
-
-        // Flag to track if we've built the marker hierarchy
-        boolean hierarchyBuilt = false;
-
-        // Cached available versions for version resolution
-        @Nullable Collection<String> availableVersions;
+        final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> gavToOriginalMarker = new HashMap<>();
+        final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> gavToNewMarker = new HashMap<>();
 
         /**
          * Build the complete marker hierarchy. This should be called once at the start of the visitor phase.
@@ -194,11 +183,9 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
          * by UpdateMavenModel after XML changes are made. Only descendant pom markers are stored.
          */
         void buildMarkerHierarchy() {
-            if (hierarchyBuilt || updatedRootMarker == null) {
+            if (updatedRootMarker == null) {
                 return;
             }
-            hierarchyBuilt = true;
-
             // Propagate marker updates to all descendants
             Queue<MavenResolutionResult> queue = new LinkedList<>();
             queue.add(updatedRootMarker);
@@ -208,12 +195,12 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                 ResolvedGroupArtifactVersion parentGav = parentMarker.getPom().getGav();
 
                 // Find all poms whose parent GAV matches this parent's GAV
-                for (Map.Entry<ResolvedGroupArtifactVersion, MavenResolutionResult> entry : projectMarkers.entrySet()) {
+                for (Map.Entry<ResolvedGroupArtifactVersion, MavenResolutionResult> entry : gavToOriginalMarker.entrySet()) {
                     ResolvedGroupArtifactVersion childGav = entry.getKey();
                     MavenResolutionResult childMarker = entry.getValue();
 
                     // Skip if already processed
-                    if (updatedMarkers.containsKey(childGav)) {
+                    if (gavToNewMarker.containsKey(childGav)) {
                         continue;
                     }
 
@@ -225,7 +212,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                             parentGav.getVersion().equals(childParentGav.getVersion())) {
                             // Create updated marker for this child with updated parent reference
                             MavenResolutionResult updatedChildMarker = childMarker.withParent(parentMarker);
-                            updatedMarkers.put(childGav, updatedChildMarker);
+                            gavToNewMarker.put(childGav, updatedChildMarker);
                             queue.add(updatedChildMarker);
                         }
                     }
@@ -240,26 +227,27 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
     }
 
     private Optional<String> findAcceptableVersion(
-            Accumulator acc, VersionComparator versionComparator, String groupId, String artifactId, String currentVersion,
+            List<String> availableVersions, VersionComparator versionComparator,
+            String groupId, String artifactId, String currentVersion,
             MavenIsoVisitor<?> visitor, ExecutionContext ctx) throws MavenDownloadingException {
         String finalCurrentVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
 
-        if (acc.availableVersions == null) {
+        if (availableVersions.isEmpty()) {
             MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> visitor.downloadMetadata(groupId, artifactId, ctx));
-            acc.availableVersions = mavenMetadata.getVersioning().getVersions().stream()
+            mavenMetadata.getVersioning().getVersions().stream()
                     .filter(v -> versionComparator.isValid(finalCurrentVersion, v))
                     .filter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(null, finalCurrentVersion, v) <= 0)
-                    .collect(toList());
+                    .forEach(availableVersions::add);
         }
         if (Boolean.TRUE.equals(allowVersionDowngrades)) {
-            return acc.availableVersions.stream()
+            return availableVersions.stream()
                     .max((v1, v2) -> versionComparator.compare(finalCurrentVersion, v1, v2));
         }
-        Optional<String> upgradedVersion = versionComparator.upgrade(finalCurrentVersion, acc.availableVersions);
+        Optional<String> upgradedVersion = versionComparator.upgrade(finalCurrentVersion, availableVersions);
         if (upgradedVersion.isPresent()) {
             return upgradedVersion;
         }
-        return acc.availableVersions.stream().filter(finalCurrentVersion::equals).findFirst();
+        return availableVersions.stream().filter(finalCurrentVersion::equals).findFirst();
     }
 
     @Override
@@ -268,12 +256,12 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
         assert versionComparator != null;
 
         return new MavenIsoVisitor<ExecutionContext>() {
+            final List<String> availableVersions = new ArrayList<>();
+
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 MavenResolutionResult mrr = getResolutionResult();
-
-                // Store all project pom markers for building the hierarchy later
-                acc.projectMarkers.put(mrr.getPom().getGav(), mrr);
+                acc.gavToOriginalMarker.put(mrr.getPom().getGav(), mrr);
 
                 Parent parent = mrr.getPom().getRequested().getParent();
                 if (parent != null &&
@@ -290,7 +278,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                     String targetArtifactId = newArtifactId != null ? newArtifactId : parent.getGav().getArtifactId();
 
                     try {
-                        Optional<String> targetVersion = findAcceptableVersion(acc, versionComparator,
+                        Optional<String> targetVersion = findAcceptableVersion(availableVersions, versionComparator,
                                 targetGroupId == null ? "" : targetGroupId, targetArtifactId, currentVersion, this, ctx);
                         if (targetVersion.isPresent()) {
                             String currentRelativePath = parent.getRelativePath();
@@ -328,7 +316,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
     @Override
     public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
         acc.buildMarkerHierarchy();
-        return Collections.emptyList();
+        return emptyList();
     }
 
     @Override
@@ -339,8 +327,6 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
         return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                // Check if this pom or any of its ancestors in the parent hierarchy
-                // has the matching parent (spring-boot-starter-parent, etc.)
                 MavenResolutionResult mrr = getResolutionResult();
                 while (mrr != null) {
                     Parent parent = mrr.getPom().getRequested().getParent();
@@ -354,6 +340,8 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                 return document;
             }
         }, new MavenIsoVisitor<ExecutionContext>() {
+            final List<String> availableVersions = new ArrayList<>();
+
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
 
@@ -362,7 +350,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                 // Check if this pom has a pre-computed updated marker
                 MavenResolutionResult mrr = d.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
                 if (mrr != null) {
-                    MavenResolutionResult updatedMarker = acc.updatedMarkers.get(mrr.getPom().getGav());
+                    MavenResolutionResult updatedMarker = acc.gavToNewMarker.get(mrr.getPom().getGav());
                     if (updatedMarker != null) {
                         d = d.withMarkers(d.getMarkers().computeByType(mrr,
                                 (original, ignored) -> updatedMarker));
@@ -391,7 +379,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                         String targetArtifactId = newArtifactId == null ? currentArtifactId : newArtifactId;
                         String targetRelativePath = newRelativePath == null ? tag.getChildValue("relativePath").orElse(oldRelativePath) : newRelativePath;
                         try {
-                            Optional<String> targetVersion = findAcceptableVersion(acc, versionComparator,
+                            Optional<String> targetVersion = findAcceptableVersion(availableVersions, versionComparator,
                                     targetGroupId, targetArtifactId, oldVersion, this, ctx);
                             if (!targetVersion.isPresent() ||
                                 (Objects.equals(targetGroupId, currentGroupId) &&
