@@ -28,59 +28,6 @@ ADDED_LIST_ITEM = -1
 T = TypeVar('T')
 
 
-def to_java_type_name(py_type: type) -> Optional[str]:
-    """Convert Python type name to Java type name.
-
-    Returns None for Python built-in types that don't have Java equivalents.
-    """
-    module = py_type.__module__
-
-    # Skip Python built-in types - they don't have Java equivalents
-    if module == 'builtins':
-        return None
-
-    # Use __qualname__ to get full nested class path (e.g., "If.Else" instead of just "Else")
-    qualname = py_type.__qualname__
-    # Convert dots to $ for Java nested class naming (If.Else -> If$Else)
-    java_name = qualname.replace('.', '$')
-
-    # Handle rewrite.python.tree types
-    if module.startswith('rewrite.python.tree'):
-        return f"org.openrewrite.python.tree.Py${java_name}"
-    elif module.startswith('rewrite.python.support_types'):
-        # PyComment is in support_types but maps to tree package
-        return f"org.openrewrite.python.tree.{java_name}"
-    elif module.startswith('rewrite.python.markers'):
-        return f"org.openrewrite.python.marker.{java_name}"
-    elif module.startswith('rewrite.java.tree'):
-        return f"org.openrewrite.java.tree.J${java_name}"
-    elif module.startswith('rewrite.java.support_types'):
-        if qualname == 'JavaType':
-            return 'org.openrewrite.java.tree.JavaType'
-        return f"org.openrewrite.java.tree.{java_name}"
-    elif module.startswith('rewrite.java.markers'):
-        return f"org.openrewrite.java.marker.{java_name}"
-    elif module.startswith('rewrite.markers'):
-        return f"org.openrewrite.marker.{java_name}"
-    elif qualname == 'Markers':
-        return 'org.openrewrite.marker.Markers'
-    elif qualname == 'Space':
-        return 'org.openrewrite.java.tree.Space'
-    elif qualname == 'Comment':
-        return 'org.openrewrite.java.tree.Comment'
-    elif qualname == 'TextComment':
-        return 'org.openrewrite.java.tree.Comment$TextComment'
-    elif qualname == 'JRightPadded':
-        return 'org.openrewrite.java.tree.JRightPadded'
-    elif qualname == 'JLeftPadded':
-        return 'org.openrewrite.java.tree.JLeftPadded'
-    elif qualname == 'JContainer':
-        return 'org.openrewrite.java.tree.JContainer'
-
-    # Default handling
-    return f"{module}.{java_name}"
-
-
 class RpcSendQueue:
     """Queue for generating RpcObjectData array from Python LST using visitor pattern."""
 
@@ -276,6 +223,10 @@ class RpcSendQueue:
 
     def _get_value_type(self, obj: Any) -> Optional[str]:
         """Get the Java type name for an object, or None for primitives."""
+        # Import python_receiver to ensure codecs are registered before get_java_type_name
+        from rewrite.rpc import python_receiver  # noqa: F401 - triggers codec registration
+        from rewrite.rpc.receive_queue import get_java_type_name
+
         if obj is None:
             return None
 
@@ -301,11 +252,8 @@ class RpcSendQueue:
         if isinstance(obj, Enum):
             return None
 
-        # Dataclasses need their Java type name
-        if is_dataclass(obj) and not isinstance(obj, type):
-            return to_java_type_name(obj_type)
-
-        return None
+        # Look up Java type name from codec registry
+        return get_java_type_name(obj_type)
 
     def _get_primitive_value(self, obj: Any) -> Any:
         """Get the primitive value representation for serialization."""

@@ -256,36 +256,36 @@ class RpcReceiveQueue:
         return self.receive(markers, on_change)
 
     def _new_obj(self, value_type: str) -> Any:
-        """Create a new instance of the given type.
+        """Create a new instance using registered factory.
 
-        This uses the codec registry to create proper instances.
+        All types should be registered via codec registration at module load time.
         """
-        codec_factory = _get_codec_factory(value_type, self._source_file_type)
-        if codec_factory is not None:
-            return codec_factory()
+        factory = _get_codec_factory(value_type, self._source_file_type)
+        if factory is not None:
+            return factory()
 
-        # Default: return a dict with kind field
+        # Fallback: return a dict with kind field
         return {'kind': value_type}
 
     def _get_codec(self, obj: Any) -> Optional[Callable[[Any, 'RpcReceiveQueue'], Any]]:
-        """Get the deserializer codec for an object."""
+        """Get the deserializer codec for an object.
+
+        Uses registry lookup by Python class name only - no AST imports.
+        This keeps the RPC layer independent of specific AST models.
+        """
         if obj is None:
             return None
 
-        from rewrite import Markers
-
-        if isinstance(obj, Markers):
-            return _receive_markers
-
-        # Get codec from registry based on object type
+        # Look up by Python class name - no isinstance checks needed
         obj_type = type(obj).__qualname__
-        codec = _get_receive_codec(obj_type, self._source_file_type)
-        return codec
+        return _get_receive_codec(obj_type, self._source_file_type)
 
 
 # Codec registry
 _codecs: Dict[str, Dict[str, Callable[[Any, RpcReceiveQueue], Any]]] = {}
 _codec_factories: Dict[str, Dict[str, Callable[[], Any]]] = {}
+# Reverse mapping: Python class -> Java type name (used by sender)
+_python_to_java_type: Dict[type, str] = {}
 
 
 def register_receive_codec(
@@ -352,16 +352,94 @@ def _receive_markers(markers: 'Markers', q: RpcReceiveQueue) -> 'Markers':
     return Markers(new_id, new_markers_list or [])
 
 
-# Helper function for converting Java type names to Python
-def java_type_to_python(java_type: str) -> str:
-    """Convert Java type name to Python module path."""
-    # org.openrewrite.python.tree.Py$CompilationUnit -> rewrite.python.tree.CompilationUnit
-    if java_type.startswith('org.openrewrite.python.tree.Py$'):
-        return java_type.replace('org.openrewrite.python.tree.Py$', 'rewrite.python.tree.')
-    elif java_type.startswith('org.openrewrite.java.tree.J$'):
-        return java_type.replace('org.openrewrite.java.tree.J$', 'rewrite.java.tree.')
-    elif java_type.startswith('org.openrewrite.java.tree.'):
-        return java_type.replace('org.openrewrite.java.tree.', 'rewrite.java.')
-    elif java_type.startswith('org.openrewrite.marker.'):
-        return java_type.replace('org.openrewrite.marker.', 'rewrite.')
-    return java_type
+# ============================================================================
+# Codec registration helpers
+# ============================================================================
+
+def register_codec_with_both_names(java_type: str, python_class: type, codec, factory):
+    """Register codec with both Java type name and Python class name.
+
+    Args:
+        java_type: Java type name (e.g., 'org.openrewrite.java.tree.J$Identifier')
+        python_class: The Python class
+        codec: Function to deserialize: (before, queue) -> after
+        factory: Function to create new instance: () -> instance
+    """
+    # Register by Java type name (for _new_obj factory lookup)
+    register_receive_codec(java_type, codec, factory)
+    # Register by Python class name (for _get_codec lookup)
+    python_name = python_class.__qualname__
+    register_receive_codec(python_name, codec, factory)
+    # Register reverse mapping for sender
+    _python_to_java_type[python_class] = java_type
+
+
+def get_java_type_name(python_class: type) -> Optional[str]:
+    """Get the Java type name for a Python class.
+
+    This uses the codec registry populated during initialization.
+    Returns None if the class is not registered.
+    """
+    return _python_to_java_type.get(python_class)
+
+
+def get_all_tree_classes(module, module_name: str):
+    """Recursively find all dataclass AST types including nested classes.
+
+    Args:
+        module: The module to search (e.g., rewrite.python.tree)
+        module_name: The module's name for filtering (e.g., 'rewrite.python.tree')
+
+    Returns:
+        List of (name, class) tuples where name includes nested path (e.g., 'Lambda.Parameters')
+    """
+    import inspect
+    from dataclasses import is_dataclass
+
+    def get_nested(cls, prefix):
+        results = []
+        for name, nested in inspect.getmembers(cls, inspect.isclass):
+            if nested.__module__ != module_name:
+                continue
+            # Skip padding helper classes
+            if name == 'PaddingHelper':
+                continue
+            full_name = f'{prefix}.{name}'
+            if is_dataclass(nested):
+                results.append((full_name, nested))
+            results.extend(get_nested(nested, full_name))
+        return results
+
+    all_classes = []
+    for name, cls in inspect.getmembers(module, inspect.isclass):
+        if cls.__module__ != module_name:
+            continue
+        if not is_dataclass(cls):
+            continue
+        all_classes.append((name, cls))
+        all_classes.extend(get_nested(cls, name))
+
+    return all_classes
+
+
+def make_dataclass_factory(cls):
+    """Create a factory that instantiates a dataclass with all fields set to None.
+
+    This is needed because the receiver code may access properties (like id, prefix, markers)
+    before they are set during deserialization. By calling the constructor with None values
+    for all fields, we create a valid frozen dataclass instance that can have its fields
+    replaced during deserialization.
+    """
+    from dataclasses import fields, is_dataclass
+
+    if is_dataclass(cls):
+        field_names = [f.name for f in fields(cls)]
+
+        def factory():
+            kwargs = {name: None for name in field_names}
+            return cls(**kwargs)
+        return factory
+    else:
+        return lambda: object.__new__(cls)
+
+
