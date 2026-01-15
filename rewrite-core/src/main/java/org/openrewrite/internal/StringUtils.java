@@ -221,6 +221,22 @@ public class StringUtils {
         }
     }
 
+    public static String readFullyWithoutClosing(InputStream is, Charset charset) {
+        try {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int n;
+            while ((n = is.read(buffer)) != -1) {
+                bos.write(buffer, 0, n);
+            }
+
+            byte[] bytes = bos.toByteArray();
+            return new String(bytes, charset);
+        } catch (IOException e) {
+            throw new UnsupportedOperationException(e);
+        }
+    }
+
     public static String capitalize(String value) {
         if (value.isEmpty()) {
             return value;
