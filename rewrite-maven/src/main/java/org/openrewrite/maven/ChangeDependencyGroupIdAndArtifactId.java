@@ -25,7 +25,6 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
-import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -171,29 +170,25 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 }
                 boolean isPluginDependency = isPluginDependencyTag(oldGroupId, oldArtifactId);
                 boolean isAnnotationProcessorPath = isAnnotationProcessorPathTag(oldGroupId, oldArtifactId);
-                boolean scheduledTagChange = false;
+                boolean deferUpdate = false;
                 if (isOldDependencyTag || isPluginDependency || isAnnotationProcessorPath) {
                     ResolvedPom rp = getResolutionResult().getPom();
                     String groupId = newGroupId;
                     if (groupId != null) {
-//                        t = changeChildTagValue(t, "groupId", groupId, ctx);
                         Optional<Xml.Tag> groupIdTag = t.getChild("groupId");
                         Optional<String> groupIdValue = t.getChildValue("groupId");
                         if (groupIdTag.isPresent() && !groupId.equals(rp.getValue(groupIdValue.orElse(null)))) {
-                            doAfterVisit(new ChangeTagValueVisitor<>(groupIdTag.get(), groupId));
-                            scheduledTagChange = true;
+                            t = changeChildTagValue(t, "groupId", groupId, ctx);
                         }
                     } else {
                         groupId = t.getChildValue("groupId").orElseThrow(NoSuchElementException::new);
                     }
                     String artifactId = newArtifactId;
                     if (artifactId != null) {
-//                        t = changeChildTagValue(t, "artifactId", artifactId, ctx);
                         Optional<Xml.Tag> artifactIdTag = t.getChild("artifactId");
-                        // TODO: resolution of placeholders
-                        if (artifactIdTag.isPresent() && !artifactId.equals(t.getChildValue("artifactId").get())) {
-                            doAfterVisit(new ChangeTagValueVisitor<>(artifactIdTag.get(), artifactId));
-                            scheduledTagChange = true;
+                        Optional<String> artifactIdValue = t.getChildValue("artifactId");
+                        if (artifactIdTag.isPresent() && !artifactId.equals(rp.getValue(artifactIdValue.orElse(null)))) {
+                            t = changeChildTagValue(t, "artifactId", artifactId, ctx);
                         }
                     } else {
                         artifactId = t.getChildValue("artifactId").orElseThrow(NoSuchElementException::new);
@@ -218,32 +213,26 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             if (versionTagPresent) {
                                 // If the previous dependency had a version but the new artifact is managed, removed the version tag.
                                 if (!configuredToOverrideManageVersion && newDependencyManaged || (oldDependencyManaged && configuredToChangeManagedDependency)) {
-//                                    t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false, true).visit(t, ctx);
-                                    doAfterVisit(new RemoveContentVisitor<>(versionTag.get(), false, true));
-                                    scheduledTagChange = true;
+                                    t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false, true).visit(t, ctx);
                                 } else {
                                     // Otherwise, change the version to the new value.
-//                                    t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
-                                    doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion));
-                                    scheduledTagChange = true;
+                                    t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
                                 }
-                            } else if (configuredToOverrideManageVersion || (!newDependencyManaged && !oldDependencyManaged)) {
+                            } else if (configuredToOverrideManageVersion || (!newDependencyManaged && !(oldDependencyManaged && configuredToChangeManagedDependency))) {
                                 //If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
                                 Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
                                 //noinspection ConstantConditions
-//                                t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
-                                doAfterVisit(new AddToTagVisitor<>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())));
-                                scheduledTagChange = true;
-                            } else if (!newDependencyManaged) {
+                                t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
+                            } else if (configuredToChangeManagedDependency && !newDependencyManaged) {
                                 // We leave it up to the managed dependency update to call `maybeUpdateModel()` instead to avoid interim dependency resolution failure
-                                scheduledTagChange = false;
+                                deferUpdate = true;
                             }
                         } catch (MavenDownloadingException e) {
                             return e.warn(tag);
                         }
                     }
 
-                    if (/*t != tag*/scheduledTagChange) {
+                    if (t != tag && !deferUpdate) {
                         maybeUpdateModel();
                     }
                 }
