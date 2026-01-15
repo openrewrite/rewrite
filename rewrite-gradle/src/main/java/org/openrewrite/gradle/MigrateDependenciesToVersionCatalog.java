@@ -40,6 +40,7 @@ import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -60,15 +61,9 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
     private static final String CATALOG_PATH = "gradle/libs.versions.toml";
     private static final String GRADLE_PROPERTIES = "gradle.properties";
 
-    @Override
-    public String getDisplayName() {
-        return "Migrate Gradle project dependencies to version catalog";
-    }
+    String displayName = "Migrate Gradle project dependencies to version catalog";
 
-    @Override
-    public String getDescription() {
-        //language=markdown
-        return "Migrates Gradle project dependencies to use the [version catalog](https://docs.gradle.org/current/userguide/platforms.html) feature. " +
+    String description = "Migrates Gradle project dependencies to use the [version catalog](https://docs.gradle.org/current/userguide/platforms.html) feature. " +
                 "Supports migrating dependency declarations of various forms:\n" +
                 " * `String` notation: `\"group:artifact:version\"`\n" +
                 " * `Map` notation: `group: 'group', name: 'artifact', version: 'version'`\n" +
@@ -79,7 +74,6 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                 " * Migrate version properties from `gradle.properties` to the version catalog\n" +
                 " * Preserve project dependencies unchanged\n\n" +
                 "**Note:** If a version catalog already exists, the recipe will not modify it.";
-    }
 
     static class DependencyAccumulator {
         final Map<String, DependencyInfo> dependencies = new LinkedHashMap<>();
@@ -148,7 +142,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                     public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                         if (tree instanceof SourceFile) {
                             SourceFile sourceFile = (SourceFile) tree;
-                            String path = sourceFile.getSourcePath().toString();
+                            Path path = sourceFile.getSourcePath();
                             if (path.endsWith(GRADLE_PROPERTIES) || path.endsWith(CATALOG_PATH)) {
                                 return SearchResult.found(tree);
                             }
@@ -167,13 +161,13 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                     SourceFile sourceFile = (SourceFile) tree;
 
                 // Check if version catalog already exists
-                if (sourceFile.getSourcePath().toString().endsWith(CATALOG_PATH)) {
+                if (sourceFile.getSourcePath().endsWith(CATALOG_PATH)) {
                     acc.catalogExists = true;
                     return tree;
                 }
 
                 // Parse gradle.properties to extract property values
-                if (sourceFile.getSourcePath().toString().endsWith(".properties") && sourceFile instanceof Properties.File) {
+                if (sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES) && sourceFile instanceof Properties.File) {
                     Properties.File propertiesFile = (Properties.File) sourceFile;
                     for (Properties.Content content : propertiesFile.getContent()) {
                         if (content instanceof Properties.Entry) {

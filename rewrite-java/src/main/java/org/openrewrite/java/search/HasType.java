@@ -38,16 +38,10 @@ public class HasType extends Recipe {
     @Nullable
     Boolean checkAssignability;
 
-    @Override
-    public String getDisplayName() {
-        return "Find files that have at least one use of a type";
-    }
+    String displayName = "Find files that have at least one use of a type";
 
-    @Override
-    public String getDescription() {
-        return "Marks files that have at least one occurrence of a type, even if the " +
+    String description = "Marks files that have at least one occurrence of a type, even if the " +
                "name of that type doesn't appear in the source code.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

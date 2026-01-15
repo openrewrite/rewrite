@@ -84,29 +84,17 @@ class RecipePrinterTest implements RewriteTest {
           example = "Some text.")
         String theOption;
 
-        @Override
-        public String getDisplayName() {
-            return "Test recipe";
-        }
+        String displayName = "Test recipe";
 
-        @Override
-        public String getDescription() {
-            return "Test recipe.";
-        }
+        String description = "Test recipe.";
     }
 
     @EqualsAndHashCode(callSuper = false)
     @Value
     private static class AnotherTestRecipe extends Recipe {
 
-        @Override
-        public String getDisplayName() {
-            return "Another Test recipe";
-        }
+        String displayName = "Another Test recipe";
 
-        @Override
-        public String getDescription() {
-            return "Another Test recipe.";
-        }
+        String description = "Another Test recipe.";
     }
 }

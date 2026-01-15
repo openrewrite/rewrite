@@ -55,10 +55,7 @@ public class FindDeprecatedUses extends Recipe {
         );
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Find uses of deprecated classes, methods, and fields";
-    }
+    String displayName = "Find uses of deprecated classes, methods, and fields";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -68,8 +65,5 @@ public class FindDeprecatedUses extends Recipe {
         return super.getInstanceNameSuffix();
     }
 
-    @Override
-    public String getDescription() {
-        return "Find deprecated uses of methods, fields, and types. Optionally ignore those classes that are inside deprecated scopes.";
-    }
+    String description = "Find deprecated uses of methods, fields, and types. Optionally ignore those classes that are inside deprecated scopes.";
 }

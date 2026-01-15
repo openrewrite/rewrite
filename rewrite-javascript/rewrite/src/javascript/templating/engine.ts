@@ -16,9 +16,9 @@
 import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
 import {emptySpace, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
-import {produce} from 'immer';
+import {create as produce} from 'mutative';
 import {CaptureMarker, PlaceholderUtils, WRAPPER_FUNCTION_NAME} from './utils';
-import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue} from './capture';
+import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
 import {JavaCoordinates} from './template';
 import {maybeAutoFormat} from '../format';
@@ -136,7 +136,7 @@ class TemplateCache {
         // the same dependencies will automatically share the same workspace
         let workspaceDir: string | undefined;
         if (dependencies && Object.keys(dependencies).length > 0) {
-            workspaceDir = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
+            workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
         }
 
         // Prepend context statements for type attribution context
@@ -293,7 +293,10 @@ export class TemplateEngine {
                     const typeString = typeof captureType === 'string'
                         ? captureType
                         : this.typeToString(captureType);
-                    preamble.push(`let ${placeholder}: ${typeString};`);
+                    // Only add preamble if we have a concrete type (not 'any')
+                    if (typeString !== 'any') {
+                        preamble.push(`let ${placeholder}: ${typeString};`);
+                    }
                 }
             } else if (isCaptureValue) {
                 // For CaptureValue, check if the root capture has a type
@@ -304,7 +307,10 @@ export class TemplateEngine {
                         const typeString = typeof captureType === 'string'
                             ? captureType
                             : this.typeToString(captureType);
-                        preamble.push(`let ${placeholder}: ${typeString};`);
+                        // Only add preamble if we have a concrete type (not 'any')
+                        if (typeString !== 'any') {
+                            preamble.push(`let ${placeholder}: ${typeString};`);
+                        }
                     }
                 }
             } else if (isTree(param) && !isTreeArray) {
@@ -312,7 +318,10 @@ export class TemplateEngine {
                 const jElement = param as J;
                 if ((jElement as any).type) {
                     const typeString = this.typeToString((jElement as any).type);
-                    preamble.push(`let ${placeholder}: ${typeString};`);
+                    // Only add preamble if we have a concrete type (not 'any')
+                    if (typeString !== 'any') {
+                        preamble.push(`let ${placeholder}: ${typeString};`);
+                    }
                 }
             }
         }
@@ -322,6 +331,8 @@ export class TemplateEngine {
 
     /**
      * Builds a template string with parameter placeholders.
+     * RawCode parameters are spliced directly into the template at construction time.
+     * Other parameters use placeholders that are replaced during application.
      *
      * @param templateParts The string parts of the template
      * @param parameters The parameters between the string parts
@@ -335,10 +346,17 @@ export class TemplateEngine {
         for (let i = 0; i < templateParts.length; i++) {
             result += templateParts[i];
             if (i < parameters.length) {
-                // All parameters are now placeholders (no primitive inlining)
-                // This ensures templates with the same structure always produce the same AST
-                const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
-                result += placeholder;
+                const param = parameters[i].value;
+
+                // Check if this is a RawCode instance - splice directly
+                if (param instanceof RawCode || (param && typeof param === 'object' && param[RAW_CODE_SYMBOL])) {
+                    result += (param as RawCode).code;
+                } else {
+                    // All other parameters use placeholders
+                    // This ensures templates with the same structure always produce the same AST
+                    const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
+                    result += placeholder;
+                }
             }
         }
 
@@ -400,20 +418,25 @@ export class TemplateEngine {
      * functionality on top of the shared template tree generation.
      *
      * @param templateParts The string parts of the template
-     * @param captures The captures between the string parts
+     * @param captures The captures between the string parts (can include RawCode)
      * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
      * @param dependencies NPM dependencies for type attribution
      * @returns A Promise resolving to the extracted pattern AST with capture markers
      */
     static async getPatternTree(
         templateParts: TemplateStringsArray,
-        captures: (Capture | Any)[],
+        captures: (Capture | Any | RawCode)[],
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {}
     ): Promise<J> {
-        // Generate type preamble for captures with types
+        // Generate type preamble for captures with types (skip RawCode)
         const preamble: string[] = [];
         for (const capture of captures) {
+            // Skip raw code - it's not a capture
+            if (capture instanceof RawCode || (capture && typeof capture === 'object' && (capture as any)[RAW_CODE_SYMBOL])) {
+                continue;
+            }
+
             const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
             const captureType = (capture as any)[CAPTURE_TYPE_SYMBOL];
             if (captureType) {
@@ -421,23 +444,30 @@ export class TemplateEngine {
                 const typeString = typeof captureType === 'string'
                     ? captureType
                     : this.typeToString(captureType);
-                const placeholder = PlaceholderUtils.createCapture(captureName, undefined);
-                preamble.push(`let ${placeholder}: ${typeString};`);
-            } else {
-                const placeholder = PlaceholderUtils.createCapture(captureName, undefined);
-                preamble.push(`let ${placeholder};`);
+                // Only add preamble if we have a concrete type (not 'any')
+                if (typeString !== 'any') {
+                    const placeholder = PlaceholderUtils.createCapture(captureName, undefined);
+                    preamble.push(`let ${placeholder}: ${typeString};`);
+                }
             }
+            // Don't add preamble declarations without types - they don't provide type attribution
         }
 
-        // Build the template string with placeholders for captures
+        // Build the template string with placeholders for captures and raw code
         let result = '';
         for (let i = 0; i < templateParts.length; i++) {
             result += templateParts[i];
             if (i < captures.length) {
                 const capture = captures[i];
-                // Use symbol to access capture name without triggering Proxy
-                const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
-                result += PlaceholderUtils.createCapture(captureName, undefined);
+
+                // Check if this is a RawCode instance - splice directly
+                if (capture instanceof RawCode || (capture && typeof capture === 'object' && (capture as any)[RAW_CODE_SYMBOL])) {
+                    result += (capture as RawCode).code;
+                } else {
+                    // Use symbol to access capture name without triggering Proxy
+                    const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
+                    result += PlaceholderUtils.createCapture(captureName, undefined);
+                }
             }
         }
 
@@ -450,10 +480,15 @@ export class TemplateEngine {
             ? [...contextStatements, ...preamble]
             : contextStatements;
 
+        // Filter out RawCode from captures for cache and marker attachment
+        const actualCaptures = captures.filter(c =>
+            !(c instanceof RawCode || (c && typeof c === 'object' && (c as any)[RAW_CODE_SYMBOL]))
+        ) as (Capture | Any)[];
+
         // Use cache to get or parse the compilation unit
         const cu = await templateCache.getOrParse(
             templateString,
-            captures,
+            actualCaptures,
             contextWithPreamble,
             dependencies
         );
@@ -469,8 +504,8 @@ export class TemplateEngine {
         // Extract from wrapper using shared utility
         const extracted = PlaceholderUtils.extractFromWrapper(lastStatement, 'Pattern');
 
-        // Attach CaptureMarkers to capture identifiers
-        const visitor = new MarkerAttachmentVisitor(captures);
+        // Attach CaptureMarkers to capture identifiers (only for actual captures, not raw code)
+        const visitor = new MarkerAttachmentVisitor(actualCaptures);
         return (await visitor.visit(extracted, undefined))!;
     }
 }
@@ -522,14 +557,14 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
     /**
      * Propagates markers from element to RightPadded wrapper.
      */
-    public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: undefined): Promise<J.RightPadded<T>> {
+    public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: undefined): Promise<J.RightPadded<T> | undefined> {
         if (!isTree(right.element)) {
             return right;
         }
 
         const visitedElement = await this.visit(right.element as J, p);
         if (visitedElement && visitedElement !== right.element as Tree) {
-            return produceAsync<J.RightPadded<T>>(right, async (draft: any) => {
+            const result = await produceAsync<J.RightPadded<T>>(right, async (draft: any) => {
                 // Visit element first
                 if (right.element && (right.element as any).kind) {
                     // Check if element has a CaptureMarker
@@ -541,6 +576,7 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
                     }
                 }
             });
+            return result!;
         }
 
         return right;
@@ -567,6 +603,33 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
         // No marker to move, just update with visited expression
         return updateIfChanged(expressionStatement, {
             expression: visitedExpression
+        });
+    }
+
+    /**
+     * Propagates markers from name identifier to BindingElement.
+     * This handles destructuring patterns like {${props}} where the capture marker
+     * is on the identifier but needs to be on the BindingElement for container matching.
+     */
+    protected override async visitBindingElement(bindingElement: JS.BindingElement, p: undefined): Promise<J | undefined> {
+        // Visit the name
+        const visitedName = await this.visit(bindingElement.name, p);
+
+        // Check if name has a CaptureMarker
+        const nameMarker = PlaceholderUtils.getCaptureMarker(visitedName as any);
+        if (nameMarker) {
+            return updateIfChanged(bindingElement, {
+                name: visitedName,
+                markers: {
+                    ...bindingElement.markers,
+                    markers: [...bindingElement.markers.markers, nameMarker]
+                },
+            });
+        }
+
+        // No marker to move, just update with visited name
+        return updateIfChanged(bindingElement, {
+            name: visitedName
         });
     }
 }

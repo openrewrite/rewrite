@@ -17,7 +17,7 @@ import {Cursor, isTree} from '../..';
 import {J} from '../../java';
 import {JS} from '..';
 import {JavaScriptVisitor} from '../visitor';
-import {produce} from 'immer';
+import {create as produce} from 'mutative';
 import {PlaceholderUtils} from './utils';
 import {CaptureImpl, TemplateParamImpl, CaptureValue, CAPTURE_NAME_SYMBOL} from './capture';
 import {Parameter} from './types';
@@ -32,6 +32,123 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         private readonly wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map()
     ) {
         super();
+    }
+
+    async visit<R extends J>(tree: J, p: any, parent?: Cursor): Promise<R | undefined> {
+        // Check if this node is a placeholder
+        // BUT: Don't handle `JS.BindingElement` here - let `visitBindingElement` preserve `propertyName`
+        if (tree.kind !== JS.Kind.BindingElement && this.isPlaceholder(tree)) {
+            const replacement = this.replacePlaceholder(tree);
+            if (replacement !== tree) {
+                return replacement as R;
+            }
+        }
+
+        // Continue with normal traversal
+        return super.visit(tree, p, parent);
+    }
+
+    /**
+     * Override visitBindingElement to preserve propertyName from template when replacing.
+     * For example, in `{ ref: ${ref} }`, we want to preserve `ref:` when replacing ${ref}.
+     */
+    override async visitBindingElement(bindingElement: JS.BindingElement, p: any): Promise<J | undefined> {
+        // Visit the name to potentially replace placeholders
+        const visitedName = await this.visit(bindingElement.name, p);
+
+        // If the name changed (placeholder was replaced), preserve the BindingElement structure
+        // including the propertyName from the template
+        if (visitedName !== bindingElement.name) {
+            return produce(bindingElement, draft => {
+                draft.name = visitedName as any;
+                // propertyName is already set from the template and will be preserved by produce
+            });
+        }
+
+        return bindingElement;
+    }
+
+    /**
+     * Override visitContainer to handle variadic expansion for containers.
+     * This handles J.Container instances anywhere in the AST (method arguments, etc.).
+     */
+    override async visitContainer<T extends J>(container: J.Container<T>, p: any): Promise<J.Container<T>> {
+        // Check if any elements are placeholders (possibly variadic)
+        const hasPlaceholder = container.elements.some(elem => this.isPlaceholder(elem.element));
+
+        if (!hasPlaceholder) {
+            return super.visitContainer(container, p);
+        }
+
+        // Expand variadic placeholders in the container's elements
+        const newElements = await this.expandVariadicElements(container.elements, undefined, p);
+
+        return produce(container, draft => {
+            draft.elements = newElements as any;
+        });
+    }
+
+    /**
+     * Override visitRightPadded to handle single placeholder replacements.
+     * The base implementation will visit the element, which triggers our visit() override
+     * for placeholder detection and replacement.
+     */
+    override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: any): Promise<J.RightPadded<T> | undefined> {
+        return super.visitRightPadded(right, p);
+    }
+
+    /**
+     * Override visitBlock to handle variadic expansion in block statements.
+     * Block.statements is J.RightPadded<Statement>[] (not a Container), so we need
+     * array-level access for variadic expansion.
+     */
+    override async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
+        const hasPlaceholder = block.statements.some(stmt => {
+            const stmtElement = stmt.element;
+            // Check if it's an ExpressionStatement containing a placeholder
+            if (stmtElement.kind === JS.Kind.ExpressionStatement) {
+                const exprStmt = stmtElement as JS.ExpressionStatement;
+                return this.isPlaceholder(exprStmt.expression);
+            }
+            return this.isPlaceholder(stmtElement);
+        });
+
+        if (!hasPlaceholder) {
+            return super.visitBlock(block, p);
+        }
+
+        // Unwrap function to extract placeholder from ExpressionStatement
+        const unwrapStatement = (element: J): J => {
+            if (element.kind === JS.Kind.ExpressionStatement) {
+                return (element as JS.ExpressionStatement).expression;
+            }
+            return element;
+        };
+
+        const newStatements = await this.expandVariadicElements(block.statements, unwrapStatement, p);
+
+        return produce(block, draft => {
+            draft.statements = newStatements;
+        });
+    }
+
+    /**
+     * Override visitJsCompilationUnit to handle variadic expansion in top-level statements.
+     * CompilationUnit.statements is J.RightPadded<Statement>[] (not a Container), so we need
+     * array-level access for variadic expansion.
+     */
+    override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: any): Promise<J | undefined> {
+        const hasPlaceholder = compilationUnit.statements.some(stmt => this.isPlaceholder(stmt.element));
+
+        if (!hasPlaceholder) {
+            return super.visitJsCompilationUnit(compilationUnit, p);
+        }
+
+        const newStatements = await this.expandVariadicElements(compilationUnit.statements, undefined, p);
+
+        return produce(compilationUnit, draft => {
+            draft.statements = newStatements;
+        });
     }
 
     /**
@@ -83,8 +200,15 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                     if (param) {
                         let arrayToExpand: J[] | J.RightPadded<J>[] | undefined = undefined;
 
+                        // Check if it's a J.Container
+                        const isContainer = param.value && typeof param.value === 'object' &&
+                            param.value.kind === J.Kind.Container;
+                        if (isContainer) {
+                            // Extract elements from J.Container
+                            arrayToExpand = param.value.elements as J.RightPadded<J>[];
+                        }
                         // Check if it's a direct Tree[] array
-                        if (Array.isArray(param.value)) {
+                        else if (Array.isArray(param.value)) {
                             arrayToExpand = param.value as J[];
                         }
                         // Check if it's a CaptureValue
@@ -97,7 +221,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                         // Check if it's a direct variadic capture
                         else {
                             const isCapture = param.value instanceof CaptureImpl ||
-                                             (param.value && typeof param.value === 'object' && param.value[CAPTURE_NAME_SYMBOL]);
+                                (param.value && typeof param.value === 'object' && param.value[CAPTURE_NAME_SYMBOL]);
                             if (isCapture) {
                                 const name = param.value[CAPTURE_NAME_SYMBOL] || param.value.name;
                                 const capture = Array.from(this.substitutions.values())
@@ -136,7 +260,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                                         newElements.push(produce(item, draft => {
                                             if (i === 0 && draft.element) {
                                                 // Merge the placeholder's prefix with the first item's prefix
-                                                // Modify prefix directly without nested produce to avoid immer issues
+                                                // Modify prefix directly within the draft
                                                 draft.element.prefix = this.mergePrefix(draft.element.prefix, element.prefix);
                                             }
                                             // Keep all other wrapper properties (including markers with Semicolon)
@@ -176,7 +300,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                     const param = this.substitutions.get(placeholderText);
                     if (param) {
                         const isCapture = param.value instanceof CaptureImpl ||
-                                         (param.value && typeof param.value === 'object' && param.value[CAPTURE_NAME_SYMBOL]);
+                            (param.value && typeof param.value === 'object' && param.value[CAPTURE_NAME_SYMBOL]);
                         if (isCapture) {
                             const name = param.value[CAPTURE_NAME_SYMBOL] || param.value.name;
                             const wrapper = this.wrappersMap.get(name);
@@ -197,98 +321,6 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         return newElements;
     }
 
-    async visit<R extends J>(tree: J, p: any, parent?: Cursor): Promise<R | undefined> {
-        // Check if this node is a placeholder
-        if (this.isPlaceholder(tree)) {
-            const replacement = this.replacePlaceholder(tree);
-            if (replacement !== tree) {
-                return replacement as R;
-            }
-        }
-
-        // Continue with normal traversal
-        return super.visit(tree, p, parent);
-    }
-
-    override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-        // Check if any arguments are placeholders (possibly variadic)
-        const hasPlaceholderInArgs = method.arguments.elements.some(arg => this.isPlaceholder(arg.element));
-        // Check if the select (the object being called on) is a placeholder
-        const hasPlaceholderInSelect = method.select && this.isPlaceholder(method.select.element);
-
-        if (!hasPlaceholderInArgs && !hasPlaceholderInSelect) {
-            return super.visitMethodInvocation(method, p);
-        }
-
-        let newArguments = method.arguments.elements;
-        if (hasPlaceholderInArgs) {
-            newArguments = await this.expandVariadicElements(method.arguments.elements, undefined, p);
-        }
-
-        let newSelect = method.select;
-        if (hasPlaceholderInSelect && method.select) {
-            const visitedSelect = await this.visit(method.select.element, p);
-            if (visitedSelect) {
-                newSelect = produce(method.select, draft => {
-                    draft.element = visitedSelect;
-                });
-            }
-        }
-
-        return produce(method, draft => {
-            draft.arguments.elements = newArguments;
-            if (newSelect !== method.select) {
-                draft.select = newSelect;
-            }
-        });
-    }
-
-    override async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
-        // Check if any statements are placeholders (possibly variadic)
-        const hasPlaceholder = block.statements.some(stmt => {
-            const stmtElement = stmt.element;
-            // Check if it's an ExpressionStatement containing a placeholder
-            if (stmtElement.kind === JS.Kind.ExpressionStatement) {
-                const exprStmt = stmtElement as JS.ExpressionStatement;
-                return this.isPlaceholder(exprStmt.expression);
-            }
-            return this.isPlaceholder(stmtElement);
-        });
-
-        if (!hasPlaceholder) {
-            return super.visitBlock(block, p);
-        }
-
-        // Unwrap function to extract placeholder from ExpressionStatement
-        const unwrapStatement = (element: J): J => {
-            if (element.kind === JS.Kind.ExpressionStatement) {
-                return (element as JS.ExpressionStatement).expression;
-            }
-            return element;
-        };
-
-        const newStatements = await this.expandVariadicElements(block.statements, unwrapStatement, p);
-
-        return produce(block, draft => {
-            draft.statements = newStatements;
-        });
-    }
-
-    override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: any): Promise<J | undefined> {
-        // Check if any statements are placeholders (possibly variadic)
-        const hasPlaceholder = compilationUnit.statements.some(stmt => this.isPlaceholder(stmt.element));
-
-        if (!hasPlaceholder) {
-            return super.visitJsCompilationUnit(compilationUnit, p);
-        }
-
-        const newStatements = await this.expandVariadicElements(compilationUnit.statements, undefined, p);
-
-        return produce(compilationUnit, draft => {
-            draft.statements = newStatements;
-        });
-    }
-
     /**
      * Checks if a node is a placeholder.
      *
@@ -302,6 +334,10 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         } else if (node.kind === J.Kind.Literal) {
             const literal = node as J.Literal;
             return literal.valueSource?.startsWith(PlaceholderUtils.PLACEHOLDER_PREFIX) || false;
+        } else if (node.kind === JS.Kind.BindingElement) {
+            // Check if the BindingElement's name is a placeholder
+            const bindingElement = node as JS.BindingElement;
+            return this.isPlaceholder(bindingElement.name);
         }
         return false;
     }
@@ -362,13 +398,13 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
 
         // Check if the parameter value is a Capture (could be a Proxy) or TemplateParam
         const isCapture = param.value instanceof CaptureImpl ||
-                         (param.value && typeof param.value === 'object' && param.value[CAPTURE_NAME_SYMBOL]);
+            (param.value && typeof param.value === 'object' && param.value[CAPTURE_NAME_SYMBOL]);
         const isTemplateParam = param.value instanceof TemplateParamImpl;
 
         if (isCapture || isTemplateParam) {
             // Simple capture/template param (no property path for template params)
             const name = isTemplateParam ? param.value.name :
-                        (param.value[CAPTURE_NAME_SYMBOL] || param.value.name);
+                (param.value[CAPTURE_NAME_SYMBOL] || param.value.name);
             const matchedNode = this.values.get(name);
             if (matchedNode && !Array.isArray(matchedNode)) {
                 return produce(matchedNode, draft => {
@@ -378,6 +414,30 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             }
 
             // If no match found, return placeholder unchanged
+            return placeholder;
+        }
+
+        // Check if the parameter value is a J.RightPadded wrapper
+        const isRightPadded = param.value && typeof param.value === 'object' &&
+            param.value.kind === J.Kind.RightPadded && isTree(param.value.element);
+
+        if (isRightPadded) {
+            // Extract the element from the J.RightPadded wrapper
+            const element = param.value.element as J;
+            return produce(element, draft => {
+                draft.markers = placeholder.markers;
+                draft.prefix = this.mergePrefix(element.prefix, placeholder.prefix);
+            });
+        }
+
+        // Check if the parameter value is a J.Container
+        const isContainer = param.value && typeof param.value === 'object' &&
+            param.value.kind === J.Kind.Container;
+
+        if (isContainer) {
+            // J.Container should be handled by expandVariadicElements
+            // For now, return placeholder - the expansion will happen at a higher level
+            // This should not happen in normal usage, as containers are typically used in argument positions
             return placeholder;
         }
 
@@ -404,6 +464,10 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             return (node as J.Identifier).simpleName;
         } else if (node.kind === J.Kind.Literal) {
             return (node as J.Literal).valueSource || null;
+        } else if (node.kind === JS.Kind.BindingElement) {
+            // Extract placeholder text from the BindingElement's name
+            const bindingElement = node as JS.BindingElement;
+            return this.getPlaceholderText(bindingElement.name);
         }
         return null;
     }

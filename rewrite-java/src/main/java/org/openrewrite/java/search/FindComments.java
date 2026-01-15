@@ -41,16 +41,10 @@ public class FindComments extends Recipe {
             example = "-----BEGIN RSA PRIVATE KEY-----")
     List<String> patterns;
 
-    @Override
-    public String getDisplayName() {
-        return "Find within comments and literals";
-    }
+    String displayName = "Find within comments and literals";
 
-    @Override
-    public String getDescription() {
-        return "Find regular expression matches within comments and literals. \"Literals\" includes string literals, " +
+    String description = "Find regular expression matches within comments and literals. \"Literals\" includes string literals, " +
                "character literals, and numeric literals.";
-    }
 
     @Override
     public Validated<Object> validate() {

@@ -15,21 +15,18 @@
  */
 package org.openrewrite.groovy.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 
 public class OmitParenthesesForLastArgumentLambda extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Move a closure which is the last argument of a method invocation out of parentheses";
-    }
+    @Getter
+    final String displayName = "Move a closure which is the last argument of a method invocation out of parentheses";
 
-    @Override
-    public String getDescription() {
-        return "Groovy allows a shorthand syntax that allows a closure to be placed outside of parentheses.";
-    }
+    @Getter
+    final String description = "Groovy allows a shorthand syntax that allows a closure to be placed outside of parentheses.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

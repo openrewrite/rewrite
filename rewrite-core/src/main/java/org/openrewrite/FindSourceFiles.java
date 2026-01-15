@@ -43,15 +43,9 @@ public class FindSourceFiles extends Recipe {
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Find files";
-    }
+    String displayName = "Find files";
 
-    @Override
-    public String getDescription() {
-        return "Find files by source path. Paths are always interpreted as relative to the repository root.";
-    }
+    String description = "Find files by source path. Paths are always interpreted as relative to the repository root.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

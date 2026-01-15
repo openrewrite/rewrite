@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,9 +29,9 @@ describe('forwardRef pattern with replacement', () => {
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
-                const m = await pat.match(methodInvocation);
+                const m = await pat.match(methodInvocation, this.cursor);
                 if (m) {
-                    const result = await tmpl.apply(this.cursor, methodInvocation, m);
+                    const result = await tmpl.apply(methodInvocation, this.cursor, { values: m });
                     if (result) {
                         return result;
                     }
@@ -69,9 +69,9 @@ describe('forwardRef pattern with replacement', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
                 if ((methodInvocation.name as J.Identifier).simpleName === 'forwardRef') {
-                    const m = await pat.match(methodInvocation);
+                    const m = await pat.match(methodInvocation, this.cursor);
                     if (m) {
-                        const result = await tmpl.apply(this.cursor, methodInvocation, m);
+                        const result = await tmpl.apply(methodInvocation, this.cursor, { values: m });
                         if (result) {
                             return result;
                         }
@@ -114,10 +114,10 @@ describe('forwardRef pattern with replacement', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
                 if ((methodInvocation.name as J.Identifier).simpleName === 'foo') {
-                    const m = await pat.match(methodInvocation);
+                    const m = await pat.match(methodInvocation, this.cursor);
                     if (m) {
                         // Replace foo(baz()) with bar(baz)
-                        const result = await tmpl.apply(this.cursor, methodInvocation, m);
+                        const result = await tmpl.apply(methodInvocation, this.cursor, { values: m });
                         if (result) {
                             return result;
                         }
@@ -158,10 +158,10 @@ describe('forwardRef pattern with replacement', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
                 if ((methodInvocation.name as J.Identifier).simpleName === 'foo') {
-                    const m = await pat.match(methodInvocation);
+                    const m = await pat.match(methodInvocation, this.cursor);
                     if (m) {
                         // Replace foo(baz()) with bar(baz())
-                        const result = await tmpl.apply(this.cursor, methodInvocation, m);
+                        const result = await tmpl.apply(methodInvocation, this.cursor, { values: m });
                         if (result) {
                             return result;
                         }

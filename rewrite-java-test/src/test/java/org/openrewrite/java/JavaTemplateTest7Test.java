@@ -74,7 +74,7 @@ class JavaTemplateTest7Test implements RewriteTest {
                   var cd = classDecl;
                   if (cd.getBody().getStatements().isEmpty()) {
                       cd = JavaTemplate.builder(
-                          //language=groovy
+                          //language=java
                           """
                             /**
                              * comment
@@ -119,7 +119,7 @@ class JavaTemplateTest7Test implements RewriteTest {
               public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext p) {
                   var a = assignment;
                   if (a.getAssignment() instanceof J.MethodInvocation) {
-                      J.MethodInvocation mi = (J.MethodInvocation) a.getAssignment();
+                      var mi = (J.MethodInvocation) a.getAssignment();
                       a = JavaTemplate.apply("1", getCursor(), mi.getCoordinates().replace());
                   }
                   return a;

@@ -109,7 +109,7 @@ class AnnotationTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.VariableDeclarations v = (J.VariableDeclarations) ((J.ClassDeclaration) cu.getStatements().get(2)).getBody().getStatements().getFirst();
+                var v = (J.VariableDeclarations) ((J.ClassDeclaration) cu.getStatements().get(2)).getBody().getStatements().getFirst();
                 assertThat(v.getLeadingAnnotations()).hasSize(2);
             })
           )
@@ -396,7 +396,7 @@ class AnnotationTest implements RewriteTest {
               @A open  @B   internal    @C @LAST  class Foo
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.ClassDeclaration last = (J.ClassDeclaration) cu.getStatements().get(cu.getStatements().size() - 1);
+                var last = (J.ClassDeclaration) cu.getStatements().get(cu.getStatements().size() - 1);
                 List<J.Annotation> annotationList = last.getPadding().getKind().getAnnotations();
                 assertThat(annotationList).hasSize(2);
                 assertThat(annotationList.getFirst().getSimpleName()).isEqualTo("C");

@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.table.DistinctGitProvenance;
@@ -33,17 +34,13 @@ public class FindGitProvenance extends ScanningRecipe<Set<GitProvenance>> {
 
     private final DistinctGitProvenance distinct = new DistinctGitProvenance(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Show Git source control metadata";
-    }
+    @Getter
+    final String displayName = "Show Git source control metadata";
 
-    @Override
-    public String getDescription() {
-        return "List out the contents of each unique `GitProvenance` marker in the set of source files. " +
-               "When everything is working correctly, exactly one such marker should be printed as all source files are " +
-               "expected to come from the same repository / branch / commit hash.";
-    }
+    @Getter
+    final String description = "List out the contents of each unique `GitProvenance` marker in the set of source files. " +
+        "When everything is working correctly, exactly one such marker should be printed as all source files are " +
+        "expected to come from the same repository / branch / commit hash.";
 
     @Override
     public Set<GitProvenance> getInitialValue(ExecutionContext ctx) {

@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {capture, JavaScriptVisitor, Pattern, pattern, Template, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 
 describe('variadic statement matching and expansion', () => {
     const spec = new RecipeSpec();
@@ -28,9 +28,9 @@ describe('variadic statement matching and expansion', () => {
         return new class extends JavaScriptVisitor<any> {
             override async visitMethodDeclaration(func: J.MethodDeclaration, p: any): Promise<J | undefined> {
                 if (func.body) {
-                    const match = await pat.match(func.body);
+                    const match = await pat.match(func.body, this.cursor);
                     if (match) {
-                        const newBody = await tmpl.apply(this.cursor, func.body, match);
+                        const newBody = await tmpl.apply(func.body, this.cursor, {values: match});
                         if (newBody && newBody !== func.body) {
                             return produce(func, draft => {
                                 draft.body = newBody as J.Block;
