@@ -57,7 +57,7 @@ public class RewriteRpcProcess extends Thread {
 
     private @Nullable Process process;
 
-    private @Nullable MessageFormatter messageFormatter;
+    private MessageFormatter messageFormatter = new JsonMessageFormatter(createDefaultModule());
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     @Getter
@@ -137,14 +137,11 @@ public class RewriteRpcProcess extends Thread {
             }
         }
 
-        MessageFormatter formatter;
-        formatter = this.messageFormatter != null ? this.messageFormatter : new JsonMessageFormatter(createDefaultModule());
-        MessageHandler handler = new HeaderDelimitedMessageHandler(formatter,
-                process.getInputStream(), process.getOutputStream());
+        MessageHandler handler = new HeaderDelimitedMessageHandler(process.getInputStream(), process.getOutputStream());
         if (trace) {
             handler = new TraceMessageHandler("client", handler);
         }
-        this.rpcClient = new JsonRpc(handler);
+        this.rpcClient = new JsonRpc(handler, this.messageFormatter);
     }
 
     /**
