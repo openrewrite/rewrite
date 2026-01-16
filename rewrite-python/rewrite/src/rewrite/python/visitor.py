@@ -132,8 +132,8 @@ class PythonVisitor(JavaVisitor[P]):
         binary = binary.replace(
             left=self.visit_and_cast(binary.left, Expression, p)
         )
-        binary = binary.replace(
-            operator=self.visit_left_padded(binary.operator, None, p)
+        binary = binary.padding.replace(
+            operator=self.visit_left_padded(binary.padding.operator, None, p)
         )
         binary = binary.replace(
             negation=self.visit_space(binary.negation, PySpace.Location.BINARY_NEGATION, p)
