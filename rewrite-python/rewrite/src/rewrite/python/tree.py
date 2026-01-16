@@ -1486,6 +1486,13 @@ class TypeAlias(Py, Statement, TypedTree):
         return self._name
 
 
+    _type_parameters: Optional[JContainer[j.TypeParameter]]
+
+    @property
+    def type_parameters(self) -> Optional[List[j.TypeParameter]]:
+        return self._type_parameters.elements if self._type_parameters else None
+
+
     _value: JLeftPadded[J]
 
     @property
@@ -1503,6 +1510,10 @@ class TypeAlias(Py, Statement, TypedTree):
     @dataclass
     class PaddingHelper:
         _t: TypeAlias
+
+        @property
+        def type_parameters(self) -> Optional[JContainer[j.TypeParameter]]:
+            return self._t._type_parameters
 
         @property
         def value(self) -> JLeftPadded[J]:

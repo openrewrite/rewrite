@@ -24,7 +24,7 @@ class Py(J):
 
     def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool:
         from .visitor import PythonVisitor
-        return isinstance(v, PythonVisitor)
+        return v.is_adaptable_to(PythonVisitor)
 
 
 class PySpace:
