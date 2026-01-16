@@ -25,7 +25,7 @@ from rewrite.java.support_types import (
     Space,
 )
 from rewrite.java.visitor import JavaVisitor
-from rewrite.python.support_types import Py, PySpace
+from rewrite.python.support_types import Py
 from rewrite.tree import SourceFile
 from rewrite.utils import list_map
 
@@ -88,7 +88,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_async(self, async_: Async, p: P) -> J:
         """Visit an async statement."""
         async_ = async_.replace(
-            prefix=self.visit_space(async_.prefix, PySpace.Location.ASYNC_PREFIX, p)
+            prefix=self.visit_space(async_.prefix, p)
         )
         temp_stmt = cast(Statement, self.visit_statement(async_, p))
         if not isinstance(temp_stmt, type(async_)):
@@ -103,7 +103,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_await(self, await_: Await, p: P) -> J:
         """Visit an await expression."""
         await_ = await_.replace(
-            prefix=self.visit_space(await_.prefix, PySpace.Location.AWAIT_PREFIX, p)
+            prefix=self.visit_space(await_.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(await_, p))
         if not isinstance(temp_expr, type(await_)):
@@ -118,7 +118,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_python_binary(self, binary: Binary, p: P) -> J:
         """Visit a Python-specific binary expression."""
         binary = binary.replace(
-            prefix=self.visit_space(binary.prefix, PySpace.Location.BINARY_PREFIX, p)
+            prefix=self.visit_space(binary.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(binary, p))
         if not isinstance(temp_expr, type(binary)):
@@ -129,10 +129,10 @@ class PythonVisitor(JavaVisitor[P]):
             left=self.visit_and_cast(binary.left, Expression, p)
         )
         binary = binary.padding.replace(
-            operator=self.visit_left_padded(binary.padding.operator, None, p)
+            operator=self.visit_left_padded(binary.padding.operator, p)
         )
         binary = binary.replace(
-            negation=self.visit_space(binary.negation, PySpace.Location.BINARY_NEGATION, p)
+            negation=self.visit_space(binary.negation, p)
         )
         binary = binary.replace(
             right=self.visit_and_cast(binary.right, Expression, p)
@@ -142,7 +142,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_chained_assignment(self, chained: ChainedAssignment, p: P) -> J:
         """Visit a chained assignment statement."""
         chained = chained.replace(
-            prefix=self.visit_space(chained.prefix, PySpace.Location.CHAINED_ASSIGNMENT_PREFIX, p)
+            prefix=self.visit_space(chained.prefix, p)
         )
         temp_stmt = cast(Statement, self.visit_statement(chained, p))
         if not isinstance(temp_stmt, type(chained)):
@@ -151,7 +151,7 @@ class PythonVisitor(JavaVisitor[P]):
         chained = chained.replace(markers=self.visit_markers(chained.markers, p))
         chained = chained.padding.replace(variables=
             list_map(
-                lambda v: self.visit_right_padded(v, None, p),
+                lambda v: self.visit_right_padded(v, p),
                 chained.padding.variables
             )
         )
@@ -163,7 +163,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_collection_literal(self, collection: CollectionLiteral, p: P) -> J:
         """Visit a collection literal (list, set, tuple)."""
         collection = collection.replace(
-            prefix=self.visit_space(collection.prefix, PySpace.Location.COLLECTION_LITERAL_PREFIX, p)
+            prefix=self.visit_space(collection.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(collection, p))
         if not isinstance(temp_expr, type(collection)):
@@ -171,33 +171,33 @@ class PythonVisitor(JavaVisitor[P]):
         collection = cast("CollectionLiteral", temp_expr)
         collection = collection.replace(markers=self.visit_markers(collection.markers, p))
         collection = collection.replace(
-            elements=self.visit_container(collection.padding.elements, None, p)
+            elements=self.visit_container(collection.padding.elements, p)
         )
         return collection
 
     def visit_compilation_unit(self, cu: CompilationUnit, p: P) -> J:
         """Visit a Python compilation unit (module)."""
-        cu = cu.replace(prefix=self.visit_space(cu.prefix, Space.Location.ANY, p))
+        cu = cu.replace(prefix=self.visit_space(cu.prefix, p))
         cu = cu.replace(markers=self.visit_markers(cu.markers, p))
         cu = cu.padding.replace(imports=
             list_map(
-                lambda v: self.visit_right_padded(v, None, p),
+                lambda v: self.visit_right_padded(v, p),
                 cu.padding.imports
             )
         )
         cu = cu.padding.replace(statements=
             list_map(
-                lambda v: self.visit_right_padded(v, None, p),
+                lambda v: self.visit_right_padded(v, p),
                 cu.padding.statements
             )
         )
-        cu = cu.replace(eof=self.visit_space(cu.eof, Space.Location.ANY, p))
+        cu = cu.replace(eof=self.visit_space(cu.eof, p))
         return cu
 
     def visit_comprehension_expression(self, comp: ComprehensionExpression, p: P) -> J:
         """Visit a comprehension expression."""
         comp = comp.replace(
-            prefix=self.visit_space(comp.prefix, PySpace.Location.COMPREHENSION_EXPRESSION_PREFIX, p)
+            prefix=self.visit_space(comp.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(comp, p))
         if not isinstance(temp_expr, type(comp)):
@@ -218,14 +218,14 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_comprehension_clause(self, clause: ComprehensionExpression.Clause, p: P) -> ComprehensionExpression.Clause:
         """Visit a comprehension clause."""
         clause = clause.replace(
-            prefix=self.visit_space(clause.prefix, None, p)
+            prefix=self.visit_space(clause.prefix, p)
         )
         clause = clause.replace(markers=self.visit_markers(clause.markers, p))
         clause = clause.replace(
             iterator_variable=self.visit_and_cast(clause.iterator_variable, Expression, p)
         )
         clause = clause.padding.replace(
-            iterated_list=self.visit_left_padded(clause.padding.iterated_list, None, p)
+            iterated_list=self.visit_left_padded(clause.padding.iterated_list, p)
         )
         clause = clause.replace(
             conditions=list_map(
@@ -238,7 +238,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_comprehension_condition(self, condition: ComprehensionExpression.Condition, p: P) -> ComprehensionExpression.Condition:
         """Visit a comprehension condition."""
         condition = condition.replace(
-            prefix=self.visit_space(condition.prefix, None, p)
+            prefix=self.visit_space(condition.prefix, p)
         )
         condition = condition.replace(markers=self.visit_markers(condition.markers, p))
         condition = condition.replace(
@@ -249,7 +249,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_del(self, del_: Del, p: P) -> J:
         """Visit a del statement."""
         del_ = del_.replace(
-            prefix=self.visit_space(del_.prefix, PySpace.Location.DEL_PREFIX, p)
+            prefix=self.visit_space(del_.prefix, p)
         )
         temp_stmt = cast(Statement, self.visit_statement(del_, p))
         if not isinstance(temp_stmt, type(del_)):
@@ -258,7 +258,7 @@ class PythonVisitor(JavaVisitor[P]):
         del_ = del_.replace(markers=self.visit_markers(del_.markers, p))
         del_ = del_.padding.replace(targets=
             list_map(
-                lambda t: self.visit_right_padded(t, None, p),
+                lambda t: self.visit_right_padded(t, p),
                 del_.padding.targets
             )
         )
@@ -267,7 +267,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_dict_literal(self, dict_lit: DictLiteral, p: P) -> J:
         """Visit a dictionary literal."""
         dict_lit = dict_lit.replace(
-            prefix=self.visit_space(dict_lit.prefix, PySpace.Location.DICT_LITERAL_PREFIX, p)
+            prefix=self.visit_space(dict_lit.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(dict_lit, p))
         if not isinstance(temp_expr, type(dict_lit)):
@@ -275,14 +275,14 @@ class PythonVisitor(JavaVisitor[P]):
         dict_lit = cast("DictLiteral", temp_expr)
         dict_lit = dict_lit.replace(markers=self.visit_markers(dict_lit.markers, p))
         dict_lit = dict_lit.replace(
-            elements=self.visit_container(dict_lit.padding.elements, None, p)
+            elements=self.visit_container(dict_lit.padding.elements, p)
         )
         return dict_lit
 
     def visit_error_from(self, error_from: ErrorFrom, p: P) -> J:
         """Visit an error from expression (raise X from Y)."""
         error_from = error_from.replace(
-            prefix=self.visit_space(error_from.prefix, None, p)
+            prefix=self.visit_space(error_from.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(error_from, p))
         if not isinstance(temp_expr, type(error_from)):
@@ -293,14 +293,14 @@ class PythonVisitor(JavaVisitor[P]):
             error=self.visit_and_cast(error_from.error, Expression, p)
         )
         error_from = error_from.replace(
-            from_=self.visit_left_padded(error_from.padding.from_, None, p)
+            from_=self.visit_left_padded(error_from.padding.from_, p)
         )
         return error_from
 
     def visit_exception_type(self, exc_type: ExceptionType, p: P) -> J:
         """Visit an exception type in an except clause."""
         exc_type = exc_type.replace(
-            prefix=self.visit_space(exc_type.prefix, None, p)
+            prefix=self.visit_space(exc_type.prefix, p)
         )
         exc_type = exc_type.replace(markers=self.visit_markers(exc_type.markers, p))
         exc_type = exc_type.replace(
@@ -326,7 +326,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_expression_type_tree(self, expr_tree: ExpressionTypeTree, p: P) -> J:
         """Visit an expression used as a type tree."""
         expr_tree = expr_tree.replace(
-            prefix=self.visit_space(expr_tree.prefix, None, p)
+            prefix=self.visit_space(expr_tree.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(expr_tree, p))
         if not isinstance(temp_expr, type(expr_tree)):
@@ -341,7 +341,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_formatted_string(self, f_string: FormattedString, p: P) -> J:
         """Visit an f-string."""
         f_string = f_string.replace(
-            prefix=self.visit_space(f_string.prefix, PySpace.Location.FORMATTED_STRING_PREFIX, p)
+            prefix=self.visit_space(f_string.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(f_string, p))
         if not isinstance(temp_expr, type(f_string)):
@@ -359,11 +359,11 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_formatted_string_value(self, value: FormattedString.Value, p: P) -> J:
         """Visit a value embedded in an f-string."""
         value = value.replace(
-            prefix=self.visit_space(value.prefix, None, p)
+            prefix=self.visit_space(value.prefix, p)
         )
         value = value.replace(markers=self.visit_markers(value.markers, p))
         value = value.padding.replace(
-            expression=self.visit_right_padded(value.padding.expression, None, p)
+            expression=self.visit_right_padded(value.padding.expression, p)
         )
         if value.format is not None:
             value = value.replace(
@@ -374,7 +374,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_key_value(self, kv: KeyValue, p: P) -> J:
         """Visit a key-value pair."""
         kv = kv.replace(
-            prefix=self.visit_space(kv.prefix, None, p)
+            prefix=self.visit_space(kv.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(kv, p))
         if not isinstance(temp_expr, type(kv)):
@@ -382,7 +382,7 @@ class PythonVisitor(JavaVisitor[P]):
         kv = cast("KeyValue", temp_expr)
         kv = kv.replace(markers=self.visit_markers(kv.markers, p))
         kv = kv.padding.replace(
-            key=self.visit_right_padded(kv.padding.key, None, p)
+            key=self.visit_right_padded(kv.padding.key, p)
         )
         kv = kv.replace(
             value=self.visit_and_cast(kv.value, Expression, p)
@@ -392,7 +392,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_literal_type(self, lit_type: LiteralType, p: P) -> J:
         """Visit a literal used as a type annotation."""
         lit_type = lit_type.replace(
-            prefix=self.visit_space(lit_type.prefix, None, p)
+            prefix=self.visit_space(lit_type.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(lit_type, p))
         if not isinstance(temp_expr, type(lit_type)):
@@ -407,7 +407,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_match_case(self, case: MatchCase, p: P) -> J:
         """Visit a match case."""
         case = case.replace(
-            prefix=self.visit_space(case.prefix, PySpace.Location.MATCH_CASE_PREFIX, p)
+            prefix=self.visit_space(case.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(case, p))
         if not isinstance(temp_expr, type(case)):
@@ -419,25 +419,25 @@ class PythonVisitor(JavaVisitor[P]):
         )
         if case.padding.guard is not None:
             case = case.padding.replace(
-                guard=self.visit_left_padded(case.padding.guard, None, p)
+                guard=self.visit_left_padded(case.padding.guard, p)
             )
         return case
 
     def visit_match_case_pattern(self, pattern: MatchCase.Pattern, p: P) -> MatchCase.Pattern:
         """Visit a match case pattern."""
         pattern = pattern.replace(
-            prefix=self.visit_space(pattern.prefix, None, p)
+            prefix=self.visit_space(pattern.prefix, p)
         )
         pattern = pattern.replace(markers=self.visit_markers(pattern.markers, p))
         pattern = pattern.replace(
-            children=self.visit_container(pattern.padding.children, None, p)
+            children=self.visit_container(pattern.padding.children, p)
         )
         return pattern
 
     def visit_multi_import(self, multi: MultiImport, p: P) -> J:
         """Visit a multi-name import statement."""
         multi = multi.replace(
-            prefix=self.visit_space(multi.prefix, PySpace.Location.MULTI_IMPORT_PREFIX, p)
+            prefix=self.visit_space(multi.prefix, p)
         )
         temp_stmt = cast(Statement, self.visit_statement(multi, p))
         if not isinstance(temp_stmt, type(multi)):
@@ -446,17 +446,17 @@ class PythonVisitor(JavaVisitor[P]):
         multi = multi.replace(markers=self.visit_markers(multi.markers, p))
         if multi.padding.from_ is not None:
             multi = multi.padding.replace(
-                _from=self.visit_right_padded(multi.padding.from_, None, p)
+                _from=self.visit_right_padded(multi.padding.from_, p)
             )
         multi = multi.replace(
-            names=self.visit_container(multi.padding.names, None, p)
+            names=self.visit_container(multi.padding.names, p)
         )
         return multi
 
     def visit_named_argument(self, named: NamedArgument, p: P) -> J:
         """Visit a named argument."""
         named = named.replace(
-            prefix=self.visit_space(named.prefix, PySpace.Location.NAMED_ARGUMENT_PREFIX, p)
+            prefix=self.visit_space(named.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(named, p))
         if not isinstance(temp_expr, type(named)):
@@ -467,14 +467,14 @@ class PythonVisitor(JavaVisitor[P]):
             name=self.visit_and_cast(named.name, J, p)
         )
         named = named.padding.replace(
-            value=self.visit_left_padded(named.padding.value, None, p)
+            value=self.visit_left_padded(named.padding.value, p)
         )
         return named
 
     def visit_pass(self, pass_: Pass, p: P) -> J:
         """Visit a pass statement."""
         pass_ = pass_.replace(
-            prefix=self.visit_space(pass_.prefix, PySpace.Location.PASS_PREFIX, p)
+            prefix=self.visit_space(pass_.prefix, p)
         )
         temp_stmt = cast(Statement, self.visit_statement(pass_, p))
         if not isinstance(temp_stmt, type(pass_)):
@@ -486,7 +486,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_slice(self, slice_: Slice, p: P) -> J:
         """Visit a slice expression."""
         slice_ = slice_.replace(
-            prefix=self.visit_space(slice_.prefix, PySpace.Location.SLICE_PREFIX, p)
+            prefix=self.visit_space(slice_.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(slice_, p))
         if not isinstance(temp_expr, type(slice_)):
@@ -495,22 +495,22 @@ class PythonVisitor(JavaVisitor[P]):
         slice_ = slice_.replace(markers=self.visit_markers(slice_.markers, p))
         if slice_.padding.start is not None:
             slice_ = slice_.padding.replace(
-                start=self.visit_right_padded(slice_.padding.start, None, p)
+                start=self.visit_right_padded(slice_.padding.start, p)
             )
         if slice_.padding.stop is not None:
             slice_ = slice_.padding.replace(
-                stop=self.visit_right_padded(slice_.padding.stop, None, p)
+                stop=self.visit_right_padded(slice_.padding.stop, p)
             )
         if slice_.padding.step is not None:
             slice_ = slice_.padding.replace(
-                step=self.visit_right_padded(slice_.padding.step, None, p)
+                step=self.visit_right_padded(slice_.padding.step, p)
             )
         return slice_
 
     def visit_special_parameter(self, special: SpecialParameter, p: P) -> J:
         """Visit a special parameter (*args or **kwargs)."""
         special = special.replace(
-            prefix=self.visit_space(special.prefix, None, p)
+            prefix=self.visit_space(special.prefix, p)
         )
         special = special.replace(markers=self.visit_markers(special.markers, p))
         if special.type_hint is not None:
@@ -522,7 +522,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_star(self, star: Star, p: P) -> J:
         """Visit a star expression (*x or **x)."""
         star = star.replace(
-            prefix=self.visit_space(star.prefix, None, p)
+            prefix=self.visit_space(star.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(star, p))
         if not isinstance(temp_expr, type(star)):
@@ -552,7 +552,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_trailing_else_wrapper(self, wrapper: TrailingElseWrapper, p: P) -> J:
         """Visit a trailing else wrapper."""
         wrapper = wrapper.replace(
-            prefix=self.visit_space(wrapper.prefix, None, p)
+            prefix=self.visit_space(wrapper.prefix, p)
         )
         temp_stmt = cast(Statement, self.visit_statement(wrapper, p))
         if not isinstance(temp_stmt, type(wrapper)):
@@ -563,14 +563,14 @@ class PythonVisitor(JavaVisitor[P]):
             statement=self.visit_and_cast(wrapper.statement, Statement, p)
         )
         wrapper = wrapper.padding.replace(
-            else_block=self.visit_left_padded(wrapper.padding.else_block, None, p)
+            else_block=self.visit_left_padded(wrapper.padding.else_block, p)
         )
         return wrapper
 
     def visit_type_alias(self, alias: TypeAlias, p: P) -> J:
         """Visit a type alias statement."""
         alias = alias.replace(
-            prefix=self.visit_space(alias.prefix, PySpace.Location.TYPE_ALIAS_PREFIX, p)
+            prefix=self.visit_space(alias.prefix, p)
         )
         temp_stmt = cast(Statement, self.visit_statement(alias, p))
         if not isinstance(temp_stmt, type(alias)):
@@ -581,14 +581,14 @@ class PythonVisitor(JavaVisitor[P]):
             name=self.visit_and_cast(alias.name, J, p)
         )
         alias = alias.padding.replace(
-            value=self.visit_left_padded(alias.padding.value, None, p)
+            value=self.visit_left_padded(alias.padding.value, p)
         )
         return alias
 
     def visit_type_hint(self, hint: TypeHint, p: P) -> J:
         """Visit a type hint annotation."""
         hint = hint.replace(
-            prefix=self.visit_space(hint.prefix, PySpace.Location.TYPE_HINT_PREFIX, p)
+            prefix=self.visit_space(hint.prefix, p)
         )
         hint = hint.replace(markers=self.visit_markers(hint.markers, p))
         hint = hint.replace(
@@ -599,7 +599,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_type_hinted_expression(self, hinted: TypeHintedExpression, p: P) -> J:
         """Visit a type-hinted expression."""
         hinted = hinted.replace(
-            prefix=self.visit_space(hinted.prefix, None, p)
+            prefix=self.visit_space(hinted.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(hinted, p))
         if not isinstance(temp_expr, type(hinted)):
@@ -617,7 +617,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_union_type(self, union: UnionType, p: P) -> J:
         """Visit a union type."""
         union = union.replace(
-            prefix=self.visit_space(union.prefix, PySpace.Location.UNION_TYPE_PREFIX, p)
+            prefix=self.visit_space(union.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(union, p))
         if not isinstance(temp_expr, type(union)):
@@ -626,7 +626,7 @@ class PythonVisitor(JavaVisitor[P]):
         union = union.replace(markers=self.visit_markers(union.markers, p))
         union = union.padding.replace(types=
             list_map(
-                lambda t: self.visit_right_padded(t, None, p),
+                lambda t: self.visit_right_padded(t, p),
                 union.padding.types
             )
         )
@@ -635,7 +635,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_variable_scope(self, scope: VariableScope, p: P) -> J:
         """Visit a variable scope declaration (global/nonlocal)."""
         scope = scope.replace(
-            prefix=self.visit_space(scope.prefix, None, p)
+            prefix=self.visit_space(scope.prefix, p)
         )
         temp_stmt = cast(Statement, self.visit_statement(scope, p))
         if not isinstance(temp_stmt, type(scope)):
@@ -644,7 +644,7 @@ class PythonVisitor(JavaVisitor[P]):
         scope = scope.replace(markers=self.visit_markers(scope.markers, p))
         scope = scope.padding.replace(names=
             list_map(
-                lambda n: self.visit_right_padded(n, None, p),
+                lambda n: self.visit_right_padded(n, p),
                 scope.padding.names
             )
         )
@@ -653,7 +653,7 @@ class PythonVisitor(JavaVisitor[P]):
     def visit_yield_from(self, yield_from: YieldFrom, p: P) -> J:
         """Visit a yield from expression."""
         yield_from = yield_from.replace(
-            prefix=self.visit_space(yield_from.prefix, PySpace.Location.YIELD_FROM_PREFIX, p)
+            prefix=self.visit_space(yield_from.prefix, p)
         )
         temp_expr = cast(Expression, self.visit_expression(yield_from, p))
         if not isinstance(temp_expr, type(yield_from)):

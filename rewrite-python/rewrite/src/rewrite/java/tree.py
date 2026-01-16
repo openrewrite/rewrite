@@ -661,9 +661,6 @@ class Block(Statement):
     def accept_java(self, v: JavaVisitor[P], p: P) -> J:
         return v.visit_block(self, p)
 
-    def get_coordinates(self) -> CoordinateBuilder.Block:
-        return CoordinateBuilder.Block(self)
-
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @dataclass(frozen=True, eq=False)
 class Break(Statement):
