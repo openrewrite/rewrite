@@ -307,7 +307,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                     (actualArgs.size() == 1 && actualArgs.get(0) instanceof J.Empty &&
                             !isTemplateParameterPlaceholder((J.Empty) actualArgs.get(0)));
             if (actualHasNoArgs) {
-                actualArgs = Collections.emptyList();
+                actualArgs = emptyList();
             }
 
             int fixedArgCount = templateArgs.size() - 1; // All except the last varargs placeholder
