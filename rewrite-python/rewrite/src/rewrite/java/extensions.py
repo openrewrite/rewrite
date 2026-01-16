@@ -65,7 +65,7 @@ def visit_left_padded(v: 'JavaVisitor', left: Optional[JLeftPadded[T]], p: P) ->
 
 def visit_space(v: 'JavaVisitor', space: Optional[Space], p: P) -> Space:
     # FIXME support Javadoc
-    return space
+    return space if space is not None else Space.EMPTY
 
 
 def with_name(method: 'MethodInvocation', name: 'Identifier') -> 'MethodInvocation':

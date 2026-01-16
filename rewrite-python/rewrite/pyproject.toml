@@ -30,9 +30,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
-    "mypy>=1.0.0",
     "black>=24.0.0",
     "ruff>=0.1.0",
+    "ty>=0.0.12",
 ]
 publish = [
     "build>=1.0.0",
@@ -66,13 +66,27 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
 
-[tool.mypy]
-python_version = "3.10"
-strict = true
-warn_return_any = true
-warn_unused_configs = true
+[tool.ty.environment]
+python-version = "3.10"
+root = ["src"]
+
+[tool.ty.src]
+include = ["src"]
+
+[tool.ty.rules]
+# Ignore rules that have many false positives due to star imports, TYPE_CHECKING patterns,
+# and complex generic type inference. These can be re-enabled as ty matures.
+unresolved-reference = "ignore"  # 843 errors - mostly from star imports not being resolved
+unresolved-import = "ignore"     # 63 errors - TYPE_CHECKING imports not resolved
+unresolved-attribute = "ignore"  # 448 errors - ClassVar attrs and visitor methods not found
+invalid-assignment = "ignore"    # 129 errors - cursor property setters not understood
+# too-many-positional-arguments - re-enabled, errors suppressed with comments
+# invalid-argument-type - re-enabled, errors suppressed with comments
+# invalid-return-type - re-enabled, errors suppressed with comments
+# invalid-type-form - re-enabled, errors fixed
+# invalid-method-override - re-enabled, errors fixed
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
+python_files = ["test_*.py", "*_test.py"]
 python_functions = ["test_*"]

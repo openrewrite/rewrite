@@ -49,12 +49,6 @@ class JavaVisitor(TreeVisitor[J, P]):
             return Space.EMPTY
         return space
 
-    def visit_and_cast(self, tree: Optional[Any], type_: type, p: P) -> Optional[Any]:
-        """Visit a tree and cast to the expected type."""
-        if tree is None:
-            return None
-        return self.visit(tree, p)
-
     def visit_left_padded(
         self,
         left: Optional[JLeftPadded],

@@ -806,7 +806,7 @@ class PythonRpcReceiver:
         if space is None:
             return Space.EMPTY
 
-        comments = q.receive_list(space.comments)
+        comments = q.receive_list_defined(space.comments)
         whitespace = q.receive(space.whitespace)
 
         if comments is space.comments and whitespace is space.whitespace:
@@ -820,59 +820,59 @@ class PythonRpcReceiver:
 
         # Handle new comments (comment is None or a dict from _new_obj)
         if comment is None or isinstance(comment, dict):
-            # For new comments, read all fields directly
-            multiline = q.receive(None)
-            text = q.receive(None)
-            suffix = q.receive(None)
+            # For new comments, read all fields directly - all are non-optional
+            multiline = q.receive_defined(None)
+            text = q.receive_defined(None)
+            suffix = q.receive_defined(None)
             markers = q.receive_markers(None)
             return TextComment(multiline, text, suffix, markers)
 
-        multiline = q.receive(comment.multiline)
-        text = q.receive(comment.text)
-        suffix = q.receive(comment.suffix)
+        multiline = q.receive_defined(comment.multiline)
+        text = q.receive_defined(comment.text)
+        suffix = q.receive_defined(comment.suffix)
         markers = q.receive_markers(comment.markers)
 
         return TextComment(multiline, text, suffix, markers)
 
-    def _receive_right_padded(self, rp: JRightPadded, q: RpcReceiveQueue) -> JRightPadded:
+    def _receive_right_padded(self, rp: JRightPadded, q: RpcReceiveQueue) -> Optional[JRightPadded]:
         """Receive a JRightPadded wrapper."""
         if rp is None:
             return None
 
         # Codec registry handles type dispatch automatically
         element = q.receive(rp.element)
-        after = q.receive(rp.after)
-        markers = q.receive(rp.markers)
+        after = q.receive_defined(rp.after)
+        markers = q.receive_markers(rp.markers)
 
         if element is rp.element and after is rp.after and markers is rp.markers:
             return rp
 
         return JRightPadded(element, after, markers)
 
-    def _receive_left_padded(self, lp: JLeftPadded, q: RpcReceiveQueue) -> JLeftPadded:
+    def _receive_left_padded(self, lp: JLeftPadded, q: RpcReceiveQueue) -> Optional[JLeftPadded]:
         """Receive a JLeftPadded wrapper."""
         if lp is None:
             return None
 
         # Codec registry handles type dispatch automatically
-        before = q.receive(lp.before)
+        before = q.receive_defined(lp.before)
         element = q.receive(lp.element)
-        markers = q.receive(lp.markers)
+        markers = q.receive_markers(lp.markers)
 
         if before is lp.before and element is lp.element and markers is lp.markers:
             return lp
 
         return JLeftPadded(before, element, markers)
 
-    def _receive_container(self, container: JContainer, q: RpcReceiveQueue) -> JContainer:
+    def _receive_container(self, container: JContainer, q: RpcReceiveQueue) -> Optional[JContainer]:
         """Receive a JContainer wrapper."""
         if container is None:
             return None
 
         # Codec registry handles type dispatch automatically
-        before = q.receive(container.before)
-        elements = q.receive_list(container.padding.elements)
-        markers = q.receive(container.markers)
+        before = q.receive_defined(container.before)
+        elements = q.receive_list_defined(container.padding.elements)
+        markers = q.receive_markers(container.markers)
 
         if before is container.before and elements is container.padding.elements and markers is container.markers:
             return container
@@ -894,14 +894,14 @@ def _register_marker_codecs():
     from rewrite.rpc.receive_queue import register_codec_with_both_names
 
     def _receive_semicolon(semicolon: Semicolon, q: RpcReceiveQueue) -> Semicolon:
-        new_id = q.receive(semicolon.id)
+        new_id = q.receive_defined(semicolon.id)
         if new_id is semicolon.id:
             return semicolon
         return semicolon.replace(id=new_id)
 
     def _receive_trailing_comma(trailing_comma: TrailingComma, q: RpcReceiveQueue) -> TrailingComma:
-        new_id = q.receive(trailing_comma.id)
-        new_suffix = q.receive(trailing_comma.suffix)
+        new_id = q.receive_defined(trailing_comma.id)
+        new_suffix = q.receive_defined(trailing_comma.suffix)
         if new_id is trailing_comma.id and new_suffix is trailing_comma.suffix:
             return trailing_comma
         result = trailing_comma
@@ -912,7 +912,7 @@ def _register_marker_codecs():
         return result
 
     def _receive_omit_parentheses(omit_paren: OmitParentheses, q: RpcReceiveQueue) -> OmitParentheses:
-        new_id = q.receive(omit_paren.id)
+        new_id = q.receive_defined(omit_paren.id)
         if new_id is omit_paren.id:
             return omit_paren
         return omit_paren.replace(id=new_id)

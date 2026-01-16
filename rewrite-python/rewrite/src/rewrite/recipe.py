@@ -29,9 +29,8 @@ from typing import (
 
 if TYPE_CHECKING:
     from rewrite.visitor import TreeVisitor, Cursor
-    from rewrite.execution import ExecutionContext, LargeSourceSet
+    from rewrite.execution import ExecutionContext, LargeSourceSet, Result
     from rewrite.tree import SourceFile
-    from rewrite.result import Result
 
 
 def option(

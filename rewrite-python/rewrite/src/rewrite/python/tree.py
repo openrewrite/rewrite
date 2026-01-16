@@ -4,7 +4,7 @@ import weakref
 from dataclasses import dataclass, replace as dataclass_replace
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING, cast
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -180,7 +180,6 @@ class Binary(Py, Expression, TypedTree):
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Binary.PaddingHelper
         if self._padding is None:
             p = Binary.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -515,7 +514,6 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
 
     @property
     def padding(self) -> PaddingHelper:
-        p: CompilationUnit.PaddingHelper
         if self._padding is None:
             p = CompilationUnit.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -527,7 +525,7 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
 
-    def printer(self, cursor: Cursor) -> TreeVisitor[Tree, PrintOutputCapture]:
+    def printer(self, cursor: Cursor) -> TreeVisitor:
         if factory := PrinterFactory.current():
             return factory.create_printer(cursor)
         from .printer import PythonPrinter

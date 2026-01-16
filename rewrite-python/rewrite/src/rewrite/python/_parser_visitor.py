@@ -300,8 +300,7 @@ class ParserVisitor(ast.NodeVisitor):
                             kwonly_prefix,
                             Markers(random_id(), [KeywordOnlyArguments(random_id())]),
                             [], [], None, None, [],
-                            [self.__pad_right(empty_name, self.__source_before(','))],
-                            None
+                            [self.__pad_right(empty_name, self.__source_before(','))]
                         ),
                         Space.EMPTY,
                         Markers.EMPTY
@@ -1758,7 +1757,7 @@ class ParserVisitor(ast.NodeVisitor):
         return left.replace(prefix=prefix)
 
     def __convert_binary_operator(self, op) -> Union[JLeftPadded[j.Binary.Type], JLeftPadded[py.Binary.Type]]:
-        operation_map: Dict[Type[ast], Tuple[j.Binary.Type, str]] = {
+        operation_map: Dict[type, Tuple[j.Binary.Type, str]] = {
             ast.Add: (j.Binary.Type.Addition, '+'),
             ast.And: (j.Binary.Type.And, 'and'),
             ast.BitAnd: (j.Binary.Type.BitAnd, '&'),
@@ -2606,6 +2605,8 @@ class ParserVisitor(ast.NodeVisitor):
                     converted = converted.tree
                 literal = cast(j.Literal, converted)
                 source = literal.value_source
+                if source is None:
+                    source = str(literal.value) if literal.value is not None else ""
 
                 # Determine quote style and extract inner content from value_source.
                 # For strings, we need to preserve escape sequences from the source, not use
@@ -2839,10 +2840,10 @@ class ParserVisitor(ast.NodeVisitor):
         return ident_or_field(name.split('.'))
 
     def __convert_all(self, trees: Sequence) -> List[J2]:
-        return [self.__convert(tree) for tree in trees]
+        return [c for tree in trees if (c := self.__convert(tree)) is not None]
 
-    def __convert_block(self, statements: Sequence[Statement], prefix: str = ':') -> j.Block:
-        prefix = self.__source_before(prefix)
+    def __convert_block(self, statements: Sequence[Statement], delim: str = ':') -> j.Block:
+        prefix = self.__source_before(delim)
         if statements:
             statements = [self.__pad_statement(cast(ast.stmt, s)) for s in statements]
         else:
@@ -3027,7 +3028,7 @@ class ParserVisitor(ast.NodeVisitor):
         return Space(comments, prefix if prefix is not None else '')
 
     def _map_unary_operator(self, op) -> Tuple[j.Unary.Type, str]:
-        operation_map: Dict[Type[ast], Tuple[j.Unary.Type, str]] = {
+        operation_map: Dict[type, Tuple[j.Unary.Type, str]] = {
             ast.Invert: (j.Unary.Type.Complement, '~'),
             ast.Not: (j.Unary.Type.Not, 'not'),
             ast.UAdd: (j.Unary.Type.Positive, '+'),
@@ -3036,7 +3037,7 @@ class ParserVisitor(ast.NodeVisitor):
         return operation_map[type(op)]
 
     def _map_assignment_operator(self, op):
-        operation_map: Dict[Type[ast], Tuple[j.AssignmentOperation.Type, str]] = {
+        operation_map: Dict[type, Tuple[j.AssignmentOperation.Type, str]] = {
             ast.Add: (j.AssignmentOperation.Type.Addition, '+='),
             ast.BitAnd: (j.AssignmentOperation.Type.BitAnd, '&='),
             ast.BitOr: (j.AssignmentOperation.Type.BitOr, '|='),
@@ -3066,14 +3067,15 @@ class ParserVisitor(ast.NodeVisitor):
         if tok.type != token.FSTRING_START:
             if len(node.values) == 1 and isinstance(node.values[0], ast.Constant):
                 # format specifiers are stored as f-strings in the AST; e.g. `f'{1:n}'`
-                format_val = cast(ast.Constant, node.values[0]).value
+                format_val = node.values[0].value
+                format_str = str(format_val) if format_val is not None else None
                 self._token_idx += 1  # consume the format token
                 return (j.Literal(
                     random_id(),
                     self.__whitespace(),
                     Markers.EMPTY,
                     format_val,
-                    format_val,
+                    format_str,
                     None,
                     JavaType.Primitive.String
                 ), self._tokens[self._token_idx], 0)

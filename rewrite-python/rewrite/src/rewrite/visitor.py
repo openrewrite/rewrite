@@ -18,11 +18,11 @@ P = TypeVar('P')
 
 @dataclass(frozen=True)
 class Cursor:
-    ROOT_VALUE: ClassVar[str] = "root"
-
     parent: Optional[Cursor]
     value: object
     messages: Optional[Dict[str, object]] = None
+
+    ROOT_VALUE: ClassVar[str] = "root"
 
     def get_message(self, key: str, default_value: O) -> O:
         return default_value if self.messages is None else cast(O, self.messages.get(key))
@@ -30,7 +30,7 @@ class Cursor:
     def put_message(self, key: str, value: object) -> None:
         if self.messages is None:
             object.__setattr__(self, 'messages', {})
-        self.messages[key] = value  # type: ignore
+        self.messages[key] = value
 
     def parent_tree_cursor(self) -> Cursor:
         c = self.parent
@@ -141,7 +141,7 @@ class TreeVisitor(ABC, Generic[T, P]):
                     if t is not None:
                         t = self.post_visit(t, p)
 
-            self.cursor = self._cursor.parent  # type: ignore
+            self.cursor = self._cursor.parent
 
             if top_level:
                 if t is not None and self._after_visit is not None:
@@ -161,8 +161,8 @@ class TreeVisitor(ABC, Generic[T, P]):
 
         return t if is_acceptable else cast(Optional[T], tree)
 
-    def visit_and_cast(self, tree: Optional[Tree], t_type: Type[T2], p: P) -> T2:
-        return cast(T2, self.visit(tree, p))
+    def visit_and_cast(self, tree: Optional[Tree], t_type: Type[T2], p: P) -> Optional[T2]:
+        return cast(Optional[T2], self.visit(tree, p))
 
     def default_value(self, tree: Optional[Tree], p: P) -> Optional[Tree]:
         return tree

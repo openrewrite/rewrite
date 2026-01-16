@@ -28,9 +28,25 @@ files in the rewrite package.
 """
 
 import ast
+import keyword
 import sys
 from pathlib import Path
 from typing import List, Tuple, Optional
+
+
+# Python reserved keywords that can't be used as parameter names
+PYTHON_RESERVED = set(keyword.kwlist) | {'type'}  # 'type' is soft keyword in 3.12+
+
+
+def to_public_name(name: str) -> str:
+    """
+    Convert internal field name to public parameter name.
+    Strips underscore prefix, adding trailing underscore for reserved keywords.
+    """
+    public_name = name.lstrip('_')
+    if public_name in PYTHON_RESERVED:
+        return public_name + '_'  # Add trailing underscore per Python convention
+    return public_name
 
 
 def extract_dataclass_fields(node: ast.ClassDef) -> List[Tuple[str, str, bool]]:
@@ -52,6 +68,27 @@ def extract_dataclass_fields(node: ast.ClassDef) -> List[Tuple[str, str, bool]]:
             has_default = item.value is not None
             fields.append((field_name, field_type, has_default))
     return fields
+
+
+def extract_explicit_init(node: ast.ClassDef) -> Optional[List[Tuple[str, str]]]:
+    """
+    Extract parameters from an explicit __init__ method if present.
+
+    Returns list of (name, type_annotation) tuples, or None if no explicit __init__.
+    """
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef) and item.name == "__init__":
+            params = []
+            for arg in item.args.args:
+                if arg.arg == "self":
+                    continue
+                if arg.annotation:
+                    param_type = ast.unparse(arg.annotation)
+                else:
+                    param_type = "Any"
+                params.append((arg.arg, param_type))
+            return params
+    return None
 
 
 def is_frozen_dataclass(node: ast.ClassDef) -> bool:
@@ -123,12 +160,34 @@ def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
     if fields:
         lines.append("")
 
+    # Check for explicit __init__ method
+    explicit_init = extract_explicit_init(node)
+
+    # Generate __init__ method for dataclass constructor
+    lines.append(f"{indent}    def __init__(")
+    lines.append(f"{indent}        self,")
+    if explicit_init is not None:
+        # Use parameters from explicit __init__
+        for name, type_str in explicit_init:
+            lines.append(f"{indent}        {name}: {type_str},")
+    else:
+        # Use dataclass fields
+        for name, type_str, has_default in fields:
+            if has_default:
+                lines.append(f"{indent}        {name}: {type_str} = ...,")
+            else:
+                lines.append(f"{indent}        {name}: {type_str},")
+    lines.append(f"{indent}    ) -> None: ...")
+    lines.append("")
+
     # Generate typed replace() method
+    # Strip underscore prefix for public API kwargs
     lines.append(f"{indent}    def replace(")
     lines.append(f"{indent}        self,")
     lines.append(f"{indent}        *,")
     for name, type_str, has_default in fields:
-        lines.append(f"{indent}        {name}: {type_str} = ...,")
+        public_name = to_public_name(name)
+        lines.append(f"{indent}        {public_name}: {type_str} = ...,")
     lines.append(f"{indent}    ) -> Self: ...")
 
     return lines

@@ -85,7 +85,10 @@ def list_map(fn: FnType[T], lst: List[T]) -> List[T]:
         elif mapped_lst is not None:
             mapped_lst.append(original)
 
-    return mapped_lst if changed else lst  # type: ignore
+    if changed:
+        assert mapped_lst is not None
+        return mapped_lst
+    return lst
 
 
 def list_flat_map(fn: FlatMapFnType[T], lst: List[T]) -> List[T]:

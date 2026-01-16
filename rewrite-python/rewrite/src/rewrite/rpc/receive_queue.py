@@ -25,7 +25,7 @@ This processes the same JSON format that Python sends:
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, Union, cast
 from uuid import UUID
 
 from rewrite.rpc.send_queue import RpcObjectState
@@ -97,6 +97,29 @@ class RpcReceiveQueue:
             ref=raw.get('ref'),
             trace=raw.get('trace')
         )
+
+    def receive_defined(
+        self,
+        before: Optional[T] = None,
+        on_change: Optional[Callable[[Optional[T]], T]] = None
+    ) -> T:
+        """Receive and deserialize an object, asserting result is not None.
+
+        Use this when the protocol guarantees a non-null result.
+
+        Args:
+            before: The previous state of the object (for delta updates)
+            on_change: Optional callback to handle deserialization manually
+
+        Returns:
+            The deserialized object (never None)
+
+        Raises:
+            AssertionError: If the result is None
+        """
+        result = self.receive(before, on_change)
+        assert result is not None, "Expected non-null result from receive"
+        return result
 
     def receive(
         self,
@@ -180,7 +203,30 @@ class RpcReceiveQueue:
         if ref is not None:
             self._refs[ref] = after
 
-        return after
+        return cast(Optional[T], after)
+
+    def receive_list_defined(
+        self,
+        before: Optional[List[T]] = None,
+        on_change: Optional[Callable[[Optional[T]], T]] = None
+    ) -> List[T]:
+        """Receive and deserialize a list, asserting result is not None.
+
+        Use this when the protocol guarantees a non-null result.
+
+        Args:
+            before: The previous state of the list
+            on_change: Optional callback to handle item deserialization
+
+        Returns:
+            The deserialized list (never None)
+
+        Raises:
+            AssertionError: If the result is None
+        """
+        result = self.receive_list(before, on_change)
+        assert result is not None, "Expected non-null result from receive_list"
+        return result
 
     def receive_list(
         self,

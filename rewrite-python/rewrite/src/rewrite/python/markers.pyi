@@ -4,77 +4,64 @@
 from typing import Any, ClassVar, List, Optional, Self
 from uuid import UUID
 
+from enum import Enum
+from rewrite import Marker
 
-class Markers:
+class KeywordArguments(Marker):
     _id: UUID
-    _markers: List[Marker]
 
     def __init__(
         self,
         _id: UUID,
-        _markers: List[Marker],
     ) -> None: ...
 
     def replace(
         self,
         *,
         id: UUID = ...,
-        markers: List[Marker] = ...,
     ) -> Self: ...
 
-class SearchResult(Marker):
+class KeywordOnlyArguments(Marker):
     _id: UUID
-    _description: Optional[str]
 
     def __init__(
         self,
         _id: UUID,
-        _description: Optional[str],
     ) -> None: ...
 
     def replace(
         self,
         *,
         id: UUID = ...,
-        description: Optional[str] = ...,
     ) -> Self: ...
 
-class UnknownJavaMarker(Marker):
+class Quoted(Marker):
     _id: UUID
-    _data: Dict[str, Any]
+    _style: Style
 
     def __init__(
         self,
         _id: UUID,
-        _data: Dict[str, Any],
+        _style: Style,
     ) -> None: ...
 
     def replace(
         self,
         *,
         id: UUID = ...,
-        data: Dict[str, Any] = ...,
+        style: Style = ...,
     ) -> Self: ...
 
-class ParseExceptionResult(Marker):
+class SuppressNewline(Marker):
     _id: UUID
-    _parser_type: str
-    _exception_type: str
-    _message: str
 
     def __init__(
         self,
         _id: UUID,
-        _parser_type: str,
-        _exception_type: str,
-        _message: str,
     ) -> None: ...
 
     def replace(
         self,
         *,
         id: UUID = ...,
-        parser_type: str = ...,
-        exception_type: str = ...,
-        message: str = ...,
     ) -> Self: ...

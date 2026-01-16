@@ -496,5 +496,5 @@ class JContainer(Generic[J2]):
     def empty(cls) -> JContainer[J2]:
         if cls._EMPTY is None:
             cls._EMPTY = JContainer(Space.EMPTY, [], Markers.EMPTY)
-        return cls._EMPTY  # type: ignore
+        return cls._EMPTY
 

@@ -13,11 +13,11 @@ try:
     _PYTYPE_AVAILABLE = True
 except ImportError:
     # pytype not available - type inference will be disabled
-    config = None  # type: ignore
-    CallableType = GenericType = ClassType = UnionType = NothingType = TypeParameter = None  # type: ignore
-    AnnotateAstVisitor = None  # type: ignore
-    PytypeError = Exception  # type: ignore
-    infer_types = None  # type: ignore
+    config = None
+    CallableType = GenericType = ClassType = UnionType = NothingType = TypeParameter = None
+    AnnotateAstVisitor = None
+    PytypeError = Exception
+    infer_types = None
 
 
 class PythonTypeMapping:
@@ -36,7 +36,7 @@ class PythonTypeMapping:
             self._source_with_types = None
 
     def resolve_types(self, node):
-        if self._source_with_types:
+        if self._source_with_types and MyAnnotateAstVisitor is not None:
             type_visitor = MyAnnotateAstVisitor(self._source_with_types, ast)
             type_visitor.visit(node)
 
@@ -126,4 +126,4 @@ if _PYTYPE_AVAILABLE:
         def visit_Call(self, node):
             self._maybe_annotate(node)
 else:
-    MyAnnotateAstVisitor = None  # type: ignore
+    MyAnnotateAstVisitor = None

@@ -16,13 +16,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast, Optional
 
 from rewrite.java.support_types import (
     J,
     Expression,
     Statement,
-    Space,
 )
 from rewrite.java.visitor import JavaVisitor
 from rewrite.python.support_types import Py
@@ -471,7 +470,7 @@ class PythonVisitor(JavaVisitor[P]):
         )
         return named
 
-    def visit_pass(self, pass_: Pass, p: P) -> J:
+    def visit_pass(self, pass_: Pass, p: P) -> Optional[J]:
         """Visit a pass statement."""
         pass_ = pass_.replace(
             prefix=self.visit_space(pass_.prefix, p)
