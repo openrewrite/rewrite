@@ -2192,10 +2192,15 @@ class ParserVisitor(ast.NodeVisitor):
         save_token_idx = self._token_idx
 
         # Check if '(' at current position actually belongs to the tuple or to the first element
-        # If tuple starts at same position as first element, the '(' belongs to the first element
+        # If tuple starts at same position (same line AND same column) as first element,
+        # the '(' belongs to the first element, not the tuple.
+        # For multi-line tuples, even if col_offset matches, different lineno means the '(' belongs to tuple.
         maybe_parens = self.__at_token('(')
-        if maybe_parens and node.elts and node.col_offset == node.elts[0].col_offset:
-            maybe_parens = False
+        if maybe_parens and node.elts:
+            same_position = (node.lineno == node.elts[0].lineno and
+                             node.col_offset == node.elts[0].col_offset)
+            if same_position:
+                maybe_parens = False
 
         if maybe_parens:
             self._token_idx += 1  # consume '('
