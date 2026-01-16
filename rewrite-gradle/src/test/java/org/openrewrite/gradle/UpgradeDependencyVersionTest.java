@@ -508,7 +508,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/3227")
     @Test
     void platformsAreManagedVersionAware() {
         rewriteRun(
