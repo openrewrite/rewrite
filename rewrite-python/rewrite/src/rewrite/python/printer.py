@@ -375,6 +375,9 @@ class PythonPrinter:
     def visit_compilation_unit(self, cu: 'py.CompilationUnit', p: PrintOutputCapture) -> J:
         """Visit a Python compilation unit."""
         from rewrite.java.tree import Import
+        # Output UTF-8 BOM if the original file had one
+        if cu.charset_bom_marked:
+            p.append('\ufeff')
         self._before_syntax(cu, Space.Location.COMPILATION_UNIT_PREFIX, p)
 
         # Print imports

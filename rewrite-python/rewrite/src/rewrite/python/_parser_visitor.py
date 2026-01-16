@@ -43,9 +43,20 @@ class ParserVisitor(ast.NodeVisitor):
     _tokens: List[TokenInfo]
     _token_idx: int
     _paren_pairs: Dict[int, int]
+    _bom_marked: bool
+
+    # UTF-8 BOM character
+    _BOM = '\ufeff'
 
     def __init__(self, source: str):
         super().__init__()
+        # Detect and strip UTF-8 BOM if present
+        if source.startswith(self._BOM):
+            self._bom_marked = True
+            source = source[1:]
+        else:
+            self._bom_marked = False
+
         self._source = source
         self._parentheses_stack = []
         self._type_mapping = PythonTypeMapping(source)
@@ -2068,7 +2079,7 @@ class ParserVisitor(ast.NodeVisitor):
             Path("TODO"),
             None,
             None,
-            False,
+            self._bom_marked,
             None,
             [],
             [self.__pad_statement(stmt) for stmt in node.body] if node.body else [

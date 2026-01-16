@@ -218,7 +218,9 @@ class RecipeSpec:
         from rewrite.python._parser_visitor import ParserVisitor
 
         visitor = ParserVisitor(source)
-        tree = ast.parse(source)
+        # Strip BOM before passing to ast.parse (ParserVisitor does this internally)
+        source_for_ast = source[1:] if source.startswith('\ufeff') else source
+        tree = ast.parse(source_for_ast)
         cu = visitor.visit_Module(tree)
         return cu.replace(source_path=source_path)
 
