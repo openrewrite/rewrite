@@ -177,6 +177,30 @@ class TreeVisitor(ABC, Generic[T, P]):
     def visit_marker(self, marker: Marker, p: P) -> Marker:
         return marker
 
+    def stop_after_pre_visit(self) -> None:
+        """
+        Stop visiting after pre_visit returns, preventing accept() and post_visit() from being called.
+        Call this in pre_visit when you only want to process at a high level without traversing children.
+        """
+        self._cursor.put_message("STOP_AFTER_PRE_VISIT", True)
+
+    def is_adaptable_to(self, adapt_to: Type['TreeVisitor[Any, Any]']) -> bool:
+        """
+        Check if this visitor can be adapted to the given visitor type.
+
+        A visitor is adaptable if:
+        1. It is already an instance of the target type, OR
+        2. It is a base TreeVisitor (not a language-specific visitor)
+
+        This is a simplified implementation. Full adaptation support
+        would check tree type hierarchies like Java does.
+        """
+        if isinstance(self, adapt_to):
+            return True
+        # Base TreeVisitor is adaptable to any visitor type
+        # (its tree type is Tree, which is a supertype of all tree types)
+        return type(self).__mro__[1] == TreeVisitor or type(self) == TreeVisitor
+
     def adapt(self, tree_type, visitor_type: Type[TV]) -> TV:
         # FIXME implement the visitor adapting
         return cast(TV, self)

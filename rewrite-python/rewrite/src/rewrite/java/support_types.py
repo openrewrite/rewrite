@@ -25,7 +25,7 @@ class J(Tree):
 
     def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool:
         from .visitor import JavaVisitor
-        return isinstance(v, JavaVisitor)
+        return v.is_adaptable_to(JavaVisitor)
 
     def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]:
         from .visitor import JavaVisitor
