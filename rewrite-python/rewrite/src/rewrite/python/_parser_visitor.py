@@ -2482,12 +2482,16 @@ class ParserVisitor(ast.NodeVisitor):
 
     def __pad_statement(self, stmt: ast.stmt) -> JRightPadded[Statement]:
         statement = self.__convert_statement(stmt)
-        # use whitespace until end of line as padding; what follows will be the prefix of next element
-        # This includes trailing comments on the same line
+        # Only capture trailing whitespace as padding if followed by semicolon
+        # Otherwise, whitespace belongs to the next statement's prefix
+        save_idx = self._token_idx
         padding = self.__whitespace('\n')
         if self.__skip(';'):
             markers = Markers.build(random_id(), [Semicolon(random_id())])
         else:
+            # No semicolon - restore position so whitespace becomes next statement's prefix
+            self._token_idx = save_idx
+            padding = Space.EMPTY
             markers = Markers.EMPTY
         return JRightPadded(statement, padding, markers)
 
