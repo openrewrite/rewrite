@@ -4941,11 +4941,11 @@ class MavenParserTest implements RewriteTest {
                   assertThat(maybeMrr).isPresent();
 
                   MavenResolutionResult mrr = maybeMrr.get();
-                  assertThat(mrr.getDependencies().get(Scope.Test)).haveExactly(1, new Condition<>(dep ->
-                    "org.bouncycastle".equals(dep.getGroupId()) &&
-                      "bcprov-jdk18on".equals(dep.getArtifactId()) &&
-                      "1.79".equals(dep.getVersion()),
-                    "expecting `org.bouncycastle:bcprov-jdk18on:1.79`"));
+                  assertThat(mrr.getDependencies().get(Scope.Test))
+                    .filteredOn(dep -> "org.bouncycastle".equals(dep.getGroupId()) && "bcprov-jdk18on".equals(dep.getArtifactId()))
+                    .singleElement()
+                    .extracting(ResolvedDependency::getVersion)
+                    .isEqualTo("1.79");
               })
             )
           )
