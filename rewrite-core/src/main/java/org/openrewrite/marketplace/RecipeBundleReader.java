@@ -18,9 +18,11 @@ package org.openrewrite.marketplace;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.RecipeDescriptor;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Map;
 
-public interface RecipeBundleReader {
+public interface RecipeBundleReader extends Closeable {
     RecipeBundle getBundle();
 
     RecipeMarketplace read();
@@ -28,4 +30,8 @@ public interface RecipeBundleReader {
     RecipeDescriptor describe(RecipeListing listing);
 
     Recipe prepare(RecipeListing listing, Map<String, Object> options);
+
+    default void close() throws IOException {
+        // no-op
+    }
 }

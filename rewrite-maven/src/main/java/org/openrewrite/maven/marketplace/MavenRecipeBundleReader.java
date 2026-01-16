@@ -28,6 +28,7 @@ import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,7 +55,7 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     private transient @Nullable Environment environment;
     transient @Nullable Path recipeJar;
     transient @Nullable List<Path> classpath;
-    private transient @Nullable ClassLoader classLoader;
+    private transient @Nullable RecipeClassLoader classLoader;
 
     @Override
     public RecipeMarketplace read() {
@@ -98,33 +99,35 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
         String[] ga = bundle.getPackageName().split(":");
         RecipeMarketplace marketplace = new RecipeMarketplace();
         List<Path> classpath = classpath();
-        RecipeClassLoader classLoader = new RecipeClassLoader(requireNonNull(recipeJar), classpath);
+        try (RecipeClassLoader classLoader = new RecipeClassLoader(requireNonNull(recipeJar), classpath)) {
+            // First pass: Scan only the recipe jar for recipes and don't list recipes from dependencies
+            Environment env = Environment.builder().scanJar(
+                    requireNonNull(recipeJar).toAbsolutePath(),
+                    classpath.stream().map(Path::toAbsolutePath).collect(toList()),
+                    classLoader
+            ).build();
 
-        // First pass: Scan only the recipe jar for recipes and don't list recipes from dependencies
-        Environment env = Environment.builder().scanJar(
-                requireNonNull(recipeJar).toAbsolutePath(),
-                classpath.stream().map(Path::toAbsolutePath).collect(toList()),
-                classLoader
-        ).build();
+            // Second pass: Scan all jars in classpath for recipes and categories
+            // This gives us proper root categories from category YAMLs.
+            Environment envWithCategories = environment();
 
-        // Second pass: Scan all jars in classpath for recipes and categories
-        // This gives us proper root categories from category YAMLs.
-        Environment envWithCategories = environment();
+            // Bundle version may be set in the environment() call above (as the JARs making up
+            // the classpath are resolved)
+            GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
 
-        // Bundle version may be set in the environment() call above (as the JARs making up
-        // the classpath are resolved)
-        GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
-
-        for (RecipeDescriptor descriptor : env.listRecipeDescriptors()) {
-            marketplace.install(
-                    RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
-                            "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
-                            bundle.getRequestedVersion() == null ? gav.getVersion() : bundle.getRequestedVersion(),
-                            gav.getVersion(), null)),
-                    descriptor.inferCategoriesFromName(envWithCategories)
-            );
+            for (RecipeDescriptor descriptor : env.listRecipeDescriptors()) {
+                marketplace.install(
+                        RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
+                                "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
+                                bundle.getRequestedVersion() == null ? gav.getVersion() : bundle.getRequestedVersion(),
+                                gav.getVersion(), null)),
+                        descriptor.inferCategoriesFromName(envWithCategories)
+                );
+            }
+            return marketplace;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
-        return marketplace;
     }
 
     @Override
@@ -136,6 +139,13 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     public Recipe prepare(RecipeListing listing, @Nullable Map<String, Object> options) {
         Recipe r = environment().activateRecipes(listing.getName());
         return r.withOptions(options);
+    }
+
+    @Override
+    public void close() throws IOException {
+        if (classLoader != null) {
+            classLoader.close();
+        }
     }
 
     private Environment environment() {

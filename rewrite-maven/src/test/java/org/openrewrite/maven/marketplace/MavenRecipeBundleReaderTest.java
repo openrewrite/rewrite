@@ -29,6 +29,7 @@ import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
+import java.io.IOException;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,7 +39,7 @@ class MavenRecipeBundleReaderTest {
     //  to the temp directories so they can be cleaned up
     @Issue("https://github.com/openrewrite/rewrite/issues/6487")
     @Test
-    void canInstallRewriteCore(@TempDir Path tempDir) {
+    void canInstallRewriteCore(@TempDir Path tempDir) throws Exception {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
         HttpSenderExecutionContextView.view(ctx).setHttpSender(new HttpUrlConnectionSender());
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
@@ -53,19 +54,19 @@ class MavenRecipeBundleReaderTest {
           Throwable::printStackTrace
         );
 
-        MavenRecipeBundleResolver resolver = new MavenRecipeBundleResolver(
+        try (MavenRecipeBundleResolver resolver = new MavenRecipeBundleResolver(
           ctx,
           downloader,
           RecipeClassLoader::new
-        );
+        )) {
+            RecipeBundle bundle = new RecipeBundle("maven", "org.openrewrite:rewrite-core", "8.70.0", null, null);
+            RecipeBundleReader reader = resolver.resolve(bundle);
 
-        RecipeBundle bundle = new RecipeBundle("maven", "org.openrewrite:rewrite-core", "8.70.0", null, null);
-        RecipeBundleReader reader = resolver.resolve(bundle);
-
-        RecipeMarketplace marketplace = reader.read();
-        assertThat(marketplace.getAllRecipes())
-          .isNotEmpty()
-          .as("rewrite-core should install and successfully list recipes")
-          .anyMatch(r -> r.getName().contains(org.openrewrite.text.Find.class.getName()));
+            RecipeMarketplace marketplace = reader.read();
+            assertThat(marketplace.getAllRecipes())
+              .isNotEmpty()
+              .as("rewrite-core should install and successfully list recipes")
+              .anyMatch(r -> r.getName().contains(org.openrewrite.text.Find.class.getName()));
+        }
     }
 }

@@ -23,6 +23,7 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.marketplace.*;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
