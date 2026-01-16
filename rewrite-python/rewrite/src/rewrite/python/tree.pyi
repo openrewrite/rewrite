@@ -9,7 +9,7 @@ from enum import Enum
 from pathlib import Path
 from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Markers, Cursor, PrintOutputCapture, PrinterFactory
 from rewrite.java import *
-from rewrite.python.support_types import Py
+from rewrite.python.support_types import Py as Py
 
 class Async(Py, Statement):
     id: UUID

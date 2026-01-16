@@ -10,6 +10,13 @@ from rewrite import Markers
 from rewrite import Tree, SourceFile, TreeVisitor
 from rewrite.utils import replace_if_changed
 
+class J(Tree):
+    @property
+    def prefix(self) -> Space: ...
+    def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool: ...
+    def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]: ...
+    def accept_java(self, v: 'JavaVisitor[P]', p: P) -> Optional['J']: ...
+
 class JavaSourceFile(J, SourceFile):
     pass
 

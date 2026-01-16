@@ -9,7 +9,7 @@ from uuid import UUID
 
 if TYPE_CHECKING:
     from .visitor import JavaVisitor
-from . import extensions
+from . import extensions as extensions  # Re-export for other modules
 from .support_types import *
 from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Markers, Cursor, PrintOutputCapture, PrinterFactory
 
@@ -1139,8 +1139,7 @@ class CompilationUnit(JavaSourceFile, SourceFile):
     def printer(self, cursor: Cursor) -> TreeVisitor[Tree, PrintOutputCapture[P]]:
         if factory := PrinterFactory.current():
             return factory.create_printer(cursor)
-        from .printer import JavaPrinter
-        return JavaPrinter[PrintOutputCapture[P]]()
+        raise NotImplementedError("JavaPrinter is not yet implemented. Use PrinterFactory to provide a printer.")
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J:
         return v.visit_compilation_unit(self, p)

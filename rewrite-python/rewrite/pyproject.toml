@@ -77,7 +77,7 @@ include = ["src"]
 # Ignore rules that have many false positives due to star imports, TYPE_CHECKING patterns,
 # and complex generic type inference. These can be re-enabled as ty matures.
 unresolved-reference = "ignore"  # 843 errors - mostly from star imports not being resolved
-unresolved-import = "ignore"     # 27 errors after stub fixes - further work needed on stub files
+# unresolved-import = "ignore"     # 27 errors after stub fixes - further work needed on stub files
 # unresolved-attribute = "ignore"  # 448 errors - ClassVar attrs and visitor methods not found
 # invalid-assignment - re-enabled, errors suppressed with comments (ty#1379)
 # too-many-positional-arguments - re-enabled, errors suppressed with comments

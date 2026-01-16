@@ -209,15 +209,20 @@ def is_abc_base_class(node: ast.ClassDef) -> bool:
     if is_frozen_dataclass(node):
         return False
 
-    # Known base types that indicate this is an ABC
+    # Known base types that indicate this is an ABC or generic class
     known_bases = {
         'J', 'Statement', 'Expression', 'TypedTree', 'NameTree', 'TypeTree', 'Loop', 'MethodCall',
-        'ABC', 'Py', 'PyStatement', 'PyExpression'
+        'ABC', 'Py', 'PyStatement', 'PyExpression',
+        'Tree', 'SourceFile', 'Generic'  # For rewrite/tree.py classes
     }
 
     for base in node.bases:
         if isinstance(base, ast.Name) and base.id in known_bases:
             return True
+        # Handle Generic[T] style bases
+        if isinstance(base, ast.Subscript) and isinstance(base.value, ast.Name):
+            if base.value.id in known_bases:
+                return True
     return False
 
 
@@ -258,21 +263,46 @@ def generate_abc_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
     return lines
 
 
-def extract_imports(tree: ast.Module) -> List[str]:
-    """Extract import statements from the module."""
+def extract_imports(tree: ast.Module, current_package: str = "") -> List[Tuple[str, bool]]:
+    """
+    Extract import statements from the module.
+
+    Returns list of (import_statement, should_reexport) tuples.
+    Sibling module imports (same package) should be re-exported.
+    """
     imports = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                imports.append(f"import {alias.name}" + (f" as {alias.asname}" if alias.asname else ""))
+                imp = f"import {alias.name}" + (f" as {alias.asname}" if alias.asname else "")
+                imports.append((imp, False))
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
-            names = ", ".join(
-                alias.name + (f" as {alias.asname}" if alias.asname else "")
-                for alias in node.names
-            )
             level = "." * node.level
-            imports.append(f"from {level}{module} import {names}")
+
+            # Check if this is a sibling module import (same package)
+            # e.g., for current_package="rewrite.python", module="rewrite.python.support_types" is sibling
+            is_sibling = False
+            if current_package and level == "":  # absolute import
+                is_sibling = module.startswith(current_package + ".")
+            elif level == ".":  # relative import from same package
+                is_sibling = True
+
+            # Build import statement, using X as X pattern for re-exports
+            if is_sibling:
+                names = ", ".join(
+                    f"{alias.name} as {alias.asname or alias.name}"
+                    for alias in node.names
+                    if alias.name != "*"  # star imports handled separately
+                )
+            else:
+                names = ", ".join(
+                    alias.name + (f" as {alias.asname}" if alias.asname else "")
+                    for alias in node.names
+                )
+
+            if names:  # Skip if only star import
+                imports.append((f"from {level}{module} import {names}", is_sibling))
     return imports
 
 
@@ -413,12 +443,30 @@ def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
     return lines
 
 
+def get_package_from_path(source_path: Path) -> str:
+    """
+    Determine the Python package name from the source file path.
+
+    E.g., .../src/rewrite/python/tree.py -> rewrite.python
+    """
+    parts = source_path.parts
+    try:
+        # Find 'rewrite' in the path and build package from there
+        rewrite_idx = parts.index('rewrite')
+        # Package is everything from 'rewrite' to parent of the file (excluding file itself)
+        package_parts = parts[rewrite_idx:-1]
+        return '.'.join(package_parts)
+    except ValueError:
+        return ""
+
+
 def generate_stub_content(source_path: Path) -> str:
     """Generate .pyi stub content for a Python source file."""
     with open(source_path) as f:
         source = f.read()
 
     tree = ast.parse(source)
+    current_package = get_package_from_path(source_path)
 
     stub_lines = [
         "# Auto-generated stub file for IDE autocomplete support.",
@@ -431,13 +479,14 @@ def generate_stub_content(source_path: Path) -> str:
     ]
 
     # Find additional imports we might need
-    imports = extract_imports(tree)
-    for imp in imports:
+    imports = extract_imports(tree, current_package)
+    for imp, is_reexport in imports:
         # Skip __future__ imports and typing imports (we add our own)
         if "__future__" in imp or "from typing import" in imp:
             continue
         # Add imports that might be needed for type annotations
-        if "from rewrite" in imp or "from pathlib" in imp or "from enum" in imp:
+        # Include: rewrite modules, pathlib, enum, and relative module imports (from . import X)
+        if "from rewrite" in imp or "from pathlib" in imp or "from enum" in imp or imp.startswith("from . import"):
             stub_lines.append(imp)
 
     stub_lines.append("")

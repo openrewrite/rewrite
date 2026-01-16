@@ -7,6 +7,7 @@ from uuid import UUID
 
 from enum import Enum
 from pathlib import Path
+from . import extensions as extensions
 from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Markers, Cursor, PrintOutputCapture, PrinterFactory
 
 from .support_types import (
