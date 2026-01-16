@@ -41,10 +41,8 @@ public class UseHttpsForRepositories extends Recipe {
     @Getter
     final String description = "Use HTTPS for repository URLs.";
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("security");
-    }
+    @Getter
+    final Set<String> tags = singleton("security");
 
     @Override
     public Duration getEstimatedEffortPerOccurrence() {

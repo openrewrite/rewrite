@@ -47,10 +47,8 @@ public class UseHttpsForRepositories extends Recipe {
         return Duration.ofMinutes(5);
     }
 
-    @Override
-    public Set<String> getTags() {
-        return new HashSet<>(Arrays.asList("security", "CWE-829"));
-    }
+    @Getter
+    final Set<String> tags = new HashSet<>(Arrays.asList("security", "CWE-829"));
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

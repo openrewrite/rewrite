@@ -15,6 +15,7 @@
  */
 package org.openrewrite.rpc;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -63,10 +64,8 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
         return descriptor.getDescription();
     }
 
-    @Override
-    public Set<String> getTags() {
-        return descriptor.getTags();
-    }
+    @Getter
+    final Set<String> tags = descriptor.getTags();
 
     @Override
     public @Nullable Duration getEstimatedEffortPerOccurrence() {

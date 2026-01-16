@@ -46,10 +46,7 @@ public class ImplicitParameterInLambda extends Recipe {
         return Duration.ofMinutes(2);
     }
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("RSPEC-S6558");
-    }
+    Set<String> tags = singleton("RSPEC-S6558");
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

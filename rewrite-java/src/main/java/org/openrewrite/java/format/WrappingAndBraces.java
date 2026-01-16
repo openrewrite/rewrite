@@ -36,10 +36,8 @@ public class WrappingAndBraces extends Recipe {
     @Getter
     final String description = "Format line wraps and braces in Java code.";
 
-    @Override
-    public Set<String> getTags() {
-        return new LinkedHashSet<>(Arrays.asList("RSPEC-S121", "RSPEC-S2681", "RSPEC-S3972", "RSPEC-S3973"));
-    }
+    @Getter
+    final Set<String> tags = new LinkedHashSet<>(Arrays.asList("RSPEC-S121", "RSPEC-S2681", "RSPEC-S3972", "RSPEC-S3973"));
 
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
