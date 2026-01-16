@@ -50,10 +50,7 @@ public class RemoveUnusedImports extends Recipe {
     String description = "Remove imports for types that are not referenced. As a precaution against incorrect changes no imports " +
                "will be removed from any source where unknown types are referenced.";
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("RSPEC-S1128");
-    }
+    Set<String> tags = singleton("RSPEC-S1128");
 
     @Override
     public Duration getEstimatedEffortPerOccurrence() {

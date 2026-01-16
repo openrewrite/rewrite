@@ -49,10 +49,7 @@ public class FindEmptyMethods extends Recipe {
 
     String description = "Find methods with empty bodies and single public no arg constructors.";
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("RSPEC-S1186");
-    }
+    Set<String> tags = singleton("RSPEC-S1186");
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

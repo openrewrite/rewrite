@@ -207,8 +207,11 @@ def parse_python_source(source: str, path: str = "<unknown>") -> dict:
         from rewrite.python._parser_visitor import ParserVisitor
         from rewrite import random_id, Markers
 
+        # Strip BOM before parsing (ParserVisitor handles it internally but ast.parse doesn't)
+        source_for_ast = source[1:] if source.startswith('\ufeff') else source
+
         # Parse using Python AST
-        tree = ast.parse(source, path)
+        tree = ast.parse(source_for_ast, path)
 
         # Convert to OpenRewrite LST
         cu = ParserVisitor(source).visit(tree)
