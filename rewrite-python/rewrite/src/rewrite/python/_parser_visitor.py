@@ -2874,13 +2874,18 @@ class ParserVisitor(ast.NodeVisitor):
     def __pad_list_element(self, element: J2, last: bool = False, pad_last: bool = True, delim: str = ',',
                            end_delim: Optional[str] = None) -> JRightPadded[J2]:
         save_token_idx = self._token_idx
-        padding = self.__whitespace() if pad_last or not last else Space.EMPTY
         markers = Markers.EMPTY
+
         if last and self._token_idx < len(self._tokens):
+            # For the last element, always consume whitespace first to check for trailing comma
+            padding = self.__whitespace()
             if end_delim != delim and self.__skip(delim):
+                # Found trailing comma - keep the whitespace as padding
                 markers = markers.replace(markers=[TrailingComma(random_id(), self.__whitespace())])
             elif not self.__at_token(end_delim) if end_delim else True:
+                # No trailing comma - decide whether to keep padding based on pad_last
                 if not pad_last:
+                    padding = Space.EMPTY
                     self._token_idx = save_token_idx
             if end_delim and self.__skip(end_delim):
                 pass
@@ -2888,8 +2893,13 @@ class ParserVisitor(ast.NodeVisitor):
             padding = Space.EMPTY
             self._token_idx = save_token_idx
         elif not last:
+            # For non-last elements, always consume whitespace (space before comma belongs to element)
+            padding = self.__whitespace()
             self._token_idx += 1  # consume delimiter
             markers = Markers.EMPTY
+        else:
+            padding = Space.EMPTY
+
         return JRightPadded(element, padding, markers)
 
     def __pad_right(self, tree, space: Space) -> JRightPadded[J2]:
