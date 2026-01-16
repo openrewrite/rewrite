@@ -16,22 +16,18 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from rewrite.java.support_types import (
     J,
     Expression,
     Statement,
     Space,
-    JRightPadded,
-    JLeftPadded,
-    JContainer,
 )
 from rewrite.java.visitor import JavaVisitor
 from rewrite.python.support_types import Py, PySpace
 from rewrite.tree import SourceFile
 from rewrite.utils import list_map
-from rewrite.visitor import Cursor
 
 if TYPE_CHECKING:
     from rewrite.python.tree import (
@@ -296,7 +292,7 @@ class PythonVisitor(JavaVisitor[P]):
         error_from = error_from.replace(
             error=self.visit_and_cast(error_from.error, Expression, p)
         )
-        error_from = error_from.padding.replace(
+        error_from = error_from.replace(
             from_=self.visit_left_padded(error_from.padding.from_, None, p)
         )
         return error_from
@@ -669,92 +665,3 @@ class PythonVisitor(JavaVisitor[P]):
         )
         return yield_from
 
-    # -------------------------------------------------------------------------
-    # Helper methods for visiting padded elements
-    # -------------------------------------------------------------------------
-
-    def visit_left_padded(
-        self,
-        left: Optional[JLeftPadded[T]],
-        loc: Optional[Any],
-        p: P,
-    ) -> Optional[JLeftPadded[T]]:
-        """Visit a left-padded element."""
-        if left is None:
-            return None
-        before = self.visit_space(left.before, loc, p)
-        # Visit element if it's a Tree
-        element = left.element
-        if isinstance(element, J):
-            element = self.visit(element, p)
-        if before is left.before and element is left.element:
-            return left
-        return left.replace(before=before, element=element)
-
-    def visit_right_padded(
-        self,
-        right: Optional[JRightPadded[T]],
-        loc: Optional[Any],
-        p: P,
-    ) -> Optional[JRightPadded[T]]:
-        """Visit a right-padded element."""
-        if right is None:
-            return None
-        # Visit element if it's a Tree
-        element = right.element
-        if isinstance(element, J):
-            element = self.visit(element, p)
-            if element is None:
-                # Element was deleted by the visitor
-                return None
-        after = self.visit_space(right.after, loc, p)
-        if element is right.element and after is right.after:
-            return right
-        return right.replace(element=element, after=after)
-
-    def visit_container(
-        self,
-        container: Optional[JContainer[T]],
-        loc: Optional[Any],
-        p: P,
-    ) -> Optional[JContainer[T]]:
-        """Visit a container of elements."""
-        if container is None:
-            return None
-        before = self.visit_space(container.before, loc, p)
-        elements = list_map(
-            lambda e: self.visit_right_padded(e, loc, p),
-            container.padding.elements
-        )
-        # Filter out None elements (deleted by visitor)
-        elements = [e for e in elements if e is not None]
-        if before is container.before and elements == list(container.padding.elements):
-            return container
-        return container.replace(before=before).padding.replace(elements=elements)
-
-    # -------------------------------------------------------------------------
-    # Placeholder methods for inherited JavaVisitor functionality
-    # -------------------------------------------------------------------------
-
-    def visit_statement(self, stmt: Statement, p: P) -> Statement:
-        """Visit a statement. Override to intercept all statements."""
-        return stmt
-
-    def visit_expression(self, expr: Expression, p: P) -> Expression:
-        """Visit an expression. Override to intercept all expressions."""
-        return expr
-
-    def visit_and_cast(self, tree: Optional[Any], type_: type, p: P) -> Optional[Any]:
-        """Visit a tree and cast to the expected type."""
-        if tree is None:
-            return None
-        result = self.visit(tree, p)
-        return result
-
-    def visit(self, tree: Any, p: P, parent: Optional['Cursor'] = None) -> Any:
-        """Visit a tree node.
-
-        Delegates to TreeVisitor.visit() for all trees, including Py instances.
-        This ensures proper cursor maintenance and pre_visit/post_visit hooks.
-        """
-        return super().visit(tree, p, parent)
