@@ -24,7 +24,9 @@ from rewrite.utils import list_map
 from rewrite.visitor import TreeVisitor
 
 if TYPE_CHECKING:
-    from rewrite.java.tree import MethodDeclaration, Block, Assert, Literal
+    from rewrite.java.tree import MethodDeclaration, Block
+
+from rewrite.java.tree import Assert, Literal
 
 P = TypeVar("P")
 
