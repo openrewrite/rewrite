@@ -198,6 +198,70 @@ class Foo:
     ))
 
 
+def test_string_with_unicode_tamil():
+    # language=python - Tamil script characters in string
+    RecipeSpec().rewrite_run(python('x = "மெல்லினம்"'))
+
+
+def test_string_with_superscript():
+    # language=python - superscript characters in string
+    RecipeSpec().rewrite_run(python('x = "²"'))
+
+
+def test_string_with_unicode_mixed_superscript():
+    # language=python - mixed German and superscript characters
+    RecipeSpec().rewrite_run(python('x = "ä²ö"'))
+
+
+def test_string_with_unicode_complex():
+    # language=python - German chars mixed with multiple superscripts
+    RecipeSpec().rewrite_run(python('x = "ää²¹öö"'))
+
+
+def test_unicode_string_in_simple_tuple():
+    # language=python - Tamil string in tuple
+    RecipeSpec().rewrite_run(python('x = ("மெல்லினம்", y)'))
+
+
+def test_unicode_string_in_nested_tuple():
+    # language=python - Tamil string in nested tuple
+    RecipeSpec().rewrite_run(python('x = (("மெல்லினம்", y),)'))
+
+
+def test_unicode_string_in_tuple():
+    # language=python - Unicode strings in tuple (as seen in data_provider decorator)
+    RecipeSpec().rewrite_run(python(
+        '''\
+x = (
+    ("மெல்லினம்", [NAME]),
+    ("²", [ERRORTOKEN]),
+    ("ä²ö", [NAME, ERRORTOKEN, NAME]),
+    ("ää²¹öö", [NAME, ERRORTOKEN, NAME]),
+)
+'''
+    ))
+
+
+def test_unicode_string_data_provider_style():
+    # language=python - Full data_provider style structure
+    RecipeSpec().rewrite_run(python(
+        '''\
+@data_provider(
+    (
+        ("1foo1", [NUMBER, NAME]),
+        ("மெல்லினம்", [NAME]),
+        ("²", [ERRORTOKEN]),
+        ("ä²ö", [NAME, ERRORTOKEN, NAME]),
+        ("ää²¹öö", [NAME, ERRORTOKEN, NAME]),
+    )
+)
+def test_token_types(self, code, types):
+    actual_types = [t.type for t in _get_token_list(code)]
+    assert actual_types == types + [ENDMARKER]
+'''
+    ))
+
+
 def find_first(tree: Tree, clazz: Type[T]) -> T:
     class Find(PythonVisitor[list[Tree]]):
         def visit(self, t: Tree, p: list[Tree]) -> Optional[Tree]:

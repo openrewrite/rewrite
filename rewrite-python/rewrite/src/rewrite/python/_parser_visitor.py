@@ -61,11 +61,46 @@ class ParserVisitor(ast.NodeVisitor):
         self._parentheses_stack = []
         self._type_mapping = PythonTypeMapping(source)
 
+        # Pre-compute byte-to-char mappings for lines with multi-byte characters
+        self._byte_to_char = self._build_byte_to_char_mapping(source)
+
         # Token infrastructure - _token_idx is the primary position tracker
         self._tokens, self._paren_pairs = self._build_tokens(
             tokenize(BytesIO(source.encode('utf-8')).readline)
         )
         self._token_idx = 1  # Skip ENCODING token
+
+    @staticmethod
+    def _build_byte_to_char_mapping(source: str) -> Optional[Dict[int, List[int]]]:
+        """Build byte-to-char offset mappings for lines with multi-byte characters.
+
+        Python 3.8+ AST uses byte offsets for col_offset/end_col_offset,
+        but the tokenizer uses character offsets. This mapping enables
+        conversion for correct position comparisons.
+
+        Returns None for pure ASCII files (no multi-byte characters).
+        Only stores mappings for lines that actually have multi-byte characters,
+        since ASCII-only lines have identical byte and character offsets.
+        """
+        result: Dict[int, List[int]] = {}
+        for lineno, line in enumerate(source.splitlines(keepends=True), start=1):
+            line_bytes = line.encode('utf-8')
+            if len(line_bytes) != len(line):  # Line has multi-byte characters
+                mapping = []
+                for char_idx, char in enumerate(line):
+                    for _ in range(len(char.encode('utf-8'))):
+                        mapping.append(char_idx)
+                result[lineno] = mapping
+        return result if result else None  # Return None for pure ASCII files
+
+    def _byte_offset_to_char_offset(self, lineno: int, byte_offset: int) -> int:
+        """Convert a byte offset to a character offset for a given line."""
+        if self._byte_to_char is None or lineno not in self._byte_to_char:
+            return byte_offset  # ASCII file or ASCII-only line, offsets are identical
+        mapping = self._byte_to_char[lineno]
+        if byte_offset >= len(mapping):
+            return mapping[-1] + 1 if mapping else byte_offset
+        return mapping[byte_offset]
 
     def _build_tokens(self, raw_tokens: Iterable[TokenInfo]) -> Tuple[List[TokenInfo], Dict[int, int]]:
         """Build token list with whitespace tokens and compute paren pairs in one pass."""
@@ -849,11 +884,13 @@ class ParserVisitor(ast.NodeVisitor):
         # generator parentheses can be shared with a function call or be explicit.
         # These are '(' tokens that appear before the generator's AST position.
         extra_parens: List[Tuple[Space, Space]] = []  # List of (prefix, inner_prefix) for each extra paren
+        # Convert AST byte offset to char offset for comparisons with token positions
+        node_char_col = self._byte_offset_to_char_offset(node.lineno, node.col_offset)
         while self.__at_token('('):
             curr_tok = self._tokens[self._token_idx]
             curr_line, curr_col = curr_tok.start
             # If token position is before generator's AST position, it's an extra paren
-            if curr_line < node.lineno or (curr_line == node.lineno and curr_col < node.col_offset):
+            if curr_line < node.lineno or (curr_line == node.lineno and curr_col < node_char_col):
                 extra_parens.append((prefix, Space.EMPTY))
                 self._token_idx += 1  # consume '('
                 prefix = self.__whitespace()  # whitespace after the extra '(' becomes the next prefix
@@ -1104,9 +1141,11 @@ class ParserVisitor(ast.NodeVisitor):
             if close_paren_idx is not None and hasattr(node, 'end_lineno') and hasattr(node, 'end_col_offset'):
                 close_tok = self._tokens[close_paren_idx]
                 close_line, close_col = close_tok.start
+                # Convert AST byte offset to character offset for comparison with token position
+                end_char_col = self._byte_offset_to_char_offset(node.end_lineno, node.end_col_offset)
                 # If closing paren is at or after node's end position, it wraps the whole pattern
                 # Note: Use >= because the pattern ends where its content ends, and ) comes right after
-                if close_line > node.end_lineno or (close_line == node.end_lineno and close_col >= node.end_col_offset - 1):
+                if close_line > node.end_lineno or (close_line == node.end_lineno and close_col >= end_char_col - 1):
                     # This is a GROUP pattern - consume '(' and convert inner pattern
                     self._token_idx += 1  # consume '('
                     inner_prefix = self.__whitespace()
@@ -2031,7 +2070,9 @@ class ParserVisitor(ast.NodeVisitor):
             curr_tok = self._tokens[self._token_idx]
             curr_line, curr_col = curr_tok.start
             # If token position is before decorator's AST position, it's an extra paren
-            if curr_line < decorator.lineno or (curr_line == decorator.lineno and curr_col < decorator.col_offset):
+            # Convert byte offset to char offset for comparison (AST uses byte offsets, tokenizer uses char offsets)
+            decorator_char_col = self._byte_offset_to_char_offset(decorator.lineno, decorator.col_offset)
+            if curr_line < decorator.lineno or (curr_line == decorator.lineno and curr_col < decorator_char_col):
                 extra_parens.append((name_prefix, Space.EMPTY))
                 self._token_idx += 1  # consume '('
                 inner_prefix = self.__whitespace()
@@ -2405,11 +2446,14 @@ class ParserVisitor(ast.NodeVisitor):
         # handle both the tuple's own parens and any extra wrapping parens in one place.
         # These are '(' tokens that appear before the tuple's AST position.
         extra_parens: List[Tuple[Space, Space]] = []  # List of (prefix, inner_prefix) for each extra paren
+        # Convert AST byte offset to char offset for comparisons with token positions
+        node_char_col = self._byte_offset_to_char_offset(node.lineno, node.col_offset)
+
         while self.__at_token('('):
             curr_tok = self._tokens[self._token_idx]
             curr_line, curr_col = curr_tok.start
             # If token position is before tuple's AST position, it's an extra paren
-            if curr_line < node.lineno or (curr_line == node.lineno and curr_col < node.col_offset):
+            if curr_line < node.lineno or (curr_line == node.lineno and curr_col < node_char_col):
                 extra_parens.append((prefix, Space.EMPTY))
                 self._token_idx += 1  # consume '('
                 prefix = self.__whitespace()  # whitespace after the extra '(' becomes the next prefix
@@ -2434,8 +2478,6 @@ class ParserVisitor(ast.NodeVisitor):
                 # starts at col 9. Since ')' is before the second element, this '(' is for the
                 # first element, not the tuple.
                 # For `t = (1 , )`, '(' has ')' after all elements, so it's the tuple's paren.
-                # We use element positions (which match tokenizer positions) rather than tuple
-                # end position (which uses byte offsets and may differ for Unicode).
                 close_paren_idx = self._paren_pairs.get(self._token_idx)
                 if close_paren_idx is not None and len(node.elts) > 1:
                     close_tok = self._tokens[close_paren_idx]
@@ -2443,8 +2485,9 @@ class ParserVisitor(ast.NodeVisitor):
                     # Check if ')' comes before the second element starts
                     # If so, the '(' is for the first element, not the tuple
                     second_elt = node.elts[1]
+                    second_elt_char_col = self._byte_offset_to_char_offset(second_elt.lineno, second_elt.col_offset)
                     if close_line < second_elt.lineno or (
-                        close_line == second_elt.lineno and close_col < second_elt.col_offset
+                        close_line == second_elt.lineno and close_col < second_elt_char_col
                     ):
                         maybe_parens = False
 
@@ -2707,8 +2750,10 @@ class ParserVisitor(ast.NodeVisitor):
         if close_paren_idx is not None and hasattr(node, 'end_lineno') and hasattr(node, 'end_col_offset'):
             close_tok = self._tokens[close_paren_idx]
             close_line, close_col = close_tok.start
+            # Convert AST byte offset to character offset for comparison with token position
+            end_char_col = self._byte_offset_to_char_offset(node.end_lineno, node.end_col_offset)
             # If closing paren is before node's end, it wraps an inner expression
-            if close_line < node.end_lineno or (close_line == node.end_lineno and close_col < node.end_col_offset):
+            if close_line < node.end_lineno or (close_line == node.end_lineno and close_col < end_char_col):
                 self._token_idx = save_token_idx
                 return mapping(cast(ast.AST, node))
 

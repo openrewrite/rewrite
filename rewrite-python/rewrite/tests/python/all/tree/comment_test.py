@@ -66,3 +66,18 @@ def test_multiline_comment_with_hash():
                 # inside a function
                 assert 1
     """))
+
+
+def test_comment_with_unicode():
+    # language=python - Comment with Unicode characters (Tamil script, Greek, etc.)
+    RecipeSpec().rewrite_run(python('''
+x = 1  # மெல்லினம் is Tamil for "soft consonant"
+y = 2  # π ≈ 3.14159, Δ is Greek capital delta
+'''))
+
+
+def test_comment_with_unicode_after_unicode_string():
+    # language=python - Unicode comment after Unicode string in tuple
+    RecipeSpec().rewrite_run(python('''
+x = ("மெல்லினம்", y)  # Tamil word in tuple
+'''))
