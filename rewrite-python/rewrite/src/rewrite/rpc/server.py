@@ -407,6 +407,8 @@ def handle_reset(params: dict) -> bool:
     remote_refs.clear()
     _prepared_recipes.clear()
     _execution_contexts.clear()
+    _recipe_accumulators.clear()
+    _recipe_phases.clear()
     logger.info("Reset: cleared all cached state")
     return True
 
@@ -524,6 +526,10 @@ def _serialize_value(value) -> Any:
 _prepared_recipes: Dict[str, Any] = {}
 # Execution contexts storage - maps context IDs to ExecutionContext instances
 _execution_contexts: Dict[str, Any] = {}
+# Accumulator storage for ScanningRecipes - maps recipe IDs to accumulators
+_recipe_accumulators: Dict[str, Any] = {}
+# Phase tracking for recipes - maps recipe IDs to 'scan' or 'edit'
+_recipe_phases: Dict[str, str] = {}
 
 
 def handle_prepare_recipe(params: dict) -> dict:
@@ -652,7 +658,8 @@ def handle_visit(params: dict) -> dict:
     before = tree
     after = visitor.visit(tree, ctx, cursor)
 
-    # Update local objects with the result
+    # Update local objects with the result and determine if modified
+    # Use referential equality (identity comparison) to detect modifications
     if after is None:
         # Tree was deleted
         if tree_id in local_objects:
@@ -663,15 +670,7 @@ def handle_visit(params: dict) -> dict:
         local_objects[tree_id] = after
         if str(after.id) != tree_id:
             local_objects[str(after.id)] = after
-        # Check if there are actual structural changes by comparing printed output
-        # This is needed because Python visitors may create new tree objects during traversal
-        from rewrite.python.printer import PythonPrinter
-        printer = PythonPrinter()
-        before_text = printer.print(before)
-        after_text = printer.print(after)
-        modified = before_text != after_text
-        logger.info(f"Visit comparison: before_text={repr(before_text[:50] + '...' if len(before_text) > 50 else before_text)}, "
-                    f"after_text={repr(after_text[:50] + '...' if len(after_text) > 50 else after_text)}")
+        modified = True
     else:
         modified = False
 
@@ -685,12 +684,29 @@ def _instantiate_visitor(visitor_name: str, ctx):
     Visitor names can be:
     - 'edit:<recipe_id>' - get the editor from a prepared recipe
     - 'scan:<recipe_id>' - get the scanner from a prepared scanning recipe
+
+    For ScanningRecipes, the accumulator is persisted across calls so that
+    data collected during the scan phase is available during the edit and
+    generate phases.
     """
     if visitor_name.startswith('edit:'):
         recipe_id = visitor_name[5:]
         recipe = _prepared_recipes.get(recipe_id)
         if recipe is None:
             raise ValueError(f"Prepared recipe not found: {recipe_id}")
+
+        # Track phase transition
+        _recipe_phases[recipe_id] = 'edit'
+
+        # For ScanningRecipe, use the accumulated data from scan phase
+        from rewrite.recipe import ScanningRecipe
+        if isinstance(recipe, ScanningRecipe):
+            # Get existing accumulator or create new one
+            if recipe_id not in _recipe_accumulators:
+                _recipe_accumulators[recipe_id] = recipe.initial_value(ctx)
+            acc = _recipe_accumulators[recipe_id]
+            return recipe.editor_with_data(acc)
+
         return recipe.editor()
 
     elif visitor_name.startswith('scan:'):
@@ -701,7 +717,18 @@ def _instantiate_visitor(visitor_name: str, ctx):
         from rewrite.recipe import ScanningRecipe
         if not isinstance(recipe, ScanningRecipe):
             raise ValueError(f"Recipe is not a scanning recipe: {recipe_id}")
-        acc = recipe.initial_value(ctx)
+
+        # Check for phase transition (edit -> scan = new cycle)
+        # If we're transitioning from edit back to scan, clear the accumulator
+        if _recipe_phases.get(recipe_id) == 'edit':
+            _recipe_accumulators.pop(recipe_id, None)
+        _recipe_phases[recipe_id] = 'scan'
+
+        # Get existing accumulator or create new one
+        if recipe_id not in _recipe_accumulators:
+            _recipe_accumulators[recipe_id] = recipe.initial_value(ctx)
+        acc = _recipe_accumulators[recipe_id]
+
         return recipe.scanner(acc)
 
     else:
@@ -713,6 +740,9 @@ def handle_generate(params: dict) -> dict:
 
     Called by the recipe run cycle to generate new source files from scanning recipes.
     For non-scanning recipes, returns an empty list.
+
+    The accumulator used here is the same one that was populated during the scan phase,
+    allowing recipes to generate files based on data collected across all source files.
 
     Args:
         params: dict with 'id' (prepared recipe id) and 'p' (context id)
@@ -744,7 +774,13 @@ def handle_generate(params: dict) -> dict:
     # Only scanning recipes can generate files
     from rewrite.recipe import ScanningRecipe
     if isinstance(recipe, ScanningRecipe):
-        acc = recipe.initial_value(ctx)
+        # Use the persisted accumulator from the scan phase, or create new one if not available
+        if recipe_id in _recipe_accumulators:
+            acc = _recipe_accumulators[recipe_id]
+        else:
+            acc = recipe.initial_value(ctx)
+            _recipe_accumulators[recipe_id] = acc
+
         generated = recipe.generate(acc, ctx)
 
         ids = []

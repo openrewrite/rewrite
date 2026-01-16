@@ -18,7 +18,10 @@ package org.openrewrite.python;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+
+import java.util.concurrent.TimeUnit;
 import org.openrewrite.Recipe;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.test.RecipeSpec;
@@ -68,6 +71,7 @@ class RemovePassIntegTest implements RewriteTest {
     }
 
     @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
     void removesPassFromFunctionWithOtherStatements() {
         Recipe removePass = client().prepareRecipe("org.openrewrite.python.RemovePass", Map.of());
         rewriteRun(
@@ -87,6 +91,7 @@ class RemovePassIntegTest implements RewriteTest {
     }
 
     @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
     void keepsPassWhenOnlyStatementInFunction() {
         Recipe removePass = client().prepareRecipe("org.openrewrite.python.RemovePass", Map.of());
         rewriteRun(
@@ -101,6 +106,7 @@ class RemovePassIntegTest implements RewriteTest {
     }
 
     @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
     void removesPassFromClassMethod() {
         Recipe removePass = client().prepareRecipe("org.openrewrite.python.RemovePass", Map.of());
         rewriteRun(
@@ -122,6 +128,7 @@ class RemovePassIntegTest implements RewriteTest {
     }
 
     @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
     void removesPassFromIfBlock() {
         Recipe removePass = client().prepareRecipe("org.openrewrite.python.RemovePass", Map.of());
         rewriteRun(
@@ -141,6 +148,7 @@ class RemovePassIntegTest implements RewriteTest {
     }
 
     @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
     void keepsPassWhenOnlyDocstringInFunction() {
         Recipe removePass = client().prepareRecipe("org.openrewrite.python.RemovePass", Map.of());
         rewriteRun(
