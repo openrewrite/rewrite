@@ -27,14 +27,18 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.DependencyMatcher;
 
+import java.util.Objects;
 import java.util.Optional;
 
+import static java.util.Objects.requireNonNull;
+
 /**
- * A recipe that adds an explicit version to dependencies that don't have one declared.
+ * A visitor that adds an explicit version to dependencies that don't have one declared.
  * This is useful when a dependency version was previously managed (e.g., by a BOM or platform)
  * and the management is being removed, requiring the version to be explicitly specified.
  * <p>
@@ -59,10 +63,7 @@ public class AddExplicitDependencyVersion extends JavaIsoVisitor<ExecutionContex
     @Override
     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
         if (tree instanceof SourceFile) {
-            Optional<GradleProject> maybeGp = tree.getMarkers().findFirst(GradleProject.class);
-            if (maybeGp.isPresent()) {
-                gp = maybeGp.get();
-            }
+            tree.getMarkers().findFirst(GradleProject.class).ifPresent(gradleProject -> gp = gradleProject);
         }
         return super.visit(tree, ctx);
     }
@@ -112,16 +113,16 @@ public class AddExplicitDependencyVersion extends JavaIsoVisitor<ExecutionContex
             return false;
         }
 
-        org.openrewrite.java.tree.Expression firstArg = m.getArguments().get(0);
+        Expression firstArg = m.getArguments().get(0);
 
         // String literal: check if it has 3 parts (group:artifact:version)
         if (firstArg instanceof J.Literal && ((J.Literal) firstArg).getValue() instanceof String) {
             String gav = (String) ((J.Literal) firstArg).getValue();
-            return gav != null && gav.chars().filter(c -> c == ':').count() >= 2;
+            return gav.chars().filter(c -> c == ':').count() >= 2;
         }
 
         // For map/assignment notation, check if version key exists
-        for (org.openrewrite.java.tree.Expression arg : m.getArguments()) {
+        for (Expression arg : m.getArguments()) {
             if (arg instanceof org.openrewrite.groovy.tree.G.MapEntry) {
                 org.openrewrite.groovy.tree.G.MapEntry entry = (org.openrewrite.groovy.tree.G.MapEntry) arg;
                 if (entry.getKey() instanceof J.Literal &&
@@ -141,7 +142,7 @@ public class AddExplicitDependencyVersion extends JavaIsoVisitor<ExecutionContex
     }
 
     private @Nullable String findResolvedVersion(String configurationName, String groupId, String artifactId) {
-        GradleDependencyConfiguration gdc = gp.getConfiguration(configurationName);
+        GradleDependencyConfiguration gdc = requireNonNull(gp).getConfiguration(configurationName);
         if (gdc == null) {
             return null;
         }
