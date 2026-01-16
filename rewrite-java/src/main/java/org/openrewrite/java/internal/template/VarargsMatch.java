@@ -17,15 +17,17 @@ package org.openrewrite.java.internal.template;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.Marker;
 
-import java.util.List;
 import java.util.UUID;
 
+/**
+ * Marker indicating that a {@link org.openrewrite.java.tree.J.NewArray} was created
+ * from matching varargs arguments. The matched elements are available via
+ * {@link org.openrewrite.java.tree.J.NewArray#getInitializer()}.
+ */
 @Value
 @With
 public class VarargsMatch implements Marker {
     UUID id;
-    List<J> matchedElements;
 }

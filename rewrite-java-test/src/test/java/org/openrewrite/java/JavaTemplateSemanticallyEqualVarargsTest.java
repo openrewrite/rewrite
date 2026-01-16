@@ -334,11 +334,12 @@ class JavaTemplateSemanticallyEqualVarargsTest implements RewriteTest {
                         JavaTemplate.Matcher matcher = template.matcher(getCursor());
                         if (matcher.find()) {
                             J param = matcher.parameter(0);
-                            VarargsMatch varargsMatch = param.getMarkers().findFirst(VarargsMatch.class).orElse(null);
-                            if (varargsMatch != null) {
-                                // Verify we captured the correct number of elements
-                                assertThat(varargsMatch.getMatchedElements()).hasSize(3);
-                                return SearchResult.found(mi, "varargs:" + varargsMatch.getMatchedElements().size());
+                            // VarargsMatch marker indicates this is a varargs match
+                            // The matched elements are in the J.NewArray initializer
+                            if (param instanceof J.NewArray && param.getMarkers().findFirst(VarargsMatch.class).isPresent()) {
+                                J.NewArray arr = (J.NewArray) param;
+                                assertThat(arr.getInitializer()).hasSize(3);
+                                return SearchResult.found(mi, "varargs:" + arr.getInitializer().size());
                             }
                         }
                         return mi;

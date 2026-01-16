@@ -342,7 +342,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
             }
 
             // Collect varargs elements
-            List<J> varargsElements = new ArrayList<>();
+            List<Expression> varargsElements = new ArrayList<>();
             for (int i = fixedArgCount; i < actualArgs.size(); i++) {
                 Expression actualArg = actualArgs.get(i);
 
@@ -370,15 +370,31 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                 }
             }
 
-            // Register the match with VarargsMatch marker
-            registerVarargsMatch(varargsElements, param.getName());
+            // Register the match with VarargsMatch marker on a J.NewArray
+            registerVarargsMatch(varargsElements, arrayType, param.getName());
             return true;
         }
 
-        private void registerVarargsMatch(List<J> elements, @Nullable String name) {
-            Markers markers = Markers.build(singleton(new VarargsMatch(randomId(), elements)));
-            J.Empty placeholder = new J.Empty(randomId(), Space.EMPTY, markers);
-            matchedParameters.put(placeholder, name);
+        private void registerVarargsMatch(List<Expression> elements, JavaType.Array arrayType, @Nullable String name) {
+            Markers markers = Markers.build(singleton(new VarargsMatch(randomId())));
+            JContainer<Expression> initializer = null;
+            if (!elements.isEmpty()) {
+                List<JRightPadded<Expression>> paddedElements = new ArrayList<>(elements.size());
+                for (Expression element : elements) {
+                    paddedElements.add(JRightPadded.build(element));
+                }
+                initializer = JContainer.build(paddedElements);
+            }
+            J.NewArray newArray = new J.NewArray(
+                    randomId(),
+                    Space.EMPTY,
+                    markers,
+                    null, // typeExpression - not needed for matching purposes
+                    emptyList(), // dimensions
+                    initializer,
+                    arrayType
+            );
+            matchedParameters.put(newArray, name);
         }
     }
 }
