@@ -1,4 +1,3 @@
-import pytest
 from rewrite.test import RecipeSpec, python
 
 
@@ -20,7 +19,6 @@ def test_generator_in_parens_in_call():
     ))
 
 
-@pytest.mark.xfail(reason="Pre-existing bug: multiple parentheses around generators not fully preserved")
 def test_generator_in_double_parens_in_call():
     # language=python
     RecipeSpec().rewrite_run(python(
@@ -30,7 +28,6 @@ def test_generator_in_double_parens_in_call():
     ))
 
 
-@pytest.mark.xfail(reason="Pre-existing bug: multiple parentheses around generators not fully preserved")
 def test_generator_in_triple_parens_in_call():
     # language=python
     RecipeSpec().rewrite_run(python(

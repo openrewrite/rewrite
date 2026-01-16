@@ -76,6 +76,7 @@ class ParserVisitor(ast.NodeVisitor):
         row = 1       # current row (1-based like tokenize)
         col = 0       # current column (0-based like tokenize)
         in_from_import = False  # track if we're between 'from' and 'import' keywords
+        fstring_depth = 0  # track nested f-string depth
 
         for tok in raw_tokens:
             # ENCODING token is virtual (doesn't consume source text)
@@ -97,17 +98,28 @@ class ParserVisitor(ast.NodeVisitor):
 
             tok_start = scan
 
-            # Insert whitespace token if there's a gap
+            # Insert whitespace token if there's a gap.
+            # Inside f-strings, skip gaps that are just escaped braces ({{ or }}) because the tokenizer
+            # already decoded them. These gaps contain exactly one '{' or '}' character.
             if tok_start > prev_end:
                 ws_text = self._source[prev_end:tok_start]
-                ws_tok = TokenInfo(
-                    WHITESPACE_TOKEN,
-                    ws_text,
-                    (0, prev_end),
-                    (0, tok_start),
-                    ''
-                )
-                result.append(ws_tok)
+                # Skip single-character brace gaps inside f-strings (escaped {{ or }})
+                is_escaped_brace = fstring_depth > 0 and ws_text in ('{', '}')
+                if not is_escaped_brace:
+                    ws_tok = TokenInfo(
+                        WHITESPACE_TOKEN,
+                        ws_text,
+                        (0, prev_end),
+                        (0, tok_start),
+                        ''
+                    )
+                    result.append(ws_tok)
+
+            # Track f-string depth for whitespace injection.
+            if tok.type == token.FSTRING_START:
+                fstring_depth += 1
+            elif tok.type == token.FSTRING_END:
+                fstring_depth -= 1
 
             # Track paren pairs
             if tok.type == token.OP:
@@ -830,6 +842,24 @@ class ParserVisitor(ast.NodeVisitor):
         prefix = self.__whitespace()
         parenthesized = False
 
+        # Collect any extra parentheses that wrap the generator expression.
+        # Similar to tuples, generators handle all surrounding parentheses here because
+        # generator parentheses can be shared with a function call or be explicit.
+        # These are '(' tokens that appear before the generator's AST position.
+        extra_parens: List[Tuple[Space, Space]] = []  # List of (prefix, inner_prefix) for each extra paren
+        while self.__at_token('('):
+            curr_tok = self._tokens[self._token_idx]
+            curr_line, curr_col = curr_tok.start
+            # If token position is before generator's AST position, it's an extra paren
+            if curr_line < node.lineno or (curr_line == node.lineno and curr_col < node.col_offset):
+                extra_parens.append((prefix, Space.EMPTY))
+                self._token_idx += 1  # consume '('
+                prefix = self.__whitespace()  # whitespace after the extra '(' becomes the next prefix
+                extra_parens[-1] = (extra_parens[-1][0], prefix)
+                prefix = Space.EMPTY
+            else:
+                break
+
         if self.__at_token('('):
             # Use paren map to determine if this '(' is for a parenthesized generator
             # or for a sub-expression within the generator element.
@@ -870,9 +900,9 @@ class ParserVisitor(ast.NodeVisitor):
             result = self.__convert(node.elt)
             parenthesized = False
 
-        return py.ComprehensionExpression(
+        gen_result: Expression = py.ComprehensionExpression(
             random_id(),
-            prefix,
+            extra_parens[0][1] if extra_parens else prefix,
             Markers.EMPTY if parenthesized else Markers.EMPTY.replace(markers=[OmitParentheses(random_id())]),
             py.ComprehensionExpression.Kind.GENERATOR,
             result,
@@ -880,6 +910,29 @@ class ParserVisitor(ast.NodeVisitor):
             self.__source_before(')') if parenthesized else Space.EMPTY,
             self._type_mapping.type(node)
         )
+
+        # Wrap in extra parentheses (in reverse order, innermost first)
+        for i in range(len(extra_parens) - 1, -1, -1):
+            paren_prefix, inner_prefix = extra_parens[i]
+            suffix = self.__whitespace()
+            self.__skip(')')  # consume the extra ')'
+            # For the outermost paren, use the original prefix
+            if i == 0:
+                gen_result = j.Parentheses(
+                    random_id(),
+                    prefix if not extra_parens else paren_prefix,
+                    Markers.EMPTY,
+                    self.__pad_right(gen_result, suffix)
+                )
+            else:
+                gen_result = j.Parentheses(
+                    random_id(),
+                    paren_prefix,
+                    Markers.EMPTY,
+                    self.__pad_right(gen_result, suffix)
+                )
+
+        return gen_result
 
     def visit_Expr(self, node):
         return self.__convert(node.value)
@@ -1869,22 +1922,73 @@ class ParserVisitor(ast.NodeVisitor):
 
     def __map_decorator(self, decorator) -> j.Annotation:
         prefix = self.__source_before('@')
+
+        # Collect any extra parentheses that wrap the decorator expression.
+        # In Python, decorators can be wrapped in parentheses like @(expr).
+        # These are '(' tokens that appear before the decorator's AST position.
+        extra_parens: List[Tuple[Space, Space]] = []  # List of (prefix, inner_prefix) for each extra paren
+        name_prefix = self.__whitespace()
+        while self.__at_token('('):
+            curr_tok = self._tokens[self._token_idx]
+            curr_line, curr_col = curr_tok.start
+            # If token position is before decorator's AST position, it's an extra paren
+            if curr_line < decorator.lineno or (curr_line == decorator.lineno and curr_col < decorator.col_offset):
+                extra_parens.append((name_prefix, Space.EMPTY))
+                self._token_idx += 1  # consume '('
+                inner_prefix = self.__whitespace()
+                extra_parens[-1] = (extra_parens[-1][0], inner_prefix)
+                name_prefix = Space.EMPTY
+            else:
+                break
+
         if isinstance(decorator, (ast.Attribute, ast.Name, ast.Subscript)):
             name = self.__convert(decorator)
             args = None
         elif isinstance(decorator, ast.Call):
-            name = self.__convert(decorator.func)
-            all_args = decorator.args + decorator.keywords
-            args = JContainer(
-                self.__source_before('('),
-                [self.__pad_right(j.Empty(random_id(), self.__source_before(')'), Markers.EMPTY),
-                                  Space.EMPTY)] if not all_args else
-                [self.__pad_list_element(self.__convert(a), i == len(all_args) - 1, end_delim=')') for i, a in
-                 enumerate(all_args)],
-                Markers.EMPTY
-            )
+            # If there are extra parentheses around the call, convert the entire call
+            # and wrap it, setting args=None since args are part of the wrapped call
+            if extra_parens:
+                name = self.__convert(decorator)  # Convert entire call expression
+                args = None
+            else:
+                name = self.__convert(decorator.func)
+                all_args = decorator.args + decorator.keywords
+                args = JContainer(
+                    self.__source_before('('),
+                    [self.__pad_right(j.Empty(random_id(), self.__source_before(')'), Markers.EMPTY),
+                                      Space.EMPTY)] if not all_args else
+                    [self.__pad_list_element(self.__convert(a), i == len(all_args) - 1, end_delim=')') for i, a in
+                     enumerate(all_args)],
+                    Markers.EMPTY
+                )
         else:
             raise NotImplementedError("Unsupported decorator type: " + str(type(decorator)))
+
+        # Wrap name in extra parentheses if present
+        if extra_parens:
+            # Set the inner prefix on the name
+            name = name.replace(prefix=extra_parens[-1][1])
+
+            # Wrap in extra parentheses (innermost to outermost)
+            wrapped: Expression = name
+            for i in range(len(extra_parens) - 1, -1, -1):
+                paren_prefix, _ = extra_parens[i]
+                suffix = self.__whitespace()
+                self.__skip(')')  # consume the extra ')'
+                wrapped = j.Parentheses(
+                    random_id(),
+                    paren_prefix,
+                    Markers.EMPTY,
+                    self.__pad_right(wrapped, suffix)
+                )
+
+            # Wrap in ExpressionTypeTree to satisfy NameTree type requirement
+            name = py.ExpressionTypeTree(
+                random_id(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                wrapped
+            )
 
         return j.Annotation(
             random_id(),
@@ -2191,6 +2295,25 @@ class ParserVisitor(ast.NodeVisitor):
         prefix = self.__whitespace()
         save_token_idx = self._token_idx
 
+        # Collect any extra parentheses that wrap the tuple.
+        # Tuples handle all surrounding parentheses here (not in __parse_expr) because
+        # tuple parentheses are optional depending on context, making it cleaner to
+        # handle both the tuple's own parens and any extra wrapping parens in one place.
+        # These are '(' tokens that appear before the tuple's AST position.
+        extra_parens: List[Tuple[Space, Space]] = []  # List of (prefix, inner_prefix) for each extra paren
+        while self.__at_token('('):
+            curr_tok = self._tokens[self._token_idx]
+            curr_line, curr_col = curr_tok.start
+            # If token position is before tuple's AST position, it's an extra paren
+            if curr_line < node.lineno or (curr_line == node.lineno and curr_col < node.col_offset):
+                extra_parens.append((prefix, Space.EMPTY))
+                self._token_idx += 1  # consume '('
+                prefix = self.__whitespace()  # whitespace after the extra '(' becomes the next prefix
+                extra_parens[-1] = (extra_parens[-1][0], prefix)
+                prefix = Space.EMPTY
+            else:
+                break
+
         # Check if '(' at current position actually belongs to the tuple or to the first element
         # If tuple starts at same position (same line AND same column) as first element,
         # the '(' belongs to the first element, not the tuple.
@@ -2231,15 +2354,38 @@ class ParserVisitor(ast.NodeVisitor):
         else:
             omit_parens = True
 
-        return py.CollectionLiteral(
+        result: Expression = py.CollectionLiteral(
             random_id(),
-            prefix,
+            extra_parens[0][1] if extra_parens else prefix,
             Markers.EMPTY,
             py.CollectionLiteral.Kind.TUPLE,
             elements.replace(markers=
                 Markers.build(random_id(), [OmitParentheses(random_id())])) if omit_parens else elements,
             self._type_mapping.type(node)
         )
+
+        # Wrap in extra parentheses (in reverse order, innermost first)
+        for i in range(len(extra_parens) - 1, -1, -1):
+            paren_prefix, inner_prefix = extra_parens[i]
+            suffix = self.__whitespace()
+            self.__skip(')')  # consume the extra ')'
+            # For the outermost paren, use the original prefix
+            if i == 0:
+                result = j.Parentheses(
+                    random_id(),
+                    prefix if not extra_parens else paren_prefix,
+                    Markers.EMPTY,
+                    self.__pad_right(result, suffix)
+                )
+            else:
+                result = j.Parentheses(
+                    random_id(),
+                    paren_prefix,
+                    Markers.EMPTY,
+                    self.__pad_right(result, suffix)
+                )
+
+        return result
 
     def visit_UnaryOp(self, node):
         mapped = self._map_unary_operator(node.op)

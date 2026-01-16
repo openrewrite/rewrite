@@ -108,3 +108,14 @@ def test_subscript_decorator():
                 return x
         """
     ))
+
+
+def test_parenthesized_decorator():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        @(pytest.fixture())
+        def outer_paren_fixture():
+            return 42
+        """
+    ))

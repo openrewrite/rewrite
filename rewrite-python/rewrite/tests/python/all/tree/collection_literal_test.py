@@ -70,3 +70,12 @@ def test_deeply_nested():
 def test_tuple_generator():
     # language=python
     RecipeSpec().rewrite_run(python("_local = tuple((i, \"\") if isinstance(i, int) else (NegativeInfinity, i) for i in local)"))
+
+
+def test_list_of_tuples_with_double_parens():
+    # language=python
+    RecipeSpec().rewrite_run(python("""
+[({"a"}, {
+    "a": 0
+}), ((set(), {}))]
+"""))

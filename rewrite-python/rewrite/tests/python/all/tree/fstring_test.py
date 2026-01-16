@@ -151,6 +151,16 @@ def test_escaped_braces():
     RecipeSpec().rewrite_run(python("a = f'{{foo{{bar}}baz}}'"))
 
 
+def test_escaped_braces_with_expr():
+    # Test f-string with escaped braces surrounding an expression
+    # f"${{{expr}}}" produces "${<value>}" - dollar, then escaped {, then expr, then escaped }
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        '''x = f"${{{name.upper()}}}"
+'''
+    ))
+
+
 def test_debug():
     # language=python
     RecipeSpec().rewrite_run(python("a = f'{None=}'"))
