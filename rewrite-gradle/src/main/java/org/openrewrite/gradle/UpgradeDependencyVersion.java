@@ -54,10 +54,11 @@ import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -665,15 +666,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             .flatMap(conf -> conf.getRequested().stream())
                             .map(Dependency::getGav)
                             .map(GroupArtifactVersion::asGroupArtifact)
-                            .collect(Collectors.toSet());
+                            .collect(toSet());
                     List<GroupArtifact> oldPlatformManaged = mpd.download(dependency.getGav(), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
                             .map(md -> new GroupArtifact(md.getGroupId(), md.getArtifactId()))
                             .filter(requested::contains)
-                            .collect(Collectors.toList());
+                            .collect(toList());
                     List<GroupArtifact> newPlatformManaged = mpd.download(dependency.getGav().withVersion(selectedVersion), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
                             .map(md -> new GroupArtifact(md.getGroupId(), md.getArtifactId()))
                             .filter(requested::contains)
-                            .collect(Collectors.toList());
+                            .collect(toList());
 
                     noLongerManaged = new ArrayList<>(oldPlatformManaged);
                     noLongerManaged.removeAll(newPlatformManaged);
