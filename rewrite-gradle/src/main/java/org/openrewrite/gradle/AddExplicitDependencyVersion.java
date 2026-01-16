@@ -32,10 +32,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.DependencyMatcher;
 
-import java.util.Objects;
-import java.util.Optional;
-
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.marker.Markup.info;
 
 /**
  * A visitor that adds an explicit version to dependencies that don't have one declared.
@@ -95,7 +93,7 @@ public class AddExplicitDependencyVersion extends JavaIsoVisitor<ExecutionContex
                     String versionToAdd = findResolvedVersion(configName, groupId, artifactId);
 
                     if (StringUtils.isBlank(versionToAdd)) {
-                        return m;
+                        return info(m, "The Gradle project marker did not contain a resolved version for this dependency. No version was added.");
                     }
 
                     // Use the trait's withDeclaredVersion to add the version

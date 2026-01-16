@@ -209,6 +209,19 @@ class AddExplicitDependencyVersionTest implements RewriteTest {
               dependencies {
                   implementation 'com.example:nonexistent'
               }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  /*~~(The Gradle project marker did not contain a resolved version for this dependency. No version was added.)~~>*/implementation 'com.example:nonexistent'
+              }
               """
           )
         );
