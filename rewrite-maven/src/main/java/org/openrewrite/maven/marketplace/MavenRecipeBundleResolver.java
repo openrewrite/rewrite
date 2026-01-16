@@ -27,7 +27,6 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
-import java.io.IOException;
 import java.util.Optional;
 
 public class MavenRecipeBundleResolver implements RecipeBundleResolver {
@@ -91,7 +90,7 @@ public class MavenRecipeBundleResolver implements RecipeBundleResolver {
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() throws Exception {
         if (reader != null) {
             reader.close();
         }

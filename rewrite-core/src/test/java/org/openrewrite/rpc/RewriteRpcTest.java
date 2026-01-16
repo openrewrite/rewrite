@@ -37,10 +37,10 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
-import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
@@ -71,7 +71,7 @@ class RewriteRpcTest implements RewriteTest {
         client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), marketplace)
           .batchSize(1);
 
-        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), marketplace, singletonList(new TestRecipeBundleResolver()))
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), marketplace, List.of(new TestRecipeBundleResolver()))
           .batchSize(1);
     }
 

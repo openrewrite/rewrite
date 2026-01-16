@@ -66,7 +66,7 @@ public class RecipeListing implements Comparable<RecipeListing> {
     @With(AccessLevel.PACKAGE)
     private final RecipeBundle bundle;
 
-    private RecipeBundleReader resolve(List<RecipeBundleResolver> resolvers) {
+    private RecipeBundleReader resolve(Collection<RecipeBundleResolver> resolvers) {
         for (RecipeBundleResolver resolver : resolvers) {
             if (resolver.getEcosystem().equals(bundle.getPackageEcosystem())) {
                 return resolver.resolve(bundle);
@@ -75,11 +75,13 @@ public class RecipeListing implements Comparable<RecipeListing> {
         throw new IllegalStateException(String.format("No available resolver for '%s' ecosystem", bundle.getPackageEcosystem()));
     }
 
-    public RecipeDescriptor describe(List<RecipeBundleResolver> resolvers) {
+    public RecipeDescriptor describe(Collection<RecipeBundleResolver> resolvers) {
+        // noinspection resource
         return resolve(resolvers).describe(this);
     }
 
-    public Recipe prepare(List<RecipeBundleResolver> resolvers, Map<String, Object> options) {
+    public Recipe prepare(Collection<RecipeBundleResolver> resolvers, Map<String, Object> options) {
+        // noinspection resource
         return resolve(resolvers).prepare(this, options);
     }
 

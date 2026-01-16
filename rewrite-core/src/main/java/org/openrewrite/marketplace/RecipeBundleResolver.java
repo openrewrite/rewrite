@@ -15,15 +15,12 @@
  */
 package org.openrewrite.marketplace;
 
-import java.io.Closeable;
-import java.io.IOException;
-
-public interface RecipeBundleResolver extends Closeable {
+public interface RecipeBundleResolver extends AutoCloseable {
     String getEcosystem();
 
     RecipeBundleReader resolve(RecipeBundle bundle);
 
-    default void close() throws IOException {
+    default void close() throws Exception {
         // no-op
     }
 }
