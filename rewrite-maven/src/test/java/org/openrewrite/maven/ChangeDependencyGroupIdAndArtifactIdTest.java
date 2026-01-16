@@ -1124,7 +1124,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>
@@ -1148,7 +1148,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>
@@ -1189,7 +1189,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>
@@ -1214,7 +1214,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>
@@ -1231,6 +1231,128 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void parentAndBomManagedToJustParentManaged() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.springframework.cloud",
+            "spring-cloud-starter-sleuth",
+            "io.micrometer",
+            "micrometer-tracing-bridge-brave",
+            "1.0.12",
+            null
+          )),
+          mavenProject(
+            "parent",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.springframework.cloud</groupId>
+                                <artifactId>spring-cloud-starter-sleuth</artifactId>
+                                <version>3.1.1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>io.micrometer</groupId>
+                                <artifactId>micrometer-tracing-bridge-brave</artifactId>
+                                <version>1.0.12</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """
+            ),
+            mavenProject(
+              "child",
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>child</artifactId>
+                      <version>1</version>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1</version>
+                      </parent>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>org.springframework.cloud</groupId>
+                                  <artifactId>spring-cloud-dependencies</artifactId>
+                                  <version>2021.0.0</version>
+                                  <type>pom</type>
+                                  <scope>import</scope>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-starter-sleuth</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>child</artifactId>
+                      <version>1</version>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1</version>
+                      </parent>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>org.springframework.cloud</groupId>
+                                  <artifactId>spring-cloud-dependencies</artifactId>
+                                  <version>2021.0.0</version>
+                                  <type>pom</type>
+                                  <scope>import</scope>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>io.micrometer</groupId>
+                              <artifactId>micrometer-tracing-bridge-brave</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            )
           )
         );
     }
@@ -1447,7 +1569,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>
@@ -1472,7 +1594,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>

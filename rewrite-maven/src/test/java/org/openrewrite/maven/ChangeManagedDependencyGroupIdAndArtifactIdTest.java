@@ -549,7 +549,7 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>
