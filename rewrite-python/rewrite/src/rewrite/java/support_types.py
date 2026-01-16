@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import weakref
 from abc import abstractmethod, ABC
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, cast
 from uuid import UUID
 
 from rewrite import Markers
 from rewrite import Tree, SourceFile, TreeVisitor
+from rewrite.utils import replace_if_changed
 
 if TYPE_CHECKING:
     from .visitor import JavaVisitor
@@ -60,18 +61,8 @@ class Comment(ABC):
         return self._markers
 
     def replace(self, **kwargs) -> 'Comment':
-        """Replace fields on this Comment using dataclasses.replace."""
-        mapped_kwargs = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_'):
-                private_key = f'_{key}'
-                if hasattr(self, private_key):
-                    mapped_kwargs[private_key] = value
-                else:
-                    mapped_kwargs[key] = value
-            else:
-                mapped_kwargs[key] = value
-        return replace(self, **mapped_kwargs)
+        """Replace fields on this Comment, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
 
 @dataclass(frozen=True)
@@ -105,18 +96,8 @@ class Space:
         return self._whitespace if self._whitespace is not None else ""
 
     def replace(self, **kwargs) -> 'Space':
-        """Replace fields on this Space using dataclasses.replace."""
-        mapped_kwargs = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_'):
-                private_key = f'_{key}'
-                if hasattr(self, private_key):
-                    mapped_kwargs[private_key] = value
-                else:
-                    mapped_kwargs[key] = value
-            else:
-                mapped_kwargs[key] = value
-        return replace(self, **mapped_kwargs)
+        """Replace fields on this Space, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
     def is_empty(self) -> bool:
         return len(self._comments) == 0 and (self._whitespace is None or self._whitespace == '')
@@ -579,15 +560,8 @@ class JRightPadded(Generic[T]):
         return hash(self._element)
 
     def replace(self, **kwargs) -> 'JRightPadded[T]':
-        """Replace fields using keyword arguments."""
-        # Map public property names to private field names
-        mapped = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_') and hasattr(self, f'_{key}'):
-                mapped[f'_{key}'] = value
-            else:
-                mapped[key] = value
-        return replace(self, **mapped)
+        """Replace fields on this JRightPadded, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
     @classmethod
     def get_elements(cls, padded_list: List[JRightPadded[T]]) -> List[T]:
@@ -701,15 +675,8 @@ class JLeftPadded(Generic[T]):
         return hash(self._element)
 
     def replace(self, **kwargs) -> 'JLeftPadded[T]':
-        """Replace fields using keyword arguments."""
-        # Map public property names to private field names
-        mapped = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_') and hasattr(self, f'_{key}'):
-                mapped[f'_{key}'] = value
-            else:
-                mapped[key] = value
-        return replace(self, **mapped)
+        """Replace fields on this JLeftPadded, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
     class Location(Enum):
         ARRAY_TYPE_DIMENSION = Space.Location.DIMENSION_PREFIX
@@ -769,15 +736,8 @@ class JContainer(Generic[J2]):
         return hash(tuple(self._elements))
 
     def replace(self, **kwargs) -> 'JContainer[J2]':
-        """Replace fields using keyword arguments."""
-        # Map public property names to private field names
-        mapped = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_') and hasattr(self, f'_{key}'):
-                mapped[f'_{key}'] = value
-            else:
-                mapped[key] = value
-        return replace(self, **mapped)
+        """Replace fields on this JContainer, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
     @dataclass
     class PaddingHelper(Generic[J3]):

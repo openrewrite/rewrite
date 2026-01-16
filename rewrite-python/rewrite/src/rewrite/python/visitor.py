@@ -30,6 +30,7 @@ from rewrite.java.support_types import (
 from rewrite.java.visitor import JavaVisitor
 from rewrite.python.support_types import Py, PySpace
 from rewrite.tree import SourceFile
+from rewrite.utils import list_map
 
 if TYPE_CHECKING:
     from rewrite.visitor import Cursor
@@ -69,16 +70,6 @@ if TYPE_CHECKING:
 
 P = TypeVar("P")
 T = TypeVar("T")
-
-
-def list_map(func, items):
-    """Apply a function to each item in a list, returning original if unchanged."""
-    if items is None:
-        return None
-    result = [func(item) for item in items]
-    if all(r is o for r, o in zip(result, items)):
-        return items
-    return result
 
 
 class PythonVisitor(JavaVisitor[P]):

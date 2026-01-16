@@ -33,7 +33,7 @@ from rewrite.java import (
     Loop,
 )
 from rewrite.java.markers import Semicolon, TrailingComma, OmitParentheses
-from rewrite.python.support_types import Py, PySpace, PyRightPadded, PyLeftPadded, PyContainer, PyComment
+from rewrite.python.support_types import Py, PySpace, PyRightPadded, PyLeftPadded, PyContainer
 from rewrite.python.markers import KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline
 
 if TYPE_CHECKING:
@@ -297,7 +297,6 @@ class PythonPrinter:
 
     def _visit_comment(self, comment: Comment, p: PrintOutputCapture) -> None:
         """Visit a comment."""
-        # Handle both TextComment and PyComment (Python's single-line comments)
         if isinstance(comment, TextComment):
             if comment.multiline:
                 # Multi-line comment (docstring)
@@ -308,10 +307,6 @@ class PythonPrinter:
                 # Single-line comment
                 p.append('#')
                 p.append(comment.text)
-        elif isinstance(comment, PyComment):
-            # Python single-line comment (not multiline)
-            p.append('#')
-            p.append(comment.text)
 
         # Print suffix (whitespace after comment)
         if comment.suffix:
@@ -1054,7 +1049,6 @@ class PythonJavaPrinter:
 
     def _visit_comment(self, comment: Comment, p: PrintOutputCapture) -> None:
         """Visit a comment."""
-        # Handle both TextComment and PyComment (Python's single-line comments)
         if isinstance(comment, TextComment):
             if comment.multiline:
                 # Multi-line comment (docstring)
@@ -1065,10 +1059,6 @@ class PythonJavaPrinter:
                 # Single-line comment
                 p.append('#')
                 p.append(comment.text)
-        elif isinstance(comment, PyComment):
-            # Python single-line comment (not multiline)
-            p.append('#')
-            p.append(comment.text)
 
         # Print suffix (whitespace after comment)
         if comment.suffix:

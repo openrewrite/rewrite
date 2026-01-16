@@ -16,7 +16,7 @@ from rewrite.java import Space, JRightPadded, JContainer, JLeftPadded, JavaType,
 from rewrite.java import tree as j
 from . import tree as py
 from .markers import KeywordArguments, KeywordOnlyArguments, Quoted
-from .support_types import PyComment
+from rewrite.java.support_types import TextComment
 from .type_mapping import PythonTypeMapping
 
 T = TypeVar('T')
@@ -1487,7 +1487,7 @@ class ParserVisitor(ast.NodeVisitor):
             j.Modifier.Type.Default,
             []
         ))
-        name = j.MethodDeclaration.IdentifierWithAnnotations(j.Identifier(
+        name_identifier = j.Identifier(
             random_id(),
             self.__source_before(node.name),
             Markers.EMPTY,
@@ -1495,7 +1495,7 @@ class ParserVisitor(ast.NodeVisitor):
             node.name,
             None,
             None
-        ), [])
+        )
 
         params = JContainer(self.__source_before('('), self.visit_arguments(node.args), Markers.EMPTY)
         if node.returns is None:
@@ -1518,7 +1518,8 @@ class ParserVisitor(ast.NodeVisitor):
             modifiers,
             None,
             return_type,
-            name,
+            [],  # name_annotations
+            name_identifier,
             params,
             None,
             body,
@@ -2196,8 +2197,8 @@ class ParserVisitor(ast.NodeVisitor):
                 while offset < source_len and source[offset] not in ['\r', '\n']:
                     comment.append(source[offset])
                     offset += 1
-                comments.append(PyComment(''.join(comment), '',
-                                          False, Markers.EMPTY))
+                comments.append(TextComment(False, ''.join(comment), '',
+                                            Markers.EMPTY))
                 continue
             else:
                 break

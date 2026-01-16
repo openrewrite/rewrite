@@ -19,20 +19,13 @@ from __future__ import annotations
 from typing import TypeVar, Optional, TYPE_CHECKING, List, Any, cast
 
 from rewrite.java.support_types import J, Space, JRightPadded
+from rewrite.utils import list_map
 from rewrite.visitor import TreeVisitor
 
 if TYPE_CHECKING:
     from rewrite.java.tree import MethodDeclaration, Block, Statement
 
 P = TypeVar("P")
-
-
-def list_map(func, items):
-    """Map a function over a list, filtering out None results."""
-    if items is None:
-        return None
-    result = [func(item) for item in items]
-    return [item for item in result if item is not None]
 
 
 class JavaVisitor(TreeVisitor[J, P]):
