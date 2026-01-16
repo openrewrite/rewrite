@@ -44,10 +44,10 @@ import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
 @SuppressWarnings("DuplicatedCode")
 @Value
@@ -247,7 +247,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                                         .flatMap(conf -> conf.getRequested().stream())
                                         .map(Dependency::getGav)
                                         .map(GroupArtifactVersion::asGroupArtifact)
-                                        .collect(Collectors.toSet());
+                                        .collect(toSet());
                                 try {
                                     MavenPomDownloader mpd = new MavenPomDownloader(ctx);
                                     List<GroupArtifact> oldPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", springBootVersion), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
