@@ -357,6 +357,19 @@ class ParserVisitor(ast.NodeVisitor):
         decorators = [self.__map_decorator(d) for d in node.decorator_list]
         kind_prefix = self.__source_before('class')
         name = self.__convert_name(node.name)
+
+        # Handle type parameters (Python 3.12+ PEP 695)
+        type_params = getattr(node, 'type_params', None)
+        if type_params:
+            type_parameters = JContainer(
+                self.__source_before('['),
+                [self.__pad_list_element(self.__convert(tp), i == len(type_params) - 1, end_delim=']')
+                 for i, tp in enumerate(type_params)],
+                Markers.EMPTY
+            )
+        else:
+            type_parameters = None
+
         save_token_idx = self._token_idx
         interfaces_prefix = self.__whitespace()
         if (node.bases or node.keywords) and self.__skip('('):
@@ -391,7 +404,7 @@ class ParserVisitor(ast.NodeVisitor):
                 j.ClassDeclaration.Kind.Type.Class
             ),
             name,
-            None,
+            type_parameters,
             None,
             None,  # no `extends`, all in `implements`
             interfaces,
@@ -912,11 +925,25 @@ class ParserVisitor(ast.NodeVisitor):
     def visit_Store(self, node):
         raise NotImplementedError("Implement visit_Store!")
 
-    def visit_ExceptHandler(self, node):
+    def visit_ExceptHandler(self, node, is_exception_group: bool = False):
         prefix = self.__source_before('except')
-        type_prefix = self.__whitespace()
+        # For except*, consume the '*' after 'except' and let __convert_type capture the space after '*'
+        if is_exception_group:
+            self.__source_before('*')
+            type_prefix = Space.EMPTY  # Space goes on inner type via __convert_type
+        else:
+            type_prefix = self.__whitespace()
         except_type = self.__convert_type(node.type) if node.type else j.Empty(random_id(), Space.EMPTY,
                                                                                Markers.EMPTY)
+        # Wrap in ExceptionType to track exception_group flag
+        except_type = py.ExceptionType(
+            random_id(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            None,
+            is_exception_group,
+            except_type
+        )
         if node.name:
             before_as = self.__source_before('as')
             except_type_name = self.__convert_name(node.name)
@@ -1007,6 +1034,17 @@ class ParserVisitor(ast.NodeVisitor):
             end_delim = ')'
         else:
             kind = py.MatchCase.Pattern.Kind.SEQUENCE
+
+        # Handle elements
+        if node.patterns:
+            elements = [self.__pad_list_element(self.__convert(e), last=i == len(node.patterns) - 1,
+                                                end_delim=end_delim) for i, e in enumerate(node.patterns)]
+        else:
+            # Empty sequence - need to consume the closing delimiter
+            if end_delim:
+                self.__source_before(end_delim)
+            elements = []
+
         return py.MatchCase(
             random_id(),
             Space.EMPTY,
@@ -1016,13 +1054,7 @@ class ParserVisitor(ast.NodeVisitor):
                 Space.EMPTY,
                 Markers.EMPTY,
                 kind,
-                JContainer(
-                    prefix,
-                    [self.__pad_list_element(self.__convert(e), last=i == len(node.patterns) - 1,
-                                             end_delim=end_delim) for i, e in
-                     enumerate(node.patterns)] if node.patterns else [],
-                    Markers.EMPTY
-                ),
+                JContainer(prefix, elements, Markers.EMPTY),
                 None
             ),
             None,
@@ -1030,7 +1062,21 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_MatchSingleton(self, node):
-        raise NotImplementedError("Implement visit_MatchSingleton!")
+        # MatchSingleton is for None, True, False in match patterns
+        # node.value is the actual Python value (not an AST node)
+        prefix = self.__whitespace()
+        if node.value is None:
+            self.__source_before('None')
+            name = 'None'
+        elif node.value is True:
+            self.__source_before('True')
+            name = 'True'
+        elif node.value is False:
+            self.__source_before('False')
+            name = 'False'
+        else:
+            raise ValueError(f"Unexpected MatchSingleton value: {node.value}")
+        return j.Identifier(random_id(), prefix, Markers.EMPTY, [], name, None, None)
 
     def visit_MatchStar(self, node):
         return py.Star(
@@ -1109,7 +1155,10 @@ class ParserVisitor(ast.NodeVisitor):
     def visit_MatchClass(self, node):
         prefix = self.__whitespace()
         children = [self.__pad_right(self.__convert(node.cls), self.__source_before('('))]
-        if len(node.patterns) > 0:
+        has_positional = len(node.patterns) > 0
+        has_keyword = len(node.kwd_attrs) > 0
+        if has_positional or has_keyword:
+            # Process positional patterns
             for i, arg in enumerate(node.patterns):
                 arg_name = j.VariableDeclarations(
                     random_id(),
@@ -1128,9 +1177,11 @@ class ParserVisitor(ast.NodeVisitor):
                         ), Space.EMPTY)
                     ]
                 )
-                converted = self.__pad_list_element(arg_name, last=i == len(node.patterns) - 1,
-                                                    end_delim=')' if len(node.kwd_attrs) == 0 else ',')
+                is_last_positional = i == len(node.patterns) - 1
+                converted = self.__pad_list_element(arg_name, last=is_last_positional and not has_keyword,
+                                                    end_delim=')' if (is_last_positional and not has_keyword) else ',')
                 children.append(converted)
+            # Process keyword patterns
             for i, kwd in enumerate(node.kwd_attrs):
                 kwd_var = j.VariableDeclarations(
                     random_id(),
@@ -1236,16 +1287,93 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_TryStar(self, node):
-        raise NotImplementedError("Implement visit_TryStar!")
+        prefix = self.__source_before('try')
+        body = self.__convert_block(node.body)
+        # For TryStar, handlers use except* syntax
+        handlers = [cast(j.Try.Catch, self.visit_ExceptHandler(handler, is_exception_group=True)) for handler in node.handlers]
+        if node.orelse:
+            else_block = self.__pad_left(
+                self.__source_before('else'),
+                self.__convert_block(node.orelse)
+            )
 
-    def visit_TypeVar(self, node):
-        raise NotImplementedError("Implement visit_TypeVar!")
+        finally_ = self.__pad_left(self.__source_before('finally'),
+                                   self.__convert_block(node.finalbody)) if node.finalbody else None
+        try_ = j.Try(random_id(), prefix, Markers.EMPTY, JContainer.empty(), body, handlers, finally_)
 
-    def visit_ParamSpec(self, node):
-        raise NotImplementedError("Implement visit_ParamSpec!")
+        return try_ if not node.orelse else py.TrailingElseWrapper(
+            random_id(),
+            try_.prefix,
+            Markers.EMPTY,
+            try_.replace(prefix=Space.EMPTY),
+            else_block
+        )
 
-    def visit_TypeVarTuple(self, node):
-        raise NotImplementedError("Implement visit_TypeVarTuple!")
+    def visit_TypeVar(self, node) -> j.TypeParameter:
+        """Visit a TypeVar (e.g., T or T: int)."""
+        prefix = self.__whitespace()
+        name = self.__convert_name(node.name)
+        if node.bound:
+            bounds = JContainer(
+                self.__source_before(':'),
+                [self.__pad_right(self.__convert(node.bound), Space.EMPTY)],
+                Markers.EMPTY
+            )
+        else:
+            bounds = None
+        return j.TypeParameter(
+            random_id(),
+            prefix,
+            Markers.EMPTY,
+            [],  # annotations
+            [],  # modifiers
+            name,
+            bounds
+        )
+
+    def visit_ParamSpec(self, node) -> j.TypeParameter:
+        """Visit a ParamSpec (e.g., **P)."""
+        prefix = self.__whitespace()
+        modifier = j.Modifier(
+            random_id(),
+            self.__source_before('**'),
+            Markers.EMPTY,
+            '**',
+            j.Modifier.Type.LanguageExtension,
+            []
+        )
+        name = self.__convert_name(node.name)
+        return j.TypeParameter(
+            random_id(),
+            prefix,
+            Markers.EMPTY,
+            [],  # annotations
+            [modifier],
+            name,
+            None  # no bounds
+        )
+
+    def visit_TypeVarTuple(self, node) -> j.TypeParameter:
+        """Visit a TypeVarTuple (e.g., *Ts)."""
+        prefix = self.__whitespace()
+        modifier = j.Modifier(
+            random_id(),
+            self.__source_before('*'),
+            Markers.EMPTY,
+            '*',
+            j.Modifier.Type.LanguageExtension,
+            []
+        )
+        name = self.__convert_name(node.name)
+        return j.TypeParameter(
+            random_id(),
+            prefix,
+            Markers.EMPTY,
+            [],  # annotations
+            [modifier],
+            name,
+            None  # no bounds
+        )
 
     def visit_TypeAlias(self, node):
         return py.TypeAlias(
@@ -1670,6 +1798,18 @@ class ParserVisitor(ast.NodeVisitor):
             None
         )
 
+        # Handle type parameters (Python 3.12+ PEP 695)
+        type_params = getattr(node, 'type_params', None)
+        if type_params:
+            type_parameters = JContainer(
+                self.__source_before('['),
+                [self.__pad_list_element(self.__convert(tp), i == len(type_params) - 1, end_delim=']')
+                 for i, tp in enumerate(type_params)],
+                Markers.EMPTY
+            )
+        else:
+            type_parameters = None
+
         params = JContainer(self.__source_before('('), self.visit_arguments(node.args), Markers.EMPTY)
         if node.returns is None:
             return_type = None
@@ -1689,7 +1829,7 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY,
             decorators,
             modifiers,
-            None,
+            type_parameters,
             return_type,
             [],  # name_annotations
             name_identifier,
@@ -1702,7 +1842,7 @@ class ParserVisitor(ast.NodeVisitor):
 
     def __map_decorator(self, decorator) -> j.Annotation:
         prefix = self.__source_before('@')
-        if isinstance(decorator, (ast.Attribute, ast.Name)):
+        if isinstance(decorator, (ast.Attribute, ast.Name, ast.Subscript)):
             name = self.__convert(decorator)
             args = None
         elif isinstance(decorator, ast.Call):
@@ -2141,19 +2281,23 @@ class ParserVisitor(ast.NodeVisitor):
                 None
             )
         elif isinstance(node, ast.BinOp):
-            # NOTE: Type unions using `|` was added in Python 3.10
-            prefix = self.__whitespace()
-            # FIXME consider flattening nested unions
-            left = self.__pad_right(self.__convert_internal(node.left, self.__convert_type),
-                                    self.__source_before('|'))
-            right = self.__pad_right(self.__convert_internal(node.right, self.__convert_type), Space.EMPTY)
-            return py.UnionType(
-                random_id(),
-                prefix,
-                Markers.EMPTY,
-                [left, right],
-                self._type_mapping.type(node)
-            )
+            # Type unions using `|` was added in Python 3.10
+            # Only treat as UnionType if the operator is actually BitOr
+            if isinstance(node.op, ast.BitOr):
+                prefix = self.__whitespace()
+                # FIXME consider flattening nested unions
+                left = self.__pad_right(self.__convert_internal(node.left, self.__convert_type),
+                                        self.__source_before('|'))
+                right = self.__pad_right(self.__convert_internal(node.right, self.__convert_type), Space.EMPTY)
+                return py.UnionType(
+                    random_id(),
+                    prefix,
+                    Markers.EMPTY,
+                    [left, right],
+                    self._type_mapping.type(node)
+                )
+            # Other binary operations in types (like `int + int`) should be handled as regular BinOp
+            return self.visit_BinOp(node)
 
         return self.__convert_internal(node, self.__convert_type)
 
@@ -2629,9 +2773,9 @@ class ParserVisitor(ast.NodeVisitor):
                     format_spec
                 ))
                 value_idx += 1
-                # After format spec: _token_idx points to '}', need to advance
-                # After scanning loop without format spec: _token_idx already past '}'
-                if format_spec is not None and self._tokens[self._token_idx].string == '}':
+                # After format spec, conversion, or debug: _token_idx points to '}', need to advance
+                # After scanning loop without any of these: _token_idx already past '}'
+                if (format_spec is not None or conv is not None or debug is not None) and self._tokens[self._token_idx].string == '}':
                     self._token_idx += 1
                 tok = self._tokens[self._token_idx]
             elif tok.type == token.FSTRING_END:

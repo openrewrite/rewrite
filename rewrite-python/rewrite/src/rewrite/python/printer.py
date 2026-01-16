@@ -973,6 +973,8 @@ class PythonJavaPrinter:
             return self.visit_ternary(tree, p)
         elif isinstance(tree, j.Throw):
             return self.visit_throw(tree, p)
+        elif isinstance(tree, j.TypeParameter):
+            return self.visit_type_parameter(tree, p)
         elif isinstance(tree, j.Try):
             return self.visit_try(tree, p)
         elif isinstance(tree, j.Try.Resource):
@@ -1343,6 +1345,9 @@ class PythonJavaPrinter:
         p.append("class")
         self.visit(class_decl.name, p)
 
+        # Visit type parameters (Python 3.12+)
+        self._visit_container("[", class_decl.padding.type_parameters, JContainer.Location.TYPE_PARAMETERS, ",", "]", p)
+
         # Visit implements (base classes in Python)
         if class_decl.padding.implements:
             omit_parens = class_decl.padding.implements.markers.find_first(OmitParentheses)
@@ -1531,6 +1536,8 @@ class PythonJavaPrinter:
             self.visit_modifier(mod, p)
 
         self.visit(method.name, p)
+        # Visit type parameters (Python 3.12+)
+        self._visit_container("[", method.padding.type_parameters, JContainer.Location.TYPE_PARAMETERS, ",", "]", p)
         self._visit_container("(", method.padding.parameters, JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p)
         self.visit(method.return_type_expression, p)
         self.visit(method.body, p)
@@ -1571,6 +1578,9 @@ class PythonJavaPrinter:
             keyword = "def"
         elif mod.type == Modifier.Type.Async:
             keyword = "async"
+        elif mod.type == Modifier.Type.LanguageExtension:
+            # Use the keyword directly (for * and ** in type parameters)
+            keyword = mod.keyword
 
         if keyword:
             for annotation in mod.annotations:
@@ -1639,6 +1649,18 @@ class PythonJavaPrinter:
         self.visit(throw.exception, p)
         self._after_syntax(throw, p)
         return throw
+
+    def visit_type_parameter(self, type_param: 'j.TypeParameter', p: PrintOutputCapture) -> J:
+        """Visit a type parameter (Python 3.12+ PEP 695)."""
+        self._before_syntax(type_param, Space.Location.TYPE_PARAMETERS_PREFIX, p)
+        # Visit modifiers (for * and ** prefixes)
+        for mod in type_param.modifiers:
+            self.visit(mod, p)
+        self.visit(type_param.name, p)
+        # Visit bounds (for T: int style bounds in Python)
+        self._visit_container(":", type_param.padding.bounds, JContainer.Location.TYPE_BOUNDS, ",", "", p)
+        self._after_syntax(type_param, p)
+        return type_param
 
     def visit_try(self, try_: 'j.Try', p: PrintOutputCapture) -> J:
         """Visit a try statement (or with statement in Python)."""
