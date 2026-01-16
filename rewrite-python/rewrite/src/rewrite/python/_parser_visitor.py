@@ -1376,11 +1376,27 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_TypeAlias(self, node):
+        prefix = self.__source_before("type")
+        name = self.__convert(node.name)
+
+        # Handle type parameters (Python 3.12+ PEP 695)
+        type_params = getattr(node, 'type_params', None)
+        if type_params:
+            type_parameters = JContainer(
+                self.__source_before('['),
+                [self.__pad_list_element(self.__convert(tp), i == len(type_params) - 1, end_delim=']')
+                 for i, tp in enumerate(type_params)],
+                Markers.EMPTY
+            )
+        else:
+            type_parameters = None
+
         return py.TypeAlias(
             random_id(),
-            self.__source_before("type"),
+            prefix,
             Markers.EMPTY,
-            self.__convert(node.name),
+            name,
+            type_parameters,
             self.__pad_left(self.__source_before('='), self.__convert(node.value)),
             self._type_mapping.type(node)
         )

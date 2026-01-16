@@ -802,6 +802,8 @@ class PythonPrinter:
         self._before_syntax(alias, PySpace.Location.UNION_TYPE_PREFIX, p)
         p.append("type")
         self.visit(alias.name, p)
+        # Visit type parameters (Python 3.12+ PEP 695)
+        self._visit_container("[", alias.padding.type_parameters, JContainer.Location.TYPE_PARAMETERS, ",", "]", p)
         self._visit_left_padded("=", alias.padding.value, PyLeftPadded.Location.TYPE_ALIAS_VALUE, p)
         self._after_syntax(alias, p)
         return alias
