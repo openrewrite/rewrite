@@ -147,7 +147,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                isNewDependencyPresent = checkIfNewDependencyPresents(newGroupId, newArtifactId, newVersion);
+                isNewDependencyPresent = checkIfNewDependencyPresent(newGroupId, newArtifactId, newVersion);
                 if (!oldGroupId.contains("*") && !oldArtifactId.contains("*") &&
                         (changeManagedDependency == null || changeManagedDependency)) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
@@ -202,28 +202,28 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             Scope scope = scopeTag.map(xml -> Scope.fromName(xml.getValue().orElse("compile"))).orElse(Scope.Compile);
                             Optional<Xml.Tag> versionTag = t.getChild("version");
 
-                            boolean configuredToOverrideManageVersion = overrideManagedVersion != null && overrideManagedVersion; // False by default
+                            boolean configuredToOverrideManagedVersion = overrideManagedVersion != null && overrideManagedVersion; // False by default
                             boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency; // True by default
 
                             boolean versionTagPresent = versionTag.isPresent();
                             // dependencyManagement does not apply to plugin dependencies or annotation processor paths
-                            boolean oldDependencyManaged = isOldDependencyTag && isDependencyManaged(scope, oldGroupId, oldArtifactId);
+                            boolean oldDependencyDefinedManaged = isOldDependencyTag && canAffectManagedDependency(getResolutionResult(), scope, oldGroupId, oldArtifactId);
                             boolean newDependencyManaged = isOldDependencyTag && isDependencyManaged(scope, groupId, artifactId);
 
                             if (versionTagPresent) {
                                 // If the previous dependency had a version but the new artifact is managed, removed the version tag.
-                                if (!configuredToOverrideManageVersion && newDependencyManaged || (oldDependencyManaged && configuredToChangeManagedDependency)) {
+                                if (!configuredToOverrideManagedVersion && newDependencyManaged || (oldDependencyDefinedManaged && configuredToChangeManagedDependency)) {
                                     t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false, true).visit(t, ctx);
                                 } else {
                                     // Otherwise, change the version to the new value.
                                     t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
                                 }
-                            } else if (configuredToOverrideManageVersion || (!newDependencyManaged && !(oldDependencyManaged && configuredToChangeManagedDependency))) {
-                                //If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
+                            } else if (configuredToOverrideManagedVersion || (!newDependencyManaged && !(oldDependencyDefinedManaged && configuredToChangeManagedDependency))) {
+                                // If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
                                 Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
                                 //noinspection ConstantConditions
                                 t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
-                            } else if (configuredToChangeManagedDependency && !newDependencyManaged) {
+                            } else if (!newDependencyManaged) {
                                 // We leave it up to the managed dependency update to call `maybeUpdateModel()` instead to avoid interim dependency resolution failure
                                 deferUpdate = true;
                             }
@@ -241,7 +241,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 return t;
             }
 
-            private boolean checkIfNewDependencyPresents(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
+            private boolean checkIfNewDependencyPresent(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
                 if ((groupId == null) || (artifactId == null)) {
                     return false;
                 }
@@ -258,6 +258,23 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                     if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {
                         return scope.isInClasspathOf(managedDependency.getScope());
                     }
+                }
+                return false;
+            }
+
+            private boolean canAffectManagedDependency(MavenResolutionResult result, Scope scope, String groupId, String artifactId) {
+                // We're only going to be able to effect managed dependencies that are either direct or are brought in as direct via a local parent
+                // `ChangeManagedDependencyGroupIdAndArtifactId` cannot manipulate BOM imported managed dependencies nor direct dependencies from remote parents
+                Pom requestedPom = result.getPom().getRequested();
+                for (ManagedDependency requestedManagedDependency : requestedPom.getDependencyManagement()) {
+                    if (groupId.equals(requestedManagedDependency.getGroupId()) && artifactId.equals(requestedManagedDependency.getArtifactId())) {
+                        if (requestedManagedDependency instanceof ManagedDependency.Defined) {
+                            return scope.isInClasspathOf(Scope.fromName(((ManagedDependency.Defined) requestedManagedDependency).getScope()));
+                        }
+                    }
+                }
+                if (result.parentPomIsProjectPom() && result.getParent() != null) {
+                    return canAffectManagedDependency(result.getParent(), scope, groupId, artifactId);
                 }
                 return false;
             }

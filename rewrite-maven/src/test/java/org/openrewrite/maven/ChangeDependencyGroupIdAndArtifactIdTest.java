@@ -538,7 +538,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             null,
             "swagger-annotations-jakarta",
             null,
-            null)),
+            null
+          )),
           pomXml(
             """
               <project>
@@ -587,7 +588,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "jakarta.activation",
             "jakarta.activation-api",
             "1.2.x",
-            null)),
+            null
+          )),
           pomXml(
             """
               <project>
@@ -908,7 +910,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "javax.activation-api",
             "jakarta.activation",
             "jakarta.activation-api",
-            "1.2.2",
+            "1.2.1",
             null,
             true,
             false
@@ -936,7 +938,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           <dependency>
                               <groupId>jakarta.activation</groupId>
                               <artifactId>jakarta.activation-api</artifactId>
-                              <version>1.2.1</version>
+                              <version>1.2.2</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
@@ -952,7 +954,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                       <dependency>
                           <groupId>jakarta.activation</groupId>
                           <artifactId>jakarta.activation-api</artifactId>
-                          <version>1.2.2</version>
+                          <version>1.2.1</version>
                       </dependency>
                   </dependencies>
                   <dependencyManagement>
@@ -965,7 +967,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           <dependency>
                               <groupId>jakarta.activation</groupId>
                               <artifactId>jakarta.activation-api</artifactId>
-                              <version>1.2.1</version>
+                              <version>1.2.2</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
@@ -976,7 +978,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void managedToUnmanaged() {
+    void updatesManagedAndDirect() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "javax.activation",
@@ -1134,6 +1136,72 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                       <dependency>
                           <groupId>org.springframework.cloud</groupId>
                           <artifactId>spring-cloud-starter-sleuth</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dependencies</artifactId>
+                              <version>2021.0.0</version>
+                              <type>bom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.micrometer</groupId>
+                          <artifactId>micrometer-tracing-bridge-brave</artifactId>
+                          <version>1.0.12</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void managedToUnmanagedExternalizedDepMgmtWithDirectVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.springframework.cloud",
+            "spring-cloud-starter-sleuth",
+            "io.micrometer",
+            "micrometer-tracing-bridge-brave",
+            "1.0.12",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dependencies</artifactId>
+                              <version>2021.0.0</version>
+                              <type>bom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-starter-sleuth</artifactId>
+                          <version>3.1.0</version>
                       </dependency>
                   </dependencies>
               </project>

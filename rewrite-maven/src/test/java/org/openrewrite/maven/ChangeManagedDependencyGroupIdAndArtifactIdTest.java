@@ -524,4 +524,45 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doesNotMakeChangeWhenChangingBomImportManagedDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "org.springframework.cloud",
+            "spring-cloud-starter-sleuth",
+            "io.micrometer",
+            "micrometer-tracking-bridge-brave",
+            "1.0.12",
+            null
+          )),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dependencies</artifactId>
+                              <version>2021.0.0</version>
+                              <type>bom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-starter-sleuth</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
 }
