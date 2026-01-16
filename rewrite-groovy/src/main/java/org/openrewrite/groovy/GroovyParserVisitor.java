@@ -16,6 +16,7 @@
 package org.openrewrite.groovy;
 
 import groovy.lang.GroovySystem;
+import groovy.transform.Canonical;
 import groovy.transform.Field;
 import groovy.transform.Generated;
 import groovy.transform.Immutable;
@@ -2451,6 +2452,10 @@ public class GroovyParserVisitor {
             // Because @groovy.transform.Immutable is discarded in favour of other transform annotations, the removed annotation must be parsed by hand.
             if (sourceStartsWith("@" + Immutable.class.getSimpleName()) || sourceStartsWith("@" + Immutable.class.getCanonicalName())) {
                 paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(Immutable.class)), classVisitor));
+            }
+            // Same for @groovy.transform.Canonical
+            if (sourceStartsWith("@" + Canonical.class.getSimpleName()) || sourceStartsWith("@" + Canonical.class.getCanonicalName())) {
+                paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(Canonical.class)), classVisitor));
             }
 
             if (appearsInSource(annotationNode)) {
