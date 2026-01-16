@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypedPatternContext;
@@ -270,17 +271,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
             }
 
             // Check select expression
-            if (!templateStatic) {
-                if (nullMissMatch(template.getSelect(), actual.getSelect())) {
-                    return false;
-                }
-                if (template.getSelect() != null && actual.getSelect() != null) {
-                    visit(template.getSelect(), actual.getSelect());
-                    if (!isEqual.get()) {
-                        return false;
-                    }
-                }
-            } else {
+            if (templateStatic) {
                 JavaType.FullyQualified templateDeclaringType = templateMethod.getDeclaringType();
                 JavaType.FullyQualified actualDeclaringType = actualMethod.getDeclaringType();
                 if (!isAssignableTo(
@@ -289,6 +280,16 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                         actualDeclaringType instanceof JavaType.Parameterized ?
                                 ((JavaType.Parameterized) actualDeclaringType).getType() : actualDeclaringType)) {
                     return false;
+                }
+            } else {
+                if (nullMissMatch(template.getSelect(), actual.getSelect())) {
+                    return false;
+                }
+                if (template.getSelect() != null && actual.getSelect() != null) {
+                    visit(template.getSelect(), actual.getSelect());
+                    if (!isEqual.get()) {
+                        return false;
+                    }
                 }
             }
 
