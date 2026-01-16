@@ -83,7 +83,6 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                         }
                     } else {
                         TypedPatternContext typedPattern = ctx.typedPattern();
-                        String matcherName = typedPattern.patternType().matcherName().Identifier().getText();
                         JavaType type = typedParameter(key, typedPattern, generics);
                         s = TypeUtils.toString(type);
 
@@ -93,7 +92,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                             typedPatternByName.put(name, s);
                         }
 
-                        Markers markers = Markers.build(singleton(new TemplateParameter(randomId(), type, name, matcherName)));
+                        Markers markers = Markers.build(singleton(new TemplateParameter(randomId(), type, name)));
                         parameters.add(new J.Empty(randomId(), Space.EMPTY, markers));
                     }
                 } else {
@@ -241,8 +240,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                 return false;
             }
             TemplateParameter param = (TemplateParameter) empty.getMarkers().getMarkers().get(0);
-            // Only use varargs matching for anyArray, not for any(Object[])
-            return "anyArray".equals(param.getMatcherName()) && param.getType() instanceof JavaType.Array;
+            return param.getType() instanceof JavaType.Array;
         }
 
         private boolean matchWithVarargs(J.MethodInvocation template, J.MethodInvocation actual) {

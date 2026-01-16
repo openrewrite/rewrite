@@ -31,11 +31,4 @@ public class TemplateParameter implements Marker {
 
     @Nullable
     String name;
-
-    /**
-     * The matcher name used to create this parameter (e.g., "any" or "anyArray").
-     * Used to distinguish between matching explicit arrays vs varargs expansion.
-     */
-    @Nullable
-    String matcherName;
 }
