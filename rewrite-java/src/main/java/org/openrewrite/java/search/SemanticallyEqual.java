@@ -1003,15 +1003,17 @@ public class SemanticallyEqual {
                     isEqual.set(false);
                     return method;
                 }
-
-                boolean static_ = method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static);
                 J.MethodInvocation compareTo = (J.MethodInvocation) j;
+                if (method.getMethodType() == null || compareTo.getMethodType() == null) {
+                    isEqual.set(false);
+                    return method;
+                }
+
+                boolean static_ = method.getMethodType().hasFlags(Flag.Static);
                 if (!method.getSimpleName().equals(compareTo.getSimpleName()) ||
                     method.getArguments().size() != compareTo.getArguments().size() ||
-                    !(static_ == (compareTo.getMethodType() != null && compareTo.getMethodType().hasFlags(Flag.Static)) ||
+                    !(static_ == compareTo.getMethodType().hasFlags(Flag.Static) ||
                       !nullMissMatch(method.getSelect(), compareTo.getSelect())) ||
-                    method.getMethodType() == null ||
-                    compareTo.getMethodType() == null ||
                     !isAssignableTo(method.getMethodType().getReturnType(), compareTo.getMethodType().getReturnType())) {
                     isEqual.set(false);
                     return method;
