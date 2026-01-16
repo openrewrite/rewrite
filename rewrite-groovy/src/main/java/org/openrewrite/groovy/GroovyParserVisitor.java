@@ -2429,7 +2429,7 @@ public class GroovyParserVisitor {
             Space space = whitespace();
             J.FieldAccess qualid = TypeTree.build(name()).withPrefix(space);
             JLeftPadded<J.Identifier> alias = null;
-            if (sourceStartsWith("as")) {
+            if (sourceStartsWith("as", "\n", " ")) {
                 alias = padLeft(sourceBefore("as"), new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), name(), null, null));
             }
             return maybeSemicolon(new J.Import(randomId(), importPrefix, Markers.EMPTY, statik, qualid, alias));
