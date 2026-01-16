@@ -2079,12 +2079,13 @@ class ParserVisitor(ast.NodeVisitor):
         return cu
 
     def visit_Name(self, node):
+        space, actual_name = self.__consume_identifier(node.id)
         return j.Identifier(
             random_id(),
-            self.__source_before(node.id),
+            space,
             Markers.EMPTY,
             [],
-            node.id,
+            actual_name,
             self._type_mapping.type(node),
             None
         )
@@ -2441,7 +2442,8 @@ class ParserVisitor(ast.NodeVisitor):
     def __convert_name(self, name: str, name_type: Optional[JavaType] = None) -> NameTree:
         def ident_or_field(parts: List[str]) -> NameTree:
             if len(parts) == 1:
-                return j.Identifier(random_id(), self.__source_before(parts[-1]), Markers.EMPTY, [], parts[-1],
+                space, actual_name = self.__consume_identifier(parts[-1])
+                return j.Identifier(random_id(), space, Markers.EMPTY, [], actual_name,
                                     name_type, None)
             else:
                 return j.FieldAccess(
@@ -2451,9 +2453,9 @@ class ParserVisitor(ast.NodeVisitor):
                     ident_or_field(parts[:-1]),
                     self.__pad_left(
                         self.__source_before('.'),
-                        j.Identifier(random_id(), self.__source_before(parts[-1]), Markers.EMPTY, [], parts[-1],
+                        (lambda s, n: j.Identifier(random_id(), s, Markers.EMPTY, [], n,
                                      name_type,
-                                     None),
+                                     None))(*self.__consume_identifier(parts[-1])),
                     ),
                     name_type
                 )
@@ -2533,6 +2535,33 @@ class ParserVisitor(ast.NodeVisitor):
                 self._token_idx += 1
 
         return space
+
+    def __consume_identifier(self, expected_name: str) -> Tuple[Space, str]:
+        """Consume an identifier token and return (prefix_space, actual_source_text).
+
+        Python normalizes identifiers to NFKC form in the AST (per PEP 3131),
+        but we need to preserve the original source text for idempotent printing.
+        This method matches the expected AST name against the token using NFKC
+        normalization, but returns the original token string.
+        """
+        import unicodedata
+        save_idx = self._token_idx
+        space = self.__whitespace()
+        if self._token_idx < len(self._tokens):
+            tok = self._tokens[self._token_idx]
+            if tok.type == token.NAME:
+                # NFKC-normalize token string to compare with AST name
+                normalized = unicodedata.normalize('NFKC', tok.string)
+                if normalized == expected_name:
+                    self._token_idx += 1
+                    return space, tok.string
+                # Token is a NAME but doesn't match - try direct match as fallback
+                if tok.string == expected_name:
+                    self._token_idx += 1
+                    return space, tok.string
+        # No matching identifier found - restore position and use __source_before
+        self._token_idx = save_idx
+        return self.__source_before(expected_name), expected_name
 
     def __skip(self, tok: Optional[str]) -> Optional[str]:
         """Skip the current token if it matches the given string."""

@@ -1,5 +1,3 @@
-import pytest
-
 from rewrite.test import RecipeSpec, python
 
 
@@ -16,7 +14,6 @@ def test_simple_with_alias():
 
 
 # noinspection PyUnresolvedReferences
-@pytest.mark.xfail(reason="The parser performs Unicode normalization which can't be disabled", strict=True)
 def test_unicode_char_normalization():
     # language=python
     RecipeSpec().rewrite_run(python("from .main import MaµToMan"))
