@@ -110,6 +110,9 @@ class TreeVisitor(ABC, Generic[T, P]):
     def cursor(self, cursor: Cursor) -> None:
         self._cursor = cursor
 
+    def set_cursor(self, cursor: Cursor) -> None:
+        self._cursor = cursor
+
     def pre_visit(self, tree: T, p: P) -> Optional[T]:
         return cast(Optional[T], self.default_value(tree, p))
 
