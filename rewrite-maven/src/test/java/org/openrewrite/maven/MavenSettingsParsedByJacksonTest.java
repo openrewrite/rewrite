@@ -69,7 +69,78 @@ public class MavenSettingsParsedByJacksonTest {
     </profiles>
 </settings>""";
 
-	// Test created to reproduce the error reported within the PR submitted
+    /* We can fix the issue reported part of the PR: 6543 if we change from "false" to "true" the
+       value of the .defaultUseWrapper(true) of the XmlMapper.Builder
+       but by doing that we will get errors on the project like:
+
+       Caused by:
+       at org.openrewrite.maven.AddDependencyTest.addTestDependenciesAfterCompile(AddDependencyTest.java:531)
+       ...
+        java.io.UncheckedIOException: Failed to parse pom: Cannot construct instance of `org.openrewrite.maven.internal.RawPom$Dependency` (although at least one Creator exists): no String-argument constructor/factory method to deserialize from String value ('commons-lang')
+         at [Source: (org.openrewrite.internal.EncodingDetectingInputStream); line: 7, column: 34] (through reference chain: org.openrewrite.maven.internal.RawPom["dependencies"]->org.openrewrite.maven.internal.RawPom$Dependencies["dependency"]->java.util.ArrayList[0])
+            at app//org.openrewrite.maven.internal.RawPom.parse(RawPom.java:162)
+            at app//org.openrewrite.maven.MavenParser.parseInputs(MavenParser.java:75)
+            ... 3 more
+
+            Caused by:
+            com.fasterxml.jackson.databind.exc.MismatchedInputException: Cannot construct instance of `org.openrewrite.maven.internal.RawPom$Dependency` (although at least one Creator exists): no String-argument constructor/factory method to deserialize from String value ('commons-lang')
+             at [Source: (org.openrewrite.internal.EncodingDetectingInputStream); line: 7, column: 34] (through reference chain: org.openrewrite.maven.internal.RawPom["dependencies"]->org.openrewrite.maven.internal.RawPom$Dependencies["dependency"]->java.util.ArrayList[0])
+                at app//com.fasterxml.jackson.databind.exc.MismatchedInputException.from(MismatchedInputException.java:63)
+
+           AddDependencyTest > addScopedDependency(String) > [1] scope=provided FAILED
+               org.opentest4j.AssertionFailedError: [Unexpected result in "project/pom.xml":
+               diff --git a/project/pom.xml b/project/pom.xml
+               index 01a8359..ae86eeb 100644
+               --- a/project/pom.xml
+               +++ b/project/pom.xml
+               @@ -3,7 +3,9 @@
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+               -        <dependency>
+               +        <!--~~(Unable to download POM: com.fasterxml.jackson.core:jackson-core:2.12.0. Tried repositories:
+               +https://repo.maven.apache.org/maven2: Failed to parse pom: Cannot construct instance of `org.openrewrite.maven.internal.RawPom$License` (although at least one Creator exists): no String-argument constructor/factory method to deserialize from String value ('The Apache Software License, Version 2.0')
+               + at [Source: (ByteArrayInputStream); line: 22, column: 53] (through reference chain: org.openrewrite.maven.internal.RawPom["licenses"]->org.openrewrite.maven.internal.RawPom$Licenses["license"]->java.util.ArrayList[0]))~~>--><dependency>
+    */
+    @Test
+    void shouldGetHttpHeaderParsedUsingXmlMapper() throws IOException {
+
+        XMLInputFactory input = new WstxInputFactory();
+        input.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
+        input.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, false);
+        XmlFactory xmlFactory = new XmlFactory(input, new WstxOutputFactory());
+
+        ObjectMapper m = XmlMapper.builder(xmlFactory)
+          .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+          .enable(FromXmlParser.Feature.EMPTY_ELEMENT_AS_NULL)
+          .defaultUseWrapper(true) // false to true
+          .build();
+
+        m.registerModule(new ParameterNamesModule())
+          .disable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)
+          .disable(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT)
+          .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+        m.setVisibility(m.getSerializationConfig().getDefaultVisibilityChecker()
+            .withFieldVisibility(JsonAutoDetect.Visibility.NONE)
+            .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
+            .withSetterVisibility(JsonAutoDetect.Visibility.NONE)
+            .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY))
+          .registerModule(new JavaTimeModule())
+          .registerModule(new MavenXmlMapper.StringTrimModule());
+
+        MavenSettings settings = m.readValue(settingsXml, MavenSettings.class);
+
+        Assertions.assertNotNull(settings.getServers());
+        MavenSettings.Server server = settings.getServers().getServers().getFirst();
+
+        Assertions.assertNotNull(server.getConfiguration().getHttpHeaders());
+        //assertThat(server.getConfiguration().getHttpHeaders().getFirst().getName()).isNull();
+        assertThat(server.getConfiguration().getHttpHeaders().getFirst().getName()).isEqualTo("X-JFrog-Art-Api");
+        assertThat(server.getConfiguration().getHttpHeaders().getFirst().getValue()).isEqualTo("myApiToken");
+    }
+
+	// Test created to reproduce the error reported within the PR: 6543
     @Test
 	void shouldGetThehttpHeaderParsedButNull() throws IOException {
 
@@ -116,5 +187,6 @@ public class MavenSettingsParsedByJacksonTest {
 
         Assertions.assertNotNull(server.getConfiguration().getHttpHeaders());
         assertThat(server.getConfiguration().getHttpHeaders().getFirst().getName()).isEqualTo("X-JFrog-Art-Api");
+        assertThat(server.getConfiguration().getHttpHeaders().getFirst().getValue()).isEqualTo("myApiToken");
     }
 }
