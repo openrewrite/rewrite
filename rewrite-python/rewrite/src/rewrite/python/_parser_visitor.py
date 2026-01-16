@@ -2337,6 +2337,25 @@ class ParserVisitor(ast.NodeVisitor):
                              node.col_offset == node.elts[0].col_offset)
             if same_position:
                 maybe_parens = False
+            else:
+                # Check if the matching ')' covers the whole tuple or just the first element.
+                # For `x = (a), (b)`, the '(' at col 4 has ')' at col 6, but the second element
+                # starts at col 9. Since ')' is before the second element, this '(' is for the
+                # first element, not the tuple.
+                # For `t = (1 , )`, '(' has ')' after all elements, so it's the tuple's paren.
+                # We use element positions (which match tokenizer positions) rather than tuple
+                # end position (which uses byte offsets and may differ for Unicode).
+                close_paren_idx = self._paren_pairs.get(self._token_idx)
+                if close_paren_idx is not None and len(node.elts) > 1:
+                    close_tok = self._tokens[close_paren_idx]
+                    close_line, close_col = close_tok.start
+                    # Check if ')' comes before the second element starts
+                    # If so, the '(' is for the first element, not the tuple
+                    second_elt = node.elts[1]
+                    if close_line < second_elt.lineno or (
+                        close_line == second_elt.lineno and close_col < second_elt.col_offset
+                    ):
+                        maybe_parens = False
 
         if maybe_parens:
             self._token_idx += 1  # consume '('

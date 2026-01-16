@@ -52,6 +52,27 @@ def test_keyword_only_args():
     ))
 
 
+def test_keyword_only_args_with_space_after_star():
+    # language=python - whitespace after bare * separator
+    RecipeSpec().rewrite_run(python(
+        """\
+        def func(x,* ,kwarg1):
+            pass
+        """
+    ))
+
+
+def test_keyword_only_args_with_newline_after_star():
+    # language=python - newline after bare * separator
+    RecipeSpec().rewrite_run(python(
+        """\
+        def foo(a, *
+            , bar):
+            pass
+        """
+    ))
+
+
 def test_kwonlyargs():
     # language=python
     RecipeSpec().rewrite_run(python(

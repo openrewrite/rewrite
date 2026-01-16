@@ -1821,11 +1821,15 @@ class PythonJavaPrinter:
 
         # Visit variables
         nodes = multi_variable.padding.variables
+        is_kwonly_marker = multi_variable.markers.find_first(KeywordOnlyArguments) is not None
         for i, node in enumerate(nodes):
             # Set cursor for context in visit_variable
             self.set_cursor(Cursor(self.get_cursor(), node))
             self.visit(node.element, p)
             self._visit_markers(node.markers, p)
+            # For keyword-only args marker (bare *), print the after space before comma
+            if is_kwonly_marker:
+                self._visit_space(node.after, JRightPadded.Location.NAMED_VARIABLE.after_location, p)
             if i < len(nodes) - 1:
                 p.append(",")
             # Restore cursor

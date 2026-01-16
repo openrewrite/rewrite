@@ -46,6 +46,21 @@ def test_tuple_with_first_element_in_parens():
     RecipeSpec().rewrite_run(python("x = (1) // 2, 0"))
 
 
+def test_tuple_with_all_elements_in_parens():
+    # language=python - each element wrapped in parens, tuple has no outer parens
+    RecipeSpec().rewrite_run(python("x = (a), (b)"))
+
+
+def test_tuple_with_parenthesized_subscript_elements():
+    # language=python - parenthesized subscript expressions as tuple elements
+    RecipeSpec().rewrite_run(python("w, h = (bbox[2] - bbox[0]), (bbox[3] - bbox[1])"))
+
+
+def test_tuple_with_parenthesized_arithmetic():
+    # language=python - expression with division as tuple elements
+    RecipeSpec().rewrite_run(python("center = (bbox[2] + bbox[0]) / 2, (bbox[3] + bbox[1]) / 2"))
+
+
 # note: `{}` is always a dict
 def test_empty_set():
     # language=python
