@@ -47,6 +47,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("DuplicatedCode")
 @Value
@@ -252,16 +253,16 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                                     List<GroupArtifact> oldPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", springBootVersion), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
                                             .map(md -> new GroupArtifact(md.getGroupId(), md.getArtifactId()))
                                             .filter(requested::contains)
-                                            .collect(Collectors.toList());
+                                            .collect(toList());
                                     List<GroupArtifactVersion> newPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", acc.pluginIdToNewVersion.get("org.springframework.boot")), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
                                             .map(md -> new GroupArtifactVersion(md.getGroupId(), md.getArtifactId(), md.getVersion()))
                                             .filter(gav -> requested.stream().anyMatch(r -> r.equals(gav.asGroupArtifact())))
-                                            .collect(Collectors.toList());
+                                            .collect(toList());
 
                                     List<GroupArtifact> noLongerManaged = new ArrayList<>(oldPlatformManaged);
                                     noLongerManaged.removeAll(newPlatformManaged);
 
-                                    List<GroupArtifact> newlyManaged = newPlatformManaged.stream().map(GroupArtifactVersion::asGroupArtifact).collect(Collectors.toList());
+                                    List<GroupArtifact> newlyManaged = newPlatformManaged.stream().map(GroupArtifactVersion::asGroupArtifact).collect(toList());
                                     newlyManaged.removeAll(oldPlatformManaged);
 
 
