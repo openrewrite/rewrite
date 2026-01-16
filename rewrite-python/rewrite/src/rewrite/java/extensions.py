@@ -32,7 +32,7 @@ def visit_right_padded(v: 'JavaVisitor', right: Optional[JRightPadded[T]], p: P)
     t = right.element
     v.cursor = Cursor(v.cursor, right)
     if isinstance(t, Tree):
-        t = v.visit_and_cast(t, T, p)
+        t = v.visit_and_cast(t, T, p)  # type: ignore[arg-type]  # TypeVar as Type arg; see https://github.com/astral-sh/ty/issues/501
     v.cursor = v.cursor.parent
 
     if t is None:
@@ -52,7 +52,7 @@ def visit_left_padded(v: 'JavaVisitor', left: Optional[JLeftPadded[T]], p: P) ->
     before = v.visit_space(left.before, p)
     t = left.element
     if isinstance(t, Tree):
-        t = v.visit_and_cast(t, T, p)
+        t = v.visit_and_cast(t, T, p)  # type: ignore[arg-type]  # TypeVar as Type arg; see https://github.com/astral-sh/ty/issues/501
     v.cursor = v.cursor.parent
 
     if left.element is t and before is left.before:

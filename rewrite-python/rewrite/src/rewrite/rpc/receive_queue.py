@@ -272,7 +272,7 @@ class RpcReceiveQueue:
                 b = None
 
             item = self.receive(b, on_change)
-            after.append(item)
+            after.append(item)  # type: ignore[arg-type]  # RPC protocol guarantees non-null list items
 
         return after
 
@@ -294,7 +294,7 @@ class RpcReceiveQueue:
             if m is None:
                 m = Markers.EMPTY
 
-            new_id = self.receive(m.id)
+            new_id = self.receive_defined(m.id)
             new_markers_list = self.receive_list(list(m.markers) if m.markers else None)
 
             return Markers(new_id, new_markers_list or [])
@@ -392,7 +392,7 @@ def _receive_markers(markers: 'Markers', q: RpcReceiveQueue) -> 'Markers':
     """Codec for receiving Markers."""
     from rewrite import Markers
 
-    new_id = q.receive(markers.id)
+    new_id = q.receive_defined(markers.id)
     new_markers_list = q.receive_list(list(markers.markers) if markers.markers else None)
 
     return Markers(new_id, new_markers_list or [])
