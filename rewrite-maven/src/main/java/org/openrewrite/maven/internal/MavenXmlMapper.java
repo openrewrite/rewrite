@@ -53,7 +53,7 @@ public class MavenXmlMapper {
         ObjectMapper m = XmlMapper.builder(xmlFactory)
                 .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
                 .enable(FromXmlParser.Feature.EMPTY_ELEMENT_AS_NULL)
-                .defaultUseWrapper(false)
+                .defaultUseWrapper(true)
                 .build()
                 .registerModule(new ParameterNamesModule())
                 .disable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)

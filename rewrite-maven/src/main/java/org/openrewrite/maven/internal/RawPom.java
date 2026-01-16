@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.internal;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -187,6 +188,26 @@ public class RawPom {
         @Nullable
         @JacksonXmlElementWrapper
         List<GroupArtifact> exclusions;
+
+        @JsonCreator
+        public Dependency(
+            @JsonProperty("groupId") String groupId,
+            @JsonProperty("artifactId") String artifactId,
+            @JsonProperty("version") @Nullable String version,
+            @JsonProperty("scope") @Nullable String scope,
+            @JsonProperty("type") @Nullable String type,
+            @JsonProperty("classifier") @Nullable String classifier,
+            @Nullable @JsonProperty("optional") String optional,
+            @Nullable @JsonProperty("exclusions") List<GroupArtifact> exclusions) {
+            this.groupId = groupId;
+            this.artifactId = artifactId;
+            this.version = version;
+            this.scope = scope;
+            this.type = type;
+            this.classifier = classifier;
+            this.optional = optional;
+            this.exclusions = exclusions;
+        }
     }
 
     @Getter
@@ -198,6 +219,7 @@ public class RawPom {
             this.dependencies = null;
         }
 
+        @JsonCreator
         public DependencyManagement(@JsonProperty("dependencies") @Nullable Dependencies dependencies) {
             this.dependencies = dependencies;
         }
@@ -211,7 +233,8 @@ public class RawPom {
             this.dependencies = new ArrayList<>();
         }
 
-        public Dependencies(@JacksonXmlProperty(localName = "dependency") List<Dependency> dependencies) {
+        @JsonCreator
+        public Dependencies(@JacksonXmlProperty(localName = "dependency") @JacksonXmlElementWrapper(useWrapping = false) List<Dependency> dependencies) {
             this.dependencies = dependencies;
         }
     }
@@ -224,7 +247,8 @@ public class RawPom {
             this.licenses = emptyList();
         }
 
-        public Licenses(@JacksonXmlProperty(localName = "license") List<License> licenses) {
+        @JsonCreator
+        public Licenses(@JacksonXmlProperty(localName = "license") @JacksonXmlElementWrapper(useWrapping = false) List<License> licenses) {
             this.licenses = licenses;
         }
     }
@@ -245,7 +269,8 @@ public class RawPom {
             this.profiles = emptyList();
         }
 
-        public Profiles(@JacksonXmlProperty(localName = "profile") List<Profile> profiles) {
+        @JsonCreator
+        public Profiles(@JacksonXmlProperty(localName = "profile") @JacksonXmlElementWrapper(useWrapping = false) List<Profile> profiles) {
             this.profiles = profiles;
         }
     }
@@ -258,7 +283,8 @@ public class RawPom {
             this.modules = emptyList();
         }
 
-        public Modules(@JacksonXmlProperty(localName = "module") List<String> modules) {
+        @JsonCreator
+        public Modules(@JacksonXmlProperty(localName = "module") @JacksonXmlElementWrapper(useWrapping = false) List<String> modules) {
             this.modules = modules;
         }
     }
@@ -271,7 +297,8 @@ public class RawPom {
             this.subprojects = emptyList();
         }
 
-        public SubProjects(@JacksonXmlProperty(localName = "subproject") List<String> subprojects) {
+        @JsonCreator
+        public SubProjects(@JacksonXmlProperty(localName = "subproject") @JacksonXmlElementWrapper(useWrapping = false) List<String> subprojects) {
             this.subprojects = subprojects;
         }
     }
@@ -373,8 +400,10 @@ public class RawPom {
             this.name = "";
         }
 
+        @JsonCreator
         public License(@JsonProperty("name") String name) {
-            this.name = name;
+            // Handling null to avoid potential NPEs if <name/> is empty or missing
+            this.name = name != null ? name : "";
         }
     }
 
@@ -401,6 +430,24 @@ public class RawPom {
 
         @Nullable
         RawPluginRepositories pluginRepositories;
+
+        @JsonCreator
+        public Profile(
+            @JsonProperty("id") @Nullable String id,
+            @JsonProperty("activation") @Nullable ProfileActivation activation,
+            @JsonProperty("properties") @Nullable Map<String, String> properties,
+            @JsonProperty("dependencies") @Nullable Dependencies dependencies,
+            @JsonProperty("dependencyManagement") @Nullable DependencyManagement dependencyManagement,
+            @JsonProperty("repositories") @Nullable RawRepositories repositories,
+            @JsonProperty("pluginRepositories") @Nullable RawPluginRepositories pluginRepositories) {
+            this.id = id;
+            this.activation = activation;
+            this.properties = properties;
+            this.dependencies = dependencies;
+            this.dependencyManagement = dependencyManagement;
+            this.repositories = repositories;
+            this.pluginRepositories = pluginRepositories;
+        }
     }
 
     public @Nullable String getGroupId() {
