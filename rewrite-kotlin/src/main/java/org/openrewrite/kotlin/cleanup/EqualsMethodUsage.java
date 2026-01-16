@@ -52,10 +52,7 @@ public class EqualsMethodUsage extends Recipe {
 
     Set<String> tags = singleton("RSPEC-S6519");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(3);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(3);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

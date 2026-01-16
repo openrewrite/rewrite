@@ -38,10 +38,8 @@ public class OrderPomElements extends Recipe {
     @Getter
     final Set<String> tags = singleton("RSPEC-S3423");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(10);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(10);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

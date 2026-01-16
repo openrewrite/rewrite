@@ -40,10 +40,8 @@ public class FindEmptyClasses extends Recipe {
     @Getter
     final Set<String> tags = singleton("RSPEC-S2094");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(5);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

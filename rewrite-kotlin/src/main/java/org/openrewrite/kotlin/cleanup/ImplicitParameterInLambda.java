@@ -41,10 +41,7 @@ public class ImplicitParameterInLambda extends Recipe {
                "only one parameter, when this is true the compiler can determine the parameter type by context. Thus " +
                "when using it with single parameter lambda expressions, you do not need to declare the type.";
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(2);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(2);
 
     Set<String> tags = singleton("RSPEC-S6558");
 

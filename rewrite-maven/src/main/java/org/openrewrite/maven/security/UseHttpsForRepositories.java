@@ -42,10 +42,8 @@ public class UseHttpsForRepositories extends Recipe {
     @Getter
     final String description = "Use HTTPS for repository URLs.";
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(5);
 
     @Getter
     final Set<String> tags = new HashSet<>(Arrays.asList("security", "CWE-829"));

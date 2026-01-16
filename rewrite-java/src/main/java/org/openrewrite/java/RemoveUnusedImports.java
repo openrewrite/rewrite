@@ -52,10 +52,7 @@ public class RemoveUnusedImports extends Recipe {
 
     Set<String> tags = singleton("RSPEC-S1128");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(5);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

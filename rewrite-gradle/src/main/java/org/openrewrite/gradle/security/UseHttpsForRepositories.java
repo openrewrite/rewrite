@@ -44,10 +44,8 @@ public class UseHttpsForRepositories extends Recipe {
     @Getter
     final Set<String> tags = singleton("security");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(5);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
