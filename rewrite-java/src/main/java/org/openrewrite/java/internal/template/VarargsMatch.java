@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,25 +17,15 @@ package org.openrewrite.java.internal.template;
 
 import lombok.Value;
 import lombok.With;
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.Marker;
 
+import java.util.List;
 import java.util.UUID;
 
 @Value
 @With
-public class TemplateParameter implements Marker {
+public class VarargsMatch implements Marker {
     UUID id;
-    JavaType type;
-
-    @Nullable
-    String name;
-
-    /**
-     * The matcher name used to create this parameter (e.g., "any" or "anyArray").
-     * Used to distinguish between matching explicit arrays vs varargs expansion.
-     */
-    @Nullable
-    String matcherName;
+    List<J> matchedElements;
 }
