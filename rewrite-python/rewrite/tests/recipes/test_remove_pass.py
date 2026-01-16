@@ -68,3 +68,96 @@ class TestRemovePass:
                 """
             )
         )
+
+    def test_keeps_pass_when_only_statement_in_function(self):
+        """Test that pass is NOT removed when it's the only statement in a function."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                """
+                def foo():
+                    pass
+                """
+            )
+        )
+
+    def test_keeps_pass_when_only_statement_in_class(self):
+        """Test that pass is NOT removed when it's the only statement in a class body."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                """
+                class Foo:
+                    pass
+                """
+            )
+        )
+
+    def test_removes_pass_from_class_method(self):
+        """Test that pass is removed from a method inside a class when there are other statements."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                """
+                class Foo:
+                    def bar(self):
+                        pass
+                        x = 1
+                """,
+                """
+                class Foo:
+                    def bar(self):
+                        x = 1
+                """,
+            )
+        )
+
+    def test_removes_pass_from_if_block(self):
+        """Test that pass is removed from an if block when there are other statements."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                """
+                if True:
+                    pass
+                    x = 1
+                """,
+                """
+                if True:
+                    x = 1
+                """,
+            )
+        )
+
+    def test_keeps_pass_when_only_statement_in_if(self):
+        """Test that pass is NOT removed when it's the only statement in an if block."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                """
+                if True:
+                    pass
+                """
+            )
+        )
+
+    def test_removes_pass_from_else_block(self):
+        """Test that pass is removed from an else block when there are other statements."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                """
+                if False:
+                    x = 1
+                else:
+                    pass
+                    y = 2
+                """,
+                """
+                if False:
+                    x = 1
+                else:
+                    y = 2
+                """,
+            )
+        )

@@ -31,9 +31,9 @@ from rewrite.java.visitor import JavaVisitor
 from rewrite.python.support_types import Py, PySpace
 from rewrite.tree import SourceFile
 from rewrite.utils import list_map
+from rewrite.visitor import Cursor
 
 if TYPE_CHECKING:
-    from rewrite.visitor import Cursor
     from rewrite.python.tree import (
         Async,
         Await,
@@ -448,9 +448,9 @@ class PythonVisitor(JavaVisitor[P]):
             return temp_stmt
         multi = cast("MultiImport", temp_stmt)
         multi = multi.replace(markers=self.visit_markers(multi.markers, p))
-        if multi.from_ is not None:
-            multi = multi.replace(
-                from_=self.visit_right_padded(multi.from_, None, p)
+        if multi.padding.from_ is not None:
+            multi = multi.padding.replace(
+                _from=self.visit_right_padded(multi.padding.from_, None, p)
             )
         multi = multi.replace(
             names=self.visit_container(multi.padding.names, None, p)
@@ -725,7 +725,7 @@ class PythonVisitor(JavaVisitor[P]):
         before = self.visit_space(container.before, loc, p)
         elements = list_map(
             lambda e: self.visit_right_padded(e, loc, p),
-            container.elements
+            container.padding.elements
         )
         if before is container.before and elements is container.elements:
             return container
@@ -751,11 +751,9 @@ class PythonVisitor(JavaVisitor[P]):
         return result
 
     def visit(self, tree: Any, p: P, parent: Optional['Cursor'] = None) -> Any:
-        """Visit a tree node."""
-        if parent is not None:
-            self._cursor = parent
-        if tree is None:
-            return None
-        if isinstance(tree, Py):
-            return tree.accept_python(self, p)
+        """Visit a tree node.
+
+        Delegates to TreeVisitor.visit() for all trees, including Py instances.
+        This ensures proper cursor maintenance and pre_visit/post_visit hooks.
+        """
         return super().visit(tree, p, parent)

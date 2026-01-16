@@ -4,7 +4,7 @@ import weakref
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, cast
+from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, Union, cast
 from uuid import UUID
 
 from rewrite import Markers
@@ -568,12 +568,16 @@ class JRightPadded(Generic[T]):
         return [x.element for x in padded_list]
 
     @classmethod
-    def merge_elements(cls, before: List[JRightPadded[J2]], elements: List[J2]) -> List[JRightPadded[J2]]:
+    def merge_elements(cls, before: List[JRightPadded[J2]], elements: List[Union[J2, JRightPadded[J2]]]) -> List[JRightPadded[J2]]:
+        # Helper to extract element - handles both wrapped JRightPadded and unwrapped elements
+        def get_element(t):
+            return t.element if isinstance(t, JRightPadded) else t
+
         # a cheaper check for the most common case when there are no changes
         if len(elements) == len(before):
             has_changes = False
             for i in range(len(before)):
-                if before[i].element is not elements[i]:
+                if before[i].element is not get_element(elements[i]):
                     has_changes = True
                     break
             if not has_changes:
@@ -590,11 +594,12 @@ class JRightPadded(Generic[T]):
             before_by_id[j.element.id] = j
 
         for t in elements:
-            found = before_by_id.get(t.id)
+            elem = get_element(t)
+            found = before_by_id.get(elem.id)
             if found is not None:
-                after.append(found.replace(element=t))
+                after.append(found.replace(element=elem))
             else:
-                after.append(JRightPadded(t, Space.EMPTY, Markers.EMPTY))
+                after.append(JRightPadded(elem, Space.EMPTY, Markers.EMPTY))
 
         return after
 

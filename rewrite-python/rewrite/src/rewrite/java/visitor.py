@@ -91,6 +91,15 @@ class JavaVisitor(TreeVisitor[J, P]):
         """Visit an expression. Override to intercept all expressions."""
         return expr
 
+    def visit_class_declaration(self, class_decl: 'ClassDeclaration', p: P) -> J:
+        """Visit a class declaration, including its body."""
+        # Visit the class body
+        if class_decl.body is not None:
+            body = self.visit(class_decl.body, p)
+            if body is not class_decl.body:
+                class_decl = class_decl.replace(body=body)
+        return class_decl
+
     def visit_method_declaration(self, method: 'MethodDeclaration', p: P) -> J:
         """Visit a method declaration, including its body."""
         # Visit the method body if present
@@ -118,6 +127,22 @@ class JavaVisitor(TreeVisitor[J, P]):
             if changed:
                 block = block.padding.replace(statements=new_statements)
         return block
+
+    def visit_if(self, if_: 'If', p: P) -> J:
+        """Visit an if statement, including then and else parts."""
+        # Visit the then part
+        then_part = self.visit_right_padded(if_.padding.then_part, None, p)
+        if then_part is not if_.padding.then_part:
+            if_ = if_.padding.replace(then_part=then_part)
+
+        # Visit the else part if present
+        if if_.else_part is not None:
+            # Use visit_right_padded to properly handle the JRightPadded body
+            else_body_padded = self.visit_right_padded(if_.else_part.padding.body, None, p)
+            if else_body_padded is not if_.else_part.padding.body:
+                if_ = if_.replace(else_part=if_.else_part.padding.replace(body=else_body_padded))
+
+        return if_
 
     def visit_assert(self, assert_: 'Assert', p: P) -> J:
         """Visit an assert statement."""

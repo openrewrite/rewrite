@@ -14,15 +14,16 @@
 
 """Recipe to remove redundant pass statements from Python code."""
 
-from typing import Any
+from typing import Any, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor
 from rewrite.category import CategoryDescriptor
 from rewrite.decorators import categorize
 from rewrite.marketplace import Python
-from rewrite.python.tree import Pass
+from rewrite.python.tree import CompilationUnit, Pass
 from rewrite.python.visitor import PythonVisitor
 from rewrite.java import J
+from rewrite.java.tree import Block
 
 # Define category path locally to avoid circular imports
 _Cleanup = [*Python, CategoryDescriptor(display_name="Cleanup")]
@@ -31,11 +32,12 @@ _Cleanup = [*Python, CategoryDescriptor(display_name="Cleanup")]
 @categorize(_Cleanup)
 class RemovePass(Recipe):
     """
-    Remove `pass` statements from Python code.
+    Remove redundant `pass` statements from Python code.
 
-    This recipe removes all `pass` statements. Note that this may make
-    code syntactically invalid if the `pass` is the only statement in a
-    block (e.g., empty function body).
+    This recipe removes `pass` statements only when they are redundant -
+    i.e., when there are other statements in the same block. It will NOT
+    remove `pass` when it's the only statement in a block, as that would
+    make the code syntactically invalid.
     """
 
     @property
@@ -44,15 +46,40 @@ class RemovePass(Recipe):
 
     @property
     def display_name(self) -> str:
-        return "Remove pass statements"
+        return "Remove redundant pass statements"
 
     @property
     def description(self) -> str:
-        return "Remove `pass` statements from Python code."
+        return "Remove redundant `pass` statements from Python code when there are other statements in the block."
 
     def editor(self) -> TreeVisitor[Any, ExecutionContext]:
         class Visitor(PythonVisitor[ExecutionContext]):
-            def visit_pass(self, pass_: Pass, ctx: ExecutionContext) -> J:
-                return None
+            def visit_pass(self, pass_: Pass, ctx: ExecutionContext) -> Optional[J]:
+                # Find the enclosing block or compilation unit
+                block = self.cursor.first_enclosing(Block)
+                if block is not None:
+                    # Count non-pass statements in the block
+                    other_statements = sum(
+                        1 for stmt in block.statements
+                        if not isinstance(stmt, Pass)
+                    )
+                    # Only remove pass if there are other statements
+                    if other_statements > 0:
+                        return None
+                    return pass_
+
+                # Check for module-level statements in CompilationUnit
+                cu = self.cursor.first_enclosing(CompilationUnit)
+                if cu is not None:
+                    # Count non-pass statements at module level
+                    other_statements = sum(
+                        1 for stmt in cu.statements
+                        if not isinstance(stmt, Pass)
+                    )
+                    # Only remove pass if there are other statements
+                    if other_statements > 0:
+                        return None
+
+                return pass_
 
         return Visitor()
