@@ -22,6 +22,11 @@ J2 = TypeVar('J2', bound=J)
 # Custom token type for whitespace gaps between tokens
 WHITESPACE_TOKEN = -1
 
+# F-string token types (Python 3.12+) - define fallbacks for older versions
+FSTRING_START = getattr(token, 'FSTRING_START', -2)
+FSTRING_MIDDLE = getattr(token, 'FSTRING_MIDDLE', -3)
+FSTRING_END = getattr(token, 'FSTRING_END', -4)
+
 # Token types to skip when looking for significant (non-whitespace) tokens
 _SKIP_TOKEN_TYPES = (token.NL, token.NEWLINE, token.INDENT, token.DEDENT,
                      token.COMMENT, token.ENCODING, token.ENDMARKER, WHITESPACE_TOKEN)
@@ -151,9 +156,9 @@ class ParserVisitor(ast.NodeVisitor):
                     result.append(ws_tok)
 
             # Track f-string depth for whitespace injection.
-            if tok.type == token.FSTRING_START:
+            if tok.type == FSTRING_START:
                 fstring_depth += 1
-            elif tok.type == token.FSTRING_END:
+            elif tok.type == FSTRING_END:
                 fstring_depth -= 1
 
             # Track paren pairs
@@ -1703,7 +1708,7 @@ class ParserVisitor(ast.NodeVisitor):
             name if isinstance(name, j.Identifier) else j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "",
                                                                      None, None),
             args,
-            name.type if isinstance(name.type, JavaType.Method) else None,
+            name.type if isinstance(name.type, JavaType.Method) else None,  # ty: ignore[possibly-missing-attribute]  # complex union type
         )
 
     def __sort_call_arguments(self, call: ast.Call) -> List[Union[ast.expr, ast.keyword]]:
@@ -1754,7 +1759,7 @@ class ParserVisitor(ast.NodeVisitor):
                     self._type_mapping.type(node)
                 )
 
-        return left.replace(prefix=prefix)
+        return left.replace(prefix=prefix)  # ty: ignore[possibly-missing-attribute]  # complex union type
 
     def __convert_binary_operator(self, op) -> Union[JLeftPadded[j.Binary.Type], JLeftPadded[py.Binary.Type]]:
         operation_map: Dict[type, Tuple[j.Binary.Type, str]] = {
@@ -1813,7 +1818,7 @@ class ParserVisitor(ast.NodeVisitor):
         res = None
         is_first = True
 
-        while tok.type in (token.STRING, token.FSTRING_START) and is_byte_string == self._is_byte_string(tok.string):
+        while tok.type in (token.STRING, FSTRING_START) and is_byte_string == self._is_byte_string(tok.string):
             if not is_first:
                 # Check for statement boundary (NEWLINE) before continuing concatenation
                 # String concatenation only applies within the same statement
@@ -1834,7 +1839,7 @@ class ParserVisitor(ast.NodeVisitor):
                     # NEWLINE means end of statement, not concatenation
                     break
 
-            if tok.type == token.FSTRING_START:
+            if tok.type == FSTRING_START:
                 prefix = self.__whitespace()
                 current, tok, _ = self.__map_fstring(node, prefix, tok)
             else:
@@ -2106,12 +2111,12 @@ class ParserVisitor(ast.NodeVisitor):
         # Apply the whitespace after @ to the name when there are no extra parentheses.
         # When extra_parens is non-empty, this is handled differently (prefix is set on the wrapped paren).
         if not extra_parens:
-            name = name.replace(prefix=name_prefix)
+            name = name.replace(prefix=name_prefix)  # ty: ignore[possibly-missing-attribute]  # recursive call returns unknown
 
         # Wrap name in extra parentheses if present
         if extra_parens:
             # Set the inner prefix on the name
-            name = name.replace(prefix=extra_parens[-1][1])
+            name = name.replace(prefix=extra_parens[-1][1])  # ty: ignore[possibly-missing-attribute]  # recursive call returns unknown
 
             # Wrap in extra parentheses (innermost to outermost)
             wrapped: Expression = name
@@ -2163,7 +2168,7 @@ class ParserVisitor(ast.NodeVisitor):
         leading_prefix = self.__whitespace()
 
         tok = self._skip_whitespace_tokens()
-        while tok.type not in (token.FSTRING_START, token.STRING):
+        while tok.type not in (FSTRING_START, token.STRING):
             tok = self._advance_token()
 
         value_idx = 0
@@ -2194,7 +2199,7 @@ class ParserVisitor(ast.NodeVisitor):
                         self._token_idx += 1
                     else:
                         break
-                if saw_statement_end or peek_tok.type not in (token.STRING, token.FSTRING_START):
+                if saw_statement_end or peek_tok.type not in (token.STRING, FSTRING_START):
                     # NEWLINE means end of statement, not concatenation
                     self._token_idx = save_idx
                     break
@@ -2214,7 +2219,7 @@ class ParserVisitor(ast.NodeVisitor):
                     expected_value = cast(ast.Constant, node.values[value_idx]).value
                     if isinstance(expected_value, str) and current.value == expected_value:
                         value_idx += 1
-            elif tok.type == token.FSTRING_START:
+            elif tok.type == FSTRING_START:
                 current, tok, value_idx = self.__map_fstring(node, prefix, tok, value_idx)
             else:
                 # No more f-strings or strings to process (should only happen for first element)
@@ -2524,7 +2529,7 @@ class ParserVisitor(ast.NodeVisitor):
             extra_parens[0][1] if extra_parens else prefix,
             Markers.EMPTY,
             py.CollectionLiteral.Kind.TUPLE,
-            elements.replace(markers=
+            elements.replace(markers=  # ty: ignore[possibly-missing-attribute]  # complex union type
                 Markers.build(random_id(), [OmitParentheses(random_id())])) if omit_parens else elements,
             self._type_mapping.type(node)
         )
@@ -3064,7 +3069,7 @@ class ParserVisitor(ast.NodeVisitor):
 
         Uses _token_idx directly to iterate through tokens.
         """
-        if tok.type != token.FSTRING_START:
+        if tok.type != FSTRING_START:
             if len(node.values) == 1 and isinstance(node.values[0], ast.Constant):
                 # format specifiers are stored as f-strings in the AST; e.g. `f'{1:n}'`
                 format_val = node.values[0].value
@@ -3090,7 +3095,7 @@ class ParserVisitor(ast.NodeVisitor):
         # tokenizer tokens: FSTRING_START, FSTRING_MIDDLE, OP, ..., OP, FSTRING_MIDDLE, FSTRING_END
         parts = []
         prev_token_idx = -1
-        while tok.type != token.FSTRING_END and value_idx < len(node.values):
+        while tok.type != FSTRING_END and value_idx < len(node.values):
             # Safety check: ensure loop is making progress
             if self._token_idx == prev_token_idx:
                 raise RuntimeError(
@@ -3107,24 +3112,24 @@ class ParserVisitor(ast.NodeVisitor):
 
             # Handle nested FSTRING_START - this indicates nested f-string concatenation
             # which is not fully supported. Skip to prevent infinite loop.
-            if tok.type == token.FSTRING_START:
+            if tok.type == FSTRING_START:
                 # Skip until we find the matching FSTRING_END
                 depth = 1
                 while depth > 0 and self._token_idx < len(self._tokens):
                     tok = self._advance_token()
-                    if tok.type == token.FSTRING_START:
+                    if tok.type == FSTRING_START:
                         depth += 1
-                    elif tok.type == token.FSTRING_END:
+                    elif tok.type == FSTRING_END:
                         depth -= 1
                 tok = self._advance_token() if self._token_idx < len(self._tokens) - 1 else tok
                 continue
 
             value = node.values[value_idx]
-            if tok.type == token.FSTRING_MIDDLE:
+            if tok.type == FSTRING_MIDDLE:
                 # Accumulate text from consecutive FSTRING_MIDDLE tokens
                 s = tok.string
                 tok = self._advance_token()  # consume first FSTRING_MIDDLE, get next
-                while tok.type == token.FSTRING_MIDDLE:
+                while tok.type == FSTRING_MIDDLE:
                     s += tok.string
                     tok = self._advance_token()  # consume and get next
                 # For value_source, escape braces so the printer outputs them correctly
@@ -3162,13 +3167,13 @@ class ParserVisitor(ast.NodeVisitor):
                     )
 
                 # Scan for specifiers (debug, conversion, format) - applies to both nested f-string and regular expressions
-                while self._token_idx < len(self._tokens) and self._tokens[self._token_idx].type not in (token.FSTRING_END, token.FSTRING_MIDDLE):
+                while self._token_idx < len(self._tokens) and self._tokens[self._token_idx].type not in (FSTRING_END, FSTRING_MIDDLE):
                     tok = self._next_token()  # get current and advance (we need to examine current token)
                     if tok.type == token.OP and tok.string in ('!'):
                         break
                     la_tok = self._tokens[self._token_idx]
                     if tok.type == token.OP and tok.string == '}' and (
-                            la_tok.type in (token.FSTRING_END, token.FSTRING_MIDDLE) or (
+                            la_tok.type in (FSTRING_END, FSTRING_MIDDLE) or (
                             la_tok.type == token.OP and la_tok.string == '{')):
                         break
                     # Debug specifier '=' - break regardless of what follows (whitespace is valid after '=')
@@ -3222,12 +3227,12 @@ class ParserVisitor(ast.NodeVisitor):
                 if (format_spec is not None or conv is not None or debug is not None) and self._tokens[self._token_idx].string == '}':
                     self._token_idx += 1
                 tok = self._tokens[self._token_idx]
-            elif tok.type == token.FSTRING_END:
+            elif tok.type == FSTRING_END:
                 raise NotImplementedError("Unsupported: String concatenation with f-strings")
 
         if consume_end_delim:
             tok = self._advance_token()  # consume FSTRING_END, get next
-        elif tok.type == token.FSTRING_MIDDLE and len(tok.string) == 0:
+        elif tok.type == FSTRING_MIDDLE and len(tok.string) == 0:
             tok = self._advance_token()  # consume empty FSTRING_MIDDLE, get next
 
         return (py.FormattedString(

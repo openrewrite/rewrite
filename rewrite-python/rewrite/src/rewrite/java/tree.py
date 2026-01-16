@@ -89,7 +89,7 @@ class Annotation(Expression):
 
     @property
     def arguments(self) -> Optional[List[Expression]]:
-        return self._arguments.elements
+        return self._arguments.elements if self._arguments else None
 
 
     @dataclass
@@ -850,14 +850,14 @@ class ClassDeclaration(Statement, TypedTree):
 
     @property
     def type_parameters(self) -> Optional[List[TypeParameter]]:
-        return self._type_parameters.elements
+        return self._type_parameters.elements if self._type_parameters else None
 
 
     _primary_constructor: Optional[JContainer[Statement]]
 
     @property
     def primary_constructor(self) -> Optional[List[Statement]]:
-        return self._primary_constructor.elements
+        return self._primary_constructor.elements if self._primary_constructor else None
 
 
     _extends: Optional[JLeftPadded[TypeTree]]
@@ -871,14 +871,14 @@ class ClassDeclaration(Statement, TypedTree):
 
     @property
     def implements(self) -> Optional[List[TypeTree]]:
-        return self._implements.elements
+        return self._implements.elements if self._implements else None
 
 
     _permits: Optional[JContainer[TypeTree]]
 
     @property
     def permits(self) -> Optional[List[TypeTree]]:
-        return self._permits.elements
+        return self._permits.elements if self._permits else None
 
 
     _body: Block
@@ -2735,7 +2735,7 @@ class MemberReference(TypedTree, MethodCall):
 
     @property
     def type_parameters(self) -> Optional[List[Expression]]:
-        return self._type_parameters.elements
+        return self._type_parameters.elements if self._type_parameters else None
 
 
     _reference: JLeftPadded[Identifier]
@@ -2881,7 +2881,7 @@ class MethodDeclaration(Statement, TypedTree):
 
     @property
     def throws(self) -> Optional[List[NameTree]]:
-        return self._throws.elements
+        return self._throws.elements if self._throws else None
 
 
     _body: Optional[Block]
@@ -3058,7 +3058,7 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
 
     @property
     def type_parameters(self) -> Optional[List[Expression]]:
-        return self._type_parameters.elements
+        return self._type_parameters.elements if self._type_parameters else None
 
 
     _name: Identifier
@@ -3304,7 +3304,7 @@ class NewArray(Expression, TypedTree):
 
     @property
     def initializer(self) -> Optional[List[Expression]]:
-        return self._initializer.elements
+        return self._initializer.elements if self._initializer else None
 
 
     _type: Optional[JavaType]
@@ -3677,7 +3677,7 @@ class ParameterizedType(TypeTree, Expression):
 
     @property
     def type_parameters(self) -> Optional[List[Expression]]:
-        return self._type_parameters.elements
+        return self._type_parameters.elements if self._type_parameters else None
 
 
     _type: Optional[JavaType]
@@ -4217,7 +4217,7 @@ class Try(Statement):
 
     @property
     def resources(self) -> Optional[List[Resource]]:
-        return self._resources.elements
+        return self._resources.elements if self._resources else None
 
 
     _body: Block
@@ -4474,7 +4474,7 @@ class TypeParameter(J):
 
     @property
     def bounds(self) -> Optional[List[TypeTree]]:
-        return self._bounds.elements
+        return self._bounds.elements if self._bounds else None
 
 
     @dataclass

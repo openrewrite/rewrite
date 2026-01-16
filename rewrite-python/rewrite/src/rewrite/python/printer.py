@@ -1764,7 +1764,7 @@ class PythonJavaPrinter:
         vd = parent_cursor.parent.value if parent_cursor and parent_cursor.parent else None
         padding = parent_cursor.value if parent_cursor else None
 
-        type_expr = vd.type_expression if vd else None
+        type_expr = vd.type_expression if vd else None  # ty: ignore[unresolved-attribute]  # ty#1589: AlwaysFalsy narrowing bug
 
         if isinstance(type_expr, py.SpecialParameter):
             special = type_expr
@@ -1777,14 +1777,14 @@ class PythonJavaPrinter:
         if isinstance(variable.name, Identifier) and not variable.name.simple_name:
             self.visit(variable.initializer, p)
         else:
-            if vd and vd.varargs is not None:
-                self._visit_space(vd.varargs, p)
+            if vd and vd.varargs is not None:  # ty: ignore[unresolved-attribute]  # ty#1589: AlwaysFalsy narrowing bug
+                self._visit_space(vd.varargs, p)  # ty: ignore[unresolved-attribute]  # ty#1589: AlwaysFalsy narrowing bug
                 p.append('*')
-            if vd and vd.markers.find_first(KeywordArguments):
+            if vd and vd.markers.find_first(KeywordArguments):  # ty: ignore[unresolved-attribute]  # ty#1589: AlwaysFalsy narrowing bug
                 p.append("**")
             self.visit(variable.name, p)
             if type_expr is not None and padding:
-                self._visit_space(padding.after, p)
+                self._visit_space(padding.after, p)  # ty: ignore[unresolved-attribute]  # ty#1589: AlwaysFalsy narrowing bug
                 p.append(':')
                 self.visit(type_expr, p)
             if variable.padding.initializer:

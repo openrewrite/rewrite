@@ -1,13 +1,21 @@
 # Auto-generated stub file for IDE autocomplete support.
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
-from typing import Any, ClassVar, List, Optional, Self
+from typing import Any, ClassVar, List, Optional
+from typing_extensions import Self
 from uuid import UUID
 
 
+class Marker(ABC):
+    @property
+    def id(self) -> UUID: ...
+    def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str: ...
+
 class Markers:
-    _id: UUID
-    _markers: List[Marker]
+    EMPTY: ClassVar[Markers]
+
+    id: UUID
+    markers: List[Marker]
 
     def __init__(
         self,
@@ -22,9 +30,16 @@ class Markers:
         markers: List[Marker] = ...,
     ) -> Self: ...
 
+    @classmethod
+    def build(cls, id: UUID, markers: List[Marker]) -> Markers: ...
+
+    def find_first(self, cls: Type[M]) -> Optional[M]: ...
+    def find_all(self, cls: Type[M]) -> List[M]: ...
+    def compute_by_type(self, cls: Type[M], remap_fn: Callable[[M], Marker]) -> Markers: ...
+
 class SearchResult(Marker):
-    _id: UUID
-    _description: Optional[str]
+    id: UUID
+    description: Optional[str]
 
     def __init__(
         self,
@@ -40,8 +55,8 @@ class SearchResult(Marker):
     ) -> Self: ...
 
 class UnknownJavaMarker(Marker):
-    _id: UUID
-    _data: Dict[str, Any]
+    id: UUID
+    data: Dict[str, Any]
 
     def __init__(
         self,
@@ -57,10 +72,10 @@ class UnknownJavaMarker(Marker):
     ) -> Self: ...
 
 class ParseExceptionResult(Marker):
-    _id: UUID
-    _parser_type: str
-    _exception_type: str
-    _message: str
+    id: UUID
+    parser_type: str
+    exception_type: str
+    message: str
 
     def __init__(
         self,
@@ -78,3 +93,6 @@ class ParseExceptionResult(Marker):
         exception_type: str = ...,
         message: str = ...,
     ) -> Self: ...
+
+    @classmethod
+    def build(cls, parser: 'Parser', exception: Exception) -> ParseExceptionResult: ...

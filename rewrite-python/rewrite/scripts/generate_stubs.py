@@ -70,6 +70,24 @@ def extract_dataclass_fields(node: ast.ClassDef) -> List[Tuple[str, str, bool]]:
     return fields
 
 
+def extract_classvar_fields(node: ast.ClassDef) -> List[Tuple[str, str]]:
+    """
+    Extract ClassVar field information from a dataclass.
+
+    Returns list of (name, type_annotation) tuples for ClassVar fields.
+    """
+    fields = []
+    for item in node.body:
+        if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+            field_name = item.target.id
+            if isinstance(item.annotation, ast.Subscript):
+                if isinstance(item.annotation.value, ast.Name):
+                    if item.annotation.value.id == "ClassVar":
+                        field_type = ast.unparse(item.annotation)
+                        fields.append((field_name, field_type))
+    return fields
+
+
 def extract_explicit_init(node: ast.ClassDef) -> Optional[List[Tuple[str, str]]]:
     """
     Extract parameters from an explicit __init__ method if present.
@@ -91,6 +109,84 @@ def extract_explicit_init(node: ast.ClassDef) -> Optional[List[Tuple[str, str]]]
     return None
 
 
+def extract_property_methods(node: ast.ClassDef) -> List[Tuple[str, str]]:
+    """
+    Extract @property methods from a class.
+
+    Returns list of (name, return_type) tuples.
+    """
+    properties = []
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef):
+            # Check if it's a property
+            is_property = any(
+                isinstance(d, ast.Name) and d.id == "property"
+                for d in item.decorator_list
+            )
+            if is_property and item.returns:
+                return_type = ast.unparse(item.returns)
+                properties.append((item.name, return_type))
+    return properties
+
+
+def extract_class_methods(node: ast.ClassDef) -> List[Tuple[str, List[Tuple[str, str]], str]]:
+    """
+    Extract @classmethod methods from a class.
+
+    Returns list of (name, params, return_type) tuples.
+    """
+    methods = []
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef):
+            is_classmethod = any(
+                isinstance(d, ast.Name) and d.id == "classmethod"
+                for d in item.decorator_list
+            )
+            if is_classmethod and item.returns:
+                params = []
+                for arg in item.args.args[1:]:  # Skip 'cls'
+                    if arg.annotation:
+                        param_type = ast.unparse(arg.annotation)
+                    else:
+                        param_type = "Any"
+                    params.append((arg.arg, param_type))
+                return_type = ast.unparse(item.returns)
+                methods.append((item.name, params, return_type))
+    return methods
+
+
+def extract_regular_methods(node: ast.ClassDef) -> List[Tuple[str, List[Tuple[str, str]], str]]:
+    """
+    Extract regular methods from a class (not __init__, __eq__, etc.).
+
+    Returns list of (name, params, return_type) tuples.
+    """
+    methods = []
+    skip_methods = {'__init__', '__eq__', '__hash__', 'replace'}
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef):
+            if item.name in skip_methods or item.name.startswith('_'):
+                continue
+            # Skip property and classmethod
+            is_special = any(
+                isinstance(d, ast.Name) and d.id in ("property", "classmethod", "staticmethod", "abstractmethod")
+                for d in item.decorator_list
+            )
+            if is_special:
+                continue
+            if item.returns:
+                params = []
+                for arg in item.args.args[1:]:  # Skip 'self'
+                    if arg.annotation:
+                        param_type = ast.unparse(arg.annotation)
+                    else:
+                        param_type = "Any"
+                    params.append((arg.arg, param_type))
+                return_type = ast.unparse(item.returns)
+                methods.append((item.name, params, return_type))
+    return methods
+
+
 def is_frozen_dataclass(node: ast.ClassDef) -> bool:
     """Check if a class is decorated with @dataclass(frozen=True)."""
     for decorator in node.decorator_list:
@@ -103,11 +199,63 @@ def is_frozen_dataclass(node: ast.ClassDef) -> bool:
     return False
 
 
+def is_abc_base_class(node: ast.ClassDef) -> bool:
+    """
+    Check if a class is an ABC-like base class (inherits from known base types
+    like J, Statement, Expression, TypedTree, etc.) but is not a dataclass.
+
+    These are typically abstract base classes like TypeTree, NameTree, TypedTree.
+    """
+    if is_frozen_dataclass(node):
+        return False
+
+    # Known base types that indicate this is an ABC
+    known_bases = {
+        'J', 'Statement', 'Expression', 'TypedTree', 'NameTree', 'TypeTree', 'Loop', 'MethodCall',
+        'ABC', 'Py', 'PyStatement', 'PyExpression'
+    }
+
+    for base in node.bases:
+        if isinstance(base, ast.Name) and base.id in known_bases:
+            return True
+    return False
+
+
 def get_class_bases(node: ast.ClassDef) -> str:
     """Get the base classes as a string."""
     if not node.bases:
         return ""
     return ", ".join(ast.unparse(base) for base in node.bases)
+
+
+def generate_abc_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
+    """Generate stub content for an ABC-like base class (no fields, just pass)."""
+    lines = []
+
+    bases = get_class_bases(node)
+    if bases:
+        lines.append(f"{indent}class {node.name}({bases}):")
+    else:
+        lines.append(f"{indent}class {node.name}:")
+
+    # Check for any methods that should be included
+    methods = extract_regular_methods(node)
+    properties = extract_property_methods(node)
+
+    if methods or properties:
+        for name, return_type in properties:
+            lines.append(f"{indent}    @property")
+            lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
+        for name, params, return_type in methods:
+            if params:
+                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
+                lines.append(f"{indent}    def {name}(self, {params_str}) -> {return_type}: ...")
+            else:
+                lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
+    else:
+        lines.append(f"{indent}    pass")
+
+    return lines
 
 
 def extract_imports(tree: ast.Module) -> List[str]:
@@ -128,6 +276,45 @@ def extract_imports(tree: ast.Module) -> List[str]:
     return imports
 
 
+def find_star_import_source(tree: ast.Module, source_path: Path) -> Optional[Path]:
+    """
+    Find the source file for a relative star import (from .module import *).
+
+    Returns the path to the source file, or None if no star import found.
+    """
+    for node in tree.body:
+        if isinstance(node, ast.ImportFrom) and node.level == 1:  # relative import
+            for alias in node.names:
+                if alias.name == "*":
+                    # Found `from .module import *`
+                    module_name = node.module
+                    if module_name:
+                        sibling = source_path.parent / f"{module_name}.py"
+                        if sibling.exists():
+                            return sibling
+    return None
+
+
+def get_classes_from_file(source_path: Path) -> List[Tuple[str, str]]:
+    """
+    Get all class names and their base classes from a Python file.
+
+    Returns list of (class_name, bases_string) tuples.
+    """
+    with open(source_path) as f:
+        source = f.read()
+
+    tree = ast.parse(source)
+    classes = []
+
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
+            bases = get_class_bases(node)
+            classes.append((node.name, bases))
+
+    return classes
+
+
 def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
     """Generate stub content for a single dataclass."""
     lines = []
@@ -140,6 +327,7 @@ def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
         lines.append(f"{indent}class {node.name}:")
 
     fields = extract_dataclass_fields(node)
+    classvar_fields = extract_classvar_fields(node)
 
     # Check for nested classes that are also dataclasses
     nested_classes = []
@@ -153,9 +341,18 @@ def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
         lines.extend(nested_lines)
         lines.append("")
 
-    # Field declarations
-    for name, type_str, has_default in fields:
+    # ClassVar declarations (like EMPTY)
+    for name, type_str in classvar_fields:
         lines.append(f"{indent}    {name}: {type_str}")
+
+    if classvar_fields:
+        lines.append("")
+
+    # Field declarations using public names for attribute access
+    # Type checkers will use these for attribute access like `obj.id`
+    for name, type_str, has_default in fields:
+        public_name = to_public_name(name)
+        lines.append(f"{indent}    {public_name}: {type_str}")
 
     if fields:
         lines.append("")
@@ -164,6 +361,7 @@ def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
     explicit_init = extract_explicit_init(node)
 
     # Generate __init__ method for dataclass constructor
+    # Use actual field names (with underscore) since that's what dataclass generates
     lines.append(f"{indent}    def __init__(")
     lines.append(f"{indent}        self,")
     if explicit_init is not None:
@@ -171,7 +369,7 @@ def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
         for name, type_str in explicit_init:
             lines.append(f"{indent}        {name}: {type_str},")
     else:
-        # Use dataclass fields
+        # Use dataclass field names (with underscore prefix)
         for name, type_str, has_default in fields:
             if has_default:
                 lines.append(f"{indent}        {name}: {type_str} = ...,")
@@ -180,8 +378,7 @@ def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
     lines.append(f"{indent}    ) -> None: ...")
     lines.append("")
 
-    # Generate typed replace() method
-    # Strip underscore prefix for public API kwargs
+    # Generate typed replace() method with public names
     lines.append(f"{indent}    def replace(")
     lines.append(f"{indent}        self,")
     lines.append(f"{indent}        *,")
@@ -189,6 +386,29 @@ def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
         public_name = to_public_name(name)
         lines.append(f"{indent}        {public_name}: {type_str} = ...,")
     lines.append(f"{indent}    ) -> Self: ...")
+
+    # Generate classmethod stubs
+    classmethods = extract_class_methods(node)
+    if classmethods:
+        lines.append("")
+        for name, params, return_type in classmethods:
+            lines.append(f"{indent}    @classmethod")
+            if params:
+                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
+                lines.append(f"{indent}    def {name}(cls, {params_str}) -> {return_type}: ...")
+            else:
+                lines.append(f"{indent}    def {name}(cls) -> {return_type}: ...")
+
+    # Generate regular method stubs
+    methods = extract_regular_methods(node)
+    if methods:
+        lines.append("")
+        for name, params, return_type in methods:
+            if params:
+                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
+                lines.append(f"{indent}    def {name}(self, {params_str}) -> {return_type}: ...")
+            else:
+                lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
 
     return lines
 
@@ -204,7 +424,8 @@ def generate_stub_content(source_path: Path) -> str:
         "# Auto-generated stub file for IDE autocomplete support.",
         "# Do not edit manually - regenerate with: python scripts/generate_stubs.py",
         "",
-        "from typing import Any, ClassVar, List, Optional, Self",
+        "from typing import Any, ClassVar, List, Optional",
+        "from typing_extensions import Self",
         "from uuid import UUID",
         "",
     ]
@@ -220,6 +441,29 @@ def generate_stub_content(source_path: Path) -> str:
             stub_lines.append(imp)
 
     stub_lines.append("")
+
+    # Handle star imports - import and re-export classes from the source module
+    # Using "X as X" pattern tells type checkers to re-export the names
+    star_import_source = find_star_import_source(tree, source_path)
+    if star_import_source:
+        # Get the relative module name
+        module_name = star_import_source.stem  # e.g., "support_types"
+        exported_classes = get_classes_from_file(star_import_source)
+        if exported_classes:
+            # Add explicit import with re-export pattern
+            class_names = [f"{name} as {name}" for name, _ in exported_classes]
+            stub_lines.append(f"from .{module_name} import (")
+            for cn in class_names:
+                stub_lines.append(f"    {cn},")
+            stub_lines.append(")")
+            stub_lines.append("")
+
+    # Find all ABC-like base classes at module level (before dataclasses)
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and is_abc_base_class(node):
+            class_lines = generate_abc_stub_class(node)
+            stub_lines.extend(class_lines)
+            stub_lines.append("")
 
     # Find all frozen dataclasses at module level
     for node in tree.body:

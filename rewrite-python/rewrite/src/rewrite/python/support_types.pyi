@@ -1,37 +1,14 @@
 # Auto-generated stub file for IDE autocomplete support.
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
-from typing import Self
+from typing import Any, ClassVar, List, Optional
+from typing_extensions import Self
+from uuid import UUID
 
-from rewrite.java.support_types import J
-from rewrite.markers import Marker
+from rewrite import TreeVisitor
+from rewrite.java.tree import J
 
-
-class KeywordArguments(Marker):
-    id: uuid.UUID
-
-    def replace(
-        self,
-        *,
-        id: uuid.UUID = ...,
-    ) -> Self: ...
-
-class KeywordOnlyArguments(Marker):
-    id: uuid.UUID
-
-    def replace(
-        self,
-        *,
-        id: uuid.UUID = ...,
-    ) -> Self: ...
-
-class Quoted(Marker):
-    id: uuid.UUID
-    style: Style
-
-    def replace(
-        self,
-        *,
-        id: uuid.UUID = ...,
-        style: Style = ...,
-    ) -> Self: ...
+class Py(J):
+    def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]: ...
+    def accept_python(self, v: 'PythonVisitor[P]', p: P) -> Optional['J']: ...
+    def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool: ...

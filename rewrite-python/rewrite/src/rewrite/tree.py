@@ -42,7 +42,7 @@ class Tree(ABC):
 
     def print(self, cursor: 'Cursor', capture: 'PrintOutputCapture[P]') -> str:
         printer = self.printer(cursor)
-        printer.set_cursor(cursor)
+        printer.cursor = cursor
         printer.visit(self, capture)
         return capture.get_out()
 

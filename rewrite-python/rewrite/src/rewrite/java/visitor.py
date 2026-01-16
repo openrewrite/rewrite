@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import TypeVar, Optional, Any, List
+from typing import TypeVar, Optional, Any, List, cast
 
 from rewrite.java.support_types import J, Space, JRightPadded, JLeftPadded, JContainer, Expression, Statement
 from rewrite.utils import list_map
@@ -382,6 +382,26 @@ class JavaVisitor(TreeVisitor[J, P]):
         )
         return kind
 
+    def visit_compilation_unit(self, cu: j.CompilationUnit, p: P) -> J:
+        cu = cu.replace(
+            prefix=self.visit_space(cu.prefix, p)
+        )
+        cu = cu.replace(markers=self.visit_markers(cu.markers, p))
+        if cu.padding.package_declaration:
+            cu = cu.padding.replace(
+                package_declaration=self.visit_right_padded(cu.padding.package_declaration, p)
+            )
+        cu = cu.padding.replace(
+            imports=[self.visit_right_padded(i, p) for i in cu.padding.imports]
+        )
+        cu = cu.replace(
+            classes=list_map(lambda c: self.visit_and_cast(c, j.ClassDeclaration, p), cu.classes)
+        )
+        cu = cu.replace(
+            eof=self.visit_space(cu.eof, p)
+        )
+        return cu
+
     def visit_continue(self, continue_: j.Continue, p: P) -> J:
         continue_ = continue_.replace(
             prefix=self.visit_space(continue_.prefix, p)
@@ -396,6 +416,19 @@ class JavaVisitor(TreeVisitor[J, P]):
                 label=self.visit_and_cast(continue_.label, j.Identifier, p)
             )
         return continue_
+
+    def visit_deconstruction_pattern(self, deconstruction_pattern: j.DeconstructionPattern, p: P) -> J:
+        deconstruction_pattern = deconstruction_pattern.replace(
+            prefix=self.visit_space(deconstruction_pattern.prefix, p)
+        )
+        deconstruction_pattern = deconstruction_pattern.replace(markers=self.visit_markers(deconstruction_pattern.markers, p))
+        deconstruction_pattern = deconstruction_pattern.replace(
+            deconstructor=self.visit_and_cast(deconstruction_pattern.deconstructor, Expression, p)
+        )
+        deconstruction_pattern = deconstruction_pattern.replace(
+            nested=self.visit_container(deconstruction_pattern.padding.nested, p)
+        )
+        return deconstruction_pattern
 
     def visit_control_parentheses(self, control_parens: j.ControlParentheses, p: P) -> J:
         control_parens = control_parens.replace(
@@ -452,7 +485,7 @@ class JavaVisitor(TreeVisitor[J, P]):
             annotations=list_map(lambda a: self.visit_and_cast(a, j.Annotation, p), enum_value.annotations)
         )
         enum_value = enum_value.replace(
-            name=self.visit_and_cast(enum_value.name, j.Identifier, p)
+            name=cast(j.Identifier, self.visit(enum_value.name, p))
         )
         if enum_value.initializer:
             enum_value = enum_value.replace(
@@ -654,6 +687,20 @@ class JavaVisitor(TreeVisitor[J, P]):
                 pattern=self.visit_and_cast(instance_of.pattern, J, p)
             )
         return instance_of
+
+    def visit_intersection_type(self, intersection_type: j.IntersectionType, p: P) -> J:
+        intersection_type = intersection_type.replace(
+            prefix=self.visit_space(intersection_type.prefix, p)
+        )
+        temp_expr = self.visit_expression(intersection_type, p)
+        if not isinstance(temp_expr, j.IntersectionType):
+            return temp_expr
+        intersection_type = temp_expr
+        intersection_type = intersection_type.replace(markers=self.visit_markers(intersection_type.markers, p))
+        intersection_type = intersection_type.replace(
+            bounds=self.visit_container(intersection_type.padding.bounds, p)
+        )
+        return intersection_type
 
     def visit_label(self, label: j.Label, p: P) -> J:
         label = label.replace(
@@ -886,6 +933,40 @@ class JavaVisitor(TreeVisitor[J, P]):
             )
         return new_class
 
+    def visit_nullable_type(self, nullable_type: j.NullableType, p: P) -> J:
+        nullable_type = nullable_type.replace(
+            prefix=self.visit_space(nullable_type.prefix, p)
+        )
+        temp_expr = self.visit_expression(nullable_type, p)
+        if not isinstance(temp_expr, j.NullableType):
+            return temp_expr
+        nullable_type = temp_expr
+        nullable_type = nullable_type.replace(markers=self.visit_markers(nullable_type.markers, p))
+        nullable_type = nullable_type.replace(
+            annotations=list_map(lambda a: self.visit_and_cast(a, j.Annotation, p), nullable_type.annotations)
+        )
+        nullable_type = nullable_type.padding.replace(
+            type_tree=self.visit_right_padded(nullable_type.padding.type_tree, p)
+        )
+        return nullable_type
+
+    def visit_package(self, package: j.Package, p: P) -> J:
+        package = package.replace(
+            prefix=self.visit_space(package.prefix, p)
+        )
+        temp_stmt = self.visit_statement(package, p)
+        if not isinstance(temp_stmt, j.Package):
+            return temp_stmt
+        package = temp_stmt
+        package = package.replace(markers=self.visit_markers(package.markers, p))
+        package = package.replace(
+            expression=self.visit_and_cast(package.expression, Expression, p)
+        )
+        package = package.replace(
+            annotations=list_map(lambda a: self.visit_and_cast(a, j.Annotation, p), package.annotations)
+        )
+        return package
+
     def visit_parameterized_type(self, parameterized_type: j.ParameterizedType, p: P) -> J:
         parameterized_type = parameterized_type.replace(
             prefix=self.visit_space(parameterized_type.prefix, p)
@@ -916,6 +997,23 @@ class JavaVisitor(TreeVisitor[J, P]):
             tree=self.visit_right_padded(parens.padding.tree, p)
         )
         return parens
+
+    def visit_parenthesized_type_tree(self, ptt: j.ParenthesizedTypeTree, p: P) -> J:
+        ptt = ptt.replace(
+            prefix=self.visit_space(ptt.prefix, p)
+        )
+        temp_expr = self.visit_expression(ptt, p)
+        if not isinstance(temp_expr, j.ParenthesizedTypeTree):
+            return temp_expr
+        ptt = temp_expr
+        ptt = ptt.replace(markers=self.visit_markers(ptt.markers, p))
+        ptt = ptt.replace(
+            annotations=list_map(lambda a: self.visit_and_cast(a, j.Annotation, p), ptt.annotations)
+        )
+        ptt = ptt.replace(
+            parenthesized_type=self.visit_and_cast(ptt.parenthesized_type, j.Parentheses, p)
+        )
+        return ptt
 
     def visit_primitive(self, primitive: j.Primitive, p: P) -> J:
         primitive = primitive.replace(
@@ -1075,7 +1173,7 @@ class JavaVisitor(TreeVisitor[J, P]):
             parameter=self.visit_and_cast(catch.parameter, j.ControlParentheses, p)
         )
         catch = catch.replace(
-            body=self.visit_and_cast(catch.body, j.Block, p)
+            body=cast(j.Block, self.visit(catch.body, p))
         )
         return catch
 
@@ -1189,7 +1287,7 @@ class JavaVisitor(TreeVisitor[J, P]):
         )
         variable = variable.replace(markers=self.visit_markers(variable.markers, p))
         variable = variable.replace(
-            name=self.visit_and_cast(variable.name, j.Identifier, p)
+            name=cast(j.Identifier, self.visit(variable.name, p))
         )
         variable = variable.replace(
             dimensions_after_name=list_map(

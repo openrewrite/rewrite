@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, TypeVar, cast, Optional
 
+from rewrite.java import tree as j
 from rewrite.java.support_types import (
     J,
     Expression,
@@ -463,7 +464,7 @@ class PythonVisitor(JavaVisitor[P]):
         named = cast("NamedArgument", temp_expr)
         named = named.replace(markers=self.visit_markers(named.markers, p))
         named = named.replace(
-            name=self.visit_and_cast(named.name, J, p)
+            name=cast(j.Identifier, self.visit(named.name, p))
         )
         named = named.padding.replace(
             value=self.visit_left_padded(named.padding.value, p)
@@ -577,7 +578,7 @@ class PythonVisitor(JavaVisitor[P]):
         alias = cast("TypeAlias", temp_stmt)
         alias = alias.replace(markers=self.visit_markers(alias.markers, p))
         alias = alias.replace(
-            name=self.visit_and_cast(alias.name, J, p)
+            name=cast(j.Identifier, self.visit(alias.name, p))
         )
         alias = alias.padding.replace(
             value=self.visit_left_padded(alias.padding.value, p)
@@ -609,7 +610,7 @@ class PythonVisitor(JavaVisitor[P]):
             expression=self.visit_and_cast(hinted.expression, Expression, p)
         )
         hinted = hinted.replace(
-            type_hint=self.visit_and_cast(hinted.type_hint, Any, p)
+            type_hint=cast("TypeHint", self.visit(hinted.type_hint, p))
         )
         return hinted
 

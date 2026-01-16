@@ -1,14 +1,15 @@
 # Auto-generated stub file for IDE autocomplete support.
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
-from typing import Any, ClassVar, List, Optional, Self
+from typing import Any, ClassVar, List, Optional
+from typing_extensions import Self
 from uuid import UUID
 
 from rewrite import Marker
 from rewrite.java.support_types import Space
 
 class Semicolon(Marker):
-    _id: UUID
+    id: UUID
 
     def __init__(
         self,
@@ -22,8 +23,8 @@ class Semicolon(Marker):
     ) -> Self: ...
 
 class TrailingComma(Marker):
-    _id: UUID
-    _suffix: Space
+    id: UUID
+    suffix: Space
 
     def __init__(
         self,
@@ -39,7 +40,7 @@ class TrailingComma(Marker):
     ) -> Self: ...
 
 class OmitParentheses(Marker):
-    _id: UUID
+    id: UUID
 
     def __init__(
         self,
