@@ -3009,7 +3009,6 @@ class MethodDeclaration(Statement, TypedTree):
 
     @property
     def annotations(self) -> AnnotationsHelper:
-        p: MethodDeclaration.AnnotationsHelper
         if self._annotations is None:
             p = MethodDeclaration.AnnotationsHelper(self)
             object.__setattr__(self, '_annotations', weakref.ref(p))

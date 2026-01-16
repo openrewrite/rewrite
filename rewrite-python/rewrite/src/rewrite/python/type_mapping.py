@@ -13,11 +13,11 @@ try:
     _PYTYPE_AVAILABLE = True
 except ImportError:
     # pytype not available - type inference will be disabled
-    config = None
-    CallableType = GenericType = ClassType = UnionType = NothingType = TypeParameter = None
-    AnnotateAstVisitor = None
-    PytypeError = Exception
-    infer_types = None
+    config = None  # ty: ignore[invalid-assignment]  # optional import fallback
+    CallableType = GenericType = ClassType = UnionType = NothingType = TypeParameter = None  # ty: ignore[invalid-assignment]  # optional import fallback
+    AnnotateAstVisitor = None  # ty: ignore[invalid-assignment]  # optional import fallback
+    PytypeError = Exception  # ty: ignore[invalid-assignment]  # optional import fallback
+    infer_types = None  # ty: ignore[invalid-assignment]  # optional import fallback
 
 
 class PythonTypeMapping:

@@ -17,10 +17,10 @@ def visit_container(v: 'JavaVisitor', container: Optional[JContainer[J2]], p: P)
     if container is None:
         return None
 
-    v.cursor = Cursor(v.cursor, container)  # type: ignore[invalid-assignment]  # property setter; ty#1379
+    v.cursor = Cursor(v.cursor, container)
     before = v.visit_space(container.before, p)
     js = list_map(lambda el: v.visit_right_padded(el, p), container.padding.elements)
-    v.cursor = v.cursor.parent  # type: ignore[invalid-assignment]  # property setter; ty#1379
+    v.cursor = v.cursor.parent  # ty: ignore[invalid-assignment]  # cursor.parent is Optional[Cursor]; ty#1379
 
     return container if js is container.padding.elements and before is container.before else JContainer(before, js, container.markers)
 
@@ -30,10 +30,10 @@ def visit_right_padded(v: 'JavaVisitor', right: Optional[JRightPadded[T]], p: P)
         return None
 
     t = right.element
-    v.cursor = Cursor(v.cursor, right)  # type: ignore[invalid-assignment]  # property setter; ty#1379
+    v.cursor = Cursor(v.cursor, right)
     if isinstance(t, Tree):
-        t = v.visit_and_cast(t, T, p)  # type: ignore[arg-type]  # TypeVar as Type arg; see https://github.com/astral-sh/ty/issues/501
-    v.cursor = v.cursor.parent  # type: ignore[invalid-assignment]  # property setter; ty#1379
+        t = v.visit_and_cast(t, T, p)  # ty: ignore[invalid-argument-type]  # TypeVar as Type arg; see ty#501
+    v.cursor = v.cursor.parent  # ty: ignore[invalid-assignment]  # cursor.parent is Optional[Cursor]; ty#1379
 
     if t is None:
         return None
@@ -48,12 +48,12 @@ def visit_left_padded(v: 'JavaVisitor', left: Optional[JLeftPadded[T]], p: P) ->
     if left is None:
         return None
 
-    v.cursor = Cursor(v.cursor, left)  # type: ignore[invalid-assignment]  # property setter; ty#1379
+    v.cursor = Cursor(v.cursor, left)
     before = v.visit_space(left.before, p)
     t = left.element
     if isinstance(t, Tree):
-        t = v.visit_and_cast(t, T, p)  # type: ignore[arg-type]  # TypeVar as Type arg; see https://github.com/astral-sh/ty/issues/501
-    v.cursor = v.cursor.parent  # type: ignore[invalid-assignment]  # property setter; ty#1379
+        t = v.visit_and_cast(t, T, p)  # ty: ignore[invalid-argument-type]  # TypeVar as Type arg; see ty#501
+    v.cursor = v.cursor.parent  # ty: ignore[invalid-assignment]  # cursor.parent is Optional[Cursor]; ty#1379
 
     if left.element is t and before is left.before:
         return left

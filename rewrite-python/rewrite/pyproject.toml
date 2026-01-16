@@ -79,7 +79,7 @@ include = ["src"]
 unresolved-reference = "ignore"  # 843 errors - mostly from star imports not being resolved
 unresolved-import = "ignore"     # 63 errors - TYPE_CHECKING imports not resolved
 unresolved-attribute = "ignore"  # 448 errors - ClassVar attrs and visitor methods not found
-invalid-assignment = "ignore"    # 129 errors - cursor property setters not understood
+# invalid-assignment - re-enabled, errors suppressed with comments (ty#1379)
 # too-many-positional-arguments - re-enabled, errors suppressed with comments
 # invalid-argument-type - re-enabled, errors suppressed with comments
 # invalid-return-type - re-enabled, errors suppressed with comments

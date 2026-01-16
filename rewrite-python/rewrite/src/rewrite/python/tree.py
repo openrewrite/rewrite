@@ -527,7 +527,7 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
     def printer(self, cursor: Cursor) -> TreeVisitor:
         # PythonPrinter has TreeVisitor interface but doesn't extend it
         if factory := PrinterFactory.current():
-            return factory.create_printer(cursor)  # ty: ignore[invalid-return-type]
+            return factory.create_printer(cursor)
         from .printer import PythonPrinter
         return PythonPrinter()  # ty: ignore[invalid-return-type]
 
@@ -1110,7 +1110,6 @@ class FormattedString(Py, Expression, TypedTree):
 
         @property
         def padding(self) -> PaddingHelper:
-            p: FormattedString.Value.PaddingHelper
             if self._padding is None:
                 p = FormattedString.Value.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1430,7 +1429,6 @@ class ComprehensionExpression(Py, Expression):
 
         @property
         def padding(self) -> PaddingHelper:
-            p: ComprehensionExpression.Clause.PaddingHelper
             if self._padding is None:
                 p = ComprehensionExpression.Clause.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
@@ -2297,7 +2295,6 @@ class MatchCase(Py, Expression):
 
         @property
         def padding(self) -> PaddingHelper:
-            p: MatchCase.Pattern.PaddingHelper
             if self._padding is None:
                 p = MatchCase.Pattern.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))

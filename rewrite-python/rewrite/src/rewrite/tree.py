@@ -151,7 +151,7 @@ class Checksum:
 class PrintOutputCapture(Generic[P]):
     @dataclass
     class MarkerPrinter(ABC):
-        DEFAULT: ClassVar['PrintOutputCapture.MarkerPrinter'] = None  # type: ignore[assignment]  # Set at module load (line 201)
+        DEFAULT: ClassVar['PrintOutputCapture.MarkerPrinter'] = None  # ty: ignore[invalid-assignment]  # Set at module load (line 201)
 
         def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
             return ""

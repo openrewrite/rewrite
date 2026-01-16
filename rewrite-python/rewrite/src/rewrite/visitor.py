@@ -28,9 +28,11 @@ class Cursor:
         return default_value if self.messages is None else cast(O, self.messages.get(key))
 
     def put_message(self, key: str, value: object) -> None:
-        if self.messages is None:
-            object.__setattr__(self, 'messages', {})
-        self.messages[key] = value
+        messages = self.messages
+        if messages is None:
+            messages = {}
+            object.__setattr__(self, 'messages', messages)
+        messages[key] = value
 
     def parent_tree_cursor(self) -> Cursor:
         c = self.parent
@@ -141,7 +143,7 @@ class TreeVisitor(ABC, Generic[T, P]):
                     if t is not None:
                         t = self.post_visit(t, p)
 
-            self.cursor = self._cursor.parent  # type: ignore[invalid-assignment]  # property setter; ty#1379
+            self.cursor = self._cursor.parent  # ty: ignore[invalid-assignment]  # property setter; ty#1379
 
             if top_level:
                 if t is not None and self._after_visit is not None:
