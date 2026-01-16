@@ -4874,6 +4874,7 @@ class MavenParserTest implements RewriteTest {
                     <artifactId>parent</artifactId>
                     <packaging>pom</packaging>
                     <properties>
+                        <!-- This property becomes inert as a result of the below managed dependency -->
                         <bouncycastle.version>1.68</bouncycastle.version>
                     </properties>
                     <dependencyManagement>
@@ -4881,6 +4882,10 @@ class MavenParserTest implements RewriteTest {
                             <dependency>
                                 <groupId>org.bouncycastle</groupId>
                                 <artifactId>bcprov-jdk18on</artifactId>
+                                <!--
+                                    1. Managed dependencies DO NOT have their properties merged together. A new managed dependency, completely overlays everything that came before it.
+                                    2. A version-less managed dependency results in no version recommendations being applied
+                                  -->
                             </dependency>
                         </dependencies>
                     </dependencyManagement>
