@@ -83,7 +83,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         if (docs.getDocuments().isEmpty()) {
                             Yaml.Document.End end = new Yaml.Document.End(randomId(), "", Markers.EMPTY, false);
                             Yaml.Mapping mapping = new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null);
-                            return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY, false, mapping, end)));
+                            return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY, emptyList(), false, mapping, end)));
                         }
                         return docs;
                     }
@@ -124,7 +124,11 @@ public class YamlParser implements org.openrewrite.Parser {
             yamlSourceWithPlaceholders.append(processedSource, pos, processedSource.length());
         }
 
-        try (FormatPreservingReader reader = new FormatPreservingReader(yamlSourceWithPlaceholders.toString())) {
+        // Pre-scan the source to extract directives, since SnakeYAML doesn't preserve exact directive text
+        String sourceText = yamlSourceWithPlaceholders.toString();
+        Queue<List<Yaml.Directive>> documentDirectives = preScanDirectives(sourceText);
+
+        try (FormatPreservingReader reader = new FormatPreservingReader(sourceText)) {
             StreamReader streamReader = new StreamReader(reader);
             Scanner scanner = new ScannerImpl(streamReader, new LoaderOptions());
             Parser parser = new ParserImpl(scanner);
@@ -166,11 +170,25 @@ public class YamlParser implements org.openrewrite.Parser {
                     case DocumentStart: {
                         String fmt = newLine + reader.prefix(lastEnd, event);
                         newLine = "";
+                        DocumentStartEvent docStartEvent = (DocumentStartEvent) event;
+
+                        // Use pre-scanned directives if available, otherwise fall back to event-based extraction
+                        List<Yaml.Directive> directives = documentDirectives.poll();
+                        String documentPrefix;
+                        if (directives != null && !directives.isEmpty()) {
+                            // Directives were pre-scanned, document prefix is whatever remains after them
+                            documentPrefix = "";
+                        } else {
+                            directives = new ArrayList<>();
+                            documentPrefix = parseDirectives(fmt, directives, docStartEvent);
+                        }
+
                         document = new Yaml.Document(
                                 randomId(),
-                                fmt,
+                                documentPrefix,
                                 Markers.EMPTY,
-                                ((DocumentStartEvent) event).getExplicit(),
+                                directives != null ? directives : emptyList(),
+                                docStartEvent.getExplicit(),
                                 new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
                                 new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
                         );
@@ -436,7 +454,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             if (!fmt.isEmpty()) {
                                 documents.add(
                                         new Yaml.Document(
-                                                randomId(), fmt, Markers.EMPTY, false,
+                                                randomId(), fmt, Markers.EMPTY, emptyList(), false,
                                                 new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
                                                 new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
                                         ));
@@ -887,6 +905,205 @@ public class YamlParser implements org.openrewrite.Parser {
         public String getDslName() {
             return "yaml";
         }
+    }
+
+    private String parseDirectives(String input, List<Yaml.Directive> directives, DocumentStartEvent docStartEvent) {
+        // First try to parse directives from the input prefix
+        String remainingPrefix = parseDirectivesFromPrefix(input, directives);
+
+        // If no directives found in prefix but the event has version/tags, reconstruct them
+        if (directives.isEmpty()) {
+            String prefix = remainingPrefix;
+            if (docStartEvent.getVersion() != null) {
+                directives.add(new Yaml.Directive(
+                        randomId(),
+                        prefix,
+                        Markers.EMPTY,
+                        "YAML " + docStartEvent.getVersion().major() + "." + docStartEvent.getVersion().minor(),
+                        "\n"
+                ));
+                prefix = "";
+            }
+            Map<String, String> tags = docStartEvent.getTags();
+            if (tags != null && !tags.isEmpty()) {
+                for (Map.Entry<String, String> tag : tags.entrySet()) {
+                    directives.add(new Yaml.Directive(
+                            randomId(),
+                            prefix,
+                            Markers.EMPTY,
+                            "TAG " + tag.getKey() + " " + tag.getValue(),
+                            "\n"
+                    ));
+                    prefix = "";
+                }
+            }
+            if (!directives.isEmpty()) {
+                return "";
+            }
+        }
+
+        return remainingPrefix;
+    }
+
+    private String parseDirectivesFromPrefix(String input, List<Yaml.Directive> directives) {
+        if (input.isEmpty()) {
+            return input;
+        }
+
+        StringBuilder currentPrefix = new StringBuilder();
+        StringBuilder currentValue = new StringBuilder();
+        boolean inDirective = false;
+        int i = 0;
+
+        while (i < input.length()) {
+            char c = input.charAt(i);
+
+            if (!inDirective) {
+                if (c == '%') {
+                    inDirective = true;
+                    i++;
+                } else {
+                    currentPrefix.append(c);
+                    i++;
+                }
+            } else {
+                if (c == '\n' || c == '\r') {
+                    StringBuilder suffix = new StringBuilder();
+                    suffix.append(c);
+                    i++;
+                    if (c == '\r' && i < input.length() && input.charAt(i) == '\n') {
+                        suffix.append('\n');
+                        i++;
+                    }
+                    directives.add(new Yaml.Directive(
+                            randomId(),
+                            currentPrefix.toString(),
+                            Markers.EMPTY,
+                            currentValue.toString(),
+                            suffix.toString()
+                    ));
+                    currentPrefix.setLength(0);
+                    currentValue.setLength(0);
+                    inDirective = false;
+                } else {
+                    currentValue.append(c);
+                    i++;
+                }
+            }
+        }
+
+        if (inDirective && currentValue.length() > 0) {
+            directives.add(new Yaml.Directive(
+                    randomId(),
+                    currentPrefix.toString(),
+                    Markers.EMPTY,
+                    currentValue.toString(),
+                    ""
+            ));
+            return "";
+        }
+
+        return currentPrefix.toString();
+    }
+
+    private Queue<List<Yaml.Directive>> preScanDirectives(String source) {
+        Queue<List<Yaml.Directive>> result = new LinkedList<>();
+        List<Yaml.Directive> currentDocDirectives = new ArrayList<>();
+
+        int i = 0;
+        StringBuilder prefix = new StringBuilder();
+        StringBuilder value = new StringBuilder();
+        boolean inDirective = false;
+
+        while (i < source.length()) {
+            char c = source.charAt(i);
+
+            if (c == '%' && (i == 0 || source.charAt(i - 1) == '\n' || source.charAt(i - 1) == '\r')) {
+                // Start of a directive
+                inDirective = true;
+                i++;
+            } else if (inDirective) {
+                if (c == '\n' || c == '\r') {
+                    // End of directive line
+                    StringBuilder suffix = new StringBuilder();
+                    suffix.append(c);
+                    i++;
+                    if (c == '\r' && i < source.length() && source.charAt(i) == '\n') {
+                        suffix.append('\n');
+                        i++;
+                    }
+                    currentDocDirectives.add(new Yaml.Directive(
+                            randomId(),
+                            prefix.toString(),
+                            Markers.EMPTY,
+                            value.toString(),
+                            suffix.toString()
+                    ));
+                    prefix.setLength(0);
+                    value.setLength(0);
+                    inDirective = false;
+                } else {
+                    value.append(c);
+                    i++;
+                }
+            } else if (c == '-' && i + 2 < source.length() &&
+                    source.charAt(i + 1) == '-' && source.charAt(i + 2) == '-') {
+                // Found document start marker, commit current directives
+                if (!currentDocDirectives.isEmpty()) {
+                    result.add(new ArrayList<>(currentDocDirectives));
+                    currentDocDirectives.clear();
+                } else {
+                    result.add(emptyList());
+                }
+                prefix.setLength(0);
+                // Skip past ---
+                i += 3;
+                // Skip to end of line
+                while (i < source.length() && source.charAt(i) != '\n') {
+                    i++;
+                }
+                if (i < source.length()) {
+                    i++; // skip newline
+                }
+            } else if (c == '\n' || c == '\r') {
+                // Accumulate newlines as potential prefix for next directive
+                prefix.append(c);
+                i++;
+                if (c == '\r' && i < source.length() && source.charAt(i) == '\n') {
+                    prefix.append('\n');
+                    i++;
+                }
+            } else {
+                // Not a directive or document marker, just content
+                // If we have pending directives and hit content, they belong to an implicit document start
+                if (!currentDocDirectives.isEmpty()) {
+                    result.add(new ArrayList<>(currentDocDirectives));
+                    currentDocDirectives.clear();
+                }
+                prefix.setLength(0);
+                // Skip to end of document or file
+                while (i < source.length()) {
+                    if (source.charAt(i) == '\n') {
+                        i++;
+                        // Check for document start/end markers on new line
+                        if (i + 2 < source.length() &&
+                                ((source.charAt(i) == '-' && source.charAt(i + 1) == '-' && source.charAt(i + 2) == '-') ||
+                                        (source.charAt(i) == '.' && source.charAt(i + 1) == '.' && source.charAt(i + 2) == '.'))) {
+                            break;
+                        }
+                    } else {
+                        i++;
+                    }
+                }
+            }
+        }
+
+        // Handle any remaining directives (for document without explicit start)
+        if (!currentDocDirectives.isEmpty()) {
+            result.add(currentDocDirectives);
+        }
+
+        return result;
     }
 
     private Yaml.Tag createTag(String prefix, Markers markers, String text, String suffix) {
