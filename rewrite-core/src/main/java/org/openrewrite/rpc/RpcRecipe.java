@@ -64,8 +64,10 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
         return descriptor.getDescription();
     }
 
-    @Getter
-    final Set<String> tags = descriptor.getTags();
+    @Override
+    public Set<String> getTags() {
+        return descriptor.getTags();
+    }
 
     @Override
     public @Nullable Duration getEstimatedEffortPerOccurrence() {
