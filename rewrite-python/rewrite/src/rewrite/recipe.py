@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, is_dataclass
 from typing import (
     Any,
     List,
@@ -110,7 +110,7 @@ class RecipeDescriptor:
         options: List[tuple[str, Any, OptionDescriptor]] = []
 
         # Extract options from dataclass fields
-        if hasattr(recipe, "__dataclass_fields__"):
+        if is_dataclass(recipe) and not isinstance(recipe, type):
             for f in fields(recipe):
                 if "option" in f.metadata:
                     descriptor = f.metadata["option"]

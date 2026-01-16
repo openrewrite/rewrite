@@ -176,7 +176,7 @@ class Binary(Py, Expression, TypedTree):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
@@ -258,11 +258,10 @@ class ChainedAssignment(Py, Statement, TypedTree):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: ChainedAssignment.PaddingHelper
         if self._padding is None:
             p = ChainedAssignment.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -510,7 +509,7 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
@@ -526,10 +525,11 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
         return p
 
     def printer(self, cursor: Cursor) -> TreeVisitor:
+        # PythonPrinter has TreeVisitor interface but doesn't extend it
         if factory := PrinterFactory.current():
-            return factory.create_printer(cursor)
+            return factory.create_printer(cursor)  # ty: ignore[invalid-return-type]
         from .printer import PythonPrinter
-        return PythonPrinter()
+        return PythonPrinter()  # ty: ignore[invalid-return-type]
 
     def accept_python(self, v: PythonVisitor[P], p: P) -> J:
         return v.visit_compilation_unit(self, p)
@@ -712,11 +712,10 @@ class MultiImport(Py, Statement):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: MultiImport.PaddingHelper
         if self._padding is None:
             p = MultiImport.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -795,11 +794,10 @@ class KeyValue(Py, Expression, TypedTree):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: KeyValue.PaddingHelper
         if self._padding is None:
             p = KeyValue.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -871,11 +869,10 @@ class DictLiteral(Py, Expression, TypedTree):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: DictLiteral.PaddingHelper
         if self._padding is None:
             p = DictLiteral.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -959,11 +956,10 @@ class CollectionLiteral(Py, Expression, TypedTree):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: CollectionLiteral.PaddingHelper
         if self._padding is None:
             p = CollectionLiteral.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1110,7 +1106,7 @@ class FormattedString(Py, Expression, TypedTree):
                     return self._t
                 return dataclass_replace(self._t, **mapped)
 
-        _padding: weakref.ReferenceType[PaddingHelper] = None
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
         @property
         def padding(self) -> PaddingHelper:
@@ -1216,11 +1212,10 @@ class TrailingElseWrapper(Py, Statement):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: TrailingElseWrapper.PaddingHelper
         if self._padding is None:
             p = TrailingElseWrapper.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1431,7 +1426,7 @@ class ComprehensionExpression(Py, Expression):
                     return self._t
                 return dataclass_replace(self._t, **mapped)
 
-        _padding: weakref.ReferenceType[PaddingHelper] = None
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
         @property
         def padding(self) -> PaddingHelper:
@@ -1528,11 +1523,10 @@ class TypeAlias(Py, Statement, TypedTree):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: TypeAlias.PaddingHelper
         if self._padding is None:
             p = TypeAlias.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1645,11 +1639,10 @@ class UnionType(Py, Expression, TypeTree):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: UnionType.PaddingHelper
         if self._padding is None:
             p = UnionType.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1725,11 +1718,10 @@ class VariableScope(Py, Statement):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: VariableScope.PaddingHelper
         if self._padding is None:
             p = VariableScope.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1794,11 +1786,10 @@ class Del(Py, Statement):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Del.PaddingHelper
         if self._padding is None:
             p = Del.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1981,11 +1972,10 @@ class NamedArgument(Py, Expression):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: NamedArgument.PaddingHelper
         if self._padding is None:
             p = NamedArgument.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -2112,11 +2102,10 @@ class ErrorFrom(Py, Expression):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: ErrorFrom.PaddingHelper
         if self._padding is None:
             p = ErrorFrom.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -2195,11 +2184,10 @@ class MatchCase(Py, Expression):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: MatchCase.PaddingHelper
         if self._padding is None:
             p = MatchCase.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -2305,7 +2293,7 @@ class MatchCase(Py, Expression):
                     return self._t
                 return dataclass_replace(self._t, **mapped)
 
-        _padding: weakref.ReferenceType[PaddingHelper] = None
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
         @property
         def padding(self) -> PaddingHelper:
@@ -2399,11 +2387,10 @@ class Slice(Py, Expression, TypedTree):
                 return self._t
             return dataclass_replace(self._t, **mapped)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Slice.PaddingHelper
         if self._padding is None:
             p = Slice.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))

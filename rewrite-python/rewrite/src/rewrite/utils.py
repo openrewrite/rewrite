@@ -1,6 +1,6 @@
 import inspect
 from dataclasses import replace as dataclass_replace
-from typing import Callable, TypeVar, List, Union
+from typing import Any, Callable, TypeVar, List, Union, cast
 from uuid import UUID, uuid4
 
 T = TypeVar('T')
@@ -48,7 +48,8 @@ def replace_if_changed(obj: T, **kwargs) -> T:
             mapped_kwargs[key] = value
             changed = changed or getattr(obj, key) is not value
 
-    return dataclass_replace(obj, **mapped_kwargs) if changed else obj
+    # cast needed because Python lacks a public Dataclass protocol (see cpython#102395)
+    return cast(T, dataclass_replace(cast(Any, obj), **mapped_kwargs)) if changed else obj
 
 
 def random_id() -> UUID:

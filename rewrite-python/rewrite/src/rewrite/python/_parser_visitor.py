@@ -648,7 +648,7 @@ class ParserVisitor(ast.NodeVisitor):
         if parenthesized and self._parentheses_stack and self._parentheses_stack[-1] is parens_handler:
             self._token_idx += 1  # consume ')'
             resources_container = self._parentheses_stack.pop().transformer(
-                JContainer(items_prefix, resources, Markers.EMPTY),
+                JContainer(items_prefix, resources, Markers.EMPTY),  # type: ignore[arg-type]  # TypeVar in Callable; transformer is generic
                 Space.EMPTY
             )
         else:
@@ -1549,7 +1549,7 @@ class ParserVisitor(ast.NodeVisitor):
 
     def visit_TypeAlias(self, node):
         prefix = self.__source_before("type")
-        name = self.__convert(node.name)
+        name = cast(j.Identifier, self.__convert_name(node.name.id))
 
         # Handle type parameters (Python 3.12+ PEP 695)
         type_params = getattr(node, 'type_params', None)
@@ -1675,7 +1675,7 @@ class ParserVisitor(ast.NodeVisitor):
                     None
                 )
                 while len(self._parentheses_stack) > 0 and self.__skip(')'):
-                    name = self._parentheses_stack.pop().transformer(name, parens_right_padding)
+                    name = self._parentheses_stack.pop().transformer(name, parens_right_padding)  # type: ignore[arg-type]  # TypeVar in Callable
                     save_token_idx = self._token_idx
                     parens_right_padding = self.__whitespace()
             self._token_idx = save_token_idx
@@ -2510,7 +2510,7 @@ class ParserVisitor(ast.NodeVisitor):
         # Use _is_closing_paren to verify the ')' matches a '(' pushed at our scope level
         if self._is_closing_paren(save_token_idx):
             self._token_idx += 1  # consume ')'
-            elements = self._parentheses_stack.pop().transformer(elements, Space.EMPTY)
+            elements = self._parentheses_stack.pop().transformer(elements, Space.EMPTY)  # type: ignore[arg-type]  # TypeVar in Callable
             omit_parens = False
         elif maybe_parens and len(self._parentheses_stack) > 0 and self._parentheses_stack[-1].node == node:
             elements = self._parentheses_stack.pop()
