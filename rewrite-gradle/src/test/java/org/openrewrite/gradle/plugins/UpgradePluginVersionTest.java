@@ -297,4 +297,83 @@ class UpgradePluginVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void upgradeSpringBootPluginWithoutDependencyManagementEnabled() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.springframework.boot", "3.2.4", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '2.7.0'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'javax.servlet:javax.servlet-api:4.0.1'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '3.2.4'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'javax.servlet:javax.servlet-api:4.0.1'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void springBootPluginsAreDependencyManagedVersionAware() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradePluginVersion("org.springframework.boot", "3.2.4", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '2.7.0'
+                  id 'io.spring.dependency-management' version '1.1.6'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'javax.servlet:javax.servlet-api'
+                  implementation 'org.apache.activemq:activemq-client-jakarta:5.18.2'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '3.2.4'
+                  id 'io.spring.dependency-management' version '1.1.6'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'javax.servlet:javax.servlet-api:4.0.1'
+                  implementation 'org.apache.activemq:activemq-client-jakarta'
+              }
+              """
+          )
+        );
+    }
 }

@@ -29,13 +29,19 @@ import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
-import org.openrewrite.semver.*;
+import org.openrewrite.semver.ExactVersion;
+import org.openrewrite.semver.LatestIntegration;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.trait.Trait;
 
 import java.util.*;
@@ -124,12 +130,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             gp = maybeGp.get();
 
                             if (gp.getPlugins().stream().anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId()))) {
-                                String springBootVersion = Optional.ofNullable(getSpringBootVersionFromConfiguration("testRuntimeClasspath")).orElseGet(() ->
-                                        gp.getNameToConfiguration().keySet().stream()
-                                                .map(this::getSpringBootVersionFromConfiguration)
-                                                .filter(Objects::nonNull)
-                                                .findFirst()
-                                                .orElse(null));
+                                String springBootVersion = Optional.ofNullable(getSpringBootVersionFromPlugin()).orElseGet(() ->
+                                        Optional.ofNullable(getSpringBootVersionFromConfiguration("testRuntimeClasspath")).orElseGet(() ->
+                                                gp.getNameToConfiguration().keySet().stream()
+                                                        .map(this::getSpringBootVersionFromConfiguration)
+                                                        .filter(Objects::nonNull)
+                                                        .findFirst()
+                                                        .orElse(null)));
                                 if (springBootVersion != null) {
                                     MavenPomDownloader mpd = new MavenPomDownloader(ctx);
                                     try {
@@ -168,11 +175,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
                             MavenPomDownloader mpd = new MavenPomDownloader(ctx);
                             GradleMultiDependency.matcher()
-                                    .groupId(groupPattern)
-                                    .artifactId(artifactPattern)
                                     .asVisitor(gmd -> gmd.map(gradleDependency -> {
                                         directDependencies.computeIfAbsent(gradleDependency.getConfigurationName(), k -> new ArrayList<>()).add(gradleDependency.getResolvedDependency());
-                                        if(!gradleDependency.isPlatform()) {
+                                        if (!gradleDependency.isPlatform()) {
                                             return gradleDependency.getTree();
                                         }
                                         GroupArtifactVersion gav = gradleDependency.getGav();
@@ -426,15 +431,27 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                         return m;
                     }
 
+                    private @Nullable String getSpringBootVersionFromPlugin() {
+                        GradleDependencyConfiguration gdc = gp.getBuildscript().getConfiguration("classpath");
+                        if (gdc != null) {
+                            for (ResolvedDependency dependency : gdc.getDirectResolved()) {
+                                if ("org.springframework.boot.gradle.plugin".equals(dependency.getArtifactId())) {
+                                    return dependency.getVersion();
+                                }
+                            }
+                        }
+                        return null;
+                    }
+
                     private @Nullable String getSpringBootVersionFromConfiguration(String configuration) {
-                        GradleDependencyConfiguration testRuntimeConfiguration = gp.getConfiguration(configuration);
-                        if (testRuntimeConfiguration != null) {
-                            for (GradleDependencyConstraint constraint : testRuntimeConfiguration.getConstraints()) {
+                        GradleDependencyConfiguration gdc = gp.getConfiguration(configuration);
+                        if (gdc != null) {
+                            for (GradleDependencyConstraint constraint : gdc.getConstraints()) {
                                 if ("org.springframework.boot".equals(constraint.getGroupId()) && constraint.getStrictVersion() != null) {
                                     return constraint.getStrictVersion();
                                 }
                             }
-                            for (ResolvedDependency dependency : testRuntimeConfiguration.getDirectResolved()) {
+                            for (ResolvedDependency dependency : gdc.getDirectResolved()) {
                                 if (dependency.getRequested().getVersion() == null && "org.springframework.boot".equals(dependency.getGroupId())) {
                                     return dependency.getVersion();
                                 }

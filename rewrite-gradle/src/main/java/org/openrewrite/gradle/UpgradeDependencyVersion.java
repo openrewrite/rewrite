@@ -40,7 +40,9 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -52,6 +54,7 @@ import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
@@ -255,9 +258,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 Tree t = tree;
                 if (t instanceof SourceFile) {
+                    stopAfterPreVisit();
                     SourceFile sf = (SourceFile) t;
                     if (updateProperties.isAcceptable(sf, ctx)) {
                         t = updateProperties.visitNonNull(t, ctx);
@@ -298,6 +302,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             }
                         } catch (MavenDownloadingException e) {
                             t = Markup.warn(t, e);
+                        }
+                    }
+                    if (updateGradle.noLongerManaged != null) {
+                        for (GroupArtifact ga : updateGradle.noLongerManaged) {
+                            doAfterVisit(new AddExplicitDependencyVersion(ga.getGroupId(), ga.getArtifactId()));
+                        }
+                    }
+
+                    if (updateGradle.newlyManaged != null) {
+                        for (GroupArtifact ga : updateGradle.newlyManaged) {
+                            doAfterVisit(new RemoveRedundantDependencyVersions(ga.getGroupId(), ga.getArtifactId(), RemoveRedundantDependencyVersions.Comparator.GTE).getVisitor());
                         }
                     }
                 }
@@ -352,6 +367,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         @Nullable
         GradleProject gradleProject;
 
+        @Nullable
+        List<GroupArtifact> newlyManaged;
+
+        @Nullable
+        List<GroupArtifact> noLongerManaged;
+
         final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
 
         @Override
@@ -364,6 +385,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile sourceFile = (JavaSourceFile) tree;
+                noLongerManaged = null;
+                newlyManaged = null;
                 gradleProject = sourceFile.getMarkers().findFirst(GradleProject.class)
                         .orElse(null);
                 sourceFile = applyPluginProvidedDependencies(sourceFile, ctx);
@@ -627,12 +650,39 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                             .select(gav, configName, newVersion, versionPattern, ctx);
                 }
+
+                if (selectedVersion == null || (currentVersion != null && currentVersion.equals(selectedVersion))) {
+                    return dependency.getTree();
+                }
             } catch (MavenDownloadingException e) {
                 return dependency.getTree();
             }
 
-            if (selectedVersion == null || (currentVersion != null && currentVersion.equals(selectedVersion))) {
-                return dependency.getTree();
+            try {
+                if (gradleProject != null && dependency.isPlatform()) {
+                    MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                    Set<GroupArtifact> requested = gradleProject.getConfigurations().stream()
+                            .flatMap(conf -> conf.getRequested().stream())
+                            .map(Dependency::getGav)
+                            .map(GroupArtifactVersion::asGroupArtifact)
+                            .collect(Collectors.toSet());
+                    List<GroupArtifact> oldPlatformManaged = mpd.download(dependency.getGav(), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
+                            .map(md -> new GroupArtifact(md.getGroupId(), md.getArtifactId()))
+                            .filter(requested::contains)
+                            .collect(Collectors.toList());
+                    List<GroupArtifact> newPlatformManaged = mpd.download(dependency.getGav().withVersion(selectedVersion), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
+                            .map(md -> new GroupArtifact(md.getGroupId(), md.getArtifactId()))
+                            .filter(requested::contains)
+                            .collect(Collectors.toList());
+
+                    noLongerManaged = new ArrayList<>(oldPlatformManaged);
+                    noLongerManaged.removeAll(newPlatformManaged);
+
+                    newlyManaged = new ArrayList<>(newPlatformManaged);
+                    newlyManaged.removeAll(oldPlatformManaged);
+                }
+            } catch (MavenDownloadingException ignored) {
+                // If we can't download the POM, we can still just upgrade the dependency version
             }
 
             return dependency.withDeclaredVersion(selectedVersion).getTree();
