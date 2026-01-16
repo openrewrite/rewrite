@@ -128,3 +128,18 @@ def test_function_parameter_with_quoted_type_hint():
             pass
         """
     ))
+
+
+def test_function_parameter_with_parenthesized_quoted_type_hint():
+    # language=python - type hint with parentheses around quoted string
+    RecipeSpec().rewrite_run(python(
+        """\
+        def foo(s: ("str")):
+            pass
+        """
+    ))
+
+
+def test_variable_with_implicit_string_concat_type_hint():
+    # language=python - type hint with implicit string concatenation
+    RecipeSpec().rewrite_run(python('''X: """List[int]"""'☃' = []'''))

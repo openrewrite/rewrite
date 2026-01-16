@@ -186,6 +186,18 @@ def test_mixed_byte_string_prefix_concatenation():
     RecipeSpec().rewrite_run(python('x = rb"haha" br"ust go"'))
 
 
+def test_string_followed_by_fstring_separate_lines():
+    # language=python - string and f-string on separate lines should NOT be concatenated
+    RecipeSpec().rewrite_run(python(
+        '''\
+class Foo:
+    a = 2
+    "str"
+    f"{int}"
+'''
+    ))
+
+
 def find_first(tree: Tree, clazz: Type[T]) -> T:
     class Find(PythonVisitor[list[Tree]]):
         def visit(self, t: Tree, p: list[Tree]) -> Optional[Tree]:

@@ -1086,6 +1086,58 @@ class ParserVisitor(ast.NodeVisitor):
             None
         )
 
+    def __convert_match_pattern(self, node):
+        """Convert a match pattern node, handling parentheses (GROUP patterns).
+
+        Python's AST doesn't have MatchGroup - parentheses are only in tokens.
+        We need to detect them and create GROUP patterns to preserve them.
+        """
+        # Check if we're at an opening parenthesis
+        save_idx = self._token_idx
+        prefix = self.__whitespace()
+
+        if self.__at_token('('):
+            # Check if this is a parenthesized pattern (GROUP)
+            # by seeing if the paren closes before the node ends
+            close_paren_idx = self._paren_pairs.get(self._token_idx)
+            if close_paren_idx is not None and hasattr(node, 'end_lineno') and hasattr(node, 'end_col_offset'):
+                close_tok = self._tokens[close_paren_idx]
+                close_line, close_col = close_tok.start
+                # If closing paren is at or after node's end position, it wraps the whole pattern
+                # Note: Use >= because the pattern ends where its content ends, and ) comes right after
+                if close_line > node.end_lineno or (close_line == node.end_lineno and close_col >= node.end_col_offset - 1):
+                    # This is a GROUP pattern - consume '(' and convert inner pattern
+                    self._token_idx += 1  # consume '('
+                    inner_prefix = self.__whitespace()
+                    inner = self.__convert(node)
+                    # Consume ')' and get trailing whitespace
+                    self.__source_before(')')
+
+                    # Wrap in GROUP pattern
+                    return py.MatchCase(
+                        random_id(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        py.MatchCase.Pattern(
+                            random_id(),
+                            Space.EMPTY,
+                            Markers.EMPTY,
+                            py.MatchCase.Pattern.Kind.GROUP,
+                            JContainer(
+                                prefix,
+                                [JRightPadded(inner.replace(prefix=inner_prefix) if hasattr(inner, 'replace') else inner, Space.EMPTY, Markers.EMPTY)],
+                                Markers.EMPTY
+                            ),
+                            None
+                        ),
+                        None,
+                        None
+                    )
+
+        # Not a GROUP, restore position and do normal conversion
+        self._token_idx = save_idx
+        return self.__convert(node)
+
     def visit_MatchValue(self, node):
         return self.__convert(node.value)
 
@@ -1103,7 +1155,7 @@ class ParserVisitor(ast.NodeVisitor):
 
         # Handle elements
         if node.patterns:
-            elements = [self.__pad_list_element(self.__convert(e), last=i == len(node.patterns) - 1,
+            elements = [self.__pad_list_element(self.__convert_match_pattern(e), last=i == len(node.patterns) - 1,
                                                 end_delim=end_delim) for i, e in enumerate(node.patterns)]
         else:
             # Empty sequence - need to consume the closing delimiter
@@ -1145,12 +1197,26 @@ class ParserVisitor(ast.NodeVisitor):
         return j.Identifier(random_id(), prefix, Markers.EMPTY, [], name, None, None)
 
     def visit_MatchStar(self, node):
+        prefix = self.__source_before('*')
+        if node.name:
+            expression = self.__convert_name(node.name)
+        else:
+            # For *_ wildcard patterns, AST has name=None but we still need an identifier
+            # Check if there's a NAME token '_' next
+            if (self._token_idx < len(self._tokens) and
+                self._tokens[self._token_idx].type == token.NAME and
+                self._tokens[self._token_idx].string == '_'):
+                space = self.__whitespace()
+                self._token_idx += 1  # consume '_'
+                expression = j.Identifier(random_id(), space, Markers.EMPTY, [], '_', None, None)
+            else:
+                expression = None
         return py.Star(
             random_id(),
-            self.__source_before('*'),
+            prefix,
             Markers.EMPTY,
             py.Star.Kind.LIST,
-            self.__convert_name(node.name),
+            expression,
             None
         )
 
@@ -1318,7 +1384,7 @@ class ParserVisitor(ast.NodeVisitor):
                     JContainer(
                         Space.EMPTY,
                         [
-                            self.__pad_right(self.__convert(node.pattern), self.__source_before('as')),
+                            self.__pad_right(self.__convert_match_pattern(node.pattern), self.__source_before('as')),
                             self.__pad_right(self.__convert_name(node.name), Space.EMPTY),
                         ],
                         Markers.EMPTY
@@ -1342,7 +1408,7 @@ class ParserVisitor(ast.NodeVisitor):
                 py.MatchCase.Pattern.Kind.OR,
                 JContainer(
                     Space.EMPTY,
-                    [self.__pad_list_element(self.__convert(e), last=i == len(node.patterns) - 1) for i, e in
+                    [self.__pad_list_element(self.__convert_match_pattern(e), last=i == len(node.patterns) - 1) for i, e in
                      enumerate(node.patterns)] if node.patterns else [],
                     Markers.EMPTY
                 ),
@@ -1705,8 +1771,29 @@ class ParserVisitor(ast.NodeVisitor):
 
         is_byte_string = self._is_byte_string(tok.string)
         res = None
+        is_first = True
 
         while tok.type in (token.STRING, token.FSTRING_START) and is_byte_string == self._is_byte_string(tok.string):
+            if not is_first:
+                # Check for statement boundary (NEWLINE) before continuing concatenation
+                # String concatenation only applies within the same statement
+                save_idx = self._token_idx
+                saw_statement_end = False
+                while self._token_idx < len(self._tokens):
+                    peek_tok = self._tokens[self._token_idx]
+                    if peek_tok.type == token.NEWLINE:
+                        saw_statement_end = True
+                        self._token_idx += 1
+                    elif peek_tok.type in (token.NL, token.INDENT, token.DEDENT, token.COMMENT,
+                                           token.ENCODING, token.ENDMARKER, WHITESPACE_TOKEN):
+                        self._token_idx += 1
+                    else:
+                        break
+                self._token_idx = save_idx
+                if saw_statement_end:
+                    # NEWLINE means end of statement, not concatenation
+                    break
+
             if tok.type == token.FSTRING_START:
                 prefix = self.__whitespace()
                 current, tok, _ = self.__map_fstring(node, prefix, tok)
@@ -1726,6 +1813,8 @@ class ParserVisitor(ast.NodeVisitor):
                     current,
                     self._type_mapping.type(node)
                 )
+
+            is_first = False
 
             # Peek at next non-whitespace token for loop condition
             tok, idx = self._peek_significant_token()
@@ -2454,7 +2543,23 @@ class ParserVisitor(ast.NodeVisitor):
                     self._type_mapping.type(node)
                 )
             else:
-                literal = cast(j.Literal, self.__convert(node))
+                # Call visit directly to avoid __convert_internal's parenthesis handling.
+                # When we're inside __convert_type which handles parentheses, calling __convert
+                # would trigger the closing paren handler and wrap in Parentheses.
+                converted = self.visit(node)
+                # For implicit string concatenation (Binary), wrap in ExpressionTypeTree
+                # to preserve the full concatenation as the type expression.
+                if isinstance(converted, py.Binary):
+                    return py.ExpressionTypeTree(
+                        random_id(),
+                        converted.prefix,
+                        Markers.EMPTY,
+                        converted.replace(prefix=Space.EMPTY)
+                    )
+                # Unwrap parenthesized literals to get to the Literal inside
+                while isinstance(converted, j.Parentheses):
+                    converted = converted.tree
+                literal = cast(j.Literal, converted)
                 source = literal.value_source
 
                 # Determine quote style and extract inner content from value_source.
