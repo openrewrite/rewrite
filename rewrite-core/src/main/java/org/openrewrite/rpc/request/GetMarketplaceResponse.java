@@ -19,6 +19,7 @@ import lombok.Value;
 import org.openrewrite.config.CategoryDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
 
@@ -27,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 
 
@@ -47,17 +49,18 @@ public class GetMarketplaceResponse extends ArrayList<GetMarketplaceResponse.Row
         return marketplace;
     }
 
-    public static GetMarketplaceResponse fromMarketplace(RecipeMarketplace marketplace) {
+    public static GetMarketplaceResponse fromMarketplace(RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers) {
         Map<String, Row> rowByRecipeId = new LinkedHashMap<>();
         for (RecipeMarketplace.Category category : marketplace.getCategories()) {
-            fromCategory(rowByRecipeId, category, new ArrayList<>());
+            fromCategory(resolvers, rowByRecipeId, category, new ArrayList<>());
         }
         GetMarketplaceResponse response = new GetMarketplaceResponse();
         response.addAll(rowByRecipeId.values());
         return response;
     }
 
-    private static void fromCategory(Map<String, Row> rowByRecipeId,
+    private static void fromCategory(List<RecipeBundleResolver> resolvers,
+                                     Map<String, Row> rowByRecipeId,
                                      RecipeMarketplace.Category category,
                                      List<CategoryDescriptor> parentCategory) {
         List<CategoryDescriptor> categoryPath = new ArrayList<>(parentCategory);
@@ -65,10 +68,10 @@ public class GetMarketplaceResponse extends ArrayList<GetMarketplaceResponse.Row
                 category.getDescription(), emptySet(), false, 0, false));
         for (RecipeListing recipe : category.getRecipes()) {
             rowByRecipeId.computeIfAbsent(recipe.getName(), recipeId ->
-                    new Row(recipe.describe(), new ArrayList<>())).categoryPaths.add(categoryPath);
+                    new Row(recipe.describe(resolvers), new ArrayList<>())).categoryPaths.add(categoryPath);
         }
         for (RecipeMarketplace.Category child : category.getCategories()) {
-            fromCategory(rowByRecipeId, child, categoryPath);
+            fromCategory(resolvers, rowByRecipeId, child, categoryPath);
         }
     }
 }

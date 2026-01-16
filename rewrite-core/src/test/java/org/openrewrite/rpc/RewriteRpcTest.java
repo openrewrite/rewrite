@@ -64,8 +64,7 @@ class RewriteRpcTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
-        marketplace = env.toMarketplace(runtimeClasspath())
-          .setResolvers(singletonList(new TestRecipeBundleResolver()));
+        marketplace = env.toMarketplace(runtimeClasspath());
 
         JsonMessageFormatter clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
         JsonMessageFormatter serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
@@ -73,7 +72,7 @@ class RewriteRpcTest implements RewriteTest {
         client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), marketplace)
           .batchSize(1);
 
-        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), marketplace)
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), marketplace, singletonList(new TestRecipeBundleResolver()))
           .batchSize(1);
     }
 
