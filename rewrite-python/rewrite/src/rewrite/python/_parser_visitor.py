@@ -1066,7 +1066,8 @@ class ParserVisitor(ast.NodeVisitor):
         prefix = self.__source_before('case')
         pattern_prefix = self.__whitespace()
 
-        pattern = self.__convert(node.pattern)
+        # Use __convert_match_pattern to handle parentheses (GROUP patterns)
+        pattern = self.__convert_match_pattern(node.pattern)
         if isinstance(pattern, py.MatchCase) and node.guard:
             guard = self.__pad_left(self.__source_before('if'), self.__convert(node.guard))
             pattern = pattern.padding.replace(guard=guard)
@@ -1408,7 +1409,8 @@ class ParserVisitor(ast.NodeVisitor):
                 py.MatchCase.Pattern.Kind.OR,
                 JContainer(
                     Space.EMPTY,
-                    [self.__pad_list_element(self.__convert_match_pattern(e), last=i == len(node.patterns) - 1) for i, e in
+                    # Use '|' as delimiter for OR patterns, not ','
+                    [self.__pad_list_element(self.__convert_match_pattern(e), last=i == len(node.patterns) - 1, delim='|') for i, e in
                      enumerate(node.patterns)] if node.patterns else [],
                     Markers.EMPTY
                 ),
@@ -2596,14 +2598,29 @@ class ParserVisitor(ast.NodeVisitor):
                     None
                 )
         elif isinstance(node, ast.Subscript):
-            slices = node.slice.elts if isinstance(node.slice, ast.Tuple) and node.slice.elts else [node.slice]
+            prefix = self.__whitespace()
+            converted_value = self.__convert(node.value)
+            bracket_prefix = self.__source_before('[')
+
+            # Determine slice elements. For tuples:
+            # - Union[str, int] - slice is Tuple, no parens -> unpack to [str, int]
+            # - Union[(str, int)] - slice is Tuple WITH parens -> keep as [(str, int)]
+            # Check if next token after '[' is '(' to detect parenthesized tuples.
+            is_parenthesized_tuple = (isinstance(node.slice, ast.Tuple) and
+                                      node.slice.elts and
+                                      self.__at_token('('))
+            if isinstance(node.slice, ast.Tuple) and node.slice.elts and not is_parenthesized_tuple:
+                slices = node.slice.elts
+            else:
+                slices = [node.slice]
+
             return j.ParameterizedType(
                 random_id(),
-                self.__whitespace(),
+                prefix,
                 Markers.EMPTY,
-                self.__convert(node.value),
+                converted_value,
                 JContainer(
-                    self.__source_before('['),
+                    bracket_prefix,
                     [self.__pad_list_element(self.__convert_type(s), last=i == len(slices) - 1, end_delim=']') for
                      i, s in
                      enumerate(slices)],

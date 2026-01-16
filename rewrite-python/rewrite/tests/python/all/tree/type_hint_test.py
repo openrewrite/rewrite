@@ -143,3 +143,33 @@ def test_function_parameter_with_parenthesized_quoted_type_hint():
 def test_variable_with_implicit_string_concat_type_hint():
     # language=python - type hint with implicit string concatenation
     RecipeSpec().rewrite_run(python('''X: """List[int]"""'☃' = []'''))
+
+
+def test_parenthesized_string_concat_type_hint():
+    # language=python - parenthesized implicit string concatenation in type hint
+    RecipeSpec().rewrite_run(python('''x: ("Foo" "Bar") = None'''))
+
+
+def test_empty_tuple_in_union_type():
+    # language=python - Union[()]
+    RecipeSpec().rewrite_run(python(
+        '''\
+from typing import Union
+
+def f(x: Union[()]) -> None:
+    ...
+'''
+    ))
+
+
+def test_tuple_in_union_then_quoted_string():
+    # language=python - parenthesized tuple in Union followed by quoted string type
+    RecipeSpec().rewrite_run(python(
+        '''\
+import typing
+def f(x: typing.Union[(str, int)]) -> None:
+    ...
+def f(x: "Union[str]") -> None:
+    ...
+'''
+    ))

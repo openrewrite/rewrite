@@ -101,3 +101,29 @@ def test_match_with_star_wildcard():
                 pass
         """
     ))
+
+
+def test_match_with_parenthesized_or_pattern_multiline():
+    # language=python - multi-line parenthesized OR pattern
+    RecipeSpec().rewrite_run(python(
+        """\
+def f(x):
+    match x:
+        case (
+            A() | B()
+        ):
+            pass
+"""
+    ))
+
+
+def test_match_with_or_pattern_in_tuple():
+    # language=python - OR pattern as first element of implicit tuple
+    RecipeSpec().rewrite_run(python(
+        """\
+def f(x, y):
+    match x, y:
+        case A | B, C:
+            pass
+"""
+    ))
