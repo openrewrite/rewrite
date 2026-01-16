@@ -538,7 +538,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             null,
             "swagger-annotations-jakarta",
             null,
-            null)),
+            null
+          )),
           pomXml(
             """
               <project>
@@ -587,7 +588,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "jakarta.activation",
             "jakarta.activation-api",
             "1.2.x",
-            null)),
+            null
+          )),
           pomXml(
             """
               <project>
@@ -623,6 +625,189 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void doesNotAddVersionNumberTagToDirectDependencyIfAbleToOnManagedDependency() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new ChangeDependencyGroupIdAndArtifactId(
+              "com.fasterxml.jackson.core",
+              "jackson-core",
+              "org.apache.commons",
+              "commons-csv",
+              "1.14.1",
+              null
+            )
+          ),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>project</artifactId>
+                <version>1</version>
+                <parent>
+                  <groupId>com.fasterxml.jackson</groupId>
+                  <artifactId>jackson-bom</artifactId>
+                  <version>2.20.0</version>
+                </parent>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.fasterxml.jackson.core</groupId>
+                      <artifactId>jackson-core</artifactId>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>project</artifactId>
+                <version>1</version>
+                <parent>
+                  <groupId>com.fasterxml.jackson</groupId>
+                  <artifactId>jackson-bom</artifactId>
+                  <version>2.20.0</version>
+                </parent>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.apache.commons</groupId>
+                      <artifactId>commons-csv</artifactId>
+                      <version>1.14.1</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-csv</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotAddVersionNumberTagToDirectDependencyIfAbleToOnParentManagedDependency() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeDependencyGroupIdAndArtifactId(
+              "com.fasterxml.jackson.core",
+              "jackson-core",
+              "org.apache.commons",
+              "commons-csv",
+              "1.14.1",
+              null,
+              null,
+              true
+            )
+          ),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>project</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.fasterxml.jackson</groupId>
+                    <artifactId>jackson-bom</artifactId>
+                    <version>2.20.0</version>
+                  </parent>
+                  <modules>
+                    <module>child-project</module>
+                  </modules>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-core</artifactId>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>project</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.fasterxml.jackson</groupId>
+                    <artifactId>jackson-bom</artifactId>
+                    <version>2.20.0</version>
+                  </parent>
+                  <modules>
+                    <module>child-project</module>
+                  </modules>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.apache.commons</groupId>
+                        <artifactId>commons-csv</artifactId>
+                        <version>1.14.1</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """
+            ),
+            mavenProject("child-project",
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>child-project</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>project</artifactId>
+                      <version>1</version>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-core</artifactId>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>child-project</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>project</artifactId>
+                      <version>1</version>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.apache.commons</groupId>
+                        <artifactId>commons-csv</artifactId>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """
+              )
+            )
           )
         );
     }
@@ -725,7 +910,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "javax.activation-api",
             "jakarta.activation",
             "jakarta.activation-api",
-            "1.2.2",
+            "1.2.1",
             null,
             true,
             false
@@ -753,7 +938,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           <dependency>
                               <groupId>jakarta.activation</groupId>
                               <artifactId>jakarta.activation-api</artifactId>
-                              <version>1.2.1</version>
+                              <version>1.2.2</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
@@ -769,7 +954,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                       <dependency>
                           <groupId>jakarta.activation</groupId>
                           <artifactId>jakarta.activation-api</artifactId>
-                          <version>1.2.2</version>
+                          <version>1.2.1</version>
                       </dependency>
                   </dependencies>
                   <dependencyManagement>
@@ -782,7 +967,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           <dependency>
                               <groupId>jakarta.activation</groupId>
                               <artifactId>jakarta.activation-api</artifactId>
-                              <version>1.2.1</version>
+                              <version>1.2.2</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
@@ -793,7 +978,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void managedToUnmanaged() {
+    void updatesManagedAndDirect() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "javax.activation",
@@ -939,7 +1124,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>
@@ -963,7 +1148,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>
@@ -980,6 +1165,194 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void managedToUnmanagedExternalizedDepMgmtWithDirectVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.springframework.cloud",
+            "spring-cloud-starter-sleuth",
+            "io.micrometer",
+            "micrometer-tracing-bridge-brave",
+            "1.0.12",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dependencies</artifactId>
+                              <version>2021.0.0</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-starter-sleuth</artifactId>
+                          <version>3.1.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dependencies</artifactId>
+                              <version>2021.0.0</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.micrometer</groupId>
+                          <artifactId>micrometer-tracing-bridge-brave</artifactId>
+                          <version>1.0.12</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void parentAndBomManagedToJustParentManaged() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.springframework.cloud",
+            "spring-cloud-starter-sleuth",
+            "io.micrometer",
+            "micrometer-tracing-bridge-brave",
+            "1.0.12",
+            null
+          )),
+          mavenProject(
+            "parent",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.springframework.cloud</groupId>
+                                <artifactId>spring-cloud-starter-sleuth</artifactId>
+                                <version>3.1.1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>io.micrometer</groupId>
+                                <artifactId>micrometer-tracing-bridge-brave</artifactId>
+                                <version>1.0.12</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """
+            ),
+            mavenProject(
+              "child",
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>child</artifactId>
+                      <version>1</version>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1</version>
+                      </parent>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>org.springframework.cloud</groupId>
+                                  <artifactId>spring-cloud-dependencies</artifactId>
+                                  <version>2021.0.0</version>
+                                  <type>pom</type>
+                                  <scope>import</scope>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-starter-sleuth</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>child</artifactId>
+                      <version>1</version>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1</version>
+                      </parent>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>org.springframework.cloud</groupId>
+                                  <artifactId>spring-cloud-dependencies</artifactId>
+                                  <version>2021.0.0</version>
+                                  <type>pom</type>
+                                  <scope>import</scope>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>io.micrometer</groupId>
+                              <artifactId>micrometer-tracing-bridge-brave</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            )
           )
         );
     }
@@ -1196,7 +1569,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>
@@ -1221,7 +1594,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>
