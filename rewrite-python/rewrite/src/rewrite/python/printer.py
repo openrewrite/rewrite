@@ -1753,7 +1753,10 @@ class PythonJavaPrinter:
             self._python_printer.visit(special, p)
             type_expr = special.type_hint
 
-        if not variable.name.simple_name:
+        from rewrite.java.tree import Identifier
+        # Check if name is an Identifier with empty simple_name (e.g., tuple unpacking)
+        # For non-Identifier names (like Literal in match patterns), visit the name directly
+        if isinstance(variable.name, Identifier) and not variable.name.simple_name:
             self.visit(variable.initializer, p)
         else:
             if vd and vd.varargs is not None:

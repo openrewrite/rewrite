@@ -161,3 +161,67 @@ class TestRemovePass:
                 """,
             )
         )
+
+    def test_keeps_pass_when_only_docstring_in_function(self):
+        """Test that pass is NOT removed when the only other statement is a docstring."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                '''
+                def foo():
+                    """This is a docstring."""
+                    pass
+                '''
+            )
+        )
+
+    def test_keeps_pass_when_only_docstring_in_class(self):
+        """Test that pass is NOT removed when the only other statement is a class docstring."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                '''
+                class Foo:
+                    """This is a class docstring."""
+                    pass
+                '''
+            )
+        )
+
+    def test_removes_pass_when_docstring_plus_other_statement(self):
+        """Test that pass IS removed when there is a docstring AND other statements."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                '''
+                def foo():
+                    """This is a docstring."""
+                    pass
+                    x = 1
+                ''',
+                '''
+                def foo():
+                    """This is a docstring."""
+                    x = 1
+                ''',
+            )
+        )
+
+    def test_removes_pass_when_string_not_first_statement(self):
+        """Test that pass IS removed when the string literal is not the first statement (not a docstring)."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                '''
+                def foo():
+                    x = 1
+                    """Not a docstring."""
+                    pass
+                ''',
+                '''
+                def foo():
+                    x = 1
+                    """Not a docstring."""
+                ''',
+            )
+        )

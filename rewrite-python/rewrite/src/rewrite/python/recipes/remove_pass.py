@@ -14,16 +14,17 @@
 
 """Recipe to remove redundant pass statements from Python code."""
 
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor
 from rewrite.category import CategoryDescriptor
 from rewrite.decorators import categorize
 from rewrite.marketplace import Python
-from rewrite.python.tree import CompilationUnit, Pass
+from rewrite.python.tree import CompilationUnit, ExpressionStatement, Pass
 from rewrite.python.visitor import PythonVisitor
 from rewrite.java import J
-from rewrite.java.tree import Block
+from rewrite.java.tree import Block, ClassDeclaration, Literal, MethodDeclaration
+
 
 # Define category path locally to avoid circular imports
 _Cleanup = [*Python, CategoryDescriptor(display_name="Cleanup")]
@@ -35,9 +36,13 @@ class RemovePass(Recipe):
     Remove redundant `pass` statements from Python code.
 
     This recipe removes `pass` statements only when they are redundant -
-    i.e., when there are other statements in the same block. It will NOT
-    remove `pass` when it's the only statement in a block, as that would
-    make the code syntactically invalid.
+    i.e., when there are other executable statements in the same block.
+    It will NOT remove `pass` when:
+    - It's the only statement in a block
+    - The only other statement is a docstring
+
+    This ensures the code remains syntactically valid and intentionally
+    empty functions/classes with docstrings retain their `pass`.
     """
 
     @property
@@ -50,7 +55,7 @@ class RemovePass(Recipe):
 
     @property
     def description(self) -> str:
-        return "Remove redundant `pass` statements from Python code when there are other statements in the block."
+        return "Remove redundant `pass` statements from Python code when there are other executable statements in the block."
 
     def editor(self) -> TreeVisitor[Any, ExecutionContext]:
         class Visitor(PythonVisitor[ExecutionContext]):
@@ -58,28 +63,64 @@ class RemovePass(Recipe):
                 # Find the enclosing block or compilation unit
                 block = self.cursor.first_enclosing(Block)
                 if block is not None:
-                    # Count non-pass statements in the block
-                    other_statements = sum(
-                        1 for stmt in block.statements
-                        if not isinstance(stmt, Pass)
-                    )
-                    # Only remove pass if there are other statements
-                    if other_statements > 0:
+                    # Docstrings are only valid in class or method/function bodies
+                    class_decl = self.cursor.first_enclosing(ClassDeclaration)
+                    method_decl = self.cursor.first_enclosing(MethodDeclaration)
+                    docstrings_valid = class_decl is not None or method_decl is not None
+
+                    # Count executable statements (excluding pass and docstrings where valid)
+                    executable_count = _count_executable_statements(block.statements, docstrings_valid)
+                    # Only remove pass if there are executable statements
+                    if executable_count > 0:
                         return None
                     return pass_
 
                 # Check for module-level statements in CompilationUnit
                 cu = self.cursor.first_enclosing(CompilationUnit)
                 if cu is not None:
-                    # Count non-pass statements at module level
-                    other_statements = sum(
-                        1 for stmt in cu.statements
-                        if not isinstance(stmt, Pass)
-                    )
-                    # Only remove pass if there are other statements
-                    if other_statements > 0:
+                    # Module-level docstrings are valid
+                    executable_count = _count_executable_statements(cu.statements, docstrings_valid=True)
+                    # Only remove pass if there are executable statements
+                    if executable_count > 0:
                         return None
 
                 return pass_
 
         return Visitor()
+
+
+def _is_docstring(stmt: Any, index: int) -> bool:
+    """
+    Check if a statement could be a docstring.
+
+    A docstring is a string literal expression statement that appears
+    as the first statement. Note: The caller must verify this is in a
+    valid docstring context (function, class, or module level).
+    """
+    if index != 0:
+        return False
+    if not isinstance(stmt, ExpressionStatement):
+        return False
+    expr = stmt.expression
+    if not isinstance(expr, Literal):
+        return False
+    # Check if the literal value is a string
+    return isinstance(expr.value, str)
+
+
+def _count_executable_statements(statements: List[Any], docstrings_valid: bool) -> int:
+    """
+    Count statements that are neither pass nor docstrings.
+
+    This excludes:
+    - pass statements
+    - docstrings (string literal as first statement, only if docstrings_valid is True)
+    """
+    count = 0
+    for i, stmt in enumerate(statements):
+        if isinstance(stmt, Pass):
+            continue
+        if docstrings_valid and _is_docstring(stmt, i):
+            continue
+        count += 1
+    return count

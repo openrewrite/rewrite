@@ -228,8 +228,8 @@ class PythonVisitor(JavaVisitor[P]):
         clause = clause.replace(
             iterator_variable=self.visit_and_cast(clause.iterator_variable, Expression, p)
         )
-        clause = clause.replace(
-            iterated_list=self.visit_left_padded(clause.iterated_list, None, p)
+        clause = clause.padding.replace(
+            iterated_list=self.visit_left_padded(clause.padding.iterated_list, None, p)
         )
         clause = clause.replace(
             conditions=list_map(
@@ -296,8 +296,8 @@ class PythonVisitor(JavaVisitor[P]):
         error_from = error_from.replace(
             error=self.visit_and_cast(error_from.error, Expression, p)
         )
-        error_from = error_from.replace(
-            from_=self.visit_left_padded(error_from.from_, None, p)
+        error_from = error_from.padding.replace(
+            from_=self.visit_left_padded(error_from.padding.from_, None, p)
         )
         return error_from
 
@@ -366,8 +366,8 @@ class PythonVisitor(JavaVisitor[P]):
             prefix=self.visit_space(value.prefix, None, p)
         )
         value = value.replace(markers=self.visit_markers(value.markers, p))
-        value = value.replace(
-            expression=self.visit_right_padded(value.expression, None, p)
+        value = value.padding.replace(
+            expression=self.visit_right_padded(value.padding.expression, None, p)
         )
         if value.format is not None:
             value = value.replace(
@@ -385,8 +385,8 @@ class PythonVisitor(JavaVisitor[P]):
             return temp_expr
         kv = cast("KeyValue", temp_expr)
         kv = kv.replace(markers=self.visit_markers(kv.markers, p))
-        kv = kv.replace(
-            key=self.visit_right_padded(kv.key, None, p)
+        kv = kv.padding.replace(
+            key=self.visit_right_padded(kv.padding.key, None, p)
         )
         kv = kv.replace(
             value=self.visit_and_cast(kv.value, Expression, p)
@@ -421,9 +421,9 @@ class PythonVisitor(JavaVisitor[P]):
         case = case.replace(
             pattern=self.visit_match_case_pattern(case.pattern, p)
         )
-        if case.guard is not None:
-            case = case.replace(
-                guard=self.visit_left_padded(case.guard, None, p)
+        if case.padding.guard is not None:
+            case = case.padding.replace(
+                guard=self.visit_left_padded(case.padding.guard, None, p)
             )
         return case
 
@@ -470,8 +470,8 @@ class PythonVisitor(JavaVisitor[P]):
         named = named.replace(
             name=self.visit_and_cast(named.name, J, p)
         )
-        named = named.replace(
-            value=self.visit_left_padded(named.value, None, p)
+        named = named.padding.replace(
+            value=self.visit_left_padded(named.padding.value, None, p)
         )
         return named
 
@@ -497,17 +497,17 @@ class PythonVisitor(JavaVisitor[P]):
             return temp_expr
         slice_ = cast("Slice", temp_expr)
         slice_ = slice_.replace(markers=self.visit_markers(slice_.markers, p))
-        if slice_.start is not None:
-            slice_ = slice_.replace(
-                start=self.visit_right_padded(slice_.start, None, p)
+        if slice_.padding.start is not None:
+            slice_ = slice_.padding.replace(
+                start=self.visit_right_padded(slice_.padding.start, None, p)
             )
-        if slice_.stop is not None:
-            slice_ = slice_.replace(
-                stop=self.visit_right_padded(slice_.stop, None, p)
+        if slice_.padding.stop is not None:
+            slice_ = slice_.padding.replace(
+                stop=self.visit_right_padded(slice_.padding.stop, None, p)
             )
-        if slice_.step is not None:
-            slice_ = slice_.replace(
-                step=self.visit_right_padded(slice_.step, None, p)
+        if slice_.padding.step is not None:
+            slice_ = slice_.padding.replace(
+                step=self.visit_right_padded(slice_.padding.step, None, p)
             )
         return slice_
 
@@ -564,10 +564,10 @@ class PythonVisitor(JavaVisitor[P]):
         wrapper = cast("TrailingElseWrapper", temp_stmt)
         wrapper = wrapper.replace(markers=self.visit_markers(wrapper.markers, p))
         wrapper = wrapper.replace(
-            statement=self.visit_right_padded(wrapper.statement, None, p)
+            statement=self.visit_and_cast(wrapper.statement, Statement, p)
         )
-        wrapper = wrapper.replace(
-            else_block=self.visit_and_cast(wrapper.else_block, J, p)
+        wrapper = wrapper.padding.replace(
+            else_block=self.visit_left_padded(wrapper.padding.else_block, None, p)
         )
         return wrapper
 
@@ -584,12 +584,8 @@ class PythonVisitor(JavaVisitor[P]):
         alias = alias.replace(
             name=self.visit_and_cast(alias.name, J, p)
         )
-        if alias.padding.type_parameters is not None:
-            alias = alias.replace(
-                type_parameters=self.visit_container(alias.padding.type_parameters, None, p)
-            )
-        alias = alias.replace(
-            value=self.visit_left_padded(alias.value, None, p)
+        alias = alias.padding.replace(
+            value=self.visit_left_padded(alias.padding.value, None, p)
         )
         return alias
 
@@ -669,7 +665,7 @@ class PythonVisitor(JavaVisitor[P]):
         yield_from = cast("YieldFrom", temp_expr)
         yield_from = yield_from.replace(markers=self.visit_markers(yield_from.markers, p))
         yield_from = yield_from.replace(
-            expression=self.visit_left_padded(yield_from.expression, None, p)
+            expression=self.visit_and_cast(yield_from.expression, Expression, p)
         )
         return yield_from
 
@@ -708,6 +704,9 @@ class PythonVisitor(JavaVisitor[P]):
         element = right.element
         if isinstance(element, J):
             element = self.visit(element, p)
+            if element is None:
+                # Element was deleted by the visitor
+                return None
         after = self.visit_space(right.after, loc, p)
         if element is right.element and after is right.after:
             return right
@@ -727,9 +726,11 @@ class PythonVisitor(JavaVisitor[P]):
             lambda e: self.visit_right_padded(e, loc, p),
             container.padding.elements
         )
-        if before is container.before and elements is container.elements:
+        # Filter out None elements (deleted by visitor)
+        elements = [e for e in elements if e is not None]
+        if before is container.before and elements == list(container.padding.elements):
             return container
-        return container.replace(before=before).padding.replace(elements=JRightPadded.merge_elements(container.padding.elements, elements))
+        return container.replace(before=before).padding.replace(elements=elements)
 
     # -------------------------------------------------------------------------
     # Placeholder methods for inherited JavaVisitor functionality
