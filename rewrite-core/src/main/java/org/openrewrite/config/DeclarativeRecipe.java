@@ -137,7 +137,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         }
         initialized.clear();
         int index = 0;
-        Iterator<Recipe> iterator = uninitialized.iterator();
+        // Work with a copy to avoid modifying the original uninitialized list
+        // This preserves recipe instance integrity when the same recipe is initialized in multiple contexts
+        List<Recipe> uninitializedCopy = new ArrayList<>(uninitialized);
+        Iterator<Recipe> iterator = uninitializedCopy.iterator();
         while (iterator.hasNext()) {
             Recipe recipe = iterator.next();
             if (recipe instanceof LazyLoadedRecipe) {
@@ -189,6 +192,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             }
             index++;
         }
+        // Clear the original uninitialized list to mark this recipe as initialized
+        uninitialized.clear();
     }
 
     private void initializeDeclarativeRecipe(DeclarativeRecipe declarativeRecipe, String recipeIdentifier,
