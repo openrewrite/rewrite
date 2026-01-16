@@ -146,6 +146,46 @@ def test_double_quoted_string():
     RecipeSpec().rewrite_run(python('assert "foo"'))
 
 
+def test_complex_number_lowercase():
+    # language=python
+    RecipeSpec().rewrite_run(python("assert 1j"))
+
+
+def test_complex_number_uppercase():
+    # language=python
+    RecipeSpec().rewrite_run(python("assert 1J"))
+
+
+def test_complex_number_uppercase_in_subscript():
+    # language=python
+    RecipeSpec().rewrite_run(python("x: Literal[1J]"))
+
+
+def test_string_with_escaped_single_quote_in_type_hint():
+    # language=python - escaped single quote in double-quoted string
+    RecipeSpec().rewrite_run(python("x: Literal[\"\\'\"]\n"))
+
+
+def test_string_with_escaped_backslash_in_type_hint():
+    # language=python
+    RecipeSpec().rewrite_run(python(r'x: Literal["\\"]'))
+
+
+def test_string_with_escaped_newline_in_type_hint():
+    # language=python
+    RecipeSpec().rewrite_run(python(r'x: Literal["\n"]'))
+
+
+def test_empty_string_concatenation():
+    # language=python - empty string prefix followed by non-empty string
+    RecipeSpec().rewrite_run(python("x = ''U'''w'''U''"))
+
+
+def test_mixed_byte_string_prefix_concatenation():
+    # language=python - rb and br prefixes should both be recognized as byte strings
+    RecipeSpec().rewrite_run(python('x = rb"haha" br"ust go"'))
+
+
 def find_first(tree: Tree, clazz: Type[T]) -> T:
     class Find(PythonVisitor[list[Tree]]):
         def visit(self, t: Tree, p: list[Tree]) -> Optional[Tree]:

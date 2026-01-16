@@ -396,12 +396,14 @@ class ParserVisitor(ast.NodeVisitor):
         save_token_idx = self._token_idx
         interfaces_prefix = self.__whitespace()
         if (node.bases or node.keywords) and self.__skip('('):
-            all = node.bases + node.keywords
+            # Sort bases and keywords by source position to preserve original order
+            all_items = list(node.bases) + list(node.keywords)
+            all_items.sort(key=lambda n: (n.lineno, n.col_offset))
             interfaces = JContainer(
                 interfaces_prefix,
                 [
-                    self.__pad_list_element(self.__convert_type(n), i == len(all) - 1, end_delim=')') for i, n in
-                    enumerate(all)],
+                    self.__pad_list_element(self.__convert_type(n), i == len(all_items) - 1, end_delim=')') for i, n in
+                    enumerate(all_items)],
                 Markers.EMPTY
             )
         elif self.__skip('('):
@@ -1682,6 +1684,17 @@ class ParserVisitor(ast.NodeVisitor):
             raise ValueError(f"Unsupported operator: {op}")
         return self.__pad_left(self.__source_before(op_str), op)
 
+    @staticmethod
+    def _is_byte_string(tok_string: str) -> bool:
+        """Check if a string token represents a byte string (has b/B in prefix)."""
+        # Find where the quote starts
+        for i, c in enumerate(tok_string):
+            if c in ('"', "'"):
+                # Check if 'b' or 'B' appears in the prefix
+                prefix = tok_string[:i].lower()
+                return 'b' in prefix
+        return False
+
     def visit_Constant(self, node):
         # For non-string constants, use simple token-based literal mapping
         if not isinstance(node.value, (str, bytes)):
@@ -1690,17 +1703,15 @@ class ParserVisitor(ast.NodeVisitor):
         # For strings/fstrings, find the next STRING/FSTRING_START token without advancing _token_idx
         tok, _ = self._peek_significant_token()
 
-        is_byte_string = tok.string.startswith(('b', "B"))
+        is_byte_string = self._is_byte_string(tok.string)
         res = None
-        end_seen = False
 
-        while tok.type in (token.STRING, token.FSTRING_START) and is_byte_string == tok.string.startswith(('b', "B")):
+        while tok.type in (token.STRING, token.FSTRING_START) and is_byte_string == self._is_byte_string(tok.string):
             if tok.type == token.FSTRING_START:
                 prefix = self.__whitespace()
                 current, tok, _ = self.__map_fstring(node, prefix, tok)
             else:
                 current, tok = self.__map_literal(node, tok)
-                end_seen = current.value.endswith(node.value)
 
             if res is None:
                 res = current
@@ -1715,9 +1726,6 @@ class ParserVisitor(ast.NodeVisitor):
                     current,
                     self._type_mapping.type(node)
                 )
-
-            if end_seen:
-                break
 
             # Peek at next non-whitespace token for loop condition
             tok, idx = self._peek_significant_token()
@@ -1963,6 +1971,11 @@ class ParserVisitor(ast.NodeVisitor):
                 )
         else:
             raise NotImplementedError("Unsupported decorator type: " + str(type(decorator)))
+
+        # Apply the whitespace after @ to the name when there are no extra parentheses.
+        # When extra_parens is non-empty, this is handled differently (prefix is set on the wrapped paren).
+        if not extra_parens:
+            name = name.replace(prefix=name_prefix)
 
         # Wrap name in extra parentheses if present
         if extra_parens:
@@ -2423,23 +2436,38 @@ class ParserVisitor(ast.NodeVisitor):
                 )
             else:
                 literal = cast(j.Literal, self.__convert(node))
-                if literal.value_source.startswith("'''"):
-                    quote_style = Quoted.Style.TRIPLE_SINGLE
-                elif literal.value_source[0] == "'":
-                    quote_style = Quoted.Style.SINGLE
-                elif literal.value_source.startswith('"""'):
-                    quote_style = Quoted.Style.TRIPLE_DOUBLE
-                elif literal.value_source.startswith('"'):
-                    quote_style = Quoted.Style.DOUBLE
+                source = literal.value_source
+
+                # Determine quote style and extract inner content from value_source.
+                # For strings, we need to preserve escape sequences from the source, not use
+                # str(literal.value) which gives the interpreted value (losing escapes like \n, \').
+                # Find where quotes start (after any prefix like r, b, u, f, etc.)
+                quote_start = 0
+                while quote_start < len(source) and source[quote_start] not in ('"', "'"):
+                    quote_start += 1
+
+                if quote_start < len(source):
+                    quote_char = source[quote_start]
+                    if source[quote_start:quote_start+3] == quote_char * 3:
+                        # Triple quotes
+                        quote_style = Quoted.Style.TRIPLE_SINGLE if quote_char == "'" else Quoted.Style.TRIPLE_DOUBLE
+                        quote_len = 3
+                    else:
+                        quote_style = Quoted.Style.SINGLE if quote_char == "'" else Quoted.Style.DOUBLE
+                        quote_len = 1
+                    # Extract inner content (between quotes), preserving escape sequences
+                    name = source[quote_start + quote_len : -quote_len]
                 else:
                     quote_style = None
+                    # Non-string literal: use value_source to preserve case (e.g., 1J vs 1j)
+                    name = source
 
                 return j.Identifier(
                     random_id(),
                     literal.prefix,
                     Markers.build(random_id(), [Quoted(random_id(), quote_style)]) if quote_style else Markers.EMPTY,
                     [],
-                    str(literal.value),
+                    name,
                     self._type_mapping.type(node),
                     None
                 )
@@ -2763,6 +2791,13 @@ class ParserVisitor(ast.NodeVisitor):
                     if tok.type in (token.NEWLINE, token.NL):
                         break
                     stop_idx = text.index(stop)
+                    # Check if this newline is escaped (line continuation: backslash before newline)
+                    # If so, don't stop here - the logical line continues
+                    if stop == '\n' and stop_idx > 0 and text[stop_idx - 1] == '\\':
+                        # Line continuation - consume entire token and continue
+                        whitespace.append(text)
+                        self._token_idx += 1
+                        continue
                     whitespace.append(text[:stop_idx])
                     break
                 whitespace.append(text)

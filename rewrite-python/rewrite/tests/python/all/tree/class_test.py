@@ -100,3 +100,13 @@ def test_metaclass():
             pass
         """
     ))
+
+
+def test_starred_base():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        class C3(Generic[T], metaclass=type, *[str]):
+            ...
+        """
+    ))

@@ -119,3 +119,32 @@ def test_parenthesized_decorator():
             return 42
         """
     ))
+
+
+def test_decorator_with_space_after_at():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        def foo(fun):
+            return fun
+
+        @ foo
+        def bar():
+            pass
+        """
+    ))
+
+
+def test_decorator_with_line_continuation():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        def foo(fun):
+            return fun
+
+        @ \\
+        foo
+        def bar():
+            pass
+        """
+    ))
