@@ -539,4 +539,96 @@ class DeclarativeRecipeTest implements RewriteTest {
             .hasMessageContaining("RecipeB")
             .hasMessageContaining("RecipeC");
     }
+
+    @Test
+    void recipeInstanceIntegrityAfterDeduplication() {
+        // Create a shared recipe D
+        DeclarativeRecipe recipeD = new DeclarativeRecipe(
+            "org.openrewrite.RecipeD",
+            "Recipe D",
+            "Test recipe D",
+            emptySet(),
+            null,
+            null,
+            false,
+            emptyList()
+        );
+        recipeD.addUninitialized(new ChangeText("Hello from D"));
+
+        // Create recipe B that includes D
+        DeclarativeRecipe recipeB = new DeclarativeRecipe(
+            "org.openrewrite.RecipeB",
+            "Recipe B",
+            "Test recipe B",
+            emptySet(),
+            null,
+            null,
+            false,
+            emptyList()
+        );
+        recipeB.addUninitialized(recipeD);
+
+        // Create recipe C that also includes D (sharing the same instance)
+        DeclarativeRecipe recipeC = new DeclarativeRecipe(
+            "org.openrewrite.RecipeC",
+            "Recipe C",
+            "Test recipe C",
+            emptySet(),
+            null,
+            null,
+            false,
+            emptyList()
+        );
+        recipeC.addUninitialized(recipeD);
+
+        // Create recipe A that includes both B and C
+        DeclarativeRecipe recipeA = new DeclarativeRecipe(
+            "org.openrewrite.RecipeA",
+            "Recipe A",
+            "Test recipe A",
+            emptySet(),
+            null,
+            null,
+            false,
+            emptyList()
+        );
+        recipeA.addUninitialized(recipeB);
+        recipeA.addUninitialized(recipeC);
+
+        // Initialize A first - this will initialize B and C, both of which initialize D
+        recipeA.initialize(List.of(recipeA, recipeB, recipeC, recipeD));
+
+        // Verify A's structure
+        assertThat(recipeA.getRecipeList()).hasSize(2);
+        Recipe aChildB = recipeA.getRecipeList().get(0);
+        Recipe aChildC = recipeA.getRecipeList().get(1);
+        assertThat(aChildB.getName()).isEqualTo("org.openrewrite.RecipeB");
+        assertThat(aChildC.getName()).isEqualTo("org.openrewrite.RecipeC");
+
+        // Both B and C should have D
+        assertThat(aChildB.getRecipeList()).hasSize(1);
+        assertThat(aChildB.getRecipeList().get(0).getName()).isEqualTo("org.openrewrite.RecipeD");
+        assertThat(aChildC.getRecipeList()).hasSize(1);
+        assertThat(aChildC.getRecipeList().get(0).getName()).isEqualTo("org.openrewrite.RecipeD");
+
+        // CRITICAL: Now initialize C independently - it should still have D in its recipe list
+        // This tests that the deduplication that happened during A's initialization didn't
+        // permanently corrupt the shared recipeD instance
+        DeclarativeRecipe recipeC2 = new DeclarativeRecipe(
+            "org.openrewrite.RecipeC2",
+            "Recipe C2",
+            "Test recipe C2",
+            emptySet(),
+            null,
+            null,
+            false,
+            emptyList()
+        );
+        recipeC2.addUninitialized(recipeD);
+        recipeC2.initialize(List.of(recipeC2, recipeD));
+
+        // C2 should have D
+        assertThat(recipeC2.getRecipeList()).hasSize(1);
+        assertThat(recipeC2.getRecipeList().get(0).getName()).isEqualTo("org.openrewrite.RecipeD");
+    }
 }
