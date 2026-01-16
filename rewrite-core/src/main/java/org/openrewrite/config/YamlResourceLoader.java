@@ -24,8 +24,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ObjectMappers;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.RecipeLoader;
-import org.openrewrite.marketplace.RecipeListing;
-import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 import org.yaml.snakeyaml.LoaderOptions;

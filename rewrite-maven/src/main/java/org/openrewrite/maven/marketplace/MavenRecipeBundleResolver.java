@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.marketplace;
 
-import lombok.SneakyThrows;
 import org.apache.commons.lang3.StringUtils;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -28,9 +27,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
-import java.io.Closeable;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.Optional;
 
 public class MavenRecipeBundleResolver implements RecipeBundleResolver {

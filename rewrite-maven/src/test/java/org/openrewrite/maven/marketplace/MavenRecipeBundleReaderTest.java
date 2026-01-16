@@ -29,14 +29,11 @@ import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
-import java.io.IOException;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MavenRecipeBundleReaderTest {
-    // TODO: Figure out how to get this to work on Windows given it doesn't want to relinquish access
-    //  to the temp directories so they can be cleaned up
     @Issue("https://github.com/openrewrite/rewrite/issues/6487")
     @Test
     void canInstallRewriteCore(@TempDir Path tempDir) throws Exception {
