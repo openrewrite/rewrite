@@ -315,6 +315,7 @@ class UpgradePluginVersionTest implements RewriteTest {
 
               dependencies {
                   implementation 'javax.servlet:javax.servlet-api:4.0.1'
+                  implementation 'org.apache.activemq:activemq-client-jakarta:5.18.2'
               }
               """,
             """
@@ -329,6 +330,7 @@ class UpgradePluginVersionTest implements RewriteTest {
 
               dependencies {
                   implementation 'javax.servlet:javax.servlet-api:4.0.1'
+                  implementation 'org.apache.activemq:activemq-client-jakarta:5.18.2'
               }
               """
           )
