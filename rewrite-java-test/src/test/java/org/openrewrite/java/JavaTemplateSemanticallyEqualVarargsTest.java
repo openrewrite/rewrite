@@ -18,7 +18,6 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.java.internal.template.VarargsMatch;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
@@ -334,9 +333,8 @@ class JavaTemplateSemanticallyEqualVarargsTest implements RewriteTest {
                         JavaTemplate.Matcher matcher = template.matcher(getCursor());
                         if (matcher.find()) {
                             J param = matcher.parameter(0);
-                            // VarargsMatch marker indicates this is a varargs match
-                            // The matched elements are in the J.NewArray initializer
-                            if (param instanceof J.NewArray && param.getMarkers().findFirst(VarargsMatch.class).isPresent()) {
+                            // Varargs matches return a J.NewArray with the matched elements as the initializer
+                            if (param instanceof J.NewArray) {
                                 J.NewArray arr = (J.NewArray) param;
                                 assertThat(arr.getInitializer()).hasSize(3);
                                 return SearchResult.found(mi, "varargs:" + arr.getInitializer().size());

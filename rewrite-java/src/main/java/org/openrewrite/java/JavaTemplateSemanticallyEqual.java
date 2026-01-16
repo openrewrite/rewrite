@@ -23,7 +23,6 @@ import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypedPatternContext;
 import org.openrewrite.java.internal.template.TemplateParameter;
 import org.openrewrite.java.internal.template.TypeParameter;
-import org.openrewrite.java.internal.template.VarargsMatch;
 import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -160,15 +159,11 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                 }
 
                 if (isAssignableTo(marker.getType(), ((TypedTree) j).getType())) {
-                    registerMatch(j, marker.getName());
+                    matchedParameters.put(j, marker.getName());
                     return true;
                 }
             }
             return false;
-        }
-
-        private void registerMatch(J j, @Nullable String name) {
-            matchedParameters.put(j, name);
         }
 
         @Override
@@ -376,7 +371,6 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         }
 
         private void registerVarargsMatch(List<Expression> elements, JavaType.Array arrayType, @Nullable String name) {
-            Markers markers = Markers.build(singleton(new VarargsMatch(randomId())));
             JContainer<Expression> initializer = null;
             if (!elements.isEmpty()) {
                 List<JRightPadded<Expression>> paddedElements = new ArrayList<>(elements.size());
@@ -388,7 +382,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
             J.NewArray newArray = new J.NewArray(
                     randomId(),
                     Space.EMPTY,
-                    markers,
+                    Markers.EMPTY,
                     null, // typeExpression - not needed for matching purposes
                     emptyList(), // dimensions
                     initializer,
