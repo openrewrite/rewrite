@@ -265,7 +265,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
             // Check static flag compatibility
             boolean templateStatic = templateMethod.hasFlags(Flag.Static);
             boolean actualStatic = actualMethod.hasFlags(Flag.Static);
-            if (templateStatic != actualStatic && nullMissMatch(template.getSelect(), actual.getSelect())) {
+            if (templateStatic != actualStatic) {
                 return false;
             }
 
