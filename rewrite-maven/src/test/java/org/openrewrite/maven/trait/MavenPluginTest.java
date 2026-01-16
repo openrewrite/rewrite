@@ -71,4 +71,48 @@ class MavenPluginTest implements RewriteTest {
           )
         );
     }
+    @DocumentExample
+    @Test
+    void findManagedMavenPlugin() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>io.quarkus</groupId>
+                                  <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                                  <version>3.0.0.Beta1</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <!--~~(io.quarkus:quarkus-bootstrap-maven-plugin)~~>--><plugin>
+                                  <groupId>io.quarkus</groupId>
+                                  <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                                  <version>3.0.0.Beta1</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
 }
