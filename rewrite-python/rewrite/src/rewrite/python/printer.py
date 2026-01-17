@@ -33,7 +33,7 @@ from rewrite.java import (
     Loop,
 )
 from rewrite.java.markers import Semicolon, TrailingComma, OmitParentheses
-from rewrite.python.support_types import Py, PySpace, PyRightPadded, PyLeftPadded, PyContainer
+from rewrite.python.support_types import Py
 from rewrite.python.markers import KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline
 
 if TYPE_CHECKING:
@@ -245,7 +245,7 @@ class PythonPrinter:
     def _java_marker_wrapper(self, out: str) -> str:
         return f"/*~~{out}{'~~' if out else ''}>*/"
 
-    def _before_syntax(self, tree: Union[Py, J], loc: Optional[Any], p: PrintOutputCapture) -> None:
+    def _before_syntax(self, tree: Union[Py, J], p: PrintOutputCapture) -> None:
         """Handle marker printing and space before syntax."""
         prefix = tree.prefix
         markers = tree.markers
@@ -255,8 +255,7 @@ class PythonPrinter:
                 marker, Cursor(self.get_cursor(), marker), self._java_marker_wrapper
             ))
 
-        if loc is not None:
-            self._visit_space(prefix, loc, p)
+        self._visit_space(prefix, p)
 
         self._visit_markers(markers, p)
 
@@ -273,7 +272,7 @@ class PythonPrinter:
                 marker, Cursor(self.get_cursor(), marker), self._java_marker_wrapper
             ))
 
-    def _visit_space(self, space: Optional[Space], loc: Any, p: PrintOutputCapture) -> Space:
+    def _visit_space(self, space: Optional[Space], p: PrintOutputCapture) -> Space:
         """Visit whitespace and comments.
 
         Space structure:
@@ -319,33 +318,32 @@ class PythonPrinter:
                 p.append(';')
             elif isinstance(marker, TrailingComma):
                 p.append(',')
-                self._visit_space(marker.suffix, Space.Location.LANGUAGE_EXTENSION, p)
+                self._visit_space(marker.suffix, p)
         return markers
 
-    def _visit_right_padded(self, padded: JRightPadded, loc: Any, p: PrintOutputCapture) -> None:
+    def _visit_right_padded(self, padded: JRightPadded, p: PrintOutputCapture) -> None:
         """Visit a right-padded element."""
         self.visit(padded.element, p)
-        self._visit_space(padded.after, loc, p)
+        self._visit_space(padded.after, p)
         self._visit_markers(padded.markers, p)
 
     def _visit_right_padded_list(
         self,
         nodes: List[JRightPadded],
-        loc: Any,
         suffix_between: str,
         p: PrintOutputCapture
     ) -> None:
         """Visit a list of right-padded elements."""
         for i, node in enumerate(nodes):
             self.visit(node.element, p)
-            self._visit_space(node.after, loc, p)
+            self._visit_space(node.after, p)
             self._visit_markers(node.markers, p)
             if i < len(nodes) - 1:
                 p.append(suffix_between)
 
-    def _visit_left_padded(self, prefix: str, padded: JLeftPadded, loc: Any, p: PrintOutputCapture) -> None:
+    def _visit_left_padded(self, prefix: str, padded: JLeftPadded, p: PrintOutputCapture) -> None:
         """Visit a left-padded element."""
-        self._visit_space(padded.before, loc, p)
+        self._visit_space(padded.before, p)
         p.append(prefix)
         self.visit(padded.element, p)
         self._visit_markers(padded.markers, p)
@@ -354,7 +352,6 @@ class PythonPrinter:
         self,
         before: str,
         container: Optional[JContainer],
-        loc: Any,
         suffix_between: str,
         after: Optional[str],
         p: PrintOutputCapture
@@ -362,9 +359,9 @@ class PythonPrinter:
         """Visit a container of elements."""
         if container is None:
             return
-        self._visit_space(container.before, loc, p)
+        self._visit_space(container.before, p)
         p.append(before)
-        self._visit_right_padded_list(container.padding.elements, loc, suffix_between, p)
+        self._visit_right_padded_list(container.padding.elements, suffix_between, p)
         if after:
             p.append(after)
 
@@ -378,18 +375,18 @@ class PythonPrinter:
         # Output UTF-8 BOM if the original file had one
         if cu.charset_bom_marked:
             p.append('\ufeff')
-        self._before_syntax(cu, Space.Location.COMPILATION_UNIT_PREFIX, p)
+        self._before_syntax(cu, p)
 
         # Print imports
         for imp in cu.padding.imports:
-            self._visit_right_padded(imp, PyRightPadded.Location.TOP_LEVEL_STATEMENT_SUFFIX, p)
+            self._visit_right_padded(imp, p)
 
         # Print statements
         for stmt in cu.padding.statements:
-            self._visit_right_padded(stmt, PyRightPadded.Location.TOP_LEVEL_STATEMENT_SUFFIX, p)
+            self._visit_right_padded(stmt, p)
 
         # Print EOF space
-        self._visit_space(cu.eof, Space.Location.COMPILATION_UNIT_EOF, p)
+        self._visit_space(cu.eof, p)
 
         # Handle SuppressNewline marker
         if cu.markers.find_first(SuppressNewline):
@@ -402,14 +399,14 @@ class PythonPrinter:
 
     def visit_async(self, async_: 'py.Async', p: PrintOutputCapture) -> J:
         """Visit an async statement."""
-        self._before_syntax(async_, PySpace.Location.ASYNC_PREFIX, p)
+        self._before_syntax(async_, p)
         p.append("async")
         self.visit(async_.statement, p)
         return async_
 
     def visit_await(self, await_: 'py.Await', p: PrintOutputCapture) -> J:
         """Visit an await expression."""
-        self._before_syntax(await_, PySpace.Location.AWAIT_PREFIX, p)
+        self._before_syntax(await_, p)
         p.append("await")
         self.visit(await_.expression, p)
         return await_
@@ -417,15 +414,15 @@ class PythonPrinter:
     def visit_binary(self, binary: 'py.Binary', p: PrintOutputCapture) -> J:
         """Visit a Python-specific binary expression."""
         from rewrite.python.tree import Binary as PyBinary
-        self._before_syntax(binary, PySpace.Location.BINARY_PREFIX, p)
+        self._before_syntax(binary, p)
         self.visit(binary.left, p)
-        self._visit_space(binary.padding.operator.before, PySpace.Location.BINARY_OPERATOR, p)
+        self._visit_space(binary.padding.operator.before, p)
 
         op = binary.operator
         if op == PyBinary.Type.NotIn:
             p.append("not")
             if binary.negation is not None:
-                self._visit_space(binary.negation, PySpace.Location.BINARY_NEGATION, p)
+                self._visit_space(binary.negation, p)
             else:
                 p.append(' ')
             p.append("in")
@@ -436,7 +433,7 @@ class PythonPrinter:
         elif op == PyBinary.Type.IsNot:
             p.append("is")
             if binary.negation is not None:
-                self._visit_space(binary.negation, PySpace.Location.BINARY_NEGATION, p)
+                self._visit_space(binary.negation, p)
             else:
                 p.append(' ')
             p.append("not")
@@ -455,10 +452,9 @@ class PythonPrinter:
 
     def visit_chained_assignment(self, chained: 'py.ChainedAssignment', p: PrintOutputCapture) -> J:
         """Visit a chained assignment."""
-        self._before_syntax(chained, PySpace.Location.CHAINED_ASSIGNMENT_PREFIX, p)
+        self._before_syntax(chained, p)
         self._visit_right_padded_list(
             chained.padding.variables,
-            PyRightPadded.Location.CHAINED_ASSIGNMENT_VARIABLES,
             "=",
             p
         )
@@ -470,20 +466,20 @@ class PythonPrinter:
     def visit_collection_literal(self, coll: 'py.CollectionLiteral', p: PrintOutputCapture) -> J:
         """Visit a collection literal."""
         from rewrite.python.tree import CollectionLiteral
-        self._before_syntax(coll, PySpace.Location.COLLECTION_LITERAL_PREFIX, p)
+        self._before_syntax(coll, p)
 
         elements = coll.padding.elements
         kind = coll.kind
 
         if kind == CollectionLiteral.Kind.LIST:
-            self._visit_container("[", elements, PyContainer.Location.COLLECTION_LITERAL_ELEMENTS, ",", "]", p)
+            self._visit_container("[", elements, ",", "]", p)
         elif kind == CollectionLiteral.Kind.SET:
-            self._visit_container("{", elements, PyContainer.Location.COLLECTION_LITERAL_ELEMENTS, ",", "}", p)
+            self._visit_container("{", elements, ",", "}", p)
         elif kind == CollectionLiteral.Kind.TUPLE:
             if elements.markers.find_first(OmitParentheses):
-                self._visit_container("", elements, PyContainer.Location.COLLECTION_LITERAL_ELEMENTS, ",", "", p)
+                self._visit_container("", elements, ",", "", p)
             else:
-                self._visit_container("(", elements, PyContainer.Location.COLLECTION_LITERAL_ELEMENTS, ",", ")", p)
+                self._visit_container("(", elements, ",", ")", p)
 
         self._after_syntax(coll, p)
         return coll
@@ -491,7 +487,7 @@ class PythonPrinter:
     def visit_comprehension_expression(self, comp: 'py.ComprehensionExpression', p: PrintOutputCapture) -> J:
         """Visit a comprehension expression."""
         from rewrite.python.tree import ComprehensionExpression
-        self._before_syntax(comp, PySpace.Location.COMPREHENSION_EXPRESSION_PREFIX, p)
+        self._before_syntax(comp, p)
 
         kind = comp.kind
         if kind in (ComprehensionExpression.Kind.DICT, ComprehensionExpression.Kind.SET):
@@ -514,7 +510,7 @@ class PythonPrinter:
         self.visit(comp.result, p)
         for clause in comp.clauses:
             self.visit(clause, p)
-        self._visit_space(comp.suffix, PySpace.Location.COMPREHENSION_EXPRESSION_SUFFIX, p)
+        self._visit_space(comp.suffix, p)
         p.append(close_char)
 
         self._after_syntax(comp, p)
@@ -522,13 +518,13 @@ class PythonPrinter:
 
     def visit_comprehension_clause(self, clause: 'py.ComprehensionExpression.Clause', p: PrintOutputCapture) -> J:
         """Visit a comprehension clause."""
-        self._before_syntax(clause, PySpace.Location.COMPREHENSION_EXPRESSION_CLAUSE_PREFIX, p)
+        self._before_syntax(clause, p)
         if clause.async_:
             p.append("async")
-            self._visit_space(clause.padding.async_.after, PySpace.Location.COMPREHENSION_EXPRESSION_CLAUSE_ASYNC_SUFFIX, p)
+            self._visit_space(clause.padding.async_.after, p)
         p.append("for")
         self.visit(clause.iterator_variable, p)
-        self._visit_space(clause.padding.iterated_list.before, PySpace.Location.COMPREHENSION_EXPRESSION_CLAUSE_ITERATED_LIST, p)
+        self._visit_space(clause.padding.iterated_list.before, p)
         p.append("in")
         self.visit(clause.iterated_list, p)
         if clause.conditions:
@@ -538,18 +534,17 @@ class PythonPrinter:
 
     def visit_comprehension_condition(self, condition: 'py.ComprehensionExpression.Condition', p: PrintOutputCapture) -> J:
         """Visit a comprehension condition."""
-        self._before_syntax(condition, PySpace.Location.COMPREHENSION_EXPRESSION_CONDITION_PREFIX, p)
+        self._before_syntax(condition, p)
         p.append("if")
         self.visit(condition.expression, p)
         return condition
 
     def visit_del(self, del_: 'py.Del', p: PrintOutputCapture) -> J:
         """Visit a del statement."""
-        self._before_syntax(del_, PySpace.Location.DEL_PREFIX, p)
+        self._before_syntax(del_, p)
         p.append("del")
         self._visit_right_padded_list(
             del_.padding.targets,
-            PyRightPadded.Location.DEL_TARGETS,
             ",",
             p
         )
@@ -557,23 +552,23 @@ class PythonPrinter:
 
     def visit_dict_literal(self, dict_: 'py.DictLiteral', p: PrintOutputCapture) -> J:
         """Visit a dict literal."""
-        self._before_syntax(dict_, PySpace.Location.DICT_LITERAL_PREFIX, p)
-        self._visit_container("{", dict_.padding.elements, PyContainer.Location.DICT_LITERAL_ELEMENTS, ",", "}", p)
+        self._before_syntax(dict_, p)
+        self._visit_container("{", dict_.padding.elements, ",", "}", p)
         self._after_syntax(dict_, p)
         return dict_
 
     def visit_error_from(self, expr: 'py.ErrorFrom', p: PrintOutputCapture) -> J:
         """Visit an error from expression."""
-        self._before_syntax(expr, PySpace.Location.ERROR_FROM_PREFIX, p)
+        self._before_syntax(expr, p)
         self.visit(expr.error, p)
-        self._visit_space(expr.padding.from_.before, PySpace.Location.ERROR_FROM_EXPRESSION_FROM_PREFIX, p)
+        self._visit_space(expr.padding.from_.before, p)
         p.append("from")
         self.visit(expr.from_, p)
         return expr
 
     def visit_exception_type(self, type_: 'py.ExceptionType', p: PrintOutputCapture) -> J:
         """Visit an exception type."""
-        self._before_syntax(type_, PySpace.Location.EXCEPTION_TYPE_PREFIX, p)
+        self._before_syntax(type_, p)
         if type_.exception_group:
             p.append("*")
         self.visit(type_.expression, p)
@@ -587,14 +582,14 @@ class PythonPrinter:
 
     def visit_expression_type_tree(self, expr: 'py.ExpressionTypeTree', p: PrintOutputCapture) -> J:
         """Visit an expression type tree."""
-        self._before_syntax(expr, PySpace.Location.EXPRESSION_TYPE_TREE_PREFIX, p)
+        self._before_syntax(expr, p)
         self.visit(expr.reference, p)
         self._after_syntax(expr, p)
         return expr
 
     def visit_formatted_string(self, fstring: 'py.FormattedString', p: PrintOutputCapture) -> J:
         """Visit a formatted string (f-string)."""
-        self._before_syntax(fstring, PySpace.Location.FORMATTED_STRING_PREFIX, p)
+        self._before_syntax(fstring, p)
         p.append(fstring.delimiter)
         for part in fstring.parts:
             self.visit(part, p)
@@ -608,12 +603,12 @@ class PythonPrinter:
     def visit_formatted_string_value(self, value: 'py.FormattedString.Value', p: PrintOutputCapture) -> J:
         """Visit a formatted string value."""
         from rewrite.python.tree import FormattedString
-        self._before_syntax(value, PySpace.Location.FORMATTED_STRING_VALUE_PREFIX, p)
+        self._before_syntax(value, p)
         p.append('{')
-        self._visit_right_padded(value.padding.expression, PyRightPadded.Location.FORMATTED_STRING_VALUE_EXPRESSION, p)
+        self._visit_right_padded(value.padding.expression, p)
         if value.padding.debug is not None:
             p.append('=')
-            self._visit_space(value.padding.debug.after, PySpace.Location.FORMATTED_STRING_VALUE_DEBUG_SUFFIX, p)
+            self._visit_space(value.padding.debug.after, p)
         if value.conversion is not None:
             p.append('!')
             conv = value.conversion
@@ -631,8 +626,8 @@ class PythonPrinter:
 
     def visit_key_value(self, kv: 'py.KeyValue', p: PrintOutputCapture) -> J:
         """Visit a key-value pair."""
-        self._before_syntax(kv, PySpace.Location.KEY_VALUE_PREFIX, p)
-        self._visit_right_padded(kv.padding.key, PyRightPadded.Location.KEY_VALUE_KEY, p)
+        self._before_syntax(kv, p)
+        self._visit_right_padded(kv.padding.key, p)
         p.append(':')
         self.visit(kv.value, p)
         self._after_syntax(kv, p)
@@ -640,17 +635,17 @@ class PythonPrinter:
 
     def visit_literal_type(self, lit: 'py.LiteralType', p: PrintOutputCapture) -> J:
         """Visit a literal type."""
-        self._before_syntax(lit, PySpace.Location.LITERAL_TYPE_PREFIX, p)
+        self._before_syntax(lit, p)
         self.visit(lit.literal, p)
         self._after_syntax(lit, p)
         return lit
 
     def visit_match_case(self, match: 'py.MatchCase', p: PrintOutputCapture) -> J:
         """Visit a match case."""
-        self._before_syntax(match, PySpace.Location.MATCH_CASE_PREFIX, p)
+        self._before_syntax(match, p)
         self.visit(match.pattern, p)
         if match.padding.guard is not None:
-            self._visit_space(match.padding.guard.before, PySpace.Location.MATCH_CASE_GUARD, p)
+            self._visit_space(match.padding.guard.before, p)
             p.append("if")
             self.visit(match.guard, p)
         return match
@@ -658,70 +653,70 @@ class PythonPrinter:
     def visit_match_case_pattern(self, pattern: 'py.MatchCase.Pattern', p: PrintOutputCapture) -> J:
         """Visit a match case pattern."""
         from rewrite.python.tree import MatchCase
-        self._before_syntax(pattern, PySpace.Location.MATCH_CASE_PATTERN_PREFIX, p)
+        self._before_syntax(pattern, p)
 
         children = pattern.padding.children
         kind = pattern.kind
 
         if kind == MatchCase.Pattern.Kind.AS:
-            self._visit_container("", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, "as", "", p)
+            self._visit_container("", children, "as", "", p)
         elif kind in (MatchCase.Pattern.Kind.CAPTURE, MatchCase.Pattern.Kind.LITERAL):
-            self._visit_container("", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, "", "", p)
+            self._visit_container("", children, "", "", p)
         elif kind == MatchCase.Pattern.Kind.CLASS:
-            self._visit_space(children.before, PySpace.Location.MATCH_CASE_PATTERN_CHILDREN_PREFIX, p)
+            self._visit_space(children.before, p)
             elements = children.padding.elements
-            self._visit_right_padded(elements[0], PyRightPadded.Location.MATCH_CASE_PATTERN_CHILD, p)
+            self._visit_right_padded(elements[0], p)
             rest = JContainer(Space.EMPTY, elements[1:], Markers.EMPTY)
-            self._visit_container("(", rest, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, ",", ")", p)
+            self._visit_container("(", rest, ",", ")", p)
         elif kind == MatchCase.Pattern.Kind.DOUBLE_STAR:
-            self._visit_container("**", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, "", "", p)
+            self._visit_container("**", children, "", "", p)
         elif kind == MatchCase.Pattern.Kind.KEY_VALUE:
-            self._visit_container("", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, ":", "", p)
+            self._visit_container("", children, ":", "", p)
         elif kind == MatchCase.Pattern.Kind.KEYWORD:
-            self._visit_container("", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, "=", "", p)
+            self._visit_container("", children, "=", "", p)
         elif kind == MatchCase.Pattern.Kind.MAPPING:
-            self._visit_container("{", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, ",", "}", p)
+            self._visit_container("{", children, ",", "}", p)
         elif kind == MatchCase.Pattern.Kind.OR:
-            self._visit_container("", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, "|", "", p)
+            self._visit_container("", children, "|", "", p)
         elif kind == MatchCase.Pattern.Kind.SEQUENCE:
-            self._visit_container("", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, ",", "", p)
+            self._visit_container("", children, ",", "", p)
         elif kind == MatchCase.Pattern.Kind.SEQUENCE_LIST:
-            self._visit_container("[", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, ",", "]", p)
+            self._visit_container("[", children, ",", "]", p)
         elif kind in (MatchCase.Pattern.Kind.GROUP, MatchCase.Pattern.Kind.SEQUENCE_TUPLE):
-            self._visit_container("(", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, ",", ")", p)
+            self._visit_container("(", children, ",", ")", p)
         elif kind == MatchCase.Pattern.Kind.STAR:
-            self._visit_container("*", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, "", "", p)
+            self._visit_container("*", children, "", "", p)
         elif kind == MatchCase.Pattern.Kind.VALUE:
-            self._visit_container("", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, "", "", p)
+            self._visit_container("", children, "", "", p)
         elif kind == MatchCase.Pattern.Kind.WILDCARD:
-            self._visit_container("_", children, PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, "", "", p)
+            self._visit_container("_", children, "", "", p)
 
         return pattern
 
     def visit_multi_import(self, multi: 'py.MultiImport', p: PrintOutputCapture) -> J:
         """Visit a multi-import statement."""
-        self._before_syntax(multi, PySpace.Location.MULTI_IMPORT_PREFIX, p)
+        self._before_syntax(multi, p)
         if multi.from_ is not None:
             p.append("from")
-            self._visit_right_padded(multi.padding.from_, PyRightPadded.Location.MULTI_IMPORT_FROM, p)
+            self._visit_right_padded(multi.padding.from_, p)
         p.append("import")
         if multi.parenthesized:
-            self._visit_container("(", multi.padding.names, PyContainer.Location.MULTI_IMPORT_NAMES, ",", ")", p)
+            self._visit_container("(", multi.padding.names, ",", ")", p)
         else:
-            self._visit_container("", multi.padding.names, PyContainer.Location.MULTI_IMPORT_NAMES, ",", "", p)
+            self._visit_container("", multi.padding.names, ",", "", p)
         self._after_syntax(multi, p)
         return multi
 
     def visit_named_argument(self, arg: 'py.NamedArgument', p: PrintOutputCapture) -> J:
         """Visit a named argument."""
-        self._before_syntax(arg, PySpace.Location.NAMED_ARGUMENT, p)
+        self._before_syntax(arg, p)
         self.visit(arg.name, p)
-        self._visit_left_padded("=", arg.padding.value, PyLeftPadded.Location.NAMED_ARGUMENT_VALUE, p)
+        self._visit_left_padded("=", arg.padding.value, p)
         return arg
 
     def visit_pass(self, pass_: 'py.Pass', p: PrintOutputCapture) -> J:
         """Visit a pass statement."""
-        self._before_syntax(pass_, PySpace.Location.PASS_PREFIX, p)
+        self._before_syntax(pass_, p)
         p.append("pass")
         self._after_syntax(pass_, p)
         return pass_
@@ -735,29 +730,29 @@ class PythonPrinter:
         - [1:2] - start=1, stop=2
         - [1:2:3] - start=1, stop=2, step=3
         """
-        self._before_syntax(slice_, PySpace.Location.SLICE_PREFIX, p)
+        self._before_syntax(slice_, p)
 
         # Start value (before first colon)
         if slice_.padding.start is not None:
-            self._visit_right_padded(slice_.padding.start, PyRightPadded.Location.SLICE_START, p)
+            self._visit_right_padded(slice_.padding.start, p)
 
         p.append(':')
 
         # Stop value (after first colon)
         if slice_.padding.stop is not None:
-            self._visit_right_padded(slice_.padding.stop, PyRightPadded.Location.SLICE_STOP, p)
+            self._visit_right_padded(slice_.padding.stop, p)
 
         # Step value (after second colon)
         if slice_.padding.step is not None:
             p.append(':')
-            self._visit_right_padded(slice_.padding.step, PyRightPadded.Location.SLICE_STEP, p)
+            self._visit_right_padded(slice_.padding.step, p)
 
         return slice_
 
     def visit_special_parameter(self, param: 'py.SpecialParameter', p: PrintOutputCapture) -> J:
         """Visit a special parameter (*args or **kwargs)."""
         from rewrite.python.tree import SpecialParameter
-        self._before_syntax(param, PySpace.Location.SPECIAL_PARAMETER_PREFIX, p)
+        self._before_syntax(param, p)
         if param.kind == SpecialParameter.Kind.ARGS:
             p.append("*")
         elif param.kind == SpecialParameter.Kind.KWARGS:
@@ -768,7 +763,7 @@ class PythonPrinter:
     def visit_star(self, star: 'py.Star', p: PrintOutputCapture) -> J:
         """Visit a star expression."""
         from rewrite.python.tree import Star
-        self._before_syntax(star, PySpace.Location.STAR_PREFIX, p)
+        self._before_syntax(star, p)
         if star.kind == Star.Kind.LIST:
             p.append("*")
         elif star.kind == Star.Kind.DICT:
@@ -791,10 +786,10 @@ class PythonPrinter:
     def visit_trailing_else_wrapper(self, wrapper: 'py.TrailingElseWrapper', p: PrintOutputCapture) -> J:
         """Visit a trailing else wrapper."""
         from rewrite.java.tree import Try
-        self._before_syntax(wrapper, PySpace.Location.TRAILING_ELSE_WRAPPER_PREFIX, p)
+        self._before_syntax(wrapper, p)
         self.visit(wrapper.statement, p)
         if not isinstance(wrapper.statement, Try):
-            self._visit_space(wrapper.padding.else_block.before, Space.Location.ELSE_PREFIX, p)
+            self._visit_space(wrapper.padding.else_block.before, p)
             p.append("else")
             self.visit(wrapper.else_block, p)
         self._after_syntax(wrapper, p)
@@ -802,19 +797,19 @@ class PythonPrinter:
 
     def visit_type_alias(self, alias: 'py.TypeAlias', p: PrintOutputCapture) -> J:
         """Visit a type alias."""
-        self._before_syntax(alias, PySpace.Location.UNION_TYPE_PREFIX, p)
+        self._before_syntax(alias, p)
         p.append("type")
         self.visit(alias.name, p)
         # Visit type parameters (Python 3.12+ PEP 695)
-        self._visit_container("[", alias.padding.type_parameters, JContainer.Location.TYPE_PARAMETERS, ",", "]", p)
-        self._visit_left_padded("=", alias.padding.value, PyLeftPadded.Location.TYPE_ALIAS_VALUE, p)
+        self._visit_container("[", alias.padding.type_parameters, ",", "]", p)
+        self._visit_left_padded("=", alias.padding.value, p)
         self._after_syntax(alias, p)
         return alias
 
     def visit_type_hint(self, hint: 'py.TypeHint', p: PrintOutputCapture) -> J:
         """Visit a type hint."""
         from rewrite.java.tree import MethodDeclaration
-        self._before_syntax(hint, PySpace.Location.TYPE_HINT_PREFIX, p)
+        self._before_syntax(hint, p)
         parent = self.get_cursor().parent
         if parent and isinstance(parent.value, MethodDeclaration):
             p.append("->")
@@ -826,7 +821,7 @@ class PythonPrinter:
 
     def visit_type_hinted_expression(self, expr: 'py.TypeHintedExpression', p: PrintOutputCapture) -> J:
         """Visit a type-hinted expression."""
-        self._before_syntax(expr, PySpace.Location.TYPE_HINTED_EXPRESSION_PREFIX, p)
+        self._before_syntax(expr, p)
         self.visit(expr.expression, p)
         self.visit(expr.type_hint, p)
         self._after_syntax(expr, p)
@@ -834,25 +829,25 @@ class PythonPrinter:
 
     def visit_union_type(self, union: 'py.UnionType', p: PrintOutputCapture) -> J:
         """Visit a union type."""
-        self._before_syntax(union, PySpace.Location.UNION_TYPE_PREFIX, p)
-        self._visit_right_padded_list(union.padding.types, PyRightPadded.Location.UNION_TYPE_TYPES, "|", p)
+        self._before_syntax(union, p)
+        self._visit_right_padded_list(union.padding.types, "|", p)
         self._after_syntax(union, p)
         return union
 
     def visit_variable_scope(self, scope: 'py.VariableScope', p: PrintOutputCapture) -> J:
         """Visit a variable scope statement (global/nonlocal)."""
         from rewrite.python.tree import VariableScope
-        self._before_syntax(scope, PySpace.Location.VARIABLE_SCOPE_PREFIX, p)
+        self._before_syntax(scope, p)
         if scope.kind == VariableScope.Kind.GLOBAL:
             p.append("global")
         elif scope.kind == VariableScope.Kind.NONLOCAL:
             p.append("nonlocal")
-        self._visit_right_padded_list(scope.padding.names, PyRightPadded.Location.VARIABLE_SCOPE_NAMES, ",", p)
+        self._visit_right_padded_list(scope.padding.names, ",", p)
         return scope
 
     def visit_yield_from(self, yield_: 'py.YieldFrom', p: PrintOutputCapture) -> J:
         """Visit a yield from expression."""
-        self._before_syntax(yield_, PySpace.Location.YIELD_FROM_PREFIX, p)
+        self._before_syntax(yield_, p)
         p.append("from")
         self.visit(yield_.expression, p)
         return yield_
@@ -1004,7 +999,7 @@ class PythonJavaPrinter:
     def _java_marker_wrapper(self, out: str) -> str:
         return f"/*~~{out}{'~~' if out else ''}>*/"
 
-    def _before_syntax(self, tree: J, loc: Optional[Any], p: PrintOutputCapture) -> None:
+    def _before_syntax(self, tree: J, p: PrintOutputCapture) -> None:
         """Handle marker printing and space before syntax."""
         prefix = tree.prefix
         markers = tree.markers
@@ -1014,9 +1009,7 @@ class PythonJavaPrinter:
                 marker, Cursor(self.get_cursor(), marker), self._java_marker_wrapper
             ))
 
-        if loc is not None:
-            self._visit_space(prefix, loc, p)
-
+        self._visit_space(prefix, p)
         self._visit_markers(markers, p)
 
         for marker in markers.markers:
@@ -1032,7 +1025,7 @@ class PythonJavaPrinter:
                 marker, Cursor(self.get_cursor(), marker), self._java_marker_wrapper
             ))
 
-    def _visit_space(self, space: Optional[Space], loc: Any, p: PrintOutputCapture) -> Space:
+    def _visit_space(self, space: Optional[Space], p: PrintOutputCapture) -> Space:
         """Visit whitespace and comments.
 
         Space structure:
@@ -1083,13 +1076,13 @@ class PythonJavaPrinter:
             p.append(';')
         elif isinstance(marker, TrailingComma):
             p.append(',')
-            self._visit_space(marker.suffix, Space.Location.LANGUAGE_EXTENSION, p)
+            self._visit_space(marker.suffix, p)
         return marker
 
-    def _visit_right_padded(self, padded: JRightPadded, loc: Any, p: PrintOutputCapture, suffix: str = "") -> None:
+    def _visit_right_padded(self, padded: JRightPadded, p: PrintOutputCapture, suffix: str = "") -> None:
         """Visit a right-padded element."""
         self.visit(padded.element, p)
-        self._visit_space(padded.after, loc, p)
+        self._visit_space(padded.after, p)
         self._visit_markers(padded.markers, p)
         if suffix:
             p.append(suffix)
@@ -1097,21 +1090,20 @@ class PythonJavaPrinter:
     def _visit_right_padded_list(
         self,
         nodes: List[JRightPadded],
-        loc: Any,
         suffix_between: str,
         p: PrintOutputCapture
     ) -> None:
         """Visit a list of right-padded elements."""
         for i, node in enumerate(nodes):
             self.visit(node.element, p)
-            self._visit_space(node.after, loc, p)
+            self._visit_space(node.after, p)
             self._visit_markers(node.markers, p)
             if i < len(nodes) - 1:
                 p.append(suffix_between)
 
-    def _visit_left_padded(self, prefix: str, padded: JLeftPadded, loc: Any, p: PrintOutputCapture) -> None:
+    def _visit_left_padded(self, prefix: str, padded: JLeftPadded, p: PrintOutputCapture) -> None:
         """Visit a left-padded element."""
-        self._visit_space(padded.before, loc, p)
+        self._visit_space(padded.before, p)
         p.append(prefix)
         self.visit(padded.element, p)
         self._visit_markers(padded.markers, p)
@@ -1120,7 +1112,6 @@ class PythonJavaPrinter:
         self,
         before: str,
         container: Optional[JContainer],
-        loc: Any,
         suffix_between: str,
         after: Optional[str],
         p: PrintOutputCapture
@@ -1128,17 +1119,17 @@ class PythonJavaPrinter:
         """Visit a container of elements."""
         if container is None:
             return
-        self._visit_space(container.before, loc, p)
+        self._visit_space(container.before, p)
         p.append(before)
-        self._visit_right_padded_list(container.padding.elements, loc, suffix_between, p)
+        self._visit_right_padded_list(container.padding.elements, suffix_between, p)
         if after:
             p.append(after)
 
-    def _visit_statements(self, statements: List[JRightPadded], loc: Any, p: PrintOutputCapture) -> None:
+    def _visit_statements(self, statements: List[JRightPadded], p: PrintOutputCapture) -> None:
         """Visit a list of statements."""
         for stmt in statements:
             self.visit(stmt.element, p)
-            self._visit_space(stmt.after, loc, p)
+            self._visit_space(stmt.after, p)
             # Handle statement markers like Semicolon
             for marker in stmt.markers.markers:
                 self._visit_marker(marker, p)
@@ -1149,16 +1140,16 @@ class PythonJavaPrinter:
 
     def visit_annotation(self, annotation: 'j.Annotation', p: PrintOutputCapture) -> J:
         """Visit an annotation (decorator in Python)."""
-        self._before_syntax(annotation, Space.Location.ANNOTATION_PREFIX, p)
+        self._before_syntax(annotation, p)
         p.append("@")
         self.visit(annotation.annotation_type, p)
-        self._visit_container("(", annotation.padding.arguments, JContainer.Location.ANNOTATION_ARGUMENTS, ",", ")", p)
+        self._visit_container("(", annotation.padding.arguments, ",", ")", p)
         self._after_syntax(annotation, p)
         return annotation
 
     def visit_array_access(self, access: 'j.ArrayAccess', p: PrintOutputCapture) -> J:
         """Visit an array access (subscript in Python)."""
-        self._before_syntax(access, Space.Location.ARRAY_ACCESS_PREFIX, p)
+        self._before_syntax(access, p)
         self.visit(access.indexed, p)
         self.visit(access.dimension, p)
         self._after_syntax(access, p)
@@ -1166,19 +1157,19 @@ class PythonJavaPrinter:
 
     def visit_array_dimension(self, dimension: 'j.ArrayDimension', p: PrintOutputCapture) -> J:
         """Visit an array dimension."""
-        self._before_syntax(dimension, Space.Location.DIMENSION_PREFIX, p)
+        self._before_syntax(dimension, p)
         p.append("[")
-        self._visit_right_padded(dimension.padding.index, JRightPadded.Location.ARRAY_INDEX, p, "]")
+        self._visit_right_padded(dimension.padding.index, p, "]")
         self._after_syntax(dimension, p)
         return dimension
 
     def visit_assert(self, assert_: 'j.Assert', p: PrintOutputCapture) -> J:
         """Visit an assert statement."""
-        self._before_syntax(assert_, Space.Location.ASSERT_PREFIX, p)
+        self._before_syntax(assert_, p)
         p.append("assert")
         self.visit(assert_.condition, p)
         if assert_.detail is not None:
-            self._visit_left_padded(",", assert_.detail, JLeftPadded.Location.ASSERT_DETAIL, p)
+            self._visit_left_padded(",", assert_.detail, p)
         self._after_syntax(assert_, p)
         return assert_
 
@@ -1201,9 +1192,9 @@ class PythonJavaPrinter:
 
         symbol = "=" if is_regular_assignment else ":="
 
-        self._before_syntax(assignment, Space.Location.ASSIGNMENT_PREFIX, p)
+        self._before_syntax(assignment, p)
         self.visit(assignment.variable, p)
-        self._visit_left_padded(symbol, assignment.padding.assignment, JLeftPadded.Location.ASSIGNMENT, p)
+        self._visit_left_padded(symbol, assignment.padding.assignment, p)
         self._after_syntax(assignment, p)
         return assignment
 
@@ -1230,9 +1221,9 @@ class PythonJavaPrinter:
 
         keyword = op_map.get(assign_op.operator, "")
 
-        self._before_syntax(assign_op, Space.Location.ASSIGNMENT_OPERATION_PREFIX, p)
+        self._before_syntax(assign_op, p)
         self.visit(assign_op.variable, p)
-        self._visit_space(assign_op.padding.operator.before, Space.Location.ASSIGNMENT_OPERATION_OPERATOR, p)
+        self._visit_space(assign_op.padding.operator.before, p)
         p.append(keyword)
         self.visit(assign_op.assignment, p)
         self._after_syntax(assign_op, p)
@@ -1266,9 +1257,9 @@ class PythonJavaPrinter:
 
         keyword = op_map.get(binary.operator, "")
 
-        self._before_syntax(binary, Space.Location.BINARY_PREFIX, p)
+        self._before_syntax(binary, p)
         self.visit(binary.left, p)
-        self._visit_space(binary.padding.operator.before, Space.Location.BINARY_OPERATOR, p)
+        self._visit_space(binary.padding.operator.before, p)
         p.append(keyword)
         self.visit(binary.right, p)
         self._after_syntax(binary, p)
@@ -1276,16 +1267,16 @@ class PythonJavaPrinter:
 
     def visit_block(self, block: 'j.Block', p: PrintOutputCapture) -> J:
         """Visit a block (indented suite in Python)."""
-        self._before_syntax(block, Space.Location.BLOCK_PREFIX, p)
+        self._before_syntax(block, p)
         p.append(':')
-        self._visit_statements(block.padding.statements, JRightPadded.Location.BLOCK_STATEMENT, p)
-        self._visit_space(block.end, Space.Location.BLOCK_END, p)
+        self._visit_statements(block.padding.statements, p)
+        self._visit_space(block.end, p)
         self._after_syntax(block, p)
         return block
 
     def visit_break(self, break_: 'j.Break', p: PrintOutputCapture) -> J:
         """Visit a break statement."""
-        self._before_syntax(break_, Space.Location.BREAK_PREFIX, p)
+        self._before_syntax(break_, p)
         p.append("break")
         self._after_syntax(break_, p)
         return break_
@@ -1293,17 +1284,17 @@ class PythonJavaPrinter:
     def visit_case(self, case: 'j.Case', p: PrintOutputCapture) -> J:
         """Visit a case (match case in Python)."""
         from rewrite.java import tree as j
-        self._before_syntax(case, Space.Location.CASE_PREFIX, p)
+        self._before_syntax(case, p)
         elem = case.case_labels[0] if case.case_labels else None
         if not (isinstance(elem, j.Identifier) and elem.simple_name == "default"):
             p.append("case")
-        self._visit_container("", case.padding.case_labels, JContainer.Location.CASE_EXPRESSION, ",", "", p)
-        self._visit_space(case.padding.statements.before, Space.Location.CASE, p)
-        self._visit_statements(case.padding.statements.padding.elements, JRightPadded.Location.CASE, p)
+        self._visit_container("", case.padding.case_labels, ",", "", p)
+        self._visit_space(case.padding.statements.before, p)
+        self._visit_statements(case.padding.statements.padding.elements, p)
         if case.body and isinstance(case.body, Statement):
-            self._visit_right_padded(case.padding.body, JRightPadded.Location.LANGUAGE_EXTENSION, p)
+            self._visit_right_padded(case.padding.body, p)
         elif case.body:
-            self._visit_right_padded(case.padding.body, JRightPadded.Location.CASE_BODY, p, ";")
+            self._visit_right_padded(case.padding.body, p, ";")
         self._after_syntax(case, p)
         return case
 
@@ -1311,18 +1302,18 @@ class PythonJavaPrinter:
         """Visit a catch clause (except in Python)."""
         from rewrite.java import tree as j
 
-        self._before_syntax(catch, Space.Location.CATCH_PREFIX, p)
+        self._before_syntax(catch, p)
         p.append("except")
 
         multi_variable = catch.parameter.tree
-        self._before_syntax(multi_variable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p)
+        self._before_syntax(multi_variable, p)
         self.visit(multi_variable.type_expression, p)
 
         for padded_variable in multi_variable.padding.variables:
             variable = padded_variable.element
             if variable.name.simple_name:
-                self._visit_space(padded_variable.after, Space.Location.LANGUAGE_EXTENSION, p)
-                self._before_syntax(variable, Space.Location.VARIABLE_PREFIX, p)
+                self._visit_space(padded_variable.after, p)
+                self._before_syntax(variable, p)
                 p.append("as")
                 self.visit(variable.name, p)
                 self._after_syntax(variable, p)
@@ -1334,8 +1325,8 @@ class PythonJavaPrinter:
 
     def visit_class_declaration(self, class_decl: 'j.ClassDeclaration', p: PrintOutputCapture) -> J:
         """Visit a class declaration."""
-        self._before_syntax(class_decl, Space.Location.CLASS_DECLARATION_PREFIX, p)
-        self._visit_space(Space.EMPTY, Space.Location.ANNOTATIONS, p)
+        self._before_syntax(class_decl, p)
+        self._visit_space(Space.EMPTY, p)
 
         # Visit leading annotations (decorators)
         for annotation in class_decl.leading_annotations:
@@ -1346,19 +1337,19 @@ class PythonJavaPrinter:
             for annotation in class_decl.padding.kind.annotations:
                 self.visit(annotation, p)
 
-        self._visit_space(class_decl.padding.kind.prefix, Space.Location.CLASS_KIND, p)
+        self._visit_space(class_decl.padding.kind.prefix, p)
         p.append("class")
         self.visit(class_decl.name, p)
 
         # Visit type parameters (Python 3.12+)
-        self._visit_container("[", class_decl.padding.type_parameters, JContainer.Location.TYPE_PARAMETERS, ",", "]", p)
+        self._visit_container("[", class_decl.padding.type_parameters, ",", "]", p)
 
         # Visit implements (base classes in Python)
         if class_decl.padding.implements:
             omit_parens = class_decl.padding.implements.markers.find_first(OmitParentheses)
             before = "" if omit_parens else "("
             after = "" if omit_parens else ")"
-            self._visit_container(before, class_decl.padding.implements, JContainer.Location.IMPLEMENTS, ",", after, p)
+            self._visit_container(before, class_decl.padding.implements, ",", after, p)
 
         self.visit(class_decl.body, p)
         self._after_syntax(class_decl, p)
@@ -1366,15 +1357,15 @@ class PythonJavaPrinter:
 
     def visit_continue(self, continue_: 'j.Continue', p: PrintOutputCapture) -> J:
         """Visit a continue statement."""
-        self._before_syntax(continue_, Space.Location.CONTINUE_PREFIX, p)
+        self._before_syntax(continue_, p)
         p.append("continue")
         self._after_syntax(continue_, p)
         return continue_
 
     def visit_control_parentheses(self, control_parens: 'j.ControlParentheses', p: PrintOutputCapture) -> J:
         """Visit control parentheses (condition in if/while)."""
-        self._before_syntax(control_parens, Space.Location.CONTROL_PARENTHESES_PREFIX, p)
-        self._visit_right_padded(control_parens.padding.tree, JRightPadded.Location.PARENTHESES, p)
+        self._before_syntax(control_parens, p)
+        self._visit_right_padded(control_parens.padding.tree, p)
         self._after_syntax(control_parens, p)
         return control_parens
 
@@ -1382,7 +1373,7 @@ class PythonJavaPrinter:
         """Visit an else clause."""
         from rewrite.java import tree as j
 
-        self._before_syntax(else_, Space.Location.ELSE_PREFIX, p)
+        self._before_syntax(else_, p)
         parent = self.get_cursor().parent
         parent_value = parent.value if parent else None
 
@@ -1406,30 +1397,30 @@ class PythonJavaPrinter:
 
     def visit_empty(self, empty: 'j.Empty', p: PrintOutputCapture) -> J:
         """Visit an empty element."""
-        self._before_syntax(empty, Space.Location.EMPTY_PREFIX, p)
+        self._before_syntax(empty, p)
         self._after_syntax(empty, p)
         return empty
 
     def visit_field_access(self, field_access: 'j.FieldAccess', p: PrintOutputCapture) -> J:
         """Visit a field access (attribute access in Python)."""
-        self._before_syntax(field_access, Space.Location.FIELD_ACCESS_PREFIX, p)
+        self._before_syntax(field_access, p)
         self.visit(field_access.target, p)
-        self._visit_left_padded(".", field_access.padding.name, JLeftPadded.Location.FIELD_ACCESS_NAME, p)
+        self._visit_left_padded(".", field_access.padding.name, p)
         self._after_syntax(field_access, p)
         return field_access
 
     def visit_for_each_control(self, control: 'j.ForEachLoop.Control', p: PrintOutputCapture) -> J:
         """Visit for-each control (for-in in Python)."""
-        self._before_syntax(control, Space.Location.FOR_EACH_CONTROL_PREFIX, p)
-        self._visit_right_padded(control.padding.variable, JRightPadded.Location.FOREACH_VARIABLE, p)
+        self._before_syntax(control, p)
+        self._visit_right_padded(control.padding.variable, p)
         p.append("in")
-        self._visit_right_padded(control.padding.iterable, JRightPadded.Location.FOREACH_ITERABLE, p)
+        self._visit_right_padded(control.padding.iterable, p)
         self._after_syntax(control, p)
         return control
 
     def visit_for_each_loop(self, for_loop: 'j.ForEachLoop', p: PrintOutputCapture) -> J:
         """Visit a for-each loop."""
-        self._before_syntax(for_loop, Space.Location.FOR_EACH_LOOP_PREFIX, p)
+        self._before_syntax(for_loop, p)
         p.append("for")
         self.visit(for_loop.control, p)
         self.visit(for_loop.body, p)
@@ -1438,7 +1429,7 @@ class PythonJavaPrinter:
 
     def visit_identifier(self, ident: 'j.Identifier', p: PrintOutputCapture) -> J:
         """Visit an identifier."""
-        self._before_syntax(ident, Space.Location.IDENTIFIER_PREFIX, p)
+        self._before_syntax(ident, p)
         quoted = ident.markers.find_first(Quoted)
         if quoted:
             p.append(quoted.style.quote)
@@ -1452,7 +1443,7 @@ class PythonJavaPrinter:
         """Visit an if statement."""
         from rewrite.java import tree as j
 
-        self._before_syntax(if_, Space.Location.IF_PREFIX, p)
+        self._before_syntax(if_, p)
         p.append("if")
         self.visit(if_.if_condition, p)
 
@@ -1460,7 +1451,7 @@ class PythonJavaPrinter:
         if not isinstance(then_part.element, j.Block):
             p.append(":")
 
-        self._visit_right_padded(then_part, JRightPadded.Location.IF_THEN, p)
+        self._visit_right_padded(then_part, p)
         self.visit(if_.else_part, p)
         self._after_syntax(if_, p)
         return if_
@@ -1469,7 +1460,7 @@ class PythonJavaPrinter:
         """Visit an import statement."""
         from rewrite.java import tree as j
 
-        self._before_syntax(import_, Space.Location.IMPORT_PREFIX, p)
+        self._before_syntax(import_, p)
 
         if isinstance(import_.qualid.target, j.Empty):
             self.visit(import_.qualid.name, p)
@@ -1477,19 +1468,19 @@ class PythonJavaPrinter:
             self.visit(import_.qualid, p)
 
         if import_.padding.alias:
-            self._visit_left_padded("as", import_.padding.alias, JLeftPadded.Location.IMPORT_ALIAS_PREFIX, p)
+            self._visit_left_padded("as", import_.padding.alias, p)
 
         self._after_syntax(import_, p)
         return import_
 
     def visit_lambda(self, lambda_: 'j.Lambda', p: PrintOutputCapture) -> J:
         """Visit a lambda expression."""
-        self._before_syntax(lambda_, Space.Location.LAMBDA_PREFIX, p)
+        self._before_syntax(lambda_, p)
         p.append("lambda")
-        self._visit_space(lambda_.parameters.prefix, Space.Location.LAMBDA_PARAMETERS_PREFIX, p)
+        self._visit_space(lambda_.parameters.prefix, p)
         self._visit_markers(lambda_.parameters.markers, p)
-        self._visit_right_padded_list(lambda_.parameters.padding.parameters, JRightPadded.Location.LAMBDA_PARAM, ",", p)
-        self._visit_space(lambda_.arrow, Space.Location.LAMBDA_ARROW_PREFIX, p)
+        self._visit_right_padded_list(lambda_.parameters.padding.parameters, ",", p)
+        self._visit_space(lambda_.arrow, p)
         p.append(":")
         self.visit(lambda_.body, p)
         self._after_syntax(lambda_, p)
@@ -1502,7 +1493,7 @@ class PythonJavaPrinter:
         if literal.value is None and value_source is None:
             value_source = "None"
 
-        self._before_syntax(literal, Space.Location.LITERAL_PREFIX, p)
+        self._before_syntax(literal, p)
 
         unicode_escapes = literal.unicode_escapes
         if unicode_escapes is None:
@@ -1529,8 +1520,8 @@ class PythonJavaPrinter:
 
     def visit_method_declaration(self, method: 'j.MethodDeclaration', p: PrintOutputCapture) -> J:
         """Visit a method declaration (function definition in Python)."""
-        self._before_syntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p)
-        self._visit_space(Space.EMPTY, Space.Location.ANNOTATIONS, p)
+        self._before_syntax(method, p)
+        self._visit_space(Space.EMPTY, p)
 
         # Visit leading annotations (decorators)
         for annotation in method.leading_annotations:
@@ -1542,8 +1533,8 @@ class PythonJavaPrinter:
 
         self.visit(method.name, p)
         # Visit type parameters (Python 3.12+)
-        self._visit_container("[", method.padding.type_parameters, JContainer.Location.TYPE_PARAMETERS, ",", "]", p)
-        self._visit_container("(", method.padding.parameters, JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p)
+        self._visit_container("[", method.padding.type_parameters, ",", "]", p)
+        self._visit_container("(", method.padding.parameters, ",", ")", p)
         self.visit(method.return_type_expression, p)
         self.visit(method.body, p)
         self._after_syntax(method, p)
@@ -1551,15 +1542,15 @@ class PythonJavaPrinter:
 
     def visit_method_invocation(self, method: 'j.MethodInvocation', p: PrintOutputCapture) -> J:
         """Visit a method invocation (function call)."""
-        self._before_syntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p)
+        self._before_syntax(method, p)
 
         # Visit select with appropriate separator
         if method.padding.select:
             suffix = "" if not method.name.simple_name else "."
-            self._visit_right_padded(method.padding.select, JRightPadded.Location.METHOD_SELECT, p, suffix)
+            self._visit_right_padded(method.padding.select, p, suffix)
 
         # Visit type parameters
-        self._visit_container("<", method.padding.type_parameters, JContainer.Location.TYPE_PARAMETERS, ",", ">", p)
+        self._visit_container("<", method.padding.type_parameters, ",", ">", p)
 
         self.visit(method.name, p)
 
@@ -1569,7 +1560,7 @@ class PythonJavaPrinter:
         if method.markers.find_first(OmitParentheses):
             before = ""
             after = ""
-        self._visit_container(before, method.padding.arguments, JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", after, p)
+        self._visit_container(before, method.padding.arguments, ",", after, p)
 
         self._after_syntax(method, p)
         return method
@@ -1590,7 +1581,7 @@ class PythonJavaPrinter:
         if keyword:
             for annotation in mod.annotations:
                 self.visit(annotation, p)
-            self._before_syntax(mod, Space.Location.MODIFIER_PREFIX, p)
+            self._before_syntax(mod, p)
             p.append(keyword)
             self._after_syntax(mod, p)
 
@@ -1598,30 +1589,30 @@ class PythonJavaPrinter:
 
     def visit_new_array(self, new_array: 'j.NewArray', p: PrintOutputCapture) -> J:
         """Visit a new array (list literal in Python)."""
-        self._before_syntax(new_array, Space.Location.NEW_ARRAY_PREFIX, p)
-        self._visit_container("[", new_array.padding.initializer, JContainer.Location.NEW_ARRAY_INITIALIZER, ",", "]", p)
+        self._before_syntax(new_array, p)
+        self._visit_container("[", new_array.padding.initializer, ",", "]", p)
         self._after_syntax(new_array, p)
         return new_array
 
     def visit_parameterized_type(self, type_: 'j.ParameterizedType', p: PrintOutputCapture) -> J:
         """Visit a parameterized type (generic type in Python)."""
-        self._before_syntax(type_, Space.Location.PARAMETERIZED_TYPE_PREFIX, p)
+        self._before_syntax(type_, p)
         self.visit(type_.clazz, p)
-        self._visit_container("[", type_.padding.type_parameters, JContainer.Location.TYPE_PARAMETERS, ",", "]", p)
+        self._visit_container("[", type_.padding.type_parameters, ",", "]", p)
         self._after_syntax(type_, p)
         return type_
 
     def visit_parentheses(self, parens: 'j.Parentheses', p: PrintOutputCapture) -> J:
         """Visit parentheses."""
-        self._before_syntax(parens, Space.Location.PARENTHESES_PREFIX, p)
+        self._before_syntax(parens, p)
         p.append("(")
-        self._visit_right_padded(parens.padding.tree, JRightPadded.Location.PARENTHESES, p, ")")
+        self._visit_right_padded(parens.padding.tree, p, ")")
         self._after_syntax(parens, p)
         return parens
 
     def visit_return(self, return_: 'j.Return', p: PrintOutputCapture) -> J:
         """Visit a return statement."""
-        self._before_syntax(return_, Space.Location.RETURN_PREFIX, p)
+        self._before_syntax(return_, p)
         p.append("return")
         self.visit(return_.expression, p)
         self._after_syntax(return_, p)
@@ -1629,7 +1620,7 @@ class PythonJavaPrinter:
 
     def visit_switch(self, switch: 'j.Switch', p: PrintOutputCapture) -> J:
         """Visit a switch statement (match in Python)."""
-        self._before_syntax(switch, Space.Location.SWITCH_PREFIX, p)
+        self._before_syntax(switch, p)
         p.append("match")
         self.visit(switch.selector, p)
         self.visit(switch.cases, p)
@@ -1638,18 +1629,18 @@ class PythonJavaPrinter:
 
     def visit_ternary(self, ternary: 'j.Ternary', p: PrintOutputCapture) -> J:
         """Visit a ternary expression (conditional expression in Python)."""
-        self._before_syntax(ternary, Space.Location.TERNARY_PREFIX, p)
+        self._before_syntax(ternary, p)
         self.visit(ternary.true_part, p)
-        self._visit_space(ternary.padding.true_part.before, Space.Location.TERNARY_TRUE, p)
+        self._visit_space(ternary.padding.true_part.before, p)
         p.append("if")
         self.visit(ternary.condition, p)
-        self._visit_left_padded("else", ternary.padding.false_part, JLeftPadded.Location.TERNARY_FALSE, p)
+        self._visit_left_padded("else", ternary.padding.false_part, p)
         self._after_syntax(ternary, p)
         return ternary
 
     def visit_throw(self, throw: 'j.Throw', p: PrintOutputCapture) -> J:
         """Visit a throw statement (raise in Python)."""
-        self._before_syntax(throw, Space.Location.THROW_PREFIX, p)
+        self._before_syntax(throw, p)
         p.append("raise")
         self.visit(throw.exception, p)
         self._after_syntax(throw, p)
@@ -1657,13 +1648,13 @@ class PythonJavaPrinter:
 
     def visit_type_parameter(self, type_param: 'j.TypeParameter', p: PrintOutputCapture) -> J:
         """Visit a type parameter (Python 3.12+ PEP 695)."""
-        self._before_syntax(type_param, Space.Location.TYPE_PARAMETERS_PREFIX, p)
+        self._before_syntax(type_param, p)
         # Visit modifiers (for * and ** prefixes)
         for mod in type_param.modifiers:
             self.visit(mod, p)
         self.visit(type_param.name, p)
         # Visit bounds (for T: int style bounds in Python)
-        self._visit_container(":", type_param.padding.bounds, JContainer.Location.TYPE_BOUNDS, ",", "", p)
+        self._visit_container(":", type_param.padding.bounds, ",", "", p)
         self._after_syntax(type_param, p)
         return type_param
 
@@ -1674,7 +1665,7 @@ class PythonJavaPrinter:
 
         is_with_statement = try_.resources and len(try_.resources) > 0
 
-        self._before_syntax(try_, Space.Location.TRY_PREFIX, p)
+        self._before_syntax(try_, p)
         if is_with_statement:
             p.append("with")
         else:
@@ -1682,7 +1673,7 @@ class PythonJavaPrinter:
 
         resources = try_.padding.resources
         if is_with_statement and resources:
-            self._visit_space(resources.before, Space.Location.TRY_RESOURCES, p)
+            self._visit_space(resources.before, p)
             omit_parens = resources.markers.find_first(OmitParentheses)
             if not omit_parens:
                 p.append("(")
@@ -1694,20 +1685,20 @@ class PythonJavaPrinter:
                 else:
                     first = False
 
-                self._visit_space(resource.element.prefix, Space.Location.TRY_RESOURCE, p)
+                self._visit_space(resource.element.prefix, p)
                 self._visit_markers(resource.element.markers, p)
 
                 decl = resource.element.variable_declarations
                 if isinstance(decl, j.Assignment):
                     self.visit(decl.assignment, p)
                     if not isinstance(decl.variable, j.Empty):
-                        self._visit_space(decl.padding.assignment.before, Space.Location.LANGUAGE_EXTENSION, p)
+                        self._visit_space(decl.padding.assignment.before, p)
                         p.append("as")
                         self.visit(decl.variable, p)
                 else:
                     self.visit(decl, p)
 
-                self._visit_space(resource.after, Space.Location.TRY_RESOURCE_SUFFIX, p)
+                self._visit_space(resource.after, p)
                 self._visit_markers(resource.markers, p)
 
             self._visit_markers(resources.markers, p)
@@ -1726,20 +1717,20 @@ class PythonJavaPrinter:
 
         # Handle else block from TrailingElseWrapper
         if else_wrapper:
-            self._visit_space(else_wrapper.padding.else_block.before, Space.Location.ELSE_PREFIX, p)
+            self._visit_space(else_wrapper.padding.else_block.before, p)
             p.append("else")
             self.visit(else_wrapper.else_block, p)
 
         # Visit finally
         if try_.padding.finally_:
-            self._visit_left_padded("finally", try_.padding.finally_, JLeftPadded.Location.TRY_FINALLY, p)
+            self._visit_left_padded("finally", try_.padding.finally_, p)
 
         self._after_syntax(try_, p)
         return try_
 
     def visit_try_resource(self, resource: 'j.Try.Resource', p: PrintOutputCapture) -> J:
         """Visit a try resource."""
-        self._before_syntax(resource, Space.Location.TRY_RESOURCE, p)
+        self._before_syntax(resource, p)
         self.visit(resource.variable_declarations, p)
         self._after_syntax(resource, p)
         return resource
@@ -1748,7 +1739,7 @@ class PythonJavaPrinter:
         """Visit a unary expression."""
         from rewrite.java.tree import Unary
 
-        self._before_syntax(unary, Space.Location.UNARY_PREFIX, p)
+        self._before_syntax(unary, p)
 
         if unary.operator == Unary.Type.Not:
             p.append("not")
@@ -1767,7 +1758,7 @@ class PythonJavaPrinter:
         """Visit a named variable."""
         from rewrite.python import tree as py
 
-        self._before_syntax(variable, Space.Location.VARIABLE_PREFIX, p)
+        self._before_syntax(variable, p)
 
         parent_cursor = self.get_cursor().parent
         vd = parent_cursor.parent.value if parent_cursor and parent_cursor.parent else None
@@ -1787,25 +1778,25 @@ class PythonJavaPrinter:
             self.visit(variable.initializer, p)
         else:
             if vd and vd.varargs is not None:
-                self._visit_space(vd.varargs, Space.Location.VARARGS, p)
+                self._visit_space(vd.varargs, p)
                 p.append('*')
             if vd and vd.markers.find_first(KeywordArguments):
                 p.append("**")
             self.visit(variable.name, p)
             if type_expr is not None and padding:
-                self._visit_space(padding.after, JRightPadded.Location.NAMED_VARIABLE.after_location, p)
+                self._visit_space(padding.after, p)
                 p.append(':')
                 self.visit(type_expr, p)
             if variable.padding.initializer:
-                self._visit_left_padded("=", variable.padding.initializer, JLeftPadded.Location.VARIABLE_INITIALIZER, p)
+                self._visit_left_padded("=", variable.padding.initializer, p)
 
         self._after_syntax(variable, p)
         return variable
 
     def visit_variable_declarations(self, multi_variable: 'j.VariableDeclarations', p: PrintOutputCapture) -> J:
         """Visit variable declarations."""
-        self._before_syntax(multi_variable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p)
-        self._visit_space(Space.EMPTY, Space.Location.ANNOTATIONS, p)
+        self._before_syntax(multi_variable, p)
+        self._visit_space(Space.EMPTY, p)
 
         # Visit leading annotations
         for annotation in multi_variable.leading_annotations:
@@ -1829,7 +1820,7 @@ class PythonJavaPrinter:
             self._visit_markers(node.markers, p)
             # For keyword-only args marker (bare *), print the after space before comma
             if is_kwonly_marker:
-                self._visit_space(node.after, JRightPadded.Location.NAMED_VARIABLE.after_location, p)
+                self._visit_space(node.after, p)
             if i < len(nodes) - 1:
                 p.append(",")
             # Restore cursor
@@ -1841,7 +1832,7 @@ class PythonJavaPrinter:
 
     def visit_while_loop(self, while_loop: 'j.WhileLoop', p: PrintOutputCapture) -> J:
         """Visit a while loop."""
-        self._before_syntax(while_loop, Space.Location.WHILE_PREFIX, p)
+        self._before_syntax(while_loop, p)
         p.append("while")
         self.visit(while_loop.condition, p)
         self.visit(while_loop.body, p)
@@ -1850,7 +1841,7 @@ class PythonJavaPrinter:
 
     def visit_yield(self, yield_: 'j.Yield', p: PrintOutputCapture) -> J:
         """Visit a yield statement."""
-        self._before_syntax(yield_, Space.Location.YIELD_PREFIX, p)
+        self._before_syntax(yield_, p)
         p.append("yield")
         self.visit(yield_.value, p)
         self._after_syntax(yield_, p)
