@@ -613,4 +613,65 @@ class DeclarativeRecipeTest implements RewriteTest {
         assertThat(recipeC.getRecipeList()).as("Original recipeC should still have D (not mutated)").hasSize(1);
         assertThat(recipeC.getRecipeList().getFirst().getName()).isEqualTo("org.openrewrite.RecipeD");
     }
+
+    @Test
+    void validationFieldsPreservedDuringDeduplication() {
+        DeclarativeRecipe recipeD = new DeclarativeRecipe(
+            "org.openrewrite.RecipeD",
+            "Recipe D",
+            "Test recipe D",
+            emptySet(),
+            null,
+            null,
+            false,
+            emptyList()
+        );
+        recipeD.addUninitialized(new ChangeText("Hello from D"));
+
+        DeclarativeRecipe recipeB = new DeclarativeRecipe(
+            "org.openrewrite.RecipeB",
+            "Recipe B",
+            "Test recipe B",
+            emptySet(),
+            null,
+            null,
+            false,
+            emptyList()
+        );
+        recipeB.addUninitialized(recipeD);
+        recipeB.addValidation(Validated.invalid("test", "value", "Test validation error"));
+
+        DeclarativeRecipe recipeC = new DeclarativeRecipe(
+            "org.openrewrite.RecipeC",
+            "Recipe C",
+            "Test recipe C",
+            emptySet(),
+            null,
+            null,
+            false,
+            emptyList()
+        );
+        recipeC.addUninitialized(recipeD);
+
+        DeclarativeRecipe recipeA = new DeclarativeRecipe(
+            "org.openrewrite.RecipeA",
+            "Recipe A",
+            "Test recipe A",
+            emptySet(),
+            null,
+            null,
+            false,
+            emptyList()
+        );
+        recipeA.addUninitialized(recipeB);
+        recipeA.addUninitialized(recipeC);
+
+        recipeA.initialize(List.of(recipeA, recipeB, recipeC, recipeD));
+
+        assertThat(recipeA.getRecipeList()).as("A should have 2 children").hasSize(2);
+        Recipe aChildB = recipeA.getRecipeList().get(0);
+
+        assertThat(aChildB.validate().failures()).as("B's validation errors should be preserved in deduplicated copy").isNotEmpty();
+        assertThat(aChildB.validate().failures().get(0).getProperty()).isEqualTo("test");
+    }
 }

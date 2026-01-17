@@ -21,6 +21,7 @@ import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 
 import java.net.URI;
 import java.time.Duration;
@@ -84,6 +85,33 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     @JsonIgnore
     private Validated<Object> initValidation = Validated.none();
 
+    private DeclarativeRecipe(
+            String name,
+            @Language("markdown") String displayName,
+            @Language("markdown") @Nullable String description,
+            Set<String> tags,
+            @Nullable Duration estimatedEffortPerOccurrence,
+            URI source,
+            boolean causesAnotherCycle,
+            List<Maintainer> maintainers,
+            List<Recipe> recipeList,
+            List<Recipe> preconditions,
+            Validated<Object> validation,
+            Validated<Object> initValidation) {
+        this.name = name;
+        this.displayName = displayName;
+        this.description = description;
+        this.tags = tags;
+        this.estimatedEffortPerOccurrence = estimatedEffortPerOccurrence;
+        this.source = source;
+        this.causesAnotherCycle = causesAnotherCycle;
+        this.maintainers = maintainers;
+        this.recipeList = recipeList;
+        this.preconditions = preconditions;
+        this.validation = validation;
+        this.initValidation = initValidation;
+    }
+
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
         return estimatedEffortPerOccurrence == null ? Duration.ofMinutes(0) :
@@ -130,8 +158,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                     initialized.add(subRecipe);
                 } else {
                     initValidation = initValidation.and(
-                            invalid(name + ".recipeList" +
-                                            "[" + i + "] (in " + source + ")",
+                            invalid(name + ".recipeList[" + i + "] (in " + source + ")",
                                     recipeFqn,
                                     "recipe '" + recipeFqn + "' does not exist.",
                                     null));
@@ -357,22 +384,18 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     private List<Recipe> deduplicateRecursively(List<Recipe> recipes, Set<String> seen) {
-        List<Recipe> result = new ArrayList<>(recipes.size());
-        for (Recipe recipe : recipes) {
+        return ListUtils.map(recipes, recipe -> {
             if (recipe instanceof DeclarativeRecipe) {
                 DeclarativeRecipe declarativeRecipe = (DeclarativeRecipe) recipe;
                 String recipeName = declarativeRecipe.getName();
                 if (seen.add(recipeName)) {
-                    // Include this recipe with its children deduplicated using the same seen set
-                    result.add(declarativeRecipe.withDeduplication(seen));
+                    return declarativeRecipe.withDeduplication(seen);
                 }
-                // Skip duplicate declarative recipes
-            } else {
-                // Non-declarative recipes are always included
-                result.add(recipe);
+                //noinspection DataFlowIssue
+                return null;
             }
-        }
-        return result;
+            return recipe;
+        });
     }
 
     /**
@@ -384,8 +407,11 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
      */
     DeclarativeRecipe withDeduplication(Set<String> seen) {
         List<Recipe> deduplicatedChildren = deduplicateRecursively(this.recipeList, seen);
+        if (deduplicatedChildren == this.recipeList) {
+            return this;
+        }
 
-        DeclarativeRecipe copy = new DeclarativeRecipe(
+        return new DeclarativeRecipe(
             this.name,
             this.displayName,
             this.description,
@@ -393,15 +419,12 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             this.estimatedEffortPerOccurrence,
             this.source,
             this.causesAnotherCycle,
-            this.maintainers
+            this.maintainers,
+            new ArrayList<>(deduplicatedChildren),
+            new ArrayList<>(this.preconditions),
+            this.validation,
+            this.initValidation
         );
-
-        // Set the deduplicated recipe list
-        copy.setRecipeList(new ArrayList<>(deduplicatedChildren));
-        copy.setPreconditions(new ArrayList<>(this.preconditions));
-        // uninitializedRecipes is already empty (already initialized)
-
-        return copy;
     }
 
     private TreeVisitor<?, ExecutionContext> orVisitors(Recipe recipe) {
@@ -489,8 +512,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             validated = validated.and(Validated.invalid("initialization", preconditions, "DeclarativeRecipe must not contain uninitialized preconditions. Be sure to call .initialize() on DeclarativeRecipe."));
         }
 
-        return validated.and(validation)
-                .and(initValidation == null ? Validated.none() : initValidation);
+        return validated.and(validation).and(initValidation);
     }
 
     @Value
