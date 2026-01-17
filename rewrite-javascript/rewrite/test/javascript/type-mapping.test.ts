@@ -1403,7 +1403,7 @@ describe('JavaScript type mapping', () => {
                                 const fa = paramType.class as J.FieldAccess;
                                 const targetName = fa.target.kind === J.Kind.Identifier ?
                                     (fa.target as J.Identifier).simpleName : '';
-                                const fieldName = fa.name.element.simpleName;
+                                const fieldName = fa.name.simpleName;
 
                                 if (targetName === 'React' && fieldName === 'Ref') {
                                     reactRefType = paramType.type;

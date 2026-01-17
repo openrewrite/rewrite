@@ -200,11 +200,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         let hasCommonJSRequires = false;
 
         for (const stmt of compilationUnit.statements) {
-            const statement = stmt.element;
-
             // Check for ES6 imports
-            if (statement?.kind === JS.Kind.Import) {
-                const jsImport = statement as JS.Import;
+            if (stmt?.kind === JS.Kind.Import) {
+                const jsImport = stmt as JS.Import & J.RightPaddingMixin;
                 const importClause = jsImport.importClause;
 
                 if (importClause) {
@@ -227,13 +225,15 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
 
             // Check for CommonJS requires
-            if (statement?.kind === J.Kind.VariableDeclarations) {
-                const varDecl = statement as J.VariableDeclarations;
+            if (stmt?.kind === J.Kind.VariableDeclarations) {
+                const varDecl = stmt as J.VariableDeclarations & J.RightPaddingMixin;
                 if (varDecl.variables.length === 1) {
-                    const namedVar = varDecl.variables[0].element;
-                    const initializer = namedVar?.initializer?.element;
+                    // With intersection types, the variable IS the NamedVariable with padding mixed in
+                    const namedVar = varDecl.variables[0];
+                    // initializer IS the expression with padding mixed in
+                    const initializer = namedVar?.initializer;
                     if (initializer?.kind === J.Kind.MethodInvocation &&
-                        this.isRequireCall(initializer as J.MethodInvocation)) {
+                        this.isRequireCall(initializer as J.MethodInvocation & J.LeftPaddingMixin)) {
                         hasCommonJSRequires = true;
                     }
                 }
@@ -277,12 +277,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      */
     private findExistingImportStyleForModule(compilationUnit: JS.CompilationUnit): ImportStyle | null {
         for (const stmt of compilationUnit.statements) {
-            const statement = stmt.element;
-
             // Check ES6 imports
-            if (statement?.kind === JS.Kind.Import) {
-                const jsImport = statement as JS.Import;
-                const moduleSpecifier = jsImport.moduleSpecifier?.element;
+            if (stmt?.kind === JS.Kind.Import) {
+                const jsImport = stmt as JS.Import & J.RightPaddingMixin;
+                // moduleSpecifier IS the literal with padding mixed in
+                const moduleSpecifier = jsImport.moduleSpecifier;
 
                 if (moduleSpecifier) {
                     const moduleName = this.getModuleName(moduleSpecifier);
@@ -304,15 +303,17 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
 
             // Check CommonJS requires
-            if (statement?.kind === J.Kind.VariableDeclarations) {
-                const varDecl = statement as J.VariableDeclarations;
+            if (stmt?.kind === J.Kind.VariableDeclarations) {
+                const varDecl = stmt as J.VariableDeclarations & J.RightPaddingMixin;
                 if (varDecl.variables.length === 1) {
-                    const namedVar = varDecl.variables[0].element;
-                    const initializer = namedVar?.initializer?.element;
+                    // With intersection types, the variable IS the NamedVariable with padding mixed in
+                    const namedVar = varDecl.variables[0];
+                    // initializer IS the expression with padding mixed in
+                    const initializer = namedVar?.initializer;
 
                     if (initializer?.kind === J.Kind.MethodInvocation &&
-                        this.isRequireCall(initializer as J.MethodInvocation)) {
-                        const moduleName = this.getModuleNameFromRequire(initializer as J.MethodInvocation);
+                        this.isRequireCall(initializer as J.MethodInvocation & J.LeftPaddingMixin)) {
+                        const moduleName = this.getModuleNameFromRequire(initializer as J.MethodInvocation & J.LeftPaddingMixin);
                         if (moduleName === this.module) {
                             return ImportStyle.CommonJS;
                         }
@@ -380,15 +381,14 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 // Insert at the beginning
                 // The `after` space should be empty since semicolon is printed after it
                 // The spacing comes from updating the next statement's prefix
+                // With intersection types, we need to create the updated statement properly
+                const firstStmt = compilationUnit.statements[0];
                 const updatedStatements = compilationUnit.statements.length > 0
                     ? [
                         rightPadded(newImport, emptySpace, semicolonMarkers),
-                        {
-                            ...compilationUnit.statements[0],
-                            element: compilationUnit.statements[0].element
-                                ? {...compilationUnit.statements[0].element, prefix: space("\n\n")}
-                                : undefined
-                        } as J.RightPadded<Statement>,
+                        firstStmt
+                            ? {...firstStmt, prefix: space("\n\n")} as J.RightPadded<Statement>
+                            : firstStmt,
                         ...compilationUnit.statements.slice(1)
                     ]
                     : [rightPadded(newImport, emptySpace, semicolonMarkers)];
@@ -401,14 +401,15 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
                 //The `after` space is empty, spacing comes from next statement's prefix
                 // Ensure the next statement has at least one newline in its prefix
-                if (after.length > 0 && after[0].element) {
-                    const currentPrefix = after[0].element.prefix;
+                // With intersection types, after[0] IS the statement with padding mixed in
+                if (after.length > 0 && after[0]) {
+                    const currentPrefix = after[0].prefix;
                     const needsNewline = !currentPrefix.whitespace.includes('\n');
 
                     const updatedNextStatement = needsNewline ? {
                         ...after[0],
-                        element: {...after[0].element, prefix: space("\n" + currentPrefix.whitespace)}
-                    } : after[0];
+                        prefix: space("\n" + currentPrefix.whitespace)
+                    } as J.RightPadded<Statement> : after[0];
 
                     draft.statements = [
                         ...before,
@@ -433,11 +434,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     private async tryMergeIntoExistingImport(compilationUnit: JS.CompilationUnit, p: P): Promise<JS.CompilationUnit> {
         for (let i = 0; i < compilationUnit.statements.length; i++) {
             const stmt = compilationUnit.statements[i];
-            const statement = stmt.element;
 
-            if (statement?.kind === JS.Kind.Import) {
-                const jsImport = statement as JS.Import;
-                const moduleSpecifier = jsImport.moduleSpecifier?.element;
+            if (stmt?.kind === JS.Kind.Import) {
+                const jsImport = stmt as JS.Import & J.RightPaddingMixin;
+                // moduleSpecifier IS the literal with padding mixed in
+                const moduleSpecifier = jsImport.moduleSpecifier;
 
                 if (!moduleSpecifier) {
                     continue;
@@ -475,8 +476,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         // Find the correct insertion position (alphabetical, case-insensitive)
                         const newName = (this.alias || this.member!).toLowerCase();
                         let insertIndex = existingElements.findIndex(elem => {
-                            if (elem.element?.kind === JS.Kind.ImportSpecifier) {
-                                const name = this.getImportAlias(elem.element) || this.getImportName(elem.element);
+                            // With intersection types, elem IS the ImportSpecifier with padding mixed in
+                            if (elem?.kind === JS.Kind.ImportSpecifier) {
+                                const name = this.getImportAlias(elem as JS.ImportSpecifier & J.RightPaddingMixin) || this.getImportName(elem as JS.ImportSpecifier & J.RightPaddingMixin);
                                 return newName.localeCompare(name.toLowerCase()) < 0;
                             }
                             return false;
@@ -485,10 +487,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
                         // Detect spacing style from existing elements:
                         // - firstElementPrefix: space after { (from first element's prefix)
-                        // - trailingSpace: space before } (from last element's after)
-                        const firstElementPrefix = existingElements[0]?.element?.prefix ?? emptySpace;
+                        // - trailingSpace: space before } (from last element's padding.after)
+                        const firstElementPrefix = existingElements[0]?.prefix ?? emptySpace;
                         const lastIndex = existingElements.length - 1;
-                        const trailingSpace = existingElements[lastIndex].after;
+                        const trailingSpace = existingElements[lastIndex].padding.after;
 
                         // Build the new elements array with proper spacing
                         const updatedNamedImports: JS.NamedImports = await this.produceJavaScript(
@@ -505,13 +507,14 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                         results.push(rightPadded({...newSpecifier, prefix}, emptySpace));
                                     }
                                     // Adjust existing element: if inserting before first, give it space prefix
+                                    // For tree types, elem IS the element with padding mixed in (no .element property)
                                     let adjusted = elem;
-                                    if (j === 0 && insertIndex === 0 && elem.element) {
-                                        adjusted = {...elem, element: {...elem.element, prefix: singleSpace}};
+                                    if (j === 0 && insertIndex === 0) {
+                                        adjusted = {...elem, prefix: singleSpace} as J.RightPadded<JS.ImportSpecifier>;
                                     }
                                     // Last element before a new trailing element loses its trailing space
                                     if (j === lastIndex && insertIndex > lastIndex) {
-                                        adjusted = {...adjusted, after: emptySpace};
+                                        adjusted = {...adjusted, padding: {...adjusted.padding, after: emptySpace}};
                                     }
                                     results.push(adjusted);
                                     return results;
@@ -538,8 +541,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         );
 
                         // Replace the statement in the compilation unit
+                        // With intersection types, we need to preserve padding when updating
                         draft.statements = compilationUnit.statements.map((s, idx) =>
-                            idx === i ? {...s, element: updatedImport} : s
+                            idx === i ? {...updatedImport, padding: s.padding} as J.RightPadded<Statement> : s
                         );
                     });
                 }
@@ -570,14 +574,14 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         };
 
                         // Update the import clause to include named bindings
-                        // Also update name.after to emptySpace since the comma goes right after the name
+                        // Also update name.padding.after to emptySpace since the comma goes right after the name
                         const updatedImport: JS.Import = await this.produceJavaScript(
                             jsImport, p, async importDraft => {
                                 importDraft.importClause = await this.produceJavaScript(
                                     importClause, p, async clauseDraft => {
                                         // Remove space after default name (comma goes right after)
                                         if (clauseDraft.name) {
-                                            clauseDraft.name = {...clauseDraft.name, after: emptySpace};
+                                            clauseDraft.name = {...clauseDraft.name, padding: {...clauseDraft.name.padding, after: emptySpace}};
                                         }
                                         clauseDraft.namedBindings = namedImports;
                                     }
@@ -586,15 +590,19 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                 if (importDraft.moduleSpecifier) {
                                     importDraft.moduleSpecifier = {
                                         ...importDraft.moduleSpecifier,
-                                        before: singleSpace
+                                        padding: {
+                                            ...importDraft.moduleSpecifier.padding,
+                                            before: singleSpace
+                                        }
                                     };
                                 }
                             }
                         );
 
                         // Replace the statement in the compilation unit
+                        // With intersection types, we need to preserve padding when updating
                         draft.statements = compilationUnit.statements.map((s, idx) =>
-                            idx === i ? {...s, element: updatedImport} : s
+                            idx === i ? {...updatedImport, padding: s.padding} as J.RightPadded<Statement> : s
                         );
                     });
                 }
@@ -609,19 +617,17 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      */
     private async checkImportExists(compilationUnit: JS.CompilationUnit): Promise<boolean> {
         for (const stmt of compilationUnit.statements) {
-            const statement = stmt.element;
-
             // Check ES6 imports
-            if (statement?.kind === JS.Kind.Import) {
-                const jsImport = statement as JS.Import;
+            if (stmt?.kind === JS.Kind.Import) {
+                const jsImport = stmt as JS.Import & J.RightPaddingMixin;
                 if (this.isMatchingImport(jsImport)) {
                     return true;
                 }
             }
 
             // Check CommonJS require statements
-            if (statement?.kind === J.Kind.VariableDeclarations) {
-                const varDecl = statement as J.VariableDeclarations;
+            if (stmt?.kind === J.Kind.VariableDeclarations) {
+                const varDecl = stmt as J.VariableDeclarations & J.RightPaddingMixin;
                 if (this.isMatchingRequire(varDecl)) {
                     return true;
                 }
@@ -635,7 +641,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      */
     private isMatchingImport(jsImport: JS.Import): boolean {
         // Check module specifier
-        const moduleSpecifier = jsImport.moduleSpecifier?.element;
+        // With intersection types, moduleSpecifier IS the literal with padding mixed in
+        const moduleSpecifier = jsImport.moduleSpecifier;
         if (!moduleSpecifier) {
             return false;
         }
@@ -690,8 +697,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 return false;
             }
             // If we have an alias, check that it matches
-            if (this.alias && importClause.name.element?.kind === J.Kind.Identifier) {
-                const existingName = (importClause.name.element as J.Identifier).simpleName;
+            // With intersection types, name IS the Identifier with padding mixed in
+            if (this.alias && importClause.name?.kind === J.Kind.Identifier) {
+                const existingName = (importClause.name as J.Identifier & J.RightPaddingMixin).simpleName;
                 return existingName === this.alias;
             }
             return true;
@@ -705,8 +713,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             if (namedBindings.kind === JS.Kind.NamedImports) {
                 const namedImports = namedBindings as JS.NamedImports;
                 for (const elem of namedImports.elements.elements) {
-                    if (elem.element?.kind === JS.Kind.ImportSpecifier) {
-                        const specifier = elem.element as JS.ImportSpecifier;
+                    // With intersection types, elem IS the ImportSpecifier with padding mixed in
+                    if (elem?.kind === JS.Kind.ImportSpecifier) {
+                        const specifier = elem as JS.ImportSpecifier & J.RightPaddingMixin;
                         const importName = this.getImportName(specifier);
                         const aliasName = this.getImportAlias(specifier);
 
@@ -729,17 +738,20 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             return false;
         }
 
-        const namedVar = varDecl.variables[0].element;
+        // With intersection types, the variable IS the NamedVariable with padding mixed in
+        const namedVar = varDecl.variables[0];
         if (!namedVar) {
             return false;
         }
 
-        const initializer = namedVar.initializer?.element;
+        // initializer IS the expression with padding mixed in
+        const initializer = namedVar.initializer;
         if (!initializer || initializer.kind !== J.Kind.MethodInvocation) {
             return false;
         }
 
-        const methodInv = initializer as J.MethodInvocation;
+        // Cast through unknown for intersection type to specific type
+        const methodInv = initializer as unknown as J.MethodInvocation;
         if (!this.isRequireCall(methodInv)) {
             return false;
         }
@@ -763,8 +775,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             // Destructured import: const { member } = require('module')
             const objectPattern = pattern as JS.ObjectBindingPattern;
             for (const elem of objectPattern.bindings.elements) {
-                if (elem.element?.kind === JS.Kind.BindingElement) {
-                    const bindingElem = elem.element as JS.BindingElement;
+                // With intersection types, elem IS the BindingElement with padding mixed in
+                if (elem?.kind === JS.Kind.BindingElement) {
+                    const bindingElem = elem as JS.BindingElement & J.RightPaddingMixin;
                     const name = (bindingElem.name as J.Identifier)?.simpleName;
                     if (name === (this.alias || this.member)) {
                         return true;
@@ -850,11 +863,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         let expectedDeclaringType: string | undefined;
 
         for (const stmt of compilationUnit.statements) {
-            const statement = stmt.element;
-
-            if (statement?.kind === JS.Kind.Import) {
-                const jsImport = statement as JS.Import;
-                const moduleSpecifier = jsImport.moduleSpecifier?.element;
+            if (stmt?.kind === JS.Kind.Import) {
+                const jsImport = stmt as JS.Import & J.RightPaddingMixin;
+                // moduleSpecifier IS the literal with padding mixed in
+                const moduleSpecifier = jsImport.moduleSpecifier;
 
                 if (!moduleSpecifier) {
                     continue;
@@ -871,9 +883,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 if (importClause?.namedBindings?.kind === JS.Kind.NamedImports) {
                     const namedImports = importClause.namedBindings as JS.NamedImports;
                     for (const elem of namedImports.elements.elements) {
-                        const specifier = elem.element;
-                        if (specifier?.kind === JS.Kind.ImportSpecifier) {
-                            const importSpec = specifier as JS.ImportSpecifier;
+                        if (elem?.kind === JS.Kind.ImportSpecifier) {
+                            const importSpec = elem as JS.ImportSpecifier & J.RightPaddingMixin;
                             let identifier: J.Identifier | undefined;
                             if (importSpec.specifier?.kind === J.Kind.Identifier) {
                                 identifier = importSpec.specifier as J.Identifier;
@@ -1151,6 +1162,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             };
         }
 
+        // With intersection types for LeftPadded tree types, we spread the element and add padding
         const jsImport: JS.Import = {
             id: randomId(),
             kind: JS.Kind.Import,
@@ -1159,11 +1171,12 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             modifiers: [],
             importClause,
             moduleSpecifier: {
-                kind: J.Kind.LeftPadded,
-                before: singleSpace,
-                element: moduleSpecifier,
-                markers: emptyMarkers
-            },
+                ...moduleSpecifier,
+                padding: {
+                    before: singleSpace,
+                    markers: emptyMarkers
+                }
+            } as J.LeftPadded<J.Literal>,
             initializer: undefined
         };
 
@@ -1228,10 +1241,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             prefix: emptySpace,
             markers: emptyMarkers,
             importType: {
-                kind: J.Kind.LeftPadded,
-                before: emptySpace,
                 element: false,
-                markers: emptyMarkers
+                padding: {
+                    before: emptySpace,
+                    markers: emptyMarkers
+                }
             },
             specifier
         };
@@ -1243,8 +1257,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     private determineImportPrefix(compilationUnit: JS.CompilationUnit, insertionIndex: number): J.Space {
         // If inserting at the beginning (index 0), use the prefix of the first statement
         // but only the whitespace part (preserve comments on the original first statement)
+        // With intersection types, statements[0] IS the statement with padding mixed in
         if (insertionIndex === 0 && compilationUnit.statements.length > 0) {
-            const firstPrefix = compilationUnit.statements[0].element?.prefix;
+            const firstPrefix = compilationUnit.statements[0]?.prefix;
             if (firstPrefix) {
                 // Keep only whitespace, not comments
                 return {
@@ -1268,7 +1283,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         let lastImportIndex = -1;
 
         for (let i = 0; i < compilationUnit.statements.length; i++) {
-            const statement = compilationUnit.statements[i].element;
+            // With intersection types, the statement IS the statement with padding mixed in
+            const statement = compilationUnit.statements[i];
             if (statement?.kind === JS.Kind.Import) {
                 lastImportIndex = i;
             } else if (lastImportIndex >= 0) {
@@ -1295,12 +1311,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             return undefined;
         }
 
-        const firstArg = args[0].element;
-        if (!firstArg || firstArg.kind !== J.Kind.Literal || typeof (firstArg as J.Literal).value !== 'string') {
+        // With intersection types, the arg IS the expression with padding mixed in
+        const firstArg = args[0];
+        if (!firstArg || firstArg.kind !== J.Kind.Literal || typeof (firstArg as J.Literal & J.RightPaddingMixin).value !== 'string') {
             return undefined;
         }
 
-        return (firstArg as J.Literal).value?.toString();
+        return (firstArg as J.Literal & J.RightPaddingMixin).value?.toString();
     }
 
     /**
@@ -1310,9 +1327,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         const spec = specifier.specifier;
         if (spec?.kind === JS.Kind.Alias) {
             const alias = spec as JS.Alias;
-            const propertyName = alias.propertyName.element;
+            // With intersection types, propertyName IS the Identifier with padding mixed in
+            const propertyName = alias.propertyName;
             if (propertyName?.kind === J.Kind.Identifier) {
-                return (propertyName as J.Identifier).simpleName;
+                return (propertyName as J.Identifier & J.RightPaddingMixin).simpleName;
             }
         } else if (spec?.kind === J.Kind.Identifier) {
             return (spec as J.Identifier).simpleName;

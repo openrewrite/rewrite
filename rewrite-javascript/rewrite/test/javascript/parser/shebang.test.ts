@@ -27,7 +27,7 @@ describe('shebang', () => {
                 console.log("Hello, world!");
                 `),
         afterRecipe: (cu: JS.CompilationUnit) => {
-            const firstStatement = cu.statements[0].element;
+            const firstStatement = cu.statements[0];
             expect(firstStatement.kind).toBe(JS.Kind.Shebang);
         }
     }));

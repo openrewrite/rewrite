@@ -33,11 +33,11 @@ describe('variable declaration mapping', () => {
             afterRecipe: (cu: JS.CompilationUnit) => {
                 expect(cu).toBeDefined();
                 expect(cu.statements).toHaveLength(2);
-                cu.statements.forEach(statement => expect(statement.element.kind).toBe(J.Kind.VariableDeclarations));
+                cu.statements.forEach(statement => expect(statement.kind).toBe(J.Kind.VariableDeclarations));
                 cu.statements.forEach(statement => {
-                    const varDecl = statement.element as J.VariableDeclarations;
-                    expect(statement.after.comments).toHaveLength(0);
-                    expect(statement.after.whitespace).toBe('');
+                    const varDecl = statement as unknown as J.VariableDeclarations;
+                    expect(statement.padding.after.comments).toHaveLength(0);
+                    expect(statement.padding.after.whitespace).toBe('');
                     expect(varDecl.variables.length).toBe(1);
                 });
             }
@@ -77,9 +77,9 @@ describe('variable declaration mapping', () => {
                 expect(cu.statements).toHaveLength(1);
 
                 const stmt = cu.statements[0];
-                expect(stmt.element.kind).toBe(JS.Kind.ScopedVariableDeclarations);
+                expect(stmt.kind).toBe(JS.Kind.ScopedVariableDeclarations);
 
-                const scopedVarDecl = stmt.element as JS.ScopedVariableDeclarations;
+                const scopedVarDecl = stmt as unknown as JS.ScopedVariableDeclarations;
 
                 // Modifiers (var/let/const) should be on the ScopedVariableDeclarations
                 expect(scopedVarDecl.modifiers).toHaveLength(1);
@@ -89,26 +89,26 @@ describe('variable declaration mapping', () => {
                 expect(scopedVarDecl.variables).toHaveLength(3);
 
                 // First variable: prefix should have whitespace (space after 'var'), no modifiers
-                const firstVar = scopedVarDecl.variables[0].element as J.VariableDeclarations;
+                const firstVar = scopedVarDecl.variables[0] as unknown as J.VariableDeclarations;
                 expect(firstVar.kind).toBe(J.Kind.VariableDeclarations);
                 expect(firstVar.modifiers).toHaveLength(0); // No modifiers on individual variables
                 expect(firstVar.prefix.whitespace).toBe(' '); // Space after 'var'
                 expect(firstVar.variables).toHaveLength(1);
-                expect(firstVar.variables[0].element.prefix.whitespace).toBe(''); // NamedVariable has empty prefix
+                expect(firstVar.variables[0].prefix.whitespace).toBe(''); // NamedVariable has empty prefix
 
                 // Second variable: prefix should have newline + indentation, no modifiers
-                const secondVar = scopedVarDecl.variables[1].element as J.VariableDeclarations;
+                const secondVar = scopedVarDecl.variables[1] as unknown as J.VariableDeclarations;
                 expect(secondVar.kind).toBe(J.Kind.VariableDeclarations);
                 expect(secondVar.modifiers).toHaveLength(0);
                 expect(secondVar.prefix.whitespace).toMatch(/\n\s+/); // Newline + spaces
-                expect(secondVar.variables[0].element.prefix.whitespace).toBe(''); // NamedVariable has empty prefix
+                expect(secondVar.variables[0].prefix.whitespace).toBe(''); // NamedVariable has empty prefix
 
                 // Third variable: similar to second
-                const thirdVar = scopedVarDecl.variables[2].element as J.VariableDeclarations;
+                const thirdVar = scopedVarDecl.variables[2] as unknown as J.VariableDeclarations;
                 expect(thirdVar.kind).toBe(J.Kind.VariableDeclarations);
                 expect(thirdVar.modifiers).toHaveLength(0);
                 expect(thirdVar.prefix.whitespace).toMatch(/\n\s+/);
-                expect(thirdVar.variables[0].element.prefix.whitespace).toBe('');
+                expect(thirdVar.variables[0].prefix.whitespace).toBe('');
             }
         }));
 
@@ -264,10 +264,10 @@ describe('variable declaration mapping', () => {
             afterRecipe: (cu: JS.CompilationUnit) => {
                 expect(cu.statements).toHaveLength(1);
                 cu.statements.forEach(statement => {
-                    const varDecl = statement.element as J.VariableDeclarations;
-                    const initializer = varDecl.variables[0].element.initializer!;
-                    expect(initializer.before.whitespace).toBe(" ");
-                    expect(initializer.element.prefix.whitespace).toBe("  ");
+                    const varDecl = statement as unknown as J.VariableDeclarations;
+                    const initializer = varDecl.variables[0].initializer!;
+                    expect(initializer.padding.before.whitespace).toBe(" ");
+                    expect(initializer.prefix.whitespace).toBe("  ");
                 });
             }
         }));

@@ -301,18 +301,20 @@ describe('Prettier marker reconciliation', () => {
         }) as JS.CompilationUnit;
 
         // Verify the original has no Semicolon marker on the statement
+        // With intersection types, padding markers are in statement.padding.markers
         const originalStatements = (sourceFile as any).statements as J.RightPadded<Statement>[];
-        const originalMarkers = originalStatements[0]?.markers?.markers || [];
-        const originalHasSemicolon = originalMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
+        const originalPaddingMarkers = (originalStatements[0] as any)?.padding?.markers?.markers || [];
+        const originalHasSemicolon = originalPaddingMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
         expect(originalHasSemicolon).toBe(false);
 
         // Format with Prettier (semi: true by default adds semicolons)
         const formatted = await prettierFormat(sourceFile, { semi: true });
 
         // Check if the formatted tree has the Semicolon marker
+        // With intersection types, padding markers are in statement.padding.markers
         const formattedStatements = (formatted as any).statements as J.RightPadded<Statement>[];
-        const formattedMarkers = formattedStatements[0]?.markers?.markers || [];
-        const formattedHasSemicolon = formattedMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
+        const formattedPaddingMarkers = (formattedStatements[0] as any)?.padding?.markers?.markers || [];
+        const formattedHasSemicolon = formattedPaddingMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
 
         // This test currently FAILS because whitespace reconciler doesn't copy markers
         // Once fixed, this should pass
@@ -328,18 +330,20 @@ describe('Prettier marker reconciliation', () => {
         }) as JS.CompilationUnit;
 
         // Verify the original has Semicolon marker
+        // With intersection types, padding markers are in statement.padding.markers
         const originalStatements = (sourceFile as any).statements as J.RightPadded<Statement>[];
-        const originalMarkers = originalStatements[0]?.markers?.markers || [];
-        const originalHasSemicolon = originalMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
+        const originalPaddingMarkers = (originalStatements[0] as any)?.padding?.markers?.markers || [];
+        const originalHasSemicolon = originalPaddingMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
         expect(originalHasSemicolon).toBe(true);
 
         // Format with Prettier
         const formatted = await prettierFormat(sourceFile, { semi: true });
 
         // Semicolon marker should still be present
+        // With intersection types, padding markers are in statement.padding.markers
         const formattedStatements = (formatted as any).statements as J.RightPadded<Statement>[];
-        const formattedMarkers = formattedStatements[0]?.markers?.markers || [];
-        const formattedHasSemicolon = formattedMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
+        const formattedPaddingMarkers = (formattedStatements[0] as any)?.padding?.markers?.markers || [];
+        const formattedHasSemicolon = formattedPaddingMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
         expect(formattedHasSemicolon).toBe(true);
     });
 });
@@ -588,7 +592,7 @@ describe('Prettier stopAfter support', () => {
                 // Get the first parameter to use as stopAfter
                 const params = lambda.parameters as J.Lambda.Parameters;
                 if (params.parameters.length > 0) {
-                    const firstParam = params.parameters[0].element;
+                    const firstParam = params.parameters[0];
                     // Format the lambda but stop after the first parameter
                     return await autoFormat(lambda, p, firstParam, this.cursor.parent, [defaultPrettierStyle]);
                 }

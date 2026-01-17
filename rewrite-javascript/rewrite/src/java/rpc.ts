@@ -15,8 +15,9 @@
  */
 import {JavaVisitor} from "./visitor";
 import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {Expression, isSpace, J, TextComment} from "./tree";
+import {emptySpace, Expression, isSpace, J, TextComment} from "./tree";
 import {isTree} from "../tree";
+import {emptyMarkers} from "../markers";
 import {Type} from "./type";
 import {TypeVisitor} from "./type-visitor";
 import {updateIfChanged} from "../util";
@@ -372,7 +373,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitEnumValueSet(enumValueSet: J.EnumValueSet, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(enumValueSet, e => e.enums, enumValue => enumValue.element.id, enumValue => this.visitRightPadded(enumValue, q));
+        await q.getAndSendList(enumValueSet, e => e.enums, enumValue => enumValue.id, enumValue => this.visitRightPadded(enumValue, q));
         await q.getAndSend(enumValueSet, e => e.terminatedWithSemicolon);
         return enumValueSet;
     }
@@ -415,9 +416,9 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitForLoopControl(control: J.ForLoop.Control, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(control, c => c.init, i => i.element.id, i => this.visitRightPadded(i, q));
+        await q.getAndSendList(control, c => c.init, i => i.id, i => this.visitRightPadded(i, q));
         await q.getAndSend(control, c => c.condition, c => this.visitRightPadded(c, q));
-        await q.getAndSendList(control, c => c.update, u => u.element.id, u => this.visitRightPadded(u, q));
+        await q.getAndSendList(control, c => c.update, u => u.id, u => this.visitRightPadded(u, q));
         return control;
     }
 
@@ -470,7 +471,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitLambdaParameters(params: J.Lambda.Parameters, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(params, p => p.parenthesized);
-        await q.getAndSendList(params, p => p.parameters, param => param.element.id, param => this.visitRightPadded(param, q));
+        await q.getAndSendList(params, p => p.parameters, param => param.id, param => this.visitRightPadded(param, q));
         return params;
     }
 
@@ -509,7 +510,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitMultiCatch(multiCatch: J.MultiCatch, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(multiCatch, m => m.alternatives, alt => alt.element.id, alt => this.visitRightPadded(alt, q));
+        await q.getAndSendList(multiCatch, m => m.alternatives, alt => alt.id, alt => this.visitRightPadded(alt, q));
         return multiCatch;
     }
 
@@ -633,7 +634,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitTypeParameters(typeParams: J.TypeParameters, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(typeParams, a => a.annotations, annot => annot.id, annot => this.visit(annot, q));
-        await q.getAndSendList(typeParams, t => t.typeParameters, p => p.element.id, params => this.visitRightPadded(params, q));
+        await q.getAndSendList(typeParams, t => t.typeParameters, p => p.id, params => this.visitRightPadded(params, q));
         return typeParams;
     }
 
@@ -646,7 +647,8 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(variable, v => v.name, name => this.visit(name, q));
-        await q.getAndSendList(variable, v => v.dimensionsAfterName, d => JSON.stringify(d.element), dims => this.visitLeftPadded(dims, q));
+        // For LeftPadded<Space>, Space now uses intersection - access whitespace directly (not via .element)
+        await q.getAndSendList(variable, v => v.dimensionsAfterName, d => JSON.stringify({whitespace: d.whitespace, before: d.padding.before.whitespace}), dims => this.visitLeftPadded(dims, q));
         await q.getAndSend(variable, v => v.initializer, init => this.visitLeftPadded(init, q));
         await q.getAndSend(variable, v => asRef(v.variableType), type => this.visitType(type, q));
         return variable;
@@ -687,7 +689,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(cu, c => c.checksum);
         await q.getAndSend(cu, c => c.fileAttributes);
         await q.getAndSend(cu, c => c.packageDeclaration, pkg => this.visitRightPadded(pkg, q));
-        await q.getAndSendList(cu, c => c.imports, imp => imp.element.id, imp => this.visitRightPadded(imp, q));
+        await q.getAndSendList(cu, c => c.imports, imp => imp.id, imp => this.visitRightPadded(imp, q));
         await q.getAndSendList(cu, c => c.classes, cls => cls.id, cls => this.visit(cls, q));
         await q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, q));
         return cu;
@@ -721,7 +723,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitBlock(block: J.Block, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(block, b => b.static, s => this.visitRightPadded(s, q));
-        await q.getAndSendList(block, b => b.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, q));
+        await q.getAndSendList(block, b => b.statements, stmt => stmt.id, stmt => this.visitRightPadded(stmt, q));
         await q.getAndSend(block, b => b.end, space => this.visitSpace(space, q));
         return block;
     }
@@ -746,7 +748,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSendList(varDecls, v => v.modifiers, mod => mod.id, mod => this.visit(mod, q));
         await q.getAndSend(varDecls, v => v.typeExpression, type => this.visit(type, q));
         await q.getAndSend(varDecls, v => v.varargs, space => this.visitSpace(space, q));
-        await q.getAndSendList(varDecls, v => v.variables, variable => variable.element.id, variable => this.visitRightPadded(variable, q));
+        await q.getAndSendList(varDecls, v => v.variables, variable => variable.id, variable => this.visitRightPadded(variable, q));
         return varDecls;
     }
 
@@ -782,32 +784,50 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     public override async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): Promise<J.LeftPadded<T>> {
-        await q.getAndSend(left, l => l.before, space => this.visitSpace(space, q));
-        if (isTree(left.element)) {
-            await q.getAndSend(left, l => l.element, elem => this.visit(elem as J, q));
-        } else if (isSpace(left.element)) {
-            await q.getAndSend(left, l => l.element, space => this.visitSpace(space as J.Space, q));
+        // Serialization order: before, element, paddingMarkers
+        await q.getAndSend(left, l => l.padding.before, space => this.visitSpace(space, q));
+
+        // Check if tree node (intersection) or primitive wrapper
+        const hasElement = 'element' in left;
+        if (hasElement) {
+            // Primitive wrapper
+            const elem = (left as unknown as { element: T }).element;
+            if (isSpace(elem)) {
+                await q.getAndSend(left, l => (l as { element: T }).element, space => this.visitSpace(space as J.Space, q));
+            } else {
+                await q.getAndSend(left, l => (l as { element: T }).element);
+            }
         } else {
-            await q.getAndSend(left, l => l.element);
+            // Tree node - the padded value IS the element
+            await q.getAndSend(left, l => l as unknown as J, elem => this.visit(elem, q));
         }
-        await q.getAndSend(left, l => l.markers);
+
+        await q.getAndSend(left, l => l.padding.markers);
         return left;
     }
 
     public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcSendQueue): Promise<J.RightPadded<T>> {
-        if (isTree(right.element)) {
-            await q.getAndSend(right, r => r.element, elem => this.visit(elem as J, q));
+        // Serialization order: element, after, paddingMarkers
+
+        // Check if tree node (intersection) or primitive wrapper
+        const hasElement = 'element' in right;
+        if (hasElement) {
+            // Boolean wrapper
+            await q.getAndSend(right, r => (r as { element: boolean }).element);
         } else {
-            await q.getAndSend(right, r => r.element);
+            // Tree node - the padded value IS the element
+            await q.getAndSend(right, r => r as unknown as J, elem => this.visit(elem, q));
         }
-        await q.getAndSend(right, r => r.after, space => this.visitSpace(space, q));
-        await q.getAndSend(right, r => r.markers);
+
+        await q.getAndSend(right, r => r.padding.after, space => this.visitSpace(space, q));
+        await q.getAndSend(right, r => r.padding.markers);
         return right;
     }
 
     public override async visitContainer<T extends J>(container: J.Container<T>, q: RpcSendQueue): Promise<J.Container<T>> {
         await q.getAndSend(container, c => c.before, space => this.visitSpace(space, q));
-        await q.getAndSendList(container, c => c.elements, elem => elem.element.id, elem => this.visitRightPadded(elem, q));
+        // For tree nodes, the padded value IS the element (has id directly)
+        await q.getAndSendList(container, c => c.elements, elem => elem.id, elem => this.visitRightPadded(elem, q));
         await q.getAndSend(container, c => c.markers);
         return container;
     }
@@ -873,7 +893,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         const updates = {
             elementType: await q.receive(arrayType.elementType, type => this.visit(type, q)),
             annotations: await q.receiveListDefined(arrayType.annotations || [], annot => this.visit(annot, q)),
-            dimension: await q.receive(arrayType.dimension, d => this.visitLeftPadded(d, q)),
+            dimension: await q.receive(arrayType.dimension, d => this.visitLeftPadded(d, q) as any),
             type: await q.receive(arrayType.type, type => this.visitType(type, q))
         };
 
@@ -902,7 +922,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     protected async visitAssignmentOperation(assignOp: J.AssignmentOperation, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             variable: await q.receive(assignOp.variable, variable => this.visit(variable, q)),
-            operator: await q.receive(assignOp.operator, op => this.visitLeftPadded(op, q)),
+            operator: await q.receive(assignOp.operator, op => this.visitLeftPadded(op, q) as any),
             assignment: await q.receive(assignOp.assignment, assign => this.visit(assign, q)),
             type: await q.receive(assignOp.type, type => this.visitType(type, q))
         };
@@ -913,7 +933,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     protected async visitBinary(binary: J.Binary, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             left: await q.receive(binary.left, left => this.visit(left, q)),
-            operator: await q.receive(binary.operator, op => this.visitLeftPadded(op, q)),
+            operator: await q.receive(binary.operator, op => this.visitLeftPadded(op, q) as any),
             right: await q.receive(binary.right, right => this.visit(right, q)),
             type: await q.receive(binary.type, type => this.visitType(type, q))
         };
@@ -1075,7 +1095,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     protected async visitImport(importStmt: J.Import, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
-            static: await q.receive(importStmt.static, s => this.visitLeftPadded(s, q)),
+            static: await q.receive(importStmt.static, s => this.visitLeftPadded(s, q) as any),
             qualid: await q.receive(importStmt.qualid, qualid => this.visit(qualid, q)),
             alias: await q.receive(importStmt.alias, alias => this.visitLeftPadded(alias, q))
         };
@@ -1299,7 +1319,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     protected async visitUnary(unary: J.Unary, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
-            operator: await q.receive(unary.operator, op => this.visitLeftPadded(op, q)),
+            operator: await q.receive(unary.operator, op => this.visitLeftPadded(op, q) as any),
             expression: await q.receive(unary.expression, expr => this.visit(expr, q)),
             type: await q.receive(unary.type, type => this.visitType(type, q))
         };
@@ -1323,7 +1343,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             name: await q.receive(variable.name, name => this.visit(name, q)),
-            dimensionsAfterName: await q.receiveListDefined(variable.dimensionsAfterName, dim => this.visitLeftPadded(dim, q)),
+            dimensionsAfterName: await q.receiveListDefined(variable.dimensionsAfterName, dim => this.visitLeftPadded(dim, q) as any),
             initializer: await q.receive(variable.initializer, init => this.visitOptionalLeftPadded(init, q)),
             variableType: await q.receive(variable.variableType, type => this.visitType(type, q) as unknown as Type.Variable)
         };
@@ -1389,7 +1409,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     protected async visitWildcard(wildcard: J.Wildcard, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
-            bound: await q.receive(wildcard.bound, bound => this.visitLeftPadded(bound, q)),
+            bound: await q.receive(wildcard.bound, bound => this.visitLeftPadded(bound, q) as any),
             boundedType: await q.receive(wildcard.boundedType, type => this.visit(type, q))
         };
         return updateIfChanged(wildcard, updates);
@@ -1444,7 +1464,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     protected async visitBlock(block: J.Block, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
-            static: await q.receive(block.static, s => this.visitRightPadded(s, q)),
+            static: await q.receive(block.static, s => this.visitRightPadded(s, q) as any),
             statements: await q.receiveListDefined(block.statements, stmt => this.visitRightPadded(stmt, q)),
             end: await q.receive(block.end, space => this.visitSpace(space, q))
         };
@@ -1511,45 +1531,87 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     public override async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
+        // If left is undefined, create a default primitive wrapper placeholder
+        // For tree nodes (J), the queue's newObj creates them using the element's kind
+        // For primitive wrappers, there's no kind on the wrapper, so we need this default
         if (!left) {
-            throw new Error("TreeDataReceiveQueue should have instantiated an empty left padding");
+            left = { element: false, padding: { before: emptySpace, markers: emptyMarkers } } as J.LeftPadded<T>;
         }
 
-        const updates = {
-            before: await q.receive(left.before, space => this.visitSpace(space, q)),
-            element: await q.receive(left.element, elem => {
-                if (isSpace(elem)) {
-                    return this.visitSpace(elem as J.Space, q) as any as T;
-                } else if (typeof elem === 'object' && elem.kind) {
-                    // FIXME find a better way to check if it is a `Tree`
-                    return this.visit(elem as J, q) as any as T;
+        // Deserialization order: before, element, paddingMarkers
+        // Note: left.padding may not exist on incoming template, so use defaults
+        const before = await q.receive(left.padding?.before ?? emptySpace, space => this.visitSpace(space, q));
+
+        // Check if tree node (intersection) or primitive wrapper
+        const hasElement = 'element' in left;
+        let receivedElement: T;
+
+        if (hasElement) {
+            // Primitive wrapper
+            const elem = (left as unknown as { element: T }).element;
+            receivedElement = await q.receive(elem, e => {
+                if (isSpace(e)) {
+                    return this.visitSpace(e as J.Space, q) as any as T;
                 }
-                return elem;
-            }),
-            markers: await q.receive(left.markers)
-        };
-        return updateIfChanged(left, updates) as J.LeftPadded<T>;
+                return e as T;
+            });
+        } else {
+            // Tree node - the padded value IS the element
+            receivedElement = await q.receive(left as unknown as J, elem => this.visit(elem, q)) as unknown as T;
+        }
+
+        const markers = await q.receive(left.padding?.markers ?? emptyMarkers);
+
+        const padding: J.Prefix = { before, markers };
+        if (hasElement) {
+            // Primitive wrapper - update with new values
+            return updateIfChanged(left, { element: receivedElement, padding } as any) as J.LeftPadded<T>;
+        } else {
+            // Tree node - merge element with padding
+            return {
+                ...receivedElement as object,
+                padding
+            } as J.LeftPadded<T>;
+        }
     }
 
     public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcReceiveQueue): Promise<J.RightPadded<T>> {
+        // If right is undefined, create a default boolean wrapper placeholder
+        // For tree nodes (J), the queue's newObj creates them using the element's kind
+        // For boolean wrappers, there's no kind on the wrapper, so we need this default
         if (!right) {
-            throw new Error("TreeDataReceiveQueue should have instantiated an empty right padding");
+            right = { element: false, padding: { after: emptySpace, markers: emptyMarkers } } as J.RightPadded<T>;
         }
 
-        const updates = {
-            element: await q.receive(right.element, elem => {
-                if (isSpace(elem)) {
-                    return this.visitSpace(elem as J.Space, q) as any as T;
-                } else if (typeof elem === 'object' && elem.kind) {
-                    // FIXME find a better way to check if it is a `Tree`
-                    return this.visit(elem as J, q) as any as T;
-                }
-                return elem as any as T;
-            }),
-            after: await q.receive(right.after, space => this.visitSpace(space, q)),
-            markers: await q.receive(right.markers)
-        };
-        return updateIfChanged(right, updates) as J.RightPadded<T>;
+        // Deserialization order: element, after, paddingMarkers
+
+        // Check if tree node (intersection) or primitive wrapper
+        const hasElement = 'element' in right;
+        let receivedElement: T;
+
+        if (hasElement) {
+            // Boolean wrapper
+            receivedElement = await q.receive((right as { element: boolean }).element) as unknown as T;
+        } else {
+            // Tree node - the padded value IS the element
+            receivedElement = await q.receive(right as unknown as J, elem => this.visit(elem, q)) as unknown as T;
+        }
+
+        // Note: right.padding may not exist on incoming template, so use defaults
+        const after = await q.receive(right.padding?.after ?? emptySpace, space => this.visitSpace(space, q));
+        const markers = await q.receive(right.padding?.markers ?? emptyMarkers);
+
+        const padding: J.Suffix = { after, markers };
+        if (hasElement) {
+            // Boolean wrapper - update with new values
+            return updateIfChanged(right, { element: receivedElement, padding } as any) as J.RightPadded<T>;
+        } else {
+            // Tree node - merge element with padding
+            return {
+                ...receivedElement as object,
+                padding
+            } as J.RightPadded<T>;
+        }
     }
 
     public override async visitContainer<T extends J>(container: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {

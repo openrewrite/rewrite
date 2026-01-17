@@ -18,7 +18,7 @@ import {Recipe} from "../../../recipe";
 import {TreeVisitor} from "../../../visitor";
 import {ExecutionContext} from "../../../execution";
 import {JavaScriptVisitor} from "../../visitor";
-import {J} from "../../../java";
+import {Expression, J, Statement} from "../../../java";
 import {JS} from "../../tree";
 import {create as produce} from "mutative";
 import {ElementRemovalFormatter} from "../../../java/formatting-utils";
@@ -48,10 +48,11 @@ export class RemoveDuplicateObjectKeys extends Recipe {
                 const propertyNameToLastIndex = new Map<string, number>();
                 const propertyNames: (string | null)[] = [];
 
+                // For tree types, the padded value IS the element (intersection type)
                 for (let i = 0; i < statements.length; i++) {
-                    const stmt = statements[i];
-                    if (stmt.element.kind === JS.Kind.PropertyAssignment) {
-                        const prop = stmt.element as JS.PropertyAssignment;
+                    const stmt = statements[i] as unknown as Statement;
+                    if (stmt.kind === JS.Kind.PropertyAssignment) {
+                        const prop = stmt as unknown as JS.PropertyAssignment;
                         const propName = this.getPropertyName(prop);
                         propertyNames.push(propName);
 
@@ -75,17 +76,20 @@ export class RemoveDuplicateObjectKeys extends Recipe {
                         if (propName !== null) {
                             const lastIndex = propertyNameToLastIndex.get(propName)!;
                             if (i < lastIndex) {
-                                formatter.markRemoved(statements[i].element);
+                                // For tree types, statements[i] IS the element with padding
+                                formatter.markRemoved(statements[i] as unknown as J);
                                 continue;
                             }
                         }
 
                         const stmt = statements[i];
-                        const adjustedElement = formatter.processKept(stmt.element);
+                        // For tree types, stmt IS the element with padding mixed in
+                        const adjustedElement = formatter.processKept(stmt as unknown as J);
+                        // Merge adjusted element with padding
                         filteredStatements.push({
-                            ...stmt,
-                            element: adjustedElement
-                        });
+                            ...adjustedElement,
+                            padding: stmt.padding
+                        } as J.RightPadded<Statement>);
                     }
 
                     if (!formatter.hasRemovals) {
@@ -97,7 +101,8 @@ export class RemoveDuplicateObjectKeys extends Recipe {
             }
 
             private getPropertyName(prop: JS.PropertyAssignment): string | null {
-                const name = prop.name.element;
+                // For tree types, name IS the expression with padding mixed in
+                const name = prop.name as unknown as Expression;
 
                 // Handle identifier: { foo: 1 }
                 if (name.kind === J.Kind.Identifier) {

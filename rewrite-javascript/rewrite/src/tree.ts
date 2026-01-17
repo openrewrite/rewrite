@@ -80,8 +80,14 @@ export class Cursor {
     parentTree(level: number = 1): Cursor | undefined {
         let c: Cursor | undefined = this.parent;
         let treeCount = 0;
+        // Track the current value to skip duplicate cursors for the same object
+        // This handles the case where visitRightPadded/visitLeftPadded creates a cursor
+        // and then visitDefined creates another cursor for the same intersection-typed object
+        const currentValue = this.value;
         while (c) {
-            if (isTree(c.value)) {
+            // Skip cursors with the same object reference as the current cursor
+            // This prevents finding the "wrapper" cursor when looking for the true parent
+            if (isTree(c.value) && c.value !== currentValue) {
                 treeCount++;
                 if (treeCount === level) {
                     return c;

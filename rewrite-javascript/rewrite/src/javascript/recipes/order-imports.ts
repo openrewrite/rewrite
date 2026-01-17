@@ -18,7 +18,7 @@ import {Recipe} from "../../recipe";
 import {produceAsync, TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {JavaScriptVisitor, JS} from "../index";
-import {J} from "../../java";
+import {Expression, J, Statement} from "../../java";
 import {create as produce, Draft} from "mutative";
 import {SpacesStyle, styleFromSourceFile, StyleKind} from "../style";
 
@@ -54,7 +54,8 @@ export class OrderImports extends Recipe {
                 }
 
                 const imports = cu.statements.slice(0, importCount) as J.RightPadded<JS.Import>[];
-                const originalImportPosition = Object.fromEntries(imports.map((item, i) => [item.element.id, i]));
+                // For tree types, the padded value IS the element (intersection type)
+                const originalImportPosition = Object.fromEntries(imports.map((item, i) => [item.id, i]));
                 const restStatements = cu.statements.slice(importCount);
 
                 // Get style for consistent brace spacing
@@ -65,9 +66,10 @@ export class OrderImports extends Recipe {
                 const sortedSpecifiers = this.sortNamedSpecifiersWithinImports(imports, useBraceSpaces);
 
                 // Sort imports by category and module path
+                // For tree types, the padded value IS the element (intersection type)
                 sortedSpecifiers.sort((aPadded, bPadded) => {
-                    const a = aPadded.element;
-                    const b = bPadded.element;
+                    const a = aPadded as unknown as JS.Import;
+                    const b = bPadded as unknown as JS.Import;
 
                     // First, compare by category
                     const categoryA = this.getImportCategory(a);
@@ -85,7 +87,7 @@ export class OrderImports extends Recipe {
                     }
 
                     // Tiebreaker: keep original order for stability
-                    return originalImportPosition[aPadded.element.id] - originalImportPosition[bPadded.element.id];
+                    return originalImportPosition[aPadded.id] - originalImportPosition[bPadded.id];
                 });
 
                 const cuWithImportsSorted = await produceAsync(cu, async draft => {
@@ -94,7 +96,8 @@ export class OrderImports extends Recipe {
 
                 return produce(cuWithImportsSorted!, draft => {
                     for (let i = 0; i < importCount; i++) {
-                        draft.statements[i].element.prefix.whitespace = i > 0 ? "\n" : "";
+                        // For tree types, the padded value IS the element (intersection type)
+                        draft.statements[i].prefix.whitespace = i > 0 ? "\n" : "";
                     }
                 });
             }
@@ -116,7 +119,9 @@ export class OrderImports extends Recipe {
                 // Namespace imports: import * as foo from 'module'
                 if (import_.importClause.namedBindings?.kind === JS.Kind.Alias) {
                     const alias = import_.importClause.namedBindings as JS.Alias;
-                    if (alias.propertyName.element.simpleName === "*") {
+                    // For tree types, propertyName IS the identifier with padding mixed in
+                    const propertyName = alias.propertyName as unknown as J.Identifier;
+                    if (propertyName.simpleName === "*") {
                         return ImportCategory.Namespace;
                     }
                 }
@@ -134,8 +139,10 @@ export class OrderImports extends Recipe {
              * Extract the module path from an import statement.
              */
             private getModulePath(import_: JS.Import): string {
-                if (import_.moduleSpecifier?.element.kind === J.Kind.Literal) {
-                    const literal = import_.moduleSpecifier.element as J.Literal;
+                // For tree types, the padded value IS the element (intersection type)
+                const moduleSpec = import_.moduleSpecifier as unknown as Expression | undefined;
+                if (moduleSpec?.kind === J.Kind.Literal) {
+                    const literal = moduleSpec as J.Literal;
                     // Remove quotes from the value
                     return String(literal.value ?? '');
                 }
@@ -144,7 +151,8 @@ export class OrderImports extends Recipe {
 
             private countImports(cu: JS.CompilationUnit): number {
                 let i = 0;
-                while ((i < cu.statements.length) && (cu.statements[i].element.kind === JS.Kind.Import)) {
+                // For tree types, the padded value IS the element (intersection type)
+                while ((i < cu.statements.length) && ((cu.statements[i] as unknown as Statement).kind === JS.Kind.Import)) {
                     i++;
                 }
                 return i;
@@ -156,7 +164,8 @@ export class OrderImports extends Recipe {
             private sortNamedSpecifiersWithinImports(imports: J.RightPadded<JS.Import>[], useBraceSpaces: boolean): J.RightPadded<JS.Import>[] {
                 const ret = [];
                 for (const importPadded of imports) {
-                    const import_ = importPadded.element;
+                    // For tree types, the padded value IS the element (intersection type)
+                    const import_ = importPadded as unknown as JS.Import;
                     if (this.hasNamedImports(import_)) {
                         const importSorted = produce(import_, draft => {
                             const namedBindings = draft.importClause!.namedBindings as Draft<JS.NamedImports>;
@@ -168,43 +177,47 @@ export class OrderImports extends Recipe {
 
                             // Handle trailing comma
                             const trailingComma = elements.length > 0 &&
-                                elements[elements.length - 1].markers?.markers.find(m => m.kind === J.Markers.TrailingComma);
+                                elements[elements.length - 1].padding.markers?.markers.find(m => m.kind === J.Markers.TrailingComma);
                             if (trailingComma) {
-                                elements[elements.length - 1].markers.markers =
-                                    elements[elements.length - 1].markers.markers.filter(m => m.kind !== J.Markers.TrailingComma);
+                                elements[elements.length - 1].padding.markers.markers =
+                                    elements[elements.length - 1].padding.markers.markers.filter(m => m.kind !== J.Markers.TrailingComma);
                             }
 
                             // Sort by the imported name (not alias)
+                            // For tree types, a IS the specifier with padding mixed in
                             elements.sort((a, b) => {
-                                const nameA = this.getSpecifierSortKey(a.element as JS.ImportSpecifier);
-                                const nameB = this.getSpecifierSortKey(b.element as JS.ImportSpecifier);
+                                const nameA = this.getSpecifierSortKey(a as unknown as JS.ImportSpecifier);
+                                const nameB = this.getSpecifierSortKey(b as unknown as JS.ImportSpecifier);
                                 return nameA.localeCompare(nameB);
                             });
 
                             // Normalize spacing based on es6ImportExportBraces style
                             const braceSpace = useBraceSpaces ? " " : "";
                             for (let i = 0; i < elements.length; i++) {
+                                // For tree types, elements[i] IS the specifier with padding mixed in
                                 if (i === 0) {
                                     // First element: space after opening brace based on style
-                                    elements[i].element.prefix = {kind: J.Kind.Space, whitespace: braceSpace, comments: []};
+                                    elements[i].prefix = {kind: J.Kind.Space, whitespace: braceSpace, comments: []};
                                 } else {
                                     // Other elements: space after comma
-                                    elements[i].element.prefix = {kind: J.Kind.Space, whitespace: ' ', comments: []};
+                                    elements[i].prefix = {kind: J.Kind.Space, whitespace: ' ', comments: []};
                                 }
                             }
                             // Last element: space before closing brace based on style
-                            elements[elements.length - 1].after = {kind: J.Kind.Space, whitespace: braceSpace, comments: []};
+                            elements[elements.length - 1].padding.after = {kind: J.Kind.Space, whitespace: braceSpace, comments: []};
 
                             // Restore trailing comma to last element
                             if (trailingComma && elements.length > 0 &&
-                                !elements[elements.length - 1].markers.markers.find(m => m.kind === J.Markers.TrailingComma)) {
-                                elements[elements.length - 1].markers.markers.push(trailingComma);
+                                !elements[elements.length - 1].padding.markers.markers.find(m => m.kind === J.Markers.TrailingComma)) {
+                                elements[elements.length - 1].padding.markers.markers.push(trailingComma);
                             }
                         });
 
-                        ret.push(produce(importPadded, draft => {
-                            draft.element = importSorted;
-                        }));
+                        // Merge the sorted import with padding
+                        ret.push({
+                            ...importSorted,
+                            padding: importPadded.padding
+                        } as J.RightPadded<JS.Import>);
                     } else {
                         ret.push(importPadded);
                     }
@@ -230,7 +243,9 @@ export class OrderImports extends Recipe {
             private getSpecifierSortKey(specifier: JS.ImportSpecifier): string {
                 if (specifier.specifier.kind === JS.Kind.Alias) {
                     // import { foo as bar } - sort by 'foo'
-                    return (specifier.specifier as JS.Alias).propertyName.element.simpleName;
+                    // For tree types, propertyName IS the identifier with padding mixed in
+                    const propertyName = (specifier.specifier as JS.Alias).propertyName as unknown as J.Identifier;
+                    return propertyName.simpleName;
                 } else if (specifier.specifier.kind === J.Kind.Identifier) {
                     // import { foo } - sort by 'foo'
                     return (specifier.specifier as J.Identifier).simpleName;

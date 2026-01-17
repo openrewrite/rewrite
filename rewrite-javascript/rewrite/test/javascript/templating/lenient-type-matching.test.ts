@@ -435,7 +435,7 @@ function greet(): string { return "hello"; }
                         const select = methodInvocation.select;
                         if (!select) {
                             namedImportMatched = true; // forwardRef(...)
-                        } else if (select.element.kind === J.Kind.Identifier) {
+                        } else if (select.kind === J.Kind.Identifier) {
                             namespaceImportMatched = true; // React.forwardRef(...)
                         }
                     }
@@ -499,7 +499,7 @@ function greet(): string { return "hello"; }
                             if (!select) {
                                 // Named import: forwardRef(...)
                                 namedImportDeclaringType = fqn;
-                            } else if (select.element.kind === J.Kind.Identifier) {
+                            } else if (select.kind === J.Kind.Identifier) {
                                 // Namespace import: React.forwardRef(...)
                                 namespaceImportDeclaringType = fqn;
                             }

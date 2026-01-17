@@ -372,13 +372,13 @@ function pruneNode(node: any, path: PathSegment[], pathIndex: number, target: an
             if (i < targetIndex) {
                 // Prior sibling - replace with "null" placeholder
                 // Preserve the original prefix to maintain line positions
-                const originalPrefix = statements[i].element.prefix;
+                // For tree types, the padded value IS the element (intersection type)
+                const originalPrefix = statements[i].prefix;
                 const placeholder = createNullPlaceholder(originalPrefix);
+                // Use spread to merge placeholder with padding properties
                 prunedStatements.push({
-                    kind: J.Kind.RightPadded,
-                    element: placeholder,
-                    after: statements[i].after,
-                    markers: statements[i].markers
+                    ...placeholder,
+                    padding: statements[i].padding
                 } as J.RightPadded<Statement>);
             } else {
                 // Target - recurse into the RightPadded (path will handle .element)

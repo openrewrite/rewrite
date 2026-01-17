@@ -51,7 +51,8 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(cu, c => c.charsetBomMarked);
         await q.getAndSend(cu, c => c.checksum);
         await q.getAndSend(cu, c => c.fileAttributes);
-        await q.getAndSendList(cu, c => c.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, q));
+        // With intersection types, stmt IS the statement with padding mixed in
+        await q.getAndSendList(cu, c => c.statements, stmt => stmt.id, stmt => this.visitRightPadded(stmt, q));
         await q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, q));
         return cu;
     }
@@ -243,7 +244,8 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(scopedVariableDeclarations, el => el.modifiers, el => el.id, el => this.visit(el, q));
-        await q.getAndSendList(scopedVariableDeclarations, el => el.variables, el => el.element.id, el => this.visitRightPadded(el, q));
+        // With intersection types, el IS the variable with padding mixed in
+        await q.getAndSendList(scopedVariableDeclarations, el => el.variables, el => el.id, el => this.visitRightPadded(el, q));
         return scopedVariableDeclarations;
     }
 
@@ -273,7 +275,8 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async visitTemplateExpression(templateExpression: JS.TemplateExpression, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(templateExpression, el => el.head, el => this.visit(el, q));
-        await q.getAndSendList(templateExpression, el => el.spans, el => el.element.id, el => this.visitRightPadded(el, q));
+        // With intersection types, el IS the span with padding mixed in
+        await q.getAndSendList(templateExpression, el => el.spans, el => el.id, el => this.visitRightPadded(el, q));
         await q.getAndSend(templateExpression, el => asRef(el.type), el => this.visitType(el, q));
         return templateExpression;
     }
@@ -370,13 +373,15 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     override async visitUnion(union: JS.Union, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(union, el => el.types, el => el.element.id, el => this.visitRightPadded(el, q));
+        // With intersection types, el IS the type with padding mixed in
+        await q.getAndSendList(union, el => el.types, el => el.id, el => this.visitRightPadded(el, q));
         await q.getAndSend(union, el => asRef(el.type), el => this.visitType(el, q));
         return union;
     }
 
     override async visitIntersection(intersection: JS.Intersection, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSendList(intersection, el => el.types, el => el.element.id, el => this.visitRightPadded(el, q));
+        // With intersection types, el IS the type with padding mixed in
+        await q.getAndSendList(intersection, el => el.types, el => el.id, el => this.visitRightPadded(el, q));
         await q.getAndSend(intersection, el => asRef(el.type), el => this.visitType(el, q));
         return intersection;
     }
@@ -396,7 +401,8 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(tag, el => el.openName, el => this.visitLeftPadded(el, q));
         await q.getAndSend(tag, el => el.typeArguments, el => this.visitContainer(el, q));
         await q.getAndSend(tag, el => el.afterName, space => this.visitSpace(space, q));
-        await q.getAndSendList(tag, el => el.attributes, attr => attr.element.id, attr => this.visitRightPadded(attr, q));
+        // With intersection types, attr IS the attribute with padding mixed in
+        await q.getAndSendList(tag, el => el.attributes, attr => attr.id, attr => this.visitRightPadded(attr, q));
 
         await q.getAndSend(tag, el => el.selfClosing, space => this.visitSpace(space, q));
         await q.getAndSendList(tag, el => el.children!, child => child.id, child => this.visit(child, q));
@@ -666,7 +672,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitFunctionType(functionType: JS.FunctionType, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             modifiers: await q.receiveListDefined(functionType.modifiers, el => this.visitDefined<J.Modifier>(el, q)),
-            constructorType: await q.receive(functionType.constructorType, el => this.visitLeftPadded(el, q)),
+            constructorType: await q.receive(functionType.constructorType, async el => this.visitLeftPadded(el, q) as any),
             typeParameters: await q.receive(functionType.typeParameters, el => this.visitDefined<J.TypeParameters>(el, q)),
             parameters: await q.receive(functionType.parameters, el => this.visitContainer(el, q)),
             returnType: await q.receive(functionType.returnType, el => this.visitLeftPadded(el, q))
@@ -684,7 +690,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     override async visitImportType(importType: JS.ImportType, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
-            hasTypeof: await q.receive(importType.hasTypeof, el => this.visitRightPadded(el, q)),
+            hasTypeof: await q.receive(importType.hasTypeof, async el => this.visitRightPadded(el, q) as any),
             argumentAndAttributes: await q.receive(importType.argumentAndAttributes, el => this.visitContainer(el, q)),
             qualifier: await q.receive(importType.qualifier, el => this.visitLeftPadded(el, q)),
             typeArguments: await q.receive(importType.typeArguments, el => this.visitContainer(el, q)),
@@ -723,7 +729,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     override async visitImportSpecifier(jsImportSpecifier: JS.ImportSpecifier, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
-            importType: await q.receive(jsImportSpecifier.importType, el => this.visitLeftPadded(el, q)),
+            importType: await q.receive(jsImportSpecifier.importType, async el => this.visitLeftPadded(el, q) as any),
             specifier: await q.receive(jsImportSpecifier.specifier, el => this.visitDefined<JS.Alias | J.Identifier>(el, q)),
             type: await q.receive(jsImportSpecifier.type, el => this.visitType(el, q))
         };
@@ -758,7 +764,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitBinaryExtensions(binary: JS.Binary, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             left: await q.receive(binary.left, el => this.visitDefined<Expression>(el, q)),
-            operator: await q.receive(binary.operator, el => this.visitLeftPadded(el, q)),
+            operator: await q.receive(binary.operator, async el => this.visitLeftPadded(el, q) as any),
             right: await q.receive(binary.right, el => this.visitDefined<Expression>(el, q)),
             type: await q.receive(binary.type, el => this.visitType(el, q))
         };
@@ -776,10 +782,10 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitMappedType(mappedType: JS.MappedType, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             prefixToken: await q.receive(mappedType.prefixToken, el => this.visitLeftPadded(el, q)),
-            hasReadonly: await q.receive(mappedType.hasReadonly, el => this.visitLeftPadded(el, q)),
+            hasReadonly: await q.receive(mappedType.hasReadonly, async el => this.visitLeftPadded(el, q) as any),
             keysRemapping: await q.receive(mappedType.keysRemapping, el => this.visitDefined<JS.MappedType.KeysRemapping>(el, q)),
             suffixToken: await q.receive(mappedType.suffixToken, el => this.visitLeftPadded(el, q)),
-            hasQuestionToken: await q.receive(mappedType.hasQuestionToken, el => this.visitLeftPadded(el, q)),
+            hasQuestionToken: await q.receive(mappedType.hasQuestionToken, async el => this.visitLeftPadded(el, q) as any),
             valueType: await q.receive(mappedType.valueType, el => this.visitContainer(el, q)),
             type: await q.receive(mappedType.type, el => this.visitType(el, q))
         };
@@ -934,7 +940,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             variable: await q.receive(assignmentOperation.variable, el => this.visitDefined<Expression>(el, q)),
-            operator: await q.receive(assignmentOperation.operator, el => this.visitLeftPadded(el, q)),
+            operator: await q.receive(assignmentOperation.operator, async el => this.visitLeftPadded(el, q) as any),
             assignment: await q.receive(assignmentOperation.assignment, el => this.visitDefined<Expression>(el, q)),
             type: await q.receive(assignmentOperation.type, el => this.visitType(el, q))
         };
@@ -991,7 +997,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     override async visitTypePredicate(typePredicate: JS.TypePredicate, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
-            asserts: await q.receive(typePredicate.asserts, el => this.visitLeftPadded(el, q)),
+            asserts: await q.receive(typePredicate.asserts, async el => this.visitLeftPadded(el, q) as any),
             parameterName: await q.receive(typePredicate.parameterName, el => this.visitDefined<J.Identifier>(el, q)),
             expression: await q.receive(typePredicate.expression, el => this.visitLeftPadded(el, q)),
             type: await q.receive(typePredicate.type, el => this.visitType(el, q))
@@ -1119,7 +1125,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             modifiers: await q.receiveListDefined(namespaceDeclaration.modifiers, el => this.visitDefined<J.Modifier>(el, q)),
-            keywordType: await q.receive(namespaceDeclaration.keywordType, el => this.visitLeftPadded(el, q)),
+            keywordType: await q.receive(namespaceDeclaration.keywordType, async el => this.visitLeftPadded(el, q) as any),
             name: await q.receive(namespaceDeclaration.name, el => this.visitRightPadded(el, q)),
             body: await q.receive(namespaceDeclaration.body, el => this.visitDefined<J.Block>(el, q))
         };
@@ -1155,7 +1161,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitExportDeclaration(exportDeclaration: JS.ExportDeclaration, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             modifiers: await q.receiveListDefined(exportDeclaration.modifiers, el => this.visitDefined<J.Modifier>(el, q)),
-            typeOnly: await q.receive(exportDeclaration.typeOnly, el => this.visitLeftPadded(el, q)),
+            typeOnly: await q.receive(exportDeclaration.typeOnly, async el => this.visitLeftPadded(el, q) as any),
             exportClause: await q.receive(exportDeclaration.exportClause, el => this.visitDefined<Expression>(el, q)),
             moduleSpecifier: await q.receive(exportDeclaration.moduleSpecifier, el => this.visitLeftPadded(el, q)),
             attributes: await q.receive(exportDeclaration.attributes, el => this.visitDefined<JS.ImportAttributes>(el, q))
@@ -1181,7 +1187,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     override async visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
-            typeOnly: await q.receive(exportSpecifier.typeOnly, el => this.visitLeftPadded(el, q)),
+            typeOnly: await q.receive(exportSpecifier.typeOnly, async el => this.visitLeftPadded(el, q) as any),
             specifier: await q.receive(exportSpecifier.specifier, el => this.visitDefined<Expression>(el, q)),
             type: await q.receive(exportSpecifier.type, el => this.visitType(el, q))
         };

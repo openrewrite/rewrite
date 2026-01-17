@@ -274,8 +274,9 @@ class FindIndentVisitor extends JavaScriptVisitor<any> {
 
     protected async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
         // Check indentation of statements in the block
+        // With intersection types, stmt IS the statement with padding mixed in
         for (const stmt of block.statements) {
-            const whitespace = stmt.element.prefix?.whitespace;
+            const whitespace = stmt.prefix?.whitespace;
             if (whitespace) {
                 this.analyzeIndent(whitespace);
             }
@@ -320,11 +321,12 @@ class FindSpacesVisitor extends JavaScriptVisitor<any> {
         if (import_.importClause?.namedBindings?.kind === JS.Kind.NamedImports) {
             const namedImports = import_.importClause.namedBindings as JS.NamedImports;
             if (namedImports.elements.elements.length > 0) {
+                // With intersection types, firstElement IS the specifier with padding mixed in
                 const firstElement = namedImports.elements.elements[0];
-                const hasSpaceAfterOpenBrace = firstElement.element.prefix?.whitespace?.includes(' ') ?? false;
+                const hasSpaceAfterOpenBrace = firstElement.prefix?.whitespace?.includes(' ') ?? false;
 
                 const lastElement = namedImports.elements.elements[namedImports.elements.elements.length - 1];
-                const hasSpaceBeforeCloseBrace = lastElement.after?.whitespace?.includes(' ') ?? false;
+                const hasSpaceBeforeCloseBrace = lastElement.padding.after?.whitespace?.includes(' ') ?? false;
 
                 if (hasSpaceAfterOpenBrace || hasSpaceBeforeCloseBrace) {
                     this.stats.es6ImportExportBracesWithSpace++;
@@ -341,11 +343,12 @@ class FindSpacesVisitor extends JavaScriptVisitor<any> {
         if (export_.exportClause?.kind === JS.Kind.NamedExports) {
             const namedExports = export_.exportClause as JS.NamedExports;
             if (namedExports.elements.elements.length > 0) {
+                // With intersection types, firstElement IS the specifier with padding mixed in
                 const firstElement = namedExports.elements.elements[0];
-                const hasSpaceAfterOpenBrace = firstElement.element.prefix?.whitespace?.includes(' ') ?? false;
+                const hasSpaceAfterOpenBrace = firstElement.prefix?.whitespace?.includes(' ') ?? false;
 
                 const lastElement = namedExports.elements.elements[namedExports.elements.elements.length - 1];
-                const hasSpaceBeforeCloseBrace = lastElement.after?.whitespace?.includes(' ') ?? false;
+                const hasSpaceBeforeCloseBrace = lastElement.padding.after?.whitespace?.includes(' ') ?? false;
 
                 if (hasSpaceAfterOpenBrace || hasSpaceBeforeCloseBrace) {
                     this.stats.es6ImportExportBracesWithSpace++;
@@ -363,12 +366,13 @@ class FindSpacesVisitor extends JavaScriptVisitor<any> {
             const stmts = newClass.body.statements;
 
             // Check if single-line (no newlines in any element prefix or in end)
-            const isMultiLine = stmts.some(s => s.element.prefix?.whitespace?.includes('\n')) ||
+            // With intersection types, stmt IS the statement with padding mixed in
+            const isMultiLine = stmts.some(s => s.prefix?.whitespace?.includes('\n')) ||
                 newClass.body.end?.whitespace?.includes('\n');
 
             if (!isMultiLine) {
                 const firstElement = stmts[0];
-                const hasSpaceAfterOpenBrace = firstElement.element.prefix?.whitespace?.includes(' ') ?? false;
+                const hasSpaceAfterOpenBrace = firstElement.prefix?.whitespace?.includes(' ') ?? false;
 
                 // For object literals, the space before } is in body.end, not in last statement's after
                 const hasSpaceBeforeCloseBrace = newClass.body.end?.whitespace?.includes(' ') ?? false;
@@ -389,12 +393,13 @@ class FindSpacesVisitor extends JavaScriptVisitor<any> {
             const stmts = typeLiteral.members.statements;
 
             // Check if single-line (no newlines in any element prefix or in end)
-            const isMultiLine = stmts.some(s => s.element.prefix?.whitespace?.includes('\n')) ||
+            // With intersection types, stmt IS the statement with padding mixed in
+            const isMultiLine = stmts.some(s => s.prefix?.whitespace?.includes('\n')) ||
                 typeLiteral.members.end?.whitespace?.includes('\n');
 
             if (!isMultiLine) {
                 const firstElement = stmts[0];
-                const hasSpaceAfterOpenBrace = firstElement.element.prefix?.whitespace?.includes(' ') ?? false;
+                const hasSpaceAfterOpenBrace = firstElement.prefix?.whitespace?.includes(' ') ?? false;
 
                 // For type literals, the space before } is in members.end, not in last statement's after
                 const hasSpaceBeforeCloseBrace = typeLiteral.members.end?.whitespace?.includes(' ') ?? false;
@@ -420,15 +425,16 @@ class FindWrappingAndBracesVisitor extends JavaScriptVisitor<any> {
 
     protected async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
         // Check if this is a simple block (empty or contains only J.Empty)
+        // With intersection types, stmt IS the statement with padding mixed in
         const isSimple = block.statements.length === 0 ||
-            (block.statements.length === 1 && block.statements[0].element.kind === J.Kind.Empty);
+            (block.statements.length === 1 && block.statements[0].kind === J.Kind.Empty);
 
         if (isSimple) {
             // Determine if block is on one line by checking for newlines
             const hasNewlineInEnd = block.end?.whitespace?.includes('\n') ?? false;
             const hasNewlineInStatements = block.statements.length > 0 &&
-                (block.statements[0].element.prefix?.whitespace?.includes('\n') ||
-                 block.statements[0].after?.whitespace?.includes('\n'));
+                (block.statements[0].prefix?.whitespace?.includes('\n') ||
+                 block.statements[0].padding.after?.whitespace?.includes('\n'));
 
             const isOnOneLine = !hasNewlineInEnd && !hasNewlineInStatements;
 

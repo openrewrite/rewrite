@@ -38,23 +38,22 @@ export class ReplaceAssignment extends Recipe {
         const envVarValue = "'" + process.env[envVar] + "'";
         return new class extends JavaScriptVisitor<ExecutionContext> {
             protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, c: ExecutionContext): Promise<J | undefined> {
-                if ((variable.initializer!.element as J.Literal).valueSource === envVarValue) {
+                if ((variable.initializer! as J.Literal).valueSource === envVarValue) {
                     return super.visitVariable(variable, c);
                 }
                 const [draft, finishDraft] = create(variable);
                 draft.initializer = {
-                    kind: J.Kind.LeftPadded,
+                    kind: J.Kind.Literal,
+                    id: randomId(),
+                    prefix: singleSpace,
                     markers: emptyMarkers,
-                    element: {
-                        kind: J.Kind.Literal,
-                        id: randomId(),
-                        prefix: singleSpace,
+                    valueSource: envVarValue,
+                    type: Type.Primitive.String,
+                    padding: {
+                        before: singleSpace,
                         markers: emptyMarkers,
-                        valueSource: envVarValue,
-                        type: Type.Primitive.String,
-                    } as J.Literal,
-                    before: singleSpace,
-                };
+                    }
+                } as J.LeftPadded<J.Literal>;
                 return finishDraft();
             }
         }

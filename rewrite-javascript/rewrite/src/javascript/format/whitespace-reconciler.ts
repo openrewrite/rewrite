@@ -15,12 +15,28 @@
  */
 import {isIdentifier, isLiteral, isSpace, J, Type} from '../../java';
 import {JS} from "../tree";
+import {isTree} from "../../tree";
 
 /**
  * Union type for all tree node types that the reconciler handles.
  * This includes J nodes and their wrapper types.
  */
 type TreeNode = J | J.RightPadded<J> | J.LeftPadded<J> | J.Container<J> | J.Space;
+
+/**
+ * Compares two tree nodes for equality by ID.
+ * Uses ID comparison if both nodes are trees with IDs, otherwise falls back to reference equality.
+ * This is important because visitors may create new objects during transformation.
+ */
+function isSameNode(a: unknown, b: unknown): boolean {
+    if (a === b) return true;
+    if (a == null || b == null) return false;
+    // Compare by ID if both have IDs (for tree nodes)
+    if (isTree(a) && isTree(b)) {
+        return a.id === b.id;
+    }
+    return false;
+}
 
 /**
  * Type guard to check if a value has a kind property (is a tree node or wrapper).
@@ -166,9 +182,9 @@ export class WhitespaceReconciler {
             return this.shouldReconcile() ? formatted : original;
         }
 
-        // Track entering target subtree (using referential equality)
-        const isTargetSubtree = this.targetSubtree !== undefined && original === this.targetSubtree;
-        const isStopAfterNode = this.stopAfterNode !== undefined && original === this.stopAfterNode;
+        // Track entering target subtree (using ID equality for tree nodes)
+        const isTargetSubtree = isSameNode(original, this.targetSubtree);
+        const isStopAfterNode = isSameNode(original, this.stopAfterNode);
         const previousState = this.reconcileState;
         if (isTargetSubtree && this.reconcileState === 'searching') {
             this.reconcileState = 'reconciling';

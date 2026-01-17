@@ -46,7 +46,7 @@ describe('method mapping', () => {
                 }
             `),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                let method = (cu.statements[0].element as J.ClassDeclaration).body.statements[0].element as J.MethodDeclaration;
+                let method = (cu.statements[0] as unknown as J.ClassDeclaration).body.statements[0] as unknown as J.MethodDeclaration;
                 expect(method.name.kind).toBe(J.Kind.Identifier);
             }
         }));

@@ -39,7 +39,7 @@ describe.each([
         afterRecipe: (cu: JS.CompilationUnit) => {
             expect(cu).toBeDefined();
             expect(cu.statements).toHaveLength(1);
-            const lit = (cu.statements[0].element as JS.ExpressionStatement).expression as Literal;
+            const lit = (cu.statements[0] as unknown as JS.ExpressionStatement).expression as Literal;
             expect(lit.valueSource).toBe(expectedValueSource);
             expect(lit.type).toBe(expectedType);
         }
@@ -52,7 +52,7 @@ describe('Old-style octal literals (error 1121)', () => {
         afterRecipe: (cu: JS.CompilationUnit) => {
             expect(cu).toBeDefined();
             expect(cu.statements).toHaveLength(1);
-            const lit = (cu.statements[0].element as JS.ExpressionStatement).expression as Literal;
+            const lit = (cu.statements[0] as unknown as JS.ExpressionStatement).expression as Literal;
             expect(lit.valueSource).toBe('0777');
             expect(lit.type).toBe(Type.Primitive.Double);
         }
@@ -69,7 +69,7 @@ describe('Old-style octal escapes (error 1487)', () => {
         afterRecipe: (cu: JS.CompilationUnit) => {
             expect(cu).toBeDefined();
             expect(cu.statements).toHaveLength(1);
-            const lit = (cu.statements[0].element as JS.ExpressionStatement).expression as Literal;
+            const lit = (cu.statements[0] as unknown as JS.ExpressionStatement).expression as Literal;
             expect(lit.valueSource).toBe("'\\033[2J'");
             expect(lit.type).toBe(Type.Primitive.String);
         }
@@ -86,7 +86,7 @@ describe('Malformed hex escape sequences (error 1125)', () => {
         afterRecipe: (cu: JS.CompilationUnit) => {
             expect(cu).toBeDefined();
             expect(cu.statements).toHaveLength(1);
-            const lit = (cu.statements[0].element as JS.ExpressionStatement).expression as Literal;
+            const lit = (cu.statements[0] as unknown as JS.ExpressionStatement).expression as Literal;
             expect(lit.valueSource).toBe('/\\x-.*/');
             expect(lit.type).toBe(Type.Primitive.String);
         }

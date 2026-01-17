@@ -1,5 +1,5 @@
 import {JavaScriptVisitor} from "./visitor";
-import {J} from "../java";
+import {J, Statement} from "../java";
 import {JS, JSX} from "./tree";
 import {mapAsync} from "../util";
 import {ElementRemovalFormatter} from "../java";
@@ -40,12 +40,8 @@ export function maybeRemoveImport(visitor: JavaScriptVisitor<any>, module: strin
 }
 
 // Type alias for RightPadded elements to simplify type signatures
-type RightPaddedElement<T extends J> = {
-    element?: T;
-    after?: J.Space;
-    markers?: any;
-    kind?: any;  // Add kind to match the RightPadded type structure
-}
+// With the new intersection type for RightPadded<T extends J>, padding is nested under `padding` property
+type RightPaddedElement<T extends J> = T & J.RightPaddingMixin;
 
 export class RemoveImport<P> extends JavaScriptVisitor<P> {
     /**
@@ -79,33 +75,31 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
 
         // Track the trailing space of the original last element
         const originalLastElement = elements[elements.length - 1];
-        const originalTrailingSpace = originalLastElement?.after;
+        const originalTrailingSpace = originalLastElement?.padding.after;
 
         for (const elem of elements) {
-            if (elem.element && shouldKeep(elem.element)) {
+            // With intersection types, elem IS the element with padding mixed in
+            if (elem && shouldKeep(elem as T)) {
                 // If we removed the previous element and this is the first kept element,
                 // apply the removed element's prefix to maintain formatting
                 if (removedPrefix && filtered.length === 0) {
-                    const updatedElement = await updatePrefix(elem.element, removedPrefix);
-                    filtered.push({...elem, element: updatedElement});
+                    const updatedElement = await updatePrefix(elem as T, removedPrefix);
+                    filtered.push({...updatedElement, padding: elem.padding} as RightPaddedElement<T>);
                     removedPrefix = undefined;
                 } else {
                     filtered.push(elem);
                 }
-            } else if (elem.element) {
+            } else if (elem) {
                 // Store the prefix of the first removed element
                 if (filtered.length === 0 && !removedPrefix) {
-                    removedPrefix = elem.element.prefix;
+                    removedPrefix = elem.prefix;
                 }
-            } else {
-                // Keep non-element entries (shouldn't happen but be safe)
-                filtered.push(elem);
             }
         }
 
         // If the original last element was removed and we have remaining elements,
         // transfer its trailing space to the new last element
-        if (filtered.length > 0 && originalLastElement?.element && !shouldKeep(originalLastElement.element)) {
+        if (filtered.length > 0 && originalLastElement && !shouldKeep(originalLastElement as T)) {
             const lastIdx = filtered.length - 1;
             filtered[lastIdx] = {...filtered[lastIdx], after: originalTrailingSpace};
         }
@@ -147,54 +141,51 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             const formatter = new ElementRemovalFormatter<J>(true); // Preserve file headers from first import
 
             draft.statements = await mapAsync(compilationUnit.statements, async (stmt) => {
-                const statement = stmt.element;
-
                 // Handle ES6 imports
-                if (statement?.kind === JS.Kind.Import) {
-                    const jsImport = statement as JS.Import;
+                if (stmt?.kind === JS.Kind.Import) {
+                    const jsImport = stmt as JS.Import & J.RightPaddingMixin;
                     const result = await this.processImport(jsImport, usedIdentifiers, usedTypes, p);
                     if (result === undefined) {
-                        formatter.markRemoved(statement);
+                        formatter.markRemoved(stmt);
                         return undefined;
                     }
 
                     const finalResult = formatter.processKept(result) as JS.Import;
-                    return {...stmt, element: finalResult};
+                    return {...finalResult, padding: stmt.padding} as J.RightPadded<Statement>;
                 }
 
                 // Handle CommonJS require statements
                 // Note: const fs = require() comes as J.VariableDeclarations
                 // Multi-variable declarations might come as JS.ScopedVariableDeclarations
-                if (statement?.kind === J.Kind.VariableDeclarations) {
-                    const varDecl = statement as J.VariableDeclarations;
+                if (stmt?.kind === J.Kind.VariableDeclarations) {
+                    const varDecl = stmt as J.VariableDeclarations & J.RightPaddingMixin;
                     const result = await this.processRequireFromVarDecls(varDecl, usedIdentifiers, p);
                     if (result === undefined) {
-                        formatter.markRemoved(statement);
+                        formatter.markRemoved(stmt);
                         return undefined;
                     }
 
                     const finalResult = formatter.processKept(result) as J.VariableDeclarations;
-                    return {...stmt, element: finalResult};
+                    return {...finalResult, padding: stmt.padding} as J.RightPadded<Statement>;
                 }
 
                 // Handle JS.ScopedVariableDeclarations (multi-variable var/let/const)
-                if (statement?.kind === JS.Kind.ScopedVariableDeclarations) {
-                    const scopedVarDecl = statement as any;
+                if (stmt?.kind === JS.Kind.ScopedVariableDeclarations) {
+                    const scopedVarDecl = stmt as any;
                     // Scoped variable declarations contain a variables array where each element is a single-variable J.VariableDeclarations
                     const filteredVariables: any[] = [];
                     let hasChanges = false;
                     const varFormatter = new ElementRemovalFormatter<J.VariableDeclarations>(true); // Preserve file headers
 
                     for (const v of scopedVarDecl.variables) {
-                        const varDecl = v.element;
-                        if (varDecl?.kind === J.Kind.VariableDeclarations) {
-                            const result = await this.processRequireFromVarDecls(varDecl as J.VariableDeclarations, usedIdentifiers, p);
+                        if (v?.kind === J.Kind.VariableDeclarations) {
+                            const result = await this.processRequireFromVarDecls(v as J.VariableDeclarations, usedIdentifiers, p);
                             if (result === undefined) {
                                 hasChanges = true;
-                                varFormatter.markRemoved(varDecl);
+                                varFormatter.markRemoved(v);
                             } else {
                                 const formattedVarDecl = varFormatter.processKept(result as J.VariableDeclarations);
-                                filteredVariables.push({...v, element: formattedVarDecl});
+                                filteredVariables.push({...formattedVarDecl, padding: v.padding});
                             }
                         } else {
                             filteredVariables.push(v);
@@ -202,21 +193,21 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     }
 
                     if (filteredVariables.length === 0) {
-                        formatter.markRemoved(statement);
+                        formatter.markRemoved(stmt);
                         return undefined;
                     }
 
                     const finalElement: any = hasChanges
                         ? formatter.processKept({...scopedVarDecl, variables: filteredVariables})
-                        : formatter.processKept(statement);
+                        : formatter.processKept(stmt);
 
-                    return {...stmt, element: finalElement};
+                    return {...finalElement, padding: stmt.padding};
                 }
 
                 // For any other statement type, apply prefix from removed elements
-                if (statement) {
-                    const finalStatement = formatter.processKept(statement);
-                    return {...stmt, element: finalStatement};
+                if (stmt) {
+                    const finalStatement = formatter.processKept(stmt);
+                    return {...finalStatement, padding: stmt.padding} as J.RightPadded<Statement>;
                 }
 
                 return stmt;
@@ -255,9 +246,10 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
 
         // Process default import
         if (importClause.name) {
-            const defaultName = importClause.name.element;
+            // With intersection types, name IS the Identifier with padding mixed in
+            const defaultName = importClause.name;
             if (defaultName && defaultName.kind === J.Kind.Identifier) {
-                const identifier = defaultName as J.Identifier;
+                const identifier = defaultName as J.Identifier & J.RightPaddingMixin;
                 const name = identifier.simpleName;
 
                 // Check if we should remove this default import
@@ -280,10 +272,10 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                         draft.name = undefined;
                         // When removing the default import, we need to transfer its prefix to namedBindings
                         // to maintain proper spacing (the default import's prefix is typically empty)
-                        if (draft.namedBindings && importClause.name?.element) {
+                        if (draft.namedBindings && importClause.name) {
                             draft.namedBindings = await this.produceJava(
                                 draft.namedBindings, p, async bindingsDraft => {
-                                    bindingsDraft.prefix = importClause.name!.element!.prefix;
+                                    bindingsDraft.prefix = importClause.name!.prefix;
                                 }
                             );
                         }
@@ -395,12 +387,13 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         usedTypes: Set<string>,
         p: P
     ): Promise<JS.Import | undefined> {
-        const initializer = jsImport.initializer?.element;
+        // With intersection types, initializer IS the expression with padding mixed in
+        const initializer = jsImport.initializer;
         if (!initializer || !this.isRequireCall(initializer)) {
             return jsImport;
         }
 
-        const methodInv = initializer as J.MethodInvocation;
+        const methodInv = initializer as J.MethodInvocation & J.LeftPaddingMixin;
         const moduleName = this.getModuleNameFromRequire(methodInv);
         if (!moduleName || !this.matchesTargetModule(moduleName)) {
             return jsImport;
@@ -413,7 +406,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             return jsImport;
         }
 
-        const importedName = (importClause.name.element as J.Identifier).simpleName;
+        // With intersection types, name IS the Identifier with padding mixed in
+        const importedName = (importClause.name as J.Identifier & J.RightPaddingMixin).simpleName;
 
         // For import-equals-require, we can only remove the entire import since
         // it imports the whole module as a single identifier
@@ -526,17 +520,20 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             return varDecls;
         }
 
-        const namedVar = varDecls.variables[0].element;
+        // With intersection types, the variable IS the NamedVariable with padding mixed in
+        const namedVar = varDecls.variables[0];
         if (!namedVar) {
             return varDecls;
         }
 
-        const initializer = namedVar.initializer?.element;
+        // With intersection types, initializer IS the expression with padding mixed in
+        const initializer = namedVar.initializer;
         if (!initializer || !this.isRequireCall(initializer)) {
             return varDecls;
         }
 
-        const methodInv = initializer as J.MethodInvocation;
+        // Cast through unknown for intersection type to specific type
+        const methodInv = initializer as unknown as J.MethodInvocation;
 
         // This is a require() statement
         const pattern = namedVar.name;
@@ -566,11 +563,12 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 // Update with filtered bindings
                 return this.produceJava(varDecls, p, async draft => {
                     const updatedNamedVar = await this.produceJava(
-                        namedVar, p, async namedDraft => {
+                        namedVar as J.VariableDeclarations.NamedVariable, p, async namedDraft => {
                             namedDraft.name = updatedPattern;
                         }
                     );
-                    draft.variables = [{...varDecls.variables[0], element: updatedNamedVar}];
+                    // Preserve padding fields when updating
+                    draft.variables = [{...updatedNamedVar, padding: varDecls.variables[0].padding} as J.RightPadded<J.VariableDeclarations.NamedVariable>];
                 });
             }
         }
@@ -587,12 +585,13 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             return undefined;
         }
 
-        const firstArg = args[0].element;
-        if (!firstArg || firstArg.kind !== J.Kind.Literal || typeof (firstArg as J.Literal).value !== 'string') {
+        // With intersection types, the arg IS the expression with padding mixed in
+        const firstArg = args[0];
+        if (!firstArg || firstArg.kind !== J.Kind.Literal || typeof (firstArg as J.Literal & J.RightPaddingMixin).value !== 'string') {
             return undefined;
         }
 
-        return (firstArg as J.Literal).value?.toString();
+        return (firstArg as J.Literal & J.RightPaddingMixin).value?.toString();
     }
 
     private async processObjectBindingPattern(
@@ -653,9 +652,10 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             // Handle aliased import: import { foo as bar }
             // Return the original name (foo)
             const alias = spec as JS.Alias;
-            const propertyName = alias.propertyName.element;
+            // With intersection types, propertyName IS the identifier with padding mixed in
+            const propertyName = alias.propertyName;
             if (propertyName?.kind === J.Kind.Identifier) {
-                return (propertyName as J.Identifier).simpleName;
+                return (propertyName as J.Identifier & J.RightPaddingMixin).simpleName;
             }
         } else if (spec?.kind === J.Kind.Identifier) {
             // Handle regular import: import { foo }
@@ -707,12 +707,13 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
 
     private isTargetModule(jsImport: JS.Import): boolean {
         // Always check if the import is from the specified module
-        const moduleSpecifier = jsImport.moduleSpecifier?.element;
+        // With intersection types, moduleSpecifier IS the literal with padding mixed in
+        const moduleSpecifier = jsImport.moduleSpecifier;
         if (!moduleSpecifier || moduleSpecifier.kind !== J.Kind.Literal) {
             return false;
         }
 
-        const literal = moduleSpecifier as J.Literal;
+        const literal = moduleSpecifier as J.Literal & J.LeftPaddingMixin;
         const moduleName = literal.value?.toString().replace(/['"`]/g, '');
 
         // Match the module name
@@ -798,23 +799,25 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             // Check the type expression on the VariableDeclarations itself
             await this.checkTypeExpression(varDecls, usedTypes);
             for (const v of varDecls.variables) {
-                // Check the initializer
-                if (v.element.initializer?.element) {
-                    await this.collectUsedIdentifiers(v.element.initializer.element, usedIdentifiers, usedTypes);
+                // With intersection types, v IS the NamedVariable with padding mixed in
+                // Check the initializer (which is also an intersection type for tree nodes)
+                if (v.initializer) {
+                    await this.collectUsedIdentifiers(v.initializer, usedIdentifiers, usedTypes);
                 }
             }
         } else if (node.kind === J.Kind.MethodInvocation) {
             const methodInv = node as J.MethodInvocation;
 
             // Check if this is a member access pattern like fs.readFileSync
-            if (methodInv.select?.element?.kind === J.Kind.FieldAccess) {
-                const fieldAccess = methodInv.select.element as J.FieldAccess;
+            // With intersection types, select IS the expression with padding mixed in
+            if (methodInv.select?.kind === J.Kind.FieldAccess) {
+                const fieldAccess = methodInv.select as J.FieldAccess & J.RightPaddingMixin;
                 if (fieldAccess.target?.kind === J.Kind.Identifier) {
                     usedIdentifiers.add((fieldAccess.target as J.Identifier).simpleName);
                 }
-            } else if (methodInv.select?.element?.kind === J.Kind.Identifier) {
+            } else if (methodInv.select?.kind === J.Kind.Identifier) {
                 // Direct identifier like fs in fs.method() - though this is rare
-                usedIdentifiers.add((methodInv.select.element as J.Identifier).simpleName);
+                usedIdentifiers.add((methodInv.select as J.Identifier & J.RightPaddingMixin).simpleName);
             } else if (!methodInv.select) {
                 // No select means this is a direct function call like isArray()
                 // Only in this case should we add the method name as a used identifier
@@ -827,19 +830,21 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             // Recursively check arguments
             if (methodInv.arguments) {
                 for (const arg of methodInv.arguments.elements) {
-                    if (arg.element) {
-                        await this.collectUsedIdentifiers(arg.element, usedIdentifiers, usedTypes);
+                    // With intersection types, arg IS the expression with padding mixed in
+                    if (arg) {
+                        await this.collectUsedIdentifiers(arg, usedIdentifiers, usedTypes);
                     }
                 }
             }
             // Check select (object being called on)
-            if (methodInv.select?.element) {
-                await this.collectUsedIdentifiers(methodInv.select.element, usedIdentifiers, usedTypes);
+            if (methodInv.select) {
+                await this.collectUsedIdentifiers(methodInv.select, usedIdentifiers, usedTypes);
             }
         } else if (node.kind === J.Kind.MemberReference) {
             const memberRef = node as J.MemberReference;
-            if (memberRef.containing && memberRef.containing.element?.kind === J.Kind.Identifier) {
-                usedIdentifiers.add((memberRef.containing.element as J.Identifier).simpleName);
+            // With intersection types, containing IS the expression with padding mixed in
+            if (memberRef.containing && memberRef.containing.kind === J.Kind.Identifier) {
+                usedIdentifiers.add((memberRef.containing as J.Identifier & J.RightPaddingMixin).simpleName);
             }
         } else if (node.kind === J.Kind.FieldAccess) {
             // Handle field access like fs.readFileSync
@@ -854,16 +859,19 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         } else if (node.kind === JS.Kind.CompilationUnit) {
             const cu = node as JS.CompilationUnit;
             for (const stmt of cu.statements) {
-                if (stmt.element && stmt.element.kind !== JS.Kind.Import) {
+                // With intersection types, stmt IS the statement with padding mixed in
+                if (stmt && stmt.kind !== JS.Kind.Import) {
                     // Skip require() statements at the top level
-                    if (stmt.element.kind === J.Kind.VariableDeclarations) {
-                        const varDecls = stmt.element as J.VariableDeclarations;
+                    if (stmt.kind === J.Kind.VariableDeclarations) {
+                        const varDecls = stmt as J.VariableDeclarations & J.RightPaddingMixin;
                         // Check if this is a require() statement
                         let isRequire = false;
                         for (const v of varDecls.variables) {
-                            const namedVar = v.element;
-                            if (namedVar?.initializer?.element?.kind === J.Kind.MethodInvocation) {
-                                const methodInv = namedVar.initializer.element as J.MethodInvocation;
+                            // v IS the NamedVariable with padding mixed in
+                            const namedVar = v;
+                            // initializer IS the expression with padding mixed in
+                            if (namedVar?.initializer?.kind === J.Kind.MethodInvocation) {
+                                const methodInv = namedVar.initializer as J.MethodInvocation & J.LeftPaddingMixin;
                                 if (methodInv.name?.kind === J.Kind.Identifier &&
                                     (methodInv.name as J.Identifier).simpleName === 'require') {
                                     isRequire = true;
@@ -873,11 +881,11 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                         }
                         if (!isRequire) {
                             // Not a require statement, process normally
-                            await this.collectUsedIdentifiers(stmt.element, usedIdentifiers, usedTypes);
+                            await this.collectUsedIdentifiers(stmt, usedIdentifiers, usedTypes);
                         }
-                    } else if (stmt.element.kind !== JS.Kind.ScopedVariableDeclarations) {
+                    } else if (stmt.kind !== JS.Kind.ScopedVariableDeclarations) {
                         // Process other non-import, non-require statements normally
-                        await this.collectUsedIdentifiers(stmt.element, usedIdentifiers, usedTypes);
+                        await this.collectUsedIdentifiers(stmt, usedIdentifiers, usedTypes);
                     }
                 }
             }
@@ -890,8 +898,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         } else if (node.kind === J.Kind.Block) {
             const block = node as J.Block;
             for (const stmt of block.statements) {
-                if (stmt.element) {
-                    await this.collectUsedIdentifiers(stmt.element, usedIdentifiers, usedTypes);
+                // With intersection types, stmt IS the statement with padding mixed in
+                if (stmt) {
+                    await this.collectUsedIdentifiers(stmt, usedIdentifiers, usedTypes);
                 }
             }
         } else if (node.kind === J.Kind.MethodDeclaration) {
@@ -899,9 +908,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             // Check parameters for type usage
             if (method.parameters) {
                 for (const param of method.parameters.elements) {
-                    // Parameters can be various types, handle them recursively
-                    if (param.element) {
-                        await this.collectUsedIdentifiers(param.element, usedIdentifiers, usedTypes);
+                    // With intersection types, param IS the parameter with padding mixed in
+                    if (param) {
+                        await this.collectUsedIdentifiers(param, usedIdentifiers, usedTypes);
                     }
                 }
             }
@@ -947,8 +956,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             const lambda = node as J.Lambda;
             if (lambda.parameters?.parameters) {
                 for (const param of lambda.parameters.parameters) {
-                    if (param.element) {
-                        await this.collectUsedIdentifiers(param.element, usedIdentifiers, usedTypes);
+                    // With intersection types, param IS the parameter with padding mixed in
+                    if (param) {
+                        await this.collectUsedIdentifiers(param, usedIdentifiers, usedTypes);
                     }
                 }
             }
@@ -961,8 +971,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             // Check attributes
             if (jsxTag.attributes) {
                 for (const attr of jsxTag.attributes) {
-                    if (attr.element) {
-                        await this.collectUsedIdentifiers(attr.element, usedIdentifiers, usedTypes);
+                    // With intersection types, attr IS the attribute with padding mixed in
+                    if (attr) {
+                        await this.collectUsedIdentifiers(attr, usedIdentifiers, usedTypes);
                     }
                 }
             }
@@ -977,8 +988,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         } else if (node.kind === JS.Kind.JsxEmbeddedExpression) {
             // Handle JSX embedded expressions like {React.version}
             const embedded = node as JSX.EmbeddedExpression;
-            // The expression is wrapped in RightPadded, so unwrap it
-            const expr = embedded.expression?.element || embedded.expression;
+            // With intersection types, expression IS the expression with padding mixed in
+            const expr = embedded.expression;
             if (expr) {
                 await this.collectUsedIdentifiers(expr, usedIdentifiers, usedTypes);
             }
@@ -991,9 +1002,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         } else if (node.kind === JS.Kind.TypeDeclaration) {
             // Handle type alias declarations like: type Props = { children: React.ReactNode }
             const typeDecl = node as JS.TypeDeclaration;
-            // The initializer contains the type expression (the right side of the =)
-            if (typeDecl.initializer?.element) {
-                await this.collectTypeUsage(typeDecl.initializer.element, usedTypes);
+            // With intersection types, initializer IS the type expression with padding mixed in
+            if (typeDecl.initializer) {
+                await this.collectTypeUsage(typeDecl.initializer, usedTypes);
             }
         } else if ((node as any).statements) {
             // Generic handler for nodes with statements
@@ -1023,8 +1034,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             // Then collect usage from type parameters (e.g., HTMLButtonElement from React.Ref<HTMLButtonElement>)
             if (paramType.typeParameters) {
                 for (const typeParam of paramType.typeParameters.elements) {
-                    if (typeParam.element) {
-                        await this.collectTypeUsage(typeParam.element, usedTypes);
+                    // With intersection types, typeParam IS the type with padding mixed in
+                    if (typeParam) {
+                        await this.collectTypeUsage(typeParam, usedTypes);
                     }
                 }
             }
@@ -1041,8 +1053,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             // Handle intersection types like ButtonProps & { ref?: React.Ref<HTMLButtonElement> }
             const intersection = typeExpr as JS.Intersection;
             for (const typeElem of intersection.types) {
-                if (typeElem.element) {
-                    await this.collectTypeUsage(typeElem.element, usedTypes);
+                // With intersection types, typeElem IS the type with padding mixed in
+                if (typeElem) {
+                    await this.collectTypeUsage(typeElem, usedTypes);
                 }
             }
         } else if (typeExpr.kind === JS.Kind.TypeLiteral) {
@@ -1050,9 +1063,10 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             const typeLiteral = typeExpr as JS.TypeLiteral;
             // TypeLiteral members are in a Block, which contains statements
             for (const stmt of typeLiteral.members.statements) {
-                if (stmt.element) {
+                // With intersection types, stmt IS the statement with padding mixed in
+                if (stmt) {
                     // Each statement is typically a VariableDeclarations representing a property
-                    await this.collectUsedIdentifiers(stmt.element, new Set(), usedTypes);
+                    await this.collectUsedIdentifiers(stmt, new Set(), usedTypes);
                 }
             }
         } else if (typeExpr.kind === JS.Kind.TypeQuery) {

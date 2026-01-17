@@ -273,20 +273,21 @@ export function flattenBlock<P>(
             const newStatements: typeof parentBlock.statements = [];
 
             for (const stmt of parentBlock.statements) {
+                // For tree types, stmt IS the statement with padding mixed in
+                const stmtElement = stmt as unknown as Statement;
                 // Check if this statement is the block we want to flatten
-                if (stmt.element === block || stmt.element.id === block.id) {
+                if (stmtElement === block || stmtElement.id === block.id) {
                     // Splice in the inner block's statements
                     for (let i = 0; i < block.statements.length; i++) {
                         const innerStmt = block.statements[i];
+                        // For tree types, innerStmt IS the statement with padding mixed in
+                        const innerStmtElement = innerStmt as unknown as Statement;
                         if (i === 0) {
                             // First statement inherits the outer statement's padding
                             newStatements.push({
                                 ...innerStmt,
-                                element: {
-                                    ...innerStmt.element,
-                                    prefix: stmt.element.prefix  // Use the original statement's prefix
-                                } as Statement
-                            });
+                                prefix: stmtElement.prefix  // Use the original statement's prefix
+                            } as J.RightPadded<Statement>);
                         } else {
                             newStatements.push(innerStmt);
                         }

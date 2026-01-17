@@ -215,8 +215,8 @@ describe('expression statement mapping', () => {
         //language=typescript
         ...typescript(`console.log("Hello");`),
         afterRecipe : (cu: JS.CompilationUnit) => {
-            const mi = cu.statements[0].element as J.MethodInvocation;
-            expect(mi.select!.element.kind).toEqual(J.Kind.Identifier);
+            const mi = cu.statements[0] as unknown as J.MethodInvocation;
+            expect(mi.select!.kind).toEqual(J.Kind.Identifier);
             expect(mi.name.simpleName).toEqual("log");
         }
         }));
