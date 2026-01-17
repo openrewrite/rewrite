@@ -94,15 +94,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         Map<String, Recipe> recipeMap = new HashMap<>();
         availableRecipes.forEach(r -> recipeMap.putIfAbsent(r.getName(), r));
         Set<String> initializingRecipes = new HashSet<>();
-        initializingRecipes.add(name);
-        Set<String> seenDeclarativeRecipeNames = new HashSet<>();
-        seenDeclarativeRecipeNames.add(name);
-        initialize(uninitializedRecipes, recipeList, recipeMap::get, initializingRecipes, seenDeclarativeRecipeNames);
-        // Preconditions get their own seenDeclarativeRecipeNames to avoid deduplicating across preconditions and recipe list
-        Set<String> seenPreconditionNames = new HashSet<>();
-        seenPreconditionNames.add(name);
-        initialize(uninitializedPreconditions, preconditions, recipeMap::get, initializingRecipes, seenPreconditionNames);
-        initializingRecipes.remove(name);
+        initialize(uninitializedRecipes, recipeList, recipeMap::get, initializingRecipes);
+        initialize(uninitializedPreconditions, preconditions, recipeMap::get, initializingRecipes);
     }
 
     @Deprecated
@@ -113,15 +106,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
     public void initialize(Function<String, @Nullable Recipe> availableRecipes) {
         Set<String> initializingRecipes = new HashSet<>();
-        initializingRecipes.add(name);
-        Set<String> seenDeclarativeRecipeNames = new HashSet<>();
-        seenDeclarativeRecipeNames.add(name);
-        initialize(uninitializedRecipes, recipeList, availableRecipes, initializingRecipes, seenDeclarativeRecipeNames);
-        // Preconditions get their own seenDeclarativeRecipeNames to avoid deduplicating across preconditions and recipe list
-        Set<String> seenPreconditionNames = new HashSet<>();
-        seenPreconditionNames.add(name);
-        initialize(uninitializedPreconditions, preconditions, availableRecipes, initializingRecipes, seenPreconditionNames);
-        initializingRecipes.remove(name);
+        initialize(uninitializedRecipes, recipeList, availableRecipes, initializingRecipes);
+        initialize(uninitializedPreconditions, preconditions, availableRecipes, initializingRecipes);
     }
 
     @Deprecated
@@ -130,70 +116,33 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         this.initialize(availableRecipes);
     }
 
-    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes, Set<String> seenDeclarativeRecipeNames) {
-        // If already initialized (uninitialized list is empty), don't re-process
-        if (uninitialized.isEmpty()) {
-            return;
-        }
+    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
         initialized.clear();
-        int index = 0;
-        // Work with a copy to avoid modifying the original uninitialized list
-        // This preserves recipe instance integrity when the same recipe is initialized in multiple contexts
-        List<Recipe> uninitializedCopy = new ArrayList<>(uninitialized);
-        Iterator<Recipe> iterator = uninitializedCopy.iterator();
-        while (iterator.hasNext()) {
-            Recipe recipe = iterator.next();
+        for (int i = 0; i < uninitialized.size(); i++) {
+            Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
                 String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
                 Recipe subRecipe = availableRecipes.apply(recipeFqn);
                 if (subRecipe != null) {
                     if (subRecipe instanceof DeclarativeRecipe) {
-                        // Check for cycles first - initializingRecipes contains recipes currently being initialized
-                        if (initializingRecipes.contains(recipeFqn)) {
-                            String cycle = String.join(" -> ", initializingRecipes) + " -> " + recipeFqn;
-                            throw new RecipeIntrospectionException(
-                                    "Recipe '" + recipeFqn + "' creates a cycle: " + cycle);
-                        }
-                        // Check for duplicates - skip if already seen in this recipe's direct children
-                        if (!seenDeclarativeRecipeNames.add(recipeFqn)) {
-                            iterator.remove();
-                             continue;
-                        }
                         initializeDeclarativeRecipe((DeclarativeRecipe) subRecipe, recipeFqn, availableRecipes, initializingRecipes);
                     }
                     initialized.add(subRecipe);
-                    iterator.remove();
                 } else {
                     initValidation = initValidation.and(
                             invalid(name + ".recipeList" +
-                                    "[" + index + "] (in " + source + ")",
+                                            "[" + i + "] (in " + source + ")",
                                     recipeFqn,
                                     "recipe '" + recipeFqn + "' does not exist.",
                                     null));
                 }
             } else {
                 if (recipe instanceof DeclarativeRecipe) {
-                    String recipeName = recipe.getName();
-                    // Check for cycles first - initializingRecipes contains recipes currently being initialized
-                    if (initializingRecipes.contains(recipeName)) {
-                        String cycle = String.join(" -> ", initializingRecipes) + " -> " + recipeName;
-                        throw new RecipeIntrospectionException(
-                                "Recipe '" + recipeName + "' creates a cycle: " + cycle);
-                    }
-                    // Check for duplicates - skip if already seen in this recipe's direct children
-                    if (!seenDeclarativeRecipeNames.add(recipeName)) {
-                        iterator.remove();
-                        continue;
-                    }
-                    initializeDeclarativeRecipe((DeclarativeRecipe) recipe, recipeName, availableRecipes, initializingRecipes);
+                    initializeDeclarativeRecipe((DeclarativeRecipe) recipe, recipe.getName(), availableRecipes, initializingRecipes);
                 }
                 initialized.add(recipe);
-                iterator.remove();
             }
-            index++;
         }
-        // Clear the original uninitialized list to mark this recipe as initialized
-        uninitialized.clear();
     }
 
     private void initializeDeclarativeRecipe(DeclarativeRecipe declarativeRecipe, String recipeIdentifier,
@@ -204,18 +153,12 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             String cycle = String.join(" -> ", initializingRecipes) + " -> " + recipeName;
             throw new RecipeIntrospectionException(
                     "Recipe '" + recipeIdentifier + "' creates a cycle: " + cycle);
+        } else {
+            initializingRecipes.add(recipeName);
+            declarativeRecipe.initialize(declarativeRecipe.uninitializedRecipes, declarativeRecipe.recipeList, availableRecipes, initializingRecipes);
+            declarativeRecipe.initialize(declarativeRecipe.uninitializedPreconditions, declarativeRecipe.preconditions, availableRecipes, initializingRecipes);
+            initializingRecipes.remove(recipeName);
         }
-        initializingRecipes.add(recipeName);
-        // Each child recipe gets its own seenDeclarativeRecipeNames for LOCAL deduplication
-        Set<String> childSeenDeclarativeRecipeNames = new HashSet<>();
-        childSeenDeclarativeRecipeNames.add(recipeName);
-        // These will return early if already initialized (uninitialized lists empty)
-        declarativeRecipe.initialize(declarativeRecipe.uninitializedRecipes, declarativeRecipe.recipeList, availableRecipes, initializingRecipes, childSeenDeclarativeRecipeNames);
-        // Preconditions get their own seenDeclarativeRecipeNames to avoid deduplicating across preconditions and recipe list
-        Set<String> childSeenPreconditionNames = new HashSet<>();
-        childSeenPreconditionNames.add(recipeName);
-        declarativeRecipe.initialize(declarativeRecipe.uninitializedPreconditions, declarativeRecipe.preconditions, availableRecipes, initializingRecipes, childSeenPreconditionNames);
-        initializingRecipes.remove(recipeName);
     }
 
     @SuppressWarnings("NotNullFieldNotInitialized")
@@ -395,8 +338,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
     @Override
     public final List<Recipe> getRecipeList() {
+        List<Recipe> deduplicated = deduplicateRecursively(recipeList, new HashSet<>());
+
         if (preconditions.isEmpty()) {
-            return recipeList;
+            return deduplicated;
         }
 
         List<Supplier<TreeVisitor<?, ExecutionContext>>> andPreconditions = new ArrayList<>();
@@ -405,10 +350,58 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         }
         //noinspection unchecked
         PreconditionBellwether bellwether = new PreconditionBellwether(Preconditions.and(andPreconditions.toArray(new Supplier[]{})));
-        List<Recipe> recipeListWithBellwether = new ArrayList<>(recipeList.size() + 1);
+        List<Recipe> recipeListWithBellwether = new ArrayList<>(deduplicated.size() + 1);
         recipeListWithBellwether.add(bellwether);
-        recipeListWithBellwether.addAll(decorateWithPreconditionBellwether(bellwether, recipeList));
+        recipeListWithBellwether.addAll(decorateWithPreconditionBellwether(bellwether, deduplicated));
         return recipeListWithBellwether;
+    }
+
+    private List<Recipe> deduplicateRecursively(List<Recipe> recipes, Set<String> seen) {
+        List<Recipe> result = new ArrayList<>(recipes.size());
+        for (Recipe recipe : recipes) {
+            if (recipe instanceof DeclarativeRecipe) {
+                DeclarativeRecipe declarativeRecipe = (DeclarativeRecipe) recipe;
+                String recipeName = declarativeRecipe.getName();
+                if (seen.add(recipeName)) {
+                    // Include this recipe with its children deduplicated using the same seen set
+                    result.add(declarativeRecipe.withDeduplication(seen));
+                }
+                // Skip duplicate declarative recipes
+            } else {
+                // Non-declarative recipes are always included
+                result.add(recipe);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Creates a copy of this DeclarativeRecipe with duplicates removed from its recipe list.
+     * The seen set is shared across the entire tree to enable deduplication across levels.
+     *
+     * @param seen Set of declarative recipe names already seen in the tree
+     * @return A copy of this recipe with deduplicated children
+     */
+    DeclarativeRecipe withDeduplication(Set<String> seen) {
+        List<Recipe> deduplicatedChildren = deduplicateRecursively(this.recipeList, seen);
+
+        DeclarativeRecipe copy = new DeclarativeRecipe(
+            this.name,
+            this.displayName,
+            this.description,
+            this.tags,
+            this.estimatedEffortPerOccurrence,
+            this.source,
+            this.causesAnotherCycle,
+            this.maintainers
+        );
+
+        // Set the deduplicated recipe list
+        copy.setRecipeList(new ArrayList<>(deduplicatedChildren));
+        copy.setPreconditions(new ArrayList<>(this.preconditions));
+        // uninitializedRecipes is already empty (already initialized)
+
+        return copy;
     }
 
     private TreeVisitor<?, ExecutionContext> orVisitors(Recipe recipe) {
@@ -489,10 +482,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     public Validated<Object> validate() {
         Validated<Object> validated = Validated.none();
 
-        if (!uninitializedRecipes.isEmpty()) {
+        if (!uninitializedRecipes.isEmpty() && uninitializedRecipes.size() != recipeList.size()) {
             validated = validated.and(Validated.invalid("initialization", recipeList, "DeclarativeRecipe must not contain uninitialized recipes. Be sure to call .initialize() on DeclarativeRecipe."));
         }
-        if (!uninitializedPreconditions.isEmpty()) {
+        if (!uninitializedPreconditions.isEmpty() && uninitializedPreconditions.size() != preconditions.size()) {
             validated = validated.and(Validated.invalid("initialization", preconditions, "DeclarativeRecipe must not contain uninitialized preconditions. Be sure to call .initialize() on DeclarativeRecipe."));
         }
 

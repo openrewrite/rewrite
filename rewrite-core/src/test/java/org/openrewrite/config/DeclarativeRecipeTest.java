@@ -595,40 +595,22 @@ class DeclarativeRecipeTest implements RewriteTest {
         recipeA.addUninitialized(recipeB);
         recipeA.addUninitialized(recipeC);
 
-        // Initialize A first - this will initialize B and C, both of which initialize D
         recipeA.initialize(List.of(recipeA, recipeB, recipeC, recipeD));
 
-        // Verify A's structure
-        assertThat(recipeA.getRecipeList()).hasSize(2);
+        assertThat(recipeA.getRecipeList()).as("A should have 2 children").hasSize(2);
         Recipe aChildB = recipeA.getRecipeList().get(0);
         Recipe aChildC = recipeA.getRecipeList().get(1);
-        assertThat(aChildB.getName()).isEqualTo("org.openrewrite.RecipeB");
-        assertThat(aChildC.getName()).isEqualTo("org.openrewrite.RecipeC");
+        assertThat(aChildB.getName())
+          .as("First child of A should be B")
+          .isEqualTo("org.openrewrite.RecipeB");
+        assertThat(aChildC.getName()).as("Second child of A should be C").isEqualTo("org.openrewrite.RecipeC");
 
-        // Both B and C should have D
-        assertThat(aChildB.getRecipeList()).hasSize(1);
-        assertThat(aChildB.getRecipeList().get(0).getName()).isEqualTo("org.openrewrite.RecipeD");
-        assertThat(aChildC.getRecipeList()).hasSize(1);
-        assertThat(aChildC.getRecipeList().get(0).getName()).isEqualTo("org.openrewrite.RecipeD");
+        assertThat(aChildB.getRecipeList()).as("B should have D (first occurrence)").hasSize(1);
+        assertThat(aChildB.getRecipeList().getFirst().getName()).isEqualTo("org.openrewrite.RecipeD");
 
-        // CRITICAL: Now initialize C independently - it should still have D in its recipe list
-        // This tests that the deduplication that happened during A's initialization didn't
-        // permanently corrupt the shared recipeD instance
-        DeclarativeRecipe recipeC2 = new DeclarativeRecipe(
-            "org.openrewrite.RecipeC2",
-            "Recipe C2",
-            "Test recipe C2",
-            emptySet(),
-            null,
-            null,
-            false,
-            emptyList()
-        );
-        recipeC2.addUninitialized(recipeD);
-        recipeC2.initialize(List.of(recipeC2, recipeD));
+        assertThat(aChildC.getRecipeList()).as("C should not have D (deduplicated in A's view)").isEmpty();
 
-        // C2 should have D
-        assertThat(recipeC2.getRecipeList()).hasSize(1);
-        assertThat(recipeC2.getRecipeList().get(0).getName()).isEqualTo("org.openrewrite.RecipeD");
+        assertThat(recipeC.getRecipeList()).as("Original recipeC should still have D (not mutated)").hasSize(1);
+        assertThat(recipeC.getRecipeList().getFirst().getName()).isEqualTo("org.openrewrite.RecipeD");
     }
 }

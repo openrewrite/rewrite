@@ -234,278 +234,6 @@ class YamlResourceLoaderTest implements RewriteTest {
     }
 
     @Test
-    void duplicateNonDeclarativeRecipesAreNotDeduplicated() {
-        Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.DuplicateRecipes
-              displayName: Recipe with duplicates
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello!
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello!
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello!
-              """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .build();
-
-        Collection<Recipe> recipes = env.listRecipes();
-        // Non-declarative recipes are not deduplicated since they may have different configurations
-        assertThat(recipes).singleElement().satisfies(r -> {
-            assertThat(r.validate().failures()).isEmpty();
-            assertThat(r.getRecipeList()).hasSize(3);
-        });
-    }
-
-    @Test
-    void duplicateDeclarativeRecipesAreDeduplicated() {
-        Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.SubRecipe
-              displayName: Sub recipe
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello!
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.DuplicateDeclarativeRecipes
-              displayName: Recipe with duplicate declarative recipes
-              recipeList:
-                  - test.SubRecipe
-                  - test.SubRecipe
-                  - test.SubRecipe
-              """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .build();
-
-        Collection<Recipe> recipes = env.listRecipes();
-        assertThat(recipes).hasSize(2);
-
-        Recipe parentRecipe = recipes.stream()
-          .filter(r -> r.getName().equals("test.DuplicateDeclarativeRecipes"))
-          .findFirst()
-          .orElseThrow();
-
-        assertThat(parentRecipe.validate().failures()).isEmpty();
-        assertThat(parentRecipe.getRecipeList()).hasSize(1);
-        assertThat(parentRecipe.getRecipeList().getFirst().getName()).isEqualTo("test.SubRecipe");
-    }
-
-    @Test
-    void duplicateDeclarativeRecipesAreDeduplicatedAcrossHierarchy() {
-        // Recipe A includes B and C, both B and C include D
-        // D should only be loaded once across the entire hierarchy
-        Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.D
-              displayName: Recipe D
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello from D!
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.B
-              displayName: Recipe B
-              recipeList:
-                  - test.D
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.C
-              displayName: Recipe C
-              recipeList:
-                  - test.D
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.A
-              displayName: Recipe A
-              recipeList:
-                  - test.B
-                  - test.C
-              """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .build();
-
-        Collection<Recipe> recipes = env.listRecipes();
-        assertThat(recipes).hasSize(4);
-
-        Recipe recipeA = recipes.stream()
-          .filter(r -> r.getName().equals("test.A"))
-          .findFirst()
-          .orElseThrow();
-
-        // A should have B and C
-        assertThat(recipeA.getRecipeList()).hasSize(2);
-
-        Recipe recipeB = recipeA.getRecipeList().stream()
-          .filter(r -> r.getName().equals("test.B"))
-          .findFirst()
-          .orElseThrow();
-
-        Recipe recipeC = recipeA.getRecipeList().stream()
-          .filter(r -> r.getName().equals("test.C"))
-          .findFirst()
-          .orElseThrow();
-
-        // B should have D
-        assertThat(recipeB.getRecipeList()).hasSize(1);
-        assertThat(recipeB.getRecipeList().getFirst().getName()).isEqualTo("test.D");
-
-        // C should ALSO have D - deduplication is LOCAL to each recipe's direct children
-        // Each recipe maintains its own scope, so B and C both independently include D
-        assertThat(recipeC.getRecipeList()).hasSize(1);
-        assertThat(recipeC.getRecipeList().getFirst().getName()).isEqualTo("test.D");
-
-        assertThat(recipeA.validate().failures()).isEmpty();
-        assertThat(recipeB.validate().failures()).isEmpty();
-        assertThat(recipeC.validate().failures()).isEmpty();
-    }
-
-    @Test
-    void duplicateDeclarativeRecipesAreDeduplicatedLocallyAcrossMultipleYamlResourceLoaders() {
-        // Recipe A includes B and C, both B and C include D
-        // Each recipe comes from a different YamlResourceLoader
-        // Deduplication is LOCAL to each recipe, so both B and C will have D
-        Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.D
-              displayName: Recipe D
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello from D!
-              """.getBytes()
-          ), URI.create("d.yml"), new Properties()))
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.B
-              displayName: Recipe B
-              recipeList:
-                  - test.D
-              """.getBytes()
-          ), URI.create("b.yml"), new Properties()))
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.C
-              displayName: Recipe C
-              recipeList:
-                  - test.D
-              """.getBytes()
-          ), URI.create("c.yml"), new Properties()))
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.A
-              displayName: Recipe A
-              recipeList:
-                  - test.B
-                  - test.C
-              """.getBytes()
-          ), URI.create("a.yml"), new Properties()))
-          .build();
-
-        Collection<Recipe> recipes = env.listRecipes();
-        assertThat(recipes).hasSize(4);
-
-        Recipe recipeA = recipes.stream()
-          .filter(r -> r.getName().equals("test.A"))
-          .findFirst()
-          .orElseThrow();
-
-        // A should have B and C
-        assertThat(recipeA.getRecipeList()).hasSize(2);
-
-        Recipe recipeB = recipeA.getRecipeList().stream()
-          .filter(r -> r.getName().equals("test.B"))
-          .findFirst()
-          .orElseThrow();
-
-        Recipe recipeC = recipeA.getRecipeList().stream()
-          .filter(r -> r.getName().equals("test.C"))
-          .findFirst()
-          .orElseThrow();
-
-        // B should have D
-        assertThat(recipeB.getRecipeList()).hasSize(1);
-        assertThat(recipeB.getRecipeList().getFirst().getName()).isEqualTo("test.D");
-
-        // C should ALSO have D - deduplication is LOCAL to each recipe's direct children
-        assertThat(recipeC.getRecipeList()).hasSize(1);
-        assertThat(recipeC.getRecipeList().getFirst().getName()).isEqualTo("test.D");
-
-        assertThat(recipeA.validate().failures()).isEmpty();
-        assertThat(recipeB.validate().failures()).isEmpty();
-        assertThat(recipeC.validate().failures()).isEmpty();
-    }
-
-    @Test
-    void recipeLoadedSeparatelyStillHasAllChildren() {
-        // If A includes B1 and B2, and both B1 and B2 include C,
-        // loading B2 separately should still show C in its recipe list
-        // (loading A shouldn't permanently affect B2's recipe list)
-        Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.C
-              displayName: Recipe C
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello from C!
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.B1
-              displayName: Recipe B1
-              recipeList:
-                  - test.C
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.B2
-              displayName: Recipe B2
-              recipeList:
-                  - test.C
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.A
-              displayName: Recipe A
-              recipeList:
-                  - test.B1
-                  - test.B2
-              """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .build();
-
-        // Load A first - this should initialize B1 and B2 as part of A's tree
-        Recipe recipeA = env.activateRecipes("test.A");
-        assertThat(recipeA.validate().failures()).isEmpty();
-
-        // Now load B2 separately - it should still have C in its recipe list
-        Recipe recipeB2Standalone = env.activateRecipes("test.B2");
-        assertThat(recipeB2Standalone.validate().failures()).isEmpty();
-        assertThat(recipeB2Standalone.getRecipeList()).hasSize(1);
-        assertThat(recipeB2Standalone.getRecipeList().getFirst().getName()).isEqualTo("test.C");
-    }
-
-    @Test
     void loadRecipeWithRecipeDataStringThatThrowsNoClassDefFoundError() {
         assertRecipeWithRecipeDataThatThrowsNoClassDefFoundError(
           RecipeWithBadStaticInitializer.class.getName());
@@ -532,6 +260,48 @@ class YamlResourceLoaderTest implements RewriteTest {
           invalidRecipes::add);
 
         assertEquals(1, invalidRecipes.size());
+    }
+
+    @Test
+    void localDeduplicationWithinRecipeList() {
+        // Recipe A includes D three times in its recipe list
+        // Deduplication should remove the duplicates within A's list
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.D
+              displayName: Recipe D
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello from D!
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.A
+              displayName: Recipe A
+              recipeList:
+                  - test.D
+                  - test.D
+                  - test.D
+              """.getBytes()
+          ), URI.create("rewrite.yml"), new Properties()))
+          .build();
+
+        Collection<Recipe> recipes = env.listRecipes();
+        assertThat(recipes).hasSize(2);
+
+        Recipe recipeA = recipes.stream()
+          .filter(r -> r.getName().equals("test.A"))
+          .findFirst()
+          .orElseThrow();
+
+        // A should only have D once, even though it was listed three times
+        assertThat(recipeA.getRecipeList()).hasSize(1);
+        assertThat(recipeA.getRecipeList().get(0).getName()).isEqualTo("test.D");
+
+        assertThat(recipeA.validate().failures()).isEmpty();
     }
 
     private YamlResourceLoader createYamlResourceLoader() {
