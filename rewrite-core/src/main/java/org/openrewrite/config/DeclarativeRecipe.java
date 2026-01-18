@@ -420,8 +420,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             this.source,
             this.causesAnotherCycle,
             this.maintainers,
-            new ArrayList<>(deduplicatedChildren),
-            new ArrayList<>(this.preconditions),
+            deduplicatedChildren,
+            this.preconditions,
             this.validation,
             this.initValidation
         );
