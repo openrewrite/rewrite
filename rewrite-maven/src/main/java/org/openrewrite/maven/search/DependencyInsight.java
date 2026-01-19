@@ -126,7 +126,7 @@ public class DependencyInsight extends Recipe {
                         .map(JavaSourceSet::getName)
                         .orElse("main");
 
-                Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByScope = new HashMap<>();
+                Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByScope = new LinkedHashMap<>();
                 DependencyTreeWalker.Matches<Scope> matches = new DependencyTreeWalker.Matches<>();
                 collectMatchingDependencies(getResolutionResult(), dependencyPathsByScope, requestedScope, matches);
 
