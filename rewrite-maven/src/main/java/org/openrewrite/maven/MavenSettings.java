@@ -281,10 +281,11 @@ public class MavenSettings {
             if (configuration == null) {
                 return null;
             }
-            return new ServerConfiguration(
-                    ListUtils.map(configuration.httpHeaders, this::interpolate),
-                    configuration.timeout
-            );
+            ServerConfiguration config = new ServerConfiguration();
+            config.setHttpHeaders(ListUtils.map(configuration.httpHeaders, this::interpolate));
+            config.setTimeout(configuration.timeout);
+
+            return config;
         }
 
         private HttpHeader interpolate(HttpHeader httpHeader) {
@@ -467,26 +468,40 @@ public class MavenSettings {
 	}
 
     @SuppressWarnings("DefaultAnnotationParam")
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
-    @With
     public static class ServerConfiguration {
-        @JacksonXmlProperty(localName = "property")
-        @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true)
-        @JsonIgnore
-        @Nullable
-        List<HttpHeader> httpHeaders;
+
+        private @Nullable List<HttpHeader> httpHeaders;
 
         /**
          * Timeout in milliseconds for reading connecting to and reading from the connection.
          */
-        @Nullable
-        Long timeout;
+        private @Nullable Long timeout;
 
-        @JsonCreator
-        public ServerConfiguration(@JsonProperty("httpHeaders") @Nullable List<HttpHeader> httpHeaders,
-                                   @JsonProperty("timeout") @Nullable Long timeout) {
+        public ServerConfiguration() {}
+
+        @JacksonXmlProperty(
+            localName = "property"
+        )
+        @JacksonXmlElementWrapper(
+            localName = "httpHeaders",
+            useWrapping = true
+        )
+        public @Nullable List<HttpHeader> getHttpHeaders() {
+            return this.httpHeaders;
+        }
+
+        @JacksonXmlProperty(
+            localName = "timeout"
+        )
+        public @Nullable Long getTimeout() {
+            return this.timeout;
+        }
+
+        public void setHttpHeaders(@Nullable List<HttpHeader> httpHeaders) {
             this.httpHeaders = httpHeaders;
+        }
+
+        public void setTimeout(@Nullable Long timeout) {
             this.timeout = timeout;
         }
     }
