@@ -538,7 +538,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             null,
             "swagger-annotations-jakarta",
             null,
-            null)),
+            null
+          )),
           pomXml(
             """
               <project>
@@ -587,7 +588,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "jakarta.activation",
             "jakarta.activation-api",
             "1.2.x",
-            null)),
+            null
+          )),
           pomXml(
             """
               <project>
@@ -725,7 +727,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "javax.activation-api",
             "jakarta.activation",
             "jakarta.activation-api",
-            "1.2.2",
+            "1.2.1",
             null,
             true,
             false
@@ -753,7 +755,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           <dependency>
                               <groupId>jakarta.activation</groupId>
                               <artifactId>jakarta.activation-api</artifactId>
-                              <version>1.2.1</version>
+                              <version>1.2.2</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
@@ -769,7 +771,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                       <dependency>
                           <groupId>jakarta.activation</groupId>
                           <artifactId>jakarta.activation-api</artifactId>
-                          <version>1.2.2</version>
+                          <version>1.2.1</version>
                       </dependency>
                   </dependencies>
                   <dependencyManagement>
@@ -782,7 +784,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           <dependency>
                               <groupId>jakarta.activation</groupId>
                               <artifactId>jakarta.activation-api</artifactId>
-                              <version>1.2.1</version>
+                              <version>1.2.2</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
@@ -793,7 +795,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void managedToUnmanaged() {
+    void updatesManagedAndDirect() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "javax.activation",
@@ -939,7 +941,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>
@@ -963,7 +965,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>
@@ -1196,7 +1198,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>
@@ -1221,7 +1223,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>org.springframework.cloud</groupId>
                               <artifactId>spring-cloud-dependencies</artifactId>
                               <version>2021.0.0</version>
-                              <type>bom</type>
+                              <type>pom</type>
                               <scope>import</scope>
                           </dependency>
                       </dependencies>
