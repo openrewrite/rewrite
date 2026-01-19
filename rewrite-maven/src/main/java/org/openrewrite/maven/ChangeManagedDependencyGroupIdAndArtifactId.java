@@ -137,10 +137,10 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 if (isManagedDependencyTag(oldGroupId, oldArtifactId)) {
                     if (t.getChild("groupId").isPresent()) {
-                        t = changeChildTagValue(t, "groupId", newGroupId, ctx);
+                        t = changeChildTagValue(t, "groupId", newGroupId, ctx, true);
                     }
                     if (t.getChild("artifactId").isPresent()) {
-                        t = changeChildTagValue(t, "artifactId", newArtifactId, ctx);
+                        t = changeChildTagValue(t, "artifactId", newArtifactId, ctx, true);
                     }
                     if (newVersion != null) {
                         try {
@@ -153,7 +153,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                     resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(newArtifactId, properties::get);
                                 }
                                 String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, resolvedArtifactId, getResolutionResult().getPom().getValue(versionTag.get().getValue().orElse(null)));
-                                t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
+                                t = changeChildTagValue(t, "version", resolvedNewVersion, ctx, true);
                             }
                         } catch (MavenDownloadingException e) {
                             return e.warn(t);
