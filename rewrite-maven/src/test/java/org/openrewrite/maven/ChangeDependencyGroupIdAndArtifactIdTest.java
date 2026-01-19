@@ -2127,7 +2127,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void changeDependencyGroupIdAndArtifactIdWithVersionProperty() {
+    void changeDependencyGroupIdAndArtifactIdWithVersionPropertyLeavesProperty() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "javax.activation",
@@ -2163,13 +2163,13 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <properties>
-                      <activation.api>1.2.2</activation.api>
+                      <activation.api>1.2.0</activation.api>
                   </properties>
                   <dependencies>
                       <dependency>
                           <groupId>jakarta.activation</groupId>
                           <artifactId>jakarta.activation-api</artifactId>
-                          <version>${activation.api}</version>
+                          <version>1.2.2</version>
                       </dependency>
                   </dependencies>
               </project>

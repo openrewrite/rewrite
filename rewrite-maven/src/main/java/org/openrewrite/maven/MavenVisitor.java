@@ -295,27 +295,27 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return changeChildTagValue(tag, childTagName, newValue, false, p, false);
     }
 
-    protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, P p, boolean doNotAlterAnyInheritedProperties) {
-        return changeChildTagValue(tag, childTagName, newValue, false, p, doNotAlterAnyInheritedProperties);
+    protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, P p, boolean doNotAlterAnyProperties) {
+        return changeChildTagValue(tag, childTagName, newValue, false, p, doNotAlterAnyProperties);
     }
 
     protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, @Nullable Boolean addPropertyIfMissing, P p) {
         return changeChildTagValue(tag, childTagName, newValue, addPropertyIfMissing, p, false);
     }
 
-    protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, @Nullable Boolean addPropertyIfMissing, P p, boolean doNotAlterAnyInheritedProperties) {
+    protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, @Nullable Boolean addPropertyIfMissing, P p, boolean doNotAlterAnyProperties) {
         Optional<Xml.Tag> childTag = tag.getChild(childTagName);
         if (childTag.isPresent()) {
             String oldValue = childTag.get().getValue().orElse(null);
             if (newValue != null && !newValue.equals(oldValue)) {
-                if (isProperty(oldValue)) {
+                if (isProperty(oldValue) && !doNotAlterAnyProperties) {
                     MavenResolutionResult resolutionResult = getResolutionResult();
                     String propertyName = oldValue.substring(2, oldValue.length() - 1);
                     ResolvedPom pom = resolutionResult.getPom();
                     if (pom.getRequested().getProperties().containsKey(propertyName)) {
                         // The current REQUESTED pom already has a property, let's change the value of the property in the current file
                         doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, addPropertyIfMissing, false).getVisitor());
-                    } else if (pom.getProperties().containsKey(propertyName) && !doNotAlterAnyInheritedProperties) {
+                    } else if (pom.getProperties().containsKey(propertyName)) {
                         // The combined pom knows about the property, but it is not originating from the current requested pom
                         boolean inheritsPropertyFromExternalParent = true;
                         while (resolutionResult.getParent() != null) {
@@ -332,8 +332,6 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                             // so we create the property in the current pom file in order to override its value
                             doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, true, false).getVisitor());
                         }
-                    } else {
-                        tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, p);
                     }
                 } else {
                     tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, p);
