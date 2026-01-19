@@ -181,7 +181,7 @@ public class DependencyInsight extends Recipe {
                     for (ResolvedDependency dependency : entry.getValue()) {
                         matches.collect(scope, dependency, dependencyMatcher,
                                 (matched, path) -> {
-                                    dependencyPathsByConfiguration.computeIfAbsent(scope.name().toLowerCase(), __ -> new HashMap<>())
+                                    dependencyPathsByConfiguration.computeIfAbsent(scope.name().toLowerCase(), __ -> new LinkedHashMap<>())
                                             .computeIfAbsent(matched.getGav(), __ -> new DependencyGraph()).append(scope.name().toLowerCase(), path);
                                 });
                     }
