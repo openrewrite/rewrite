@@ -26,7 +26,6 @@ import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
-import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -129,7 +128,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                isNewDependencyPresent = checkIfNewDependencyPresent(newGroupId, newArtifactId, newVersion);
+                isNewDependencyPresent = checkIfNewDependencyPresents(newGroupId, newArtifactId, newVersion);
                 return super.visitDocument(document, ctx);
             }
 
@@ -155,9 +154,6 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                 }
                                 String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, resolvedArtifactId, getResolutionResult().getPom().getValue(versionTag.get().getValue().orElse(null)));
                                 t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
-                            } else {
-                                Xml.Tag newChild = Xml.Tag.build("<version>" + newVersion + "</version>");
-                                t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newChild, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParentOrThrow());
                             }
                         } catch (MavenDownloadingException e) {
                             return e.warn(t);
@@ -175,7 +171,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 return t;
             }
 
-            private boolean checkIfNewDependencyPresent(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
+            private boolean checkIfNewDependencyPresents(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
                 if ((groupId == null) || (artifactId == null)) {
                     return false;
                 }
