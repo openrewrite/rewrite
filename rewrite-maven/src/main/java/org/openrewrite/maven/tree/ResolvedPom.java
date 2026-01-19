@@ -499,24 +499,27 @@ public class ResolvedPom {
                             (x, y) -> y, // Keep first (child wins)
                             LinkedHashMap::new));
 
-            resolveParentDependenciesRecursively(pomAncestry, managedDependencyMap);
+            // Track already-imported BOMs by groupId:artifactId to avoid re-importing with different versions
+            Set<GroupArtifact> importedBoms = new HashSet<>();
+
+            resolveParentDependenciesRecursively(pomAncestry, managedDependencyMap, importedBoms);
             if (!managedDependencyMap.isEmpty()) {
                 dependencyManagement = new ArrayList<>(managedDependencyMap.values());
                 dependencyManagementSorted = false;
             }
         }
 
-        private void resolveParentDependenciesRecursively(List<Pom> pomAncestry, Map<GroupArtifactClassifierType, ResolvedManagedDependency> managedDependencyMap) throws MavenDownloadingException {
+        private void resolveParentDependenciesRecursively(List<Pom> pomAncestry, Map<GroupArtifactClassifierType, ResolvedManagedDependency> managedDependencyMap, Set<GroupArtifact> importedBoms) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
 
             List<Profile> effectiveProfiles = pom.effectiveProfiles(activeProfiles);
 
             for (Profile profile : effectiveProfiles) {
-                mergeDependencyManagement(profile.getDependencyManagement(), managedDependencyMap, pomAncestry);
+                mergeDependencyManagement(profile.getDependencyManagement(), managedDependencyMap, pomAncestry, importedBoms);
                 mergeRequestedDependencies(profile.getDependencies());
             }
 
-            mergeDependencyManagement(pom.getDependencyManagement(), managedDependencyMap, pomAncestry);
+            mergeDependencyManagement(pom.getDependencyManagement(), managedDependencyMap, pomAncestry, importedBoms);
             mergeRequestedDependencies(pom.getDependencies());
 
             if (pom.getParent() != null) {
@@ -534,7 +537,7 @@ public class ResolvedPom {
                 }
 
                 pomAncestry.add(0, parentPom);
-                resolveParentDependenciesRecursively(pomAncestry, managedDependencyMap);
+                resolveParentDependenciesRecursively(pomAncestry, managedDependencyMap, importedBoms);
             }
         }
 
@@ -904,14 +907,18 @@ public class ResolvedPom {
         private void mergeDependencyManagement(
                 List<ManagedDependency> incomingDependencyManagement,
                 Map<GroupArtifactClassifierType, ResolvedManagedDependency> managedDependencyMap,
-                List<Pom> pomAncestry) throws MavenDownloadingException {
+                List<Pom> pomAncestry,
+                Set<GroupArtifact> importedBoms) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
             for (ManagedDependency d : incomingDependencyManagement) {
                 if (d instanceof Imported) {
                     GroupArtifactVersion groupArtifactVersion = getValues(((Imported) d).getGav());
-                    if (isAlreadyResolved(groupArtifactVersion, pomAncestry)) {
+                    GroupArtifact bomGa = new GroupArtifact(groupArtifactVersion.getGroupId(), groupArtifactVersion.getArtifactId());
+                    // Skip if this BOM (by groupId:artifactId) was already imported or declared - first definition wins
+                    if (importedBoms.contains(bomGa) || isAlreadyResolved(groupArtifactVersion, pomAncestry)) {
                         continue;
                     }
+                    importedBoms.add(bomGa);
                     ResolvedPom bom = downloader.download(groupArtifactVersion, null, ResolvedPom.this, repositories)
                             .resolve(activeProfiles, downloader, initialRepositories, ctx);
                     MavenExecutionContextView.view(ctx)
@@ -924,7 +931,10 @@ public class ResolvedPom {
                         managedDependencyMap.putIfAbsent(createDependencyManagementKey(managed), managed);
                     }
                 } else if (d instanceof Defined) {
+                    // Track defined managed dependencies to prevent later BOM imports with the same groupId:artifactId
                     Defined defined = (Defined) d;
+                    GroupArtifact definedGa = new GroupArtifact(getValue(defined.getGroupId()), getValue(defined.getArtifactId()));
+                    importedBoms.add(definedGa);
                     MavenExecutionContextView.view(ctx)
                             .getResolutionListener()
                             .dependencyManagement(defined.withGav(getValues(defined.getGav())), pom);

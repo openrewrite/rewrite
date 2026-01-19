@@ -4955,30 +4955,31 @@ class MavenParserTest implements RewriteTest {
     @Test
     void resolveDependencyManagementImportsOnlyOnce() {
         rewriteRun(
-          pomXml("""
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              <parent>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-parent</artifactId>
-                <version>2.7.5</version>
-              </parent>
-              <groupId>org.sample</groupId>
-              <artifactId>sample</artifactId>
-              <properties>
-                <mockito.version>3.9.0</mockito.version> <!-- mockito-bom did not exist prior to 4.x -->
-              </properties>
-              <dependencyManagement>
-                <dependencies>
-                  <dependency>
-                    <groupId>org.mockito</groupId>
-                    <artifactId>mockito-bom</artifactId>
-                    <version>4.6.1</version>
-                  </dependency>
-                </dependencies>
-              </dependencyManagement>
-            </project>
+          pomXml(
             """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.5</version>
+                </parent>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <properties>
+                  <mockito.version>3.9.0</mockito.version> <!-- mockito-bom did not exist prior to 4.x -->
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.mockito</groupId>
+                      <artifactId>mockito-bom</artifactId>
+                      <version>4.6.1</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
           )
         );
     }
