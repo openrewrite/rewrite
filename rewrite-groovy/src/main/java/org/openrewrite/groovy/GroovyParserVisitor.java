@@ -674,7 +674,7 @@ public class GroovyParserVisitor {
                         body = bodyVisitor.visit(method.getCode());
                     }
                 } else {
-                    if (annotations.stream().anyMatch(a -> a.getAnnotationType().getType().toString().equals("groovy.transform.Synchronized"))) {
+                    if (annotations.stream().anyMatch(a -> TypeUtils.isOfClassType(a.getAnnotationType().getType(), "groovy.transform.Synchronized"))) {
                         body = bodyVisitor.visit(((SynchronizedStatement) method.getCode()).getCode());
                     } else {
                         body = bodyVisitor.visit(method.getCode());
