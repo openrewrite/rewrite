@@ -240,7 +240,7 @@ class RemoveManagedDependencyTest implements RewriteTest {
                               <artifactId>micrometer-bom</artifactId>
                               <version>1.9.9</version>
                               <scope>import</scope>
-                              <type>pom</type>
+                              <type>bom</type>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
