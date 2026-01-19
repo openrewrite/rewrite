@@ -674,7 +674,11 @@ public class GroovyParserVisitor {
                         body = bodyVisitor.visit(method.getCode());
                     }
                 } else {
-                    body = bodyVisitor.visit(method.getCode());
+                    if (annotations.stream().anyMatch(a -> TypeUtils.isOfClassType(a.getAnnotationType().getType(), "groovy.transform.Synchronized"))) {
+                        body = bodyVisitor.visit(((SynchronizedStatement) method.getCode()).getCode());
+                    } else {
+                        body = bodyVisitor.visit(method.getCode());
+                    }
                 }
             }
 
@@ -2443,7 +2447,7 @@ public class GroovyParserVisitor {
 
     // The groovy compiler discards these annotations in favour of other transform annotations,
     // so they must be parsed by hand when found in source.
-    private static final Class<?>[] DISCARDED_TRANSFORM_ANNOTATIONS = {Canonical.class, Immutable.class};
+    private static final Class<?>[] DISCARDED_TRANSFORM_ANNOTATIONS = {Canonical.class, Immutable.class, groovy.transform.Synchronized.class};
 
     public List<J.Annotation> visitAndGetAnnotations(AnnotatedNode node, RewriteGroovyClassVisitor classVisitor) {
         if (node.getAnnotations().isEmpty()) {
