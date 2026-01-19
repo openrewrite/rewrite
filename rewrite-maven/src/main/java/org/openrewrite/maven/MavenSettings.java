@@ -52,25 +52,25 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 @JacksonXmlRootElement(localName = "settings")
 public class MavenSettings {
     @Nullable
-    public String localRepository;
+    private String localRepository;
 
     @Nullable
     @NonFinal
     @JsonIgnore
-    public MavenRepository mavenLocal;
+    private MavenRepository mavenLocal;
 
     @Nullable
-    public Profiles profiles;
+    private Profiles profiles;
 
     @Nullable
-    public ActiveProfiles activeProfiles;
+    private ActiveProfiles activeProfiles;
 
     @Nullable
-    public Mirrors mirrors;
+    private Mirrors mirrors;
 
     @Nullable
     @With
-    public Servers servers;
+    private Servers servers;
 
 	@JsonCreator
 	public MavenSettings(@JsonProperty("localRepository") @Nullable String localRepository,
