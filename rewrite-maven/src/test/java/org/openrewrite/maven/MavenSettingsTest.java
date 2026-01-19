@@ -981,7 +981,9 @@ class MavenSettingsTest {
           """).findFirst().get();
 
         MavenSettings.HttpHeader httpHeader = new MavenSettings.HttpHeader("X-JFrog-Art-Api", "myApiToken");
-        MavenSettings.ServerConfiguration configuration = new MavenSettings.ServerConfiguration(singletonList(httpHeader), 10000L);
+        MavenSettings.ServerConfiguration configuration = new MavenSettings.ServerConfiguration();
+        configuration.setHttpHeaders(singletonList(httpHeader));
+        configuration.setTimeout(10000L);
         MavenSettings.Server server = new MavenSettings.Server("maven-snapshots", null, null, configuration);
         MavenSettings.Servers servers = new MavenSettings.Servers(singletonList(server));
         MavenSettings settings = new MavenSettings(null, null, null, null, servers);
