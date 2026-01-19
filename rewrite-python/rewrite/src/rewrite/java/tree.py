@@ -661,9 +661,6 @@ class Block(Statement):
     def accept_java(self, v: JavaVisitor[P], p: P) -> J:
         return v.visit_block(self, p)
 
-    def get_coordinates(self) -> CoordinateBuilder.Block:
-        return CoordinateBuilder.Block(self)
-
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @dataclass(frozen=True, eq=False)
 class Break(Statement):
@@ -2885,11 +2882,17 @@ class MethodDeclaration(Statement, TypedTree):
         return self._return_type_expression
 
 
-    _name: IdentifierWithAnnotations
+    _name_annotations: List[Annotation]
+
+    @property
+    def name_annotations(self) -> List[Annotation]:
+        return self._name_annotations
+
+    _name: Identifier
 
     @property
     def name(self) -> Identifier:
-        return self._name.identifier
+        return self._name
 
     _parameters: JContainer[Statement]
 
@@ -2927,26 +2930,6 @@ class MethodDeclaration(Statement, TypedTree):
 
 
     @dataclass
-    class IdentifierWithAnnotations:
-        _identifier: Identifier
-
-        @property
-        def identifier(self) -> Identifier:
-            return self._identifier
-
-        def with_identifier(self, identifier: Identifier) -> MethodDeclaration.IdentifierWithAnnotations:
-            return self if identifier is self._identifier else replace(self, _identifier=identifier)
-
-        _annotations: List[Annotation]
-
-        @property
-        def annotations(self) -> List[Annotation]:
-            return self._annotations
-
-        def with_annotations(self, annotations: List[Annotation]) -> MethodDeclaration.IdentifierWithAnnotations:
-            return self if annotations is self._annotations else replace(self, _annotations=annotations)
-
-    @dataclass
     class PaddingHelper:
         _t: MethodDeclaration
 
@@ -2955,8 +2938,12 @@ class MethodDeclaration(Statement, TypedTree):
             return self._t._type_parameters
 
         @property
-        def name(self) -> MethodDeclaration.IdentifierWithAnnotations:
+        def name(self) -> Identifier:
             return self._t._name
+
+        @property
+        def name_annotations(self) -> List[Annotation]:
+            return self._t._name_annotations
 
         @property
         def parameters(self) -> JContainer[Statement]:
@@ -3009,11 +2996,18 @@ class MethodDeclaration(Statement, TypedTree):
             return self._t if self._t._type_parameters is type_parameters else replace(self._t, _type_parameters=type_parameters)
 
         @property
-        def name(self) -> MethodDeclaration.IdentifierWithAnnotations:
+        def name(self) -> Identifier:
             return self._t._name
 
-        def with_name(self, name: MethodDeclaration.IdentifierWithAnnotations) -> MethodDeclaration:
+        def with_name(self, name: Identifier) -> MethodDeclaration:
             return self._t if self._t._name is name else replace(self._t, _name=name)
+
+        @property
+        def name_annotations(self) -> List[Annotation]:
+            return self._t._name_annotations
+
+        def with_name_annotations(self, name_annotations: List[Annotation]) -> MethodDeclaration:
+            return self._t if self._t._name_annotations is name_annotations else replace(self._t, _name_annotations=name_annotations)
 
         @property
         def parameters(self) -> JContainer[Statement]:

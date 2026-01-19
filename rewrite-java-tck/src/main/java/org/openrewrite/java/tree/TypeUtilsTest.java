@@ -25,7 +25,6 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import java.util.EnumSet;
-import java.util.List;
 import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;

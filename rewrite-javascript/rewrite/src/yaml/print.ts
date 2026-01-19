@@ -35,6 +35,9 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
 
     protected async visitDocument(document: Yaml.Document, p: PrintOutputCapture): Promise<Yaml | undefined> {
         await this.beforeSyntax(document, p);
+        for (const directive of document.directives) {
+            await this.visit(directive, p);
+        }
         if (document.explicit) {
             p.append("---");
         }
@@ -42,6 +45,15 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         await this.visit(document.end, p);
         this.afterSyntax(document, p);
         return document;
+    }
+
+    protected async visitDirective(directive: Yaml.Directive, p: PrintOutputCapture): Promise<Yaml | undefined> {
+        await this.beforeSyntax(directive, p);
+        p.append('%');
+        p.append(directive.value);
+        p.append(directive.suffix);
+        this.afterSyntax(directive, p);
+        return directive;
     }
 
     protected async visitDocumentEnd(end: Yaml.DocumentEnd, p: PrintOutputCapture): Promise<Yaml | undefined> {

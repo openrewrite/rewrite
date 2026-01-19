@@ -192,6 +192,24 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6302")
+    @Test
+    void groovyCanonicalAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Canonical
+
+              @Canonical
+              class Person {
+                  String name
+                  int age
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4853")
     @Test
     void annotationOnVariable() {

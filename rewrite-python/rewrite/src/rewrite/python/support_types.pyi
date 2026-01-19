@@ -3,18 +3,9 @@
 
 from typing import Self
 
-from rewrite.java.support_types import J, Comment
+from rewrite.java.support_types import J
 from rewrite.markers import Marker
 
-
-class PyComment(Comment):
-    aligned_to_indent: bool
-
-    def replace(
-        self,
-        *,
-        aligned_to_indent: bool = ...,
-    ) -> Self: ...
 
 class KeywordArguments(Marker):
     id: uuid.UUID

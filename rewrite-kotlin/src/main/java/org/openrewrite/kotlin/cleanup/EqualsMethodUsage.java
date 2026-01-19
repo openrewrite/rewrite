@@ -50,15 +50,9 @@ public class EqualsMethodUsage extends Recipe {
                "languages like Java, where `==` means reference equality and `!=` means reference inequality.\n" +
                "The `==` and `!=` operators are a more concise and elegant way to test structural equality than calling a function.";
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("RSPEC-S6519");
-    }
+    Set<String> tags = singleton("RSPEC-S6519");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(3);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(3);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

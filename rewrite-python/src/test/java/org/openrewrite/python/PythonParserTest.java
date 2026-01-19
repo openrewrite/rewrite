@@ -19,6 +19,9 @@ import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.python.tree.Py;
 import org.openrewrite.test.RewriteTest;
 
@@ -38,6 +41,29 @@ class PythonParserTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> SoftAssertions.assertSoftly(softly -> {
                   softly.assertThat(cu).isInstanceOf(Py.CompilationUnit.class);
                   softly.assertThat(cu.getMarkers().getMarkers()).isEmpty();
+              })
+            )
+          )
+        );
+    }
+
+    @Test
+    void parseAndPrint() {
+        rewriteRun(
+          python(
+            """
+              import sys # comment
+              print(sys.path)
+              """,
+            spec -> spec.afterRecipe(cu -> SoftAssertions.assertSoftly(softly -> {
+                  softly.assertThat(cu).isInstanceOf(Py.CompilationUnit.class);
+                  softly.assertThat(cu.getMarkers().getMarkers()).isEmpty();
+                  softly.assertThat(((SourceFile) new TreeVisitor<J, Integer>() {
+                      @Override
+                      public J preVisit(J tree, Integer integer) {
+                          return tree.withId(Tree.randomId());
+                      }
+                  }.visitNonNull(cu, 0)).printAll()).isEqualTo("import sys # comment\nprint(sys.path)");
               })
             )
           )

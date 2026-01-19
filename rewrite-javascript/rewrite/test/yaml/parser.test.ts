@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser} from "../../src/yaml";
+import {isDirective, isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser} from "../../src/yaml";
 import {printer} from "../../src";
 import {RecipeSpec} from "../../src/test";
 
@@ -332,4 +332,102 @@ describe('yaml assertion helper', () => {
         spec.rewriteRun(
             yaml('key: value')
         ));
+});
+
+describe('YAML directives roundtrip', () => {
+
+    test('YAML directive', async () => {
+        const yaml = `%YAML 1.2
+---
+key: value`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
+    });
+
+    test('TAG directive', async () => {
+        const yaml = `%TAG !yaml! tag:yaml.org,2002:
+---
+key: value`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
+    });
+
+    test('multiple directives', async () => {
+        const yaml = `%YAML 1.2
+%TAG !yaml! tag:yaml.org,2002:
+---
+key: value`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
+    });
+
+    test('directive with leading newline', async () => {
+        const yaml = `
+%YAML 1.2
+---
+key: value`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
+    });
+
+    test('document without directives', async () => {
+        const yaml = `---
+key: value`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
+    });
+});
+
+describe('YAML directives AST structure', () => {
+
+    test('parses YAML directive', async () => {
+        // given
+        const docs = await parseYaml(`%YAML 1.2
+---
+key: value`);
+
+        // then
+        const doc = docs.documents[0];
+        expect(doc.directives.length).toBe(1);
+        const directive = doc.directives[0];
+        expect(isDirective(directive)).toBe(true);
+        expect(directive.value).toBe('YAML 1.2');
+    });
+
+    test('parses TAG directive', async () => {
+        // given
+        const docs = await parseYaml(`%TAG !yaml! tag:yaml.org,2002:
+---
+key: value`);
+
+        // then
+        const doc = docs.documents[0];
+        expect(doc.directives.length).toBe(1);
+        const directive = doc.directives[0];
+        expect(directive.value).toBe('TAG !yaml! tag:yaml.org,2002:');
+    });
+
+    test('parses multiple directives', async () => {
+        // given
+        const docs = await parseYaml(`%YAML 1.2
+%TAG !yaml! tag:yaml.org,2002:
+---
+key: value`);
+
+        // then
+        const doc = docs.documents[0];
+        expect(doc.directives.length).toBe(2);
+        expect(doc.directives[0].value).toBe('YAML 1.2');
+        expect(doc.directives[1].value).toBe('TAG !yaml! tag:yaml.org,2002:');
+    });
+
+    test('document without directives has empty directives list', async () => {
+        // given
+        const docs = await parseYaml(`---
+key: value`);
+
+        // then
+        const doc = docs.documents[0];
+        expect(doc.directives.length).toBe(0);
+    });
 });

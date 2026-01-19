@@ -120,15 +120,11 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
     @Nullable
     final Boolean enforceWrapperChecksumVerification;
 
-    @Override
-    public String getDisplayName() {
-        return "Update Maven wrapper";
-    }
+    @Getter
+    final String displayName = "Update Maven wrapper";
 
-    @Override
-    public String getDescription() {
-        return "Update the version of Maven used in an existing Maven wrapper.";
-    }
+    @Getter
+    final String description = "Update the version of Maven used in an existing Maven wrapper.";
 
     @Override
     public Validated<Object> validate() {
