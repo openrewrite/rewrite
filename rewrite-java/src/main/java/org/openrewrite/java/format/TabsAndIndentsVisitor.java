@@ -157,7 +157,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         if (loc == Space.Location.ANNOTATION_PREFIX) {
-            J annotated = getCursor().getParentTreeCursor().getValue();
+            Cursor annotatedCursor = getCursor().getParentTreeCursor();
+            J annotated = annotatedCursor.getValue();
             List<J.Annotation> annotations = null;
             if (annotated instanceof J.VariableDeclarations) {
                 annotations = ((J.VariableDeclarations) annotated).getLeadingAnnotations();
@@ -174,7 +175,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     try {
                         JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                         if (sourceFile != null) {
-                            int alignTo = getCursor().firstEnclosing(JavaSourceFile.class).service(SourcePositionService.class).positionOf(getCursor(), annotated).getStartColumn() - 1;
+                            int alignTo = getCursor().firstEnclosing(JavaSourceFile.class).service(SourcePositionService.class).positionOf(annotatedCursor, annotated).getStartColumn() - 1;
                             getCursor().getParentTreeCursor().putMessage("lastIndent", alignTo);
                             return indentTo(space, alignTo, loc);
                         }

@@ -799,7 +799,12 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 ListUtils.mapLast(space.getComments(), comment -> {
                     Cursor cursor = getCursor();
                     if (!(cursor.getValue() instanceof JRightPadded)) {
-                        cursor = cursor.dropParentUntil(it -> it instanceof JRightPadded || it == Cursor.ROOT_VALUE);
+                        try {
+                            cursor = cursor.dropParentUntil(it -> it instanceof JRightPadded || it == Cursor.ROOT_VALUE);
+                        } catch (IllegalStateException e) {
+                            //There is no root cursor passed in chain.
+                            cursor = new Cursor(null, Cursor.ROOT_VALUE);
+                        }
                     }
                     Boolean trimCommentSuffix = null;
                     if (!cursor.isRoot()) {

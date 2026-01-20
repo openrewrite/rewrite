@@ -243,11 +243,9 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
         if (space != null && sourceFile != null) {
             SourcePositionService positionService = sourceFile.service(SourcePositionService.class);
-            Cursor newLinedCursorElement;
             Cursor parentTreeCursor;
             J parent;
             LineWrapSetting wrap = null;
-            boolean isLong = false;
             switch (loc) {
                 case BLOCK_END:
                     if (Boolean.TRUE.equals(getCursor().pollMessage("single-line-enum"))) {
@@ -402,12 +400,26 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                         space = withWhitespace(space, "\n");
                     }
                     break;
+                case IMPORT_PREFIX:
+                    space = withWhitespace(space, space.getWhitespace().replaceAll(" ", ""));
                 default:
                     if (getCursor().getValue() instanceof TypeTree && Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
                         space = withWhitespace(space, "\n");
                     }
                     break;
             }
+            //JavaTemplate calls autoFormat on statements in the block per statement iso formatting the entire block so we add newlines in that case for each statement causing the template to be new line sensitive if we do not have this check
+            try {
+                if (getCursor().getValue() instanceof Statement &&
+                        loc != Space.Location.NEW_PREFIX &&
+                        loc.name().endsWith("_PREFIX") &&
+                        !(getCursor().getValue() instanceof J.EnumValueSet) &&
+                        getCursor().getParentTreeCursor().getValue() instanceof J.Block &&
+                        !space.getWhitespace().contains("\n")
+                ) {
+                    space = withWhitespace(space, "\n");
+                }
+            } catch (IllegalStateException ignored) {}
         }
         return super.visitSpace(space, loc, p);
     }
