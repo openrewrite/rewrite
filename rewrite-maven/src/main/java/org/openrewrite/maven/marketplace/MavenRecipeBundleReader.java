@@ -71,13 +71,16 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
                     if (entry != null) {
                         try (InputStream recipesCsv = jarFile.getInputStream(entry)) {
                             RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(recipesCsv);
-                            for (RecipeListing recipe : marketplace.getAllRecipes()) {
-                                // The recipes.csv inside a JAR may be generated without a version,
-                                // since the version of a published Maven artifact is determined at
-                                // publish time if the artifact is a snapshot. Having resolved the
-                                // JAR containing the recipes.csv, we now know the version.
-                                recipe.getBundle().setVersion(bundle.getVersion());
-                            }
+                            // The recipes.csv inside a JAR may be generated without a version,
+                            // since the version of a published Maven artifact is determined at
+                            // publish time if the artifact is a snapshot. Having resolved the
+                            // JAR containing the recipes.csv, we now know the version.
+                            //
+                            // We must walk the full tree structure rather than using getAllRecipes()
+                            // because getAllRecipes() returns a deduplicated set (by recipe name).
+                            // When a recipe appears in multiple categories, each category has its
+                            // own RecipeListing with its own RecipeBundle that needs updating.
+                            setVersionRecursive(marketplace.getRoot());
                             return marketplace;
                         }
                     }
@@ -190,5 +193,19 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     private boolean isResolvedBundle(ResolvedDependency resolvedDependency) {
         return resolvedDependency.isDirect() && bundle.getPackageName()
                 .equals(resolvedDependency.getGroupId() + ":" + resolvedDependency.getArtifactId());
+    }
+
+    private void setVersionRecursive(RecipeMarketplace.Category category) {
+        for (RecipeListing recipe : category.getRecipes()) {
+            RecipeBundle recipeBundle = recipe.getBundle();
+            // Only update bundles from the same package as the bundle we're reading
+            if (bundle.getPackageName().equals(recipeBundle.getPackageName())) {
+                recipeBundle.setVersion(bundle.getVersion());
+                recipeBundle.setRequestedVersion(bundle.getRequestedVersion());
+            }
+        }
+        for (RecipeMarketplace.Category child : category.getCategories()) {
+            setVersionRecursive(child);
+        }
     }
 }
