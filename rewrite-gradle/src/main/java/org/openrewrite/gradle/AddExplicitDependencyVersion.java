@@ -27,7 +27,6 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.DependencyMatcher;
@@ -82,7 +81,7 @@ public class AddExplicitDependencyVersion extends JavaIsoVisitor<ExecutionContex
                 .map(gradleDep -> {
                     // Skip if version is already declared
                     String declaredVersion = gradleDep.getResolvedDependency().getVersion();
-                    if (!StringUtils.isBlank(declaredVersion) && hasExplicitVersion(gradleDep)) {
+                    if (!StringUtils.isBlank(declaredVersion) && gradleDep.getDeclaredVersion() != null) {
                         return m;
                     }
 
@@ -101,42 +100,6 @@ public class AddExplicitDependencyVersion extends JavaIsoVisitor<ExecutionContex
                     return updated.getTree();
                 })
                 .orElse(m);
-    }
-
-    private boolean hasExplicitVersion(GradleDependency dep) {
-        // Check if the dependency has an explicit version in the source
-        // by parsing the arguments
-        J.MethodInvocation m = dep.getTree();
-        if (m.getArguments().isEmpty()) {
-            return false;
-        }
-
-        Expression firstArg = m.getArguments().get(0);
-
-        // String literal: check if it has 3 parts (group:artifact:version)
-        if (firstArg instanceof J.Literal && ((J.Literal) firstArg).getValue() instanceof String) {
-            String gav = (String) ((J.Literal) firstArg).getValue();
-            return gav.chars().filter(c -> c == ':').count() >= 2;
-        }
-
-        // For map/assignment notation, check if version key exists
-        for (Expression arg : m.getArguments()) {
-            if (arg instanceof org.openrewrite.groovy.tree.G.MapEntry) {
-                org.openrewrite.groovy.tree.G.MapEntry entry = (org.openrewrite.groovy.tree.G.MapEntry) arg;
-                if (entry.getKey() instanceof J.Literal &&
-                        "version".equals(((J.Literal) entry.getKey()).getValue())) {
-                    return true;
-                }
-            } else if (arg instanceof J.Assignment) {
-                J.Assignment assignment = (J.Assignment) arg;
-                if (assignment.getVariable() instanceof J.Identifier &&
-                        "version".equals(((J.Identifier) assignment.getVariable()).getSimpleName())) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     private @Nullable String findResolvedVersion(String configurationName, String groupId, String artifactId) {
