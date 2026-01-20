@@ -29,6 +29,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -153,7 +154,12 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 if (!(pluginArgs.get(0) instanceof J.Literal)) {
                     return m;
                 }
-                String pluginId = literalValue(pluginArgs.get(0));
+                String pluginId;
+                if (((J.MethodInvocation) m.getSelect()).getSimpleName().equals("kotlin")) {
+                    pluginId = "kotlin";
+                } else {
+                    pluginId = literalValue(pluginArgs.get(0));
+                }
                 if (pluginId == null || !StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
                     return m;
                 }
@@ -162,8 +168,15 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 try {
                     String currentVersion = literalValue(versionArgs.get(0));
                     if (currentVersion != null) {
-                        String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
-                                .select(new GroupArtifactVersion(pluginId, pluginId + ".gradle.plugin", currentVersion), "classpath", newVersion, versionPattern, ctx);
+                        String resolvedVersion;
+                        if (pluginId.equals("kotlin")) {
+                            String fullPluginId = String.format("org.jetbrains.%s.%s", pluginId, literalValue(pluginArgs.get(0)));
+                            resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
+                                    .select(new GroupArtifactVersion(fullPluginId, fullPluginId + ".gradle.plugin", currentVersion), "classpath", newVersion, versionPattern, ctx);
+                        } else {
+                            resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
+                                    .select(new GroupArtifactVersion(pluginId, pluginId + ".gradle.plugin", currentVersion), "classpath", newVersion, versionPattern, ctx);
+                        }
                         acc.pluginIdToNewVersion.put(pluginId, resolvedVersion);
                     } else if (versionArgs.get(0) instanceof G.GString) {
                         G.GString gString = (G.GString) versionArgs.get(0);
@@ -236,7 +249,12 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 }
                 assert m.getSelect() != null;
                 List<Expression> pluginArgs = ((J.MethodInvocation) m.getSelect()).getArguments();
-                String pluginId = literalValue(pluginArgs.get(0));
+                String pluginId;
+                if (((J.MethodInvocation) m.getSelect()).getSimpleName().equals("kotlin")) {
+                    pluginId = "kotlin";
+                } else {
+                    pluginId = literalValue(pluginArgs.get(0));
+                }
                 if (pluginId == null || !StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
                     return m;
                 }
@@ -264,8 +282,15 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     String oldVersion = literalValue(initializer);
                     String newVersion = acc.pluginIdToNewVersion.get(acc.versionPropNameToPluginId.get(visited.getSimpleName()));
                     if (newVersion != null && !newVersion.equals(oldVersion)) {
-                        String valueSource = initializer.getValueSource() == null || oldVersion == null ? initializer.getValueSource() : initializer.getValueSource().replace(oldVersion, newVersion);
-                        return visited.withInitializer(initializer.withValueSource(valueSource).withValue(newVersion));
+                        VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
+                        if (versionComparator == null) {
+                            return visited;
+                        }
+                        Optional<String> finalVersion = versionComparator.upgrade(oldVersion != null ? oldVersion : "", singletonList(newVersion));
+                        if (finalVersion.isPresent()) {
+                            String valueSource = initializer.getValueSource() == null || oldVersion == null ? initializer.getValueSource() : initializer.getValueSource().replace(oldVersion, newVersion);
+                            return visited.withInitializer(initializer.withValueSource(valueSource).withValue(finalVersion.get()));
+                        }
                     }
                 }
                 return visited;
