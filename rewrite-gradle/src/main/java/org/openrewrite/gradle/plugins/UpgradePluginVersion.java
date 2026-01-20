@@ -169,7 +169,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     String currentVersion = literalValue(versionArgs.get(0));
                     if (currentVersion != null) {
                         String resolvedVersion;
-                        if (pluginId.equals("kotlin")) {
+                        if ("kotlin".equals(pluginId)) {
                             String fullPluginId = String.format("org.jetbrains.%s.%s", pluginId, literalValue(pluginArgs.get(0)));
                             resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
                                     .select(new GroupArtifactVersion(fullPluginId, fullPluginId + ".gradle.plugin", currentVersion), "classpath", newVersion, versionPattern, ctx);
