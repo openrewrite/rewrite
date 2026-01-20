@@ -10,7 +10,20 @@ from uuid import UUID
 if TYPE_CHECKING:
     from .visitor import PythonVisitor
 from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Markers, Cursor, PrintOutputCapture, PrinterFactory
-from rewrite.java import *
+# Explicit imports from rewrite.java (excluding Binary, CompilationUnit which are redefined here)
+from rewrite.java import (
+    Comment, TextComment, J, JavaType, JContainer, JLeftPadded, JRightPadded, Space, JavaVisitor,
+    JavaSourceFile, Loop, TypeTree, TypedTree, NameTree, Expression, Statement,
+    OmitParentheses, Semicolon, TrailingComma,
+    AnnotatedType, Annotation, ArrayAccess, ArrayType, Assert, Assignment, AssignmentOperation,
+    Block, Break, Case, ClassDeclaration, Continue, DeconstructionPattern, DoWhileLoop, Empty,
+    EnumValue, EnumValueSet, Erroneous, FieldAccess, ForEachLoop, ForLoop, ParenthesizedTypeTree,
+    Identifier, If, Import, InstanceOf, IntersectionType, Label, Lambda, Literal, MemberReference,
+    MethodDeclaration, MethodInvocation, Modifier, MultiCatch, NewArray, ArrayDimension, NewClass,
+    NullableType, Package, ParameterizedType, Parentheses, ControlParentheses, Primitive, Return,
+    Switch, SwitchExpression, Synchronized, Ternary, Throw, Try, TypeCast, TypeParameter,
+    TypeParameters, Unary, VariableDeclarations, WhileLoop, Wildcard, Yield, Unknown,
+)
 from rewrite.python.support_types import Py
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
@@ -625,7 +638,7 @@ class StatementExpression(Py, Expression, Statement):
         """Replace fields, handling delegated prefix/markers specially."""
         # Handle delegated properties by modifying the inner statement
         if 'prefix' in kwargs:
-            new_statement = self._statement.replace(prefix=kwargs.pop('prefix'))
+            new_statement = self._statement.replace(prefix=kwargs.pop('prefix'))  # ty: ignore[unresolved-attribute]  # Statement base class doesn't have replace
             kwargs['statement'] = new_statement
         if 'markers' in kwargs:
             new_statement = kwargs.get('statement', self._statement).replace(markers=kwargs.pop('markers'))

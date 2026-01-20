@@ -166,7 +166,7 @@ class PythonRpcReceiver:
 
         result = j
         if new_id is not j.id:
-            result = result.replace(id=new_id)
+            result = result.replace(id=new_id)  # ty: ignore[unresolved-attribute]
         if new_prefix is not j.prefix:
             result = result.replace(prefix=new_prefix)
         if new_markers is not j.markers:
@@ -273,7 +273,7 @@ class PythonRpcReceiver:
     def _visit_formatted_string(self, fs: FormattedString, q: RpcReceiveQueue) -> FormattedString:
         delimiter = q.receive(fs.delimiter)
         parts = q.receive_list(fs.parts)
-        type_ = q.receive(fs.type)
+        type_ = q.receive(fs.type)  # ty: ignore[unresolved-attribute]  # type property missing from stub
         return replace_if_changed(fs, delimiter=delimiter, parts=parts, type=type_)
 
     def _visit_formatted_string_value(self, v: FormattedString.Value, q: RpcReceiveQueue) -> FormattedString.Value:

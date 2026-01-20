@@ -1,9 +1,11 @@
 # Auto-generated stub file for IDE autocomplete support.
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
+from dataclasses import dataclass
 from typing import Any, ClassVar, List, Optional
 from typing_extensions import Self
 from uuid import UUID
+import weakref
 
 from enum import Enum
 from pathlib import Path
@@ -11,6 +13,10 @@ from . import extensions as extensions
 from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Markers, Cursor, PrintOutputCapture, PrinterFactory
 
 from .support_types import (
+    P as P,
+    T as T,
+    J2 as J2,
+    J3 as J3,
     J as J,
     Comment as Comment,
     TextComment as TextComment,
@@ -29,391 +35,441 @@ from .support_types import (
     JContainer as JContainer,
 )
 
+@dataclass(frozen=True)
 class AnnotatedType(Expression, TypeTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    annotations: List[Annotation]
-    type_expression: TypeTree
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _annotations: List[Annotation]
+    _type_expression: TypeTree
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _annotations: List[Annotation],
-        _type_expression: TypeTree,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        annotations: List[Annotation] = ...,
-        type_expression: TypeTree = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def annotations(self) -> List[Annotation]: ...
+    @property
+    def type_expression(self) -> TypeTree: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Annotation(Expression):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    annotation_type: NameTree
-    arguments: Optional[JContainer[Expression]]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: Annotation
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _annotation_type: NameTree,
-        _arguments: Optional[JContainer[Expression]],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> Annotation: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        annotation_type: NameTree = ...,
-        arguments: Optional[JContainer[Expression]] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def arguments(self) -> Optional[JContainer[Expression]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _annotation_type: NameTree
+    _arguments: Optional[JContainer[Expression]]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def annotation_type(self) -> NameTree: ...
+    @property
+    def arguments(self) -> Optional[List[Expression]]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class ArrayAccess(Expression, TypedTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    indexed: Expression
-    dimension: ArrayDimension
-    type_: Optional[JavaType]
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _indexed: Expression
+    _dimension: ArrayDimension
+    _type: Optional[JavaType]
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _indexed: Expression,
-        _dimension: ArrayDimension,
-        _type: Optional[JavaType],
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        indexed: Expression = ...,
-        dimension: ArrayDimension = ...,
-        type_: Optional[JavaType] = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def indexed(self) -> Expression: ...
+    @property
+    def dimension(self) -> ArrayDimension: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class ArrayType(TypeTree, Expression):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    element_type: TypeTree
-    annotations: Optional[List[Annotation]]
-    dimension: Optional[JLeftPadded[Space]]
-    type_: JavaType
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _element_type: TypeTree
+    _annotations: Optional[List[Annotation]]
+    _dimension: Optional[JLeftPadded[Space]]
+    _type: JavaType
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _element_type: TypeTree,
-        _annotations: Optional[List[Annotation]],
-        _dimension: Optional[JLeftPadded[Space]],
-        _type: JavaType,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        element_type: TypeTree = ...,
-        annotations: Optional[List[Annotation]] = ...,
-        dimension: Optional[JLeftPadded[Space]] = ...,
-        type_: JavaType = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def element_type(self) -> TypeTree: ...
+    @property
+    def annotations(self) -> Optional[List[Annotation]]: ...
+    @property
+    def dimension(self) -> Optional[JLeftPadded[Space]]: ...
+    @property
+    def type(self) -> JavaType: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Assert(Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    condition: Expression
-    detail: Optional[JLeftPadded[Expression]]
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _condition: Expression
+    _detail: Optional[JLeftPadded[Expression]]
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _condition: Expression,
-        _detail: Optional[JLeftPadded[Expression]],
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        condition: Expression = ...,
-        detail: Optional[JLeftPadded[Expression]] = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def condition(self) -> Expression: ...
+    @property
+    def detail(self) -> Optional[JLeftPadded[Expression]]: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Assignment(Statement, Expression, TypedTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    variable: Expression
-    assignment: JLeftPadded[Expression]
-    type_: Optional[JavaType]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: Assignment
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _variable: Expression,
-        _assignment: JLeftPadded[Expression],
-        _type: Optional[JavaType],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> Assignment: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        variable: Expression = ...,
-        assignment: JLeftPadded[Expression] = ...,
-        type_: Optional[JavaType] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def assignment(self) -> JLeftPadded[Expression]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _variable: Expression
+    _assignment: JLeftPadded[Expression]
+    _type: Optional[JavaType]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def variable(self) -> Expression: ...
+    @property
+    def assignment(self) -> Expression: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class AssignmentOperation(Statement, Expression, TypedTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    variable: Expression
-    operator: JLeftPadded[Type]
-    assignment: Expression
-    type_: Optional[JavaType]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    class Type(Enum):
+        Addition: Type
+        BitAnd: Type
+        BitOr: Type
+        BitXor: Type
+        Division: Type
+        Exponentiation: Type
+        FloorDivision: Type
+        LeftShift: Type
+        MatrixMultiplication: Type
+        Modulo: Type
+        Multiplication: Type
+        RightShift: Type
+        Subtraction: Type
+        UnsignedRightShift: Type
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _variable: Expression,
-        _operator: JLeftPadded[Type],
-        _assignment: Expression,
-        _type: Optional[JavaType],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: AssignmentOperation
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        variable: Expression = ...,
-        operator: JLeftPadded[Type] = ...,
-        assignment: Expression = ...,
-        type_: Optional[JavaType] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        def replace(self, **kwargs: Any) -> AssignmentOperation: ...
+
+        @property
+        def operator(self) -> JLeftPadded[AssignmentOperation.Type]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _variable: Expression
+    _operator: JLeftPadded[Type]
+    _assignment: Expression
+    _type: Optional[JavaType]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def variable(self) -> Expression: ...
+    @property
+    def operator(self) -> Type: ...
+    @property
+    def assignment(self) -> Expression: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Binary(Expression, TypedTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    left: Expression
-    operator: JLeftPadded[Type]
-    right: Expression
-    type_: Optional[JavaType]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    class Type(Enum):
+        Addition: Type
+        Subtraction: Type
+        Multiplication: Type
+        Division: Type
+        Modulo: Type
+        LessThan: Type
+        GreaterThan: Type
+        LessThanOrEqual: Type
+        GreaterThanOrEqual: Type
+        Equal: Type
+        NotEqual: Type
+        BitAnd: Type
+        BitOr: Type
+        BitXor: Type
+        LeftShift: Type
+        RightShift: Type
+        UnsignedRightShift: Type
+        Or: Type
+        And: Type
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _left: Expression,
-        _operator: JLeftPadded[Type],
-        _right: Expression,
-        _type: Optional[JavaType],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: Binary
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        left: Expression = ...,
-        operator: JLeftPadded[Type] = ...,
-        right: Expression = ...,
-        type_: Optional[JavaType] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        def replace(self, **kwargs: Any) -> Binary: ...
+
+        @property
+        def operator(self) -> JLeftPadded[Binary.Type]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _left: Expression
+    _operator: JLeftPadded[Type]
+    _right: Expression
+    _type: Optional[JavaType]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def left(self) -> Expression: ...
+    @property
+    def operator(self) -> Type: ...
+    @property
+    def right(self) -> Expression: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Block(Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    static: JRightPadded[bool]
-    statements: List[JRightPadded[Statement]]
-    end: Space
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: Block
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _static: JRightPadded[bool],
-        _statements: List[JRightPadded[Statement]],
-        _end: Space,
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> Block: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        static: JRightPadded[bool] = ...,
-        statements: List[JRightPadded[Statement]] = ...,
-        end: Space = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def static(self) -> JRightPadded[bool]: ...
+        @property
+        def statements(self) -> List[JRightPadded[Statement]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _static: JRightPadded[bool]
+    _statements: List[JRightPadded[Statement]]
+    _end: Space
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def static(self) -> bool: ...
+    @property
+    def statements(self) -> List[Statement]: ...
+    @property
+    def end(self) -> Space: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Break(Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    label: Optional[Identifier]
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _label: Optional[Identifier]
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _label: Optional[Identifier],
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        label: Optional[Identifier] = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def label(self) -> Optional[Identifier]: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Case(Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    type_: Type
-    case_labels: JContainer[J]
-    statements: JContainer[Statement]
-    body: Optional[JRightPadded[J]]
-    guard: Optional[Expression]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    class Type(Enum):
+        Statement: Type
+        Rule: Type
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _type: Type,
-        _case_labels: JContainer[J],
-        _statements: JContainer[Statement],
-        _body: Optional[JRightPadded[J]],
-        _guard: Optional[Expression],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: Case
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        type_: Type = ...,
-        case_labels: JContainer[J] = ...,
-        statements: JContainer[Statement] = ...,
-        body: Optional[JRightPadded[J]] = ...,
-        guard: Optional[Expression] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        def replace(self, **kwargs: Any) -> Case: ...
+
+        @property
+        def case_labels(self) -> JContainer[J]: ...
+        @property
+        def statements(self) -> JContainer[Statement]: ...
+        @property
+        def body(self) -> Optional[JRightPadded[J]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _type: Type
+    _case_labels: JContainer[J]
+    _statements: JContainer[Statement]
+    _body: Optional[JRightPadded[J]]
+    _guard: Optional[Expression]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def type(self) -> Type: ...
+    @property
+    def case_labels(self) -> List[J]: ...
+    @property
+    def statements(self) -> List[Statement]: ...
+    @property
+    def body(self) -> Optional[J]: ...
+    @property
+    def guard(self) -> Optional[Expression]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class ClassDeclaration(Statement, TypedTree):
+    @dataclass(frozen=True)
     class Kind(J):
-        id: UUID
-        prefix: Space
-        markers: Markers
-        annotations: List[Annotation]
-        type_: Type
+        class Type(Enum):
+            Class: Type
+            Enum: Type
+            Interface: Type
+            Annotation: Type
+            Record: Type
+            Value: Type
 
-        def __init__(
-            self,
-            _id: UUID,
-            _prefix: Space,
-            _markers: Markers,
-            _annotations: List[Annotation],
-            _type: Type,
-        ) -> None: ...
+        _id: UUID
+        _prefix: Space
+        _markers: Markers
+        _annotations: List[Annotation]
+        _type: Type
 
-        def replace(
-            self,
-            *,
-            id: UUID = ...,
-            prefix: Space = ...,
-            markers: Markers = ...,
-            annotations: List[Annotation] = ...,
-            type_: Type = ...,
-        ) -> Self: ...
+        def replace(self, **kwargs: Any) -> Self: ...
+
+        @property
+        def id(self) -> UUID: ...
+        @property
+        def prefix(self) -> Space: ...
+        @property
+        def markers(self) -> Markers: ...
+        @property
+        def annotations(self) -> List[Annotation]: ...
+        @property
+        def type(self) -> Type: ...
 
         def with_id(self, id: UUID) -> ClassDeclaration.Kind: ...
         def with_prefix(self, prefix: Space) -> ClassDeclaration.Kind: ...
@@ -422,319 +478,342 @@ class ClassDeclaration(Statement, TypedTree):
         def with_type(self, type: Type) -> ClassDeclaration.Kind: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    id: UUID
-    prefix: Space
-    markers: Markers
-    leading_annotations: List[Annotation]
-    modifiers: List[Modifier]
-    kind: Kind
-    name: Identifier
-    type_parameters: Optional[JContainer[TypeParameter]]
-    primary_constructor: Optional[JContainer[Statement]]
-    extends: Optional[JLeftPadded[TypeTree]]
-    implements: Optional[JContainer[TypeTree]]
-    permits: Optional[JContainer[TypeTree]]
-    body: Block
-    type_: Optional[JavaType.FullyQualified]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: ClassDeclaration
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _leading_annotations: List[Annotation],
-        _modifiers: List[Modifier],
-        _kind: Kind,
-        _name: Identifier,
-        _type_parameters: Optional[JContainer[TypeParameter]],
-        _primary_constructor: Optional[JContainer[Statement]],
-        _extends: Optional[JLeftPadded[TypeTree]],
-        _implements: Optional[JContainer[TypeTree]],
-        _permits: Optional[JContainer[TypeTree]],
-        _body: Block,
-        _type: Optional[JavaType.FullyQualified],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> ClassDeclaration: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        leading_annotations: List[Annotation] = ...,
-        modifiers: List[Modifier] = ...,
-        kind: Kind = ...,
-        name: Identifier = ...,
-        type_parameters: Optional[JContainer[TypeParameter]] = ...,
-        primary_constructor: Optional[JContainer[Statement]] = ...,
-        extends: Optional[JLeftPadded[TypeTree]] = ...,
-        implements: Optional[JContainer[TypeTree]] = ...,
-        permits: Optional[JContainer[TypeTree]] = ...,
-        body: Block = ...,
-        type_: Optional[JavaType.FullyQualified] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def kind(self) -> ClassDeclaration.Kind: ...
+        @property
+        def type_parameters(self) -> Optional[JContainer[TypeParameter]]: ...
+        @property
+        def primary_constructor(self) -> Optional[JContainer[Statement]]: ...
+        @property
+        def extends(self) -> Optional[JLeftPadded[TypeTree]]: ...
+        @property
+        def implements(self) -> Optional[JContainer[TypeTree]]: ...
+        @property
+        def permits(self) -> Optional[JContainer[TypeTree]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _leading_annotations: List[Annotation]
+    _modifiers: List[Modifier]
+    _kind: Kind
+    _name: Identifier
+    _type_parameters: Optional[JContainer[TypeParameter]]
+    _primary_constructor: Optional[JContainer[Statement]]
+    _extends: Optional[JLeftPadded[TypeTree]]
+    _implements: Optional[JContainer[TypeTree]]
+    _permits: Optional[JContainer[TypeTree]]
+    _body: Block
+    _type: Optional[JavaType.FullyQualified]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def leading_annotations(self) -> List[Annotation]: ...
+    @property
+    def modifiers(self) -> List[Modifier]: ...
+    @property
+    def name(self) -> Identifier: ...
+    @property
+    def type_parameters(self) -> Optional[List[TypeParameter]]: ...
+    @property
+    def primary_constructor(self) -> Optional[List[Statement]]: ...
+    @property
+    def extends(self) -> Optional[TypeTree]: ...
+    @property
+    def implements(self) -> Optional[List[TypeTree]]: ...
+    @property
+    def permits(self) -> Optional[List[TypeTree]]: ...
+    @property
+    def body(self) -> Block: ...
+    @property
+    def type(self) -> Optional[JavaType.FullyQualified]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class CompilationUnit(JavaSourceFile, SourceFile):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    source_path: Path
-    file_attributes: Optional[FileAttributes]
-    charset_name: Optional[str]
-    charset_bom_marked: bool
-    checksum: Optional[Checksum]
-    package_declaration: Optional[JRightPadded[Package]]
-    imports: List[JRightPadded[Import]]
-    classes: List[ClassDeclaration]
-    eof: Space
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: CompilationUnit
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _source_path: Path,
-        _file_attributes: Optional[FileAttributes],
-        _charset_name: Optional[str],
-        _charset_bom_marked: bool,
-        _checksum: Optional[Checksum],
-        _package_declaration: Optional[JRightPadded[Package]],
-        _imports: List[JRightPadded[Import]],
-        _classes: List[ClassDeclaration],
-        _eof: Space,
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> CompilationUnit: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        source_path: Path = ...,
-        file_attributes: Optional[FileAttributes] = ...,
-        charset_name: Optional[str] = ...,
-        charset_bom_marked: bool = ...,
-        checksum: Optional[Checksum] = ...,
-        package_declaration: Optional[JRightPadded[Package]] = ...,
-        imports: List[JRightPadded[Import]] = ...,
-        classes: List[ClassDeclaration] = ...,
-        eof: Space = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def package_declaration(self) -> Optional[JRightPadded[Package]]: ...
+        @property
+        def imports(self) -> List[JRightPadded[Import]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _source_path: Path
+    _file_attributes: Optional[FileAttributes]
+    _charset_name: Optional[str]
+    _charset_bom_marked: bool
+    _checksum: Optional[Checksum]
+    _package_declaration: Optional[JRightPadded[Package]]
+    _imports: List[JRightPadded[Import]]
+    _classes: List[ClassDeclaration]
+    _eof: Space
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def source_path(self) -> Path: ...
+    @property
+    def file_attributes(self) -> Optional[FileAttributes]: ...
+    @property
+    def charset_name(self) -> Optional[str]: ...
+    @property
+    def charset_bom_marked(self) -> bool: ...
+    @property
+    def checksum(self) -> Optional[Checksum]: ...
+    @property
+    def package_declaration(self) -> Optional[Package]: ...
+    @property
+    def imports(self) -> List[Import]: ...
+    @property
+    def classes(self) -> List[ClassDeclaration]: ...
+    @property
+    def eof(self) -> Space: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def printer(self, cursor: Cursor) -> TreeVisitor[Tree, PrintOutputCapture[P]]: ...
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Continue(Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    label: Optional[Identifier]
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _label: Optional[Identifier]
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _label: Optional[Identifier],
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        label: Optional[Identifier] = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def label(self) -> Optional[Identifier]: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class DoWhileLoop(Loop):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    body: JRightPadded[Statement]
-    while_condition: JLeftPadded[ControlParentheses[Expression]]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: DoWhileLoop
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _body: JRightPadded[Statement],
-        _while_condition: JLeftPadded[ControlParentheses[Expression]],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> DoWhileLoop: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        body: JRightPadded[Statement] = ...,
-        while_condition: JLeftPadded[ControlParentheses[Expression]] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def body(self) -> JRightPadded[Statement]: ...
+        @property
+        def while_condition(self) -> JLeftPadded[ControlParentheses[Expression]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _body: JRightPadded[Statement]
+    _while_condition: JLeftPadded[ControlParentheses[Expression]]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def body(self) -> Statement: ...
+    @property
+    def while_condition(self) -> ControlParentheses[Expression]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Empty(Statement, Expression, TypeTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class EnumValue(J):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    annotations: List[Annotation]
-    name: Identifier
-    initializer: Optional[NewClass]
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _annotations: List[Annotation]
+    _name: Identifier
+    _initializer: Optional[NewClass]
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _annotations: List[Annotation],
-        _name: Identifier,
-        _initializer: Optional[NewClass],
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        annotations: List[Annotation] = ...,
-        name: Identifier = ...,
-        initializer: Optional[NewClass] = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def annotations(self) -> List[Annotation]: ...
+    @property
+    def name(self) -> Identifier: ...
+    @property
+    def initializer(self) -> Optional[NewClass]: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class EnumValueSet(Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    enums: List[JRightPadded[EnumValue]]
-    terminated_with_semicolon: bool
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: EnumValueSet
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _enums: List[JRightPadded[EnumValue]],
-        _terminated_with_semicolon: bool,
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> EnumValueSet: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        enums: List[JRightPadded[EnumValue]] = ...,
-        terminated_with_semicolon: bool = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def enums(self) -> List[JRightPadded[EnumValue]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _enums: List[JRightPadded[EnumValue]]
+    _terminated_with_semicolon: bool
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def enums(self) -> List[EnumValue]: ...
+    @property
+    def terminated_with_semicolon(self) -> bool: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class FieldAccess(TypeTree, Expression, Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    target: Expression
-    name: JLeftPadded[Identifier]
-    type_: Optional[JavaType]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: FieldAccess
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _target: Expression,
-        _name: JLeftPadded[Identifier],
-        _type: Optional[JavaType],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> FieldAccess: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        target: Expression = ...,
-        name: JLeftPadded[Identifier] = ...,
-        type_: Optional[JavaType] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def name(self) -> JLeftPadded[Identifier]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _target: Expression
+    _name: JLeftPadded[Identifier]
+    _type: Optional[JavaType]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def target(self) -> Expression: ...
+    @property
+    def name(self) -> Identifier: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class ForEachLoop(Loop):
+    @dataclass(frozen=True)
     class Control(J):
-        id: UUID
-        prefix: Space
-        markers: Markers
-        variable: JRightPadded[Statement]
-        iterable: JRightPadded[Expression]
-        padding: Optional[weakref.ReferenceType[PaddingHelper]]
+        @dataclass(frozen=True)
+        class PaddingHelper:
+            _t: ForEachLoop.Control
 
-        def __init__(
-            self,
-            _id: UUID,
-            _prefix: Space,
-            _markers: Markers,
-            _variable: JRightPadded[Statement],
-            _iterable: JRightPadded[Expression],
-            _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-        ) -> None: ...
+            def replace(self, **kwargs: Any) -> ForEachLoop.Control: ...
 
-        def replace(
-            self,
-            *,
-            id: UUID = ...,
-            prefix: Space = ...,
-            markers: Markers = ...,
-            variable: JRightPadded[Statement] = ...,
-            iterable: JRightPadded[Expression] = ...,
-            padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-        ) -> Self: ...
+            @property
+            def variable(self) -> JRightPadded[Statement]: ...
+            @property
+            def iterable(self) -> JRightPadded[Expression]: ...
+
+        _id: UUID
+        _prefix: Space
+        _markers: Markers
+        _variable: JRightPadded[Statement]
+        _iterable: JRightPadded[Expression]
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+        def replace(self, **kwargs: Any) -> Self: ...
+
+        @property
+        def id(self) -> UUID: ...
+        @property
+        def prefix(self) -> Space: ...
+        @property
+        def markers(self) -> Markers: ...
+        @property
+        def variable(self) -> Statement: ...
+        @property
+        def iterable(self) -> Expression: ...
+        @property
+        def padding(self) -> PaddingHelper: ...
 
         def with_id(self, id: UUID) -> ForEachLoop.Control: ...
         def with_prefix(self, prefix: Space) -> ForEachLoop.Control: ...
@@ -743,68 +822,80 @@ class ForEachLoop(Loop):
         def with_iterable(self, iterable: Expression) -> ForEachLoop.Control: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    id: UUID
-    prefix: Space
-    markers: Markers
-    control: Control
-    body: JRightPadded[Statement]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: ForEachLoop
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _control: Control,
-        _body: JRightPadded[Statement],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> ForEachLoop: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        control: Control = ...,
-        body: JRightPadded[Statement] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def body(self) -> JRightPadded[Statement]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _control: Control
+    _body: JRightPadded[Statement]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def control(self) -> Control: ...
+    @property
+    def body(self) -> Statement: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class ForLoop(Loop):
+    @dataclass(frozen=True)
     class Control(J):
-        id: UUID
-        prefix: Space
-        markers: Markers
-        init: List[JRightPadded[Statement]]
-        condition: JRightPadded[Expression]
-        update: List[JRightPadded[Statement]]
-        padding: Optional[weakref.ReferenceType[PaddingHelper]]
+        @dataclass(frozen=True)
+        class PaddingHelper:
+            _t: ForLoop.Control
 
-        def __init__(
-            self,
-            _id: UUID,
-            _prefix: Space,
-            _markers: Markers,
-            _init: List[JRightPadded[Statement]],
-            _condition: JRightPadded[Expression],
-            _update: List[JRightPadded[Statement]],
-            _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-        ) -> None: ...
+            def replace(self, **kwargs: Any) -> ForLoop.Control: ...
 
-        def replace(
-            self,
-            *,
-            id: UUID = ...,
-            prefix: Space = ...,
-            markers: Markers = ...,
-            init: List[JRightPadded[Statement]] = ...,
-            condition: JRightPadded[Expression] = ...,
-            update: List[JRightPadded[Statement]] = ...,
-            padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-        ) -> Self: ...
+            @property
+            def init(self) -> List[JRightPadded[Statement]]: ...
+            @property
+            def condition(self) -> JRightPadded[Expression]: ...
+            @property
+            def update(self) -> List[JRightPadded[Statement]]: ...
+
+        _id: UUID
+        _prefix: Space
+        _markers: Markers
+        _init: List[JRightPadded[Statement]]
+        _condition: JRightPadded[Expression]
+        _update: List[JRightPadded[Statement]]
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+        def replace(self, **kwargs: Any) -> Self: ...
+
+        @property
+        def id(self) -> UUID: ...
+        @property
+        def prefix(self) -> Space: ...
+        @property
+        def markers(self) -> Markers: ...
+        @property
+        def init(self) -> List[Statement]: ...
+        @property
+        def condition(self) -> Expression: ...
+        @property
+        def update(self) -> List[Statement]: ...
+        @property
+        def padding(self) -> PaddingHelper: ...
 
         def with_id(self, id: UUID) -> ForLoop.Control: ...
         def with_prefix(self, prefix: Space) -> ForLoop.Control: ...
@@ -814,124 +905,122 @@ class ForLoop(Loop):
         def with_update(self, update: List[Statement]) -> ForLoop.Control: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    id: UUID
-    prefix: Space
-    markers: Markers
-    control: Control
-    body: JRightPadded[Statement]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: ForLoop
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _control: Control,
-        _body: JRightPadded[Statement],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> ForLoop: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        control: Control = ...,
-        body: JRightPadded[Statement] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def body(self) -> JRightPadded[Statement]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _control: Control
+    _body: JRightPadded[Statement]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def control(self) -> Control: ...
+    @property
+    def body(self) -> Statement: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class ParenthesizedTypeTree(TypeTree, Expression):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    annotations: List[Annotation]
-    parenthesized_type: Parentheses[TypeTree]
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _annotations: List[Annotation]
+    _parenthesized_type: Parentheses[TypeTree]
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _annotations: List[Annotation],
-        _parenthesized_type: Parentheses[TypeTree],
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        annotations: List[Annotation] = ...,
-        parenthesized_type: Parentheses[TypeTree] = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def annotations(self) -> List[Annotation]: ...
+    @property
+    def parenthesized_type(self) -> Parentheses[TypeTree]: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Identifier(TypeTree, Expression):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    annotations: List[Annotation]
-    simple_name: str
-    type_: Optional[JavaType]
-    field_type: Optional[JavaType.Variable]
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _annotations: List[Annotation]
+    _simple_name: str
+    _type: Optional[JavaType]
+    _field_type: Optional[JavaType.Variable]
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _annotations: List[Annotation],
-        _simple_name: str,
-        _type: Optional[JavaType],
-        _field_type: Optional[JavaType.Variable],
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        annotations: List[Annotation] = ...,
-        simple_name: str = ...,
-        type_: Optional[JavaType] = ...,
-        field_type: Optional[JavaType.Variable] = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def annotations(self) -> List[Annotation]: ...
+    @property
+    def simple_name(self) -> str: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
+    def field_type(self) -> Optional[JavaType.Variable]: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class If(Statement):
+    @dataclass(frozen=True)
     class Else(J):
-        id: UUID
-        prefix: Space
-        markers: Markers
-        body: JRightPadded[Statement]
-        padding: Optional[weakref.ReferenceType[PaddingHelper]]
+        @dataclass(frozen=True)
+        class PaddingHelper:
+            _t: If.Else
 
-        def __init__(
-            self,
-            _id: UUID,
-            _prefix: Space,
-            _markers: Markers,
-            _body: JRightPadded[Statement],
-            _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-        ) -> None: ...
+            def replace(self, **kwargs: Any) -> If.Else: ...
 
-        def replace(
-            self,
-            *,
-            id: UUID = ...,
-            prefix: Space = ...,
-            markers: Markers = ...,
-            body: JRightPadded[Statement] = ...,
-            padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-        ) -> Self: ...
+            @property
+            def body(self) -> JRightPadded[Statement]: ...
+
+        _id: UUID
+        _prefix: Space
+        _markers: Markers
+        _body: JRightPadded[Statement]
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+        def replace(self, **kwargs: Any) -> Self: ...
+
+        @property
+        def id(self) -> UUID: ...
+        @property
+        def prefix(self) -> Space: ...
+        @property
+        def markers(self) -> Markers: ...
+        @property
+        def body(self) -> Statement: ...
+        @property
+        def padding(self) -> PaddingHelper: ...
 
         def with_id(self, id: UUID) -> If.Else: ...
         def with_prefix(self, prefix: Space) -> If.Else: ...
@@ -939,232 +1028,262 @@ class If(Statement):
         def with_body(self, body: Statement) -> If.Else: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    id: UUID
-    prefix: Space
-    markers: Markers
-    if_condition: ControlParentheses[Expression]
-    then_part: JRightPadded[Statement]
-    else_part: Optional[Else]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: If
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _if_condition: ControlParentheses[Expression],
-        _then_part: JRightPadded[Statement],
-        _else_part: Optional[Else],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> If: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        if_condition: ControlParentheses[Expression] = ...,
-        then_part: JRightPadded[Statement] = ...,
-        else_part: Optional[Else] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def then_part(self) -> JRightPadded[Statement]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _if_condition: ControlParentheses[Expression]
+    _then_part: JRightPadded[Statement]
+    _else_part: Optional[Else]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def if_condition(self) -> ControlParentheses[Expression]: ...
+    @property
+    def then_part(self) -> Statement: ...
+    @property
+    def else_part(self) -> Optional[Else]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Import(Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    static: JLeftPadded[bool]
-    qualid: FieldAccess
-    alias: Optional[JLeftPadded[Identifier]]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: Import
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _static: JLeftPadded[bool],
-        _qualid: FieldAccess,
-        _alias: Optional[JLeftPadded[Identifier]],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> Import: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        static: JLeftPadded[bool] = ...,
-        qualid: FieldAccess = ...,
-        alias: Optional[JLeftPadded[Identifier]] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def static(self) -> JLeftPadded[bool]: ...
+        @property
+        def alias(self) -> Optional[JLeftPadded[Identifier]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _static: JLeftPadded[bool]
+    _qualid: FieldAccess
+    _alias: Optional[JLeftPadded[Identifier]]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def static(self) -> bool: ...
+    @property
+    def qualid(self) -> FieldAccess: ...
+    @property
+    def alias(self) -> Optional[Identifier]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class InstanceOf(Expression, TypedTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    expression: JRightPadded[Expression]
-    clazz: J
-    pattern: Optional[J]
-    type_: Optional[JavaType]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: InstanceOf
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _expression: JRightPadded[Expression],
-        _clazz: J,
-        _pattern: Optional[J],
-        _type: Optional[JavaType],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> InstanceOf: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        expression: JRightPadded[Expression] = ...,
-        clazz: J = ...,
-        pattern: Optional[J] = ...,
-        type_: Optional[JavaType] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def expression(self) -> JRightPadded[Expression]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _expression: JRightPadded[Expression]
+    _clazz: J
+    _pattern: Optional[J]
+    _type: Optional[JavaType]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def expression(self) -> Expression: ...
+    @property
+    def clazz(self) -> J: ...
+    @property
+    def pattern(self) -> Optional[J]: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class DeconstructionPattern(TypedTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    deconstructor: Expression
-    nested: JContainer[J]
-    type_: JavaType
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: DeconstructionPattern
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _deconstructor: Expression,
-        _nested: JContainer[J],
-        _type: JavaType,
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> DeconstructionPattern: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        deconstructor: Expression = ...,
-        nested: JContainer[J] = ...,
-        type_: JavaType = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def nested(self) -> JContainer[J]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _deconstructor: Expression
+    _nested: JContainer[J]
+    _type: JavaType
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def deconstructor(self) -> Expression: ...
+    @property
+    def nested(self) -> List[J]: ...
+    @property
+    def type(self) -> JavaType: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class IntersectionType(TypeTree, Expression):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    bounds: JContainer[TypeTree]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: IntersectionType
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _bounds: JContainer[TypeTree],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> IntersectionType: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        bounds: JContainer[TypeTree] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def bounds(self) -> JContainer[TypeTree]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _bounds: JContainer[TypeTree]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def bounds(self) -> List[TypeTree]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Label(Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    label: JRightPadded[Identifier]
-    statement: Statement
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: Label
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _label: JRightPadded[Identifier],
-        _statement: Statement,
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> Label: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        label: JRightPadded[Identifier] = ...,
-        statement: Statement = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def label(self) -> JRightPadded[Identifier]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _label: JRightPadded[Identifier]
+    _statement: Statement
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def label(self) -> Identifier: ...
+    @property
+    def statement(self) -> Statement: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Lambda(Statement, Expression, TypedTree):
+    @dataclass(frozen=True)
     class Parameters(J):
-        id: UUID
-        prefix: Space
-        markers: Markers
-        parenthesized: bool
-        parameters: List[JRightPadded[J]]
-        padding: Optional[weakref.ReferenceType[PaddingHelper]]
+        @dataclass(frozen=True)
+        class PaddingHelper:
+            _t: Lambda.Parameters
 
-        def __init__(
-            self,
-            _id: UUID,
-            _prefix: Space,
-            _markers: Markers,
-            _parenthesized: bool,
-            _parameters: List[JRightPadded[J]],
-            _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-        ) -> None: ...
+            def replace(self, **kwargs: Any) -> Lambda.Parameters: ...
 
-        def replace(
-            self,
-            *,
-            id: UUID = ...,
-            prefix: Space = ...,
-            markers: Markers = ...,
-            parenthesized: bool = ...,
-            parameters: List[JRightPadded[J]] = ...,
-            padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-        ) -> Self: ...
+            @property
+            def parameters(self) -> List[JRightPadded[J]]: ...
+
+        _id: UUID
+        _prefix: Space
+        _markers: Markers
+        _parenthesized: bool
+        _parameters: List[JRightPadded[J]]
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+        def replace(self, **kwargs: Any) -> Self: ...
+
+        @property
+        def id(self) -> UUID: ...
+        @property
+        def prefix(self) -> Space: ...
+        @property
+        def markers(self) -> Markers: ...
+        @property
+        def parenthesized(self) -> bool: ...
+        @property
+        def parameters(self) -> List[J]: ...
+        @property
+        def padding(self) -> PaddingHelper: ...
 
         def with_id(self, id: UUID) -> Lambda.Parameters: ...
         def with_prefix(self, prefix: Space) -> Lambda.Parameters: ...
@@ -1173,758 +1292,834 @@ class Lambda(Statement, Expression, TypedTree):
         def with_parameters(self, parameters: List[J]) -> Lambda.Parameters: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    id: UUID
-    prefix: Space
-    markers: Markers
-    parameters: Parameters
-    arrow: Space
-    body: J
-    type_: Optional[JavaType]
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _parameters: Parameters
+    _arrow: Space
+    _body: J
+    _type: Optional[JavaType]
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _parameters: Parameters,
-        _arrow: Space,
-        _body: J,
-        _type: Optional[JavaType],
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        parameters: Parameters = ...,
-        arrow: Space = ...,
-        body: J = ...,
-        type_: Optional[JavaType] = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def parameters(self) -> Parameters: ...
+    @property
+    def arrow(self) -> Space: ...
+    @property
+    def body(self) -> J: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Literal(Expression, TypedTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    value: Optional[object]
-    value_source: Optional[str]
-    unicode_escapes: Optional[List[UnicodeEscape]]
-    type_: JavaType.Primitive
+    @dataclass(frozen=True)
+    class UnicodeEscape:
+        _value_source_index: int
+        _code_point: str
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _value: Optional[object],
-        _value_source: Optional[str],
-        _unicode_escapes: Optional[List[UnicodeEscape]],
-        _type: JavaType.Primitive,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        value: Optional[object] = ...,
-        value_source: Optional[str] = ...,
-        unicode_escapes: Optional[List[UnicodeEscape]] = ...,
-        type_: JavaType.Primitive = ...,
-    ) -> Self: ...
+        @property
+        def value_source_index(self) -> int: ...
+        @property
+        def code_point(self) -> str: ...
+
+        def with_value_source_index(self, value_source_index: int) -> Literal.UnicodeEscape: ...
+        def with_code_point(self, code_point: str) -> Literal.UnicodeEscape: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _value: Optional[object]
+    _value_source: Optional[str]
+    _unicode_escapes: Optional[List[UnicodeEscape]]
+    _type: JavaType.Primitive
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def value(self) -> Optional[object]: ...
+    @property
+    def value_source(self) -> Optional[str]: ...
+    @property
+    def unicode_escapes(self) -> Optional[List[UnicodeEscape]]: ...
+    @property
+    def type(self) -> JavaType.Primitive: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class MemberReference(TypedTree, MethodCall):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    containing: JRightPadded[Expression]
-    type_parameters: Optional[JContainer[Expression]]
-    reference: JLeftPadded[Identifier]
-    type_: Optional[JavaType]
-    method_type: Optional[JavaType.Method]
-    variable_type: Optional[JavaType.Variable]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: MemberReference
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _containing: JRightPadded[Expression],
-        _type_parameters: Optional[JContainer[Expression]],
-        _reference: JLeftPadded[Identifier],
-        _type: Optional[JavaType],
-        _method_type: Optional[JavaType.Method],
-        _variable_type: Optional[JavaType.Variable],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> MemberReference: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        containing: JRightPadded[Expression] = ...,
-        type_parameters: Optional[JContainer[Expression]] = ...,
-        reference: JLeftPadded[Identifier] = ...,
-        type_: Optional[JavaType] = ...,
-        method_type: Optional[JavaType.Method] = ...,
-        variable_type: Optional[JavaType.Variable] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def containing(self) -> JRightPadded[Expression]: ...
+        @property
+        def type_parameters(self) -> Optional[JContainer[Expression]]: ...
+        @property
+        def reference(self) -> JLeftPadded[Identifier]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _containing: JRightPadded[Expression]
+    _type_parameters: Optional[JContainer[Expression]]
+    _reference: JLeftPadded[Identifier]
+    _type: Optional[JavaType]
+    _method_type: Optional[JavaType.Method]
+    _variable_type: Optional[JavaType.Variable]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def containing(self) -> Expression: ...
+    @property
+    def type_parameters(self) -> Optional[List[Expression]]: ...
+    @property
+    def reference(self) -> Identifier: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
+    def method_type(self) -> Optional[JavaType.Method]: ...
+    @property
+    def variable_type(self) -> Optional[JavaType.Variable]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class MethodDeclaration(Statement, TypedTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    leading_annotations: List[Annotation]
-    modifiers: List[Modifier]
-    type_parameters: Optional[TypeParameters]
-    return_type_expression: Optional[TypeTree]
-    name_annotations: List[Annotation]
-    name: Identifier
-    parameters: JContainer[Statement]
-    throws: Optional[JContainer[NameTree]]
-    body: Optional[Block]
-    default_value: Optional[JLeftPadded[Expression]]
-    method_type: Optional[JavaType.Method]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
-    annotations: Optional[weakref.ReferenceType[AnnotationsHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: MethodDeclaration
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _leading_annotations: List[Annotation],
-        _modifiers: List[Modifier],
-        _type_parameters: Optional[TypeParameters],
-        _return_type_expression: Optional[TypeTree],
-        _name_annotations: List[Annotation],
-        _name: Identifier,
-        _parameters: JContainer[Statement],
-        _throws: Optional[JContainer[NameTree]],
-        _body: Optional[Block],
-        _default_value: Optional[JLeftPadded[Expression]],
-        _method_type: Optional[JavaType.Method],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-        _annotations: Optional[weakref.ReferenceType[AnnotationsHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> MethodDeclaration: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        leading_annotations: List[Annotation] = ...,
-        modifiers: List[Modifier] = ...,
-        type_parameters: Optional[TypeParameters] = ...,
-        return_type_expression: Optional[TypeTree] = ...,
-        name_annotations: List[Annotation] = ...,
-        name: Identifier = ...,
-        parameters: JContainer[Statement] = ...,
-        throws: Optional[JContainer[NameTree]] = ...,
-        body: Optional[Block] = ...,
-        default_value: Optional[JLeftPadded[Expression]] = ...,
-        method_type: Optional[JavaType.Method] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-        annotations: Optional[weakref.ReferenceType[AnnotationsHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def type_parameters(self) -> Optional[TypeParameters]: ...
+        @property
+        def name(self) -> Identifier: ...
+        @property
+        def name_annotations(self) -> List[Annotation]: ...
+        @property
+        def parameters(self) -> JContainer[Statement]: ...
+        @property
+        def throws(self) -> Optional[JContainer[NameTree]]: ...
+        @property
+        def default_value(self) -> Optional[JLeftPadded[Expression]]: ...
+
+    @dataclass(frozen=True)
+    class AnnotationsHelper:
+        _t: MethodDeclaration
+
+        def replace(self, **kwargs: Any) -> Self: ...
+
+        @property
+        def type_parameters(self) -> Optional[TypeParameters]: ...
+        @property
+        def name(self) -> Identifier: ...
+        @property
+        def name_annotations(self) -> List[Annotation]: ...
+        @property
+        def parameters(self) -> JContainer[Statement]: ...
+        @property
+        def throws(self) -> Optional[JContainer[NameTree]]: ...
+        @property
+        def default_value(self) -> Optional[JLeftPadded[Expression]]: ...
+
+        def with_type_parameters(self, type_parameters: Optional[TypeParameters]) -> MethodDeclaration: ...
+        def with_name(self, name: Identifier) -> MethodDeclaration: ...
+        def with_name_annotations(self, name_annotations: List[Annotation]) -> MethodDeclaration: ...
+        def with_parameters(self, parameters: JContainer[Statement]) -> MethodDeclaration: ...
+        def with_throws(self, throws: Optional[JContainer[NameTree]]) -> MethodDeclaration: ...
+        def with_default_value(self, default_value: Optional[JLeftPadded[Expression]]) -> MethodDeclaration: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _leading_annotations: List[Annotation]
+    _modifiers: List[Modifier]
+    _type_parameters: Optional[TypeParameters]
+    _return_type_expression: Optional[TypeTree]
+    _name_annotations: List[Annotation]
+    _name: Identifier
+    _parameters: JContainer[Statement]
+    _throws: Optional[JContainer[NameTree]]
+    _body: Optional[Block]
+    _default_value: Optional[JLeftPadded[Expression]]
+    _method_type: Optional[JavaType.Method]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+    _annotations: Optional[weakref.ReferenceType[AnnotationsHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def leading_annotations(self) -> List[Annotation]: ...
+    @property
+    def modifiers(self) -> List[Modifier]: ...
+    @property
+    def return_type_expression(self) -> Optional[TypeTree]: ...
+    @property
+    def name_annotations(self) -> List[Annotation]: ...
+    @property
+    def name(self) -> Identifier: ...
+    @property
+    def parameters(self) -> List[Statement]: ...
+    @property
+    def throws(self) -> Optional[List[NameTree]]: ...
+    @property
+    def body(self) -> Optional[Block]: ...
+    @property
+    def default_value(self) -> Optional[Expression]: ...
+    @property
+    def method_type(self) -> Optional[JavaType.Method]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
+    @property
+    def annotations(self) -> AnnotationsHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class MethodInvocation(Statement, TypedTree, MethodCall):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    select: Optional[JRightPadded[Expression]]
-    type_parameters: Optional[JContainer[Expression]]
-    name: Identifier
-    arguments: JContainer[Expression]
-    method_type: Optional[JavaType.Method]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: MethodInvocation
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _select: Optional[JRightPadded[Expression]],
-        _type_parameters: Optional[JContainer[Expression]],
-        _name: Identifier,
-        _arguments: JContainer[Expression],
-        _method_type: Optional[JavaType.Method],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> MethodInvocation: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        select: Optional[JRightPadded[Expression]] = ...,
-        type_parameters: Optional[JContainer[Expression]] = ...,
-        name: Identifier = ...,
-        arguments: JContainer[Expression] = ...,
-        method_type: Optional[JavaType.Method] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def select(self) -> Optional[JRightPadded[Expression]]: ...
+        @property
+        def type_parameters(self) -> Optional[JContainer[Expression]]: ...
+        @property
+        def arguments(self) -> JContainer[Expression]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _select: Optional[JRightPadded[Expression]]
+    _type_parameters: Optional[JContainer[Expression]]
+    _name: Identifier
+    _arguments: JContainer[Expression]
+    _method_type: Optional[JavaType.Method]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def select(self) -> Optional[Expression]: ...
+    @property
+    def type_parameters(self) -> Optional[List[Expression]]: ...
+    @property
+    def name(self) -> Identifier: ...
+    @property
+    def arguments(self) -> List[Expression]: ...
+    @property
+    def method_type(self) -> Optional[JavaType.Method]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Modifier(J):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    keyword: Optional[str]
-    type_: Type
-    annotations: List[Annotation]
+    class Type(Enum):
+        Default: Type
+        Public: Type
+        Protected: Type
+        Private: Type
+        Abstract: Type
+        Static: Type
+        Final: Type
+        Sealed: Type
+        NonSealed: Type
+        Transient: Type
+        Volatile: Type
+        Synchronized: Type
+        Native: Type
+        Strictfp: Type
+        Async: Type
+        Reified: Type
+        Inline: Type
+        LanguageExtension: Type
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _keyword: Optional[str],
-        _type: Type,
-        _annotations: List[Annotation],
-    ) -> None: ...
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _keyword: Optional[str]
+    _type: Type
+    _annotations: List[Annotation]
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        keyword: Optional[str] = ...,
-        type_: Type = ...,
-        annotations: List[Annotation] = ...,
-    ) -> Self: ...
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def keyword(self) -> Optional[str]: ...
+    @property
+    def type(self) -> Type: ...
+    @property
+    def annotations(self) -> List[Annotation]: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class MultiCatch(TypeTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    alternatives: List[JRightPadded[NameTree]]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: MultiCatch
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _alternatives: List[JRightPadded[NameTree]],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> MultiCatch: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        alternatives: List[JRightPadded[NameTree]] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def alternatives(self) -> List[JRightPadded[NameTree]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _alternatives: List[JRightPadded[NameTree]]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def alternatives(self) -> List[NameTree]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class NewArray(Expression, TypedTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    type_expression: Optional[TypeTree]
-    dimensions: List[ArrayDimension]
-    initializer: Optional[JContainer[Expression]]
-    type_: Optional[JavaType]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: NewArray
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _type_expression: Optional[TypeTree],
-        _dimensions: List[ArrayDimension],
-        _initializer: Optional[JContainer[Expression]],
-        _type: Optional[JavaType],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> NewArray: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        type_expression: Optional[TypeTree] = ...,
-        dimensions: List[ArrayDimension] = ...,
-        initializer: Optional[JContainer[Expression]] = ...,
-        type_: Optional[JavaType] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def initializer(self) -> Optional[JContainer[Expression]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _type_expression: Optional[TypeTree]
+    _dimensions: List[ArrayDimension]
+    _initializer: Optional[JContainer[Expression]]
+    _type: Optional[JavaType]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def type_expression(self) -> Optional[TypeTree]: ...
+    @property
+    def dimensions(self) -> List[ArrayDimension]: ...
+    @property
+    def initializer(self) -> Optional[List[Expression]]: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class ArrayDimension(J):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    index: JRightPadded[Expression]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: ArrayDimension
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _index: JRightPadded[Expression],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> ArrayDimension: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        index: JRightPadded[Expression] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def index(self) -> JRightPadded[Expression]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _index: JRightPadded[Expression]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def index(self) -> Expression: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class NewClass(Statement, TypedTree, MethodCall):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    enclosing: Optional[JRightPadded[Expression]]
-    new: Space
-    clazz: Optional[TypeTree]
-    arguments: JContainer[Expression]
-    body: Optional[Block]
-    constructor_type: Optional[JavaType.Method]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: NewClass
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _enclosing: Optional[JRightPadded[Expression]],
-        _new: Space,
-        _clazz: Optional[TypeTree],
-        _arguments: JContainer[Expression],
-        _body: Optional[Block],
-        _constructor_type: Optional[JavaType.Method],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> NewClass: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        enclosing: Optional[JRightPadded[Expression]] = ...,
-        new: Space = ...,
-        clazz: Optional[TypeTree] = ...,
-        arguments: JContainer[Expression] = ...,
-        body: Optional[Block] = ...,
-        constructor_type: Optional[JavaType.Method] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def enclosing(self) -> Optional[JRightPadded[Expression]]: ...
+        @property
+        def arguments(self) -> JContainer[Expression]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _enclosing: Optional[JRightPadded[Expression]]
+    _new: Space
+    _clazz: Optional[TypeTree]
+    _arguments: JContainer[Expression]
+    _body: Optional[Block]
+    _constructor_type: Optional[JavaType.Method]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def enclosing(self) -> Optional[Expression]: ...
+    @property
+    def new(self) -> Space: ...
+    @property
+    def clazz(self) -> Optional[TypeTree]: ...
+    @property
+    def arguments(self) -> List[Expression]: ...
+    @property
+    def body(self) -> Optional[Block]: ...
+    @property
+    def constructor_type(self) -> Optional[JavaType.Method]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class NullableType(TypeTree, Expression):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    annotations: List[Annotation]
-    type_tree: JRightPadded[TypeTree]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: NullableType
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _annotations: List[Annotation],
-        _type_tree: JRightPadded[TypeTree],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> NullableType: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        annotations: List[Annotation] = ...,
-        type_tree: JRightPadded[TypeTree] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def type_tree(self) -> JRightPadded[TypeTree]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _annotations: List[Annotation]
+    _type_tree: JRightPadded[TypeTree]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def annotations(self) -> List[Annotation]: ...
+    @property
+    def type_tree(self) -> TypeTree: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Package(Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    expression: Expression
-    annotations: List[Annotation]
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _expression: Expression
+    _annotations: List[Annotation]
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _expression: Expression,
-        _annotations: List[Annotation],
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        expression: Expression = ...,
-        annotations: List[Annotation] = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def expression(self) -> Expression: ...
+    @property
+    def annotations(self) -> List[Annotation]: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class ParameterizedType(TypeTree, Expression):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    clazz: NameTree
-    type_parameters: Optional[JContainer[Expression]]
-    type_: Optional[JavaType]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: ParameterizedType
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _clazz: NameTree,
-        _type_parameters: Optional[JContainer[Expression]],
-        _type: Optional[JavaType],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> ParameterizedType: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        clazz: NameTree = ...,
-        type_parameters: Optional[JContainer[Expression]] = ...,
-        type_: Optional[JavaType] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def type_parameters(self) -> Optional[JContainer[Expression]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _clazz: NameTree
+    _type_parameters: Optional[JContainer[Expression]]
+    _type: Optional[JavaType]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def clazz(self) -> NameTree: ...
+    @property
+    def type_parameters(self) -> Optional[List[Expression]]: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Parentheses(Expression, Generic[J2]):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    tree: JRightPadded[J2]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: Parentheses[J2]
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _tree: JRightPadded[J2],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> Parentheses[J2]: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        tree: JRightPadded[J2] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def tree(self) -> JRightPadded[J2]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _tree: JRightPadded[J2]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def tree(self) -> J2: ...
+    @property
+    def type(self) -> JavaType: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class ControlParentheses(Expression, Generic[J2]):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    tree: JRightPadded[J2]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: ControlParentheses[J2]
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _tree: JRightPadded[J2],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> ControlParentheses[J2]: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        tree: JRightPadded[J2] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def tree(self) -> JRightPadded[J2]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _tree: JRightPadded[J2]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def tree(self) -> J2: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Primitive(TypeTree, Expression):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    type_: JavaType.Primitive
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _type: JavaType.Primitive
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _type: JavaType.Primitive,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        type_: JavaType.Primitive = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def type(self) -> JavaType.Primitive: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Return(Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    expression: Optional[Expression]
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _expression: Optional[Expression]
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _expression: Optional[Expression],
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        expression: Optional[Expression] = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def expression(self) -> Optional[Expression]: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Switch(Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    selector: ControlParentheses[Expression]
-    cases: Block
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _selector: ControlParentheses[Expression]
+    _cases: Block
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _selector: ControlParentheses[Expression],
-        _cases: Block,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        selector: ControlParentheses[Expression] = ...,
-        cases: Block = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def selector(self) -> ControlParentheses[Expression]: ...
+    @property
+    def cases(self) -> Block: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class SwitchExpression(Expression, TypedTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    selector: ControlParentheses[Expression]
-    cases: Block
-    type_: Optional[JavaType]
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _selector: ControlParentheses[Expression]
+    _cases: Block
+    _type: Optional[JavaType]
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _selector: ControlParentheses[Expression],
-        _cases: Block,
-        _type: Optional[JavaType],
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        selector: ControlParentheses[Expression] = ...,
-        cases: Block = ...,
-        type_: Optional[JavaType] = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def selector(self) -> ControlParentheses[Expression]: ...
+    @property
+    def cases(self) -> Block: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Synchronized(Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    lock: ControlParentheses[Expression]
-    body: Block
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _lock: ControlParentheses[Expression]
+    _body: Block
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _lock: ControlParentheses[Expression],
-        _body: Block,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        lock: ControlParentheses[Expression] = ...,
-        body: Block = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def lock(self) -> ControlParentheses[Expression]: ...
+    @property
+    def body(self) -> Block: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Ternary(Expression, Statement, TypedTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    condition: Expression
-    true_part: JLeftPadded[Expression]
-    false_part: JLeftPadded[Expression]
-    type_: Optional[JavaType]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: Ternary
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _condition: Expression,
-        _true_part: JLeftPadded[Expression],
-        _false_part: JLeftPadded[Expression],
-        _type: Optional[JavaType],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> Ternary: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        condition: Expression = ...,
-        true_part: JLeftPadded[Expression] = ...,
-        false_part: JLeftPadded[Expression] = ...,
-        type_: Optional[JavaType] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def true_part(self) -> JLeftPadded[Expression]: ...
+        @property
+        def false_part(self) -> JLeftPadded[Expression]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _condition: Expression
+    _true_part: JLeftPadded[Expression]
+    _false_part: JLeftPadded[Expression]
+    _type: Optional[JavaType]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def condition(self) -> Expression: ...
+    @property
+    def true_part(self) -> Expression: ...
+    @property
+    def false_part(self) -> Expression: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Throw(Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    exception: Expression
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _exception: Expression
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _exception: Expression,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        exception: Expression = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def exception(self) -> Expression: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Try(Statement):
+    @dataclass(frozen=True)
     class Resource(J):
-        id: UUID
-        prefix: Space
-        markers: Markers
-        variable_declarations: TypedTree
-        terminated_with_semicolon: bool
+        _id: UUID
+        _prefix: Space
+        _markers: Markers
+        _variable_declarations: TypedTree
+        _terminated_with_semicolon: bool
 
-        def __init__(
-            self,
-            _id: UUID,
-            _prefix: Space,
-            _markers: Markers,
-            _variable_declarations: TypedTree,
-            _terminated_with_semicolon: bool,
-        ) -> None: ...
+        def replace(self, **kwargs: Any) -> Self: ...
 
-        def replace(
-            self,
-            *,
-            id: UUID = ...,
-            prefix: Space = ...,
-            markers: Markers = ...,
-            variable_declarations: TypedTree = ...,
-            terminated_with_semicolon: bool = ...,
-        ) -> Self: ...
+        @property
+        def id(self) -> UUID: ...
+        @property
+        def prefix(self) -> Space: ...
+        @property
+        def markers(self) -> Markers: ...
+        @property
+        def variable_declarations(self) -> TypedTree: ...
+        @property
+        def terminated_with_semicolon(self) -> bool: ...
 
         def with_id(self, id: UUID) -> Try.Resource: ...
         def with_prefix(self, prefix: Space) -> Try.Resource: ...
@@ -1933,31 +2128,26 @@ class Try(Statement):
         def with_terminated_with_semicolon(self, terminated_with_semicolon: bool) -> Try.Resource: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+    @dataclass(frozen=True)
     class Catch(J):
-        id: UUID
-        prefix: Space
-        markers: Markers
-        parameter: ControlParentheses[VariableDeclarations]
-        body: Block
+        _id: UUID
+        _prefix: Space
+        _markers: Markers
+        _parameter: ControlParentheses[VariableDeclarations]
+        _body: Block
 
-        def __init__(
-            self,
-            _id: UUID,
-            _prefix: Space,
-            _markers: Markers,
-            _parameter: ControlParentheses[VariableDeclarations],
-            _body: Block,
-        ) -> None: ...
+        def replace(self, **kwargs: Any) -> Self: ...
 
-        def replace(
-            self,
-            *,
-            id: UUID = ...,
-            prefix: Space = ...,
-            markers: Markers = ...,
-            parameter: ControlParentheses[VariableDeclarations] = ...,
-            body: Block = ...,
-        ) -> Self: ...
+        @property
+        def id(self) -> UUID: ...
+        @property
+        def prefix(self) -> Space: ...
+        @property
+        def markers(self) -> Markers: ...
+        @property
+        def parameter(self) -> ControlParentheses[VariableDeclarations]: ...
+        @property
+        def body(self) -> Block: ...
 
         def with_id(self, id: UUID) -> Try.Catch: ...
         def with_prefix(self, prefix: Space) -> Try.Catch: ...
@@ -1966,207 +2156,234 @@ class Try(Statement):
         def with_body(self, body: Block) -> Try.Catch: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    id: UUID
-    prefix: Space
-    markers: Markers
-    resources: Optional[JContainer[Resource]]
-    body: Block
-    catches: List[Catch]
-    finally_: Optional[JLeftPadded[Block]]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: Try
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _resources: Optional[JContainer[Resource]],
-        _body: Block,
-        _catches: List[Catch],
-        _finally: Optional[JLeftPadded[Block]],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> Try: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        resources: Optional[JContainer[Resource]] = ...,
-        body: Block = ...,
-        catches: List[Catch] = ...,
-        finally_: Optional[JLeftPadded[Block]] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def resources(self) -> Optional[JContainer[Try.Resource]]: ...
+        @property
+        def finally_(self) -> Optional[JLeftPadded[Block]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _resources: Optional[JContainer[Resource]]
+    _body: Block
+    _catches: List[Catch]
+    _finally: Optional[JLeftPadded[Block]]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def resources(self) -> Optional[List[Resource]]: ...
+    @property
+    def body(self) -> Block: ...
+    @property
+    def catches(self) -> List[Catch]: ...
+    @property
+    def finally_(self) -> Optional[Block]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class TypeCast(Expression, TypedTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    clazz: ControlParentheses[TypeTree]
-    expression: Expression
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _clazz: ControlParentheses[TypeTree]
+    _expression: Expression
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _clazz: ControlParentheses[TypeTree],
-        _expression: Expression,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        clazz: ControlParentheses[TypeTree] = ...,
-        expression: Expression = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def clazz(self) -> ControlParentheses[TypeTree]: ...
+    @property
+    def expression(self) -> Expression: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class TypeParameter(J):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    annotations: List[Annotation]
-    modifiers: List[Modifier]
-    name: Expression
-    bounds: Optional[JContainer[TypeTree]]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: TypeParameter
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _annotations: List[Annotation],
-        _modifiers: List[Modifier],
-        _name: Expression,
-        _bounds: Optional[JContainer[TypeTree]],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> TypeParameter: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        annotations: List[Annotation] = ...,
-        modifiers: List[Modifier] = ...,
-        name: Expression = ...,
-        bounds: Optional[JContainer[TypeTree]] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def bounds(self) -> Optional[JContainer[TypeTree]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _annotations: List[Annotation]
+    _modifiers: List[Modifier]
+    _name: Expression
+    _bounds: Optional[JContainer[TypeTree]]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def annotations(self) -> List[Annotation]: ...
+    @property
+    def modifiers(self) -> List[Modifier]: ...
+    @property
+    def name(self) -> Expression: ...
+    @property
+    def bounds(self) -> Optional[List[TypeTree]]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class TypeParameters(J):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    annotations: List[Annotation]
-    type_parameters: List[JRightPadded[TypeParameter]]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: TypeParameters
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _annotations: List[Annotation],
-        _type_parameters: List[JRightPadded[TypeParameter]],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> TypeParameters: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        annotations: List[Annotation] = ...,
-        type_parameters: List[JRightPadded[TypeParameter]] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def type_parameters(self) -> List[JRightPadded[TypeParameter]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _annotations: List[Annotation]
+    _type_parameters: List[JRightPadded[TypeParameter]]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def annotations(self) -> List[Annotation]: ...
+    @property
+    def type_parameters(self) -> List[TypeParameter]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Unary(Statement, Expression, TypedTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    operator: JLeftPadded[Type]
-    expression: Expression
-    type_: Optional[JavaType]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    class Type(Enum):
+        PreIncrement: Type
+        PreDecrement: Type
+        PostIncrement: Type
+        PostDecrement: Type
+        Positive: Type
+        Negative: Type
+        Complement: Type
+        Not: Type
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _operator: JLeftPadded[Type],
-        _expression: Expression,
-        _type: Optional[JavaType],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: Unary
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        operator: JLeftPadded[Type] = ...,
-        expression: Expression = ...,
-        type_: Optional[JavaType] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        def replace(self, **kwargs: Any) -> Unary: ...
+
+        @property
+        def operator(self) -> JLeftPadded[Unary.Type]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _operator: JLeftPadded[Type]
+    _expression: Expression
+    _type: Optional[JavaType]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def operator(self) -> Type: ...
+    @property
+    def expression(self) -> Expression: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class VariableDeclarations(Statement, TypedTree):
+    @dataclass(frozen=True)
     class NamedVariable(NameTree):
-        id: UUID
-        prefix: Space
-        markers: Markers
-        name: Identifier
-        dimensions_after_name: List[JLeftPadded[Space]]
-        initializer: Optional[JLeftPadded[Expression]]
-        variable_type: Optional[JavaType.Variable]
-        padding: Optional[weakref.ReferenceType[PaddingHelper]]
+        @dataclass(frozen=True)
+        class PaddingHelper:
+            _t: VariableDeclarations.NamedVariable
 
-        def __init__(
-            self,
-            _id: UUID,
-            _prefix: Space,
-            _markers: Markers,
-            _name: Identifier,
-            _dimensions_after_name: List[JLeftPadded[Space]],
-            _initializer: Optional[JLeftPadded[Expression]],
-            _variable_type: Optional[JavaType.Variable],
-            _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-        ) -> None: ...
+            def replace(self, **kwargs: Any) -> VariableDeclarations.NamedVariable: ...
 
-        def replace(
-            self,
-            *,
-            id: UUID = ...,
-            prefix: Space = ...,
-            markers: Markers = ...,
-            name: Identifier = ...,
-            dimensions_after_name: List[JLeftPadded[Space]] = ...,
-            initializer: Optional[JLeftPadded[Expression]] = ...,
-            variable_type: Optional[JavaType.Variable] = ...,
-            padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-        ) -> Self: ...
+            @property
+            def initializer(self) -> Optional[JLeftPadded[Expression]]: ...
+
+        _id: UUID
+        _prefix: Space
+        _markers: Markers
+        _name: Identifier
+        _dimensions_after_name: List[JLeftPadded[Space]]
+        _initializer: Optional[JLeftPadded[Expression]]
+        _variable_type: Optional[JavaType.Variable]
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+        def replace(self, **kwargs: Any) -> Self: ...
+
+        @property
+        def id(self) -> UUID: ...
+        @property
+        def prefix(self) -> Space: ...
+        @property
+        def markers(self) -> Markers: ...
+        @property
+        def name(self) -> Identifier: ...
+        @property
+        def dimensions_after_name(self) -> List[JLeftPadded[Space]]: ...
+        @property
+        def initializer(self) -> Optional[Expression]: ...
+        @property
+        def variable_type(self) -> Optional[JavaType.Variable]: ...
+        @property
+        def padding(self) -> PaddingHelper: ...
 
         def with_id(self, id: UUID) -> VariableDeclarations.NamedVariable: ...
         def with_prefix(self, prefix: Space) -> VariableDeclarations.NamedVariable: ...
@@ -2177,161 +2394,167 @@ class VariableDeclarations(Statement, TypedTree):
         def with_variable_type(self, variable_type: Optional[JavaType.Variable]) -> VariableDeclarations.NamedVariable: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    id: UUID
-    prefix: Space
-    markers: Markers
-    leading_annotations: List[Annotation]
-    modifiers: List[Modifier]
-    type_expression: Optional[TypeTree]
-    varargs: Optional[Space]
-    dimensions_before_name: List[JLeftPadded[Space]]
-    variables: List[JRightPadded[NamedVariable]]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: VariableDeclarations
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _leading_annotations: List[Annotation],
-        _modifiers: List[Modifier],
-        _type_expression: Optional[TypeTree],
-        _varargs: Optional[Space],
-        _dimensions_before_name: List[JLeftPadded[Space]],
-        _variables: List[JRightPadded[NamedVariable]],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> VariableDeclarations: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        leading_annotations: List[Annotation] = ...,
-        modifiers: List[Modifier] = ...,
-        type_expression: Optional[TypeTree] = ...,
-        varargs: Optional[Space] = ...,
-        dimensions_before_name: List[JLeftPadded[Space]] = ...,
-        variables: List[JRightPadded[NamedVariable]] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def variables(self) -> List[JRightPadded[VariableDeclarations.NamedVariable]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _leading_annotations: List[Annotation]
+    _modifiers: List[Modifier]
+    _type_expression: Optional[TypeTree]
+    _varargs: Optional[Space]
+    _dimensions_before_name: List[JLeftPadded[Space]]
+    _variables: List[JRightPadded[NamedVariable]]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def leading_annotations(self) -> List[Annotation]: ...
+    @property
+    def modifiers(self) -> List[Modifier]: ...
+    @property
+    def type_expression(self) -> Optional[TypeTree]: ...
+    @property
+    def varargs(self) -> Optional[Space]: ...
+    @property
+    def dimensions_before_name(self) -> List[JLeftPadded[Space]]: ...
+    @property
+    def variables(self) -> List[NamedVariable]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class WhileLoop(Loop):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    condition: ControlParentheses[Expression]
-    body: JRightPadded[Statement]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: WhileLoop
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _condition: ControlParentheses[Expression],
-        _body: JRightPadded[Statement],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+        def replace(self, **kwargs: Any) -> WhileLoop: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        condition: ControlParentheses[Expression] = ...,
-        body: JRightPadded[Statement] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        @property
+        def body(self) -> JRightPadded[Statement]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _condition: ControlParentheses[Expression]
+    _body: JRightPadded[Statement]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def condition(self) -> ControlParentheses[Expression]: ...
+    @property
+    def body(self) -> Statement: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Wildcard(Expression, TypeTree):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    bound: Optional[JLeftPadded[Bound]]
-    bounded_type: Optional[NameTree]
-    padding: Optional[weakref.ReferenceType[PaddingHelper]]
+    class Bound(Enum):
+        Extends: Bound
+        Super: Bound
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _bound: Optional[JLeftPadded[Bound]],
-        _bounded_type: Optional[NameTree],
-        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> None: ...
+    @dataclass(frozen=True)
+    class PaddingHelper:
+        _t: Wildcard
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        bound: Optional[JLeftPadded[Bound]] = ...,
-        bounded_type: Optional[NameTree] = ...,
-        padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...,
-    ) -> Self: ...
+        def replace(self, **kwargs: Any) -> Wildcard: ...
+
+        @property
+        def bound(self) -> Optional[JLeftPadded[Wildcard.Bound]]: ...
+
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _bound: Optional[JLeftPadded[Bound]]
+    _bounded_type: Optional[NameTree]
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def bound(self) -> Optional[Bound]: ...
+    @property
+    def bounded_type(self) -> Optional[NameTree]: ...
+    @property
+    def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Yield(Statement):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    implicit: bool
-    value: Expression
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _implicit: bool
+    _value: Expression
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _implicit: bool,
-        _value: Expression,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        implicit: bool = ...,
-        value: Expression = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def implicit(self) -> bool: ...
+    @property
+    def value(self) -> Expression: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Unknown(Statement, Expression, TypeTree):
+    @dataclass(frozen=True)
     class Source(J):
-        id: UUID
-        prefix: Space
-        markers: Markers
-        text: str
+        _id: UUID
+        _prefix: Space
+        _markers: Markers
+        _text: str
 
-        def __init__(
-            self,
-            _id: UUID,
-            _prefix: Space,
-            _markers: Markers,
-            _text: str,
-        ) -> None: ...
+        def replace(self, **kwargs: Any) -> Self: ...
 
-        def replace(
-            self,
-            *,
-            id: UUID = ...,
-            prefix: Space = ...,
-            markers: Markers = ...,
-            text: str = ...,
-        ) -> Self: ...
+        @property
+        def id(self) -> UUID: ...
+        @property
+        def prefix(self) -> Space: ...
+        @property
+        def markers(self) -> Markers: ...
+        @property
+        def text(self) -> str: ...
 
         def with_id(self, id: UUID) -> Unknown.Source: ...
         def with_prefix(self, prefix: Space) -> Unknown.Source: ...
@@ -2339,51 +2562,40 @@ class Unknown(Statement, Expression, TypeTree):
         def with_text(self, text: str) -> Unknown.Source: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    id: UUID
-    prefix: Space
-    markers: Markers
-    source: Source
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _source: Source
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _source: Source,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        source: Source = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def source(self) -> Source: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
+@dataclass(frozen=True)
 class Erroneous(Statement, Expression):
-    id: UUID
-    prefix: Space
-    markers: Markers
-    text: str
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _text: str
 
-    def __init__(
-        self,
-        _id: UUID,
-        _prefix: Space,
-        _markers: Markers,
-        _text: str,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        prefix: Space = ...,
-        markers: Markers = ...,
-        text: str = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def text(self) -> str: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...

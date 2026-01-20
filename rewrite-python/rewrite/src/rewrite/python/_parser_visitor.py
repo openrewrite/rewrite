@@ -1169,7 +1169,7 @@ class ParserVisitor(ast.NodeVisitor):
                             py.MatchCase.Pattern.Kind.GROUP,
                             JContainer(
                                 prefix,
-                                [JRightPadded(inner.replace(prefix=inner_prefix) if hasattr(inner, 'replace') else inner, Space.EMPTY, Markers.EMPTY)],
+                                [JRightPadded(inner.replace(prefix=inner_prefix) if hasattr(inner, 'replace') else inner, Space.EMPTY, Markers.EMPTY)],  # ty: ignore[call-non-callable]
                                 Markers.EMPTY
                             ),
                             None
@@ -1708,7 +1708,7 @@ class ParserVisitor(ast.NodeVisitor):
             name if isinstance(name, j.Identifier) else j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "",
                                                                      None, None),
             args,
-            name.type if isinstance(name.type, JavaType.Method) else None,  # ty: ignore[possibly-missing-attribute]  # complex union type
+            name.type if isinstance(name.type, JavaType.Method) else None,  # ty: ignore[unresolved-attribute]  # complex union type
         )
 
     def __sort_call_arguments(self, call: ast.Call) -> List[Union[ast.expr, ast.keyword]]:
@@ -1759,7 +1759,7 @@ class ParserVisitor(ast.NodeVisitor):
                     self._type_mapping.type(node)
                 )
 
-        return left.replace(prefix=prefix)  # ty: ignore[possibly-missing-attribute]  # complex union type
+        return left.replace(prefix=prefix)  # ty: ignore[unresolved-attribute]  # complex union type
 
     def __convert_binary_operator(self, op) -> Union[JLeftPadded[j.Binary.Type], JLeftPadded[py.Binary.Type]]:
         operation_map: Dict[type, Tuple[j.Binary.Type, str]] = {
@@ -2111,7 +2111,7 @@ class ParserVisitor(ast.NodeVisitor):
         # Apply the whitespace after @ to the name when there are no extra parentheses.
         # When extra_parens is non-empty, this is handled differently (prefix is set on the wrapped paren).
         if not extra_parens:
-            name = name.replace(prefix=name_prefix)  # ty: ignore[possibly-missing-attribute]  # recursive call returns unknown
+            name = name.replace(prefix=name_prefix)  # ty: ignore[unresolved-attribute]  # recursive call returns unknown
 
         # Wrap name in extra parentheses if present
         if extra_parens:
@@ -2572,7 +2572,7 @@ class ParserVisitor(ast.NodeVisitor):
         prefix = self.__whitespace()
         converted_type = self.__convert_internal(node, self.__convert_type, self.__convert_type_mapper)
         if isinstance(converted_type, TypeTree):
-            return converted_type.replace(prefix=prefix)
+            return converted_type.replace(prefix=prefix)  # ty: ignore[unresolved-attribute]  # TypeTree base class doesn't have replace
         else:
             return py.ExpressionTypeTree(
                 random_id(),
@@ -2850,15 +2850,15 @@ class ParserVisitor(ast.NodeVisitor):
     def __convert_block(self, statements: Sequence[Statement], delim: str = ':') -> j.Block:
         prefix = self.__source_before(delim)
         if statements:
-            statements = [self.__pad_statement(cast(ast.stmt, s)) for s in statements]
+            statements = [self.__pad_statement(cast(ast.stmt, s)) for s in statements]  # ty: ignore[invalid-assignment]
         else:
-            statements = [self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY)]
+            statements = [self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY)]  # ty: ignore[invalid-assignment]
         return j.Block(
             random_id(),
             prefix,
             Markers.EMPTY,
             JRightPadded(False, Space.EMPTY, Markers.EMPTY),
-            statements,
+            statements,  # ty: ignore[invalid-argument-type]
             Space.EMPTY
         )
 

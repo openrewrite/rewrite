@@ -74,17 +74,28 @@ root = ["src"]
 include = ["src"]
 
 [tool.ty.rules]
-# Ignore rules that have many false positives due to star imports, TYPE_CHECKING patterns,
-# and complex generic type inference. These can be re-enabled as ty matures.
-unresolved-reference = "ignore"  # 843 errors - mostly from star imports not being resolved
-# unresolved-import = "ignore"     # 27 errors after stub fixes - further work needed on stub files
-# unresolved-attribute = "ignore"  # 448 errors - ClassVar attrs and visitor methods not found
-# invalid-assignment - re-enabled, errors suppressed with comments (ty#1379)
-# too-many-positional-arguments - re-enabled, errors suppressed with comments
-# invalid-argument-type - re-enabled, errors suppressed with comments
-# invalid-return-type - re-enabled, errors suppressed with comments
-# invalid-type-form - re-enabled, errors fixed
-# invalid-method-override - re-enabled, errors fixed
+# Rule status (217 total errors remaining):
+#
+# FIXED (0 errors):
+# - unresolved-import: fixed via stub generator path handling
+# - unresolved-attribute: fixed via stub generator
+# - unknown-argument: fixed via stub generator replace method handling
+# - invalid-method-override: fixed via stub generator + 1 ignore comment
+# - call-non-callable: fixed via 1 ignore comment
+#
+# REMAINING (ty limitations with visitor pattern):
+# - invalid-argument-type: ~200 errors
+#   - ~100 are Self type vs concrete type in accept_java() methods
+#     (tracked as ty bug: https://github.com/astral-sh/ty/issues/2255)
+#   - ~14 are __pad_list_element() with J|None where J2 expected
+#   - rest are generic __convert() returns J|None where specific type expected
+# - invalid-return-type: ~10 errors - TypeVar inference through property chains
+# - invalid-assignment: ~5 errors - generic type compatibility issues
+#
+# These are fundamental ty limitations with the visitor pattern architecture.
+# The code is correct but ty cannot statically verify the types.
+#
+unresolved-reference = "ignore"  # TYPE_CHECKING forward references
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

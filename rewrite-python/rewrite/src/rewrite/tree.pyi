@@ -1,10 +1,17 @@
 # Auto-generated stub file for IDE autocomplete support.
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
-from typing import Any, ClassVar, List, Optional
+from dataclasses import dataclass
+from typing import Any, ClassVar, List, Optional, TypeVar, Generic
 from typing_extensions import Self
 from uuid import UUID
+import weakref
 
+P = TypeVar('P')
+S = TypeVar('S', bound=Style)
+
+from abc import ABC, abstractmethod
+from datetime import datetime
 from pathlib import Path
 from rewrite import TreeVisitor, ExecutionContext
 
@@ -13,13 +20,16 @@ class Tree(ABC):
     def id(self) -> UUID: ...
     @property
     def markers(self) -> Markers: ...
+    def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool: ...
     def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]: ...
     def print(self, cursor: 'Cursor', capture: 'PrintOutputCapture[P]') -> str: ...
     def printer(self, cursor: 'Cursor') -> 'TreeVisitor[Any, PrintOutputCapture[P]]': ...
     def is_scope(self, tree: Optional[Tree]) -> bool: ...
 
 class PrinterFactory(ABC):
-    pass
+    @classmethod
+    def current(cls) -> Optional[PrinterFactory]: ...
+    def create_printer(self, cursor: Cursor) -> TreeVisitor[Any, PrintOutputCapture[P]]: ...
 
 class SourceFile(Tree):
     @property
@@ -33,6 +43,16 @@ class SourceFile(Tree):
     def get_style(self, style: Type[S]) -> Optional[S]: ...
 
 class PrintOutputCapture(Generic[P]):
+    @dataclass(frozen=True)
+    class MarkerPrinter(ABC):
+        DEFAULT: ClassVar['PrintOutputCapture.MarkerPrinter']
+
+        def replace(self, **kwargs: Any) -> Self: ...
+
+        def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str: ...
+        def before_prefix(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str: ...
+        def after_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str: ...
+
     @property
     def marker_printer(self) -> MarkerPrinter: ...
     def get_out(self) -> str: ...
@@ -41,6 +61,7 @@ class PrintOutputCapture(Generic[P]):
     def clone(self) -> 'PrintOutputCapture[P]': ...
     def get_marker_printer(self) -> MarkerPrinter: ...
 
+@dataclass(frozen=True)
 class FileAttributes:
     creation_time: Optional[datetime]
     last_modified_time: Optional[datetime]
@@ -50,42 +71,11 @@ class FileAttributes:
     is_executable: bool
     size: int
 
-    def __init__(
-        self,
-        creation_time: Optional[datetime],
-        last_modified_time: Optional[datetime],
-        last_access_time: Optional[datetime],
-        is_readable: bool,
-        is_writable: bool,
-        is_executable: bool,
-        size: int,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        creation_time: Optional[datetime] = ...,
-        last_modified_time: Optional[datetime] = ...,
-        last_access_time: Optional[datetime] = ...,
-        is_readable: bool = ...,
-        is_writable: bool = ...,
-        is_executable: bool = ...,
-        size: int = ...,
-    ) -> Self: ...
-
+@dataclass(frozen=True)
 class Checksum:
     algorithm: str
     value: bytes
 
-    def __init__(
-        self,
-        algorithm: str,
-        value: bytes,
-    ) -> None: ...
-
-    def replace(
-        self,
-        *,
-        algorithm: str = ...,
-        value: bytes = ...,
-    ) -> Self: ...
+    def replace(self, **kwargs: Any) -> Self: ...

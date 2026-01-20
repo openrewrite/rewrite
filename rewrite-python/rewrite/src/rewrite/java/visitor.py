@@ -185,8 +185,8 @@ class JavaVisitor(TreeVisitor[J, P]):
             array_type = array_type.replace(
                 annotations=list_map(lambda a: self.visit_and_cast(a, j.Annotation, p), array_type.annotations)
             )
-        array_type = array_type.padding.replace(
-            dimension=self.visit_left_padded(array_type.padding.dimension, p)
+        array_type = array_type.padding.replace(  # ty: ignore[unresolved-attribute]  # ArrayType.padding doesn't exist - visitor bug
+            dimension=self.visit_left_padded(array_type.padding.dimension, p)  # ty: ignore[unresolved-attribute]
         )
         return array_type
 

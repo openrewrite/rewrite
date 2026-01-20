@@ -72,10 +72,10 @@ class PythonTypeMapping:
             return result
 
         if isinstance(type, ClassType):
-            self.__cache[signature] = (result := JavaType.Class())
-            result._kind = JavaType.FullyQualified.Kind.Class
-            result._fully_qualified_name = type.name
-            result._interfaces = [self.__map_type(i, node) for i in type.cls.bases]
+            self.__cache[signature] = (result := JavaType.Class())  # ty: ignore[invalid-assignment]
+            result._kind = JavaType.FullyQualified.Kind.Class  # private attr
+            result._fully_qualified_name = type.name  # private attr
+            result._interfaces = [self.__map_type(i, node) for i in type.cls.bases]  # private attr
         elif isinstance(type, CallableType):
             if isinstance(node, ast.Name):
                 name = node.id
@@ -85,11 +85,11 @@ class PythonTypeMapping:
                 name = ''
             return JavaType.Method(_name=name)
         elif isinstance(type, GenericType):
-            self.__cache[signature] = (result := JavaType.Parameterized)
-            result._type = self.__map_type(type.base_type, node)
-            result._type_parameters = [self.__map_type(t, node) for t in type.parameters]
+            self.__cache[signature] = (result := JavaType.Parameterized)  # ty: ignore[invalid-assignment]
+            result._type = self.__map_type(type.base_type, node)  # private attr
+            result._type_parameters = [self.__map_type(t, node) for t in type.parameters]  # private attr
         elif isinstance(type, NothingType):
-            self.__cache[signature] = (result := JavaType.Unknown())
+            self.__cache[signature] = (result := JavaType.Unknown())  # ty: ignore[invalid-assignment]
         return result
 
 

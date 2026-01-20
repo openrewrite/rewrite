@@ -1,16 +1,12 @@
-from typing import Optional, TypeVar, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from rewrite.tree import Tree
 from rewrite.utils import list_map
-from .support_types import J, JRightPadded, JLeftPadded, JContainer, Space
+from .support_types import J, JRightPadded, JLeftPadded, JContainer, Space, P, T, J2
 
 if TYPE_CHECKING:
     from .visitor import JavaVisitor
     from .tree import *
-
-P = TypeVar('P')
-T = TypeVar('T')
-J2 = TypeVar('J2', bound=J)
 
 
 def visit_container(v: 'JavaVisitor', container: Optional[JContainer[J2]], p: P) -> Optional[JContainer[J2]]:

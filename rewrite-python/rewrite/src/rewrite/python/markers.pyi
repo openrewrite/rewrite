@@ -1,77 +1,65 @@
 # Auto-generated stub file for IDE autocomplete support.
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
+from dataclasses import dataclass
 from typing import Any, ClassVar, List, Optional
 from typing_extensions import Self
 from uuid import UUID
+import weakref
 
 from enum import Enum
 from rewrite import Marker
 
+@dataclass(frozen=True)
 class KeywordArguments(Marker):
-    id: UUID
+    _id: UUID
 
-    def __init__(
-        self,
-        _id: UUID,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
 
     def with_id(self, id_: UUID) -> 'KeywordArguments': ...
 
+@dataclass(frozen=True)
 class KeywordOnlyArguments(Marker):
-    id: UUID
+    _id: UUID
 
-    def __init__(
-        self,
-        _id: UUID,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
 
     def with_id(self, id_: UUID) -> 'KeywordOnlyArguments': ...
 
+@dataclass(frozen=True)
 class Quoted(Marker):
-    id: UUID
-    style: Style
+    class Style(Enum):
+        SINGLE: Style
+        DOUBLE: Style
+        TRIPLE_SINGLE: Style
+        TRIPLE_DOUBLE: Style
 
-    def __init__(
-        self,
-        _id: UUID,
-        _style: Style,
-    ) -> None: ...
+    _id: UUID
+    _style: Style
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        style: Style = ...,
-    ) -> Self: ...
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def style(self) -> Style: ...
 
     def with_id(self, id_: UUID) -> Quoted: ...
     def with_style(self, style: Style) -> Quoted: ...
 
+@dataclass(frozen=True)
 class SuppressNewline(Marker):
-    id: UUID
+    _id: UUID
 
-    def __init__(
-        self,
-        _id: UUID,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
 
     def with_id(self, id_: UUID) -> 'SuppressNewline': ...

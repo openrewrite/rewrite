@@ -1,54 +1,41 @@
 # Auto-generated stub file for IDE autocomplete support.
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
+from dataclasses import dataclass
 from typing import Any, ClassVar, List, Optional
 from typing_extensions import Self
 from uuid import UUID
+import weakref
 
 from rewrite import Marker
-from rewrite.java.support_types import Space
+from rewrite.java.support_types import Space as Space
 
+@dataclass(frozen=True)
 class Semicolon(Marker):
-    id: UUID
+    _id: UUID
 
-    def __init__(
-        self,
-        _id: UUID,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
 
+@dataclass(frozen=True)
 class TrailingComma(Marker):
-    id: UUID
-    suffix: Space
+    _id: UUID
+    _suffix: Space
 
-    def __init__(
-        self,
-        _id: UUID,
-        _suffix: Space,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-        suffix: Space = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def suffix(self) -> Space: ...
 
+@dataclass(frozen=True)
 class OmitParentheses(Marker):
-    id: UUID
+    _id: UUID
 
-    def __init__(
-        self,
-        _id: UUID,
-    ) -> None: ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
-    def replace(
-        self,
-        *,
-        id: UUID = ...,
-    ) -> Self: ...
+    @property
+    def id(self) -> UUID: ...
