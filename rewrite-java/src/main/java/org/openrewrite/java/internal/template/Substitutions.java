@@ -298,7 +298,48 @@ public class Substitutions {
                 } else if (param != null) {
                     return param;
                 }
-                return super.visitMethodInvocation(method, integer);
+
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, integer);
+                return maybeExpandVarargsNewArray(m);
+            }
+
+            private J.MethodInvocation maybeExpandVarargsNewArray(J.MethodInvocation method) {
+                List<Expression> args = method.getArguments();
+                List<Expression> expandedArgs = null;
+
+                for (int i = 0; i < args.size(); i++) {
+                    Expression arg = args.get(i);
+                    if (arg instanceof J.NewArray) {
+                        J.NewArray newArray = (J.NewArray) arg;
+                        // Varargs-captured arrays have no type expression and no dimensions
+                        if (newArray.getTypeExpression() == null && newArray.getDimensions().isEmpty()) {
+                            if (expandedArgs == null) {
+                                expandedArgs = new ArrayList<>(args.subList(0, i));
+                            }
+                            List<Expression> elements = newArray.getInitializer();
+                            if (elements != null && !elements.isEmpty()) {
+                                for (int k = 0; k < elements.size(); k++) {
+                                    Expression element = elements.get(k);
+                                    if (k == 0) {
+                                        // Preserve the whitespace prefix from the NewArray
+                                        element = element.withPrefix(newArray.getPrefix());
+                                    }
+                                    expandedArgs.add(element);
+                                }
+                            }
+                            // If initializer is null or empty, nothing is added (empty varargs)
+                            continue;
+                        }
+                    }
+                    if (expandedArgs != null) {
+                        expandedArgs.add(arg);
+                    }
+                }
+
+                if (expandedArgs != null) {
+                    return method.withArguments(expandedArgs);
+                }
+                return method;
             }
 
             @Override
