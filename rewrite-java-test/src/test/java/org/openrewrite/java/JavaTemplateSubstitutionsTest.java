@@ -555,6 +555,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
     @Test
     void changeVarargsToList() {
         rewriteRun(
+          // Mimics what a Refaster template would generate for varargs
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation elem, ExecutionContext ctx) {
