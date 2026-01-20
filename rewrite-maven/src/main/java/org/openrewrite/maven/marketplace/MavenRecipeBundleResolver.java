@@ -88,4 +88,11 @@ public class MavenRecipeBundleResolver implements RecipeBundleResolver {
                 .flatMap(sf -> sf.getMarkers().findFirst(MavenResolutionResult.class))
                 .filter(mrr -> !mrr.getDependencies().isEmpty());
     }
+
+    @Override
+    public void close() throws Exception {
+        if (reader != null) {
+            reader.close();
+        }
+    }
 }
