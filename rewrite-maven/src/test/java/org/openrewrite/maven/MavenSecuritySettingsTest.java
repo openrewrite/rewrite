@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.openrewrite.InMemoryExecutionContext;
 
 import java.io.IOException;
@@ -29,6 +30,7 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Isolated("Modifies user.home system property")
 @Execution(ExecutionMode.SAME_THREAD)
 class MavenSecuritySettingsTest {
 
