@@ -33,10 +33,8 @@ public class UnnecessaryTypeParentheses extends Recipe {
     @Getter
     final String description = "In Kotlin, it's possible to add redundant nested parentheses in type definitions. This recipe is designed to remove those unnecessary parentheses.";
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(3);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(3);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -45,10 +45,8 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
         "names and import statements, provided that it doesn't result in " +
         "any conflicts with other imports or types declared in the local compilation unit.";
 
-    @Override
-    public @Nullable Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(2);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(2);
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {

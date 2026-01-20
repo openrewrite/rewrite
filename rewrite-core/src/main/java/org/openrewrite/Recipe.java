@@ -206,9 +206,8 @@ public abstract class Recipe implements Cloneable {
      *
      * @return The tags.
      */
-    public Set<String> getTags() {
-        return emptySet();
-    }
+    @Getter
+    final Set<String> tags = emptySet();
 
     /**
      * @return An estimated effort were a developer to fix manually instead of using this recipe.

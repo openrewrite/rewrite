@@ -15,6 +15,7 @@
  */
 package org.openrewrite.rpc;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;

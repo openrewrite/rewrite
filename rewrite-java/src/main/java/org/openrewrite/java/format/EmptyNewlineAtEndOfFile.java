@@ -45,15 +45,11 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
     @Getter
     final String description = "Some tools work better when files end with an empty line.";
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("RSPEC-S113");
-    }
+    @Getter
+    final Set<String> tags = singleton("RSPEC-S113");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(1);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(1);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
