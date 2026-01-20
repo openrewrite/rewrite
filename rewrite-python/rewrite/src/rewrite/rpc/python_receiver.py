@@ -885,11 +885,21 @@ class PythonRpcReceiver:
 
 # Register marker codecs
 def _register_marker_codecs():
-    """Register receive codecs for Java marker types."""
+    """Register receive and send codecs for Java marker types."""
+    from rewrite import Markers
     from rewrite.java.markers import Semicolon, TrailingComma, OmitParentheses
     from rewrite.java.support_types import Space
-    from rewrite.rpc.receive_queue import register_codec_with_both_names
+    from rewrite.rpc.receive_queue import register_codec_with_both_names, register_send_codec
+    from rewrite.rpc.send_queue import RpcSendQueue
 
+    # Markers send codec (Markers uses special handling in receive_queue, but needs send codec)
+    def _send_markers(markers: Markers, q: RpcSendQueue) -> None:
+        q.get_and_send(markers, lambda x: x.id)
+        q.get_and_send_list(markers, lambda x: x.markers, lambda m: m.id, None)
+
+    register_send_codec(Markers, _send_markers)
+
+    # Receive codecs
     def _receive_semicolon(semicolon: Semicolon, q: RpcReceiveQueue) -> Semicolon:
         new_id = q.receive_defined(semicolon.id)
         if new_id is semicolon.id:
@@ -914,6 +924,17 @@ def _register_marker_codecs():
             return omit_paren
         return omit_paren.replace(id=new_id)
 
+    # Send codecs
+    def _send_semicolon(marker: Semicolon, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: x.id)
+
+    def _send_trailing_comma(marker: TrailingComma, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: x.suffix, lambda s: _get_sender()._visit_space(s, q))
+
+    def _send_omit_parentheses(marker: OmitParentheses, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: x.id)
+
     from uuid import uuid4
 
     # Use register_codec_with_both_names to ensure the sender can look up Java type names
@@ -921,19 +942,22 @@ def _register_marker_codecs():
         'org.openrewrite.java.marker.Semicolon',
         Semicolon,
         _receive_semicolon,
-        lambda: Semicolon(uuid4())
+        lambda: Semicolon(uuid4()),
+        _send_semicolon
     )
     register_codec_with_both_names(
         'org.openrewrite.java.marker.TrailingComma',
         TrailingComma,
         _receive_trailing_comma,
-        lambda: TrailingComma(uuid4(), Space.EMPTY)
+        lambda: TrailingComma(uuid4(), Space.EMPTY),
+        _send_trailing_comma
     )
     register_codec_with_both_names(
         'org.openrewrite.java.marker.OmitParentheses',
         OmitParentheses,
         _receive_omit_parentheses,
-        lambda: OmitParentheses(uuid4())
+        lambda: OmitParentheses(uuid4()),
+        _send_omit_parentheses
     )
 
 
@@ -943,6 +967,8 @@ def _register_marker_codecs():
 
 # Shared receiver instance (stateless, so one instance works for all codecs)
 _python_receiver = None
+# Shared sender instance for marker codecs
+_python_sender = None
 
 
 def _get_receiver():
@@ -951,6 +977,15 @@ def _get_receiver():
     if _python_receiver is None:
         _python_receiver = PythonRpcReceiver()
     return _python_receiver
+
+
+def _get_sender():
+    """Lazily get the shared PythonRpcSender instance."""
+    global _python_sender
+    if _python_sender is None:
+        from rewrite.rpc.python_sender import PythonRpcSender
+        _python_sender = PythonRpcSender()
+    return _python_sender
 
 
 def _receive_j(j, q: RpcReceiveQueue):

@@ -328,6 +328,8 @@ class RpcReceiveQueue:
 # Codec registry
 _codecs: Dict[str, Dict[str, Callable[[Any, RpcReceiveQueue], Any]]] = {}
 _codec_factories: Dict[str, Dict[str, Callable[[], Any]]] = {}
+# Send codec registry: Python class -> sender function
+_send_codecs: Dict[type, Callable[[Any, Any], None]] = {}
 # Reverse mapping: Python class -> Java type name (used by sender)
 _python_to_java_type: Dict[type, str] = {}
 
@@ -386,6 +388,31 @@ def _get_codec_factory(
     return _codec_factories.get('', {}).get(value_type)
 
 
+def register_send_codec(
+    python_class: type,
+    codec: Callable[[Any, Any], None]
+) -> None:
+    """Register a send codec for a Python class.
+
+    Args:
+        python_class: The Python class to register
+        codec: Function to serialize the type: (obj, queue) -> None
+    """
+    _send_codecs[python_class] = codec
+
+
+def get_send_codec(obj: Any) -> Optional[Callable[[Any, Any], None]]:
+    """Get the send codec for an object.
+
+    Args:
+        obj: The object to get the codec for
+
+    Returns:
+        The send codec function, or None if not registered
+    """
+    return _send_codecs.get(type(obj))
+
+
 def _receive_markers(markers: 'Markers', q: RpcReceiveQueue) -> 'Markers':
     """Codec for receiving Markers."""
     from rewrite import Markers
@@ -400,7 +427,13 @@ def _receive_markers(markers: 'Markers', q: RpcReceiveQueue) -> 'Markers':
 # Codec registration helpers
 # ============================================================================
 
-def register_codec_with_both_names(java_type: str, python_class: type, codec, factory):
+def register_codec_with_both_names(
+    java_type: str,
+    python_class: type,
+    codec,
+    factory,
+    sender: Optional[Callable[[Any, Any], None]] = None
+):
     """Register codec with both Java type name and Python class name.
 
     Args:
@@ -408,6 +441,7 @@ def register_codec_with_both_names(java_type: str, python_class: type, codec, fa
         python_class: The Python class
         codec: Function to deserialize: (before, queue) -> after
         factory: Function to create new instance: () -> instance
+        sender: Optional function to serialize: (obj, queue) -> None
     """
     # Register by Java type name (for _new_obj factory lookup)
     register_receive_codec(java_type, codec, factory)
@@ -416,6 +450,9 @@ def register_codec_with_both_names(java_type: str, python_class: type, codec, fa
     register_receive_codec(python_name, codec, factory)
     # Register reverse mapping for sender
     _python_to_java_type[python_class] = java_type
+    # Register send codec if provided
+    if sender is not None:
+        register_send_codec(python_class, sender)
 
 
 def get_java_type_name(python_class: type) -> Optional[str]:

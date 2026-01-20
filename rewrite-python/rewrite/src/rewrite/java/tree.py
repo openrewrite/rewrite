@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import weakref
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
+from rewrite.utils import replace_if_changed
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional, TYPE_CHECKING, Generic
@@ -100,15 +101,7 @@ class Annotation(Expression):
             return self._t._arguments
 
         def replace(self, **kwargs) -> Annotation:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -326,15 +319,7 @@ class Assignment(Statement, Expression, TypedTree):
             return self._t._assignment
 
         def replace(self, **kwargs) -> Assignment:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -431,15 +416,7 @@ class AssignmentOperation(Statement, Expression, TypedTree):
             return self._t._operator
 
         def replace(self, **kwargs) -> AssignmentOperation:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -541,15 +518,7 @@ class Binary(Expression, TypedTree):
             return self._t._operator
 
         def replace(self, **kwargs) -> Binary:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -627,15 +596,7 @@ class Block(Statement):
             return self._t._statements
 
         def replace(self, **kwargs) -> Block:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -769,15 +730,7 @@ class Case(Statement):
             return self._t._body
 
         def replace(self, **kwargs) -> Case:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -982,15 +935,7 @@ class ClassDeclaration(Statement, TypedTree):
             return self._t._permits
 
         def replace(self, **kwargs) -> ClassDeclaration:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -1110,15 +1055,7 @@ class CompilationUnit(JavaSourceFile, SourceFile):
             return self._t._imports
 
         def replace(self, **kwargs) -> CompilationUnit:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -1228,15 +1165,7 @@ class DoWhileLoop(Loop):
             return self._t._while_condition
 
         def replace(self, **kwargs) -> DoWhileLoop:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -1378,15 +1307,7 @@ class EnumValueSet(Statement):
             return self._t._enums
 
         def replace(self, **kwargs) -> EnumValueSet:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -1460,15 +1381,7 @@ class FieldAccess(TypeTree, Expression, Statement):
             return self._t._name
 
         def replace(self, **kwargs) -> FieldAccess:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -1587,15 +1500,7 @@ class ForEachLoop(Loop):
                 return self._t._iterable
 
             def replace(self, **kwargs) -> ForEachLoop.Control:
-                mapped = {}
-                for key, value in kwargs.items():
-                    if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                        mapped[f'_{key}'] = value
-                    else:
-                        mapped[key] = value
-                if not mapped:
-                    return self._t
-                return replace(self._t, **mapped)
+                return replace_if_changed(self._t, **kwargs)
 
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -1624,15 +1529,7 @@ class ForEachLoop(Loop):
             return self._t._body
 
         def replace(self, **kwargs) -> ForEachLoop:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -1764,15 +1661,7 @@ class ForLoop(Loop):
                 return self._t._update
 
             def replace(self, **kwargs) -> ForLoop.Control:
-                mapped = {}
-                for key, value in kwargs.items():
-                    if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                        mapped[f'_{key}'] = value
-                    else:
-                        mapped[key] = value
-                if not mapped:
-                    return self._t
-                return replace(self._t, **mapped)
+                return replace_if_changed(self._t, **kwargs)
 
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -1801,15 +1690,7 @@ class ForLoop(Loop):
             return self._t._body
 
         def replace(self, **kwargs) -> ForLoop:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -2018,15 +1899,7 @@ class If(Statement):
                 return self._t._body
 
             def replace(self, **kwargs) -> If.Else:
-                mapped = {}
-                for key, value in kwargs.items():
-                    if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                        mapped[f'_{key}'] = value
-                    else:
-                        mapped[key] = value
-                if not mapped:
-                    return self._t
-                return replace(self._t, **mapped)
+                return replace_if_changed(self._t, **kwargs)
 
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -2055,15 +1928,7 @@ class If(Statement):
             return self._t._then_part
 
         def replace(self, **kwargs) -> If:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -2141,15 +2006,7 @@ class Import(Statement):
             return self._t._alias
 
         def replace(self, **kwargs) -> Import:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -2230,15 +2087,7 @@ class InstanceOf(Expression, TypedTree):
             return self._t._expression
 
         def replace(self, **kwargs) -> InstanceOf:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -2312,15 +2161,7 @@ class DeconstructionPattern(TypedTree):
             return self._t._nested
 
         def replace(self, **kwargs) -> DeconstructionPattern:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -2380,15 +2221,7 @@ class IntersectionType(TypeTree, Expression):
             return self._t._bounds
 
         def replace(self, **kwargs) -> IntersectionType:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -2455,15 +2288,7 @@ class Label(Statement):
             return self._t._label
 
         def replace(self, **kwargs) -> Label:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -2592,15 +2417,7 @@ class Lambda(Statement, Expression, TypedTree):
                 return self._t._parameters
 
             def replace(self, **kwargs) -> Lambda.Parameters:
-                mapped = {}
-                for key, value in kwargs.items():
-                    if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                        mapped[f'_{key}'] = value
-                    else:
-                        mapped[key] = value
-                if not mapped:
-                    return self._t
-                return replace(self._t, **mapped)
+                return replace_if_changed(self._t, **kwargs)
 
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -2781,15 +2598,7 @@ class MemberReference(TypedTree, MethodCall):
             return self._t._reference
 
         def replace(self, **kwargs) -> MemberReference:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -2932,15 +2741,7 @@ class MethodDeclaration(Statement, TypedTree):
             return self._t._default_value
 
         def replace(self, **kwargs) -> MethodDeclaration:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -3096,15 +2897,7 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
             return self._t._arguments
 
         def replace(self, **kwargs) -> MethodInvocation:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -3232,15 +3025,7 @@ class MultiCatch(TypeTree):
             return self._t._alternatives
 
         def replace(self, **kwargs) -> MultiCatch:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -3321,15 +3106,7 @@ class NewArray(Expression, TypedTree):
             return self._t._initializer
 
         def replace(self, **kwargs) -> NewArray:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -3389,15 +3166,7 @@ class ArrayDimension(J):
             return self._t._index
 
         def replace(self, **kwargs) -> ArrayDimension:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -3496,15 +3265,7 @@ class NewClass(Statement, TypedTree, MethodCall):
             return self._t._arguments
 
         def replace(self, **kwargs) -> NewClass:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -3571,15 +3332,7 @@ class NullableType(TypeTree, Expression):
             return self._t._type_tree
 
         def replace(self, **kwargs) -> NullableType:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -3694,15 +3447,7 @@ class ParameterizedType(TypeTree, Expression):
             return self._t._type_parameters
 
         def replace(self, **kwargs) -> ParameterizedType:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -3767,15 +3512,7 @@ class Parentheses(Expression, Generic[J2]):
             return self._t._tree
 
         def replace(self, **kwargs) -> Parentheses[J2]:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -3835,15 +3572,7 @@ class ControlParentheses(Expression, Generic[J2]):
             return self._t._tree
 
         def replace(self, **kwargs) -> ControlParentheses[J2]:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -4126,15 +3855,7 @@ class Ternary(Expression, Statement, TypedTree):
             return self._t._false_part
 
         def replace(self, **kwargs) -> Ternary:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -4355,15 +4076,7 @@ class Try(Statement):
             return self._t._finally
 
         def replace(self, **kwargs) -> Try:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -4485,15 +4198,7 @@ class TypeParameter(J):
             return self._t._bounds
 
         def replace(self, **kwargs) -> TypeParameter:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -4560,15 +4265,7 @@ class TypeParameters(J):
             return self._t._type_parameters
 
         def replace(self, **kwargs) -> TypeParameters:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -4652,15 +4349,7 @@ class Unary(Statement, Expression, TypedTree):
             return self._t._operator
 
         def replace(self, **kwargs) -> Unary:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -4821,15 +4510,7 @@ class VariableDeclarations(Statement, TypedTree):
                 return self._t._initializer
 
             def replace(self, **kwargs) -> VariableDeclarations.NamedVariable:
-                mapped = {}
-                for key, value in kwargs.items():
-                    if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                        mapped[f'_{key}'] = value
-                    else:
-                        mapped[key] = value
-                if not mapped:
-                    return self._t
-                return replace(self._t, **mapped)
+                return replace_if_changed(self._t, **kwargs)
 
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -4858,15 +4539,7 @@ class VariableDeclarations(Statement, TypedTree):
             return self._t._variables
 
         def replace(self, **kwargs) -> VariableDeclarations:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -4933,15 +4606,7 @@ class WhileLoop(Loop):
             return self._t._body
 
         def replace(self, **kwargs) -> WhileLoop:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
@@ -5012,15 +4677,7 @@ class Wildcard(Expression, TypeTree):
             return self._t._bound
 
         def replace(self, **kwargs) -> Wildcard:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
