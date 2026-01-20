@@ -22,16 +22,13 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
-import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.DependencyMatcher;
 
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.marker.Markup.info;
 
 /**
@@ -77,6 +74,7 @@ public class AddExplicitDependencyVersion extends JavaIsoVisitor<ExecutionContex
         // Use the GradleDependency trait to match dependencies
         return new GradleDependency.Matcher()
                 .matcher(dependencyMatcher)
+                .configuration(m.getSimpleName())
                 .get(getCursor())
                 .map(gradleDep -> {
                     // Skip if version is already declared
@@ -86,46 +84,15 @@ public class AddExplicitDependencyVersion extends JavaIsoVisitor<ExecutionContex
                     }
 
                     // Look up the resolved version from the GradleProject marker
-                    String configName = m.getSimpleName();
-                    String groupId = gradleDep.getResolvedDependency().getGroupId();
-                    String artifactId = gradleDep.getResolvedDependency().getArtifactId();
-                    String versionToAdd = findResolvedVersion(configName, groupId, artifactId);
+                    String versionToAdd = gradleDep.getVersion();
 
                     if (StringUtils.isBlank(versionToAdd)) {
                         return info(m, "The Gradle project marker did not contain a resolved version for this dependency. No version was added.");
                     }
 
                     // Use the trait's withDeclaredVersion to add the version
-                    GradleDependency updated = gradleDep.withDeclaredVersion(versionToAdd);
-                    return updated.getTree();
+                    return gradleDep.withDeclaredVersion(versionToAdd).getTree();
                 })
                 .orElse(m);
-    }
-
-    private @Nullable String findResolvedVersion(String configurationName, String groupId, String artifactId) {
-        GradleDependencyConfiguration gdc = requireNonNull(gp).getConfiguration(configurationName);
-        if (gdc == null) {
-            return null;
-        }
-
-        // Check this configuration's resolved dependencies
-        for (ResolvedDependency resolved : gdc.getDirectResolved()) {
-            if (groupId.equals(resolved.getGroupId()) && artifactId.equals(resolved.getArtifactId())) {
-                return resolved.getVersion();
-            }
-        }
-
-        // Declarable configurations (like 'implementation') don't have resolved dependencies directly.
-        // We need to check resolvable configurations that extend from this one
-        // (e.g., compileClasspath extends implementation)
-        for (GradleDependencyConfiguration extending : gp.configurationsExtendingFrom(gdc, true)) {
-            for (ResolvedDependency resolved : extending.getDirectResolved()) {
-                if (groupId.equals(resolved.getGroupId()) && artifactId.equals(resolved.getArtifactId())) {
-                    return resolved.getVersion();
-                }
-            }
-        }
-
-        return null;
     }
 }

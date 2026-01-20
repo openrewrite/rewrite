@@ -21,9 +21,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
+import org.openrewrite.gradle.trait.GradlePlugin;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -36,7 +36,6 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.Semver;
@@ -241,8 +240,15 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                         if (acc.pluginIdToNewVersion.containsKey("org.springframework.boot") &&
                                 gradleProject.getPlugins().stream().anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId())) &&
                                 gradleProject.getPlugins().stream().anyMatch(plugin -> "org.springframework.boot".equals(plugin.getId()))) {
-                            String springBootVersion = getVersionFromPlugin("classpath", "org.springframework.boot.gradle.plugin");
-                            if (springBootVersion != null) {
+                            AtomicReference<@Nullable String> springBootPluginVersion = new GradlePlugin.Matcher()
+                                    .pluginIdPattern("org.springframework.boot")
+                                    .asVisitor((GradlePlugin plugin, AtomicReference<String> ref) -> {
+                                        if (plugin.getVersion() != null) {
+                                            ref.set(plugin.getVersion());
+                                        }
+                                        return plugin.getTree();
+                                    }).reduce(tree, new AtomicReference<>());
+                            if (springBootPluginVersion.get() != null) {
                                 Set<GroupArtifact> requested = gradleProject.getConfigurations().stream()
                                         .flatMap(conf -> conf.getRequested().stream())
                                         .map(Dependency::getGav)
@@ -250,7 +256,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                                         .collect(toSet());
                                 try {
                                     MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-                                    List<GroupArtifact> oldPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", springBootVersion), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
+                                    List<GroupArtifact> oldPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", springBootPluginVersion.get()), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
                                             .map(md -> new GroupArtifact(md.getGroupId(), md.getArtifactId()))
                                             .filter(requested::contains)
                                             .collect(toList());
@@ -326,18 +332,6 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     }
                 }
                 return visited;
-            }
-
-            private @Nullable String getVersionFromPlugin(String configuration, String pluginArtifactId) {
-                GradleDependencyConfiguration gdc = gradleProject.getBuildscript().getConfiguration(configuration);
-                if (gdc != null) {
-                    for (ResolvedDependency dependency : gdc.getDirectResolved()) {
-                        if (pluginArtifactId.equals(dependency.getArtifactId())) {
-                            return dependency.getVersion();
-                        }
-                    }
-                }
-                return null;
             }
         };
         return Preconditions.or(propertiesVisitor, Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), javaVisitor));
