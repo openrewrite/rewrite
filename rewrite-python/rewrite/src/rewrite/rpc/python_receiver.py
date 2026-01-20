@@ -161,17 +161,14 @@ class PythonRpcReceiver:
         new_prefix = q.receive(j.prefix)
         new_markers = q.receive_markers(j.markers)
 
-        if new_id is j.id and new_prefix is j.prefix and new_markers is j.markers:
-            return j
-
-        result = j
+        changes = {}
         if new_id is not j.id:
-            result = result.replace(id=new_id)  # ty: ignore[unresolved-attribute]
+            changes['_id'] = new_id
         if new_prefix is not j.prefix:
-            result = result.replace(prefix=new_prefix)
+            changes['_prefix'] = new_prefix
         if new_markers is not j.markers:
-            result = result.replace(markers=new_markers)
-        return result
+            changes['_markers'] = new_markers
+        return replace_if_changed(j, **changes) if changes else j
 
     def _visit_compilation_unit(self, cu: CompilationUnit, q: RpcReceiveQueue) -> CompilationUnit:
         """Visit CompilationUnit - only non-common fields."""

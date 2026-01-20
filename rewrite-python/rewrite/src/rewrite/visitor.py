@@ -213,4 +213,4 @@ class TreeVisitor(ABC, Generic[T, P]):
 
 class NoopVisitor(TreeVisitor[Tree, P]):
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
-        return cast(T, tree) if tree else tree
+        return cast(T, tree) if tree else None

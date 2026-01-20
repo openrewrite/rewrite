@@ -3751,8 +3751,7 @@ class Parentheses(Expression, Generic[J2]):
 
     @property
     def tree(self) -> J2:
-        return self._tree.element
-
+        return self._tree.element  # ty: ignore[invalid-return-type]  # TypeVar bound to JRightPadded element
 
     @property
     def type(self) -> JavaType:
@@ -3823,8 +3822,7 @@ class ControlParentheses(Expression, Generic[J2]):
 
     @property
     def tree(self) -> J2:
-        return self._tree.element
-
+        return self._tree.element  # ty: ignore[invalid-return-type]  # TypeVar bound to JLeftPadded element
 
     @dataclass
     class PaddingHelper:

@@ -28,7 +28,7 @@ def visit_right_padded(v: 'JavaVisitor', right: Optional[JRightPadded[T]], p: P)
     t = right.element
     v.cursor = Cursor(v.cursor, right)
     if isinstance(t, Tree):
-        t = v.visit_and_cast(t, T, p)  # ty: ignore[invalid-argument-type]  # TypeVar as Type arg; see ty#501
+        t = v.visit_and_cast(t, T, p)
     v.cursor = v.cursor.parent  # ty: ignore[invalid-assignment]  # cursor.parent is Optional[Cursor]; ty#1379
 
     if t is None:
@@ -48,7 +48,7 @@ def visit_left_padded(v: 'JavaVisitor', left: Optional[JLeftPadded[T]], p: P) ->
     before = v.visit_space(left.before, p)
     t = left.element
     if isinstance(t, Tree):
-        t = v.visit_and_cast(t, T, p)  # ty: ignore[invalid-argument-type]  # TypeVar as Type arg; see ty#501
+        t = v.visit_and_cast(t, T, p)
     v.cursor = v.cursor.parent  # ty: ignore[invalid-assignment]  # cursor.parent is Optional[Cursor]; ty#1379
 
     if left.element is t and before is left.before:

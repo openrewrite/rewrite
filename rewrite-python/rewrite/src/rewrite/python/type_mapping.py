@@ -55,7 +55,7 @@ class PythonTypeMapping:
             else:
                 return JavaType.Primitive.None_
         elif isinstance(node, ast.Call):
-            return self.method_invocation_type(node)
+            return self.method_invocation_type(node)  # ty: ignore[invalid-return-type]  # Method is semantically a JavaType
         elif self.__enabled and hasattr(node, 'resolved_type'):
             return self.__map_type(node.resolved_type, node)
         return None

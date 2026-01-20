@@ -1165,7 +1165,7 @@ class Pass(Py, Statement):
 
 
     def accept_python(self, v: PythonVisitor[P], p: P) -> J:
-        return v.visit_pass(self, p)
+        return v.visit_pass(self, p)  # ty: ignore[invalid-return-type]  # visitor returns J|None
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @dataclass(frozen=True, eq=False)

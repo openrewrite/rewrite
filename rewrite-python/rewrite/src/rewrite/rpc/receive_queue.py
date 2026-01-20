@@ -272,7 +272,7 @@ class RpcReceiveQueue:
                 b = None
 
             item = self.receive(b, on_change)
-            after.append(item)  # type: ignore[arg-type]  # RPC protocol guarantees non-null list items
+            after.append(item)
 
         return after
 

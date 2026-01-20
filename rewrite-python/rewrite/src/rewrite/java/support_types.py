@@ -487,8 +487,8 @@ class JContainer(Generic[J2]):
         if elements is None or elements == []:
             return None
         if before is None:
-            return JContainer(Space.EMPTY, JRightPadded.merge_elements([], elements), Markers.EMPTY)  # type: ignore[arg-type]  # List[J2] is subtype of List[Union[J2, JRightPadded[J2]]]
-        return before.padding.replace(elements=JRightPadded.merge_elements(before._elements, elements))  # type: ignore[arg-type]  # List[J2] is subtype of List[Union[J2, JRightPadded[J2]]]
+            return JContainer(Space.EMPTY, JRightPadded.merge_elements([], elements), Markers.EMPTY)
+        return before.padding.replace(elements=JRightPadded.merge_elements(before._elements, elements))
 
     _EMPTY: Optional[JContainer[J]] = None
 

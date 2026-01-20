@@ -238,7 +238,7 @@ class ParserVisitor(ast.NodeVisitor):
     def generic_visit(self, node):
         return super().generic_visit(node)
 
-    def visit_arguments(self, node, with_close_paren: bool = True) -> List[JRightPadded[j.VariableDeclarations]]:
+    def visit_arguments(self, node, with_close_paren: bool = True) -> List[JRightPadded[Statement]]:
         first_with_default = len(node.posonlyargs) + len(node.args) - len(
             node.defaults) if node.defaults else sys.maxsize
         if not node.posonlyargs and not node.args and not node.vararg and not node.kwarg and not node.kwonlyargs:
@@ -653,7 +653,7 @@ class ParserVisitor(ast.NodeVisitor):
         if parenthesized and self._parentheses_stack and self._parentheses_stack[-1] is parens_handler:
             self._token_idx += 1  # consume ')'
             resources_container = self._parentheses_stack.pop().transformer(
-                JContainer(items_prefix, resources, Markers.EMPTY),  # type: ignore[arg-type]  # TypeVar in Callable; transformer is generic
+                JContainer(items_prefix, resources, Markers.EMPTY),
                 Space.EMPTY
             )
         else:
@@ -1680,7 +1680,7 @@ class ParserVisitor(ast.NodeVisitor):
                     None
                 )
                 while len(self._parentheses_stack) > 0 and self.__skip(')'):
-                    name = self._parentheses_stack.pop().transformer(name, parens_right_padding)  # type: ignore[arg-type]  # TypeVar in Callable
+                    name = self._parentheses_stack.pop().transformer(name, parens_right_padding)
                     save_token_idx = self._token_idx
                     parens_right_padding = self.__whitespace()
             self._token_idx = save_token_idx
@@ -2515,7 +2515,7 @@ class ParserVisitor(ast.NodeVisitor):
         # Use _is_closing_paren to verify the ')' matches a '(' pushed at our scope level
         if self._is_closing_paren(save_token_idx):
             self._token_idx += 1  # consume ')'
-            elements = self._parentheses_stack.pop().transformer(elements, Space.EMPTY)  # type: ignore[arg-type]  # TypeVar in Callable
+            elements = self._parentheses_stack.pop().transformer(elements, Space.EMPTY)
             omit_parens = False
         elif maybe_parens and len(self._parentheses_stack) > 0 and self._parentheses_stack[-1].node == node:
             elements = self._parentheses_stack.pop()
@@ -2696,7 +2696,7 @@ class ParserVisitor(ast.NodeVisitor):
             # Other binary operations in types (like `int + int`) should be handled as regular BinOp
             return self.visit_BinOp(node)
 
-        return self.__convert_internal(node, self.__convert_type)
+        return self.__convert_internal(node, self.__convert_type)  # ty: ignore[invalid-return-type]  # __convert_internal returns J, TypeTree is subtype
 
     def __convert(self, node) -> Optional[J]:
         return self.__convert_internal(node, self.__convert)
@@ -2738,7 +2738,7 @@ class ParserVisitor(ast.NodeVisitor):
             self._parentheses_stack.pop()
 
         self._token_idx = save_token_idx_2
-        return result
+        return result  # ty: ignore[invalid-return-type]  # result type from transformer
 
     def __parse_expr(self, node, mapping, recursion, save_token_idx: int, prefix: Space) -> J:
         """Parse either a normal expression or a parenthesized expression."""
@@ -2845,7 +2845,7 @@ class ParserVisitor(ast.NodeVisitor):
         return ident_or_field(name.split('.'))
 
     def __convert_all(self, trees: Sequence) -> List[J2]:
-        return [c for tree in trees if (c := self.__convert(tree)) is not None]
+        return [c for tree in trees if (c := self.__convert(tree)) is not None]  # ty: ignore[invalid-return-type]
 
     def __convert_block(self, statements: Sequence[Statement], delim: str = ':') -> j.Block:
         prefix = self.__source_before(delim)
@@ -2858,7 +2858,7 @@ class ParserVisitor(ast.NodeVisitor):
             prefix,
             Markers.EMPTY,
             JRightPadded(False, Space.EMPTY, Markers.EMPTY),
-            statements,  # ty: ignore[invalid-argument-type]
+            statements,
             Space.EMPTY
         )
 
@@ -2875,7 +2875,7 @@ class ParserVisitor(ast.NodeVisitor):
             self._token_idx = save_idx
             padding = Space.EMPTY
             markers = Markers.EMPTY
-        return JRightPadded(statement, padding, markers)
+        return JRightPadded(statement, padding, markers)  # ty: ignore[invalid-return-type]  # statement is J|None from __convert_statement
 
     def __pad_list_element(self, element: J2, last: bool = False, pad_last: bool = True, delim: str = ',',
                            end_delim: Optional[str] = None) -> JRightPadded[J2]:

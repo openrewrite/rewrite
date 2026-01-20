@@ -93,7 +93,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_stmt = cast(Statement, self.visit_statement(async_, p))
         if not isinstance(temp_stmt, type(async_)):
             return temp_stmt
-        async_ = cast("Async", temp_stmt)
+        async_ = temp_stmt
         async_ = async_.replace(markers=self.visit_markers(async_.markers, p))
         async_ = async_.replace(
             statement=self.visit_and_cast(async_.statement, Statement, p)
@@ -108,7 +108,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(await_, p))
         if not isinstance(temp_expr, type(await_)):
             return temp_expr
-        await_ = cast("Await", temp_expr)
+        await_ = temp_expr
         await_ = await_.replace(markers=self.visit_markers(await_.markers, p))
         await_ = await_.replace(
             expression=self.visit_and_cast(await_.expression, Expression, p)
@@ -123,7 +123,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(binary, p))
         if not isinstance(temp_expr, type(binary)):
             return temp_expr
-        binary = cast("Binary", temp_expr)
+        binary = temp_expr
         binary = binary.replace(markers=self.visit_markers(binary.markers, p))
         binary = binary.replace(
             left=self.visit_and_cast(binary.left, Expression, p)
@@ -147,7 +147,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_stmt = cast(Statement, self.visit_statement(chained, p))
         if not isinstance(temp_stmt, type(chained)):
             return temp_stmt
-        chained = cast("ChainedAssignment", temp_stmt)
+        chained = temp_stmt
         chained = chained.replace(markers=self.visit_markers(chained.markers, p))
         chained = chained.padding.replace(variables=
             list_map(
@@ -168,7 +168,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(collection, p))
         if not isinstance(temp_expr, type(collection)):
             return temp_expr
-        collection = cast("CollectionLiteral", temp_expr)
+        collection = temp_expr
         collection = collection.replace(markers=self.visit_markers(collection.markers, p))
         collection = collection.replace(
             elements=self.visit_container(collection.padding.elements, p)
@@ -202,7 +202,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(comp, p))
         if not isinstance(temp_expr, type(comp)):
             return temp_expr
-        comp = cast("ComprehensionExpression", temp_expr)
+        comp = temp_expr
         comp = comp.replace(markers=self.visit_markers(comp.markers, p))
         comp = comp.replace(
             result=self.visit_and_cast(comp.result, Expression, p)
@@ -254,7 +254,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_stmt = cast(Statement, self.visit_statement(del_, p))
         if not isinstance(temp_stmt, type(del_)):
             return temp_stmt
-        del_ = cast("Del", temp_stmt)
+        del_ = temp_stmt
         del_ = del_.replace(markers=self.visit_markers(del_.markers, p))
         del_ = del_.padding.replace(targets=
             list_map(
@@ -272,7 +272,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(dict_lit, p))
         if not isinstance(temp_expr, type(dict_lit)):
             return temp_expr
-        dict_lit = cast("DictLiteral", temp_expr)
+        dict_lit = temp_expr
         dict_lit = dict_lit.replace(markers=self.visit_markers(dict_lit.markers, p))
         dict_lit = dict_lit.replace(
             elements=self.visit_container(dict_lit.padding.elements, p)
@@ -287,7 +287,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(error_from, p))
         if not isinstance(temp_expr, type(error_from)):
             return temp_expr
-        error_from = cast("ErrorFrom", temp_expr)
+        error_from = temp_expr
         error_from = error_from.replace(markers=self.visit_markers(error_from.markers, p))
         error_from = error_from.replace(
             error=self.visit_and_cast(error_from.error, Expression, p)
@@ -313,11 +313,11 @@ class PythonVisitor(JavaVisitor[P]):
         temp_stmt = cast(Statement, self.visit_statement(expr_stmt, p))
         if not isinstance(temp_stmt, type(expr_stmt)):
             return temp_stmt
-        expr_stmt = cast("ExpressionStatement", temp_stmt)
+        expr_stmt = temp_stmt
         temp_expr = cast(Expression, self.visit_expression(expr_stmt, p))
         if not isinstance(temp_expr, type(expr_stmt)):
             return temp_expr
-        expr_stmt = cast("ExpressionStatement", temp_expr)
+        expr_stmt = temp_expr
         expr_stmt = expr_stmt.replace(
             expression=self.visit_and_cast(expr_stmt.expression, Expression, p)
         )
@@ -331,7 +331,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(expr_tree, p))
         if not isinstance(temp_expr, type(expr_tree)):
             return temp_expr
-        expr_tree = cast("ExpressionTypeTree", temp_expr)
+        expr_tree = temp_expr
         expr_tree = expr_tree.replace(markers=self.visit_markers(expr_tree.markers, p))
         expr_tree = expr_tree.replace(
             reference=self.visit_and_cast(expr_tree.reference, J, p)
@@ -346,7 +346,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(f_string, p))
         if not isinstance(temp_expr, type(f_string)):
             return temp_expr
-        f_string = cast("FormattedString", temp_expr)
+        f_string = temp_expr
         f_string = f_string.replace(markers=self.visit_markers(f_string.markers, p))
         f_string = f_string.replace(
             parts=list_map(
@@ -379,7 +379,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(kv, p))
         if not isinstance(temp_expr, type(kv)):
             return temp_expr
-        kv = cast("KeyValue", temp_expr)
+        kv = temp_expr
         kv = kv.replace(markers=self.visit_markers(kv.markers, p))
         kv = kv.padding.replace(
             key=self.visit_right_padded(kv.padding.key, p)
@@ -397,7 +397,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(lit_type, p))
         if not isinstance(temp_expr, type(lit_type)):
             return temp_expr
-        lit_type = cast("LiteralType", temp_expr)
+        lit_type = temp_expr
         lit_type = lit_type.replace(markers=self.visit_markers(lit_type.markers, p))
         lit_type = lit_type.replace(
             literal=self.visit_and_cast(lit_type.literal, Expression, p)
@@ -412,7 +412,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(case, p))
         if not isinstance(temp_expr, type(case)):
             return temp_expr
-        case = cast("MatchCase", temp_expr)
+        case = temp_expr
         case = case.replace(markers=self.visit_markers(case.markers, p))
         case = case.replace(
             pattern=self.visit_match_case_pattern(case.pattern, p)
@@ -442,7 +442,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_stmt = cast(Statement, self.visit_statement(multi, p))
         if not isinstance(temp_stmt, type(multi)):
             return temp_stmt
-        multi = cast("MultiImport", temp_stmt)
+        multi = temp_stmt
         multi = multi.replace(markers=self.visit_markers(multi.markers, p))
         if multi.padding.from_ is not None:
             multi = multi.padding.replace(
@@ -461,7 +461,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(named, p))
         if not isinstance(temp_expr, type(named)):
             return temp_expr
-        named = cast("NamedArgument", temp_expr)
+        named = temp_expr
         named = named.replace(markers=self.visit_markers(named.markers, p))
         named = named.replace(
             name=cast(j.Identifier, self.visit(named.name, p))
@@ -479,7 +479,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_stmt = cast(Statement, self.visit_statement(pass_, p))
         if not isinstance(temp_stmt, type(pass_)):
             return temp_stmt
-        pass_ = cast("Pass", temp_stmt)
+        pass_ = temp_stmt
         pass_ = pass_.replace(markers=self.visit_markers(pass_.markers, p))
         return pass_
 
@@ -491,7 +491,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(slice_, p))
         if not isinstance(temp_expr, type(slice_)):
             return temp_expr
-        slice_ = cast("Slice", temp_expr)
+        slice_ = temp_expr
         slice_ = slice_.replace(markers=self.visit_markers(slice_.markers, p))
         if slice_.padding.start is not None:
             slice_ = slice_.padding.replace(
@@ -527,7 +527,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(star, p))
         if not isinstance(temp_expr, type(star)):
             return temp_expr
-        star = cast("Star", temp_expr)
+        star = temp_expr
         star = star.replace(markers=self.visit_markers(star.markers, p))
         star = star.replace(
             expression=self.visit_and_cast(star.expression, Expression, p)
@@ -539,11 +539,11 @@ class PythonVisitor(JavaVisitor[P]):
         temp_stmt = cast(Statement, self.visit_statement(stmt_expr, p))
         if not isinstance(temp_stmt, type(stmt_expr)):
             return temp_stmt
-        stmt_expr = cast("StatementExpression", temp_stmt)
+        stmt_expr = temp_stmt
         temp_expr = cast(Expression, self.visit_expression(stmt_expr, p))
         if not isinstance(temp_expr, type(stmt_expr)):
             return temp_expr
-        stmt_expr = cast("StatementExpression", temp_expr)
+        stmt_expr = temp_expr
         stmt_expr = stmt_expr.replace(
             statement=self.visit_and_cast(stmt_expr.statement, Statement, p)
         )
@@ -557,7 +557,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_stmt = cast(Statement, self.visit_statement(wrapper, p))
         if not isinstance(temp_stmt, type(wrapper)):
             return temp_stmt
-        wrapper = cast("TrailingElseWrapper", temp_stmt)
+        wrapper = temp_stmt
         wrapper = wrapper.replace(markers=self.visit_markers(wrapper.markers, p))
         wrapper = wrapper.replace(
             statement=self.visit_and_cast(wrapper.statement, Statement, p)
@@ -575,7 +575,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_stmt = cast(Statement, self.visit_statement(alias, p))
         if not isinstance(temp_stmt, type(alias)):
             return temp_stmt
-        alias = cast("TypeAlias", temp_stmt)
+        alias = temp_stmt
         alias = alias.replace(markers=self.visit_markers(alias.markers, p))
         alias = alias.replace(
             name=cast(j.Identifier, self.visit(alias.name, p))
@@ -604,7 +604,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(hinted, p))
         if not isinstance(temp_expr, type(hinted)):
             return temp_expr
-        hinted = cast("TypeHintedExpression", temp_expr)
+        hinted = temp_expr
         hinted = hinted.replace(markers=self.visit_markers(hinted.markers, p))
         hinted = hinted.replace(
             expression=self.visit_and_cast(hinted.expression, Expression, p)
@@ -622,7 +622,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(union, p))
         if not isinstance(temp_expr, type(union)):
             return temp_expr
-        union = cast("UnionType", temp_expr)
+        union = temp_expr
         union = union.replace(markers=self.visit_markers(union.markers, p))
         union = union.padding.replace(types=
             list_map(
@@ -640,7 +640,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_stmt = cast(Statement, self.visit_statement(scope, p))
         if not isinstance(temp_stmt, type(scope)):
             return temp_stmt
-        scope = cast("VariableScope", temp_stmt)
+        scope = temp_stmt
         scope = scope.replace(markers=self.visit_markers(scope.markers, p))
         scope = scope.padding.replace(names=
             list_map(
@@ -658,7 +658,7 @@ class PythonVisitor(JavaVisitor[P]):
         temp_expr = cast(Expression, self.visit_expression(yield_from, p))
         if not isinstance(temp_expr, type(yield_from)):
             return temp_expr
-        yield_from = cast("YieldFrom", temp_expr)
+        yield_from = temp_expr
         yield_from = yield_from.replace(markers=self.visit_markers(yield_from.markers, p))
         yield_from = yield_from.replace(
             expression=self.visit_and_cast(yield_from.expression, Expression, p)
