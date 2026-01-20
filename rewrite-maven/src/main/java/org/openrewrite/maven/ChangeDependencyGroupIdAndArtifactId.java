@@ -174,13 +174,13 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 if (isOldDependencyTag || isPluginDependency || isAnnotationProcessorPath) {
                     String groupId = newGroupId;
                     if (groupId != null) {
-                        t = changeChildTagValue(t, "groupId", groupId, ctx, true);
+                        t = changeChildTagValueInlineOnly(t, "groupId", groupId, ctx);
                     } else {
                         groupId = t.getChildValue("groupId").orElseThrow(NoSuchElementException::new);
                     }
                     String artifactId = newArtifactId;
                     if (artifactId != null) {
-                        t = changeChildTagValue(t, "artifactId", artifactId, ctx, true);
+                        t = changeChildTagValueInlineOnly(t, "artifactId", artifactId, ctx);
                     } else {
                         artifactId = t.getChildValue("artifactId").orElseThrow(NoSuchElementException::new);
                     }
@@ -206,7 +206,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                                     t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false, true).visit(t, ctx);
                                 } else {
                                     // Otherwise, change the version to the new value.
-                                    t = changeChildTagValue(t, "version", resolvedNewVersion, ctx, true);
+                                    t = changeChildTagValueInlineOnly(t, "version", resolvedNewVersion, ctx);
                                 }
                             } else if (configuredToOverrideManagedVersion || (!newDependencyManaged && !(oldDependencyDefinedManaged && configuredToChangeManagedDependency))) {
                                 // If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.

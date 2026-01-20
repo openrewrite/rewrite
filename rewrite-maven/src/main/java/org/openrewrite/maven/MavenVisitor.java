@@ -291,24 +291,27 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return getCursor().getValue() instanceof Xml.Tag && name.equals(getCursor().<Xml.Tag>getValue().getName());
     }
 
-    protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, P p) {
-        return changeChildTagValue(tag, childTagName, newValue, false, p, false);
-    }
-
-    protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, P p, boolean doNotAlterAnyProperties) {
-        return changeChildTagValue(tag, childTagName, newValue, false, p, doNotAlterAnyProperties);
-    }
-
-    protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, @Nullable Boolean addPropertyIfMissing, P p) {
-        return changeChildTagValue(tag, childTagName, newValue, addPropertyIfMissing, p, false);
-    }
-
-    protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, @Nullable Boolean addPropertyIfMissing, P p, boolean doNotAlterAnyProperties) {
+    protected Xml.Tag changeChildTagValueInlineOnly(Xml.Tag tag, String childTagName, @Nullable String newValue, P p) {
         Optional<Xml.Tag> childTag = tag.getChild(childTagName);
         if (childTag.isPresent()) {
             String oldValue = childTag.get().getValue().orElse(null);
             if (newValue != null && !newValue.equals(oldValue)) {
-                if (isProperty(oldValue) && !doNotAlterAnyProperties) {
+                tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, p);
+            }
+        }
+        return tag;
+    }
+
+    protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, P p) {
+        return changeChildTagValue(tag, childTagName, newValue, false, p);
+    }
+
+    protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, @Nullable Boolean addPropertyIfMissing, P p) {
+        Optional<Xml.Tag> childTag = tag.getChild(childTagName);
+        if (childTag.isPresent()) {
+            String oldValue = childTag.get().getValue().orElse(null);
+            if (newValue != null && !newValue.equals(oldValue)) {
+                if (isProperty(oldValue)) {
                     MavenResolutionResult resolutionResult = getResolutionResult();
                     String propertyName = oldValue.substring(2, oldValue.length() - 1);
                     ResolvedPom pom = resolutionResult.getPom();
