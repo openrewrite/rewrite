@@ -1,5 +1,5 @@
 import ast
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
 from ..java import JavaType
 

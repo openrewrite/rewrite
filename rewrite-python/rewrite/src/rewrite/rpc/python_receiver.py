@@ -270,7 +270,7 @@ class PythonRpcReceiver:
     def _visit_formatted_string(self, fs: FormattedString, q: RpcReceiveQueue) -> FormattedString:
         delimiter = q.receive(fs.delimiter)
         parts = q.receive_list(fs.parts)
-        type_ = q.receive(fs.type)  # ty: ignore[unresolved-attribute]  # type property missing from stub
+        type_ = q.receive(fs.type)
         return replace_if_changed(fs, delimiter=delimiter, parts=parts, type=type_)
 
     def _visit_formatted_string_value(self, v: FormattedString.Value, q: RpcReceiveQueue) -> FormattedString.Value:

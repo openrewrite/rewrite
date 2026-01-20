@@ -23,11 +23,9 @@ This processes the same JSON format that Python sends:
 ]
 """
 from dataclasses import dataclass
-from enum import Enum
-from pathlib import Path
-from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, Union, cast
-from uuid import UUID
+from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
 
+from rewrite import Markers
 from rewrite.rpc.send_queue import RpcObjectState
 
 T = TypeVar('T')
@@ -299,7 +297,7 @@ class RpcReceiveQueue:
 
             return Markers(new_id, new_markers_list or [])
 
-        return self.receive(markers, on_change)
+        return self.receive(markers, on_change) or Markers.EMPTY
 
     def _new_obj(self, value_type: str) -> Any:
         """Create a new instance using registered factory.

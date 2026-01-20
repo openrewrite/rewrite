@@ -45,7 +45,7 @@ class SourceFile(Tree):
 class PrintOutputCapture(Generic[P]):
     @dataclass(frozen=True)
     class MarkerPrinter(ABC):
-        DEFAULT: ClassVar['PrintOutputCapture.MarkerPrinter']
+        DEFAULT: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']]
 
         def replace(self, **kwargs: Any) -> Self: ...
 

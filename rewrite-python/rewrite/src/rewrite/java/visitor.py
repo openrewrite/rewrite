@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import TypeVar, Optional, Any, List, cast
+from typing import TypeVar, Optional, cast
 
 from rewrite.java.support_types import J, Space, JRightPadded, JLeftPadded, JContainer, Expression, Statement
 from rewrite.utils import list_map
@@ -185,8 +185,8 @@ class JavaVisitor(TreeVisitor[J, P]):
             array_type = array_type.replace(
                 annotations=list_map(lambda a: self.visit_and_cast(a, j.Annotation, p), array_type.annotations)
             )
-        array_type = array_type.padding.replace(  # ty: ignore[unresolved-attribute]  # ArrayType.padding doesn't exist - visitor bug
-            dimension=self.visit_left_padded(array_type.padding.dimension, p)  # ty: ignore[unresolved-attribute]
+        array_type = array_type.replace(
+            dimension=self.visit_left_padded(array_type.dimension, p)
         )
         return array_type
 

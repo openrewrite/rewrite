@@ -8,7 +8,6 @@ This produces the same JSON format that Java expects:
   {"state": "END_OF_OBJECT"}
 ]
 """
-from dataclasses import is_dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Callable, TypeVar

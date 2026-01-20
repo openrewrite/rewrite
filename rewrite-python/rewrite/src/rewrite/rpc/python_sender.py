@@ -11,7 +11,7 @@ from rewrite import Markers
 from rewrite.java import Space, JRightPadded, JLeftPadded, JContainer, J
 from rewrite.python import CompilationUnit
 from rewrite.python.tree import (
-    Py, Async, Await, Binary, ChainedAssignment, ExceptionType,
+    Async, Await, Binary, ChainedAssignment, ExceptionType,
     LiteralType, TypeHint, ExpressionStatement, ExpressionTypeTree,
     StatementExpression, MultiImport, KeyValue, DictLiteral, CollectionLiteral,
     FormattedString, Pass, TrailingElseWrapper, ComprehensionExpression,

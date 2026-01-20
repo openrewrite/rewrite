@@ -4,27 +4,19 @@ import weakref
 from dataclasses import dataclass, replace as dataclass_replace
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING, cast
+from typing import List, Optional, TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
     from .visitor import PythonVisitor
-from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Markers, Cursor, PrintOutputCapture, PrinterFactory
+from rewrite import Checksum, FileAttributes, SourceFile, TreeVisitor, Markers, Cursor, PrinterFactory
 # Explicit imports from rewrite.java (excluding Binary, CompilationUnit which are redefined here)
 from rewrite.java import (
-    Comment, TextComment, J, JavaType, JContainer, JLeftPadded, JRightPadded, Space, JavaVisitor,
-    JavaSourceFile, Loop, TypeTree, TypedTree, NameTree, Expression, Statement,
-    OmitParentheses, Semicolon, TrailingComma,
-    AnnotatedType, Annotation, ArrayAccess, ArrayType, Assert, Assignment, AssignmentOperation,
-    Block, Break, Case, ClassDeclaration, Continue, DeconstructionPattern, DoWhileLoop, Empty,
-    EnumValue, EnumValueSet, Erroneous, FieldAccess, ForEachLoop, ForLoop, ParenthesizedTypeTree,
-    Identifier, If, Import, InstanceOf, IntersectionType, Label, Lambda, Literal, MemberReference,
-    MethodDeclaration, MethodInvocation, Modifier, MultiCatch, NewArray, ArrayDimension, NewClass,
-    NullableType, Package, ParameterizedType, Parentheses, ControlParentheses, Primitive, Return,
-    Switch, SwitchExpression, Synchronized, Ternary, Throw, Try, TypeCast, TypeParameter,
-    TypeParameters, Unary, VariableDeclarations, WhileLoop, Wildcard, Yield, Unknown,
+    J, JavaType, JContainer, JLeftPadded, JRightPadded, Space,
+    JavaSourceFile, TypeTree, TypedTree, NameTree, Expression, Statement,
+    Block, Identifier, Import, TypeParameter,
 )
-from rewrite.python.support_types import Py
+from rewrite.python.support_types import Py, P
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @dataclass(frozen=True, eq=False)
@@ -1490,10 +1482,10 @@ class TypeAlias(Py, Statement, TypedTree):
         return self._name
 
 
-    _type_parameters: Optional[JContainer[j.TypeParameter]]
+    _type_parameters: Optional[JContainer[TypeParameter]]
 
     @property
-    def type_parameters(self) -> Optional[List[j.TypeParameter]]:
+    def type_parameters(self) -> Optional[List[TypeParameter]]:
         return self._type_parameters.elements if self._type_parameters else None
 
 
@@ -1516,7 +1508,7 @@ class TypeAlias(Py, Statement, TypedTree):
         _t: TypeAlias
 
         @property
-        def type_parameters(self) -> Optional[JContainer[j.TypeParameter]]:
+        def type_parameters(self) -> Optional[JContainer[TypeParameter]]:
             return self._t._type_parameters
 
         @property

@@ -5,7 +5,7 @@ from argparse import ArgumentError
 from io import BytesIO
 from pathlib import Path
 from tokenize import tokenize, TokenInfo
-from typing import Optional, TypeVar, cast, Callable, List, Tuple, Dict, Type, Sequence, Union, Iterable, NamedTuple
+from typing import Optional, TypeVar, cast, Callable, List, Tuple, Dict, Sequence, Union, Iterable, NamedTuple
 
 from rewrite import random_id, Markers
 from rewrite.java import Space, JRightPadded, JContainer, JLeftPadded, JavaType, J, Statement, Semicolon, TrailingComma, \
@@ -1708,7 +1708,7 @@ class ParserVisitor(ast.NodeVisitor):
             name if isinstance(name, j.Identifier) else j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "",
                                                                      None, None),
             args,
-            name.type if isinstance(name.type, JavaType.Method) else None,  # ty: ignore[unresolved-attribute]  # complex union type
+            name.type if isinstance(name.type, JavaType.Method) else None,  # ty: ignore[possibly-missing-attribute]
         )
 
     def __sort_call_arguments(self, call: ast.Call) -> List[Union[ast.expr, ast.keyword]]:

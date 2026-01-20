@@ -4,12 +4,11 @@ import weakref
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING, Generic
 from uuid import UUID
 
 if TYPE_CHECKING:
     from .visitor import JavaVisitor
-from . import extensions as extensions  # Re-export for other modules
 from .support_types import *
 from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Markers, Cursor, PrintOutputCapture, PrinterFactory
 
@@ -3751,11 +3750,13 @@ class Parentheses(Expression, Generic[J2]):
 
     @property
     def tree(self) -> J2:
-        return self._tree.element  # ty: ignore[invalid-return-type]  # TypeVar bound to JRightPadded element
+        return self._tree.element
 
     @property
-    def type(self) -> JavaType:
-        return self.tree.type
+    def type(self) -> Optional[JavaType]:
+        if isinstance(self.tree, (Expression, TypedTree)):
+            return self.tree.type
+        return None
 
     @dataclass
     class PaddingHelper:
@@ -3822,7 +3823,8 @@ class ControlParentheses(Expression, Generic[J2]):
 
     @property
     def tree(self) -> J2:
-        return self._tree.element  # ty: ignore[invalid-return-type]  # TypeVar bound to JLeftPadded element
+        return self._tree.element
+
 
     @dataclass
     class PaddingHelper:

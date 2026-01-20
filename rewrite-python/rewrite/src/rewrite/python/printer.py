@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, List, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Callable, List, Optional, TypeVar, Union, cast
 
 from rewrite import Cursor, Marker, Markers, Tree
 from rewrite.java import (
@@ -28,7 +28,6 @@ from rewrite.java import (
     JRightPadded,
     JLeftPadded,
     JContainer,
-    Expression,
     Statement,
     Loop,
 )
@@ -371,7 +370,6 @@ class PythonPrinter:
 
     def visit_compilation_unit(self, cu: 'py.CompilationUnit', p: PrintOutputCapture) -> J:
         """Visit a Python compilation unit."""
-        from rewrite.java.tree import Import
         # Output UTF-8 BOM if the original file had one
         if cu.charset_bom_marked:
             p.append('\ufeff')
@@ -1300,8 +1298,6 @@ class PythonJavaPrinter:
 
     def visit_catch(self, catch: 'j.Try.Catch', p: PrintOutputCapture) -> J:
         """Visit a catch clause (except in Python)."""
-        from rewrite.java import tree as j
-
         self._before_syntax(catch, p)
         p.append("except")
 
@@ -1756,15 +1752,16 @@ class PythonJavaPrinter:
 
     def visit_variable(self, variable: 'j.VariableDeclarations.NamedVariable', p: PrintOutputCapture) -> J:
         """Visit a named variable."""
+        from rewrite.java import tree as j
         from rewrite.python import tree as py
 
         self._before_syntax(variable, p)
 
         parent_cursor = self.get_cursor().parent
-        vd = parent_cursor.parent.value if parent_cursor and parent_cursor.parent else None
-        padding = parent_cursor.value if parent_cursor else None
+        vd = cast(j.VariableDeclarations, parent_cursor.parent.value) if parent_cursor and parent_cursor.parent else None
+        padding = cast(j.JRightPadded, parent_cursor.value) if parent_cursor else None
 
-        type_expr = vd.type_expression if vd else None  # ty: ignore[unresolved-attribute]  # vd type unknown from cursor
+        type_expr = vd.type_expression if vd else None
 
         if isinstance(type_expr, py.SpecialParameter):
             special = type_expr
@@ -1777,14 +1774,14 @@ class PythonJavaPrinter:
         if isinstance(variable.name, Identifier) and not variable.name.simple_name:
             self.visit(variable.initializer, p)
         else:
-            if vd and vd.varargs is not None:  # ty: ignore[unresolved-attribute]  # vd type unknown from cursor
-                self._visit_space(vd.varargs, p)  # ty: ignore[unresolved-attribute]  # vd type unknown from cursor
+            if vd and vd.varargs is not None:
+                self._visit_space(vd.varargs, p)
                 p.append('*')
-            if vd and vd.markers.find_first(KeywordArguments):  # ty: ignore[unresolved-attribute]  # vd type unknown from cursor
+            if vd and vd.markers.find_first(KeywordArguments):
                 p.append("**")
             self.visit(variable.name, p)
             if type_expr is not None and padding:
-                self._visit_space(padding.after, p)  # ty: ignore[unresolved-attribute]  # vd type unknown from cursor
+                self._visit_space(padding.after, p)
                 p.append(':')
                 self.visit(type_expr, p)
             if variable.padding.initializer:

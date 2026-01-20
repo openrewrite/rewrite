@@ -157,7 +157,9 @@ class JavaSourceFile(J, SourceFile):
 
 
 class Expression(J):
-    pass
+    @property
+    def type(self) -> Optional[JavaType]:
+        return None
 
 
 class Statement(J):
@@ -165,7 +167,9 @@ class Statement(J):
 
 
 class TypedTree(J):
-    pass
+    @property
+    def type(self) -> Optional[JavaType]:
+        return None
 
 
 class NameTree(TypedTree):

@@ -1,5 +1,6 @@
 from typing import Optional, TYPE_CHECKING
 
+from rewrite import Cursor
 from rewrite.tree import Tree
 from rewrite.utils import list_map
 from .support_types import J, JRightPadded, JLeftPadded, JContainer, Space, P, T, J2

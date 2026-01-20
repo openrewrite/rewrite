@@ -29,13 +29,15 @@ class JavaSourceFile(J, SourceFile):
     pass
 
 class Expression(J):
-    pass
+    @property
+    def type(self) -> Optional[JavaType]: ...
 
 class Statement(J):
     pass
 
 class TypedTree(J):
-    pass
+    @property
+    def type(self) -> Optional[JavaType]: ...
 
 class NameTree(TypedTree):
     pass
@@ -170,7 +172,6 @@ class Comment(ABC):
 class TextComment(Comment):
     _multiline: bool
 
-    def __init__(self, _multiline: bool, _text: str, _suffix: str, _markers: Markers) -> None: ...
     def replace(self, **kwargs: Any) -> Self: ...
 
     @property
