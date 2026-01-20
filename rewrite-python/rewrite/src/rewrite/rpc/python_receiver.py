@@ -161,17 +161,14 @@ class PythonRpcReceiver:
         new_prefix = q.receive(j.prefix)
         new_markers = q.receive_markers(j.markers)
 
-        if new_id is j.id and new_prefix is j.prefix and new_markers is j.markers:
-            return j
-
-        result = j
+        changes = {}
         if new_id is not j.id:
-            result = result.replace(id=new_id)
+            changes['_id'] = new_id
         if new_prefix is not j.prefix:
-            result = result.replace(prefix=new_prefix)
+            changes['_prefix'] = new_prefix
         if new_markers is not j.markers:
-            result = result.replace(markers=new_markers)
-        return result
+            changes['_markers'] = new_markers
+        return replace_if_changed(j, **changes) if changes else j
 
     def _visit_compilation_unit(self, cu: CompilationUnit, q: RpcReceiveQueue) -> CompilationUnit:
         """Visit CompilationUnit - only non-common fields."""
@@ -806,7 +803,7 @@ class PythonRpcReceiver:
         if space is None:
             return Space.EMPTY
 
-        comments = q.receive_list(space.comments)
+        comments = q.receive_list_defined(space.comments)
         whitespace = q.receive(space.whitespace)
 
         if comments is space.comments and whitespace is space.whitespace:
@@ -820,59 +817,59 @@ class PythonRpcReceiver:
 
         # Handle new comments (comment is None or a dict from _new_obj)
         if comment is None or isinstance(comment, dict):
-            # For new comments, read all fields directly
-            multiline = q.receive(None)
-            text = q.receive(None)
-            suffix = q.receive(None)
+            # For new comments, read all fields directly - all are non-optional
+            multiline = q.receive_defined(None)
+            text = q.receive_defined(None)
+            suffix = q.receive_defined(None)
             markers = q.receive_markers(None)
             return TextComment(multiline, text, suffix, markers)
 
-        multiline = q.receive(comment.multiline)
-        text = q.receive(comment.text)
-        suffix = q.receive(comment.suffix)
+        multiline = q.receive_defined(comment.multiline)
+        text = q.receive_defined(comment.text)
+        suffix = q.receive_defined(comment.suffix)
         markers = q.receive_markers(comment.markers)
 
         return TextComment(multiline, text, suffix, markers)
 
-    def _receive_right_padded(self, rp: JRightPadded, q: RpcReceiveQueue) -> JRightPadded:
+    def _receive_right_padded(self, rp: JRightPadded, q: RpcReceiveQueue) -> Optional[JRightPadded]:
         """Receive a JRightPadded wrapper."""
         if rp is None:
             return None
 
         # Codec registry handles type dispatch automatically
         element = q.receive(rp.element)
-        after = q.receive(rp.after)
-        markers = q.receive(rp.markers)
+        after = q.receive_defined(rp.after)
+        markers = q.receive_markers(rp.markers)
 
         if element is rp.element and after is rp.after and markers is rp.markers:
             return rp
 
         return JRightPadded(element, after, markers)
 
-    def _receive_left_padded(self, lp: JLeftPadded, q: RpcReceiveQueue) -> JLeftPadded:
+    def _receive_left_padded(self, lp: JLeftPadded, q: RpcReceiveQueue) -> Optional[JLeftPadded]:
         """Receive a JLeftPadded wrapper."""
         if lp is None:
             return None
 
         # Codec registry handles type dispatch automatically
-        before = q.receive(lp.before)
+        before = q.receive_defined(lp.before)
         element = q.receive(lp.element)
-        markers = q.receive(lp.markers)
+        markers = q.receive_markers(lp.markers)
 
         if before is lp.before and element is lp.element and markers is lp.markers:
             return lp
 
         return JLeftPadded(before, element, markers)
 
-    def _receive_container(self, container: JContainer, q: RpcReceiveQueue) -> JContainer:
+    def _receive_container(self, container: JContainer, q: RpcReceiveQueue) -> Optional[JContainer]:
         """Receive a JContainer wrapper."""
         if container is None:
             return None
 
         # Codec registry handles type dispatch automatically
-        before = q.receive(container.before)
-        elements = q.receive_list(container.padding.elements)
-        markers = q.receive(container.markers)
+        before = q.receive_defined(container.before)
+        elements = q.receive_list_defined(container.padding.elements)
+        markers = q.receive_markers(container.markers)
 
         if before is container.before and elements is container.padding.elements and markers is container.markers:
             return container
@@ -888,20 +885,30 @@ class PythonRpcReceiver:
 
 # Register marker codecs
 def _register_marker_codecs():
-    """Register receive codecs for Java marker types."""
+    """Register receive and send codecs for Java marker types."""
+    from rewrite import Markers
     from rewrite.java.markers import Semicolon, TrailingComma, OmitParentheses
     from rewrite.java.support_types import Space
-    from rewrite.rpc.receive_queue import register_codec_with_both_names
+    from rewrite.rpc.receive_queue import register_codec_with_both_names, register_send_codec
+    from rewrite.rpc.send_queue import RpcSendQueue
 
+    # Markers send codec (Markers uses special handling in receive_queue, but needs send codec)
+    def _send_markers(markers: Markers, q: RpcSendQueue) -> None:
+        q.get_and_send(markers, lambda x: x.id)
+        q.get_and_send_list(markers, lambda x: x.markers, lambda m: m.id, None)
+
+    register_send_codec(Markers, _send_markers)
+
+    # Receive codecs
     def _receive_semicolon(semicolon: Semicolon, q: RpcReceiveQueue) -> Semicolon:
-        new_id = q.receive(semicolon.id)
+        new_id = q.receive_defined(semicolon.id)
         if new_id is semicolon.id:
             return semicolon
         return semicolon.replace(id=new_id)
 
     def _receive_trailing_comma(trailing_comma: TrailingComma, q: RpcReceiveQueue) -> TrailingComma:
-        new_id = q.receive(trailing_comma.id)
-        new_suffix = q.receive(trailing_comma.suffix)
+        new_id = q.receive_defined(trailing_comma.id)
+        new_suffix = q.receive_defined(trailing_comma.suffix)
         if new_id is trailing_comma.id and new_suffix is trailing_comma.suffix:
             return trailing_comma
         result = trailing_comma
@@ -912,10 +919,21 @@ def _register_marker_codecs():
         return result
 
     def _receive_omit_parentheses(omit_paren: OmitParentheses, q: RpcReceiveQueue) -> OmitParentheses:
-        new_id = q.receive(omit_paren.id)
+        new_id = q.receive_defined(omit_paren.id)
         if new_id is omit_paren.id:
             return omit_paren
         return omit_paren.replace(id=new_id)
+
+    # Send codecs
+    def _send_semicolon(marker: Semicolon, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: x.id)
+
+    def _send_trailing_comma(marker: TrailingComma, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: x.suffix, lambda s: _get_sender()._visit_space(s, q))
+
+    def _send_omit_parentheses(marker: OmitParentheses, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: x.id)
 
     from uuid import uuid4
 
@@ -924,19 +942,22 @@ def _register_marker_codecs():
         'org.openrewrite.java.marker.Semicolon',
         Semicolon,
         _receive_semicolon,
-        lambda: Semicolon(uuid4())
+        lambda: Semicolon(uuid4()),
+        _send_semicolon
     )
     register_codec_with_both_names(
         'org.openrewrite.java.marker.TrailingComma',
         TrailingComma,
         _receive_trailing_comma,
-        lambda: TrailingComma(uuid4(), Space.EMPTY)
+        lambda: TrailingComma(uuid4(), Space.EMPTY),
+        _send_trailing_comma
     )
     register_codec_with_both_names(
         'org.openrewrite.java.marker.OmitParentheses',
         OmitParentheses,
         _receive_omit_parentheses,
-        lambda: OmitParentheses(uuid4())
+        lambda: OmitParentheses(uuid4()),
+        _send_omit_parentheses
     )
 
 
@@ -946,6 +967,8 @@ def _register_marker_codecs():
 
 # Shared receiver instance (stateless, so one instance works for all codecs)
 _python_receiver = None
+# Shared sender instance for marker codecs
+_python_sender = None
 
 
 def _get_receiver():
@@ -954,6 +977,15 @@ def _get_receiver():
     if _python_receiver is None:
         _python_receiver = PythonRpcReceiver()
     return _python_receiver
+
+
+def _get_sender():
+    """Lazily get the shared PythonRpcSender instance."""
+    global _python_sender
+    if _python_sender is None:
+        from rewrite.rpc.python_sender import PythonRpcSender
+        _python_sender = PythonRpcSender()
+    return _python_sender
 
 
 def _receive_j(j, q: RpcReceiveQueue):

@@ -59,7 +59,7 @@ class RemovePass(Recipe):
 
     def editor(self) -> TreeVisitor[Any, ExecutionContext]:
         class Visitor(PythonVisitor[ExecutionContext]):
-            def visit_pass(self, pass_: Pass, ctx: ExecutionContext) -> Optional[J]:
+            def visit_pass(self, pass_: Pass, p: ExecutionContext) -> Optional[J]:
                 # Find the enclosing block or compilation unit
                 block = self.cursor.first_enclosing(Block)
                 if block is not None:
