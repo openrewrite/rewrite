@@ -18,7 +18,6 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.experimental.NonFinal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
@@ -58,7 +57,7 @@ public class AddExplicitDependencyVersion extends JavaIsoVisitor<ExecutionContex
 
 
     @Override
-    public @Nullable J preVisit(@NonNull J tree, ExecutionContext ctx) {
+    public @Nullable J preVisit(J tree, ExecutionContext ctx) {
         if (tree instanceof SourceFile) {
             Optional<GradleProject> gradleProject = tree.getMarkers().findFirst(GradleProject.class);
             if (gradleProject.isPresent()) {
