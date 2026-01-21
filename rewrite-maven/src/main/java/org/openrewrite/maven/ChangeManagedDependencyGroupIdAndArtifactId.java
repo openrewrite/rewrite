@@ -20,6 +20,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.ResolvedManagedDependency;
@@ -33,6 +34,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.*;
 
 import static java.util.Collections.max;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Validated.test;
 import static org.openrewrite.internal.StringUtils.isBlank;
 
@@ -126,10 +128,12 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             @Nullable
             private Collection<String> availableVersions;
             private boolean isNewDependencyPresent;
+            private boolean hasProblematicVersionPlaceholder;
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 isNewDependencyPresent = checkIfNewDependencyPresent(newGroupId, newArtifactId, newVersion);
+                hasProblematicVersionPlaceholder = hasProblematicPropertyUsage(oldGroupId, oldArtifactId, ctx);
                 return super.visitDocument(document, ctx);
             }
 
@@ -150,7 +154,11 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                     resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(newArtifactId, properties::get);
                                 }
                                 String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, resolvedArtifactId, getResolutionResult().getPom().getValue(versionTag.get().getValue().orElse(null)));
-                                t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
+                                if (hasProblematicVersionPlaceholder) {
+                                    t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
+                                } else {
+                                    t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
+                                }
                             }
                         } catch (MavenDownloadingException e) {
                             return e.warn(t);
@@ -178,6 +186,71 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 } else {
                     return false;
                 }
+            }
+
+            private boolean hasPropertyOverlapInDependencies(String relevantProperty, String groupId, String artifactId, Pom requestedPom, @Nullable ResolvedPom resolvedPom) {
+                // resolvedPom being `null` is an indicator of dealing with a remote parent that we can't change
+                if (requestedPom.getDependencyManagement().stream()
+                        .anyMatch(md -> relevantProperty.equals(md.getVersion()) &&
+                                (resolvedPom == null || !groupId.equals(resolvedPom.getValue(md.getGroupId())) || !artifactId.equals(resolvedPom.getValue(md.getArtifactId()))))
+                ) {
+                    return true;
+                }
+                return requestedPom.getDependencies().stream()
+                        .anyMatch(d -> relevantProperty.equals(d.getVersion()) &&
+                                (resolvedPom == null || !groupId.equals(resolvedPom.getValue(d.getGroupId())) || !artifactId.equals(resolvedPom.getValue(d.getArtifactId()))));
+            }
+
+            private boolean hasProblematicPropertyUsage(String groupId, String artifactId, ExecutionContext ctx) {
+                MavenResolutionResult result = getResolutionResult();
+                final ResolvedPom resolvedPom = result.getPom();
+                Pom requestedPom = resolvedPom.getRequested();
+                GroupArtifactVersion relevantGavUsingProperty = requestedPom.getDependencyManagement().stream()
+                        .filter(md -> isProperty(md.getVersion()) &&
+                                groupId.equals(resolvedPom.getValue(md.getGroupId())) &&
+                                artifactId.equals(resolvedPom.getValue(md.getArtifactId())))
+                        .map(md -> new GroupArtifactVersion(md.getGroupId(), md.getArtifactId(), md.getVersion()))
+                        .findFirst()
+                        .orElse(null);
+                // We already proved it was a property placeholder
+                String relevantProperty = relevantGavUsingProperty == null ? null : requireNonNull(relevantGavUsingProperty.getVersion());
+                if (relevantProperty == null) {
+                    return false;
+                }
+                if (hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, requestedPom, resolvedPom)) {
+                    return true;
+                }
+                MavenPomDownloader downloader = new MavenPomDownloader(getResolutionResult().getProjectPoms(), ctx);
+                MavenResolutionResult current = result;
+                while (current.parentPomIsProjectPom()) {
+                    current = requireNonNull(current.getParent());
+                    ResolvedPom currentResolved = current.getPom();
+                    Pom currentRequested = currentResolved.getRequested();
+                    if (hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, currentRequested, currentResolved)) {
+                        return true;
+                    }
+                }
+                ResolvedPom relevantContextPom = current.getPom();
+                Parent remoteParent = relevantContextPom.getRequested().getParent();
+                List<MavenRepository> relevantRepositories = relevantContextPom.getRepositories();
+                while (remoteParent != null) {
+                    try {
+                        Pom downloadedParent = downloader.download(remoteParent.getGav(), null, relevantContextPom, relevantRepositories);
+                        if (downloadedParent.getProperties().containsKey(relevantProperty.substring(2,  relevantProperty.length() - 1))) {
+                            return true;
+                        }
+                        if (hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, downloadedParent, null)) {
+                            return true;
+                        }
+                        // TODO: keep traversing upwards
+                        remoteParent = null;
+                    } catch (MavenDownloadingException e) {
+                        // Give up
+                        return false;
+                    }
+                }
+                // TODO: traverse downwards to find inheritance of our relevant property
+                return false;
             }
 
             private boolean compareVersions(@Nullable String targetVersion, @Nullable String foundVersion) {
