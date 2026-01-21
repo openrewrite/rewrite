@@ -18,16 +18,18 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.semver.DependencyMatcher;
+
+import java.util.Optional;
 
 import static org.openrewrite.marker.Markup.info;
 
@@ -54,22 +56,27 @@ public class AddExplicitDependencyVersion extends JavaIsoVisitor<ExecutionContex
     @NonFinal
     GradleProject gp;
 
+
     @Override
-    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+    public @Nullable J preVisit(@NonNull J tree, ExecutionContext ctx) {
         if (tree instanceof SourceFile) {
-            tree.getMarkers().findFirst(GradleProject.class).ifPresent(gradleProject -> gp = gradleProject);
+            Optional<GradleProject> gradleProject = tree.getMarkers().findFirst(GradleProject.class);
+            if (gradleProject.isPresent()) {
+                gp = gradleProject.get();
+            } else {
+                stopAfterPreVisit();
+            }
         }
-        return super.visit(tree, ctx);
+        return super.preVisit(tree, ctx);
     }
 
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-
         // Can't do anything without GradleProject
         if (gp == null) {
-            return m;
+            return method;
         }
+        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
         // Use the GradleDependency trait to match dependencies
         return new GradleDependency.Matcher()
