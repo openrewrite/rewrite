@@ -36,6 +36,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -86,7 +87,10 @@ public class RewriteRpcProcess extends Thread {
             if (workingDirectory != null) {
                 pb.directory(workingDirectory.toFile());
             }
+            System.out.println("89>> Starting " + Arrays.toString(command));
             process = pb.start();
+            System.out.println("92>> Started");
+            System.out.println("Liveness check " + getLivenessCheck());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -97,13 +101,14 @@ public class RewriteRpcProcess extends Thread {
             int exitCode = process.exitValue();
             String errorOutput = "", stdOutput = "";
 
+            System.out.println("100>> TRY TO READ STREAMS");
             // Read any remaining output from the process
             try (InputStream errorStream = process.getErrorStream();
                  InputStream inputStream = process.getInputStream()) {
                 errorOutput = readFully(errorStream);
                 stdOutput = readFully(inputStream);
             } catch (IOException | UnsupportedOperationException e) {
-                throw new RuntimeException("106", e);
+                System.out.println("107>>  " + e.getMessage());
             }
 
             String message = "Java!Script RPC process shut down early with exit code " + exitCode;
@@ -143,6 +148,7 @@ public class RewriteRpcProcess extends Thread {
     }
 
     public void shutdown() {
+        System.out.println("147>> Shutting down");
         if (process != null && process.isAlive()) {
             process.destroy();
             try {
