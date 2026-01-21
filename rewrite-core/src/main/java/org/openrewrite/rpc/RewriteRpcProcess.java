@@ -97,11 +97,8 @@ public class RewriteRpcProcess extends Thread {
             int exitCode = process.exitValue();
             String errorOutput = "", stdOutput = "";
 
-            // Read any remaining output from the process
-            try (InputStream errorStream = process.getErrorStream();
-                 InputStream inputStream = process.getInputStream()) {
+            try (InputStream errorStream = process.getErrorStream()) {
                 errorOutput = readFully(errorStream);
-                stdOutput = readFully(inputStream);
             } catch (IOException | UnsupportedOperationException e) {
                 // Ignore errors reading final output
             }
