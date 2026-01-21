@@ -38,7 +38,8 @@ jobs:
           develocity-access-key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
 
       - name: Test rewrite-rpc directly
-        run: timeout 30 npx --package=@openrewrite/rewrite@0.1.0-20260121-105540 rewrite-rpc || echo "Exit code: $?"
+        run: |
+          timeout 30 npx --package='@openrewrite/rewrite@0.1.0-20260121-105540' rewrite-rpc || echo "Exit code: $?"
 
       - name: Run JavaScript integration tests
         run: ./gradlew :rewrite-javascript:integTest --tests "org.openrewrite.javascript.JavaScriptParserTest" --no-daemon --stacktrace --console=plain --info
