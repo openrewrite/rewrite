@@ -103,10 +103,10 @@ public class RewriteRpcProcess extends Thread {
                 errorOutput = readFully(errorStream);
                 stdOutput = readFully(inputStream);
             } catch (IOException | UnsupportedOperationException e) {
-                // Ignore errors reading final output
+                throw new RuntimeException("106", e);
             }
 
-            String message = "JavaScript RPC process shut down early with exit code " + exitCode;
+            String message = "Java!Script RPC process shut down early with exit code " + exitCode;
             if (!stdOutput.isEmpty()) {
                 message += "\nStandard output:\n  " + stdOutput.replace("\n", "\n  ");
             }
