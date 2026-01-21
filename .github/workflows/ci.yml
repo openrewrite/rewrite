@@ -40,6 +40,6 @@ jobs:
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
 
       - name: Run JavaScript integration tests
-        run: ./gradlew :rewrite-javascript:integTest --no-daemon --stacktrace
+        run: ./gradlew :rewrite-javascript:integTest --no-daemon --stacktrace --console=plain --info
         env:
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
