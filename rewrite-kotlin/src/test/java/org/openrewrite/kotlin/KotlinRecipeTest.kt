@@ -22,35 +22,49 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.Option
 import org.openrewrite.Recipe
 import org.openrewrite.TreeVisitor
-import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.SourceSpecs.text
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
 
-
-class KotlinFromDeclarativeRecipeTest : RewriteTest {
-    override fun defaults(spec: RecipeSpec) {
-        spec.recipeFromYaml(
-            """
-            type: specs.openrewrite.org/v1beta/recipe
-            name: org.openrewrite.kotlin.KotlinReplaceAllRecipeWrapper
-            displayName: Kotlin Replace All Wrapper
-            description: Tests a simple Kotlin recipe that replaces all text with the provided option.
-            recipeList:
-              - org.openrewrite.kotlin.KotlinReplaceAllRecipeJackson:
-                  replacementText: "REPLACED_WITH_JACKSON"
-              - org.openrewrite.kotlin.KotlinReplaceAllRecipe:
-                  replacementText: "REPLACED_WITH_KOTLIN"
-            """, "org.openrewrite.kotlin.KotlinReplaceAllRecipeWrapper"
-        )
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
-    }
+class KotlinRecipeTest : RewriteTest {
 
     @Test
     fun `replaces all text with provided replacement argument text`() =
-        rewriteRun(text("Some Text", "REPLACED_WITH_KOTLIN"))
+        rewriteRun(
+            { spec ->
+                spec.cycles(1)
+                    .expectedCyclesThatMakeChanges(1)
+                    .recipeFromYaml(
+                    """
+                    type: specs.openrewrite.org/v1beta/recipe
+                    name: org.openrewrite.kotlin.KotlinReplaceAllRecipeWrapper
+                    displayName: Kotlin Replace All Wrapper
+                    description: Tests a simple Kotlin recipe that replaces all text with the provided option.
+                    recipeList:
+                      - org.openrewrite.kotlin.KotlinReplaceAllRecipeJackson:
+                          replacementText: "REPLACED_WITH_JACKSON"
+                      - org.openrewrite.kotlin.KotlinReplaceAllRecipe:
+                          replacementText: "REPLACED_WITH_KOTLIN"
+                    """,
+                    "org.openrewrite.kotlin.KotlinReplaceAllRecipeWrapper"
+                )
+            },
+            text("Some Text", "REPLACED_WITH_KOTLIN")
+        )
+
+    /**
+     * This test directly uses a Kotlin recipe with required options (without the declarative wrapper).
+     * Before the fix in RewriteTest.java, this test would fail because Jackson's Kotlin module
+     * enforces non-nullability when trying to instantiate with null arguments via RecipeLoader.
+     * Now the RecipeLoader null-instantiation validation is skipped for Kotlin recipes with required options.
+     */
+    @Test
+    fun `directly uses kotlin recipe with required options`() =
+        rewriteRun(
+            { spec -> spec.recipe(KotlinReplaceAllRecipe("DIRECT_REPLACEMENT")) },
+            text("Some Text", "DIRECT_REPLACEMENT")
+        )
 }
 
 @Suppress("unused")
