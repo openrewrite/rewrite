@@ -46,4 +46,4 @@ jobs:
 
       - name: Print RPC output log
         if: always()
-        run: cat /tmp/output136.log || echo "Log file not found"
+        run: cat /tmp/output*.log || echo "Log file not found"

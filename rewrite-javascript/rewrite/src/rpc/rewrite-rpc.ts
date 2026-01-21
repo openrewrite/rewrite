@@ -72,6 +72,7 @@ export class RewriteRpc {
                     metricsCsv?: string,
                     recipeInstallDir?: string
                 }) {
+        require("fs").appendFileSync("/tmp/output436.log", "{{75 RewriteRPC init}}\n");
         // Initialize metrics CSV file if configured
         initializeMetricsCsv(options.metricsCsv, options.logger);
         this.logger = options.logger;

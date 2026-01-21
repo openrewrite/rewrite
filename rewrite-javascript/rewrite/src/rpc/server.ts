@@ -43,6 +43,7 @@ interface ProgramOptions {
 async function main() {
     const program = new Command();
     process.stderr.write("{{{{ HELLO FROM JS\n");
+    require("fs").appendFileSync("/tmp/output436.log", "Hello from JS\n");
     program
         .option('--port <number>', 'port number')
         .option('--log-file <log_path>', 'log file path')
