@@ -97,13 +97,17 @@ public class RewriteRpcProcess extends Thread {
             int exitCode = process.exitValue();
             String errorOutput = "", stdOutput = "";
 
-            // Read any remaining output from the process
-            try (InputStream errorStream = process.getErrorStream();
-                 InputStream inputStream = process.getInputStream()) {
+            try (InputStream errorStream = process.getErrorStream()) {
                 errorOutput = readFully(errorStream);
+            } catch (IOException | UnsupportedOperationException e) {
+                errorOutput = "Error reading stderr of the RPC process: " + e.getMessage();
+            }
+
+            // Read any remaining output from the process
+            try (InputStream inputStream = process.getInputStream()) {
                 stdOutput = readFully(inputStream);
             } catch (IOException | UnsupportedOperationException e) {
-                // Ignore errors reading final output
+                // This is likely to be "stream is closed" which doesn't add much value
             }
 
             String message = "JavaScript RPC process shut down early with exit code " + exitCode;
