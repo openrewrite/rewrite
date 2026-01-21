@@ -11,26 +11,31 @@ on:
     branches:
       - main
   workflow_dispatch: {}
-  schedule:
-    - cron: 0 16 * * *
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
-    uses: openrewrite/gh-automation/.github/workflows/ci-gradle.yml@main
-    with:
-      java_version: |
-        25
-        21
-    secrets:
-      gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-      sonatype_username: ${{ secrets.SONATYPE_USERNAME }}
-      sonatype_token: ${{ secrets.SONATYPE_TOKEN}}
-      ossrh_signing_key: ${{ secrets.OSSRH_SIGNING_KEY }}
-      ossrh_signing_password: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
-      OPS_GITHUB_ACTIONS_WEBHOOK: ${{ secrets.OPS_GITHUB_ACTIONS_WEBHOOK }}
-      node_auth_token: ${{ secrets.NPM_TOKEN }}
-      pypi_token: ${{ secrets.PYPI_OPENREWRITE_PUBLISH }}
+  javascript-integ-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: rewrite-javascript/rewrite/package-lock.json
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run JavaScript integration tests
+        run: ./gradlew :rewrite-javascript:integTest --no-daemon --stacktrace
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
