@@ -291,17 +291,6 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return getCursor().getValue() instanceof Xml.Tag && name.equals(getCursor().<Xml.Tag>getValue().getName());
     }
 
-    protected Xml.Tag changeChildTagValueInlineOnly(Xml.Tag tag, String childTagName, @Nullable String newValue, P p) {
-        Optional<Xml.Tag> childTag = tag.getChild(childTagName);
-        if (childTag.isPresent()) {
-            String oldValue = childTag.get().getValue().orElse(null);
-            if (newValue != null && !newValue.equals(oldValue)) {
-                tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, p);
-            }
-        }
-        return tag;
-    }
-
     protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, P p) {
         return changeChildTagValue(tag, childTagName, newValue, false, p);
     }

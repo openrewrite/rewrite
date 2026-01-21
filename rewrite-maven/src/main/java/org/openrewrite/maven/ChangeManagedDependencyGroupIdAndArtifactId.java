@@ -26,6 +26,7 @@ import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -136,11 +137,13 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 if (isManagedDependencyTag(oldGroupId, oldArtifactId)) {
-                    if (t.getChild("groupId").isPresent()) {
-                        t = changeChildTagValueInlineOnly(t, "groupId", newGroupId, ctx);
+                    Optional<Xml.Tag> groupIdTag = t.getChild("groupId");
+                    if (groupIdTag.isPresent()) {
+                        t = (Xml.Tag) new ChangeTagValueVisitor<>(groupIdTag.get(), newGroupId).visitNonNull(t, ctx);
                     }
-                    if (t.getChild("artifactId").isPresent()) {
-                        t = changeChildTagValueInlineOnly(t, "artifactId", newArtifactId, ctx);
+                    Optional<Xml.Tag> artifactIdTag = t.getChild("artifactId");
+                    if (artifactIdTag.isPresent()) {
+                        t = (Xml.Tag) new ChangeTagValueVisitor<>(artifactIdTag.get(), newArtifactId).visitNonNull(t, ctx);
                     }
                     if (newVersion != null) {
                         try {
@@ -153,7 +156,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                     resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(newArtifactId, properties::get);
                                 }
                                 String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, resolvedArtifactId, getResolutionResult().getPom().getValue(versionTag.get().getValue().orElse(null)));
-                                t = changeChildTagValueInlineOnly(t, "version", resolvedNewVersion, ctx);
+                                t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
                             }
                         } catch (MavenDownloadingException e) {
                             return e.warn(t);

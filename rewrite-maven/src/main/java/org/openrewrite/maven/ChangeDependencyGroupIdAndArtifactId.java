@@ -25,6 +25,7 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
+import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -174,13 +175,19 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 if (isOldDependencyTag || isPluginDependency || isAnnotationProcessorPath) {
                     String groupId = newGroupId;
                     if (groupId != null) {
-                        t = changeChildTagValueInlineOnly(t, "groupId", groupId, ctx);
+                        Optional<Xml.Tag> groupIdTag = t.getChild("groupId");
+                        if (groupIdTag.isPresent()) {
+                            t = (Xml.Tag) new ChangeTagValueVisitor<>(groupIdTag.get(), groupId).visitNonNull(t, ctx);
+                        }
                     } else {
                         groupId = t.getChildValue("groupId").orElseThrow(NoSuchElementException::new);
                     }
                     String artifactId = newArtifactId;
                     if (artifactId != null) {
-                        t = changeChildTagValueInlineOnly(t, "artifactId", artifactId, ctx);
+                        Optional<Xml.Tag> artifactIdTag = t.getChild("artifactId");
+                        if (artifactIdTag.isPresent()) {
+                            t = (Xml.Tag) new ChangeTagValueVisitor<>(artifactIdTag.get(), artifactId).visitNonNull(t, ctx);
+                        }
                     } else {
                         artifactId = t.getChildValue("artifactId").orElseThrow(NoSuchElementException::new);
                     }
@@ -206,7 +213,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                                     t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false, true).visit(t, ctx);
                                 } else {
                                     // Otherwise, change the version to the new value.
-                                    t = changeChildTagValueInlineOnly(t, "version", resolvedNewVersion, ctx);
+                                    t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
                                 }
                             } else if (configuredToOverrideManagedVersion || (!newDependencyManaged && !(oldDependencyDefinedManaged && configuredToChangeManagedDependency))) {
                                 // If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
