@@ -29,10 +29,7 @@ import org.openrewrite.rpc.RewriteRpcProcessManager;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -390,8 +387,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
-                        .log(System.out);
-            } catch (Exception e) {
+                        .log(new PrintStream(new FileOutputStream("/tmp/output108.log", true)));
+            } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
