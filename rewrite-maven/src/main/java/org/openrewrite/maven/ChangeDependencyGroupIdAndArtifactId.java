@@ -175,19 +175,13 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 if (isOldDependencyTag || isPluginDependency || isAnnotationProcessorPath) {
                     String groupId = newGroupId;
                     if (groupId != null) {
-                        Optional<Xml.Tag> groupIdTag = t.getChild("groupId");
-                        if (groupIdTag.isPresent()) {
-                            t = (Xml.Tag) new ChangeTagValueVisitor<>(groupIdTag.get(), groupId).visitNonNull(t, ctx);
-                        }
+                        t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("groupId").orElse(null), groupId).visitNonNull(t, ctx);
                     } else {
                         groupId = t.getChildValue("groupId").orElseThrow(NoSuchElementException::new);
                     }
                     String artifactId = newArtifactId;
                     if (artifactId != null) {
-                        Optional<Xml.Tag> artifactIdTag = t.getChild("artifactId");
-                        if (artifactIdTag.isPresent()) {
-                            t = (Xml.Tag) new ChangeTagValueVisitor<>(artifactIdTag.get(), artifactId).visitNonNull(t, ctx);
-                        }
+                        t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").orElse(null), artifactId).visitNonNull(t, ctx);
                     } else {
                         artifactId = t.getChildValue("artifactId").orElseThrow(NoSuchElementException::new);
                     }

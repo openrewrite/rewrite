@@ -137,14 +137,8 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 if (isManagedDependencyTag(oldGroupId, oldArtifactId)) {
-                    Optional<Xml.Tag> groupIdTag = t.getChild("groupId");
-                    if (groupIdTag.isPresent()) {
-                        t = (Xml.Tag) new ChangeTagValueVisitor<>(groupIdTag.get(), newGroupId).visitNonNull(t, ctx);
-                    }
-                    Optional<Xml.Tag> artifactIdTag = t.getChild("artifactId");
-                    if (artifactIdTag.isPresent()) {
-                        t = (Xml.Tag) new ChangeTagValueVisitor<>(artifactIdTag.get(), newArtifactId).visitNonNull(t, ctx);
-                    }
+                    t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("groupId").orElse(null), newGroupId).visitNonNull(t, ctx);
+                    t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").orElse(null), newArtifactId).visitNonNull(t, ctx);
                     if (newVersion != null) {
                         try {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
