@@ -386,9 +386,9 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
-                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
+                        .log(System.out);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
         }
     }
