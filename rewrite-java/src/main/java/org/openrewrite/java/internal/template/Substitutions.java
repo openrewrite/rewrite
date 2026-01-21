@@ -298,7 +298,22 @@ public class Substitutions {
                 } else if (param != null) {
                     return param;
                 }
-                return super.visitMethodInvocation(method, integer);
+
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, integer);
+                return maybeExpandVarargsNewArray(m);
+            }
+
+            private J.MethodInvocation maybeExpandVarargsNewArray(J.MethodInvocation method) {
+                return method.withArguments(ListUtils.flatMap(method.getArguments(), arg -> {
+                    if (arg instanceof J.NewArray) {
+                        J.NewArray newArray = (J.NewArray) arg;
+                        // Varargs-captured arrays have no type expression and no dimensions
+                        if (newArray.getTypeExpression() == null && newArray.getDimensions().isEmpty()) {
+                            return ListUtils.mapFirst(newArray.getInitializer(), e -> e.withPrefix(newArray.getPrefix()));
+                        }
+                    }
+                    return arg;
+                }));
             }
 
             @Override

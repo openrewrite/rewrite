@@ -50,7 +50,7 @@ class Tree(ABC):
         return cursor.first_enclosing_or_throw(SourceFile).printer(cursor)
 
     def is_scope(self, tree: Optional[Tree]) -> bool:
-        return tree and tree.id == self.id
+        return tree is not None and tree.id == self.id
 
     def __eq__(self, other: object) -> bool:
         if self.__class__ == other.__class__:
@@ -151,7 +151,7 @@ class Checksum:
 class PrintOutputCapture(Generic[P]):
     @dataclass
     class MarkerPrinter(ABC):
-        DEFAULT: ClassVar['PrintOutputCapture.MarkerPrinter'] = None  # type: ignore
+        DEFAULT: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load (line 201)
 
         def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
             return ""
@@ -164,8 +164,8 @@ class PrintOutputCapture(Generic[P]):
 
     def __init__(self, p: P, marker_printer: Optional['PrintOutputCapture.MarkerPrinter'] = None):
         self._context = p
-        self._marker_printer = marker_printer or PrintOutputCapture.MarkerPrinter.DEFAULT
-        self._out = []
+        self._marker_printer: PrintOutputCapture.MarkerPrinter = marker_printer or PrintOutputCapture.MarkerPrinter.DEFAULT
+        self._out: list[str] = []
 
     def get_out(self) -> str:
         return ''.join(self._out)

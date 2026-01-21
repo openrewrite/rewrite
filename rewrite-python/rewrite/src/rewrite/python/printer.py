@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, List, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Callable, List, Optional, TypeVar, Union, cast
 
 from rewrite import Cursor, Marker, Markers, Tree
 from rewrite.java import (
@@ -28,7 +28,6 @@ from rewrite.java import (
     JRightPadded,
     JLeftPadded,
     JContainer,
-    Expression,
     Statement,
     Loop,
 )
@@ -371,7 +370,6 @@ class PythonPrinter:
 
     def visit_compilation_unit(self, cu: 'py.CompilationUnit', p: PrintOutputCapture) -> J:
         """Visit a Python compilation unit."""
-        from rewrite.java.tree import Import
         # Output UTF-8 BOM if the original file had one
         if cu.charset_bom_marked:
             p.append('\ufeff')
@@ -521,7 +519,7 @@ class PythonPrinter:
         self._before_syntax(clause, p)
         if clause.async_:
             p.append("async")
-            self._visit_space(clause.padding.async_.after, p)
+            self._visit_space(clause.padding.async_.after, p)  # ty: ignore[possibly-missing-attribute]  # guarded by if clause.async_
         p.append("for")
         self.visit(clause.iterator_variable, p)
         self._visit_space(clause.padding.iterated_list.before, p)
@@ -1187,7 +1185,7 @@ class PythonJavaPrinter:
             isinstance(parent_value, py.CompilationUnit) or
             (isinstance(parent_value, j.If) and parent_value.then_part == assignment) or
             (isinstance(parent_value, j.If.Else) and parent_value.body == assignment) or
-            (isinstance(parent_value, Loop) and parent_value.body == assignment)
+            (isinstance(parent_value, Loop) and parent_value.body == assignment)  # ty: ignore[unresolved-attribute]  # Loop base class doesn't have body
         )
 
         symbol = "=" if is_regular_assignment else ":="
@@ -1300,8 +1298,6 @@ class PythonJavaPrinter:
 
     def visit_catch(self, catch: 'j.Try.Catch', p: PrintOutputCapture) -> J:
         """Visit a catch clause (except in Python)."""
-        from rewrite.java import tree as j
-
         self._before_syntax(catch, p)
         p.append("except")
 
@@ -1756,13 +1752,14 @@ class PythonJavaPrinter:
 
     def visit_variable(self, variable: 'j.VariableDeclarations.NamedVariable', p: PrintOutputCapture) -> J:
         """Visit a named variable."""
+        from rewrite.java import tree as j
         from rewrite.python import tree as py
 
         self._before_syntax(variable, p)
 
         parent_cursor = self.get_cursor().parent
-        vd = parent_cursor.parent.value if parent_cursor and parent_cursor.parent else None
-        padding = parent_cursor.value if parent_cursor else None
+        vd = cast(j.VariableDeclarations, parent_cursor.parent.value) if parent_cursor and parent_cursor.parent else None
+        padding = cast(j.JRightPadded, parent_cursor.value) if parent_cursor else None
 
         type_expr = vd.type_expression if vd else None
 

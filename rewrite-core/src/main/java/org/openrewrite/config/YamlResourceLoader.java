@@ -24,8 +24,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ObjectMappers;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.RecipeLoader;
-import org.openrewrite.marketplace.RecipeListing;
-import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -86,34 +84,6 @@ public class YamlResourceLoader implements ResourceLoader {
                     .filter(type -> type.getSpec().equals(spec))
                     .findAny()
                     .orElse(null);
-        }
-    }
-
-    public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties, RecipeMarketplace marketplace) {
-        this.source = source;
-        this.dependencyResourceLoaders = emptyList();
-        this.mapper = ObjectMappers.propertyBasedMapper(getClass().getClassLoader());
-        this.recipeLoader = (recipeName, options) -> {
-            RecipeListing listing = marketplace.findRecipe(recipeName);
-            if (listing == null) {
-                throw new IllegalStateException("Unable to find recipe " + recipeName + " listed in " + source);
-            }
-            return listing.prepare(options == null ? emptyMap() : options);
-        };
-
-        maybeAddKotlinModule(mapper);
-
-        try {
-            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            int nRead;
-            byte[] data = new byte[8192];
-            while ((nRead = yamlInput.read(data, 0, data.length)) != -1) {
-                buffer.write(data, 0, nRead);
-            }
-            this.yamlSource = propertyPlaceholderHelper.replacePlaceholders(
-                    new String(buffer.toByteArray(), StandardCharsets.UTF_8), properties);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
         }
     }
 

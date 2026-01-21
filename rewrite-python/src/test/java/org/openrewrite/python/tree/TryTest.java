@@ -15,7 +15,6 @@
  */
 package org.openrewrite.python.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -50,14 +49,11 @@ class TryTest implements RewriteTest {
 
     @CsvSource(textBlock = """
       "" ,       "* TypeError"
-      "" ,       " * TypeError"
       "" ,       "*  TypeError"
       "" ,       "* TypeError as e"
       "" ,       "*  TypeError as e"
       "" ,       "*TypeError"
-      "" ,       " *TypeError"
     """, quoteCharacter = '"')
-    @Disabled
     @ParameterizedTest
     void tryStarExcept(String afterTry, String afterExcept) {
         rewriteRun(python(

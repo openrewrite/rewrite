@@ -310,6 +310,8 @@ def handle_get_object(params: dict) -> List[dict]:
     """
     obj_id = params.get('id')
     source_file_type = params.get('sourceFileType')
+    if obj_id is None:
+        return [{'state': 'DELETE'}, {'state': 'END_OF_OBJECT'}]
     obj = local_objects.get(obj_id)
     logger.info(f"handle_get_object: id={obj_id}, type={type(obj).__name__ if obj else 'None'}")
 
@@ -375,6 +377,10 @@ def handle_print(params: dict) -> str:
     source_file_type = params.get('sourceFileType')
 
     logger.info(f"handle_print: treeId={obj_id}, sourceFileType={source_file_type}")
+
+    if obj_id is None:
+        logger.warning("No treeId or id provided")
+        return ""
 
     # Fetch the object from Java to get the latest version (including recipe modifications)
     obj = get_object_from_java(obj_id, source_file_type)
@@ -1014,6 +1020,10 @@ def main():
             request_id = message.get('id')
             method = message.get('method')
             params = message.get('params', {})
+
+            if method is None:
+                logger.error("Missing 'method' in request")
+                continue
 
             try:
                 result = handle_request(method, params)
