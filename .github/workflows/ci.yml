@@ -37,6 +37,9 @@ jobs:
         with:
           develocity-access-key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
 
+      - name: Install strace
+        run: sudo apt update && sudo apt install -y strace
+
       - name: Test rewrite-rpc directly
         working-directory: rewrite-javascript/rewrite
         run: |

@@ -343,6 +343,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
                 System.out.println("347>>> |" + version+"|");
                 cmd = Stream.of(
+                        "strace",
                         npxPath.toString(),
                         // For SNAPSHOT versions, assume npm link has been run and don't use --package
                         version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
