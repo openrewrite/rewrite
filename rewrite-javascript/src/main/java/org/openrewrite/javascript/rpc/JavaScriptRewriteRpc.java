@@ -324,6 +324,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         public JavaScriptRewriteRpc get() {
             Stream<@Nullable String> cmd;
 
+            log = Paths.get("/tmp/output136.log");
+
             if (inspectBrk != null) {
                 Path serverJs = requireNonNull(inspectBrkRewriteSourcePath).resolve("dist/rpc/server.js");
 

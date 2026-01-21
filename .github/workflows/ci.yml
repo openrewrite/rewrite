@@ -43,3 +43,7 @@ jobs:
 
       - name: Run JavaScript integration tests
         run: ./gradlew :rewrite-javascript:integTest --tests "org.openrewrite.javascript.JavaScriptParserTest" --no-daemon --stacktrace --console=plain --info
+
+      - name: Print RPC output log
+        if: always()
+        run: cat /tmp/output136.log || echo "Log file not found"
