@@ -344,6 +344,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 System.out.println("347>>> |" + version+"|");
                 cmd = Stream.of(
                         "strace",
+                        "-o", "/tmp/output107.log", "-f",
                         npxPath.toString(),
                         // For SNAPSHOT versions, assume npm link has been run and don't use --package
                         version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
