@@ -31,6 +31,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -88,6 +89,7 @@ public class RewriteRpcProcess extends Thread {
                 pb.directory(workingDirectory.toFile());
             }
             System.out.println("89>> Starting " + Arrays.toString(command));
+            pb.redirectError(new File("/tmp/output189.log"));
             process = pb.start();
             System.out.println("92>> Started");
             System.out.println("93>> Liveness check " + getLivenessCheck());
