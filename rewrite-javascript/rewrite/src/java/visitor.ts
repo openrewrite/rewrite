@@ -1231,17 +1231,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     public async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: P): Promise<J.RightPadded<T> | undefined> {
         this.cursor = new Cursor(right, this.cursor);
 
-        // Check if this is a tree node (intersection type) or primitive wrapper
+        // Check if this is a primitive wrapper (has 'element' property) or intersection type (tree node)
         const hasElement = 'element' in right;
-        let visitedElement: T | undefined;
-
-        if (hasElement) {
-            // Primitive wrapper - just pass through the element
-            visitedElement = (right as { element: boolean }).element as T;
-        } else {
-            // Tree node - the padded value IS the element, visit it
-            visitedElement = await this.visitDefined(right as J, p) as T | undefined;
-        }
+        const visitedElement: T | undefined = hasElement
+            ? (right as { element: boolean }).element as T
+            : await this.visitDefined(right as J, p) as T | undefined;
 
         // Handle missing padding (can happen with template-generated trees)
         const after = await this.visitSpace(right.padding?.after ?? emptySpace, p);
@@ -1252,17 +1246,16 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             return undefined;
         }
 
-        const padding: J.Suffix = { after, markers: paddingMarkers };
+        // Build padding, preserving identity if unchanged
+        const beforePadding = right.padding;
+        const paddingUnchanged = after === beforePadding?.after && paddingMarkers === beforePadding?.markers;
+        const padding: J.Suffix = paddingUnchanged ? beforePadding! : { after, markers: paddingMarkers };
+
         if (hasElement) {
-            // Primitive wrapper - update wrapper fields
             return updateIfChanged(right, { element: visitedElement, padding } as any);
-        } else {
-            // Tree node - merge visited element with padding
-            return {
-                ...visitedElement as object,
-                padding
-            } as J.RightPadded<T>;
         }
+        // Tree node - merge visited element with padding using updateIfChanged
+        return updateIfChanged(visitedElement as J & { padding: J.Suffix }, { padding }) as J.RightPadded<T>;
     }
 
     protected async visitOptionalLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T> | undefined, p: P): Promise<J.LeftPadded<T> | undefined> {
@@ -1294,13 +1287,10 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         let visitedElement: T | undefined;
 
         if (hasElement) {
-            // Primitive wrapper (boolean, number, string) - pass through the element
             visitedElement = (left as unknown as { element: T }).element;
         } else if (isSpace(left)) {
-            // Space - visit with visitSpace (Space uses intersection, not wrapper)
             visitedElement = await this.visitSpace(left as J.Space, p) as T;
         } else {
-            // Tree node (J) - the padded value IS the element, visit it
             visitedElement = await this.visitDefined(left as J, p) as T | undefined;
         }
 
@@ -1311,17 +1301,16 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             return undefined;
         }
 
-        const padding: J.Prefix = { before, markers: paddingMarkers };
+        // Build padding, preserving identity if unchanged
+        const beforePadding = left.padding;
+        const paddingUnchanged = before === beforePadding?.before && paddingMarkers === beforePadding?.markers;
+        const padding: J.Prefix = paddingUnchanged ? beforePadding! : { before, markers: paddingMarkers };
+
         if (hasElement) {
-            // Primitive wrapper - update wrapper fields
             return updateIfChanged(left, { element: visitedElement, padding } as any);
-        } else {
-            // Tree node or Space - merge visited element with padding
-            return {
-                ...visitedElement as object,
-                padding
-            } as J.LeftPadded<T>;
         }
+        // Tree node or Space - merge visited element with padding using updateIfChanged
+        return updateIfChanged(visitedElement as (J | J.Space) & { padding: J.Prefix }, { padding }) as J.LeftPadded<T>;
     }
 
     protected async visitOptionalContainer<T extends J>(container: J.Container<T> | undefined, p: P): Promise<J.Container<T> | undefined> {
