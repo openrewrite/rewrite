@@ -42,6 +42,7 @@ interface ProgramOptions {
 
 async function main() {
     const program = new Command();
+    process.stdout.write("{{{{ HELLO FROM JS\n");
     program
         .option('--port <number>', 'port number')
         .option('--log-file <log_path>', 'log file path')
