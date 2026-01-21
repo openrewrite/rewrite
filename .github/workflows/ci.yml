@@ -34,6 +34,10 @@ jobs:
           cache-dependency-path: rewrite-javascript/rewrite/package-lock.json
 
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-home-cache-cleanup: true
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
 
       - name: Run JavaScript integration tests
         run: ./gradlew :rewrite-javascript:integTest --no-daemon --stacktrace
