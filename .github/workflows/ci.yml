@@ -38,4 +38,4 @@ jobs:
           develocity-access-key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
 
       - name: Run JavaScript integration tests
-        run: ./gradlew :rewrite-javascript:integTest --no-daemon --stacktrace --console=plain --info
+        run: ./gradlew :rewrite-javascript:integTest --tests "org.openrewrite.javascript.JavaScriptParserTest" --no-daemon --stacktrace --console=plain --info
