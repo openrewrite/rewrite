@@ -142,7 +142,9 @@ public class RewriteRpcProcess extends Thread {
         JsonMessageFormatter formatter = new JsonMessageFormatter(module);
         MessageHandler handler = new HeaderDelimitedMessageHandler(formatter,
                 process.getInputStream(), process.getOutputStream());
-        handler = new TraceMessageHandler("client", handler);
+        if (trace) {
+            handler = new TraceMessageHandler("client", handler);
+        }
         this.rpcClient = new JsonRpc(handler);
     }
 

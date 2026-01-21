@@ -96,7 +96,7 @@ async function main() {
         info: (msg: string) => log && log.write(`[js info] ${msg}\n`),
         // The RPC Tracer configured below itself writes to this "log" level for every message it sends or receives,
         // because the Tracer type has a log method on it that matches this signature.
-        log: (msg: string) => log && options.traceRpcMessages && log.write(`[js trace] ${msg}\n`)
+        log: (msg: string) => log && log.write(`[js trace] ${msg}\n`)
     };
 
     // Create the connection with the custom logger
@@ -106,14 +106,10 @@ async function main() {
         logger
     );
 
-    if (options.traceRpcMessages) {
-        await connection.trace(rpc.Trace.Verbose, logger).catch((err: Error) => {
-            // Handle any unexpected errors during trace configuration
-            logger.error(`Failed to set trace: ${err}`);
-        });
-    } else {
-        await connection.trace(rpc.Trace.Off, {} as rpc.Tracer);
-    }
+    await connection.trace(rpc.Trace.Verbose, logger).catch((err: Error) => {
+        // Handle any unexpected errors during trace configuration
+        logger.error(`Failed to set trace: ${err}`);
+    });
 
     connection.onError(err => {
         logger.error(`error: ${err}`);

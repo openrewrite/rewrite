@@ -347,6 +347,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         // For SNAPSHOT versions, assume npm link has been run and don't use --package
                         version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
                         "--loglevel", "verbose",
+                        "--trace-rpc-messages", "true",
                         "rewrite-rpc",
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
@@ -388,7 +389,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
                         .log(new PrintStream(new FileOutputStream("/tmp/output108.log", true)));
-            } catch (IOException e) {
+            } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         }
