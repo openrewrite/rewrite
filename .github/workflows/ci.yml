@@ -42,7 +42,7 @@ jobs:
         run: |
           npm ci
           npm run build
-          echo "A" | 30 npx rewrite-rpc
+          echo "A" | npx rewrite-rpc
 
       - name: Run JavaScript integration tests
         run: ./gradlew :rewrite-javascript:integTest --tests "org.openrewrite.javascript.JavaScriptParserTest" --no-daemon --stacktrace --console=plain --info
