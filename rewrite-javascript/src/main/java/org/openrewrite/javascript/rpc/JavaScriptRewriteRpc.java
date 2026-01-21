@@ -201,7 +201,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private @Nullable Path log;
         private @Nullable Path metricsCsv;
         private @Nullable Path recipeInstallDir;
-        private Duration timeout = Duration.ofSeconds(60);
+        private Duration timeout = Duration.ofSeconds(600);
         private boolean traceRpcMessages;
 
         private @Nullable Integer inspectBrk;
