@@ -488,6 +488,7 @@ public class RewriteRpc {
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
         checkLiveness();
+        System.out.println("491>> SEND " + body);
         try {
 
             // Send the request and get the future
