@@ -348,6 +348,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         npxPath.toString(),
                         // For SNAPSHOT versions, assume npm link has been run and don't use --package
                         version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
+                        "--loglevel verbose",
                         "rewrite-rpc",
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
