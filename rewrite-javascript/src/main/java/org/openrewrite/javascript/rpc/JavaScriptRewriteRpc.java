@@ -344,6 +344,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 );
             } else {
                 String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
+                System.out.println("347>>> |" + version+"|");
                 cmd = Stream.of(
                         npxPath.toString(),
                         // For SNAPSHOT versions, assume npm link has been run and don't use --package
