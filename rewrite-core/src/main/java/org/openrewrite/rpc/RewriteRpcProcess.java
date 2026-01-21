@@ -90,13 +90,14 @@ public class RewriteRpcProcess extends Thread {
             System.out.println("89>> Starting " + Arrays.toString(command));
             process = pb.start();
             System.out.println("92>> Started");
-            System.out.println("Liveness check " + getLivenessCheck());
+            System.out.println("93>> Liveness check " + getLivenessCheck());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
     public @Nullable RuntimeException getLivenessCheck() {
+        System.out.println("100>> LIVENESS CHECK " + process.isAlive());
         if (process != null && !process.isAlive()) {
             int exitCode = process.exitValue();
             String errorOutput = "", stdOutput = "";
