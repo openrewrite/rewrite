@@ -95,7 +95,7 @@ public class RewriteRpcProcess extends Thread {
     public @Nullable RuntimeException getLivenessCheck() {
         if (process != null && !process.isAlive()) {
             int exitCode = process.exitValue();
-            String errorOutput = "", stdOutput = "";
+            String errorOutput = "";
 
             try (InputStream errorStream = process.getErrorStream()) {
                 errorOutput = readFully(errorStream);
@@ -104,9 +104,6 @@ public class RewriteRpcProcess extends Thread {
             }
 
             String message = "JavaScript RPC process shut down early with exit code " + exitCode;
-            if (!stdOutput.isEmpty()) {
-                message += "\nStandard output:\n  " + stdOutput.replace("\n", "\n  ");
-            }
             if (!errorOutput.isEmpty()) {
                 message += "\nError output:\n  " + errorOutput.replace("\n", "\n  ");
             }
