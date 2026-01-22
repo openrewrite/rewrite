@@ -42,13 +42,19 @@ public class MavenPlugin implements Trait<Xml.Tag> {
 
         @Nullable
         Boolean isManaged;
+        @Nullable
+        String groupId;
+        @Nullable
+        String artifactId;
 
         public Matcher() {
-            this(null);
+            this(null,  null, null);
         }
 
-        public Matcher(@Nullable Boolean isManaged) {
+        public Matcher(@Nullable Boolean isManaged,  @Nullable String groupId, @Nullable String artifactId) {
             this.isManaged = isManaged;
+            this.groupId = groupId;
+            this.artifactId = artifactId;
         }
 
         @Override
@@ -65,11 +71,17 @@ public class MavenPlugin implements Trait<Xml.Tag> {
                     return null;
                 }
 
-                return new MavenPlugin(
-                        cursor,
-                        getProperty(cursor, "groupId").orElse("org.apache.maven.plugins"),
-                        getProperty(cursor, "artifactId").orElse(null)
-                );
+                String currentGroupId = getProperty(cursor, "groupId").orElse("org.apache.maven.plugins");
+                if (groupId != null && !groupId.equals(currentGroupId)) {
+                    return null;
+                }
+
+                String currentArtifactId = getProperty(cursor, "artifactId").orElse(null);
+                if (artifactId != null &&  currentArtifactId != null && !artifactId.equals(currentArtifactId)) {
+                    return null;
+                }
+
+                return new MavenPlugin(cursor, currentGroupId, currentArtifactId);
             }
             return null;
         }

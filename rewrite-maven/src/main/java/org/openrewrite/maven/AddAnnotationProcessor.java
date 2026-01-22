@@ -92,10 +92,7 @@ public class AddAnnotationProcessor extends Recipe {
                 @Override
                 public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                     Xml.Tag plugins = super.visitTag(tag, ctx);
-                    plugins = (Xml.Tag) new MavenPlugin.Matcher(addToManaged).asVisitor(plugin -> {
-                        if (!MAVEN_COMPILER_PLUGIN_GROUP_ID.equals(plugin.getGroupId()) || !MAVEN_COMPILER_PLUGIN_ARTIFACT_ID.equals(plugin.getArtifactId())) {
-                            return plugin.getTree();
-                        }
+                    plugins = (Xml.Tag)  new MavenPlugin.Matcher(addToManaged,MAVEN_COMPILER_PLUGIN_GROUP_ID, MAVEN_COMPILER_PLUGIN_ARTIFACT_ID).asVisitor(plugin -> {
 
                         MavenResolutionResult mrr = getResolutionResult();
                         AtomicReference<TreeVisitor<?, ExecutionContext>> afterVisitor = new AtomicReference<>();
