@@ -34,9 +34,11 @@ import java.util.*;
 
 import static java.util.Collections.max;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.required;
 import static org.openrewrite.Validated.test;
 import static org.openrewrite.internal.StringUtils.isBlank;
+import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -148,13 +150,15 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             private Collection<String> availableVersions;
             private boolean isNewDependencyPresent;
             private boolean hasProblematicVersionPlaceholder;
+            private final boolean oldGavPatternsUseGlob = oldGroupId.contains("*") ||  oldArtifactId.contains("*");
+            private final boolean configuredToOverrideManagedVersion = overrideManagedVersion != null && overrideManagedVersion; // False by default
+            private final boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency;  // True by default
 
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 isNewDependencyPresent = checkIfNewDependencyPresent(newGroupId, newArtifactId, newVersion);
                 hasProblematicVersionPlaceholder = hasProblematicPropertyUsage(oldGroupId, oldArtifactId, ctx);
-                if (!oldGroupId.contains("*") && !oldArtifactId.contains("*") &&
-                        (changeManagedDependency == null || changeManagedDependency)) {
+                if (!oldGavPatternsUseGlob && configuredToChangeManagedDependency) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
                             oldGroupId, oldArtifactId,
                             Optional.ofNullable(newGroupId).orElse(oldGroupId),
@@ -197,9 +201,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             Optional<Xml.Tag> scopeTag = t.getChild("scope");
                             Scope scope = scopeTag.map(xml -> Scope.fromName(xml.getValue().orElse("compile"))).orElse(Scope.Compile);
                             Optional<Xml.Tag> versionTag = t.getChild("version");
-
-                            boolean configuredToOverrideManagedVersion = overrideManagedVersion != null && overrideManagedVersion; // False by default
-                            boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency; // True by default
 
                             boolean versionTagPresent = versionTag.isPresent();
                             // dependencyManagement does not apply to plugin dependencies or annotation processor paths
@@ -288,7 +289,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 }
                 return requestedPom.getDependencies().stream()
                         .anyMatch(d -> relevantProperty.equals(d.getVersion()) &&
-                                (resolvedPom == null || !groupId.equals(resolvedPom.getValue(d.getGroupId())) || !artifactId.equals(resolvedPom.getValue(d.getArtifactId()))));
+                                (resolvedPom == null || !matchesGlob(resolvedPom.getValue(d.getGroupId()), groupId) || !matchesGlob(resolvedPom.getValue(d.getArtifactId()), artifactId)));
             }
 
             private boolean checkOverlapInChildren(String relevantProperty, String groupId, String artifactId, MavenResolutionResult result) {
@@ -304,18 +305,18 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 MavenResolutionResult result = getResolutionResult();
                 final ResolvedPom resolvedPom = result.getPom();
                 Pom requestedPom = resolvedPom.getRequested();
-                GroupArtifactVersion relevantGavUsingProperty = requestedPom.getDependencies().stream()
+                List<GroupArtifactVersion> relevantGavsUsingProperty = requestedPom.getDependencies().stream()
                         .filter(d -> isProperty(d.getVersion()) &&
-                                groupId.equals(resolvedPom.getValue(d.getGroupId())) &&
-                                artifactId.equals(resolvedPom.getValue(d.getArtifactId())))
+                                matchesGlob(resolvedPom.getValue(d.getGroupId()), groupId) &&
+                                matchesGlob(resolvedPom.getValue(d.getArtifactId()), artifactId))
                         .map(Dependency::getGav)
-                        .findFirst()
-                        .orElse(null);
-                // We already proved it was a placeholder
-                String relevantProperty = relevantGavUsingProperty == null ? null : requireNonNull(relevantGavUsingProperty.getVersion());
-                if (relevantProperty == null) {
+                        .collect(toList());
+                if (relevantGavsUsingProperty.isEmpty()) {
                     return false;
                 }
+                GroupArtifactVersion relevantGavUsingProperty = relevantGavsUsingProperty.get(0);
+                // We already proved it was a placeholder
+                String relevantProperty = requireNonNull(relevantGavUsingProperty.getVersion());
                 if (hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, requestedPom, resolvedPom)) {
                     return true;
                 }
