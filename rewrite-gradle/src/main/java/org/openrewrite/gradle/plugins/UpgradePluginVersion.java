@@ -25,6 +25,7 @@ import org.openrewrite.gradle.IsSettingsGradle;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
+import org.openrewrite.gradle.trait.GradlePlugin;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -155,7 +156,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     return m;
                 }
                 String pluginId;
-                if (((J.MethodInvocation) m.getSelect()).getSimpleName().equals("kotlin")) {
+                if ("kotlin".equals(((J.MethodInvocation) m.getSelect()).getSimpleName())) {
                     pluginId = "kotlin";
                 } else {
                     pluginId = literalValue(pluginArgs.get(0));
@@ -250,7 +251,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 assert m.getSelect() != null;
                 List<Expression> pluginArgs = ((J.MethodInvocation) m.getSelect()).getArguments();
                 String pluginId;
-                if (((J.MethodInvocation) m.getSelect()).getSimpleName().equals("kotlin")) {
+                if ("kotlin".equals(((J.MethodInvocation) m.getSelect()).getSimpleName())) {
                     pluginId = "kotlin";
                 } else {
                     pluginId = literalValue(pluginArgs.get(0));
