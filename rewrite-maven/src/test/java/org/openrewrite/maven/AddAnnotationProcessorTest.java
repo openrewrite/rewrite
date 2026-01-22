@@ -46,7 +46,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-
+              
                   <build>
                       <plugins>
                           <plugin>
@@ -74,7 +74,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-
+              
                   <build>
                       <plugins>
                           <plugin>
@@ -115,7 +115,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-
+              
                   <build>
                       <plugins>
                           <plugin>
@@ -149,7 +149,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-
+              
                   <build>
                       <plugins>
                           <plugin>
@@ -293,7 +293,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-app</artifactId>
                       <version>1</version>
-
+                  
                       <build>
                           <plugins>
                               <plugin>
@@ -317,7 +317,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-app</artifactId>
                       <version>1</version>
-
+                  
                       <build>
                           <plugins>
                               <plugin>
@@ -356,7 +356,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-app</artifactId>
                       <version>1</version>
-
+                  
                       <build>
                           <pluginManagement>
                               <plugins>
@@ -378,7 +378,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-app</artifactId>
                       <version>1</version>
-
+                  
                       <build>
                           <pluginManagement>
                               <plugins>
@@ -425,7 +425,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-app</artifactId>
                       <version>1</version>
-
+                  
                       <build>
                           <plugins>
                               <plugin>
@@ -441,7 +441,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-app</artifactId>
                       <version>1</version>
-
+                  
                       <build>
                           <plugins>
                               <plugin>
@@ -523,7 +523,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-app</artifactId>
                       <version>1</version>
-
+                  
                       <build>
                           <pluginManagement>
                               <plugins>
@@ -558,7 +558,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-app</artifactId>
                       <version>1</version>
-
+                  
                       <build>
                           <pluginManagement>
                               <plugins>
@@ -616,7 +616,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <modules>
                           <module>child</module>
                       </modules>
-
+                  
                       <build>
                           <pluginManagement>
                               <plugins>
@@ -646,7 +646,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <modules>
                           <module>child</module>
                       </modules>
-
+                  
                       <build>
                           <pluginManagement>
                               <plugins>
@@ -706,7 +706,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <modules>
                           <module>child</module>
                       </modules>
-
+                  
                       <build>
                           <plugins>
                               <plugin>
@@ -730,8 +730,17 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <modules>
                           <module>child</module>
                       </modules>
-
+                  
                       <build>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <source>17</source>
+                                      <target>17</target>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
                           <pluginManagement>
                               <plugins>
                                   <plugin>
@@ -749,15 +758,6 @@ class AddAnnotationProcessorTest implements RewriteTest {
                                   </plugin>
                               </plugins>
                           </pluginManagement>
-                          <plugins>
-                              <plugin>
-                                  <artifactId>maven-compiler-plugin</artifactId>
-                                  <configuration>
-                                      <source>17</source>
-                                      <target>17</target>
-                                  </configuration>
-                              </plugin>
-                          </plugins>
                       </build>
                   </project>
                   """
@@ -910,7 +910,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                             <version>1</version>
                         </parent>
                         <artifactId>child</artifactId>
-
+                    
                         <build>
                             <plugins>
                                 <plugin>
@@ -949,7 +949,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <modules>
                           <module>child</module>
                       </modules>
-
+                  
                       <build>
                           <pluginManagement>
                               <plugins>
@@ -986,7 +986,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <modules>
                           <module>child</module>
                       </modules>
-
+                  
                       <build>
                           <pluginManagement>
                               <plugins>
@@ -1053,7 +1053,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <modules>
                           <module>child</module>
                       </modules>
-
+                  
                       <build>
                           <pluginManagement>
                               <plugins>
@@ -1084,7 +1084,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       <modules>
                           <module>child</module>
                       </modules>
-
+                  
                       <build>
                           <pluginManagement>
                               <plugins>
