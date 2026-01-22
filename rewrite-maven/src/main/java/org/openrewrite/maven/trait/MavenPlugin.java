@@ -28,6 +28,8 @@ import java.util.Optional;
 @Value
 public class MavenPlugin implements Trait<Xml.Tag> {
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
+    static final XPathMatcher BUILD_PLUGIN_MATCHER = new XPathMatcher("//build/plugins/plugin");
+    static final XPathMatcher MANGED_PLUGIN_MATCHER = new XPathMatcher("//build/pluginManagement/plugins/plugin");
 
     Cursor cursor;
 
@@ -38,6 +40,17 @@ public class MavenPlugin implements Trait<Xml.Tag> {
 
     public static class Matcher extends MavenTraitMatcher<MavenPlugin> {
 
+        @Nullable
+        Boolean isManaged;
+
+        public Matcher() {
+            this(null);
+        }
+
+        public Matcher(@Nullable Boolean isManaged) {
+            this.isManaged = isManaged;
+        }
+
         @Override
         protected @Nullable MavenPlugin test(Cursor cursor) {
             Object value = cursor.getValue();
@@ -46,7 +59,9 @@ public class MavenPlugin implements Trait<Xml.Tag> {
 
                 // `XPathMatcher` is still a bit expensive
                 if (!"plugin".equals(tag.getName()) ||
-                    (!PLUGIN_MATCHER.matches(cursor))) {
+                        (isManaged == null && !PLUGIN_MATCHER.matches(cursor)) ||
+                        (Boolean.FALSE.equals(isManaged) && !BUILD_PLUGIN_MATCHER.matches(cursor)) ||
+                        (Boolean.TRUE.equals(isManaged) && !MANGED_PLUGIN_MATCHER.matches(cursor))) {
                     return null;
                 }
 

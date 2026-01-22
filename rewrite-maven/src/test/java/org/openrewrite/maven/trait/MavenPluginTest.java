@@ -71,7 +71,7 @@ class MavenPluginTest implements RewriteTest {
           )
         );
     }
-    @DocumentExample
+
     @Test
     void findManagedMavenPlugin() {
         rewriteRun(
@@ -109,6 +109,186 @@ class MavenPluginTest implements RewriteTest {
                               </plugin>
                           </plugins>
                       </pluginManagement>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void findAllPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new MavenPlugin.Matcher(null).asVisitor(plugin ->
+            SearchResult.found(plugin.getTree(), plugin.getGroupId() + ":" + plugin.getArtifactId())))),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>io.quarkus</groupId>
+                                  <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                                  <version>3.0.0.Beta1</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                              <version>3.0.0.Beta1</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <!--~~(io.quarkus:quarkus-bootstrap-maven-plugin)~~>--><plugin>
+                                  <groupId>io.quarkus</groupId>
+                                  <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                                  <version>3.0.0.Beta1</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <!--~~(io.quarkus:quarkus-bootstrap-maven-plugin)~~>--><plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                              <version>3.0.0.Beta1</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void findBuildPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new MavenPlugin.Matcher(false).asVisitor(plugin ->
+            SearchResult.found(plugin.getTree(), plugin.getGroupId() + ":" + plugin.getArtifactId())))),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>io.quarkus</groupId>
+                                  <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                                  <version>3.0.0.Beta1</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                              <version>3.0.0.Beta1</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>io.quarkus</groupId>
+                                  <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                                  <version>3.0.0.Beta1</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <!--~~(io.quarkus:quarkus-bootstrap-maven-plugin)~~>--><plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                              <version>3.0.0.Beta1</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void findManagedPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new MavenPlugin.Matcher(true).asVisitor(plugin ->
+            SearchResult.found(plugin.getTree(), plugin.getGroupId() + ":" + plugin.getArtifactId())))),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>io.quarkus</groupId>
+                                  <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                                  <version>3.0.0.Beta1</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                              <version>3.0.0.Beta1</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <!--~~(io.quarkus:quarkus-bootstrap-maven-plugin)~~>--><plugin>
+                                  <groupId>io.quarkus</groupId>
+                                  <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                                  <version>3.0.0.Beta1</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                              <version>3.0.0.Beta1</version>
+                          </plugin>
+                      </plugins>
                   </build>
               </project>
               """
