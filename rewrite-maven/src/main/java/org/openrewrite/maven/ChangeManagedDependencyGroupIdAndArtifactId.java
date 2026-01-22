@@ -199,6 +199,15 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                 (resolvedPom == null || !groupId.equals(resolvedPom.getValue(d.getGroupId())) || !artifactId.equals(resolvedPom.getValue(d.getArtifactId()))));
             }
 
+            private boolean checkOverlapInChildren(String relevantProperty, String groupId, String artifactId, MavenResolutionResult result) {
+                return result.getModules().stream().anyMatch(c -> {
+                    ResolvedPom childResolvedPom = c.getPom();
+                    Pom childRequestedPom = childResolvedPom.getRequested();
+                    return hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, childRequestedPom, childResolvedPom) &&
+                            !childRequestedPom.getProperties().containsKey(relevantProperty.substring(2, relevantProperty.length() - 1));
+                });
+            }
+
             private boolean hasProblematicPropertyUsage(String groupId, String artifactId, ExecutionContext ctx) {
                 MavenResolutionResult result = getResolutionResult();
                 final ResolvedPom resolvedPom = result.getPom();
@@ -218,36 +227,33 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 if (hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, requestedPom, resolvedPom)) {
                     return true;
                 }
-                MavenPomDownloader downloader = new MavenPomDownloader(result.getProjectPoms(), ctx);
                 MavenResolutionResult current = result;
                 while (current.parentPomIsProjectPom()) {
                     current = requireNonNull(current.getParent());
                     ResolvedPom currentResolved = current.getPom();
-                    Pom currentRequested = currentResolved.getRequested();
-                    if (hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, currentRequested, currentResolved)) {
+                    if (hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, currentResolved.getRequested(), currentResolved)) {
                         return true;
                     }
                 }
+                if (checkOverlapInChildren(relevantProperty, groupId, artifactId, result)) {
+                    return true;
+                }
                 ResolvedPom relevantContextPom = current.getPom();
                 Parent remoteParent = relevantContextPom.getRequested().getParent();
-                List<MavenRepository> relevantRepositories = relevantContextPom.getRepositories();
-                while (remoteParent != null) {
+                if (remoteParent != null) {
                     try {
-                        Pom downloadedParent = downloader.download(remoteParent.getGav(), null, relevantContextPom, relevantRepositories);
-                        if (downloadedParent.getProperties().containsKey(relevantProperty.substring(2,  relevantProperty.length() - 1))) {
+                        Pom downloadedParent = new MavenPomDownloader(current.getProjectPoms(), ctx)
+                                .download(remoteParent.getGav(), null, relevantContextPom, relevantContextPom.getRepositories());
+                        if (downloadedParent.getProperties().containsKey(relevantProperty.substring(2, relevantProperty.length() - 1)) ||
+                                hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, downloadedParent, null)
+                        ) {
                             return true;
                         }
-                        if (hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, downloadedParent, null)) {
-                            return true;
-                        }
-                        // TODO: keep traversing upwards
-                        remoteParent = null;
                     } catch (MavenDownloadingException e) {
                         // Give up
                         return false;
                     }
                 }
-                // TODO: traverse downwards to find inheritance of our relevant property
                 return false;
             }
 

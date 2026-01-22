@@ -1145,6 +1145,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>parent</artifactId>
                     <version>1</version>
+                    <properties>
+                        <dep.version>3.1.1</dep.version>
+                    </properties>
                     <modules>
                         <module>child</module>
                     </modules>
@@ -1153,7 +1156,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                             <dependency>
                                 <groupId>org.springframework.cloud</groupId>
                                 <artifactId>spring-cloud-starter-sleuth</artifactId>
-                                <version>3.1.1</version>
+                                <version>${dep.version}</version>
                             </dependency>
                         </dependencies>
                     </dependencyManagement>
@@ -1164,6 +1167,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>parent</artifactId>
                     <version>1</version>
+                    <properties>
+                        <dep.version>1.0.12</dep.version>
+                    </properties>
                     <modules>
                         <module>child</module>
                     </modules>
@@ -1172,7 +1178,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                             <dependency>
                                 <groupId>io.micrometer</groupId>
                                 <artifactId>micrometer-tracing-bridge-brave</artifactId>
-                                <version>1.0.12</version>
+                                <version>${dep.version}</version>
                             </dependency>
                         </dependencies>
                     </dependencyManagement>
