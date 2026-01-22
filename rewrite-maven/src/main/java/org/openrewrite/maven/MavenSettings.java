@@ -52,7 +52,7 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 @JacksonXmlRootElement(localName = "settings")
 public class MavenSettings {
     @Nullable
-    private String localRepository;
+    String localRepository;
 
     @Nullable
     @NonFinal
