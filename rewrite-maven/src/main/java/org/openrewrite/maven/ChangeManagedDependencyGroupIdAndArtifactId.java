@@ -218,7 +218,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 if (hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, requestedPom, resolvedPom)) {
                     return true;
                 }
-                MavenPomDownloader downloader = new MavenPomDownloader(getResolutionResult().getProjectPoms(), ctx);
+                MavenPomDownloader downloader = new MavenPomDownloader(result.getProjectPoms(), ctx);
                 MavenResolutionResult current = result;
                 while (current.parentPomIsProjectPom()) {
                     current = requireNonNull(current.getParent());
