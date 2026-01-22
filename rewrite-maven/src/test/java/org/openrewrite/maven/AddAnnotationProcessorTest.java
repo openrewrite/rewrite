@@ -849,7 +849,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
         }
 
         @Test
-        void childModuleUnchanged() {
+        void leaveChildPluginsUntouched() {
             // Multi-module: child module has its own maven-compiler-plugin
             // Expected: child remains untouched, only root gets pluginManagement entry
             rewriteRun(
@@ -926,6 +926,75 @@ class AddAnnotationProcessorTest implements RewriteTest {
                                 </plugin>
                             </plugins>
                         </build>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void childIsUntouched() {
+            // Multi-module: child module has no maven-compiler-plugin
+            // Expected: child remains untouched, only root gets pluginManagement entry
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>org.apache.maven.plugins</groupId>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <annotationProcessorPaths>
+                                              <path>
+                                                  <groupId>org.projectlombok</groupId>
+                                                  <artifactId>lombok-mapstruct-binding</artifactId>
+                                                  <version>0.2.0</version>
+                                              </path>
+                                          </annotationProcessorPaths>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """
+              ),
+              mavenProject("child",
+                pomXml(
+                  // Child has nothing - should NOT be modified
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>child</artifactId>
                     </project>
                     """
                 )

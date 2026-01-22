@@ -69,6 +69,7 @@ public class AddAnnotationProcessor extends Recipe {
                     return tree;
                 }
 
+                // if we find more than one project pom, it has to be multi-module
                 boolean isMultiModule = tree.getMarkers()
                         .findFirst(MavenResolutionResult.class)
                         .map(MavenResolutionResult::getProjectPoms)
@@ -79,70 +80,72 @@ public class AddAnnotationProcessor extends Recipe {
                 // maybe add the plugin to //build/pluginManagement/plugins or //build/plugins is not present yet
                 tree = new AddPluginVisitor(isMultiModule, MAVEN_COMPILER_PLUGIN_GROUP_ID, MAVEN_COMPILER_PLUGIN_ARTIFACT_ID, null, "<configuration><annotationProcessorPaths/></configuration>", null, null, null).visit(tree, ctx);
 
-                return new AddAnnotationProcessorPath(isMultiModule).visit(tree, ctx);
-            }
+                // configure the plugin adding process
+                return new MavenIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                        Xml.Tag plugins = super.visitTag(tag, ctx);
+                        plugins = (Xml.Tag) new MavenPlugin.Matcher(isMultiModule, MAVEN_COMPILER_PLUGIN_GROUP_ID, MAVEN_COMPILER_PLUGIN_ARTIFACT_ID).asVisitor(plugin -> {
 
-            class AddAnnotationProcessorPath extends MavenIsoVisitor<ExecutionContext> {
-                private final boolean addToManaged;
+                            MavenResolutionResult mrr = getResolutionResult();
+                            AtomicReference<TreeVisitor<?, ExecutionContext>> maybePropertyUpdate = new AtomicReference<>();
+                            Xml.Tag modifiedPlugin = new XmlIsoVisitor<ExecutionContext>() {
+                                @Override
+                                public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                                    Xml.Tag tg = super.visitTag(tag, ctx);
 
-                AddAnnotationProcessorPath(boolean addToManaged) {
-                    this.addToManaged = addToManaged;
-                }
-
-                @Override
-                public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                    Xml.Tag plugins = super.visitTag(tag, ctx);
-                    plugins = (Xml.Tag)  new MavenPlugin.Matcher(addToManaged,MAVEN_COMPILER_PLUGIN_GROUP_ID, MAVEN_COMPILER_PLUGIN_ARTIFACT_ID).asVisitor(plugin -> {
-
-                        MavenResolutionResult mrr = getResolutionResult();
-                        AtomicReference<TreeVisitor<?, ExecutionContext>> afterVisitor = new AtomicReference<>();
-                        Xml.Tag modifiedPlugin = new XmlIsoVisitor<ExecutionContext>() {
-                            @Override
-                            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                                Xml.Tag tg = super.visitTag(tag, ctx);
-                                if (!"annotationProcessorPaths".equals(tg.getName())) {
-                                    return tg;
-                                }
-                                for (int i = 0; i < tg.getChildren().size(); i++) {
-                                    Xml.Tag child = tg.getChildren().get(i);
-                                    if (!groupId.equals(child.getChildValue("groupId").orElse(null)) ||
-                                            !artifactId.equals(child.getChildValue("artifactId").orElse(null))) {
-                                        continue;
+                                    if (!"annotationProcessorPaths".equals(tg.getName())) {
+                                        return tg;
                                     }
-                                    if (!version.equals(child.getChildValue("version").orElse(null))) {
-                                        String oldVersion = child.getChildValue("version").orElse("");
-                                        boolean oldVersionUsesProperty = oldVersion.startsWith("${");
-                                        String lookupVersion = oldVersionUsesProperty ?
-                                                mrr.getPom().getValue(oldVersion.trim()) :
-                                                oldVersion;
-                                        VersionComparator comparator = Semver.validate(lookupVersion, null).getValue();
-                                        if (comparator.compare(version, lookupVersion) > 0) {
-                                            if (oldVersionUsesProperty) {
-                                                afterVisitor.set(new ChangePropertyValue(oldVersion, version, null, null).getVisitor());
-                                            } else {
-                                                List<Xml.Tag> tags = tg.getChildren();
-                                                tags.set(i, child.withChildValue("version", version));
-                                                return tg.withContent(tags);
+
+                                    // iterate the children (annotation processor paths) and try to update the version
+                                    for (int i = 0; i < tg.getChildren().size(); i++) {
+                                        Xml.Tag child = tg.getChildren().get(i);
+                                        if (!groupId.equals(child.getChildValue("groupId").orElse(null)) ||
+                                                !artifactId.equals(child.getChildValue("artifactId").orElse(null))) {
+                                            continue;
+                                        }
+
+                                        if (!version.equals(child.getChildValue("version").orElse(null))) {
+                                            String oldVersion = child.getChildValue("version").orElse("");
+                                            boolean oldVersionUsesProperty = oldVersion.startsWith("${");
+                                            String lookupVersion = oldVersionUsesProperty ? mrr.getPom().getValue(oldVersion.trim()) : oldVersion;
+                                            VersionComparator comparator = Semver.validate(lookupVersion, null).getValue();
+                                            if (comparator.compare(version, lookupVersion) > 0) {
+                                                if (oldVersionUsesProperty) {
+                                                    // a maven property is used here, update in properties section later
+                                                    maybePropertyUpdate.set(new ChangePropertyValue(oldVersion, version, null, null).getVisitor());
+                                                } else {
+                                                    // update the paths version directly
+                                                    List<Xml.Tag> tags = tg.getChildren();
+                                                    tags.set(i, child.withChildValue("version", version));
+                                                    return tg.withContent(tags);
+                                                }
                                             }
                                         }
+
+                                        return tg;
                                     }
-                                    return tg;
+
+                                    // not found so we add it
+                                    return tg.withContent(ListUtils.concat(tg.getChildren(), Xml.Tag.build(String.format(
+                                            "<path>\n<groupId>%s</groupId>\n<artifactId>%s</artifactId>\n<version>%s</version>\n</path>",
+                                            groupId, artifactId, version))));
                                 }
-                                return tg.withContent(ListUtils.concat(tg.getChildren(), Xml.Tag.build(String.format(
-                                        "<path>\n<groupId>%s</groupId>\n<artifactId>%s</artifactId>\n<version>%s</version>\n</path>",
-                                        groupId, artifactId, version))));
+                            }.visitTag(plugin.getTree(), ctx);
+
+                            if (maybePropertyUpdate.get() != null) {
+                                doAfterVisit(maybePropertyUpdate.get());
                             }
-                        }.visitTag(plugin.getTree(), ctx);
-                        if (afterVisitor.get() != null) {
-                            doAfterVisit(afterVisitor.get());
+
+                            return modifiedPlugin;
+                        }).visitNonNull(plugins, 0);
+                        if (plugins != tag) {
+                            plugins = autoFormat(plugins, ctx);
                         }
-                        return modifiedPlugin;
-                    }).visitNonNull(plugins, 0);
-                    if (plugins != tag) {
-                        plugins = autoFormat(plugins, ctx);
+                        return plugins;
                     }
-                    return plugins;
-                }
+                }.visit(tree, ctx);
             }
         };
     }
