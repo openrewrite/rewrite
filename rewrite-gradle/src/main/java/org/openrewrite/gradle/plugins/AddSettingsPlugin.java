@@ -66,15 +66,9 @@ public class AddSettingsPlugin extends Recipe {
     @Nullable
     Boolean acceptTransitive;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Gradle settings plugin";
-    }
+    String displayName = "Add Gradle settings plugin";
 
-    @Override
-    public String getDescription() {
-        return "Add plugin to Gradle settings file `plugins` block by id.";
-    }
+    String description = "Add plugin to Gradle settings file `plugins` block by id.";
 
     @Override
     public Validated<Object> validate() {

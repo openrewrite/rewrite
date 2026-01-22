@@ -29,6 +29,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     public Yaml visitDocuments(Yaml.Documents documents, PrintOutputCapture<P> p) {
         visitMarkers(documents.getMarkers(), p);
         visit(documents.getDocuments(), p);
+        p.append(documents.getSuffix());
         afterSyntax(documents, p);
         return documents;
     }
@@ -36,6 +37,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     @Override
     public Yaml visitDocument(Yaml.Document document, PrintOutputCapture<P> p) {
         beforeSyntax(document, p);
+        visit(document.getDirectives(), p);
         if (document.isExplicit()) {
             p.append("---");
         }
@@ -43,6 +45,14 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         visit(document.getEnd(), p);
         afterSyntax(document, p);
         return document;
+    }
+
+    @Override
+    public Yaml visitDirective(Yaml.Directive directive, PrintOutputCapture<P> p) {
+        beforeSyntax(directive, p);
+        p.append('%').append(directive.getValue()).append(directive.getSuffix());
+        afterSyntax(directive, p);
+        return directive;
     }
 
     @Override

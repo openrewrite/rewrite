@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@openrewrite/rewrite": ["./src/index.ts"],
+      "@openrewrite/rewrite/*": ["./src/*/index.ts"]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "test/**/*",
+    "fixtures/**/*"
+  ]
+}

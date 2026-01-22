@@ -15,16 +15,19 @@
  */
 package org.openrewrite.yaml;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
 
-@SuppressWarnings("LanguageMismatch")
+import static java.util.Collections.singletonList;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
@@ -54,10 +57,13 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     @Nullable
     String newFilePath;
 
-    @Override
-    public String getDisplayName() {
-        return "Copy YAML value";
-    }
+    @Option(displayName = "Create new keys",
+            description = "When the key path does _not_ match any keys, create new keys on the spot. Default is `true`.",
+            required = false)
+    @Nullable
+    Boolean createNewKeys;
+
+    String displayName = "Copy YAML value";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -68,16 +74,28 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
                 newKey);
     }
 
-    @Override
-    public String getDescription() {
-        return "Copies a YAML value from one key to another. " +
+    String description = "Copies a YAML value from one key to another. " +
                "The existing key/value pair remains unaffected by this change. " +
                "Attempts to merge the copied value into the new key if it already exists. " +
-               "Attempts to create the new key if it does not exist.";
+               "By default, attempts to create the new key if it does not exist.";
+
+    @JsonCreator
+    public CopyValue(String oldKeyPath, @Nullable String oldFilePath, String newKey, @Nullable String newFilePath, @Nullable Boolean createNewKeys) {
+        this.oldKeyPath = oldKeyPath;
+        this.oldFilePath = oldFilePath;
+        this.newKey = newKey;
+        this.newFilePath = newFilePath;
+        this.createNewKeys = createNewKeys;
+    }
+
+    @Deprecated
+    public CopyValue(String oldKeyPath, String oldFilePath, String newKey, String newFilePath) {
+        this(oldKeyPath, oldFilePath, newKey, newFilePath, null);
     }
 
     @Data
     public static class Accumulator {
+        @Language("yml")
         @Nullable
         String snippet;
 
@@ -125,7 +143,16 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
         if (acc.snippet == null) {
             return TreeVisitor.noop();
         }
-        return Preconditions.check(new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
-                new MergeYaml(newKey, acc.snippet, false, null, null, null, null, null).getVisitor());
+        return Preconditions.check(
+                new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
+                new YamlIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
+                        doAfterVisit(new UnfoldProperties(null, singletonList(newKey)).getVisitor());
+                        return (Yaml.Documents) new MergeYaml(newKey, acc.snippet, false, null, null, null, null, createNewKeys)
+                                .getVisitor()
+                                .visitNonNull(documents, ctx);
+                    }
+                });
     }
 }

@@ -30,90 +30,91 @@ import java.nio.file.Path;
 import java.util.function.Consumer;
 
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.json.Assertions.json;
-
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "DataFlowIssue"})
 public class Assertions {
 
     private Assertions() {
     }
 
     public static SourceSpecs npm(Path relativeTo, SourceSpecs... sources) {
-        // Second pass: run npm install if needed
-        boolean alreadyInstalled = false;
+        String packageJsonContent = null;
 
-        // First pass: write package.json files
+        // First pass: find package.json content and write it to relativeTo
         for (SourceSpecs multiSpec : sources) {
             if (multiSpec instanceof SourceSpec) {
                 SourceSpec<?> spec = (SourceSpec<?>) multiSpec;
                 Path sourcePath = spec.getSourcePath();
                 if (sourcePath != null && "package.json".equals(sourcePath.toFile().getName())) {
+                    packageJsonContent = spec.getBefore();
                     try {
                         Path packageJson = relativeTo.resolve(sourcePath);
-                        if (Files.exists(packageJson)) {
-                            // If relativeTo is a non-transient directory we can optimize not having
-                            // to do npm install if the package.json hasn't changed.
-                            if (new String(Files.readAllBytes(packageJson), StandardCharsets.UTF_8).equals(spec.getBefore())) {
-                                alreadyInstalled = true;
-                                continue;
-                            }
-                        }
-                        Files.write(packageJson, requireNonNull(spec.getBefore()).getBytes(StandardCharsets.UTF_8));
+                        Files.write(packageJson, requireNonNull(packageJsonContent).getBytes(StandardCharsets.UTF_8));
                     } catch (IOException e) {
                         throw new UncheckedIOException(e);
                     }
+                    break;
                 }
             }
         }
 
-        for (SourceSpecs multiSpec : sources) {
-            if (multiSpec instanceof SourceSpec) {
-                SourceSpec<?> spec = (SourceSpec<?>) multiSpec;
-                if (!alreadyInstalled && spec.getParser() instanceof JavaScriptParser.Builder) {
-                    // Execute npm install to ensure dependencies are available
-                    // First check if package.json exists
-                    Path packageJsonPath = relativeTo.resolve("package.json");
-                    if (!Files.exists(packageJsonPath)) {
-                        // Skip npm install if no package.json exists
-                        alreadyInstalled = true;
-                        continue;
-                    }
+        // Second pass: get or create cached workspace and symlink node_modules and package-lock.json
+        if (packageJsonContent != null) {
+            Path workspaceDir = DependencyWorkspace.getOrCreateWorkspace(packageJsonContent);
+            Path nodeModulesSource = workspaceDir.resolve("node_modules");
+            Path nodeModulesTarget = relativeTo.resolve("node_modules");
+            Path lockFileSource = workspaceDir.resolve("package-lock.json");
+            Path lockFileTarget = relativeTo.resolve("package-lock.json");
 
-                    try {
-                        ProcessBuilder pb = new ProcessBuilder("npm", "install");
-                        pb.directory(relativeTo.toFile());
-                        pb.inheritIO();
-                        Process process = pb.start();
-                        int exitCode = process.waitFor();
-                        if (exitCode != 0) {
-                            throw new RuntimeException("npm install failed with exit code: " + exitCode + " in directory: " + relativeTo.toFile().getAbsolutePath());
-                        }
-                    } catch (IOException | InterruptedException e) {
-                        throw new RuntimeException("Failed to run npm install in directory: " + relativeTo.toFile().getAbsolutePath(), e);
-                    }
-
-                    alreadyInstalled = true;
+            try {
+                if (Files.exists(nodeModulesSource) && !Files.exists(nodeModulesTarget)) {
+                    Files.createSymbolicLink(nodeModulesTarget, nodeModulesSource);
                 }
+                if (Files.exists(lockFileSource) && !Files.exists(lockFileTarget)) {
+                    Files.createSymbolicLink(lockFileTarget, lockFileSource);
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to create symlink for node_modules", e);
             }
         }
 
         return SourceSpecs.dir(relativeTo.toString(), sources);
     }
 
-    public static SourceSpecs packageJson(@Language("json") @Nullable String before) {
-        return json(before, spec -> spec.path("package.json"));
-    }
-
-    public static SourceSpecs packageJson(@Language("json") @Nullable String before, @Language("json") @Nullable String after) {
-        return json(before, after, spec -> spec.path("package.json"));
-    }
-
-    public static SourceSpecs packageJson(@Language("json") @Nullable String before, @Language("json") @Nullable String after,
-                                          Consumer<SourceSpec<Json.Document>> spec) {
-        return json(before, after, s -> {
-            s.path("package.json");
-            spec.accept(s);
+    public static SourceSpecs packageJson(@Language("json5") @Nullable String before) {
+        return packageJson(before, s -> {
         });
+    }
+
+    public static SourceSpecs packageJson(@Language("json5") @Nullable String before,
+                                          Consumer<SourceSpec<Json.Document>> spec) {
+        SourceSpec<Json.Document> json = new SourceSpec<>(
+                Json.Document.class, null, PackageJsonParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        json.path("package.json");
+        spec.accept(json);
+        return json;
+    }
+
+    public static SourceSpecs packageJson(@Language("json5") @Nullable String before, @Language("json5") @Nullable String after) {
+        return packageJson(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs packageJson(@Language("json5") @Nullable String before, @Language("json5") @Nullable String after,
+                                          Consumer<SourceSpec<Json.Document>> spec) {
+        SourceSpec<Json.Document> json = new SourceSpec<>(
+                Json.Document.class, null, PackageJsonParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        json.path("package.json");
+        json.after(s -> after);
+        spec.accept(json);
+        return json;
     }
 
     public static SourceSpecs javascript(@Language("js") @Nullable String before) {
@@ -122,8 +123,13 @@ public class Assertions {
     }
 
     public static SourceSpecs javascript(@Language("js") @Nullable String before, Consumer<SourceSpec<JS.CompilationUnit>> spec) {
-        SourceSpec<JS.CompilationUnit> js = new SourceSpec<>(JS.CompilationUnit.class, null, JavaScriptParser.builder(), before, null);
-        spec.accept(js);
+        SourceSpec<JS.CompilationUnit> js = new SourceSpec<>(
+                JS.CompilationUnit.class, null, JavaScriptParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        acceptSpec(spec, js);
         return js;
     }
 
@@ -134,9 +140,43 @@ public class Assertions {
 
     public static SourceSpecs javascript(@Language("js") @Nullable String before, @Language("js") @Nullable String after,
                                          Consumer<SourceSpec<JS.CompilationUnit>> spec) {
-        SourceSpec<JS.CompilationUnit> js = new SourceSpec<>(JS.CompilationUnit.class, null, JavaScriptParser.builder(), before, s -> after);
-        spec.accept(js);
+        SourceSpec<JS.CompilationUnit> js = new SourceSpec<>(
+                JS.CompilationUnit.class, null, JavaScriptParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        ).after(s -> after);
+        acceptSpec(spec, js);
         return js;
+    }
+
+    public static SourceSpecs jsx(@Language("jsx") @Nullable String before) {
+        //noinspection LanguageMismatch
+        return javascript(before, s -> {
+        });
+    }
+
+    public static SourceSpecs jsx(@Language("jsx") @Nullable String before, Consumer<SourceSpec<JS.CompilationUnit>> spec) {
+        //noinspection LanguageMismatch
+        return javascript(before, spec2 -> {
+            spec2.path(System.nanoTime() + ".jsx");
+            spec.accept(spec2);
+        });
+    }
+
+    public static SourceSpecs jsx(@Language("jsx") @Nullable String before, @Language("jsx") @Nullable String after) {
+        //noinspection LanguageMismatch
+        return javascript(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs jsx(@Language("jsx") @Nullable String before, @Language("jsx") @Nullable String after,
+                                  Consumer<SourceSpec<JS.CompilationUnit>> spec) {
+        //noinspection LanguageMismatch
+        return javascript(before, after, spec2 -> {
+            spec2.path(System.nanoTime() + ".jsx");
+            spec.accept(spec2);
+        });
     }
 
     public static SourceSpecs typescript(@Language("ts") @Nullable String before) {
@@ -146,7 +186,10 @@ public class Assertions {
 
     public static SourceSpecs typescript(@Language("ts") @Nullable String before, Consumer<SourceSpec<JS.CompilationUnit>> spec) {
         //noinspection LanguageMismatch
-        return javascript(before, spec);
+        return javascript(before, spec2 -> {
+            spec2.path(System.nanoTime() + ".ts");
+            spec.accept(spec2);
+        });
     }
 
     public static SourceSpecs typescript(@Language("ts") @Nullable String before, @Language("ts") @Nullable String after) {
@@ -157,7 +200,10 @@ public class Assertions {
     public static SourceSpecs typescript(@Language("ts") @Nullable String before, @Language("ts") @Nullable String after,
                                          Consumer<SourceSpec<JS.CompilationUnit>> spec) {
         //noinspection LanguageMismatch
-        return javascript(before, after, spec);
+        return javascript(before, after, spec2 -> {
+            spec2.path(System.nanoTime() + ".tsx");
+            spec.accept(spec2);
+        });
     }
 
     public static SourceSpecs tsx(@Language("tsx") @Nullable String before) {
@@ -168,18 +214,29 @@ public class Assertions {
 
     public static SourceSpecs tsx(@Language("tsx") @Nullable String before, Consumer<SourceSpec<JS.CompilationUnit>> spec) {
         //noinspection LanguageMismatch
-        return typescript(before, spec);
+        return typescript(before, spec2 -> {
+            spec2.path(System.nanoTime() + ".tsx");
+            spec.accept(spec2);
+        });
     }
 
     public static SourceSpecs tsx(@Language("tsx") @Nullable String before, @Language("tsx") @Nullable String after) {
-        //noinspection LanguageMismatch
-        return typescript(before, after, s -> {
+        return tsx(before, after, s -> {
         });
     }
 
     public static SourceSpecs tsx(@Language("tsx") @Nullable String before, @Language("tsx") @Nullable String after,
                                   Consumer<SourceSpec<JS.CompilationUnit>> spec) {
         //noinspection LanguageMismatch
-        return javascript(before, after, spec);
+        return typescript(before, after, spec2 -> {
+            spec2.path(System.nanoTime() + ".tsx");
+            spec.accept(spec2);
+        });
+    }
+
+    private static void acceptSpec(Consumer<SourceSpec<JS.CompilationUnit>> spec, SourceSpec<JS.CompilationUnit> js) {
+        Consumer<JS.CompilationUnit> userSuppliedAfterRecipe = js.getAfterRecipe();
+        js.afterRecipe(userSuppliedAfterRecipe::accept);
+        spec.accept(js);
     }
 }

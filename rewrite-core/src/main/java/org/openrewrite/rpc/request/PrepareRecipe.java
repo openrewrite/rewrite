@@ -21,7 +21,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
-import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 
 import java.util.Map;
@@ -33,13 +32,18 @@ public class PrepareRecipe implements RpcRequest {
     String id;
     Map<String, Object> options;
 
+    public interface Loader {
+        Recipe load(String id, Map<String, Object> options) throws Exception;
+    }
+
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<PrepareRecipe> {
         private final PreparedRecipeCache preparedRecipes;
+        private final Loader recipeLoader;
 
         @Override
         protected Object handle(PrepareRecipe request) throws Exception {
-            Recipe recipe = new RecipeLoader(null).load(request.getId(), request.getOptions());
+            Recipe recipe = recipeLoader.load(request.id, request.getOptions());
             String instanceId = SnowflakeId.generateId();
             preparedRecipes.getInstantiated().put(instanceId, recipe);
             return new PrepareRecipeResponse(

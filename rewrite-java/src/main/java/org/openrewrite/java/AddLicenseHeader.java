@@ -42,15 +42,9 @@ public class AddLicenseHeader extends Recipe {
             example = "Copyright ${CURRENT_YEAR} the original author or authors...")
     String licenseText;
 
-    @Override
-    public String getDisplayName() {
-        return "Add license header";
-    }
+    String displayName = "Add license header";
 
-    @Override
-    public String getDescription() {
-        return "Adds license headers to Java source files when missing. Does not override existing license headers.";
-    }
+    String description = "Adds license headers to Java source files when missing. Does not override existing license headers.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -21,7 +21,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.GroovyIsoVisitor;
@@ -42,6 +41,7 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -149,18 +149,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         }));
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Upgrade transitive Gradle dependencies";
-    }
+    String displayName = "Upgrade transitive Gradle dependencies";
 
-    @Override
-    public String getDescription() {
-        return "Upgrades the version of a transitive dependency in a Gradle build file. " +
+    String description = "Upgrades the version of a transitive dependency in a Gradle build file. " +
                "There are many ways to do this in Gradle, so the mechanism for upgrading a " +
                "transitive dependency must be considered carefully depending on your style " +
                "of dependency management.";
-    }
 
     @Override
     public Validated<Object> validate() {
@@ -225,20 +219,30 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
                     DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
 
-                    // Determine the configurations used to declare dependencies that requested dependencies in the build
-                    List<GradleDependencyConfiguration> declaredConfigurations = gradleProject.getConfigurations().stream()
+                    // Determine the configurations used to declare dependencies.
+                    // Include both configurations with user-declared dependencies (preferred for constraint target)
+                    // and all declarable configurations (fallback for plugin-provided dependencies).
+                    List<GradleDependencyConfiguration> declaredConfigurationsWithDeps = gradleProject.getConfigurations().stream()
                             .filter(c -> c.isCanBeDeclared() && !c.getRequested().isEmpty())
+                            .collect(toList());
+                    List<GradleDependencyConfiguration> allDeclarableConfigurations = gradleProject.getConfigurations().stream()
+                            .filter(GradleDependencyConfiguration::isCanBeDeclared)
                             .collect(toList());
 
                     configurations:
                     for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
-                        // Skip when there's a direct dependency, as per openrewrite/rewrite#5355
+                        // Skip when there's a direct dependency declared in the build script, as per openrewrite/rewrite#5355.
+                        // UpgradeDependencyVersion is responsible for upgrading those.
                         for (Dependency dependency : configuration.getRequested()) {
                             if (dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                                 continue configurations;
                             }
                         }
                         for (ResolvedDependency resolved : configuration.getResolved()) {
+                            // Only process transitive dependencies (depth > 0).
+                            // Direct dependencies (depth=0), whether user-declared or plugin-provided, are not handled here.
+                            // User-declared direct dependencies are skipped above via getRequested() check.
+                            // Plugin-provided direct dependencies should use a different mechanism to upgrade.
                             if (resolved.isTransitive() && dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId(), resolved.getVersion())) {
                                 try {
                                     String selected = versionSelector.select(resolved.getGav(), configuration.getName(), version, versionPattern, ctx);
@@ -246,7 +250,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                         continue;
                                     }
 
-                                    GradleDependencyConfiguration constraintConfig = constraintConfiguration(configuration, declaredConfigurations);
+                                    GradleDependencyConfiguration constraintConfig = constraintConfiguration(configuration, declaredConfigurationsWithDeps, allDeclarableConfigurations);
                                     if (constraintConfig == null) {
                                         continue;
                                     }
@@ -357,7 +361,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         if (depArg instanceof G.GString) {
                             List<J> strings = ((G.GString) depArg).getStrings();
                             if (strings.size() == 2 && strings.get(0) instanceof J.Literal && (((J.Literal) strings.get(0)).getValue() instanceof String) && strings.get(1) instanceof G.GString.Value) {
-                                org.openrewrite.gradle.internal.Dependency dep = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
+                                Dependency dep = DependencyNotation.parse((String) ((J.Literal) strings.get(0)).getValue());
                                 if (dep != null) {
                                     G.GString.Value versionValue = (G.GString.Value) strings.get(1);
                                     acc.versionPropNameToGA.put(versionValue.getTree().toString(), new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
@@ -366,7 +370,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         } else if (depArg instanceof K.StringTemplate) {
                             List<J> strings = ((K.StringTemplate) depArg).getStrings();
                             if (strings.size() == 2 && strings.get(0) instanceof J.Literal && (((J.Literal) strings.get(0)).getValue() instanceof String) && strings.get(1) instanceof K.StringTemplate.Expression) {
-                                org.openrewrite.gradle.internal.Dependency dep = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
+                                Dependency dep = DependencyNotation.parse((String) ((J.Literal) strings.get(0)).getValue());
                                 if (dep != null) {
                                     K.StringTemplate.Expression versionValue = (K.StringTemplate.Expression) strings.get(1);
                                     acc.versionPropNameToGA.put(versionValue.getTree().toString(), new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
@@ -400,13 +404,28 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
              *     implementation("g:a:v") { }
              * }
              */
-            private @Nullable GradleDependencyConfiguration constraintConfiguration(GradleDependencyConfiguration config, List<GradleDependencyConfiguration> declaredConfigurations) {
+            private @Nullable GradleDependencyConfiguration constraintConfiguration(
+                    GradleDependencyConfiguration config,
+                    List<GradleDependencyConfiguration> declaredConfigurationsWithDeps,
+                    List<GradleDependencyConfiguration> allDeclarableConfigurations) {
                 // Check if the resolved configuration e.g. compileClasspath extends from a declared configuration
                 // defined in the build e.g. implementation. Constraints should only use the configuration name of the
                 // dependency declared in the build.
+                // For configurations with user-declared dependencies, prefer direct parents (getExtendsFrom)
+                // to preserve the original behavior.
                 Optional<GradleDependencyConfiguration> declaredConfig = config.getExtendsFrom().stream()
-                        .filter(declaredConfigurations::contains)
+                        .filter(declaredConfigurationsWithDeps::contains)
                         .findFirst();
+
+                // Only use allExtendsFrom fallback when there are no user-declared dependencies at all.
+                // This is needed for plugin-provided dependencies when user hasn't declared any dependencies.
+                // If there are user-declared deps but not in this config's parents, the original fallback
+                // to config.getName() will be used below.
+                if (!declaredConfig.isPresent() && declaredConfigurationsWithDeps.isEmpty()) {
+                    declaredConfig = config.allExtendsFrom().stream()
+                            .filter(allDeclarableConfigurations::contains)
+                            .findFirst();
+                }
 
                 // The configuration name for the used constraint should be the name of the declared configuration if it exists,
                 // otherwise the name of the current configuration
@@ -418,7 +437,11 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         return null;
                     }
                 } else {
-                    for (GradleDependencyConfiguration extended : config.getExtendsFrom()) {
+                    // Check direct parents only when there are user-declared deps, otherwise check all ancestors
+                    // (allExtendsFrom() returns direct parents first, so no separate direct-parent loop needed)
+                    Collection<GradleDependencyConfiguration> extendsFromConfigs =
+                            declaredConfigurationsWithDeps.isEmpty() ? config.allExtendsFrom() : config.getExtendsFrom();
+                    for (GradleDependencyConfiguration extended : extendsFromConfigs) {
                         if (extended.getName().equals(constraintConfigName)) {
                             return extended;
                         }
@@ -601,6 +624,79 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         boolean isKotlinDsl;
 
         @Override
+        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile cu = (JavaSourceFile) tree;
+                if (cu instanceof G.CompilationUnit && !isKotlinDsl) {
+                    G.CompilationUnit g = (G.CompilationUnit) cu;
+                    if (!hasDependenciesBlock(g.getStatements())) {
+                        J.MethodInvocation dependencies = parseAsGradle(
+                                //language=groovy
+                                "dependencies {\n" +
+                                "}\n", false, ctx)
+                                .map(G.CompilationUnit.class::cast)
+                                .map(parsed -> (J.MethodInvocation) parsed.getStatements().get(0))
+                                .orElseThrow(() -> new IllegalStateException("Unable to parse dependencies block"))
+                                .withPrefix(Space.format("\n\n"));
+                        cu = g.withStatements(ListUtils.concat(g.getStatements(), dependencies));
+                    }
+                } else if (cu instanceof K.CompilationUnit && isKotlinDsl) {
+                    K.CompilationUnit k = (K.CompilationUnit) cu;
+                    List<Statement> statements = k.getStatements().stream()
+                            .filter(J.Block.class::isInstance)
+                            .map(J.Block.class::cast)
+                            .flatMap(block -> block.getStatements().stream())
+                            .collect(toList());
+                    if (!hasDependenciesBlock(statements)) {
+                        J.MethodInvocation dependencies = parseAsGradle(
+                                //language=kotlin
+                                "dependencies {\n" +
+                                "}\n", true, ctx)
+                                .map(K.CompilationUnit.class::cast)
+                                .map(parsed -> (J.Block) parsed.getStatements().get(0))
+                                .map(block -> (J.MethodInvocation) block.getStatements().get(0))
+                                .map(m -> m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                                    if (!(arg instanceof J.Lambda)) {
+                                        return arg;
+                                    }
+                                    J.Lambda lambda = (J.Lambda) arg;
+                                    if (!(lambda.getBody() instanceof J.Block)) {
+                                        return arg;
+                                    }
+                                    J.Block body = (J.Block) lambda.getBody();
+                                    return lambda.withBody(body.withEnd(Space.format("\n")));
+                                })))
+                                .orElseThrow(() -> new IllegalStateException("Unable to parse dependencies block"))
+                                .withPrefix(Space.format("\n\n"));
+                        if (!k.getStatements().isEmpty() && k.getStatements().get(0) instanceof J.Block) {
+                            J.Block block = (J.Block) k.getStatements().get(0);
+                            cu = k.withStatements(singletonList(block.withStatements(
+                                    ListUtils.concat(block.getStatements(), dependencies))));
+                        }
+                    }
+                }
+                // Continue with the visit to add constraints inside the dependencies block
+                return super.visit(cu, ctx);
+            }
+            return super.visit(tree, ctx);
+        }
+
+        private boolean hasDependenciesBlock(List<Statement> statements) {
+            for (Statement statement : statements) {
+                if (statement instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) statement, true)) {
+                    return true;
+                } else if (statement instanceof J.MethodInvocation && "dependencies".equals(((J.MethodInvocation) statement).getSimpleName())) {
+                    return true;
+                } else if (statement instanceof J.Return &&
+                        ((J.Return) statement).getExpression() instanceof J.MethodInvocation &&
+                        DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) ((J.Return) statement).getExpression(), true)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
@@ -725,7 +821,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             if (m2.getSimpleName().equals(config)) {
                                 existingConstraint = m2;
                                 if (m2.getArguments().get(0) instanceof J.Literal) {
-                                    org.openrewrite.gradle.internal.Dependency notation = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) m2.getArguments().get(0)).getValue()));
+                                    Dependency notation = DependencyNotation.parse((String) requireNonNull(((J.Literal) m2.getArguments().get(0)).getValue()));
                                     if (notation == null) {
                                         continue;
                                     }

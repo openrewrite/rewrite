@@ -29,15 +29,9 @@ public class RemoveBuildPlugin extends Recipe {
     )
     String pluginId;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove Gradle plugin";
-    }
+    String displayName = "Remove Gradle plugin";
 
-    @Override
-    public String getDescription() {
-        return "Remove plugin from Gradle `plugins` block by its id. Does not remove plugins from the `buildscript` block.";
-    }
+    String description = "Remove plugin from Gradle `plugins` block by its id. Does not remove plugins from the `buildscript` block.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

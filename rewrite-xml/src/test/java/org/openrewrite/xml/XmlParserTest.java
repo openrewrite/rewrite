@@ -15,16 +15,24 @@
  */
 package org.openrewrite.xml;
 
+import java.util.stream.Stream;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Parser.Input;
+import org.openrewrite.SourceFile;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Reference;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
@@ -73,6 +81,125 @@ class XmlParserTest implements RewriteTest {
               </html>
               """,
             spec -> spec.path("index.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspScriptlet() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <html>
+                <body>
+                  <%
+                    String name = request.getParameter("name");
+                    if (name == null) {
+                        name = "Guest";
+                    }
+                  %>
+                  <h1>Welcome!</h1>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("scriptlet.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspExpression() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <html>
+                <body>
+                  <h1>Current time: <%= new java.util.Date() %></h1>
+                  <p>Your name: <%= request.getParameter("name") %></p>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("expression.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspDeclaration() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <%!
+                private int counter = 0;
+
+                public int incrementCounter() {
+                    return ++counter;
+                }
+              %>
+              <html>
+                <body>
+                  <h1>Page visits: <%= incrementCounter() %></h1>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("declaration.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspComment() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <html>
+                <body>
+                  <%-- This is a JSP comment that won't appear in the HTML output --%>
+                  <h1>Hello World</h1>
+                  <%--
+                    Multi-line JSP comment
+                    for documenting JSP code
+                  --%>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("comment.jsp")
+          )
+        );
+    }
+
+    @Test
+    void mixedJspElements() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <%@ page language="java" contentType="text/html; charset=UTF-8" %>
+              <html>
+                <body>
+                  <%!
+                    private String greeting = "Hello";
+                  %>
+                  <%-- Display greeting --%>
+                  <h1><%= greeting %> from JSP!</h1>
+                  <%
+                    for(int i = 1; i <= 3; i++) {
+                  %>
+                    <p>Line <%= i %></p>
+                  <% } %>
+                </body>
+              </html>
+              """,
+            spec -> spec.path("mixed.jsp")
           )
         );
     }
@@ -373,14 +500,40 @@ class XmlParserTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1382")
-    @Test
-    void utf8BOM() {
-        rewriteRun(
-          xml(
-            """
-              %s<?xml version="1.0" encoding="UTF-8"?><test></test>
-              """.formatted("\uFEFF")
-          )
+    @ParameterizedTest
+    @MethodSource
+    void testUtf8WithAndWithoutBom(@Language("xml") String xml, boolean hasBom) {
+        XmlParser parser = XmlParser.builder().build();
+        SourceFile parsed = parser.parse(xml).findFirst().orElseThrow();
+
+        assertThat(parsed).isInstanceOf(Xml.class);
+
+        assertThat(parsed.isCharsetBomMarked()).isEqualTo(hasBom);
+
+        SourceFile checked = parser.requirePrintEqualsInput(
+          parsed, Input.fromString(xml), null, new InMemoryExecutionContext()
+        );
+
+        assertThat(checked).isNotInstanceOf(ParseError.class);
+        assertThat(checked).isSameAs(parsed);
+
+        rewriteRun(xml(xml));
+    }
+
+    static Stream<Arguments> testUtf8WithAndWithoutBom() {
+        return Stream.of(
+            Arguments.of("""
+              <?xml version="1.0" encoding="UTF-8"?><a />
+              """, false),
+            Arguments.of("""
+              \uFEFF<?xml version="1.0" encoding="UTF-8"?><a />
+              """, true),
+            Arguments.of("""
+              <?xml version="1.0" encoding="UTF-8"?><test></test>
+              """, false),
+            Arguments.of("""
+              \uFEFF<?xml version="1.0" encoding="UTF-8"?><test></test>
+              """, true)
         );
     }
 
@@ -460,6 +613,38 @@ class XmlParserTest implements RewriteTest {
         rewriteRun(
           xml(
             "<?xml version=\"1.0\"?>CR<a>CR</a>".replace("CR", "\r")
+          )
+        );
+    }
+
+    @Test
+    void utf8SurrogatePairsInComments() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                  <!-- 👇 Problem below -->
+                  <dependency>
+                      <groupId>org.example</groupId>
+                      <artifactId>example</artifactId>
+                  </dependency>
+                  <!-- 👆 Problem above -->
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void utf8SurrogatePairsSimple() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <!-- 👇 -->
+              <a></a>
+              """
           )
         );
     }

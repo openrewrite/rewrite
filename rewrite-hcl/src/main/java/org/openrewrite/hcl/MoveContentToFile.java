@@ -48,15 +48,9 @@ public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned>
             example = "to.tf")
     String destinationPath;
 
-    @Override
-    public String getDisplayName() {
-        return "Move content to another file";
-    }
+    String displayName = "Move content to another file";
 
-    @Override
-    public String getDescription() {
-        return "Move content to another HCL file, deleting it in the original file.";
-    }
+    String description = "Move content to another HCL file, deleting it in the original file.";
 
     static class Scanned {
         @Nullable

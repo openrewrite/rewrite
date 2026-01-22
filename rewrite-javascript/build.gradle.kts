@@ -53,15 +53,25 @@ extensions.configure<NodeExtension> {
     nodeProjectDir.set(projectDir.resolve("rewrite"))
 }
 
-val datedSnapshotVersion by extra {
-    if (System.getenv("CI") != null) {
-        project.version.toString().replace(
-            "SNAPSHOT",
-            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-        )
-    } else {
-        project.version.toString()
-    }
+// Generate a timestamped version for CI builds, or use the regular version for local development
+val datedSnapshotVersion = if (System.getenv("CI") != null) {
+    project.version.toString().replace(
+        "SNAPSHOT",
+        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+    )
+} else {
+    project.version.toString()
+}
+
+// Helper function to extract version from the JAR if it exists
+fun extractVersionFromJar(): String? {
+    val jarTask = tasks.named("jar", Jar::class).get()
+    val jarFile = jarTask.archiveFile.get().asFile
+    if (!jarFile.exists()) return null
+
+    return zipTree(jarFile).matching {
+        include("META-INF/version.txt")
+    }.singleFile.readText().trim()
 }
 
 val npmVersion = tasks.register<NpmTask>("npmVersion") {
@@ -77,7 +87,9 @@ val npmVersion = tasks.register<NpmTask>("npmVersion") {
         }
     }
 
-    args = listOf("version", "--no-git-tag-version", datedSnapshotVersion)
+    // Use version from JAR if available (second Gradle invocation), otherwise use generated version
+    val versionToUse = provider { extractVersionFromJar() ?: datedSnapshotVersion }
+    args = listOf("version", "--no-git-tag-version", versionToUse.get())
     workingDir = versionDir
 }
 
@@ -143,7 +155,8 @@ val npmPack = tasks.register<Tar>("npmPack") {
     }
 
     archiveBaseName = "openrewrite-rewrite"
-    archiveVersion = datedSnapshotVersion
+    // Use version from JAR if available (second Gradle invocation), otherwise use generated version
+    archiveVersion = provider { extractVersionFromJar() ?: datedSnapshotVersion }.get()
     compression = Compression.GZIP
     archiveExtension = "tgz"
     destinationDirectory = layout.buildDirectory.dir("distributions")
@@ -182,6 +195,7 @@ testing {
                 implementation(project(":rewrite-test"))
                 implementation(project(":rewrite-json"))
                 implementation(project(":rewrite-java-tck"))
+                implementation(project(":rewrite-yaml"))
                 implementation("org.assertj:assertj-core:latest.release")
                 implementation("org.junit.platform:junit-platform-suite-api")
                 runtimeOnly("org.junit.platform:junit-platform-suite-engine")

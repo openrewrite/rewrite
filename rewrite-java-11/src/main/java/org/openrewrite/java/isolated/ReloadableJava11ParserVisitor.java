@@ -1569,8 +1569,18 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = convert(vartype);
         }
 
-        if (typeExpr == null && node.declaredUsingVar()) {
-            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", typeMapping.type(vartype), null);
+        if (typeExpr == null) {
+            // `node.declaredUsingVar()` was only added around 11.0.15
+            int nextTokenIdx = indexOfNextNonWhitespace(cursor, source);
+            boolean nextTokenStartsWithVar = source.startsWith("var", nextTokenIdx);
+            if (nextTokenStartsWithVar &&
+                node.getStartPosition() <= nextTokenIdx &&
+                nextTokenIdx + 3 < node.getPreferredPosition()
+            ) {
+                typeExpr = new J.Identifier(randomId(), sourceBefore("var"),
+                    Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var",
+                    typeMapping.type(vartype), null);
+            }
         }
 
         if (typeExpr != null && !typeExprAnnotations.isEmpty()) {
@@ -2170,7 +2180,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
             if (inMultilineComment && c == '/' && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
-            } else if (inComment && c == '\n' || c == '\r') {
+            } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
                 // Check: char is whitespace OR next char is an `@` (which is an annotation preceded by modifier/annotation without space)
@@ -2197,6 +2207,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                             currentAnnotations = new ArrayList<>();
                             word.set("");
                             afterLastModifierPosition = cursor;
+                            i = cursor - 1;
                         }
                     }
                 } else {
@@ -2294,7 +2305,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
             if (inMultilineComment && c == '/' && i > 0 && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
-            } else if (inComment && c == '\n' || c == '\r') {
+            } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
                 if (!Character.isWhitespace(c)) {

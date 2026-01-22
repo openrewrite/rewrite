@@ -38,6 +38,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -63,7 +64,7 @@ public class YamlResourceLoader implements ResourceLoader {
     @Nullable
     private Map<String, List<RecipeExample>> recipeNameToExamples;
 
-    private final RecipeLoader recipeLoader;
+    private final BiFunction<String, @Nullable Map<String, Object>, Recipe> recipeLoader;
 
     @Getter
     private enum ResourceType {
@@ -95,7 +96,7 @@ public class YamlResourceLoader implements ResourceLoader {
      * @throws UncheckedIOException On unexpected IOException
      */
     public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties) throws UncheckedIOException {
-        this(yamlInput, source, properties, null);
+        this(yamlInput, source, properties, (ClassLoader) null);
     }
 
     /**
@@ -153,11 +154,12 @@ public class YamlResourceLoader implements ResourceLoader {
         this.source = source;
         this.dependencyResourceLoaders = dependencyResourceLoaders;
         this.mapper = ObjectMappers.propertyBasedMapper(classLoader);
-        this.recipeLoader = new RecipeLoader(classLoader);
+
+        RecipeLoader nonMarketplaceLoader = new RecipeLoader(classLoader);
+        this.recipeLoader = nonMarketplaceLoader::load;
 
         mapperCustomizer.accept(mapper);
         maybeAddKotlinModule(mapper);
-
 
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -201,7 +203,7 @@ public class YamlResourceLoader implements ResourceLoader {
             return mapToRecipe(recipeResource, EnumSet.copyOf(Arrays.asList(details)));
         }
         try {
-            return recipeLoader.load(recipeName, null);
+            return recipeLoader.apply(recipeName, null);
         } catch (IllegalArgumentException | NoClassDefFoundError ignored) {
             // handled by caller
         }
@@ -318,7 +320,7 @@ public class YamlResourceLoader implements ResourceLoader {
         if (recipeData instanceof String) {
             String recipeName = (String) recipeData;
             try {
-                addRecipe.accept(recipeLoader.load(recipeName, null));
+                addRecipe.accept(recipeLoader.apply(recipeName, null));
             } catch (IllegalArgumentException ignored) {
                 // it's probably declarative
                 addLazyLoadRecipe.accept(recipeName);
@@ -336,7 +338,7 @@ public class YamlResourceLoader implements ResourceLoader {
             try {
                 if (recipeArgs instanceof Map) {
                     try {
-                        addRecipe.accept(recipeLoader.load(recipeName, (Map<String, Object>) recipeArgs));
+                        addRecipe.accept(recipeLoader.apply(recipeName, (Map<String, Object>) recipeArgs));
                     } catch (IllegalArgumentException e) {
                         if (e.getCause() instanceof InvalidTypeIdException) {
                             addInvalidRecipeValidation(
@@ -504,11 +506,6 @@ public class YamlResourceLoader implements ResourceLoader {
 
                     @Language("markdown")
                     String packageName = (String) c.get("packageName");
-                    if (packageName.endsWith("." + CategoryTree.CORE) ||
-                        packageName.contains("." + CategoryTree.CORE + ".")) {
-                        throw new IllegalArgumentException("The package name 'core' is reserved.");
-                    }
-
                     if (name == null) {
                         name = packageName;
                     }

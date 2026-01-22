@@ -31,6 +31,7 @@ import java.util.stream.Stream;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
 import static java.util.stream.Collectors.toSet;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 import static org.openrewrite.java.tree.TypeUtils.toFullyQualifiedName;
@@ -44,27 +45,14 @@ import static org.openrewrite.java.tree.TypeUtils.toFullyQualifiedName;
 @EqualsAndHashCode(callSuper = false)
 public class RemoveUnusedImports extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Remove unused imports";
-    }
+    String displayName = "Remove unused imports";
 
-    @Override
-    public String getDescription() {
-        return "Remove imports for types that are not referenced. As a precaution against incorrect changes no imports " +
-               "will be removed from any source where unknown types are referenced. The most common cause of unknown " +
-               "types is the use of annotation processors not supported by OpenRewrite, such as lombok.";
-    }
+    String description = "Remove imports for types that are not referenced. As a precaution against incorrect changes no imports " +
+               "will be removed from any source where unknown types are referenced.";
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("RSPEC-S1128");
-    }
+    Set<String> tags = singleton("RSPEC-S1128");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(5);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -187,6 +175,7 @@ public class RemoveUnusedImports extends Recipe {
                             if (methodsAndFields != null) {
                                 for (String method : methodsAndFields) {
                                     anImport.imports.add(new JRightPadded<>(elem
+                                            .withId(randomId())
                                             .withQualid(qualid.withName(name.withSimpleName(method)))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
                                 }
@@ -195,6 +184,7 @@ public class RemoveUnusedImports extends Recipe {
                             if (staticClasses != null) {
                                 for (JavaType.FullyQualified fqn : staticClasses) {
                                     anImport.imports.add(new JRightPadded<>(elem
+                                            .withId(randomId())
                                             .withQualid(qualid.withName(name.withSimpleName(fqn.getClassName().contains(".") ? fqn.getClassName().substring(fqn.getClassName().lastIndexOf(".") + 1) : fqn.getClassName())))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
                                 }
@@ -246,6 +236,7 @@ public class RemoveUnusedImports extends Recipe {
                                     .sorted()
                                     .distinct()
                                     .forEach(type -> anImport.imports.add(new JRightPadded<>(elem
+                                            .withId(randomId())
                                             .withQualid(qualid.withName(name.withSimpleName(type.substring(type.lastIndexOf('.') + 1))))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
                                     );

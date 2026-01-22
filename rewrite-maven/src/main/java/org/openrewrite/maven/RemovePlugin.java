@@ -39,20 +39,14 @@ public class RemovePlugin extends Recipe {
             example = "rewrite-maven-plugin")
     String artifactId;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove Maven plugin";
-    }
+    String displayName = "Remove Maven plugin";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Remove the specified Maven plugin from the POM.";
-    }
+    String description = "Remove the specified Maven plugin from the POM.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

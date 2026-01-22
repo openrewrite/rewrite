@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -23,15 +24,11 @@ import org.openrewrite.TreeVisitor;
  * Ensures that whitespace is on the outermost AST element possible.
  */
 public class NormalizeFormat extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Normalize format";
-    }
+    @Getter
+    final String displayName = "Normalize format";
 
-    @Override
-    public String getDescription() {
-        return "Move whitespace to the outermost LST element possible.";
-    }
+    @Getter
+    final String description = "Move whitespace to the outermost LST element possible.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

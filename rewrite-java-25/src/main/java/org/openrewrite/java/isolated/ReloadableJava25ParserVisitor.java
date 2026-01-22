@@ -21,6 +21,8 @@ import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Symtab;
+import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.tree.DocCommentTable;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
@@ -37,10 +39,9 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.marker.CompactConstructor;
-import org.openrewrite.java.marker.OmitParentheses;
-import org.openrewrite.java.marker.TrailingComma;
+import org.openrewrite.java.marker.*;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 
@@ -397,9 +398,11 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getModifiers().getAnnotations(),
                 new HashMap<>(node.getModifiers().getAnnotations().size()));
 
+        int saveCursor = cursor;
         ReloadableJava25ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         List<J.Annotation> kindAnnotations = collectAnnotations(annotationPosTable);
+        CompactSourceFile compactSourceFile = null;
 
         J.ClassDeclaration.Kind kind;
         if (hasFlag(node.getModifiers(), Flags.ENUM)) {
@@ -412,10 +415,17 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         } else if (hasFlag(node.getModifiers(), Flags.RECORD)) {
             kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("record"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Record);
         } else {
-            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
+            Space prefix = whitespace();
+            if (source.startsWith("class", cursor)) {
+                skip("class");
+            } else {
+                compactSourceFile = new CompactSourceFile(randomId());
+                cursor = saveCursor;
+            }
+            kind = new J.ClassDeclaration.Kind(randomId(), prefix, Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
         }
 
-        J.Identifier name = new J.Identifier(randomId(), sourceBefore(node.getSimpleName().toString()),
+        J.Identifier name = new J.Identifier(randomId(), compactSourceFile != null ? EMPTY : sourceBefore(node.getSimpleName().toString()),
                 Markers.EMPTY, emptyList(), ((JCClassDecl) node).getSimpleName().toString(), typeMapping.type(node), null);
 
         JContainer<J.TypeParameter> typeParams = node.getTypeParameters().isEmpty() ? null : JContainer.build(
@@ -427,13 +437,18 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
             Map<String, List<J.Annotation>> recordParams = new HashMap<>();
             Space prefix = sourceBefore("(");
-            Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = new HashMap<>();
             List<JRightPadded<J.VariableDeclarations>> varDecls = new ArrayList<>();
+            Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = ((JCClassDecl) node).sym.getRecordComponents().stream()
+                    .collect(toMap(
+                            Symbol::getSimpleName,
+                            rc -> mapAnnotations(extractRecordComponentAnnotations(rc), new HashMap<>())
+                    ));
+
             for (Tree member : node.getMembers()) {
                 if (member instanceof JCMethodDecl md) {
                     if (hasFlag(md.getModifiers(), Flags.RECORD) && "<init>".equals(md.getName().toString())) {
                         for (JCVariableDecl var : md.getParameters()) {
-                            recordAnnotationPosTable.put(var.getName(), mapAnnotations(var.getModifiers().getAnnotations(), new HashMap<>()));
+                            mapAnnotations(var.getModifiers().getAnnotations(), recordAnnotationPosTable.computeIfAbsent(var.getName(), k -> new HashMap<>()));
                         }
                     }
                 }
@@ -498,7 +513,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             );
         }
 
-        Space bodyPrefix = sourceBefore("{");
+        Space bodyPrefix = compactSourceFile != null ? whitespace() : sourceBefore("{");
 
         // enum values are required by the grammar to occur before any ordinary field, constructor, or method members
         List<Tree> jcEnums = new ArrayList<>(node.getMembers().size());
@@ -571,9 +586,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                     hasFlag(md.getModifiers(), Flags.RECORD))) {
                 continue;
             }
-            if (m instanceof JCVariableDecl vt &&
-                (hasFlag(vt.getModifiers(), Flags.ENUM) ||
-                 hasFlag(vt.getModifiers(), Flags.RECORD))) {
+            if (m instanceof JCVariableDecl vt && (
+                    hasFlag(vt.getModifiers(), Flags.ENUM) ||
+                    hasFlag(vt.getModifiers(), Flags.RECORD))) {
                 continue;
             }
             membersMultiVariablesSeparated.add(m);
@@ -587,11 +602,22 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         members.addAll(convertStatements(membersMultiVariablesSeparated));
         addPossibleEmptyStatementsBeforeClosingBrace(members);
 
-        J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                members, sourceBefore("}"));
+        J.Block body = new J.Block(randomId(), bodyPrefix, compactSourceFile != null ? Markers.build(List.of(new OmitBraces(randomId()))) : Markers.EMPTY,
+                new JRightPadded<>(false, EMPTY, Markers.EMPTY),
+                members,
+                compactSourceFile != null ? whitespace() : sourceBefore("}"));
 
-        return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams,
+        return new J.ClassDeclaration(randomId(), fmt, compactSourceFile != null ? Markers.build(List.of(compactSourceFile)) : Markers.EMPTY,
+                modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams,
                 primaryConstructor, extendings, implementings, permitting, body, (JavaType.FullyQualified) typeMapping.type(node));
+    }
+
+    private List<JCAnnotation> extractRecordComponentAnnotations(Symbol.RecordComponent rc) {
+        List<JCAnnotation> annotations = rc.getOriginalAnnos();
+        for (int i = 0; i < rc.getAnnotationMirrors().size(); i++) {
+            annotations.get(i).getAnnotationType().setType((Type) rc.getAnnotationMirrors().get(i).getAnnotationType());
+        }
+        return annotations;
     }
 
     @Override
@@ -611,17 +637,21 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getPackageAnnotations(),
                 new HashMap<>(node.getPackageAnnotations().size()));
         List<J.Annotation> packageAnnotations = collectAnnotations(annotationPosTable);
+        List<Marker> markers = new ArrayList<>(styles);
 
         J.Package packageDecl = null;
         if (cu.getPackageName() != null) {
-            Space packagePrefix = sourceBefore("package");
-            packageDecl = new J.Package(randomId(), packagePrefix, Markers.EMPTY,
+            packageDecl = new J.Package(randomId(), sourceBefore("package"), Markers.EMPTY,
                     convert(cu.getPackageName()), packageAnnotations);
+        } else if (cu.getPackageName() == null &&
+                   cu.modle.equals(Symtab.instance(context).unnamedModule) &&
+                   cu.packge.equals(Symtab.instance(context).unnamedModule.unnamedPackage)) {
+            int saveCursor = cursor;
         }
         return new J.CompilationUnit(
                 randomId(),
                 fmt,
-                Markers.build(styles),
+                Markers.build(markers),
                 sourcePath,
                 fileAttributes,
                 charset.name(),
@@ -934,7 +964,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         if (endPos == Position.NOPOS) {
             if (typeMapping.primitive(((JCLiteral) node).typetag) == JavaType.Primitive.String) {
                 int quote = source.startsWith("\"\"\"", cursor) ? 3 : 1;
-                int elementLength = quote == 3 ? source.indexOf("\"\"\"", cursor + quote) - cursor - quote  : value.toString().length();
+                int elementLength = quote == 3 ? source.indexOf("\"\"\"", cursor + quote) - cursor - quote : value.toString().length();
                 endPos = cursor + quote + elementLength + quote;
             } else {
                 endPos = indexOf(source, cursor,
@@ -2232,17 +2262,17 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         return delimIndex > source.length() - untilDelim.length() ? -1 : delimIndex;
     }
 
-    private final Function<Tree, Space> semiDelim = _ -> {
+    private final Function<Tree, Space> semiDelim = t -> {
         Space prefix = whitespace();
         skip(";");
         return prefix;
     };
-    private final Function<Tree, Space> commaDelim = _ -> {
+    private final Function<Tree, Space> commaDelim = t -> {
         Space prefix = whitespace();
         skip(",");
         return prefix;
     };
-    private final Function<Tree, Space> noDelim = _ -> EMPTY;
+    private final Function<Tree, Space> noDelim = t -> EMPTY;
 
     private Space whitespace() {
         int nextNonWhitespace = indexOfNextNonWhitespace(cursor, source);
@@ -2354,7 +2384,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
 
             if (inMultilineComment && c == '/' && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
-            } else if (inComment && c == '\n' || c == '\r') {
+            } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
                 // Check: char is whitespace OR next char is an `@` (which is an annotation preceded by modifier/annotation without space)
@@ -2371,6 +2401,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                             afterFirstModifier = true;
                             currentAnnotations = new ArrayList<>(2);
                             afterLastModifierPosition = cursor;
+                            i = cursor - 1;
                         }
                     }
                 } else if (keywordStartIdx == -1) {
@@ -2474,7 +2505,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
 
             if (inMultilineComment && c == '/' && i > 0 && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
-            } else if (inComment && c == '\n' || c == '\r') {
+            } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
                 if (!Character.isWhitespace(c)) {

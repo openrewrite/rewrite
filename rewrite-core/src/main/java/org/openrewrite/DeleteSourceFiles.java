@@ -31,15 +31,9 @@ public class DeleteSourceFiles extends Recipe {
             example = ".github/workflows/*.yml")
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Delete files";
-    }
+    String displayName = "Delete files";
 
-    @Override
-    public String getDescription() {
-        return "Delete files by source path.";
-    }
+    String description = "Delete files by source path.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

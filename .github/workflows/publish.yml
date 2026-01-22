@@ -16,7 +16,7 @@ jobs:
     uses: openrewrite/gh-automation/.github/workflows/publish-gradle.yml@main
     with:
       java_version: |
-        25-ea
+        25
         21
     secrets:
       gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
@@ -25,3 +25,4 @@ jobs:
       ossrh_signing_key: ${{ secrets.OSSRH_SIGNING_KEY }}
       ossrh_signing_password: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
       node_auth_token: ${{ secrets.NPM_TOKEN }}
+      pypi_token: ${{ secrets.PYPI_OPENREWRITE_PUBLISH }}

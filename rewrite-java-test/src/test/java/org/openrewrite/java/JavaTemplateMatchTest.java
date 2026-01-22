@@ -781,7 +781,7 @@ class JavaTemplateMatchTest implements RewriteTest {
               class Foo {
                   void test() {
                       Objects.hash(new Object[5]);
-                      Objects.hash(new Object(), new Object()); // varargs not yet supported
+                      Objects.hash(new Object(), new Object()); // varargs also matches
                   }
               }
               """,
@@ -790,7 +790,7 @@ class JavaTemplateMatchTest implements RewriteTest {
               class Foo {
                   void test() {
                       /*~~>*/Objects.hash(new Object[5]);
-                      Objects.hash(new Object(), new Object()); // varargs not yet supported
+                      /*~~>*/Objects.hash(new Object(), new Object()); // varargs also matches
                   }
               }
               """
@@ -993,6 +993,40 @@ class JavaTemplateMatchTest implements RewriteTest {
                       /*~~(double)~~>*/Double.valueOf((Long) 1L);
                       /*~~(double)~~>*/Double.valueOf(Float.valueOf(1.2f));
                       /*~~(double)~~>*/Double.valueOf((Double) 1.2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchBigDecimalPrecision() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate template = JavaTemplate.builder("java.math.BigDecimal.valueOf(0)").build();
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.math.BigDecimal;
+              class Foo {
+                  void test() {
+                      BigDecimal.valueOf(0); // matched
+                      BigDecimal.valueOf(0.0); // different precision
+                  }
+              }
+              """,
+            """
+              import java.math.BigDecimal;
+              class Foo {
+                  void test() {
+                      /*~~>*/BigDecimal.valueOf(0); // matched
+                      BigDecimal.valueOf(0.0); // different precision
                   }
               }
               """

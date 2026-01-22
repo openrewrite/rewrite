@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -39,16 +40,16 @@ class YamlParserTest implements RewriteTest {
         List<SourceFile> yamlSources = YamlParser.builder().build().parse("a: b\n").toList();
         assertThat(yamlSources).singleElement().isInstanceOf(Yaml.Documents.class);
 
-        Yaml.Documents documents = (Yaml.Documents) yamlSources.getFirst();
+        var documents = (Yaml.Documents) yamlSources.getFirst();
         Yaml.Document document = documents.getDocuments().getFirst();
 
         // Assert that end is parsed correctly
         assertThat(document.getEnd().getPrefix()).isEqualTo("\n");
 
         // Assert that the title is parsed correctly
-        Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
+        var mapping = (Yaml.Mapping) document.getBlock();
         Yaml.Mapping.Entry entry = mapping.getEntries().getFirst();
-        Yaml.Scalar title = (Yaml.Scalar) entry.getValue();
+        var title = (Yaml.Scalar) entry.getValue();
         assertThat(title.getValue()).isEqualTo("b");
     }
 
@@ -121,13 +122,13 @@ class YamlParserTest implements RewriteTest {
         SourceFile sourceFile = yamlSources.findFirst().get();
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
 
-        Yaml.Documents documents = (Yaml.Documents) sourceFile;
+        var documents = (Yaml.Documents) sourceFile;
         Yaml.Document document = documents.getDocuments().getFirst();
 
         // Assert that end is parsed correctly
-        Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
+        var mapping = (Yaml.Mapping) document.getBlock();
         Yaml.Mapping.Entry entry = mapping.getEntries().getFirst();
-        Yaml.Scalar title = (Yaml.Scalar) entry.getValue();
+        var title = (Yaml.Scalar) entry.getValue();
         assertThat(title.getValue()).isEqualTo(input.trim());
     }
 
@@ -281,6 +282,19 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5179")
+    @Test
+    void tagsInSequences() {
+        rewriteRun(
+          yaml(
+            """
+            Conditions:
+              IsPollingFrequencyInMinutesSingular: !Equals [!Ref PollingFrequencyInMinutes, 1]
+            """
+          )
+        );
+    }
+
     @Test
     void globalTags() {
         rewriteRun(
@@ -311,14 +325,14 @@ class YamlParserTest implements RewriteTest {
           """;
 
         // when
-        Yaml.Documents parsed = (Yaml.Documents) YamlParser.builder().build().parse(code).toList().getFirst();
+        var parsed = (Yaml.Documents) YamlParser.builder().build().parse(code).toList().getFirst();
 
         // test
         Yaml.Document document = parsed.getDocuments().getFirst();
-        Yaml.Mapping topMapping = (Yaml.Mapping) document.getBlock();
+        var topMapping = (Yaml.Mapping) document.getBlock();
         Yaml.Mapping.Entry person = topMapping.getEntries().getFirst();
         assertEquals("person", person.getKey().getValue());
-        Yaml.Mapping withinPerson = (Yaml.Mapping) person.getValue();
+        var withinPerson = (Yaml.Mapping) person.getValue();
         assertEquals("map", withinPerson.getTag().getName());
         assertEquals(Yaml.Tag.Kind.IMPLICIT_GLOBAL, withinPerson.getTag().getKind());
     }
@@ -466,6 +480,40 @@ class YamlParserTest implements RewriteTest {
     }
 
     @Test
+    void parseTagsCorrectlyOnFirstLineOfMappingEntry() {
+        rewriteRun(
+          yaml(
+            """
+              - !SOMETAG
+                a: b
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                var sequence = (Yaml.Sequence) docs.getDocuments().getFirst().getBlock();
+                var mapping = (Yaml.Mapping) sequence.getEntries().getFirst().getBlock();
+                assertThat(mapping.getTag().getName()).isEqualTo("SOMETAG");
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1471")
+    @Test
+    void yamlWithDocumentEndMarker() {
+        rewriteRun(
+          yaml(
+            """
+              ---
+              applications:
+                - name: modified-app-name
+                  memory: 1G
+              ...
+              """,
+            SourceSpec::noTrim
+          )
+        );
+    }
+
+    @Test
     void helmTemplateMatchingDocumentEndParsesCorrectly() {
         rewriteRun(
           yaml(
@@ -507,6 +555,65 @@ class YamlParserTest implements RewriteTest {
                   - items1: []
                   - items2: []
               # ${{ looks.like.helm.end }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void flowStyleMappingsInSequences() {
+        rewriteRun(
+          yaml(
+            """
+              tasks:
+                - {"task_type": "Shell"}
+                - { "task_type": "Shell2"}
+              """
+          ),
+          yaml(
+            """
+              items:
+                - name: block-style
+                  type: mapping
+                - {"name": "flow-style", "type": "mapping"}
+                - key: another-block
+              """
+          ),
+          yaml(
+            """
+              items:
+                - {}
+                - {"key": "value"}
+              """
+          ),
+          yaml(
+            """
+              data:
+                - {"list": [1, 2, 3], "map": {"nested": "value"}}
+                - {"array": [{"inner": "map"}]}
+              """
+          ),
+          yaml(
+            """
+              items:
+                - {
+                    "key": "value",
+                    "another": "test"
+                  }
+              """
+          ),
+          yaml(
+            """
+              items:
+                - {"key": "value",}
+              """
+          ),
+          yaml(
+            """
+              defaults: &defaults {"type": "default", "enabled": true}
+              items:
+                - *defaults
+                - {"type": "custom"}
               """
           )
         );

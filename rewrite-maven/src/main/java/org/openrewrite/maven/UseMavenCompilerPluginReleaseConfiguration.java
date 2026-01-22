@@ -22,7 +22,6 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -33,7 +32,6 @@ import static org.openrewrite.xml.FilterTagChildrenVisitor.filterTagChildren;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
-    private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project//build//plugins");
 
     @Option(
             displayName = "Release version",
@@ -42,16 +40,10 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
     )
     Integer releaseVersion;
 
-    @Override
-    public String getDisplayName() {
-        return "Use Maven compiler plugin release configuration";
-    }
+    String displayName = "Use Maven compiler plugin release configuration";
 
-    @Override
-    public String getDescription() {
-        return "Replaces any explicit `source` or `target` configuration (if present) on the `maven-compiler-plugin` with " +
+    String description = "Replaces any explicit `source` or `target` configuration (if present) on the `maven-compiler-plugin` with " +
                 "`release`, and updates the `release` value if needed. Will not downgrade the Java version if the current version is higher.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

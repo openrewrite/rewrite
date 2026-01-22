@@ -42,15 +42,9 @@ public class EffectiveDependencies extends Recipe {
             example = "compile")
     String scope;
 
-    @Override
-    public String getDisplayName() {
-        return "Effective dependencies";
-    }
+    String displayName = "Effective dependencies";
 
-    @Override
-    public String getDescription() {
-        return "Emit the data of binary dependency relationships.";
-    }
+    String description = "Emit the data of binary dependency relationships.";
 
     @Override
     public Validated<Object> validate() {

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
@@ -35,15 +36,11 @@ import static org.openrewrite.Tree.randomId;
 
 public class PadEmptyForLoopComponents extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Pad empty `for` loop components";
-    }
+    @Getter
+    final String displayName = "Pad empty `for` loop components";
 
-    @Override
-    public String getDescription() {
-        return "Fixes padding on empty `for` loop iterators and initializers to match Checkstyle policies.";
-    }
+    @Getter
+    final String description = "Fixes padding on empty `for` loop iterators and initializers to match Checkstyle policies.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -52,7 +49,7 @@ public class PadEmptyForLoopComponents extends Recipe {
             public J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     SourceFile cu = (SourceFile) requireNonNull(tree);
-                    if (cu.getStyle(EmptyForIteratorPadStyle.class) != null || cu.getStyle(EmptyForInitializerPadStyle.class) != null) {
+                    if (Style.from(EmptyForIteratorPadStyle.class, cu) != null || Style.from(EmptyForInitializerPadStyle.class, cu) != null) {
                         return cu.withMarkers(cu.getMarkers().add(new SearchResult(randomId(), null)));
                     }
                     return (JavaSourceFile) cu;

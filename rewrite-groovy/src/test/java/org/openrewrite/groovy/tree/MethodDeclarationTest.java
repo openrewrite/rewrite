@@ -271,8 +271,8 @@ class MethodDeclarationTest implements RewriteTest {
               def accept(final def variable m) {}
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().get(1);
-                J.VariableDeclarations m = (J.VariableDeclarations) accept.getParameters().getFirst();
+                var accept = (J.MethodDeclaration) cu.getStatements().get(1);
+                var m = (J.VariableDeclarations) accept.getParameters().getFirst();
                 assertThat(m.getModifiers()).satisfiesExactly(
                   mod -> assertThat(mod.getType()).isEqualTo(J.Modifier.Type.Final),
                   mod -> assertThat(mod.getKeyword()).isEqualTo("def")
@@ -291,7 +291,7 @@ class MethodDeclarationTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().getFirst();
+                var accept = (J.MethodDeclaration) cu.getStatements().getFirst();
                 assertThat(accept.getReturnTypeExpression()).isNull();
             })
           )

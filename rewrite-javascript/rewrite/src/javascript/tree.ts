@@ -17,7 +17,20 @@
  */
 
 import {SourceFile} from "../tree";
-import {Expression, J, NameTree, Statement, Type, TypedTree, TypeTree, VariableDeclarator,} from "../java";
+import {
+    Expression,
+    J,
+    JavaVisitor,
+    MethodCall,
+    NameTree,
+    Statement,
+    Type,
+    TypedTree,
+    TypeTree,
+    VariableDeclarator,
+    registerJavaExtensionKinds
+} from "../java";
+import {JavaScriptVisitor} from "./visitor";
 
 export interface JS extends J {
 }
@@ -76,6 +89,8 @@ export namespace JS {
         PropertyAssignment: "org.openrewrite.javascript.tree.JS$PropertyAssignment",
         SatisfiesExpression: "org.openrewrite.javascript.tree.JS$SatisfiesExpression",
         ScopedVariableDeclarations: "org.openrewrite.javascript.tree.JS$ScopedVariableDeclarations",
+        Shebang: "org.openrewrite.javascript.tree.JS$Shebang",
+        Spread: "org.openrewrite.javascript.tree.JS$Spread",
         StatementExpression: "org.openrewrite.javascript.tree.JS$StatementExpression",
         TaggedTemplateExpression: "org.openrewrite.javascript.tree.JS$TaggedTemplateExpression",
         TemplateExpression: "org.openrewrite.javascript.tree.JS$TemplateExpression",
@@ -93,6 +108,10 @@ export namespace JS {
         Void: "org.openrewrite.javascript.tree.JS$Void",
         WithStatement: "org.openrewrite.javascript.tree.JS$WithStatement",
     } as const;
+
+    export function isMethodCall(e?: Expression): e is MethodCall {
+        return J.isMethodCall(e) || e?.kind === JS.Kind.FunctionCall;
+    }
 
     /**
      * Represents the root of a JavaScript AST (compilation unit).
@@ -338,7 +357,7 @@ export namespace JS {
     export interface LiteralType extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.LiteralType;
         readonly literal: Expression;
-        readonly type: Type;
+        type: Type;
     }
 
 
@@ -430,6 +449,31 @@ export namespace JS {
         readonly kind: typeof Kind.ScopedVariableDeclarations;
         readonly modifiers: J.Modifier[];
         readonly variables: J.RightPadded<J>[];
+    }
+
+    /**
+     * Represents a shebang line at the beginning of a script.
+     * @example #!/usr/bin/env node
+     */
+    export interface Shebang extends JS, Statement {
+        readonly kind: typeof Kind.Shebang;
+        readonly text: string;
+    }
+
+    /**
+     * Represents the spread syntax (...) applied to an expression.
+     * Used in array literals, object literals, function call arguments,
+     * and rest syntax in function parameters and destructuring patterns.
+     * @example [...arr]
+     * @example {...obj}
+     * @example f(...args)
+     * @example function f(...args) {}
+     * @example const [first, ...rest] = arr
+     */
+    export interface Spread extends JS, Statement, Expression, TypedTree, VariableDeclarator {
+        readonly kind: typeof Kind.Spread;
+        readonly expression: Expression;
+        readonly type?: Type;
     }
 
     /**
@@ -650,12 +694,11 @@ export namespace JS {
      * @example data["key"](5, 0, 4)
      * @example (() => { return 3 + 5 })()
      */
-    export interface FunctionCall extends JS, Expression {
+    export interface FunctionCall extends JS, MethodCall {
         readonly kind: typeof Kind.FunctionCall;
         readonly function?: J.RightPadded<Expression>;
         readonly typeParameters?: J.Container<Expression>;
         readonly arguments: J.Container<Expression>;
-        readonly functionType?: Type.Method;
     }
 
     /**
@@ -900,6 +943,34 @@ export namespace JSX {
 }
 
 const KindValues = new Set(Object.values(JS.Kind));
+
+function javascriptVisitorAdapter<P>(visitor: JavaVisitor<P>): JavaVisitor<P> {
+    const adaptedVisitor = new JavaScriptVisitor<P>();
+
+    // Walk up the prototype chain of the visitor to get all overridden methods
+    let proto = Object.getPrototypeOf(visitor);
+    while (proto && proto !== JavaVisitor.prototype) {
+        Object.getOwnPropertyNames(proto).forEach(name => {
+            const descriptor = Object.getOwnPropertyDescriptor(proto, name);
+            if (descriptor && typeof descriptor.value === 'function' && name !== 'constructor') {
+                // Copy the method, binding it to jsVisitor
+                (adaptedVisitor as any)[name] = descriptor.value.bind(adaptedVisitor);
+            }
+        });
+        proto = Object.getPrototypeOf(proto);
+    }
+
+    // Also copy any instance properties
+    Object.keys(visitor).forEach(key => {
+        if (!(key in adaptedVisitor)) {
+            (adaptedVisitor as any)[key] = (visitor as any)[key];
+        }
+    });
+
+    return adaptedVisitor;
+}
+
+registerJavaExtensionKinds(Object.values(JS.Kind), javascriptVisitorAdapter);
 
 export function isJavaScript(tree: any): tree is JS {
     return KindValues.has(tree["kind"]);

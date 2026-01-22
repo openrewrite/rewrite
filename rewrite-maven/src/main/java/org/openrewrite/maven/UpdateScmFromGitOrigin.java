@@ -45,16 +45,10 @@ public class UpdateScmFromGitOrigin extends Recipe {
     @Nullable
     Boolean addIfMissing;
 
-    @Override
-    public String getDisplayName() {
-        return "Update SCM with Git origin";
-    }
+    String displayName = "Update SCM with Git origin";
 
-    @Override
-    public String getDescription() {
-        return "Updates or adds the Maven `<scm>` tag based on the Git remote origin. " +
+    String description = "Updates or adds the Maven `<scm>` tag based on the Git remote origin. " +
                "By default, only existing Source Control Management (SCM) sections are updated. Set `addIfMissing` to `true` to also add missing SCM sections.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

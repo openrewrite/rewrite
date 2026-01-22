@@ -15,46 +15,62 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {MessageConnection} from "vscode-jsonrpc/node";
-import {Recipe, RecipeDescriptor, RecipeRegistry, ScanningRecipe} from "../../recipe";
+import {Recipe, RecipeDescriptor, ScanningRecipe} from "../../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {Check} from "../../preconditions";
 import {RpcRecipe} from "../recipe";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
+import {withMetrics} from "./metrics";
+import {RecipeMarketplace} from "../../marketplace";
 
 export class PrepareRecipe {
     constructor(private readonly id: string, private readonly options?: any) {
     }
 
     static handle(connection: MessageConnection,
-                  registry: RecipeRegistry,
-                  preparedRecipes: Map<String, Recipe>) {
+                  marketplace: RecipeMarketplace,
+                  preparedRecipes: Map<String, Recipe>,
+                  metricsCsv?: string) {
         const snowflake = SnowflakeId();
-        connection.onRequest(new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"), async (request) => {
-            const id = snowflake.generate();
-            const recipeCtor = registry.all.get(request.id);
-            if (!recipeCtor) {
-                throw new Error(`Could not find recipe with id ${request.id}`);
-            }
-            let recipe = new recipeCtor(request.options);
+        connection.onRequest(
+            new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
+            withMetrics<PrepareRecipe, PrepareRecipeResponse>(
+                "PrepareRecipe",
+                metricsCsv,
+                (context) => async (request) => {
+                    context.target = request.id;
+                    const id = snowflake.generate();
+                    const recipeCtor = marketplace.findRecipe(request.id);
+                    if (!recipeCtor) {
+                        throw new Error(`Could not find recipe with id ${request.id}`);
+                    }
+                    if (!recipeCtor[1]) {
+                        throw new Error(`Recipe ${request.id} was installed without a constructor`);
+                    }
+                    let recipe = new recipeCtor[1](request.options);
 
-            const editPreconditions: Precondition[] = [];
-            recipe = await this.optimizePreconditions(recipe, "edit", editPreconditions);
+                    const editPreconditions: Precondition[] = [];
+                    recipe = await this.optimizePreconditions(recipe, "edit", editPreconditions);
 
-            const scanPreconditions: Precondition[] = [];
-            recipe = await this.optimizePreconditions(recipe, "scan", scanPreconditions);
+                    const scanPreconditions: Precondition[] = [];
+                    recipe = await this.optimizePreconditions(recipe, "scan", scanPreconditions);
 
-            preparedRecipes.set(id, recipe);
+                    preparedRecipes.set(id, recipe);
 
-            return {
-                id: id,
-                descriptor: await recipe.descriptor(),
-                editVisitor: `edit:${id}`,
-                editPreconditions: editPreconditions,
-                scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
-                scanPreconditions: scanPreconditions
-            }
-        });
+                    const result = {
+                        id: id,
+                        descriptor: await recipe.descriptor(),
+                        editVisitor: `edit:${id}`,
+                        editPreconditions: editPreconditions,
+                        scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
+                        scanPreconditions: scanPreconditions
+                    };
+
+                    return result;
+                }
+            )
+        );
     }
 
     /**
@@ -103,12 +119,14 @@ export class PrepareRecipe {
 
     private static visitorTypePrecondition(preconditions: Precondition[], v: TreeVisitor<any, ExecutionContext>): Precondition[] {
         let treeType: string | undefined;
-        
+
         // Use CommonJS require to defer loading and avoid circular dependencies
         const {JsonVisitor} = require("../../json");
         const {JavaScriptVisitor} = require("../../javascript");
         const {JavaVisitor} = require("../../java");
-        
+        const {PlainTextVisitor} = require("../../text");
+        const {YamlVisitor} = require("../../yaml");
+
         if (v instanceof JsonVisitor) {
             treeType = "org.openrewrite.json.tree.Json";
         } else if (v instanceof JavaScriptVisitor) {
@@ -117,6 +135,10 @@ export class PrepareRecipe {
             treeType = "org.openrewrite.javascript.tree.JS";
         } else if (v instanceof JavaVisitor) {
             treeType = "org.openrewrite.java.tree.J";
+        } else if (v instanceof PlainTextVisitor) {
+            treeType = "org.openrewrite.text.PlainText";
+        } else if (v instanceof YamlVisitor) {
+            treeType = "org.openrewrite.yaml.tree.Yaml";
         }
         if (treeType) {
             preconditions.push({

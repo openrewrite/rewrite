@@ -25,6 +25,7 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.newSetFromMap;
 import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.InferenceDirection.FROM;
 import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.InferenceDirection.TO;
 
@@ -109,8 +110,24 @@ public class TypeUtils {
 
     public static boolean fullyQualifiedNamesAreEqual(@Nullable String fqn1, @Nullable String fqn2) {
         if (fqn1 != null && fqn2 != null) {
-            return fqn1.equals(fqn2) || fqn1.length() == fqn2.length() &&
-                                        toFullyQualifiedName(fqn1).equals(toFullyQualifiedName(fqn2));
+            if (fqn1.equals(fqn2)) {
+                return true;
+            }
+            int patternLen = fqn1.length();
+            if (patternLen != fqn2.length()) {
+                return false;
+            }
+            for (int i = 0; i < patternLen; i++) {
+                char p = fqn1.charAt(i);
+                char t = fqn2.charAt(i);
+                if (p != t) {
+                    if ((p == '$' && t == '.') || (p == '.' && t == '$')) {
+                        continue;
+                    }
+                    return false;
+                }
+            }
+            return true;
         }
         return fqn1 == null && fqn2 == null;
     }
@@ -667,6 +684,22 @@ public class TypeUtils {
 
     private static JavaType resolveTypeParameters(JavaType type, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
         return Objects.requireNonNull(new JavaTypeVisitor<Map<JavaType.GenericTypeVariable, JavaType>>() {
+            @Nullable Set<JavaType> visited;
+
+            @Override
+            public JavaType visit(@Nullable JavaType javaType, Map<JavaType.GenericTypeVariable, JavaType> genericTypeVariableJavaTypeMap) {
+                // Prevent infinite recursion
+                if (javaType != null) {
+                    if (visited == null) {
+                        visited = newSetFromMap(new IdentityHashMap<>());
+                    }
+                    if (!visited.add(javaType)) {
+                        return javaType;
+                    }
+                }
+                return super.visit(javaType, genericTypeVariableJavaTypeMap);
+            }
+
             @Override
             public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
                 if (!replacements.containsKey(generic)) {

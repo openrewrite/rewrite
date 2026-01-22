@@ -48,4 +48,12 @@ public enum Delimiter {
         }
         return null;
     }
+
+    public boolean isSlashyStringDelimiter() {
+        return this == SLASHY_STRING || this == PATTERN_SLASHY_STRING;
+    }
+
+    public boolean isDollarSlashyStringDelimiter() {
+        return this == DOLLAR_SLASHY_STRING || this == PATTERN_DOLLAR_SLASHY_STRING;
+    }
 }

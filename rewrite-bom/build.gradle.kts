@@ -11,17 +11,10 @@ dependencies {
                 it != project &&
                         !it.name.contains("benchmark") &&
                         !it.name.contains("tck") &&
-                        it.name != "tools"
+                        it.name != "tools" &&
+                        it.name != "rewrite-gradle-tooling-model"
             }
             .sortedBy { it.name }
             .forEach { api(it) }
-    }
-}
-
-publishing {
-    publications {
-        named("nebula", MavenPublication::class.java) {
-            from(components["javaPlatform"])
-        }
     }
 }

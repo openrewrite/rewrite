@@ -42,15 +42,9 @@ public class RenameTypeAlias extends Recipe {
     String fullyQualifiedAliasedType;
 
 
-    @Override
-    public String getDisplayName() {
-        return "Rename type alias";
-    }
+    String displayName = "Rename type alias";
 
-    @Override
-    public String getDescription() {
-        return "Change the name of a given type alias.";
-    }
+    String description = "Change the name of a given type alias.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

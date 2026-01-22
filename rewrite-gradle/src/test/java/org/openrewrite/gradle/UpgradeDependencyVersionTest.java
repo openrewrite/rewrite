@@ -824,8 +824,17 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
-    void versionInPropertiesFile() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "$guavaVersion",
+      "${guavaVersion}",
+      "${property('guavaVersion')}",
+      "${project.property('guavaVersion')}",
+      "${findProperty('guavaVersion')}",
+      "${project.findProperty('guavaVersion')}",
+      "${project.properties['guavaVersion']}"
+    })
+    void versionInPropertiesFile(String propertyNotation) {
         rewriteRun(
           properties(
             """
@@ -847,9 +856,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
 
               dependencies {
-                implementation ("com.google.guava:guava:$guavaVersion")
+                implementation ("com.google.guava:guava:%s")
               }
-              """
+              """.formatted(propertyNotation)
           )
         );
     }
@@ -1131,8 +1140,21 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
-    void mapNotationVariableInPropertiesFile() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "guavaVersion",
+      "\"$guavaVersion\"",
+      "\"${guavaVersion}\"",
+      "property('guavaVersion')",
+      "\"${property('guavaVersion')}\"",
+      "\"${project.property('guavaVersion')}\"",
+      "findProperty('guavaVersion')",
+      "\"${findProperty('guavaVersion')}\"",
+      "\"${project.findProperty('guavaVersion')}\"",
+      "project.properties['guavaVersion']",
+      "\"${project.properties['guavaVersion']}\""
+    })
+    void mapNotationVariableInPropertiesFile(String propertyNotation) {
         rewriteRun(
           properties(
             """
@@ -1154,9 +1176,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
 
               dependencies {
-                implementation group: "com.google.guava", name: "guava", version: guavaVersion
+                implementation group: "com.google.guava", name: "guava", version: %s
               }
-              """
+              """.formatted(propertyNotation)
           )
         );
     }
@@ -2100,6 +2122,189 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void upgradeAnnotationProcessors() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.mapstruct", "mapstruct*", "1.6.x", null)),
+          buildGradle(
+            //language=groovy
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation 'org.mapstruct:mapstruct:1.4.1.Final'
+                  annotationProcessor 'org.mapstruct:mapstruct-processor:1.4.1.Final'
+              }
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .doesNotContain("1.4.1.Final")
+                .containsPattern("1.6.\\d+(.\\d+)?")
+                .actual())
+          )
+        );
+    }
+
+    /**
+     * Plugin-provided direct dependencies are upgraded by adding a direct dependency declaration.
+     * Uses 'api' configuration because the Kotlin plugin exposes kotlin-stdlib-jdk8 as an API dependency.
+     */
+    @Test
+    void groovyDslUpgradesPluginProvidedDirectDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null)),
+          buildGradle(
+            //language=groovy
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+              """,
+            //language=groovy
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.0"
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Plugin-provided direct dependencies are upgraded by adding a direct dependency declaration (Kotlin DSL).
+     * Uses 'api' configuration because the Kotlin plugin exposes kotlin-stdlib-jdk8 as an API dependency.
+     */
+    @Test
+    void kotlinDslUpgradesPluginProvidedDirectDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null)),
+          buildGradleKts(
+            //language=kotlin
+            """
+              plugins {
+                  kotlin("jvm") version "1.7.21"
+              }
+              repositories { mavenCentral() }
+              """,
+            //language=kotlin
+            """
+              plugins {
+                  kotlin("jvm") version "1.7.21"
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  api("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.0")
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Transitive dependencies from plugins should not be upgraded by this recipe.
+     * kotlin-stdlib is a transitive dependency of kotlin-stdlib-jdk8 which is added by the Kotlin plugin.
+     */
+    @Test
+    void doesNotUpgradePluginProvidedTransitiveDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib", "1.9.0", null)),
+          buildGradle(
+            //language=groovy
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "$springCloudVersion",
+      "${springCloudVersion}",
+      "${property('springCloudVersion')}",
+      "${project.property('springCloudVersion')}",
+      "${findProperty('springCloudVersion')}",
+      "${project.findProperty('springCloudVersion')}",
+      "${project.properties['springCloudVersion']}"
+    })
+    void upgradesSpringDependencyManagementPluginMavenBomVersionPropertyWithGroovyDSL(String versionRef) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2023.0.x", null)),
+          buildGradle(
+            //language=groovy
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+              repositories { mavenCentral() }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom "org.springframework.cloud:spring-cloud-dependencies:%s"
+                  }
+              }
+              """.formatted(versionRef)
+          ),
+          properties(
+            """
+              springCloudVersion=2021.0.8
+              """,
+            """
+              springCloudVersion=2023.0.6
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "$springCloudVersion",
+      "${springCloudVersion}"
+    })
+    void upgradesSpringDependencyManagementPluginMavenBomVersionPropertyWithKotlinDSL(String versionRef) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2023.0.x", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+                  id("io.spring.dependency-management") version "1.1.7"
+              }
+              repositories { mavenCentral() }
+
+              val springCloudVersion: String by project
+
+              dependencyManagement {
+                  imports {
+                      mavenBom("org.springframework.cloud:spring-cloud-dependencies:%s")
+                  }
+              }
+              """.formatted(versionRef)
+          ),
+          properties(
+            """
+              springCloudVersion=2021.0.8
+              """,
+            """
+              springCloudVersion=2023.0.6
+              """,
+            spec -> spec.path("gradle.properties")
           )
         );
     }

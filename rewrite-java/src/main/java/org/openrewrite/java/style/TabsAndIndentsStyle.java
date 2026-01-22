@@ -34,6 +34,7 @@ public class TabsAndIndentsStyle implements JavaStyle {
     Boolean indentsRelativeToExpressionStart;
 
     MethodDeclarationParameters methodDeclarationParameters;
+    RecordComponents recordComponents;
 
     @Value
     @With
@@ -41,8 +42,19 @@ public class TabsAndIndentsStyle implements JavaStyle {
         Boolean alignWhenMultiple;
     }
 
+    @Value
+    @With
+    public static class RecordComponents {
+        Boolean alignWhenMultiple;
+    }
+
     @Override
     public Style applyDefaults() {
         return StyleHelper.merge(IntelliJ.tabsAndIndents(), this);
+    }
+
+    public RecordComponents getRecordComponents() {
+        //noinspection ConstantConditions
+        return recordComponents == null ? new RecordComponents(true) : recordComponents;
     }
 }

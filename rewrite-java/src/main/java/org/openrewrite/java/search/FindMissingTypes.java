@@ -21,6 +21,7 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.*;
@@ -45,15 +46,9 @@ public class FindMissingTypes extends Recipe {
     )
     boolean checkDocumentation;
 
-    @Override
-    public String getDisplayName() {
-        return "Find missing type information on Java LSTs";
-    }
+    String displayName = "Find missing type information on Java LSTs";
 
-    @Override
-    public String getDescription() {
-        return "This is a diagnostic recipe to highlight where LSTs are missing type attribution information.";
-    }
+    String description = "This is a diagnostic recipe to highlight where LSTs are missing type attribution information.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -181,19 +176,31 @@ public class FindMissingTypes extends Recipe {
         @Override
         public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
             J.MemberReference mr = super.visitMemberReference(memberRef, ctx);
-            JavaType.Method type = mr.getMethodType();
-            if (type != null) {
-                if (!isWellFormedType(type, seenTypes)) {
+            if (mr.getMethodType() != null) {
+                JavaType.Method methodType = mr.getMethodType();
+                if (!isWellFormedType(methodType, seenTypes)) {
                     mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
-                } else if (!type.getName().equals(mr.getReference().getSimpleName()) && !type.isConstructor()) {
-                    mr = SearchResult.found(mr, "type information has a different method name '" + type.getName() + "'");
+                } else if (!methodType.getName().equals(mr.getReference().getSimpleName()) && !methodType.isConstructor()) {
+                    mr = SearchResult.found(mr, "type information has a different method name '" + methodType.getName() + "'");
                 }
-            } else {
+            } else if (mr.getVariableType() != null) {
                 JavaType.Variable variableType = mr.getVariableType();
                 if (!isWellFormedType(variableType, seenTypes)) {
                     mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
                 } else if (!variableType.getName().equals(mr.getReference().getSimpleName())) {
                     mr = SearchResult.found(mr, "type information has a different variable name '" + variableType.getName() + "'");
+                }
+            } else if (mr.getType() != null) {
+                JavaType type = mr.getType();
+                if (type instanceof JavaType.Parameterized) {
+                    JavaType.Parameterized parameterizedType = (JavaType.Parameterized) type;
+                    for (JavaType t : parameterizedType.getTypeParameters()) {
+                        if (!isWellFormedType(t, seenTypes)) {
+                            mr = SearchResult.found(mr, "MemberReference Parameterized type is missing or malformed");
+                        }
+                    }
+                } else if (type instanceof JavaType.Unknown) {
+                    mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
                 }
             }
             return mr;
@@ -214,6 +221,14 @@ public class FindMissingTypes extends Recipe {
                 md = SearchResult.found(md, "MethodDeclaration#name#type is not the same instance as the MethodType of MethodDeclaration.");
             }
             return super.visitMethodDeclaration(md, ctx);
+        }
+
+        @Override
+        public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
+            J.Package p = pkg.withAnnotations(ListUtils.map(pkg.getAnnotations(),
+                    a -> isWellFormedType(a.getType(), seenTypes) ? a :
+                            SearchResult.found(a, "Annotation type is missing or malformed")));
+            return p == pkg ? super.visitPackage(pkg, ctx) : p;
         }
 
         @Override

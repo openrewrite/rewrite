@@ -15,10 +15,13 @@
  */
 package org.openrewrite.config;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
+import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeListing;
+import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.File;
@@ -121,15 +124,6 @@ public class Environment {
         return result;
     }
 
-    @Deprecated
-    public Recipe activateRecipes(Iterable<String> activeRecipes) {
-        List<String> asList = new ArrayList<>();
-        for (String activeRecipe : activeRecipes) {
-            asList.add(activeRecipe);
-        }
-        return activateRecipes(asList);
-    }
-
     public Recipe activateRecipes(Collection<String> activeRecipes) {
         List<Recipe> recipes;
         if (activeRecipes.isEmpty()) {
@@ -156,10 +150,9 @@ public class Environment {
             }
         }
         if (!recipesNotFound.isEmpty()) {
-            @SuppressWarnings("deprecation")
             List<String> suggestions = recipesNotFound.stream()
                     .map(r -> recipesByName.keySet().stream()
-                            .min(comparingInt(a -> StringUtils.getLevenshteinDistance(a, r)))
+                            .min(comparingInt(a -> LevenshteinDistance.getDefaultInstance().apply(a, r)))
                             .orElse(r))
                     .collect(toList());
             String message = String.format("Recipe(s) not found: %s\nDid you mean: %s",
@@ -264,6 +257,17 @@ public class Environment {
         return activateStyles(Arrays.asList(activeStyles));
     }
 
+    public RecipeMarketplace toMarketplace(RecipeBundle bundle) {
+        RecipeMarketplace marketplace = new RecipeMarketplace();
+        for (RecipeDescriptor descriptor : listRecipeDescriptors()) {
+            marketplace.install(
+                    RecipeListing.fromDescriptor(descriptor, bundle),
+                    descriptor.inferCategoriesFromName(this)
+            );
+        }
+        return marketplace;
+    }
+
     public Environment(Collection<? extends ResourceLoader> resourceLoaders) {
         this.resourceLoaders = resourceLoaders;
         this.dependencyResourceLoaders = emptyList();
@@ -296,7 +300,7 @@ public class Environment {
             return load(new ClasspathScanningLoader(properties, acceptPackages));
         }
 
-        @SuppressWarnings("unused")
+        @SuppressWarnings("unused") // Used by rewrite-gradle-plugin
         public Builder scanClassLoader(ClassLoader classLoader) {
             return load(new ClasspathScanningLoader(properties, classLoader));
         }
@@ -331,7 +335,7 @@ public class Environment {
             return load(new ClasspathScanningLoader(jar, properties, secondPassLoaderList, classLoader), secondPassLoaderList);
         }
 
-        @SuppressWarnings("unused")
+        @SuppressWarnings("unused") // Used by rewrite-maven-plugin and CLI
         public Builder scanUserHome() {
             File userHomeRewriteConfig = new File(System.getProperty("user.home") + "/.rewrite/rewrite.yml");
             if (userHomeRewriteConfig.exists()) {
@@ -345,12 +349,12 @@ public class Environment {
         }
 
         public Builder load(ResourceLoader resourceLoader) {
-            resourceLoaders.add(resourceLoader);
+            this.resourceLoaders.add(resourceLoader);
             return this;
         }
 
         public Builder load(ResourceLoader resourceLoader, Collection<? extends ResourceLoader> dependencyResourceLoaders) {
-            resourceLoaders.add(resourceLoader);
+            this.resourceLoaders.add(resourceLoader);
             this.dependencyResourceLoaders.addAll(dependencyResourceLoaders);
             return this;
         }

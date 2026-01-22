@@ -28,15 +28,9 @@ import org.openrewrite.xml.tree.Xml;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ExplicitPluginGroupId extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Add explicit `groupId` to Maven plugins";
-    }
+    String displayName = "Add explicit `groupId` to Maven plugins";
 
-    @Override
-    public String getDescription() {
-        return "Add the default `<groupId>org.apache.maven.plugins</groupId>` to plugins for clarity.";
-    }
+    String description = "Add the default `<groupId>org.apache.maven.plugins</groupId>` to plugins for clarity.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

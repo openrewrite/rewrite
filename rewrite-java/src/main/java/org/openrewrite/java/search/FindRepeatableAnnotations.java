@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaVisitor;
@@ -28,15 +29,11 @@ import static java.util.Objects.requireNonNull;
 
 public class FindRepeatableAnnotations extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Find uses of `@Repeatable` annotations";
-    }
+    @Getter
+    final String displayName = "Find uses of `@Repeatable` annotations";
 
-    @Override
-    public String getDescription() {
-        return "Java 8 introduced the concept of `@Repeatable` annotations.";
-    }
+    @Getter
+    final String description = "Java 8 introduced the concept of `@Repeatable` annotations.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

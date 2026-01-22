@@ -15,29 +15,57 @@
  */
 package org.openrewrite.javascript.rpc;
 
-import io.moderne.jsonrpc.JsonRpc;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.config.Environment;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
-import java.util.Objects;
+import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
+import static java.util.Objects.requireNonNull;
+
+@Getter
 public class JavaScriptRewriteRpc extends RewriteRpc {
     private static final RewriteRpcProcessManager<JavaScriptRewriteRpc> MANAGER = new RewriteRpcProcessManager<>(builder());
 
-    JavaScriptRewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
-        super(jsonRpc, marketplace);
+    /**
+     * The command used to start the RPC process. Useful for logging and diagnostics.
+     */
+    private final String command;
+    private final Map<String, String> commandEnv;
+    private final RewriteRpcProcess process;
+
+    JavaScriptRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, String command, Map<String, String> commandEnv) {
+        super(process.getRpcClient(), marketplace);
+        this.command = command;
+        this.commandEnv = commandEnv;
+        this.process = process;
+    }
+
+    public static @Nullable JavaScriptRewriteRpc get() {
+        return MANAGER.get();
     }
 
     public static JavaScriptRewriteRpc getOrStart() {
@@ -48,29 +76,120 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         MANAGER.setFactory(builder);
     }
 
+    @Override
+    public void shutdown() {
+        super.shutdown();
+        process.shutdown();
+    }
+
     public static void shutdownCurrent() {
         MANAGER.shutdown();
     }
 
-    public int installRecipes(File recipes) {
+    public InstallRecipesResponse installRecipes(File recipes) {
         return send(
                 "InstallRecipes",
-                new InstallRecipesByFile(recipes),
+                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath()),
                 InstallRecipesResponse.class
-        ).getRecipesInstalled();
+        );
     }
 
-    public int installRecipes(String packageName) {
+    public InstallRecipesResponse installRecipes(String packageName) {
         return installRecipes(packageName, null);
     }
 
-    public int installRecipes(String packageName, @Nullable String version) {
+    public InstallRecipesResponse installRecipes(String packageName, @Nullable String version) {
         return send(
                 "InstallRecipes",
                 new InstallRecipesByPackage(
                         new InstallRecipesByPackage.Package(packageName, version)),
                 InstallRecipesResponse.class
-        ).getRecipesInstalled();
+        );
+    }
+
+    /**
+     * Parses an entire JavaScript/TypeScript project directory.
+     * Discovers and parses all relevant source files, package.json files, and lock files.
+     *
+     * @param projectPath Path to the project directory to parse
+     * @param ctx         Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parseProject(Path projectPath, ExecutionContext ctx) {
+        return parseProject(projectPath, null, null, ctx);
+    }
+
+    /**
+     * Parses an entire JavaScript/TypeScript project directory.
+     * Discovers and parses all relevant source files, package.json files, and lock files.
+     *
+     * @param projectPath Path to the project directory to parse
+     * @param exclusions  Optional glob patterns to exclude from parsing
+     * @param ctx         Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, ExecutionContext ctx) {
+        return parseProject(projectPath, exclusions, null, ctx);
+    }
+
+    /**
+     * Parses an entire JavaScript/TypeScript project directory.
+     * Discovers and parses all relevant source files, package.json files, and lock files.
+     *
+     * @param projectPath Path to the project directory to parse
+     * @param exclusions  Optional glob patterns to exclude from parsing
+     * @param relativeTo  Optional path to make source file paths relative to. If not specified,
+     *                    paths are relative to projectPath. Use this when parsing a subdirectory
+     *                    but wanting paths relative to the repository root.
+     * @param ctx         Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
+
+        return StreamSupport.stream(new Spliterator<SourceFile>() {
+            private int index = 0;
+            private @Nullable ParseProjectResponse response;
+
+            @Override
+            public boolean tryAdvance(Consumer<? super SourceFile> action) {
+                if (response == null) {
+                    parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo), ParseProjectResponse.class);
+                    parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
+                }
+
+                if (index >= response.size()) {
+                    return false;
+                }
+
+                ParseProjectResponse.Item item = response.get(index);
+                index++;
+
+                SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
+                // for status update messages
+                parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
+                action.accept(sourceFile);
+                return true;
+            }
+
+            @Override
+            public @Nullable Spliterator<SourceFile> trySplit() {
+                return null;
+            }
+
+            @Override
+            public long estimateSize() {
+                return response == null ? Long.MAX_VALUE : response.size() - index;
+            }
+
+            @Override
+            public int characteristics() {
+                // Don't report SIZED until response is available, as estimateSize()
+                // returns Long.MAX_VALUE before the RPC call completes
+                return response == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
+            }
+        }, false);
     }
 
     public static Builder builder() {
@@ -79,15 +198,22 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
     @RequiredArgsConstructor
     public static class Builder implements Supplier<JavaScriptRewriteRpc> {
-        private Environment marketplace = Environment.builder().build();
+        private RecipeMarketplace marketplace = new RecipeMarketplace();
+        private final Map<String, String> environment = new HashMap<>();
         private Path npxPath = Paths.get("npx");
         private @Nullable Path log;
+        private @Nullable Path metricsCsv;
         private @Nullable Path recipeInstallDir;
-        private Duration timeout = Duration.ofSeconds(30);
-        private boolean verboseLogging;
-        private @Nullable Integer inspectBrk;
+        private Duration timeout = Duration.ofSeconds(60);
+        private boolean traceRpcMessages;
 
-        public Builder marketplace(Environment marketplace) {
+        private @Nullable Integer inspectBrk;
+        private @Nullable Path inspectBrkRewriteSourcePath;
+
+        private @Nullable Integer maxHeapSize;
+        private @Nullable Path workingDirectory;
+
+        public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
             return this;
         }
@@ -121,18 +247,28 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        public Builder metricsCsv(@Nullable Path metricsCsv) {
+            this.metricsCsv = metricsCsv;
+            return this;
+        }
+
+        public Builder environment(Map<String, String> environment) {
+            this.environment.putAll(environment);
+            return this;
+        }
+
         /**
          * Enables info and debug level logging.
          *
          * @return This builder.
          */
-        public Builder verboseLogging(boolean verboseLogging) {
-            this.verboseLogging = verboseLogging;
+        public Builder traceRpcMessages(boolean verboseLogging) {
+            this.traceRpcMessages = verboseLogging;
             return this;
         }
 
-        public Builder verboseLogging() {
-            return verboseLogging(true);
+        public Builder traceRpcMessages() {
+            return traceRpcMessages(true);
         }
 
         /**
@@ -140,16 +276,48 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
          * an "Attach to Node.js/Chrome" run configuration in IDEA to debug the JavaScript Rewrite RPC process.
          * The Rewrite RPC process will block waiting for this connection.
          *
-         * @param inspectBrk The port for the Node.js inspector to listen on.
+         * @param rewriteSourcePath The path to either OpenRewrite TypeScript source code, or inside a
+         *                          node_modules folder e.g., @openrewrite/rewrite. When
+         *                          running a test from within this project, the value should be
+         *                          "rewrite" (since "rewrite-javascript/rewrite" contains the TypeScript
+         *                          source code).
+         * @param inspectBrk        The port for the Node.js inspector to listen on.
          * @return This builder
          */
-        public Builder inspectBrk(@Nullable Integer inspectBrk) {
+        public Builder inspectBrk(Path rewriteSourcePath, int inspectBrk) {
             this.inspectBrk = inspectBrk;
+            this.inspectBrkRewriteSourcePath = rewriteSourcePath;
             return this;
         }
 
-        public Builder inspectBrk() {
-            return inspectBrk(9229);
+        public Builder inspectBrk(Path rewriteDistPath) {
+            return inspectBrk(rewriteDistPath, 9229);
+        }
+
+        /**
+         * Set the maximum heap size for the Node.js process in megabytes.
+         * Default V8 heap size is approximately 1.5-2 GB on 64-bit systems.
+         * For large repositories with many source files, you may need to increase this.
+         *
+         * @param maxHeapSize Maximum heap size in megabytes (e.g., 4096 for 4GB)
+         * @return This builder
+         */
+        public Builder maxHeapSize(@Nullable Integer maxHeapSize) {
+            this.maxHeapSize = maxHeapSize;
+            return this;
+        }
+
+        /**
+         * Set the working directory for the Node.js process.
+         * This affects where profile logs and other output files are generated.
+         * If not set, the process inherits the current working directory.
+         *
+         * @param workingDirectory The working directory for the Node.js process
+         * @return This builder
+         */
+        public Builder workingDirectory(@Nullable Path workingDirectory) {
+            this.workingDirectory = workingDirectory;
+            return this;
         }
 
         @Override
@@ -157,11 +325,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             Stream<@Nullable String> cmd;
 
             if (inspectBrk != null) {
-                // Find the server.js file - check local development path first, then installed package
-                Path serverJs = Paths.get("rewrite/dist/rpc/server.js");
-                if (!Files.exists(serverJs)) {
-                    serverJs = Paths.get("node_modules/@openrewrite/rewrite/dist/rpc/server.js");
-                }
+                Path serverJs = requireNonNull(inspectBrkRewriteSourcePath).resolve("dist/rpc/server.js");
 
                 // We have to use node directly here because npx spawns a child node process. The
                 // IDE's debug configuration would connect to the npx process rather than the spawned
@@ -170,10 +334,11 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         "node",
                         "--enable-source-maps",
                         "--inspect-brk=" + inspectBrk,
+                        maxHeapSize != null ? "--max-old-space-size=" + maxHeapSize : null,
                         serverJs.toAbsolutePath().normalize().toString(),
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                        verboseLogging ? "--verbose" : null,
-                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize().toString()
+                        traceRpcMessages ? "--trace-rpc-messages" : null,
+                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
                 );
             } else {
                 String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
@@ -183,19 +348,48 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
                         "rewrite-rpc",
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                        verboseLogging ? "--verbose" : null,
-                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize().toString()
+                        metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
+                        traceRpcMessages ? "--trace-rpc-messages" : null,
+                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
                 );
             }
 
-            RewriteRpcProcess process = new RewriteRpcProcess(cmd.filter(Objects::nonNull).toArray(String[]::new));
-//            process.trace();
-            process.environment().put("NODE_OPTIONS", "--enable-source-maps");
+            String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
+            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
+
+            // Set working directory if specified
+            if (workingDirectory != null) {
+                process.setWorkingDirectory(workingDirectory);
+            }
+
+            // Build NODE_OPTIONS with all necessary flags
+            StringBuilder nodeOptions = new StringBuilder("--enable-source-maps");
+            if (inspectBrk == null) {
+                // When not using inspect-brk, we need to pass Node.js flags via NODE_OPTIONS
+                // since npx spawns a child process
+                // Note: --prof is not allowed in NODE_OPTIONS for security reasons
+                if (maxHeapSize != null) {
+                    nodeOptions.append(" --max-old-space-size=").append(maxHeapSize);
+                }
+            }
+            process.environment().putAll(environment);
+            process.environment().put("NODE_OPTIONS", nodeOptions.toString());
+            if (npxPath.getParent() != null) {
+                // `npx` is typically a shebang script alongside the `node` executable
+                process.environment().put("PATH", npxPath.getParent() + File.pathSeparator +
+                        System.getenv("PATH"));
+            }
             process.start();
 
-            return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process.getRpcClient(), marketplace)
-                    .livenessCheck(process::getLivenessCheck)
-                    .timeout(timeout);
+            try {
+                return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process, marketplace,
+                        String.join(" ", cmdArr), process.environment())
+                        .livenessCheck(process::getLivenessCheck)
+                        .timeout(timeout)
+                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
     }
 }

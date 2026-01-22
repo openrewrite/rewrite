@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -36,18 +37,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Upgrade transitive Maven dependencies";
-    }
+    String displayName = "Upgrade transitive Maven dependencies";
 
-    @Override
-    public String getDescription() {
-        return "Upgrades the version of a transitive dependency in a Maven pom file. " +
+    String description = "Upgrades the version of a transitive dependency in a Maven pom file. " +
                "Leaves direct dependencies unmodified. " +
                "Can be paired with the regular Upgrade Dependency Version recipe to upgrade a dependency everywhere, " +
                "regardless of whether it is direct or transitive.";
-    }
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.apache.logging.log4j:ARTIFACT_ID:VERSION'.",
@@ -114,6 +109,52 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
     @Nullable
     Boolean addToRootPom;
 
+    @Option(displayName = "Because",
+            description = "The reason for upgrading the transitive dependency. This will be added as an XML comment preceding the managed dependency.",
+            required = false,
+            example = "CVE-2021-1234")
+    @Nullable
+    String because;
+
+    @Deprecated
+    public UpgradeTransitiveDependencyVersion(String groupId,
+                                              String artifactId,
+                                              String version,
+                                              @Nullable String scope,
+                                              @Nullable String type,
+                                              @Nullable String classifier,
+                                              @Nullable String versionPattern,
+                                              @Nullable Boolean releasesOnly,
+                                              @Nullable String onlyIfUsing,
+                                              @Nullable Boolean addToRootPom) {
+        this(groupId, artifactId, version, scope, type, classifier, versionPattern, releasesOnly, onlyIfUsing, addToRootPom, null);
+    }
+
+    @JsonCreator
+    public UpgradeTransitiveDependencyVersion(String groupId,
+                                              String artifactId,
+                                              String version,
+                                              @Nullable String scope,
+                                              @Nullable String type,
+                                              @Nullable String classifier,
+                                              @Nullable String versionPattern,
+                                              @Nullable Boolean releasesOnly,
+                                              @Nullable String onlyIfUsing,
+                                              @Nullable Boolean addToRootPom,
+                                              @Nullable String because) {
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.version = version;
+        this.scope = scope;
+        this.type = type;
+        this.classifier = classifier;
+        this.versionPattern = versionPattern;
+        this.releasesOnly = releasesOnly;
+        this.onlyIfUsing = onlyIfUsing;
+        this.addToRootPom = addToRootPom;
+        this.because = because;
+    }
+
     @Override
     public Validated<Object> validate() {
         return super.validate().and(Semver.validate(version, versionPattern));
@@ -157,6 +198,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
     }
 
     private AddManagedDependency addManagedDependency(String groupId, String artifactId) {
-        return new AddManagedDependency(groupId, artifactId, version, scope, type, classifier, versionPattern, releasesOnly, onlyIfUsing, addToRootPom);
+        return new AddManagedDependency(groupId, artifactId, version, scope, type, classifier, versionPattern, releasesOnly, onlyIfUsing, addToRootPom, because);
     }
 }

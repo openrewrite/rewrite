@@ -15,27 +15,24 @@
  */
 package org.openrewrite.groovy.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.groovy.style.OmitParenthesesStyle;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-
-import java.util.Optional;
+import org.openrewrite.style.Style;
 
 import static java.util.Objects.requireNonNull;
 
+@SuppressWarnings("unused")
 public class OmitParenthesesFormat extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Stylize Groovy code to omit parentheses";
-    }
+    @Getter
+    final String displayName = "Stylize Groovy code to omit parentheses";
 
-    @Override
-    public String getDescription() {
-        return "Omit parentheses for last argument lambdas in Groovy code.";
-    }
+    @Getter
+    final String description = "Omit parentheses for last argument lambdas in Groovy code.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -44,10 +41,10 @@ public class OmitParenthesesFormat extends Recipe {
 
     private static class OmitParenthesesFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
-                OmitParenthesesStyle style = Optional.ofNullable(cu.getStyle(OmitParenthesesStyle.class)).orElse(OmitParenthesesStyle.DEFAULT);
+                OmitParenthesesStyle style = Style.from(OmitParenthesesStyle.class, cu, () -> OmitParenthesesStyle.DEFAULT);
                 if (style.getLastArgumentLambda()) {
                     doAfterVisit(new OmitParenthesesForLastArgumentLambda().getVisitor());
                 }

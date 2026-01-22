@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -24,23 +25,18 @@ import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.TypecastParenPadStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-
-import java.util.Optional;
+import org.openrewrite.style.Style;
 
 import static java.util.Objects.requireNonNull;
 
 public class TypecastParenPad extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Typecast parentheses padding";
-    }
+    @Getter
+    final String displayName = "Typecast parentheses padding";
 
-    @Override
-    public String getDescription() {
-        return "Fixes whitespace padding between a typecast type identifier and the enclosing left and right parenthesis. " +
-               "For example, when configured to remove spacing, `( int ) 0L;` becomes `(int) 0L;`.";
-    }
+    @Getter
+    final String description = "Fixes whitespace padding between a typecast type identifier and the enclosing left and right parenthesis. " +
+        "For example, when configured to remove spacing, `( int ) 0L;` becomes `(int) 0L;`.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -52,12 +48,11 @@ public class TypecastParenPad extends Recipe {
         TypecastParenPadStyle typecastParenPadStyle;
 
         @Override
-        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
-                spacesStyle = Optional.ofNullable(cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces());
-                typecastParenPadStyle = Optional.ofNullable(cu.getStyle(TypecastParenPadStyle.class)).orElse(Checkstyle.typecastParenPadStyle());
-
+                spacesStyle = Style.from(SpacesStyle.class, cu, IntelliJ::spaces);
+                typecastParenPadStyle = Style.from(TypecastParenPadStyle.class, cu, Checkstyle::typecastParenPadStyle);
                 spacesStyle = spacesStyle.withWithin(spacesStyle.getWithin().withTypeCastParentheses(typecastParenPadStyle.getSpace()));
             }
             return super.visit(tree, ctx);
@@ -66,7 +61,7 @@ public class TypecastParenPad extends Recipe {
         @Override
         public J.TypeCast visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
             J.TypeCast tc = super.visitTypeCast(typeCast, ctx);
-            return (J.TypeCast) new SpacesVisitor<>(spacesStyle, null, null, tc)
+            return (J.TypeCast) new SpacesVisitor<>(spacesStyle, tc)
                     .visitNonNull(tc, ctx, getCursor().getParentTreeCursor().fork());
         }
     }

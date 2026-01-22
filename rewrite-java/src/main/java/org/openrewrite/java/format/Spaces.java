@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -28,15 +29,11 @@ import org.openrewrite.style.Style;
 
 public class Spaces extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Spaces";
-    }
+    @Getter
+    final String displayName = "Spaces";
 
-    @Override
-    public String getDescription() {
-        return "Format whitespace in Java code.";
-    }
+    @Getter
+    final String description = "Format whitespace in Java code.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -50,12 +47,12 @@ public class Spaces extends Recipe {
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
-                    SpacesStyle style = cu.getStyle(SpacesStyle.class);
-                    if (style == null) {
-                        style = IntelliJ.spaces();
-                    }
-                    return new SpacesVisitor<>(style, cu.getStyle(EmptyForInitializerPadStyle.class),
-                            cu.getStyle(EmptyForIteratorPadStyle.class)).visit(cu, ctx);
+                    return new SpacesVisitor<>(
+                            Style.from(SpacesStyle.class, cu, IntelliJ::spaces),
+                            Style.from(EmptyForInitializerPadStyle.class, cu),
+                            Style.from(EmptyForIteratorPadStyle.class, cu),
+                            null, false)
+                            .visit(cu, ctx);
                 }
                 return super.visit(tree, ctx);
             }
@@ -64,10 +61,12 @@ public class Spaces extends Recipe {
 
     public static <J2 extends J> J2 formatSpaces(J j, Cursor cursor) {
         SourceFile cu = cursor.firstEnclosingOrThrow(SourceFile.class);
-        SpacesStyle style = cu.getStyle(SpacesStyle.class);
+        SpacesStyle style = Style.from(SpacesStyle.class, cu);
         //noinspection unchecked
         return (J2) new SpacesVisitor<>(style == null ? IntelliJ.spaces() : style,
                 Style.from(EmptyForInitializerPadStyle.class, cu),
-                Style.from(EmptyForIteratorPadStyle.class, cu)).visitNonNull(j, 0, cursor);
+                Style.from(EmptyForIteratorPadStyle.class, cu),
+                null,
+                false).visitNonNull(j, 0, cursor);
     }
 }

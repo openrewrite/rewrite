@@ -30,15 +30,9 @@ public class RemoveMethodInvocations extends Recipe {
             example = "java.lang.StringBuilder append(java.lang.String)")
     String methodPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove method invocations";
-    }
+    String displayName = "Remove method invocations";
 
-    @Override
-    public String getDescription() {
-        return "Remove method invocations if syntactically safe.";
-    }
+    String description = "Remove method invocations if syntactically safe.";
 
     @Override
     public Validated<Object> validate() {

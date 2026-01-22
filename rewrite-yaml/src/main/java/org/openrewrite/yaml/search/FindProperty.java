@@ -54,15 +54,9 @@ public class FindProperty extends Recipe {
     @Nullable
     String propertyValue;
 
-    @Override
-    public String getDisplayName() {
-        return "Find YAML properties";
-    }
+    String displayName = "Find YAML properties";
 
-    @Override
-    public String getDescription() {
-        return "Find YAML properties that match the specified `propertyKey`. Expects dot notation for nested YAML mappings, similar to how Spring Boot interprets `application.yml` files.";
-    }
+    String description = "Find YAML properties that match the specified `propertyKey`. Expects dot notation for nested YAML mappings, similar to how Spring Boot interprets `application.yml` files.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
