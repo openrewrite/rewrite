@@ -290,8 +290,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                         .collect(toSet());
                 relevantProperties = filterPropertiesWithOverlapInDependencies(relevantProperties, groupId, artifactId, requestedPom, resolvedPom, configuredToChangeManagedDependency);
                 relevantProperties = filterPropertiesWithOverlapInChildren(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency);
-                relevantProperties = filterPropertiesWithOverlapInParents(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency, ctx);
-                return relevantProperties;
+                return filterPropertiesWithOverlapInParents(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency, ctx);
             }
 
 

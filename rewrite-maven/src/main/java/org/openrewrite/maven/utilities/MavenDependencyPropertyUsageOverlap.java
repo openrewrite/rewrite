@@ -21,10 +21,10 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
@@ -126,7 +126,7 @@ public class MavenDependencyPropertyUsageOverlap {
                         .filter(p -> !downloadedParent.getProperties().containsKey(p.substring(2, p.length() - 1)))
                         .collect(toSet());
                 remainingProperties = filterPropertiesWithOverlapInDependencies(remainingProperties, groupId, artifactId, downloadedParent, null, configuredToChangeManagedDependency);
-                currentResolved = downloadedParent.resolve(Collections.emptyList(), downloader, ctx);
+                currentResolved = downloadedParent.resolve(emptyList(), downloader, ctx);
             } catch (MavenDownloadingException e) {
                 // Give up
                 return remainingProperties;
