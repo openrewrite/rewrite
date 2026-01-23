@@ -1110,7 +1110,17 @@ class JsonPathMatcherTest {
     }
 
     @Test
-    void invalidJsonPathThrowsIllegalArgumentException() {
+    void invalidJsonPathValidationReturnsInvalid() {
+        var validated = JsonPathMatcher.validate("key", "$[invalid syntax");
+        assertThat(validated.isValid()).isFalse();
+        assertThat(validated.failures().get(0).getMessage())
+          .contains("Invalid JsonPath expression")
+          .contains("Syntax error at line 1:16")
+          .contains("extraneous input '<EOF>' expecting {']', Identifier, StringLiteral}");
+    }
+
+    @Test
+    void invalidJsonPathMatchesThrowsIllegalArgumentException() {
         Yaml.Documents yaml = (Yaml.Documents) new YamlParser().parse("key: value").findFirst().orElseThrow();
         JsonPathMatcher matcher = new JsonPathMatcher("$[invalid syntax");
         assertThatThrownBy(() -> new YamlVisitor<Integer>() {

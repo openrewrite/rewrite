@@ -115,7 +115,6 @@ public class MergeYaml extends Recipe {
                             return incoming != null;
                         }))
                 .and(Validated.required("key", key))
-                .and(JsonPathMatcher.validate("key", key))
                 .and(Validated.test("insertProperty", "Insert property must be filed when `insert mode` is either `BeforeProperty` or `AfterProperty`.", insertProperty,
                         s -> insertMode == null || insertMode == Last || !isBlank(s)));
     }
@@ -143,7 +142,7 @@ public class MergeYaml extends Recipe {
 
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
-                if ("$".equals(key)) {
+                if ("$".equals(key) || "$.".equals(key)) {
                     Yaml.Document d = document.withBlock((Yaml.Block)
                             new MergeYamlVisitor<>(document.getBlock(), incoming, accptTheirs, objectIdentifyingProperty, insertMode, insertProperty)
                                     .visitNonNull(document.getBlock(), ctx, getCursor())
