@@ -2023,11 +2023,13 @@ class ParserVisitor(ast.NodeVisitor):
         # Handle type parameters (Python 3.12+ PEP 695)
         type_params = getattr(node, 'type_params', None)
         if type_params:
-            type_parameters = JContainer(
+            type_parameters = j.TypeParameters(
+                random_id(),
                 self.__source_before('['),
+                Markers.EMPTY,
+                [],  # annotations
                 [self.__pad_list_element(self.__convert(tp), i == len(type_params) - 1, end_delim=']')
-                 for i, tp in enumerate(type_params)],
-                Markers.EMPTY
+                 for i, tp in enumerate(type_params)]
             )
         else:
             type_parameters = None
