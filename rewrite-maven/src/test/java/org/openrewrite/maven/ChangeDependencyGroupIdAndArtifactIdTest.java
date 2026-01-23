@@ -1145,6 +1145,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>parent</artifactId>
                     <version>1</version>
+                    <properties>
+                        <dep.version>3.1.1</dep.version>
+                    </properties>
                     <modules>
                         <module>child</module>
                     </modules>
@@ -1153,7 +1156,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                             <dependency>
                                 <groupId>org.springframework.cloud</groupId>
                                 <artifactId>spring-cloud-starter-sleuth</artifactId>
-                                <version>3.1.1</version>
+                                <version>${dep.version}</version>
                             </dependency>
                         </dependencies>
                     </dependencyManagement>
@@ -1164,6 +1167,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>parent</artifactId>
                     <version>1</version>
+                    <properties>
+                        <dep.version>1.0.12</dep.version>
+                    </properties>
                     <modules>
                         <module>child</module>
                     </modules>
@@ -1172,7 +1178,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                             <dependency>
                                 <groupId>io.micrometer</groupId>
                                 <artifactId>micrometer-tracing-bridge-brave</artifactId>
-                                <version>1.0.12</version>
+                                <version>${dep.version}</version>
                             </dependency>
                         </dependencies>
                     </dependencyManagement>
@@ -2127,7 +2133,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void changeDependencyGroupIdAndArtifactIdWithVersionPropertyLeavesProperty() {
+    void changeDependencyGroupIdAndArtifactIdWithVersionPropertyUpdatesProperty() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "javax.activation",
@@ -2163,13 +2169,75 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <properties>
-                      <activation.api>1.2.0</activation.api>
+                      <activation.api>1.2.2</activation.api>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>${activation.api}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeDependencyGroupIdAndArtifactIdWithVersionPropertyAlreadyInUseLeavesPropertyAndInlines() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.x",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <version.property>1.2.0</version.property>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>javax.activation</groupId>
+                          <artifactId>javax.activation-api</artifactId>
+                          <version>${version.property}</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.openrewrite.recipe</groupId>
+                          <artifactId>rewrite-recipe-bom</artifactId>
+                          <version>${version.property}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <version.property>1.2.0</version.property>
                   </properties>
                   <dependencies>
                       <dependency>
                           <groupId>jakarta.activation</groupId>
                           <artifactId>jakarta.activation-api</artifactId>
                           <version>1.2.2</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.openrewrite.recipe</groupId>
+                          <artifactId>rewrite-recipe-bom</artifactId>
+                          <version>${version.property}</version>
                       </dependency>
                   </dependencies>
               </project>
@@ -2433,6 +2501,310 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           </plugin>
                       </plugins>
                   </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void handlesGlobCorrectly() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "io.swagger",
+            "swagger-*",
+            "io.swagger.core.v3",
+            null,
+            "2.2.42",
+            null
+          )),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo-child</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <properties>
+                  <version.swagger>1.5.16</version.swagger>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.swagger</groupId>
+                    <artifactId>swagger-annotations</artifactId>
+                    <version>${version.swagger}</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger</groupId>
+                    <artifactId>swagger-models</artifactId>
+                    <version>${version.swagger}</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger</groupId>
+                    <artifactId>swagger-core</artifactId>
+                    <version>${version.swagger}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo-child</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <properties>
+                  <version.swagger>2.2.42</version.swagger>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.swagger.core.v3</groupId>
+                    <artifactId>swagger-annotations</artifactId>
+                    <version>${version.swagger}</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger.core.v3</groupId>
+                    <artifactId>swagger-models</artifactId>
+                    <version>${version.swagger}</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger.core.v3</groupId>
+                    <artifactId>swagger-core</artifactId>
+                    <version>${version.swagger}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void handlesGlobCorrectlyLeavingPropertyIfNecessary() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "io.swagger",
+            "swagger-*",
+            "io.swagger.core.v3",
+            null,
+            "2.2.0",
+            null
+          )),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo-child</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <properties>
+                  <dep.version>1.6.1</dep.version>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.swagger</groupId>
+                    <artifactId>swagger-annotations</artifactId>
+                    <version>${dep.version}</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger</groupId>
+                    <artifactId>swagger-models</artifactId>
+                    <version>${dep.version}</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger</groupId>
+                    <artifactId>swagger-core</artifactId>
+                    <version>${dep.version}</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>org.openrewrite.recipe</groupId>
+                    <artifactId>rewrite-recipe-bom</artifactId>
+                    <version>${dep.version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo-child</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <properties>
+                  <dep.version>1.6.1</dep.version>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.swagger.core.v3</groupId>
+                    <artifactId>swagger-annotations</artifactId>
+                    <version>2.2.0</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger.core.v3</groupId>
+                    <artifactId>swagger-models</artifactId>
+                    <version>2.2.0</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger.core.v3</groupId>
+                    <artifactId>swagger-core</artifactId>
+                    <version>2.2.0</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>org.openrewrite.recipe</groupId>
+                    <artifactId>rewrite-recipe-bom</artifactId>
+                    <version>${dep.version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void handlesGlobCorrectlyWhenAlsoConflictingManagedLeavingPropertyIfNecessary() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "io.swagger",
+            "swagger-*",
+            "io.swagger.core.v3",
+            null,
+            "2.2.0",
+            null,
+            null,
+            false
+          )),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo-child</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <properties>
+                  <dep.version>1.6.1</dep.version>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.swagger</groupId>
+                      <artifactId>swagger-hibernate-validations</artifactId>
+                      <version>${dep.version}</version>
+                      </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.swagger</groupId>
+                    <artifactId>swagger-annotations</artifactId>
+                    <version>${dep.version}</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger</groupId>
+                    <artifactId>swagger-models</artifactId>
+                    <version>${dep.version}</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger</groupId>
+                    <artifactId>swagger-core</artifactId>
+                    <version>${dep.version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo-child</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <properties>
+                  <dep.version>1.6.1</dep.version>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.swagger</groupId>
+                      <artifactId>swagger-hibernate-validations</artifactId>
+                      <version>${dep.version}</version>
+                      </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.swagger.core.v3</groupId>
+                    <artifactId>swagger-annotations</artifactId>
+                    <version>2.2.0</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger.core.v3</groupId>
+                    <artifactId>swagger-models</artifactId>
+                    <version>2.2.0</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger.core.v3</groupId>
+                    <artifactId>swagger-core</artifactId>
+                    <version>2.2.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void handlesCollisionInDeepRemoteParent() {
+        rewriteRun(
+            spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+              "io.swagger",
+              "swagger-annotations",
+              "io.swagger.core.v3",
+              null,
+              "2.2.0",
+              null
+            )),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example.myapp</groupId>
+                  <artifactId>myapp</artifactId>
+                  <version>1</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>4.0.1</version>
+                  </parent>
+                  <properties>
+                      <jsonassert.version>1.5.3</jsonassert.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.swagger</groupId>
+                          <artifactId>swagger-annotations</artifactId>
+                          <version>${jsonassert.version}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example.myapp</groupId>
+                  <artifactId>myapp</artifactId>
+                  <version>1</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>4.0.1</version>
+                  </parent>
+                  <properties>
+                      <jsonassert.version>1.5.3</jsonassert.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.swagger.core.v3</groupId>
+                          <artifactId>swagger-annotations</artifactId>
+                          <version>2.2.0</version>
+                      </dependency>
+                  </dependencies>
               </project>
               """
           )
