@@ -1123,4 +1123,10 @@ class JsonPathMatcherTest {
           .hasRootCauseInstanceOf(IllegalArgumentException.class)
           .hasRootCauseMessage("Syntax error at line 1:16 extraneous input '<EOF>' expecting {']', Identifier, StringLiteral}. Original input: '$[invalid syntax'");
     }
+
+    @Test
+    void rootOnlyJsonPathIsValid() {
+        // "$" alone is valid and means "root" - handled as special case
+        assertThat(JsonPathMatcher.validate("key", "$").isValid()).isTrue();
+    }
 }

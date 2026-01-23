@@ -57,6 +57,10 @@ public class JsonPathMatcher {
     }
 
     public static Validated<String> validate(String property, String jsonPath) {
+        // "$" alone is valid and means "root" - it's handled as a special case in recipes
+        if ("$".equals(jsonPath)) {
+            return Validated.valid(property, jsonPath);
+        }
         try {
             new JsonPathMatcher(jsonPath).parse();
             return Validated.valid(property, jsonPath);
