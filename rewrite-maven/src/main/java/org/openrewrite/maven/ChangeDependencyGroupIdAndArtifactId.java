@@ -20,7 +20,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
@@ -33,12 +32,12 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.*;
 
 import static java.util.Collections.max;
-import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Validated.required;
 import static org.openrewrite.Validated.test;
 import static org.openrewrite.internal.StringUtils.isBlank;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
+import static org.openrewrite.maven.utilities.MavenDependencyPropertyUsageOverlap.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -149,16 +148,15 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             @Nullable
             private Collection<String> availableVersions;
             private boolean isNewDependencyPresent;
-            private boolean hasProblematicVersionPlaceholder;
-            private final boolean oldGavPatternsUseGlob = oldGroupId.contains("*") ||  oldArtifactId.contains("*");
+            private Set<String> safeVersionPlaceholdersToChange = new HashSet<>();
             private final boolean configuredToOverrideManagedVersion = overrideManagedVersion != null && overrideManagedVersion; // False by default
             private final boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency;  // True by default
 
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 isNewDependencyPresent = checkIfNewDependencyPresent(newGroupId, newArtifactId, newVersion);
-                hasProblematicVersionPlaceholder = hasProblematicPropertyUsage(oldGroupId, oldArtifactId, ctx);
-                if (!oldGavPatternsUseGlob && configuredToChangeManagedDependency) {
+                safeVersionPlaceholdersToChange = getSafeVersionPlaceholdersToChange(oldGroupId, oldArtifactId, ctx);
+                if (configuredToChangeManagedDependency) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
                             oldGroupId, oldArtifactId,
                             Optional.ofNullable(newGroupId).orElse(oldGroupId),
@@ -212,7 +210,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                                     t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false, true).visit(t, ctx);
                                 } else {
                                     // Otherwise, change the version to the new value.
-                                    if (hasProblematicVersionPlaceholder) {
+                                    String versionTagValue = t.getChildValue("version").orElse(null);
+                                    if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
                                         t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
                                     } else {
                                         t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
@@ -267,7 +266,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 // `ChangeManagedDependencyGroupIdAndArtifactId` cannot manipulate BOM imported managed dependencies nor direct dependencies from remote parents
                 Pom requestedPom = result.getPom().getRequested();
                 for (ManagedDependency requestedManagedDependency : requestedPom.getDependencyManagement()) {
-                    if (groupId.equals(requestedManagedDependency.getGroupId()) && artifactId.equals(requestedManagedDependency.getArtifactId())) {
+                    if (matchesGlob(requestedManagedDependency.getGroupId(), groupId) && matchesGlob(requestedManagedDependency.getArtifactId(), artifactId)) {
                         if (requestedManagedDependency instanceof ManagedDependency.Defined) {
                             return scope.isInClasspathOf(Scope.fromName(((ManagedDependency.Defined) requestedManagedDependency).getScope()));
                         }
@@ -279,75 +278,20 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 return false;
             }
 
-            private boolean hasPropertyOverlapInDependencies(String relevantProperty, String groupId, String artifactId, Pom requestedPom, @Nullable ResolvedPom resolvedPom) {
-                // resolvedPom being `null` is an indicator of dealing with a remote parent that we can't change
-                if (requestedPom.getDependencyManagement().stream()
-                        .anyMatch(md -> relevantProperty.equals(md.getVersion()) &&
-                                (resolvedPom == null || !groupId.equals(resolvedPom.getValue(md.getGroupId())) || !artifactId.equals(resolvedPom.getValue(md.getArtifactId()))))
-                ) {
-                    return true;
-                }
-                return requestedPom.getDependencies().stream()
-                        .anyMatch(d -> relevantProperty.equals(d.getVersion()) &&
-                                (resolvedPom == null || !matchesGlob(resolvedPom.getValue(d.getGroupId()), groupId) || !matchesGlob(resolvedPom.getValue(d.getArtifactId()), artifactId)));
-            }
-
-            private boolean checkOverlapInChildren(String relevantProperty, String groupId, String artifactId, MavenResolutionResult result) {
-                return result.getModules().stream().anyMatch(c -> {
-                    ResolvedPom childResolvedPom = c.getPom();
-                    Pom childRequestedPom = childResolvedPom.getRequested();
-                    return hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, childRequestedPom, childResolvedPom) &&
-                                    !childRequestedPom.getProperties().containsKey(relevantProperty.substring(2, relevantProperty.length() - 1));
-                });
-            }
-
-            private boolean hasProblematicPropertyUsage(String groupId, String artifactId, ExecutionContext ctx) {
+            private Set<String> getSafeVersionPlaceholdersToChange(String groupId, String artifactId, ExecutionContext ctx) {
                 MavenResolutionResult result = getResolutionResult();
-                final ResolvedPom resolvedPom = result.getPom();
+                ResolvedPom resolvedPom = result.getPom();
                 Pom requestedPom = resolvedPom.getRequested();
-                List<GroupArtifactVersion> relevantGavsUsingProperty = requestedPom.getDependencies().stream()
+                Set<String> relevantProperties = requestedPom.getDependencies().stream()
                         .filter(d -> isProperty(d.getVersion()) &&
                                 matchesGlob(resolvedPom.getValue(d.getGroupId()), groupId) &&
                                 matchesGlob(resolvedPom.getValue(d.getArtifactId()), artifactId))
-                        .map(Dependency::getGav)
-                        .collect(toList());
-                if (relevantGavsUsingProperty.isEmpty()) {
-                    return false;
-                }
-                GroupArtifactVersion relevantGavUsingProperty = relevantGavsUsingProperty.get(0);
-                // We already proved it was a placeholder
-                String relevantProperty = requireNonNull(relevantGavUsingProperty.getVersion());
-                if (hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, requestedPom, resolvedPom)) {
-                    return true;
-                }
-                MavenResolutionResult current = result;
-                while (current.parentPomIsProjectPom()) {
-                    current = requireNonNull(current.getParent());
-                    ResolvedPom currentResolved = current.getPom();
-                    if (hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, currentResolved.getRequested(), currentResolved)) {
-                        return true;
-                    }
-                }
-                if (checkOverlapInChildren(relevantProperty, groupId, artifactId, result)) {
-                    return true;
-                }
-                ResolvedPom relevantContextPom = current.getPom();
-                Parent remoteParent = relevantContextPom.getRequested().getParent();
-                if (remoteParent != null) {
-                    try {
-                        Pom downloadedParent = new MavenPomDownloader(current.getProjectPoms(), ctx)
-                                .download(remoteParent.getGav(), null, relevantContextPom, relevantContextPom.getRepositories());
-                        if (downloadedParent.getProperties().containsKey(relevantProperty.substring(2, relevantProperty.length() - 1)) ||
-                                hasPropertyOverlapInDependencies(relevantProperty, groupId, artifactId, downloadedParent, null)
-                        ) {
-                            return true;
-                        }
-                    } catch (MavenDownloadingException e) {
-                        // Give up
-                        return false;
-                    }
-                }
-                return false;
+                        .map(Dependency::getVersion)
+                        .collect(toSet());
+                relevantProperties = filterPropertiesWithOverlapInDependencies(relevantProperties, groupId, artifactId, requestedPom, resolvedPom, configuredToChangeManagedDependency);
+                relevantProperties = filterPropertiesWithOverlapInChildren(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency);
+                relevantProperties = filterPropertiesWithOverlapInParents(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency, ctx);
+                return relevantProperties;
             }
 
 
