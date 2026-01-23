@@ -45,6 +45,11 @@ public class DeleteKey extends Recipe {
     String description = "Delete a YAML mapping entry key.";
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(JsonPathMatcher.validate("keyPath", keyPath));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(keyPath);
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {

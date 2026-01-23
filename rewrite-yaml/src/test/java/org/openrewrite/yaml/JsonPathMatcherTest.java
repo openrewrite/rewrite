@@ -26,6 +26,7 @@ import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JsonPathMatcherTest {
 
@@ -1106,5 +1107,20 @@ class JsonPathMatcherTest {
         }.reduce(new YamlParser().parse(before.toArray(new String[0]))
           .findFirst()
           .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML")), new ArrayList<>());
+    }
+
+    @Test
+    void invalidJsonPathThrowsIllegalArgumentException() {
+        Yaml.Documents yaml = (Yaml.Documents) new YamlParser().parse("key: value").findFirst().orElseThrow();
+        JsonPathMatcher matcher = new JsonPathMatcher("$[invalid syntax");
+        assertThatThrownBy(() -> new YamlVisitor<Integer>() {
+            @Override
+            public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, Integer p) {
+                matcher.matches(getCursor());
+                return entry;
+            }
+        }.reduce(yaml, 0))
+          .hasRootCauseInstanceOf(IllegalArgumentException.class)
+          .hasRootCauseMessage("Syntax error at line 1:16 extraneous input '<EOF>' expecting {']', Identifier, StringLiteral}. Original input: '$[invalid syntax'");
     }
 }

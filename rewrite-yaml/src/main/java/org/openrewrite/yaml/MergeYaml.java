@@ -115,6 +115,7 @@ public class MergeYaml extends Recipe {
                             return incoming != null;
                         }))
                 .and(Validated.required("key", key))
+                .and(JsonPathMatcher.validate("key", key))
                 .and(Validated.test("insertProperty", "Insert property must be filed when `insert mode` is either `BeforeProperty` or `AfterProperty`.", insertProperty,
                         s -> insertMode == null || insertMode == Last || !isBlank(s)));
     }
