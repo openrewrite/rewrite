@@ -392,7 +392,7 @@ class PythonRpcReceiver:
             AssignmentOperation, Unary, Ternary, Lambda, Empty, Throw,
             Assert, Break, Continue, WhileLoop, ForEachLoop, Switch, Case,
             Annotation, Import, Binary as JBinary, Parentheses, ControlParentheses,
-            NewArray, Modifier, Yield, ParameterizedType
+            NewArray, Modifier, Yield, ParameterizedType, TypeParameter, TypeParameters
         )
 
         if isinstance(j, Identifier):
@@ -481,6 +481,10 @@ class PythonRpcReceiver:
             return self._visit_j_yield(j, q)
         elif isinstance(j, ParameterizedType):
             return self._visit_j_parameterized_type(j, q)
+        elif isinstance(j, TypeParameter):
+            return self._visit_j_type_parameter(j, q)
+        elif isinstance(j, TypeParameters):
+            return self._visit_j_type_parameters(j, q)
 
         return j
 
@@ -795,6 +799,21 @@ class PythonRpcReceiver:
         )
         type_ = q.receive(param_type.type)
         return replace_if_changed(param_type, clazz=clazz, type_parameters=type_parameters, type=type_)
+
+    def _visit_j_type_parameter(self, tp, q: RpcReceiveQueue):
+        annotations = q.receive_list(tp.annotations)
+        modifiers = q.receive_list(tp.modifiers)
+        name = q.receive(tp.name)
+        bounds = q.receive(
+            tp.padding.bounds if hasattr(tp, 'padding') and hasattr(tp.padding, 'bounds') else None,
+            lambda c: self._receive_container(c, q) if c else None
+        )
+        return replace_if_changed(tp, annotations=annotations, modifiers=modifiers, name=name, bounds=bounds)
+
+    def _visit_j_type_parameters(self, tps, q: RpcReceiveQueue):
+        annotations = q.receive_list(tps.annotations)
+        type_parameters = q.receive_list(tps.padding.type_parameters, lambda rp: self._receive_right_padded(rp, q))
+        return replace_if_changed(tps, annotations=annotations, type_parameters=type_parameters)
 
     # Helper methods for Space, JRightPadded, JLeftPadded, JContainer
 

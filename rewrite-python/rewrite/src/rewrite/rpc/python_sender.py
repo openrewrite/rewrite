@@ -360,7 +360,7 @@ class PythonRpcSender:
             AssignmentOperation, Unary, Ternary, Lambda, Empty, Throw,
             Assert, Break, Continue, WhileLoop, ForEachLoop, Switch, Case, Annotation, Import,
             Binary, Parentheses, ControlParentheses, NewArray, Modifier, Yield,
-            ParameterizedType
+            ParameterizedType, TypeParameter, TypeParameters
         )
 
         # For Java types, we need to handle their specific fields
@@ -450,6 +450,10 @@ class PythonRpcSender:
             self._visit_j_yield(j, q)
         elif isinstance(j, ParameterizedType):
             self._visit_j_parameterized_type(j, q)
+        elif isinstance(j, TypeParameter):
+            self._visit_j_type_parameter(j, q)
+        elif isinstance(j, TypeParameters):
+            self._visit_j_type_parameters(j, q)
 
     def _visit_identifier(self, ident, q: 'RpcSendQueue') -> None:
         # Java Identifier sends: annotations (list), simpleName, type (ref), fieldType (ref)
@@ -770,6 +774,27 @@ class PythonRpcSender:
         q.get_and_send(pt, lambda x: x.clazz, lambda el: self._visit(el, q))
         q.get_and_send(pt, lambda x: x.padding.type_parameters, lambda c: self._visit_container(c, q))
         q.get_and_send(pt, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
+
+    def _visit_j_type_parameter(self, tp, q: 'RpcSendQueue') -> None:
+        # Java TypeParameter: annotations (list), modifiers (list), name (Expression), bounds (JContainer)
+        q.get_and_send_list(tp, lambda x: x.annotations,
+                           lambda a: a.id,
+                           lambda a: self._visit(a, q))
+        q.get_and_send_list(tp, lambda x: x.modifiers,
+                           lambda m: m.id,
+                           lambda m: self._visit(m, q))
+        q.get_and_send(tp, lambda x: x.name, lambda el: self._visit(el, q))
+        q.get_and_send(tp, lambda x: x.padding.bounds if hasattr(x, 'padding') and hasattr(x.padding, 'bounds') else None,
+                      lambda c: self._visit_container(c, q) if c else None)
+
+    def _visit_j_type_parameters(self, tps, q: 'RpcSendQueue') -> None:
+        # Java TypeParameters: annotations (list), typeParameters (list of JRightPadded)
+        q.get_and_send_list(tps, lambda x: x.annotations,
+                           lambda a: a.id,
+                           lambda a: self._visit(a, q))
+        q.get_and_send_list(tps, lambda x: x.padding.type_parameters,
+                           lambda rp: rp.element.id,
+                           lambda rp: self._visit_right_padded(rp, q))
 
     # Helper methods for Space, JRightPadded, JLeftPadded, JContainer
 
