@@ -129,6 +129,7 @@ public interface JavaParser extends Parser {
         }
         List<Path> artifacts = new ArrayList<>(artifactNamesWithVersions.length);
         Set<String> missingArtifactNames = new LinkedHashSet<>(Arrays.asList(artifactNamesWithVersions));
+        List<String> availableArtifacts = new ArrayList<>();
 
         TypeTable typeTable = TypeTable.fromClasspath(ctx, missingArtifactNames);
         if (typeTable != null) {
@@ -139,6 +140,9 @@ public interface JavaParser extends Parser {
                     artifacts.add(located);
                     it.remove();
                 }
+            }
+            if (!missingArtifactNames.isEmpty()) {
+                availableArtifacts.addAll(typeTable.availableArtifacts());
             }
         }
 
@@ -151,12 +155,20 @@ public interface JavaParser extends Parser {
                         missingArtifactNames.remove(missingArtifactName);
                     }
                 }
+                if (!missingArtifactNames.isEmpty()) {
+                    availableArtifacts.addAll(classpathLoader.availableArtifacts());
+                }
             }
         }
 
         if (!missingArtifactNames.isEmpty()) {
             String missing = missingArtifactNames.stream().sorted().collect(joining("', '", "'", "'"));
-            throw new IllegalArgumentException(String.format("Unable to find classpath resource dependencies beginning with: %s", missing));
+            StringBuilder message = new StringBuilder();
+            message.append("Unable to find classpath resource dependencies beginning with: ").append(missing);
+            if (!availableArtifacts.isEmpty()) {
+                message.append(" in [").append(String.join(", ", availableArtifacts)).append(']');
+            }
+            throw new IllegalArgumentException(message.toString());
         }
 
         return artifacts;
