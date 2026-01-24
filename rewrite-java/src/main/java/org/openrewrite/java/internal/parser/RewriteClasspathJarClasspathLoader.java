@@ -63,7 +63,7 @@ public class RewriteClasspathJarClasspathLoader implements JavaParserClasspathLo
 
     @Override
     public @Nullable Path load(String artifactName) {
-        Pattern jarPattern = Pattern.compile(artifactName + "-?.*\\.jar");
+        Pattern jarPattern = Pattern.compile(artifactName + "-?.*\\.jar$");
         for (Resource resource : resources) {
             String fileName = Paths.get(resource.getPath()).getFileName().toString();
             if (jarPattern.matcher(fileName).matches()) {
