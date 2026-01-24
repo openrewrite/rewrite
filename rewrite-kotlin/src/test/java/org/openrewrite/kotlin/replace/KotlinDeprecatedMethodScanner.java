@@ -148,6 +148,10 @@ public class KotlinDeprecatedMethodScanner {
 
                 if (name.endsWith(".class") && !"module-info.class".equals(name)) {
                     String className = name.replace('/', '.').replace(".class", "");
+                    // Skip internal Kotlin implementation classes
+                    if (className.contains("$DefaultImpls") || className.contains("__")) {
+                        continue;
+                    }
                     try {
                         Class<?> clazz = classLoader.loadClass(className);
                         List<DeprecatedMethod> methods = extractDeprecatedMethods(clazz, classpathResource);
@@ -216,6 +220,10 @@ public class KotlinDeprecatedMethodScanner {
 
         // Scan methods using reflection
         for (Method method : clazz.getDeclaredMethods()) {
+            // Skip synthetic annotation holder methods
+            if (method.getName().contains("$annotations")) {
+                continue;
+            }
             Deprecated deprecated = method.getAnnotation(Deprecated.class);
             if (deprecated != null) {
                 ReplaceWith replaceWith = deprecated.replaceWith();
@@ -344,12 +352,17 @@ public class KotlinDeprecatedMethodScanner {
         pattern.append(method.getName());
         pattern.append("(");
 
+        java.lang.reflect.Type[] genericParams = method.getGenericParameterTypes();
         Class<?>[] params = method.getParameterTypes();
-        if (params.length > 0) {
-            pattern.append(Arrays.stream(params)
-                    .map(this::classToPattern)
-                    .collect(joining(", ")));
+        StringJoiner paramJoiner = new StringJoiner(", ");
+        for (int i = 0; i < params.length; i++) {
+            if (genericParams[i] instanceof java.lang.reflect.TypeVariable<?>) {
+                paramJoiner.add("*");
+            } else {
+                paramJoiner.add(classToPattern(params[i]));
+            }
         }
+        pattern.append(paramJoiner);
         pattern.append(")");
 
         return pattern.toString();
@@ -385,11 +398,21 @@ public class KotlinDeprecatedMethodScanner {
         if (type.isArray()) {
             return classToPattern(type.getComponentType()) + "[]";
         }
+        // Map Java/JVM types to Kotlin types (the Kotlin parser uses Kotlin type names)
+        if (type == int.class) return "kotlin.Int";
+        if (type == long.class) return "kotlin.Long";
+        if (type == short.class) return "kotlin.Short";
+        if (type == byte.class) return "kotlin.Byte";
+        if (type == float.class) return "kotlin.Float";
+        if (type == double.class) return "kotlin.Double";
+        if (type == boolean.class) return "kotlin.Boolean";
+        if (type == char.class) return "kotlin.Char";
+        if (type == void.class) return "kotlin.Unit";
         String name = type.getName();
-        // Map JVM function types back to Kotlin types (the Kotlin parser uses kotlin.FunctionN)
         if (name.startsWith("kotlin.jvm.functions.Function")) {
             return "kotlin." + name.substring("kotlin.jvm.functions.".length());
         }
+        if ("java.lang.Object".equals(name)) return "kotlin.Any";
         return name;
     }
 
@@ -407,26 +430,10 @@ public class KotlinDeprecatedMethodScanner {
     }
 
     private String mapKotlinType(String kotlinType) {
+        // Keep Kotlin type names as-is since the Kotlin parser uses them in the LST.
+        // Only map types that the Kotlin parser represents differently.
         return switch (kotlinType) {
-            case "kotlin.Int" -> "int";
-            case "kotlin.Long" -> "long";
-            case "kotlin.Short" -> "short";
-            case "kotlin.Byte" -> "byte";
-            case "kotlin.Float" -> "float";
-            case "kotlin.Double" -> "double";
-            case "kotlin.Boolean" -> "boolean";
-            case "kotlin.Char" -> "char";
             case "kotlin.String" -> "java.lang.String";
-            case "kotlin.Unit" -> "void";
-            case "kotlin.Any" -> "java.lang.Object";
-            case "kotlin.IntArray" -> "int[]";
-            case "kotlin.LongArray" -> "long[]";
-            case "kotlin.ShortArray" -> "short[]";
-            case "kotlin.ByteArray" -> "byte[]";
-            case "kotlin.FloatArray" -> "float[]";
-            case "kotlin.DoubleArray" -> "double[]";
-            case "kotlin.BooleanArray" -> "boolean[]";
-            case "kotlin.CharArray" -> "char[]";
             default -> kotlinType;
         };
     }

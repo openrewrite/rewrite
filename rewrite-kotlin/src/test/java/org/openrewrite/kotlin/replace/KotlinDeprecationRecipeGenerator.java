@@ -80,8 +80,6 @@ public class KotlinDeprecationRecipeGenerator {
 
         Set<String> seen = new LinkedHashSet<>();
         List<DeprecatedMethod> methods = result.deprecatedMethods().stream()
-                // Filter out $DefaultImpls (internal Kotlin implementation detail)
-                .filter(m -> !m.methodPattern().contains("$DefaultImpls"))
                 .sorted(comparing(DeprecatedMethod::methodPattern))
                 // Deduplicate by method pattern (same method can be found on multiple classes)
                 .filter(m -> seen.add(m.methodPattern()))
