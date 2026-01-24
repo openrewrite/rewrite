@@ -65,7 +65,7 @@ tasks {
         description = "Generate recipes from Kotlin @Deprecated annotations with ReplaceWith."
         mainClass = "org.openrewrite.kotlin.replace.KotlinDeprecationRecipeGenerator"
         classpath = sourceSets.getByName("test").runtimeClasspath
-        args("arrow-core", "kotlinx-coroutines-core", "kotlinx-serialization-core")
+        args("kotlinx-coroutines-core", "kotlinx-serialization-core")
         finalizedBy("licenseFormat")
     }
 }

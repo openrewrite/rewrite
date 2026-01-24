@@ -85,6 +85,7 @@ public class KotlinDeprecationRecipeGenerator {
                 .filter(m -> seen.add(m.methodPattern()))
                 .toList();
         for (DeprecatedMethod method : methods) {
+            yaml.append("  # ").append(method.deprecatedAnnotation()).append("\n");
             yaml.append("  - org.openrewrite.kotlin.replace.ReplaceDeprecatedKotlinMethod:\n");
             yaml.append("      methodPattern: '").append(escapeYaml(method.methodPattern())).append("'\n");
             yaml.append("      replacement: '").append(escapeYaml(method.replacement())).append("'\n");
@@ -99,7 +100,7 @@ public class KotlinDeprecationRecipeGenerator {
             yaml.append("      classpathFromResources:\n");
             yaml.append("        - '").append(escapeYaml(method.classpathResource())).append("'\n");
         }
-        System.out.println("Generated " + methods.size() + " deprecated method recipes");
+        System.out.printf("Generated %d deprecated method recipes for %s:%s%n", methods.size(), result.artifactId(), result.version());
         return yaml;
     }
 

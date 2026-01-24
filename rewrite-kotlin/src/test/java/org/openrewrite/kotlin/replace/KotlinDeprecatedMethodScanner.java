@@ -67,7 +67,8 @@ public class KotlinDeprecatedMethodScanner {
             String methodPattern,
             String replacement,
             List<String> imports,
-            String classpathResource
+            String classpathResource,
+            String deprecatedAnnotation
     ) {
     }
 
@@ -234,12 +235,28 @@ public class KotlinDeprecatedMethodScanner {
                     String declaringType = findOriginalDeclaringType(clazz, method);
                     String methodPattern = buildMethodPattern(declaringType, method, kmFunctions);
                     List<String> imports = Arrays.asList(replaceWith.imports());
-                    methods.add(new DeprecatedMethod(methodPattern, expression, imports, classpathResource));
+                    String annotation = formatDeprecatedAnnotation(deprecated);
+                    methods.add(new DeprecatedMethod(methodPattern, expression, imports, classpathResource, annotation));
                 }
             }
         }
 
         return methods;
+    }
+
+    private String formatDeprecatedAnnotation(Deprecated deprecated) {
+        StringBuilder sb = new StringBuilder("@Deprecated(\"");
+        sb.append(deprecated.message().replace("\"", "\\\"").replace("\n", " "));
+        sb.append("\", ReplaceWith(\"");
+        ReplaceWith replaceWith = deprecated.replaceWith();
+        sb.append(replaceWith.expression().replace("\"", "\\\""));
+        sb.append("\"");
+        for (String imp : replaceWith.imports()) {
+            sb.append(", \"").append(imp).append("\"");
+        }
+        sb.append("), DeprecationLevel.").append(deprecated.level().name());
+        sb.append(")");
+        return sb.toString();
     }
 
     /**

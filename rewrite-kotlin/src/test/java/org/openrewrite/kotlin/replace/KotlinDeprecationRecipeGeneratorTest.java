@@ -55,13 +55,15 @@ class KotlinDeprecationRecipeGeneratorTest {
                     "com.example.Foo bar(java.lang.String)",
                     "baz(s)",
                     List.of(),
-                    "my-lib-1"
+                    "my-lib-1",
+                    "@Deprecated(\"Use baz instead\", ReplaceWith(\"baz(s)\"), DeprecationLevel.WARNING)"
             ));
             ScanResult result = new ScanResult("com.example", "my-lib", "1.0.0", "1", methods);
 
             String yaml = generateYamlRecipe(result).toString();
 
             assertThat(yaml).contains("methodPattern: 'com.example.Foo bar(java.lang.String)'");
+            assertThat(yaml).contains("  # @Deprecated(\"Use baz instead\", ReplaceWith(\"baz(s)\"), DeprecationLevel.WARNING)");
         }
 
         @Test
@@ -71,7 +73,8 @@ class KotlinDeprecationRecipeGeneratorTest {
                     "com.example.Foo bar()",
                     "newBar()",
                     List.of(),
-                    "my-lib-1"
+                    "my-lib-1",
+                    "@Deprecated(\"Use newBar instead\", ReplaceWith(\"newBar()\"), DeprecationLevel.WARNING)"
             ));
             ScanResult result = new ScanResult("com.example", "my-lib", "1.0.0", "1", methods);
 
@@ -87,7 +90,8 @@ class KotlinDeprecationRecipeGeneratorTest {
                     "com.example.Foo bar()",
                     "Helper.create()",
                     List.of("com.example.Helper", "com.example.util.Utils"),
-                    "my-lib-1"
+                    "my-lib-1",
+                    "@Deprecated(\"Use Helper.create instead\", ReplaceWith(\"Helper.create()\", \"com.example.Helper\", \"com.example.util.Utils\"), DeprecationLevel.WARNING)"
             ));
             ScanResult result = new ScanResult("com.example", "my-lib", "1.0.0", "1", methods);
 
@@ -105,7 +109,8 @@ class KotlinDeprecationRecipeGeneratorTest {
                     "com.example.Foo bar()",
                     "baz()",
                     List.of(),
-                    "my-lib-1"
+                    "my-lib-1",
+                    "@Deprecated(\"Use baz\", ReplaceWith(\"baz()\"), DeprecationLevel.WARNING)"
             ));
             ScanResult result = new ScanResult("com.example", "my-lib", "1.0.0", "1", methods);
 
@@ -121,7 +126,8 @@ class KotlinDeprecationRecipeGeneratorTest {
                     "com.example.Foo bar()",
                     "baz()",
                     List.of(),
-                    "my-lib-1"
+                    "my-lib-1",
+                    "@Deprecated(\"Use baz\", ReplaceWith(\"baz()\"), DeprecationLevel.WARNING)"
             ));
             ScanResult result = new ScanResult("com.example", "my-lib", "1.0.0", "1", methods);
 
@@ -138,7 +144,8 @@ class KotlinDeprecationRecipeGeneratorTest {
                     "com.example.Foo bar()",
                     "it's working",
                     List.of(),
-                    "my-lib-1"
+                    "my-lib-1",
+                    "@Deprecated(\"Use it's working\", ReplaceWith(\"it's working\"), DeprecationLevel.WARNING)"
             ));
             ScanResult result = new ScanResult("com.example", "my-lib", "1.0.0", "1", methods);
 
@@ -150,9 +157,9 @@ class KotlinDeprecationRecipeGeneratorTest {
         @Test
         void sortsMethodsByPattern() {
             List<DeprecatedMethod> methods = new ArrayList<>();
-            methods.add(new DeprecatedMethod("com.example.Zoo method()", "z()", List.of(), "lib-1"));
-            methods.add(new DeprecatedMethod("com.example.Alpha method()", "a()", List.of(), "lib-1"));
-            methods.add(new DeprecatedMethod("com.example.Middle method()", "m()", List.of(), "lib-1"));
+            methods.add(new DeprecatedMethod("com.example.Zoo method()", "z()", List.of(), "lib-1", "@Deprecated(\"use z\", ReplaceWith(\"z()\"), DeprecationLevel.WARNING)"));
+            methods.add(new DeprecatedMethod("com.example.Alpha method()", "a()", List.of(), "lib-1", "@Deprecated(\"use a\", ReplaceWith(\"a()\"), DeprecationLevel.WARNING)"));
+            methods.add(new DeprecatedMethod("com.example.Middle method()", "m()", List.of(), "lib-1", "@Deprecated(\"use m\", ReplaceWith(\"m()\"), DeprecationLevel.WARNING)"));
 
             ScanResult result = new ScanResult("com.example", "lib", "1.0.0", "1", methods);
 
