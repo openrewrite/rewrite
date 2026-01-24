@@ -31,8 +31,12 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.sort;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
 
@@ -59,9 +63,10 @@ public class RewriteClasspathJarClasspathLoader implements JavaParserClasspathLo
 
     @Override
     public @Nullable Path load(String artifactName) {
-        Pattern jarPattern = Pattern.compile(artifactName + "-?.*\\.jar$");
+        Pattern jarPattern = Pattern.compile(artifactName + "-?.*\\.jar");
         for (Resource resource : resources) {
-            if (jarPattern.matcher(resource.getPath()).find()) {
+            String fileName = Paths.get(resource.getPath()).getFileName().toString();
+            if (jarPattern.matcher(fileName).matches()) {
                 try {
                     Path artifact = getJarsFolder(ctx).resolve(Paths.get(resource.getPath()).getFileName());
                     if (!Files.exists(artifact)) {
@@ -81,6 +86,19 @@ public class RewriteClasspathJarClasspathLoader implements JavaParserClasspathLo
             }
         }
         return null;
+    }
+
+    @Override
+    public Collection<String> availableArtifacts() {
+        List<String> available = new ArrayList<>(resources.size());
+        for (Resource resource : resources) {
+            String fileName = Paths.get(resource.getPath()).getFileName().toString();
+            if (fileName.endsWith(".jar")) {
+                available.add(fileName.substring(0, fileName.length() - 4));
+            }
+        }
+        sort(available);
+        return available;
     }
 
     /**

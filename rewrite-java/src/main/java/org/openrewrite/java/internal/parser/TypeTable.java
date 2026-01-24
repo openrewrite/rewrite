@@ -606,6 +606,16 @@ public class TypeTable implements JavaParserClasspathLoader {
         return null;
     }
 
+    @Override
+    public Collection<String> availableArtifacts() {
+        List<String> available = new ArrayList<>(classesDirByArtifact.size());
+        for (GroupArtifactVersion gav : classesDirByArtifact.keySet()) {
+            available.add(gav.getArtifactId() + "-" + gav.getVersion());
+        }
+        Collections.sort(available);
+        return available;
+    }
+
     public static class Writer implements AutoCloseable {
         private final PrintStream out;
         private final GZIPOutputStream deflater;
