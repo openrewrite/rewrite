@@ -157,7 +157,9 @@ class JavaSourceFile(J, SourceFile):
 
 
 class Expression(J):
-    pass
+    @property
+    def type(self) -> Optional[JavaType]:
+        return None
 
 
 class Statement(J):
@@ -165,7 +167,9 @@ class Statement(J):
 
 
 class TypedTree(J):
-    pass
+    @property
+    def type(self) -> Optional[JavaType]:
+        return None
 
 
 class NameTree(TypedTree):
@@ -496,5 +500,5 @@ class JContainer(Generic[J2]):
     def empty(cls) -> JContainer[J2]:
         if cls._EMPTY is None:
             cls._EMPTY = JContainer(Space.EMPTY, [], Markers.EMPTY)
-        return cls._EMPTY  # type: ignore
+        return cls._EMPTY  # type: ignore[return-value]  # _EMPTY is JContainer[J] but J2 is bound to J
 

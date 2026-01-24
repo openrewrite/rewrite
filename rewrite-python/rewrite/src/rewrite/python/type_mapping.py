@@ -1,5 +1,5 @@
 import ast
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
 from ..java import JavaType
 
@@ -13,11 +13,11 @@ try:
     _PYTYPE_AVAILABLE = True
 except ImportError:
     # pytype not available - type inference will be disabled
-    config = None  # type: ignore
-    CallableType = GenericType = ClassType = UnionType = NothingType = TypeParameter = None  # type: ignore
-    AnnotateAstVisitor = None  # type: ignore
-    PytypeError = Exception  # type: ignore
-    infer_types = None  # type: ignore
+    config = None  # ty: ignore[invalid-assignment]  # optional import fallback
+    CallableType = GenericType = ClassType = UnionType = NothingType = TypeParameter = None  # ty: ignore[invalid-assignment]  # optional import fallback
+    AnnotateAstVisitor = None  # ty: ignore[invalid-assignment]  # optional import fallback
+    PytypeError = Exception  # ty: ignore[invalid-assignment]  # optional import fallback
+    infer_types = None  # ty: ignore[invalid-assignment]  # optional import fallback
 
 
 class PythonTypeMapping:
@@ -36,7 +36,7 @@ class PythonTypeMapping:
             self._source_with_types = None
 
     def resolve_types(self, node):
-        if self._source_with_types:
+        if self._source_with_types and MyAnnotateAstVisitor is not None:
             type_visitor = MyAnnotateAstVisitor(self._source_with_types, ast)
             type_visitor.visit(node)
 
@@ -55,7 +55,7 @@ class PythonTypeMapping:
             else:
                 return JavaType.Primitive.None_
         elif isinstance(node, ast.Call):
-            return self.method_invocation_type(node)
+            return self.method_invocation_type(node)  # ty: ignore[invalid-return-type]  # Method is semantically a JavaType
         elif self.__enabled and hasattr(node, 'resolved_type'):
             return self.__map_type(node.resolved_type, node)
         return None
@@ -72,10 +72,10 @@ class PythonTypeMapping:
             return result
 
         if isinstance(type, ClassType):
-            self.__cache[signature] = (result := JavaType.Class())
-            result._kind = JavaType.FullyQualified.Kind.Class
-            result._fully_qualified_name = type.name
-            result._interfaces = [self.__map_type(i, node) for i in type.cls.bases]
+            self.__cache[signature] = (result := JavaType.Class())  # ty: ignore[invalid-assignment]
+            result._kind = JavaType.FullyQualified.Kind.Class  # private attr
+            result._fully_qualified_name = type.name  # private attr
+            result._interfaces = [self.__map_type(i, node) for i in type.cls.bases]  # private attr
         elif isinstance(type, CallableType):
             if isinstance(node, ast.Name):
                 name = node.id
@@ -85,11 +85,11 @@ class PythonTypeMapping:
                 name = ''
             return JavaType.Method(_name=name)
         elif isinstance(type, GenericType):
-            self.__cache[signature] = (result := JavaType.Parameterized)
-            result._type = self.__map_type(type.base_type, node)
-            result._type_parameters = [self.__map_type(t, node) for t in type.parameters]
+            self.__cache[signature] = (result := JavaType.Parameterized)  # ty: ignore[invalid-assignment]
+            result._type = self.__map_type(type.base_type, node)  # private attr
+            result._type_parameters = [self.__map_type(t, node) for t in type.parameters]  # private attr
         elif isinstance(type, NothingType):
-            self.__cache[signature] = (result := JavaType.Unknown())
+            self.__cache[signature] = (result := JavaType.Unknown())  # ty: ignore[invalid-assignment]
         return result
 
 
@@ -126,4 +126,4 @@ if _PYTYPE_AVAILABLE:
         def visit_Call(self, node):
             self._maybe_annotate(node)
 else:
-    MyAnnotateAstVisitor = None  # type: ignore
+    MyAnnotateAstVisitor = None

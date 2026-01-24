@@ -781,7 +781,7 @@ class JavaTemplateMatchTest implements RewriteTest {
               class Foo {
                   void test() {
                       Objects.hash(new Object[5]);
-                      Objects.hash(new Object(), new Object()); // varargs not yet supported
+                      Objects.hash(new Object(), new Object()); // varargs also matches
                   }
               }
               """,
@@ -790,7 +790,7 @@ class JavaTemplateMatchTest implements RewriteTest {
               class Foo {
                   void test() {
                       /*~~>*/Objects.hash(new Object[5]);
-                      Objects.hash(new Object(), new Object()); // varargs not yet supported
+                      /*~~>*/Objects.hash(new Object(), new Object()); // varargs also matches
                   }
               }
               """

@@ -31,14 +31,6 @@ public class RecipeMarketplace {
             "When displaying the category hierarchy of a marketplace, " +
             "this is typically not shown.");
 
-    private final @Getter List<RecipeBundleResolver> resolvers = new ArrayList<>();
-
-    public RecipeMarketplace setResolvers(Collection<RecipeBundleResolver> resolvers) {
-        this.resolvers.clear();
-        this.resolvers.addAll(resolvers);
-        return this;
-    }
-
     public @Nullable RecipeListing findRecipe(String name) {
         return root.findRecipe(name);
     }

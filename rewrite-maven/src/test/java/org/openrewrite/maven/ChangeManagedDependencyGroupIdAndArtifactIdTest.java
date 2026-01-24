@@ -292,7 +292,7 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void changeManagedDependencyWithPropertyVersion() {
+    void changeManagedDependencyWithPropertyVersionUpdatesProperty() {
         rewriteRun(
           spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
             "javax.activation",
@@ -347,7 +347,72 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void changeManagedDependencyMissingExplicitVersion() {
+    void changeManagedDependencyWithPropertyVersionAlreadyInUseLeavesPropertyAndInlines() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "latest.patch"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <version.property>1.2.0</version.property>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.activation</groupId>
+                              <artifactId>javax.activation-api</artifactId>
+                              <version>${version.property}</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>org.openrewrite.recipe</groupId>
+                              <artifactId>rewrite-recipe-bom</artifactId>
+                              <version>${version.property}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <version.property>1.2.0</version.property>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.2</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>org.openrewrite.recipe</groupId>
+                              <artifactId>rewrite-recipe-bom</artifactId>
+                              <version>${version.property}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotIntroducePropertyForVersion() {
         rewriteRun(
           spec -> spec.recipe(
             new ChangeManagedDependencyGroupIdAndArtifactId(
@@ -376,6 +441,7 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     <dependency>
                       <groupId>com.fasterxml.jackson.core</groupId>
                       <artifactId>jackson-core</artifactId>
+                      <version>${jackson.version.core}</version>
                     </dependency>
                   </dependencies>
                 </dependencyManagement>

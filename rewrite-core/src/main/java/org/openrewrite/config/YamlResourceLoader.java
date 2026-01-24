@@ -24,6 +24,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ObjectMappers;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.RecipeLoader;
+import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.style.NamedStyles;
@@ -89,7 +90,7 @@ public class YamlResourceLoader implements ResourceLoader {
         }
     }
 
-    public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties, RecipeMarketplace marketplace) {
+    public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties, RecipeMarketplace marketplace, Collection<RecipeBundleResolver> resolvers) {
         this.source = source;
         this.dependencyResourceLoaders = emptyList();
         this.mapper = ObjectMappers.propertyBasedMapper(getClass().getClassLoader());
@@ -98,7 +99,7 @@ public class YamlResourceLoader implements ResourceLoader {
             if (listing == null) {
                 throw new IllegalStateException("Unable to find recipe " + recipeName + " listed in " + source);
             }
-            return listing.prepare(options == null ? emptyMap() : options);
+            return listing.prepare(resolvers, options == null ? emptyMap() : options);
         };
 
         maybeAddKotlinModule(mapper);

@@ -8,7 +8,6 @@ This produces the same JSON format that Java expects:
   {"state": "END_OF_OBJECT"}
 ]
 """
-from dataclasses import is_dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Callable, TypeVar
@@ -187,39 +186,10 @@ class RpcSendQueue:
 
     def _get_rpc_codec(self, obj: Any) -> Optional[Callable[[Any, 'RpcSendQueue'], None]]:
         """Get the RpcCodec serialization function for an object."""
-        from rewrite import Markers
-        from rewrite.java.markers import OmitParentheses, Semicolon, TrailingComma
-        if isinstance(obj, Markers):
-            return self._rpc_send_markers
-        if isinstance(obj, OmitParentheses):
-            return self._rpc_send_omit_parens
-        if isinstance(obj, Semicolon):
-            return self._rpc_send_semicolon
-        if isinstance(obj, TrailingComma):
-            return self._rpc_send_trailing_comma
-        return None
-
-    def _rpc_send_omit_parens(self, marker: 'OmitParentheses', q: 'RpcSendQueue') -> None:
-        """RpcCodec implementation for OmitParentheses."""
-        q.get_and_send(marker, lambda x: x.id)
-
-    def _rpc_send_semicolon(self, marker: 'Semicolon', q: 'RpcSendQueue') -> None:
-        """RpcCodec implementation for Semicolon."""
-        q.get_and_send(marker, lambda x: x.id)
-
-    def _rpc_send_trailing_comma(self, marker: 'TrailingComma', q: 'RpcSendQueue') -> None:
-        """RpcCodec implementation for TrailingComma."""
-        from rewrite.rpc.python_sender import PythonRpcSender
-        sender = PythonRpcSender()
-        q.get_and_send(marker, lambda x: x.id)
-        q.get_and_send(marker, lambda x: x.suffix, lambda s: sender._visit_space(s, q))
-
-    def _rpc_send_markers(self, markers: 'Markers', q: 'RpcSendQueue') -> None:
-        """RpcCodec implementation for Markers."""
-        q.get_and_send(markers, lambda x: x.id)
-        # Send markers list as ref (simplified - no ref tracking for now)
-        q.get_and_send_list(markers, lambda x: x.markers,
-                           lambda m: m.id, None)
+        # Import python_receiver to ensure codecs are registered
+        from rewrite.rpc import python_receiver  # noqa: F401 - triggers codec registration
+        from rewrite.rpc.receive_queue import get_send_codec
+        return get_send_codec(obj)
 
     def _get_value_type(self, obj: Any) -> Optional[str]:
         """Get the Java type name for an object, or None for primitives."""

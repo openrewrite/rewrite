@@ -25,15 +25,19 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
+import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
 import static java.util.Collections.max;
+import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Validated.required;
 import static org.openrewrite.Validated.test;
 import static org.openrewrite.internal.StringUtils.isBlank;
+import static org.openrewrite.internal.StringUtils.matchesGlob;
+import static org.openrewrite.maven.utilities.MavenDependencyPropertyUsageOverlap.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -144,12 +148,15 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             @Nullable
             private Collection<String> availableVersions;
             private boolean isNewDependencyPresent;
+            private Set<String> safeVersionPlaceholdersToChange = new HashSet<>();
+            private final boolean configuredToOverrideManagedVersion = overrideManagedVersion != null && overrideManagedVersion; // False by default
+            private final boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency;  // True by default
 
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 isNewDependencyPresent = checkIfNewDependencyPresent(newGroupId, newArtifactId, newVersion);
-                if (!oldGroupId.contains("*") && !oldArtifactId.contains("*") &&
-                        (changeManagedDependency == null || changeManagedDependency)) {
+                safeVersionPlaceholdersToChange = getSafeVersionPlaceholdersToChange(oldGroupId, oldArtifactId, ctx);
+                if (configuredToChangeManagedDependency) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
                             oldGroupId, oldArtifactId,
                             Optional.ofNullable(newGroupId).orElse(oldGroupId),
@@ -172,24 +179,15 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 boolean isAnnotationProcessorPath = isAnnotationProcessorPathTag(oldGroupId, oldArtifactId);
                 boolean deferUpdate = false;
                 if (isOldDependencyTag || isPluginDependency || isAnnotationProcessorPath) {
-                    ResolvedPom rp = getResolutionResult().getPom();
                     String groupId = newGroupId;
                     if (groupId != null) {
-                        Optional<Xml.Tag> groupIdTag = t.getChild("groupId");
-                        Optional<String> groupIdValue = t.getChildValue("groupId");
-                        if (groupIdTag.isPresent() && !groupId.equals(rp.getValue(groupIdValue.orElse(null)))) {
-                            t = changeChildTagValue(t, "groupId", groupId, ctx);
-                        }
+                        t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("groupId").orElse(null), groupId).visitNonNull(t, ctx);
                     } else {
                         groupId = t.getChildValue("groupId").orElseThrow(NoSuchElementException::new);
                     }
                     String artifactId = newArtifactId;
                     if (artifactId != null) {
-                        Optional<Xml.Tag> artifactIdTag = t.getChild("artifactId");
-                        Optional<String> artifactIdValue = t.getChildValue("artifactId");
-                        if (artifactIdTag.isPresent() && !artifactId.equals(rp.getValue(artifactIdValue.orElse(null)))) {
-                            t = changeChildTagValue(t, "artifactId", artifactId, ctx);
-                        }
+                        t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").orElse(null), artifactId).visitNonNull(t, ctx);
                     } else {
                         artifactId = t.getChildValue("artifactId").orElseThrow(NoSuchElementException::new);
                     }
@@ -202,21 +200,22 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             Scope scope = scopeTag.map(xml -> Scope.fromName(xml.getValue().orElse("compile"))).orElse(Scope.Compile);
                             Optional<Xml.Tag> versionTag = t.getChild("version");
 
-                            boolean configuredToOverrideManagedVersion = overrideManagedVersion != null && overrideManagedVersion; // False by default
-                            boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency; // True by default
-
                             boolean versionTagPresent = versionTag.isPresent();
                             // dependencyManagement does not apply to plugin dependencies or annotation processor paths
                             boolean oldDependencyDefinedManaged = isOldDependencyTag && canAffectManagedDependency(getResolutionResult(), scope, oldGroupId, oldArtifactId);
                             boolean newDependencyManaged = isOldDependencyTag && isDependencyManaged(scope, groupId, artifactId);
-
                             if (versionTagPresent) {
                                 // If the previous dependency had a version but the new artifact is managed, removed the version tag.
                                 if (!configuredToOverrideManagedVersion && newDependencyManaged || (oldDependencyDefinedManaged && configuredToChangeManagedDependency)) {
                                     t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false, true).visit(t, ctx);
                                 } else {
                                     // Otherwise, change the version to the new value.
-                                    t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
+                                    String versionTagValue = t.getChildValue("version").orElse(null);
+                                    if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
+                                        t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
+                                    } else {
+                                        t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
+                                    }
                                 }
                             } else if (configuredToOverrideManagedVersion || (!newDependencyManaged && !(oldDependencyDefinedManaged && configuredToChangeManagedDependency))) {
                                 // If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
@@ -267,7 +266,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 // `ChangeManagedDependencyGroupIdAndArtifactId` cannot manipulate BOM imported managed dependencies nor direct dependencies from remote parents
                 Pom requestedPom = result.getPom().getRequested();
                 for (ManagedDependency requestedManagedDependency : requestedPom.getDependencyManagement()) {
-                    if (groupId.equals(requestedManagedDependency.getGroupId()) && artifactId.equals(requestedManagedDependency.getArtifactId())) {
+                    if (matchesGlob(requestedManagedDependency.getGroupId(), groupId) && matchesGlob(requestedManagedDependency.getArtifactId(), artifactId)) {
                         if (requestedManagedDependency instanceof ManagedDependency.Defined) {
                             return scope.isInClasspathOf(Scope.fromName(((ManagedDependency.Defined) requestedManagedDependency).getScope()));
                         }
@@ -278,6 +277,22 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 }
                 return false;
             }
+
+            private Set<String> getSafeVersionPlaceholdersToChange(String groupId, String artifactId, ExecutionContext ctx) {
+                MavenResolutionResult result = getResolutionResult();
+                ResolvedPom resolvedPom = result.getPom();
+                Pom requestedPom = resolvedPom.getRequested();
+                Set<String> relevantProperties = requestedPom.getDependencies().stream()
+                        .filter(d -> isProperty(d.getVersion()) &&
+                                matchesGlob(resolvedPom.getValue(d.getGroupId()), groupId) &&
+                                matchesGlob(resolvedPom.getValue(d.getArtifactId()), artifactId))
+                        .map(Dependency::getVersion)
+                        .collect(toSet());
+                relevantProperties = filterPropertiesWithOverlapInDependencies(relevantProperties, groupId, artifactId, requestedPom, resolvedPom, configuredToChangeManagedDependency);
+                relevantProperties = filterPropertiesWithOverlapInChildren(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency);
+                return filterPropertiesWithOverlapInParents(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency, ctx);
+            }
+
 
             @SuppressWarnings("ConstantConditions")
             private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId, @Nullable String currentVersion) throws MavenDownloadingException {
