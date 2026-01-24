@@ -612,7 +612,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         for (GroupArtifactVersion gav : classesDirByArtifact.keySet()) {
             available.add(gav.getArtifactId() + "-" + gav.getVersion());
         }
-        Collections.sort(available);
+        sort(available);
         return available;
     }
 
