@@ -21,7 +21,10 @@ import org.openrewrite.kotlin.replace.KotlinDeprecatedMethodScanner.ScanResult;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.joining;
