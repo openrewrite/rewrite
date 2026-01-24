@@ -24,6 +24,7 @@ import kotlin.metadata.jvm.JvmMethodSignature;
 import kotlin.metadata.jvm.KotlinClassMetadata;
 import org.jspecify.annotations.Nullable;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
@@ -103,31 +104,16 @@ class DeprecatedMethodScanner {
                 version = matcher.group(2);
             }
 
-            // Try to extract version from pom.properties in JAR
-            Enumeration<JarEntry> entries = jarFile.entries();
-            while (entries.hasMoreElements()) {
-                JarEntry entry = entries.nextElement();
-                if (entry.getName().endsWith("pom.properties")) {
-                    Properties props = new Properties();
-                    try (InputStream is = jarFile.getInputStream(entry)) {
-                        props.load(is);
-                        if (version == null) {
-                            version = props.getProperty("version");
-                        }
-                    }
-                    break;
-                }
-            }
-
             if (version == null) {
-                version = "unknown";
+                // Try to extract version from pom.properties in JAR, otherwise leave blank
+                version = readVersionFromPomProperties(jarFile.entries(), jarFile).orElse("");
             }
 
-            String majorVersion = extractMajorVersion(version);
+            String majorVersion = version.contains(".") ? version.substring(0, version.indexOf('.')) : version;
             String classpathResource = resolvedArtifactId + "-" + majorVersion;
 
             // Scan all class files in the JAR
-            entries = jarFile.entries();
+            Enumeration<JarEntry> entries = jarFile.entries();
             while (entries.hasMoreElements()) {
                 JarEntry entry = entries.nextElement();
                 String name = entry.getName();
@@ -154,6 +140,20 @@ class DeprecatedMethodScanner {
         }
     }
 
+    private static Optional<String> readVersionFromPomProperties(Enumeration<JarEntry> entries, JarFile jarFile) throws IOException {
+        while (entries.hasMoreElements()) {
+            JarEntry entry = entries.nextElement();
+            if (entry.getName().endsWith("pom.properties")) {
+                try (InputStream is = jarFile.getInputStream(entry)) {
+                    Properties props = new Properties();
+                    props.load(is);
+                    return Optional.ofNullable(props.getProperty("version"));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     private @Nullable Path findJarOnClasspath(String artifactId) {
         String classpath = System.getProperty("java.class.path");
         if (classpath == null) {
@@ -162,7 +162,7 @@ class DeprecatedMethodScanner {
 
         // Try exact match first, then JVM variant
         for (String variant : List.of(artifactId, artifactId + "-jvm")) {
-            for (String path : classpath.split(System.getProperty("path.separator"))) {
+            for (String path : classpath.split(File.pathSeparator)) {
                 // Match artifactId-version.jar pattern
                 if (path.contains("/" + variant + "-") && path.endsWith(".jar")) {
                     Path jarPath = Path.of(path);
@@ -173,10 +173,6 @@ class DeprecatedMethodScanner {
             }
         }
         return null;
-    }
-
-    private String extractMajorVersion(String version) {
-        return version.contains(".") ? version.substring(0, version.indexOf('.')) : version;
     }
 
     private List<DeprecatedMethod> extractDeprecatedMethods(Class<?> clazz, String classpathResource) {
@@ -375,15 +371,13 @@ class DeprecatedMethodScanner {
 
     private boolean isContinuationType(java.lang.reflect.Type type) {
         if (type instanceof java.lang.reflect.ParameterizedType paramType) {
-            if (paramType.getRawType() instanceof Class<?> raw &&
-              "kotlin.coroutines.Continuation".equals(raw.getName())) {
-                return true;
-            }
-        } else if (type instanceof Class<?> clazz) {
-            if ("kotlin.coroutines.Continuation".equals(clazz.getName())) {
-                return true;
-            }
-        } else if (type instanceof java.lang.reflect.WildcardType wildcard) {
+            return paramType.getRawType() instanceof Class<?> raw &&
+              "kotlin.coroutines.Continuation".equals(raw.getName());
+        }
+        if (type instanceof Class<?> clazz) {
+            return "kotlin.coroutines.Continuation".equals(clazz.getName());
+        }
+        if (type instanceof java.lang.reflect.WildcardType wildcard) {
             for (java.lang.reflect.Type bound : wildcard.getLowerBounds()) {
                 if (isContinuationType(bound)) {
                     return true;
@@ -459,17 +453,15 @@ class DeprecatedMethodScanner {
             if (name.startsWith("kotlin.Function") && isSuspendFunctionType(type)) {
                 return "*";
             }
-            return mapKotlinType(name);
+            // Keep Kotlin type names as-is since the Kotlin parser uses them in the LST.
+            // Only map types that the Kotlin parser represents differently.
+            return "kotlin.String".equals(name) ? "java.lang.String" : name;
         }
         return "..";
     }
 
     private boolean isSuspendFunctionType(KmType type) {
-        List<KmTypeProjection> args = type.getArguments();
-        if (args == null || args.isEmpty()) {
-            return false;
-        }
-        for (KmTypeProjection arg : args) {
+        for (KmTypeProjection arg : type.getArguments()) {
             KmType argType = arg.getType();
             if (argType != null) {
                 KmClassifier argClassifier = argType.getClassifier();
@@ -480,14 +472,5 @@ class DeprecatedMethodScanner {
             }
         }
         return false;
-    }
-
-    private String mapKotlinType(String kotlinType) {
-        // Keep Kotlin type names as-is since the Kotlin parser uses them in the LST.
-        // Only map types that the Kotlin parser represents differently.
-        return switch (kotlinType) {
-            case "kotlin.String" -> "java.lang.String";
-            default -> kotlinType;
-        };
     }
 }
