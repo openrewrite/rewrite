@@ -20,7 +20,8 @@ import org.openrewrite.java.JavaParser;
 
 import java.nio.file.Path;
 import java.util.Collection;
-import java.util.Collections;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Prepares classpath resources for use by {@link JavaParser}.
@@ -41,6 +42,6 @@ public interface JavaParserClasspathLoader {
      * @return The artifact identifiers available from this loader, for use in diagnostic messages.
      */
     default Collection<String> availableArtifacts() {
-        return Collections.emptyList();
+        return emptyList();
     }
 }
