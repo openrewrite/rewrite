@@ -375,6 +375,8 @@ public class KotlinDeprecatedMethodScanner {
         for (int i = 0; i < params.length; i++) {
             if (genericParams[i] instanceof java.lang.reflect.TypeVariable<?>) {
                 paramJoiner.add("*");
+            } else if (isSuspendFunctionType(genericParams[i], params[i])) {
+                paramJoiner.add("*");
             } else {
                 paramJoiner.add(classToPattern(params[i]));
             }
@@ -383,6 +385,45 @@ public class KotlinDeprecatedMethodScanner {
         pattern.append(")");
 
         return pattern.toString();
+    }
+
+    private boolean isSuspendFunctionType(java.lang.reflect.Type genericType, Class<?> rawType) {
+        if (!rawType.getName().startsWith("kotlin.jvm.functions.Function")) {
+            return false;
+        }
+        if (genericType instanceof java.lang.reflect.ParameterizedType paramType) {
+            for (java.lang.reflect.Type arg : paramType.getActualTypeArguments()) {
+                if (isContinuationType(arg)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean isContinuationType(java.lang.reflect.Type type) {
+        if (type instanceof java.lang.reflect.ParameterizedType paramType) {
+            if (paramType.getRawType() instanceof Class<?> raw &&
+                    "kotlin.coroutines.Continuation".equals(raw.getName())) {
+                return true;
+            }
+        } else if (type instanceof Class<?> clazz) {
+            if ("kotlin.coroutines.Continuation".equals(clazz.getName())) {
+                return true;
+            }
+        } else if (type instanceof java.lang.reflect.WildcardType wildcard) {
+            for (java.lang.reflect.Type bound : wildcard.getLowerBounds()) {
+                if (isContinuationType(bound)) {
+                    return true;
+                }
+            }
+            for (java.lang.reflect.Type bound : wildcard.getUpperBounds()) {
+                if (isContinuationType(bound)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private String getMethodDescriptor(Method method) {
@@ -441,9 +482,32 @@ public class KotlinDeprecatedMethodScanner {
         KmClassifier classifier = type.getClassifier();
         if (classifier instanceof KmClassifier.Class classClassifier) {
             String name = classClassifier.getName().replace('/', '.');
+            // Suspend function types (kotlin.FunctionN with Continuation in type args)
+            // can't be matched by name since the Kotlin parser represents them differently
+            if (name.startsWith("kotlin.Function") && isSuspendFunctionType(type)) {
+                return "*";
+            }
             return mapKotlinType(name);
         }
         return "..";
+    }
+
+    private boolean isSuspendFunctionType(KmType type) {
+        List<KmTypeProjection> args = type.getArguments();
+        if (args == null || args.isEmpty()) {
+            return false;
+        }
+        for (KmTypeProjection arg : args) {
+            KmType argType = arg.getType();
+            if (argType != null) {
+                KmClassifier argClassifier = argType.getClassifier();
+                if (argClassifier instanceof KmClassifier.Class argClass &&
+                        argClass.getName().equals("kotlin/coroutines/Continuation")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private String mapKotlinType(String kotlinType) {
