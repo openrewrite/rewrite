@@ -14,12 +14,12 @@
 # limitations under the License.
 #
 
-# Recipes generated for `@Deprecated` methods with `ReplaceWith` in `org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.3`
+# Recipes generated for `@Deprecated` methods with `ReplaceWith` in `null:kotlinx-serialization-core:1.6.3`
 #
 
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.jetbrains.kotlinx.ReplaceDeprecatedKotlinxSerializationCore1Methods
+name: null.ReplaceDeprecatedKotlinxSerializationCore1Methods
 displayName: Replace deprecated `kotlinx-serialization-core` methods
 description: >-
   Automatically generated recipes to replace deprecated Kotlin methods based on

@@ -46,7 +46,7 @@ import static java.util.stream.Collectors.joining;
  * Uses Java reflection to access the {@code kotlin.Deprecated} annotation (which has RUNTIME retention)
  * and kotlin-metadata-jvm to get proper Kotlin function signatures.
  */
-public class KotlinDeprecatedMethodScanner {
+class DeprecatedMethodScanner {
 
     /**
      * Result of scanning a JAR for deprecated methods.
@@ -102,7 +102,7 @@ public class KotlinDeprecatedMethodScanner {
         try (JarFile jarFile = new JarFile(jarPath.toFile());
              URLClassLoader classLoader = new URLClassLoader(
                      new URL[]{jarPath.toUri().toURL()},
-                     KotlinDeprecatedMethodScanner.class.getClassLoader())) {
+                     DeprecatedMethodScanner.class.getClassLoader())) {
 
             // Extract version and actual artifact name from JAR path (handles both artifactId and artifactId-jvm naming)
             String jarName = jarPath.getFileName().toString();

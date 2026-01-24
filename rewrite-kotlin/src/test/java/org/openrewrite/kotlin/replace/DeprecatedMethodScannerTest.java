@@ -17,17 +17,17 @@ package org.openrewrite.kotlin.replace;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.kotlin.replace.KotlinDeprecatedMethodScanner.DeprecatedMethod;
-import org.openrewrite.kotlin.replace.KotlinDeprecatedMethodScanner.ScanResult;
+import org.openrewrite.kotlin.replace.DeprecatedMethodScanner.DeprecatedMethod;
+import org.openrewrite.kotlin.replace.DeprecatedMethodScanner.ScanResult;
 
 import java.io.IOException;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class KotlinDeprecatedMethodScannerTest {
+class DeprecatedMethodScannerTest {
 
-    private final KotlinDeprecatedMethodScanner scanner = new KotlinDeprecatedMethodScanner();
+    private final DeprecatedMethodScanner scanner = new DeprecatedMethodScanner();
 
     @Nested
     class ScanKotlinxCoroutines {

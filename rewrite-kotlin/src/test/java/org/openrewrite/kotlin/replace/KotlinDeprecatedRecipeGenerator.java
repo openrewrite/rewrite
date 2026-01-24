@@ -15,8 +15,8 @@
  */
 package org.openrewrite.kotlin.replace;
 
-import org.openrewrite.kotlin.replace.KotlinDeprecatedMethodScanner.DeprecatedMethod;
-import org.openrewrite.kotlin.replace.KotlinDeprecatedMethodScanner.ScanResult;
+import org.openrewrite.kotlin.replace.DeprecatedMethodScanner.DeprecatedMethod;
+import org.openrewrite.kotlin.replace.DeprecatedMethodScanner.ScanResult;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -33,7 +33,7 @@ import static java.util.stream.Collectors.joining;
  * Generator that produces OpenRewrite YAML recipes from Kotlin
  * {@code @Deprecated(replaceWith=ReplaceWith(...))} annotations.
  */
-public class KotlinDeprecationRecipeGenerator {
+public class KotlinDeprecatedRecipeGenerator {
 
     public static void main(String[] args) {
         if (args.length < 1) {
@@ -41,7 +41,7 @@ public class KotlinDeprecationRecipeGenerator {
             System.exit(1);
         }
 
-        KotlinDeprecatedMethodScanner scanner = new KotlinDeprecatedMethodScanner();
+        DeprecatedMethodScanner scanner = new DeprecatedMethodScanner();
 
         for (String artifactId : args) {
             try {
@@ -117,7 +117,7 @@ public class KotlinDeprecationRecipeGenerator {
 
     static String buildRecipeName(String groupId, String artifactId, String majorVersion) {
         String moduleName = Arrays.stream(artifactId.split("-"))
-                .map(KotlinDeprecationRecipeGenerator::capitalize)
+                .map(KotlinDeprecatedRecipeGenerator::capitalize)
                 .collect(joining());
         return groupId + ".ReplaceDeprecated" + moduleName + majorVersion + "Methods";
     }

@@ -60,12 +60,15 @@ tasks.withType<KotlinCompile>().configureEach {
 }
 
 tasks {
-    val generateKotlinDeprecationRecipes by registering(JavaExec::class) {
+    val generateKotlinDeprecatedReplaceWithRecipes by registering(JavaExec::class) {
         group = "generate"
-        description = "Generate recipes from Kotlin @Deprecated annotations with ReplaceWith."
-        mainClass = "org.openrewrite.kotlin.replace.KotlinDeprecationRecipeGenerator"
+        description = "Generate recipes from Kotlin `@Deprecated` annotations using `ReplaceWith`."
+        mainClass = "org.openrewrite.kotlin.replace.KotlinDeprecatedRecipeGenerator"
         classpath = sourceSets.getByName("test").runtimeClasspath
-        args("kotlinx-coroutines-core", "kotlinx-serialization-core")
+        args(
+            "kotlinx-coroutines-core",
+            "kotlinx-serialization-core"
+        )
         finalizedBy("licenseFormat")
     }
 }
