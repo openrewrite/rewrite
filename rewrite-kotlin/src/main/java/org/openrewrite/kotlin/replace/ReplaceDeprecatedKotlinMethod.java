@@ -141,8 +141,13 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
                 // Map parameter names to their argument expressions
                 List<String> parameterNames = methodType.getParameterNames();
                 List<Expression> arguments = method.getArguments();
-                for (int i = 0; i < parameterNames.size() && i < arguments.size(); i++) {
-                    parameterLookup.put(parameterNames.get(i), arguments.get(i));
+                // For extension functions, the method type includes the receiver as the first
+                // parameter, but the arguments don't include it (it's the select/receiver).
+                // Detect this by checking if there are more parameter names than arguments.
+                int paramOffset = parameterNames.size() > arguments.size() && select != null ?
+                        parameterNames.size() - arguments.size() : 0;
+                for (int i = 0; i < arguments.size() && i + paramOffset < parameterNames.size(); i++) {
+                    parameterLookup.put(parameterNames.get(i + paramOffset), arguments.get(i));
                 }
 
                 // Also support positional references like p0, p1, etc.
@@ -150,9 +155,14 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
                     parameterLookup.put("p" + i, arguments.get(i));
                 }
 
-                // Determine if this is an instance method call that needs a receiver
+                // Determine if this is an instance method call that needs a receiver.
+                // The replacement needs a receiver prepended if:
+                // - The original call has a receiver (select)
+                // - The replacement doesn't explicitly use 'this' (handled separately)
+                // - The replacement isn't a static/constructor call (starts with uppercase)
                 boolean needsReceiver = select != null && !replacement.startsWith("this.") &&
-                                        !replacement.contains(".") && !isStaticReplacement(replacement);
+                                        !replacement.matches(".*\\bthis\\b.*") &&
+                                        !isStaticReplacement(replacement);
 
                 // Convert the replacement expression to a template
                 // Replace 'this.' prefix with receiver placeholder
@@ -221,10 +231,9 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
             }
 
             private boolean isStaticReplacement(String replacement) {
-                // Check if the replacement looks like a static call or fully qualified reference
-                // e.g., "SomeClass.method()" or "somePackage.function()"
-                return replacement.contains(".") ||
-                       (replacement.length() > 0 && Character.isUpperCase(replacement.charAt(0)));
+                // Check if the replacement looks like a constructor or static call
+                // e.g., "EmptySerializersModule()" or "SomeClass.method()"
+                return !replacement.isEmpty() && Character.isUpperCase(replacement.charAt(0));
             }
 
             private boolean isKotlinKeyword(String identifier) {
