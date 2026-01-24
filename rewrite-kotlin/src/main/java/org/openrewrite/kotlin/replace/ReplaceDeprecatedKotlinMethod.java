@@ -189,7 +189,7 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
                     String identifier = identifierMatcher.group(1);
 
                     // Skip if already a placeholder or a keyword
-                    if (identifier.equals("any") || identifier.equals("this") ||
+                    if ("any".equals(identifier) || "this".equals(identifier) ||
                         isKotlinKeyword(identifier) || processedParams.contains(identifier)) {
                         continue;
                     }
