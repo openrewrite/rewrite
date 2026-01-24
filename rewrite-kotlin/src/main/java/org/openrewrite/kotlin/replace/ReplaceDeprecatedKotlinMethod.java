@@ -25,6 +25,7 @@ import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.MethodCall;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.KotlinVisitor;
@@ -85,17 +86,25 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher matcher = new MethodMatcher(methodPattern, true);
         return Preconditions.check(new UsesMethod<>(methodPattern, true), new KotlinVisitor<ExecutionContext>() {
+            @Override
+            public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+                MethodCall mc = (MethodCall) super.visitNewClass(newClass, ctx);
+                if (matcher.matches(mc)) {
+                    return replaceMethod(mc, ctx);
+                }
+                return mc;
+            }
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (matcher.matches(mi)) {
-                    return replaceMethod(mi, ctx);
+                MethodCall mc = (MethodCall) super.visitMethodInvocation(method, ctx);
+                if (matcher.matches(mc)) {
+                    return replaceMethod(mc, ctx);
                 }
-                return mi;
+                return mc;
             }
 
-            private J replaceMethod(J.MethodInvocation method, ExecutionContext ctx) {
+            private J replaceMethod(MethodCall method, ExecutionContext ctx) {
                 JavaType.Method methodType = method.getMethodType();
                 if (methodType == null) {
                     return method;
@@ -128,13 +137,13 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
                 return result.withPrefix(method.getPrefix());
             }
 
-            private TemplateConversion convertToTemplate(J.MethodInvocation method, JavaType.Method methodType) {
+            private TemplateConversion convertToTemplate(MethodCall method, JavaType.Method methodType) {
                 String templateString = replacement;
                 List<Object> parameters = new ArrayList<>();
                 Map<String, Expression> parameterLookup = new HashMap<>();
 
                 // Map 'this' to the select expression (receiver)
-                Expression select = method.getSelect();
+                Expression select = method instanceof J.MethodInvocation ? ((J.MethodInvocation) method).getSelect() : null;
                 if (select != null) {
                     parameterLookup.put("this", select);
                 }
