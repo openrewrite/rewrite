@@ -66,8 +66,8 @@ tasks {
         mainClass = "org.openrewrite.kotlin.replace.KotlinDeprecatedRecipeGenerator"
         classpath = sourceSets.getByName("test").runtimeClasspath
         args(
-            "kotlinx-coroutines-core",
-            "kotlinx-serialization-core"
+            "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+            "org.jetbrains.kotlinx:kotlinx-serialization-core"
         )
         finalizedBy("licenseFormat")
     }

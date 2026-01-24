@@ -33,7 +33,7 @@ class DeprecatedMethodScannerTest {
     class ScanKotlinxCoroutines {
         @Test
         void findsDeprecatedMethods() throws IOException {
-            ScanResult result = scanner.scan("kotlinx-coroutines-core");
+            ScanResult result = scanner.scan("org.jetbrains.kotlinx", "kotlinx-coroutines-core");
 
             assertThat(result).isNotNull();
             assertThat(result.groupId()).isEqualTo("org.jetbrains.kotlinx");
@@ -44,7 +44,7 @@ class DeprecatedMethodScannerTest {
 
         @Test
         void extractsChannelMethods() throws IOException {
-            ScanResult result = scanner.scan("kotlinx-coroutines-core");
+            ScanResult result = scanner.scan("org.jetbrains.kotlinx", "kotlinx-coroutines-core");
 
             assertThat(result).isNotNull();
             List<DeprecatedMethod> channelMethods = result.deprecatedMethods().stream()
@@ -62,7 +62,7 @@ class DeprecatedMethodScannerTest {
     class ScanKotlinxSerialization {
         @Test
         void findsDeprecatedMethods() throws IOException {
-            ScanResult result = scanner.scan("kotlinx-serialization-core");
+            ScanResult result = scanner.scan("org.jetbrains.kotlinx", "kotlinx-serialization-core");
 
             assertThat(result).isNotNull();
             assertThat(result.groupId()).isEqualTo("org.jetbrains.kotlinx");
@@ -76,7 +76,7 @@ class DeprecatedMethodScannerTest {
     class ScanNonExistentArtifact {
         @Test
         void returnsNullForMissingArtifact() throws IOException {
-            ScanResult result = scanner.scan("non-existent-artifact");
+            ScanResult result = scanner.scan("com.example", "non-existent-artifact");
 
             assertThat(result).isNull();
         }

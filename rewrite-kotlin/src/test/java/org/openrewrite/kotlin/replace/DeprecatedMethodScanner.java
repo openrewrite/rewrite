@@ -75,28 +75,17 @@ class DeprecatedMethodScanner {
     /**
      * Scans the classpath for a JAR matching the given artifact ID and extracts deprecated methods.
      *
-     * @param artifactId the artifact ID to search for (e.g., "arrow-core")
+     * @param groupId    the group ID (e.g., "org.jetbrains.kotlinx")
+     * @param artifactId the artifact ID to search for (e.g., "kotlinx-coroutines-core")
      * @return scan result containing GAV info and deprecated methods, or null if JAR not found
      */
-    public @Nullable ScanResult scan(String artifactId) throws IOException {
+    public @Nullable ScanResult scan(String groupId, String artifactId) throws IOException {
         Path jarPath = findJarOnClasspath(artifactId);
         if (jarPath == null) {
             return null;
         }
 
-        return scanJar(jarPath, artifactId);
-    }
-
-    /**
-     * Scans a specific JAR file for deprecated methods.
-     *
-     * @param jarPath    path to the JAR file
-     * @param artifactId the artifact ID (used for classpath resource naming)
-     * @return scan result containing GAV info and deprecated methods
-     */
-    public ScanResult scanJar(Path jarPath, String artifactId) throws IOException {
         List<DeprecatedMethod> deprecatedMethods = new ArrayList<>();
-        String groupId = null;
         String version = null;
 
         try (JarFile jarFile = new JarFile(jarPath.toFile());
@@ -114,7 +103,7 @@ class DeprecatedMethodScanner {
                 version = matcher.group(2);
             }
 
-            // Try to extract groupId from pom.properties in JAR
+            // Try to extract version from pom.properties in JAR
             Enumeration<JarEntry> entries = jarFile.entries();
             while (entries.hasMoreElements()) {
                 JarEntry entry = entries.nextElement();
@@ -122,7 +111,6 @@ class DeprecatedMethodScanner {
                     Properties props = new Properties();
                     try (InputStream is = jarFile.getInputStream(entry)) {
                         props.load(is);
-                        groupId = props.getProperty("groupId");
                         if (version == null) {
                             version = props.getProperty("version");
                         }
@@ -131,9 +119,6 @@ class DeprecatedMethodScanner {
                 }
             }
 
-            if (groupId == null) {
-                groupId = inferGroupIdFromArtifact(artifactId);
-            }
             if (version == null) {
                 version = "unknown";
             }
@@ -190,20 +175,7 @@ class DeprecatedMethodScanner {
         return null;
     }
 
-    private String inferGroupIdFromArtifact(String artifactId) {
-        if (artifactId.startsWith("arrow-")) {
-            return "io.arrow-kt";
-        }
-        if (artifactId.startsWith("kotlinx-coroutines")) {
-            return "org.jetbrains.kotlinx";
-        }
-        if (artifactId.startsWith("kotlinx-serialization")) {
-            return "org.jetbrains.kotlinx";
-        }
-        return "unknown";
-    }
-
-    private String extractMajorVersion(String version) {
+private String extractMajorVersion(String version) {
         return version.contains(".") ? version.substring(0, version.indexOf('.')) : version;
     }
 

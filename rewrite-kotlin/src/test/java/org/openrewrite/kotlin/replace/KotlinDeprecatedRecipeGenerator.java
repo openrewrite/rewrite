@@ -37,28 +37,33 @@ public class KotlinDeprecatedRecipeGenerator {
 
     public static void main(String[] args) {
         if (args.length < 1) {
-            System.err.println("Usage: KotlinDeprecationRecipeGenerator <artifactId> [artifactId...]");
+            System.err.println("Usage: KotlinDeprecatedRecipeGenerator <groupId:artifactId> [groupId:artifactId...]");
             System.exit(1);
         }
 
         DeprecatedMethodScanner scanner = new DeprecatedMethodScanner();
 
-        for (String artifactId : args) {
+        for (String arg : args) {
             try {
-                System.out.println("Processing artifact: " + artifactId);
+                String[] parts = arg.split(":", 2);
+                if (parts.length != 2) {
+                    System.err.println("Invalid format (expected groupId:artifactId): " + arg);
+                    continue;
+                }
 
-                ScanResult result = scanner.scan(artifactId);
+                System.out.println("Processing " + arg);
+                ScanResult result = scanner.scan(parts[0], parts[1]);
                 if (result == null) {
-                    System.err.println("Could not find JAR for artifact: " + artifactId);
+                    System.err.println("Could not find JAR for " + arg);
                 } else if (result.deprecatedMethods().isEmpty()) {
-                    System.out.println("No deprecated methods with ReplaceWith found in " + artifactId);
+                    System.out.println("No deprecated methods with ReplaceWith found in " + arg);
                 } else {
                     CharSequence yaml = generateYamlRecipe(result);
                     writeYamlRecipe(result, yaml);
                 }
 
             } catch (Exception e) {
-                System.err.println("Failed to generate recipes for " + artifactId + ": " + e.getMessage());
+                System.err.println("Failed to generate recipes for " + arg + " due to: " + e.getMessage());
                 e.printStackTrace();
             }
         }
