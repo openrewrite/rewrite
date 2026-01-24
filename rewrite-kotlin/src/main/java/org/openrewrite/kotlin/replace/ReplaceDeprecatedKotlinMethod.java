@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
@@ -29,6 +30,7 @@ import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.KotlinVisitor;
 
 import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
@@ -46,6 +48,10 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
 
     private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("\\b(\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)\\b");
     private static final Pattern TEMPLATE_PLACEHOLDER = Pattern.compile("#\\{([^}]+)}");
+    private static final Collection<String> KOTLIN_KEYWORDS = new HashSet<>(Arrays.asList(
+            "as", "break", "class", "continue", "do", "else", "false", "for", "fun", "if", "in", "interface", "is",
+            "null", "object", "package", "return", "super", "this", "throw", "true", "try", "typealias", "typeof",
+            "val", "var", "when", "while"));
 
     @Option(displayName = "Method pattern",
             description = "A method pattern that is used to find matching method invocations.",
@@ -95,12 +101,6 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
                     return method;
                 }
 
-                // Build the template string and extract parameters
-                TemplateConversion conversion = convertToTemplate(method, methodType);
-                if (conversion == null) {
-                    return method;
-                }
-
                 // Add imports if specified
                 if (imports != null) {
                     for (String imp : imports) {
@@ -112,6 +112,7 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
                 }
 
                 // Build and apply the template
+                TemplateConversion conversion = convertToTemplate(method, methodType);
                 KotlinTemplate.Builder templateBuilder = KotlinTemplate.builder(conversion.templateString);
                 if (imports != null) {
                     templateBuilder.imports(imports.toArray(new String[0]));
@@ -160,9 +161,9 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
                 // - The original call has a receiver (select)
                 // - The replacement doesn't explicitly use 'this' (handled separately)
                 // - The replacement isn't a static/constructor call (starts with uppercase)
-                boolean needsReceiver = select != null && !replacement.startsWith("this.") &&
+                boolean needsReceiver = select != null &&
                                         !replacement.matches(".*\\bthis\\b.*") &&
-                                        !isStaticReplacement(replacement);
+                                        !isLikelyStaticReplacement(replacement);
 
                 // Convert the replacement expression to a template
                 // Replace 'this.' prefix with receiver placeholder
@@ -182,7 +183,7 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
 
                 // Now replace 'this' references that appear elsewhere
                 if (templateString.contains("this") && select != null) {
-                    int thisCount = countOccurrences(templateString, "this");
+                    int thisCount = StringUtils.countOccurrences(templateString, "this");
                     templateString = templateString.replaceAll("\\bthis\\b", "#{any()}");
                     for (int i = 0; i < thisCount; i++) {
                         parameters.add(select);
@@ -192,15 +193,16 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
                 // Find all identifiers in the template and replace with placeholders
                 Set<String> processedParams = new HashSet<>();
                 StringBuilder result = new StringBuilder();
-                java.util.regex.Matcher identifierMatcher = IDENTIFIER_PATTERN.matcher(templateString);
+                Matcher identifierMatcher = IDENTIFIER_PATTERN.matcher(templateString);
                 int lastEnd = 0;
 
                 while (identifierMatcher.find()) {
                     String identifier = identifierMatcher.group(1);
 
                     // Skip if already a placeholder or a keyword
-                    if ("any".equals(identifier) || "this".equals(identifier) ||
-                        isKotlinKeyword(identifier) || processedParams.contains(identifier)) {
+                    if ("any".equals(identifier) ||
+                            KOTLIN_KEYWORDS.contains(identifier) ||
+                            processedParams.contains(identifier)) {
                         continue;
                     }
 
@@ -220,56 +222,10 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
                 return new TemplateConversion(templateString, parameters);
             }
 
-            private int countOccurrences(String str, String sub) {
-                int count = 0;
-                int idx = 0;
-                while ((idx = str.indexOf(sub, idx)) != -1) {
-                    count++;
-                    idx += sub.length();
-                }
-                return count;
-            }
-
-            private boolean isStaticReplacement(String replacement) {
+            private boolean isLikelyStaticReplacement(String replacement) {
                 // Check if the replacement looks like a constructor or static call
                 // e.g., "EmptySerializersModule()" or "SomeClass.method()"
                 return !replacement.isEmpty() && Character.isUpperCase(replacement.charAt(0));
-            }
-
-            private boolean isKotlinKeyword(String identifier) {
-                switch (identifier) {
-                    case "as":
-                    case "break":
-                    case "class":
-                    case "continue":
-                    case "do":
-                    case "else":
-                    case "false":
-                    case "for":
-                    case "fun":
-                    case "if":
-                    case "in":
-                    case "interface":
-                    case "is":
-                    case "null":
-                    case "object":
-                    case "package":
-                    case "return":
-                    case "super":
-                    case "this":
-                    case "throw":
-                    case "true":
-                    case "try":
-                    case "typealias":
-                    case "typeof":
-                    case "val":
-                    case "var":
-                    case "when":
-                    case "while":
-                        return true;
-                    default:
-                        return false;
-                }
             }
         });
     }
