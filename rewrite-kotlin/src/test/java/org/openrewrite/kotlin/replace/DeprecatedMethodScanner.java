@@ -128,10 +128,8 @@ class DeprecatedMethodScanner {
                         Class<?> clazz = classLoader.loadClass(className);
                         List<DeprecatedMethod> methods = extractDeprecatedMethods(clazz, classpathResource);
                         deprecatedMethods.addAll(methods);
-                    } catch (ClassNotFoundException | NoClassDefFoundError e) {
+                    } catch (ClassNotFoundException | LinkageError  e) {
                         // Skip classes that can't be loaded
-                    } catch (LinkageError e) {
-                        // Skip classes with linkage issues
                     }
                 }
             }
