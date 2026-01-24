@@ -78,7 +78,7 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher matcher = new MethodMatcher(methodPattern, true);
-        return Preconditions.check(new UsesMethod<>(methodPattern), new KotlinVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesMethod<>(methodPattern, true), new KotlinVisitor<ExecutionContext>() {
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {

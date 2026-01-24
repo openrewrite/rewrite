@@ -103,11 +103,13 @@ public class KotlinDeprecatedMethodScanner {
                      new URL[]{jarPath.toUri().toURL()},
                      KotlinDeprecatedMethodScanner.class.getClassLoader())) {
 
-            // Extract version from JAR path (handles both artifactId and artifactId-jvm naming)
+            // Extract version and actual artifact name from JAR path (handles both artifactId and artifactId-jvm naming)
             String jarName = jarPath.getFileName().toString();
+            String resolvedArtifactId = artifactId;
             Pattern gavPattern = Pattern.compile("(" + Pattern.quote(artifactId) + "(?:-jvm)?)-(\\d+\\.\\d+[^/]*)\\.jar");
             Matcher matcher = gavPattern.matcher(jarName);
             if (matcher.matches()) {
+                resolvedArtifactId = matcher.group(1);
                 version = matcher.group(2);
             }
 
@@ -136,7 +138,7 @@ public class KotlinDeprecatedMethodScanner {
             }
 
             String majorVersion = extractMajorVersion(version);
-            String classpathResource = artifactId + "-" + majorVersion;
+            String classpathResource = resolvedArtifactId + "-" + majorVersion;
 
             // Scan all class files in the JAR
             entries = jarFile.entries();
@@ -213,14 +215,16 @@ public class KotlinDeprecatedMethodScanner {
         }
 
         // Scan methods using reflection
-        String className = clazz.getName();
         for (Method method : clazz.getDeclaredMethods()) {
             Deprecated deprecated = method.getAnnotation(Deprecated.class);
             if (deprecated != null) {
                 ReplaceWith replaceWith = deprecated.replaceWith();
                 String expression = replaceWith.expression();
                 if (expression != null && !expression.isEmpty()) {
-                    String methodPattern = buildMethodPattern(className, method, kmFunctions);
+                    // Use the original declaring type (interface) since the Kotlin parser
+                    // resolves method calls to the interface declaring the method
+                    String declaringType = findOriginalDeclaringType(clazz, method);
+                    String methodPattern = buildMethodPattern(declaringType, method, kmFunctions);
                     List<String> imports = Arrays.asList(replaceWith.imports());
                     methods.add(new DeprecatedMethod(methodPattern, expression, imports, classpathResource));
                 }
@@ -228,6 +232,56 @@ public class KotlinDeprecatedMethodScanner {
         }
 
         return methods;
+    }
+
+    /**
+     * Finds the original declaring type for a method by walking up the interface hierarchy.
+     * The Kotlin parser resolves method calls to the interface that originally declares the method,
+     * so the scanner must do the same to generate matching method patterns.
+     */
+    private String findOriginalDeclaringType(Class<?> clazz, Method method) {
+        String name = method.getName();
+        Class<?>[] paramTypes = method.getParameterTypes();
+
+        // Walk up interfaces to find where this method is originally declared
+        for (Class<?> iface : getAllInterfaces(clazz)) {
+            try {
+                iface.getDeclaredMethod(name, paramTypes);
+                return iface.getName();
+            } catch (NoSuchMethodException e) {
+                // Not declared in this interface
+            }
+        }
+
+        // Check superclass hierarchy
+        Class<?> superClass = clazz.getSuperclass();
+        while (superClass != null && superClass != Object.class) {
+            try {
+                superClass.getDeclaredMethod(name, paramTypes);
+                return superClass.getName();
+            } catch (NoSuchMethodException e) {
+                superClass = superClass.getSuperclass();
+            }
+        }
+
+        return clazz.getName();
+    }
+
+    private Set<Class<?>> getAllInterfaces(Class<?> clazz) {
+        Set<Class<?>> interfaces = new LinkedHashSet<>();
+        collectInterfaces(clazz, interfaces);
+        return interfaces;
+    }
+
+    private void collectInterfaces(Class<?> clazz, Set<Class<?>> interfaces) {
+        for (Class<?> iface : clazz.getInterfaces()) {
+            if (interfaces.add(iface)) {
+                collectInterfaces(iface, interfaces);
+            }
+        }
+        if (clazz.getSuperclass() != null) {
+            collectInterfaces(clazz.getSuperclass(), interfaces);
+        }
     }
 
     private void collectFunctions(KotlinClassMetadata classMetadata, Map<String, KmFunction> kmFunctions) {
@@ -331,7 +385,12 @@ public class KotlinDeprecatedMethodScanner {
         if (type.isArray()) {
             return classToPattern(type.getComponentType()) + "[]";
         }
-        return type.getName();
+        String name = type.getName();
+        // Map JVM function types back to Kotlin types (the Kotlin parser uses kotlin.FunctionN)
+        if (name.startsWith("kotlin.jvm.functions.Function")) {
+            return "kotlin." + name.substring("kotlin.jvm.functions.".length());
+        }
+        return name;
     }
 
     private String typeToPattern(KmType type) {

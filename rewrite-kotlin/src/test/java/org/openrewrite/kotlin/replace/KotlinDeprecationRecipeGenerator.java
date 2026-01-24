@@ -21,8 +21,7 @@ import org.openrewrite.kotlin.replace.KotlinDeprecatedMethodScanner.ScanResult;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.joining;
@@ -79,8 +78,14 @@ public class KotlinDeprecationRecipeGenerator {
         yaml.append("  `@Deprecated(replaceWith=ReplaceWith(...))` annotations.\n");
         yaml.append("recipeList:\n");
 
-        List<DeprecatedMethod> methods = result.deprecatedMethods();
-        methods.sort(comparing(DeprecatedMethod::methodPattern));
+        Set<String> seen = new LinkedHashSet<>();
+        List<DeprecatedMethod> methods = result.deprecatedMethods().stream()
+                // Filter out $DefaultImpls (internal Kotlin implementation detail)
+                .filter(m -> !m.methodPattern().contains("$DefaultImpls"))
+                .sorted(comparing(DeprecatedMethod::methodPattern))
+                // Deduplicate by method pattern (same method can be found on multiple classes)
+                .filter(m -> seen.add(m.methodPattern()))
+                .toList();
         for (DeprecatedMethod method : methods) {
             yaml.append("  - org.openrewrite.kotlin.replace.ReplaceDeprecatedKotlinMethod:\n");
             yaml.append("      methodPattern: '").append(escapeYaml(method.methodPattern())).append("'\n");
