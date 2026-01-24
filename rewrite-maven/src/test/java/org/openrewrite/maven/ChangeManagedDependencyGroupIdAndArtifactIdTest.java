@@ -120,8 +120,7 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               </project>
               """,
             spec -> spec.after(pom -> {
-                assertThat(pom).containsPattern("<version>2.1.(\\d+)</version>");
-                return pom;
+                return assertThat(pom).containsPattern("<version>2.1.(\\d+)</version>").actual();
             })
           )
         );
