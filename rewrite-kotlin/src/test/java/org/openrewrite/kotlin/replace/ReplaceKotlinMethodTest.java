@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.replace;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
@@ -135,6 +136,30 @@ class ReplaceKotlinMethodTest implements RewriteTest {
               fun test(a: Char, b: Char): Int {
                   return a.code + b.code
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceConstructorCall() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceKotlinMethod(
+            "Holder <constructor>(kotlin.Int)",
+            "listOf(value)",
+            null,
+            null
+          )).typeValidationOptions(TypeValidation.all().methodInvocations(false)),
+          kotlin(
+            """
+              class Holder(val value: Int)
+              """),
+          kotlin(
+            """
+              val h = Holder(42)
+              """,
+            """
+              val h = listOf(42)
               """
           )
         );
