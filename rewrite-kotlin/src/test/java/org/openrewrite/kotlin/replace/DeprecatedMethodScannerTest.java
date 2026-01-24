@@ -48,13 +48,13 @@ class DeprecatedMethodScannerTest {
 
             assertThat(result).isNotNull();
             List<DeprecatedMethod> channelMethods = result.deprecatedMethods().stream()
-                    .filter(m -> m.methodPattern().contains("Channel"))
-                    .toList();
+              .filter(m -> m.methodPattern().contains("Channel"))
+              .toList();
 
             assertThat(channelMethods).isNotEmpty();
             assertThat(channelMethods)
-                    .extracting(DeprecatedMethod::replacement)
-                    .anyMatch(r -> r.contains("trySend") || r.contains("tryReceive"));
+              .extracting(DeprecatedMethod::replacement)
+              .anyMatch(r -> r.contains("trySend") || r.contains("tryReceive"));
         }
     }
 

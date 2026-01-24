@@ -52,11 +52,11 @@ class DeprecatedMethodScanner {
      * Result of scanning a JAR for deprecated methods.
      */
     public record ScanResult(
-            String groupId,
-            String artifactId,
-            String version,
-            String majorVersion,
-            List<DeprecatedMethod> deprecatedMethods
+      String groupId,
+      String artifactId,
+      String version,
+      String majorVersion,
+      List<DeprecatedMethod> deprecatedMethods
     ) {
     }
 
@@ -64,11 +64,11 @@ class DeprecatedMethodScanner {
      * A deprecated method with its replacement information.
      */
     public record DeprecatedMethod(
-            String methodPattern,
-            String replacement,
-            List<String> imports,
-            String classpathResource,
-            String deprecatedAnnotation
+      String methodPattern,
+      String replacement,
+      List<String> imports,
+      String classpathResource,
+      String deprecatedAnnotation
     ) {
     }
 
@@ -90,8 +90,8 @@ class DeprecatedMethodScanner {
 
         try (JarFile jarFile = new JarFile(jarPath.toFile());
              URLClassLoader classLoader = new URLClassLoader(
-                     new URL[]{jarPath.toUri().toURL()},
-                     DeprecatedMethodScanner.class.getClassLoader())) {
+               new URL[]{jarPath.toUri().toURL()},
+               DeprecatedMethodScanner.class.getClassLoader())) {
 
             // Extract version and actual artifact name from JAR path (handles both artifactId and artifactId-jvm naming)
             String jarName = jarPath.getFileName().toString();
@@ -175,7 +175,7 @@ class DeprecatedMethodScanner {
         return null;
     }
 
-private String extractMajorVersion(String version) {
+    private String extractMajorVersion(String version) {
         return version.contains(".") ? version.substring(0, version.indexOf('.')) : version;
     }
 
@@ -327,8 +327,8 @@ private String extractMajorVersion(String version) {
         List<KmValueParameter> params = function.getValueParameters();
         if (!params.isEmpty()) {
             pattern.append(params.stream()
-                    .map(p -> typeToPattern(p.getType()))
-                    .collect(joining(", ")));
+              .map(p -> typeToPattern(p.getType()))
+              .collect(joining(", ")));
         }
         pattern.append(")");
 
@@ -376,7 +376,7 @@ private String extractMajorVersion(String version) {
     private boolean isContinuationType(java.lang.reflect.Type type) {
         if (type instanceof java.lang.reflect.ParameterizedType paramType) {
             if (paramType.getRawType() instanceof Class<?> raw &&
-                    "kotlin.coroutines.Continuation".equals(raw.getName())) {
+              "kotlin.coroutines.Continuation".equals(raw.getName())) {
                 return true;
             }
         } else if (type instanceof Class<?> clazz) {
@@ -474,7 +474,7 @@ private String extractMajorVersion(String version) {
             if (argType != null) {
                 KmClassifier argClassifier = argType.getClassifier();
                 if (argClassifier instanceof KmClassifier.Class argClass &&
-                        argClass.getName().equals("kotlin/coroutines/Continuation")) {
+                  argClass.getName().equals("kotlin/coroutines/Continuation")) {
                     return true;
                 }
             }

@@ -88,10 +88,10 @@ public class KotlinDeprecatedRecipeGenerator {
 
         Set<String> seen = new LinkedHashSet<>();
         List<DeprecatedMethod> methods = result.deprecatedMethods().stream()
-                .sorted(comparing(DeprecatedMethod::methodPattern))
-                // Deduplicate by method pattern (same method can be found on multiple classes)
-                .filter(m -> seen.add(m.methodPattern()))
-                .toList();
+          .sorted(comparing(DeprecatedMethod::methodPattern))
+          // Deduplicate by method pattern (same method can be found on multiple classes)
+          .filter(m -> seen.add(m.methodPattern()))
+          .toList();
         for (DeprecatedMethod method : methods) {
             yaml.append("  # ").append(method.deprecatedAnnotation()).append("\n");
             yaml.append("  - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:\n");
@@ -122,8 +122,8 @@ public class KotlinDeprecatedRecipeGenerator {
 
     static String buildRecipeName(String groupId, String artifactId, String majorVersion) {
         String moduleName = Arrays.stream(artifactId.split("-"))
-                .map(KotlinDeprecatedRecipeGenerator::capitalize)
-                .collect(joining());
+          .map(KotlinDeprecatedRecipeGenerator::capitalize)
+          .collect(joining());
         return groupId + ".ReplaceDeprecated" + moduleName + majorVersion + "Methods";
     }
 

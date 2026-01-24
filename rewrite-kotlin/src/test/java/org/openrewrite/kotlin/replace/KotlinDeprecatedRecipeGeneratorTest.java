@@ -34,11 +34,11 @@ class KotlinDeprecatedRecipeGeneratorTest {
         @Test
         void generatesCorrectDisplayName() {
             ScanResult result = new ScanResult(
-                    "org.jetbrains.kotlinx",
-                    "kotlinx-coroutines-core",
-                    "1.10.2",
-                    "1",
-                    new ArrayList<>()
+              "org.jetbrains.kotlinx",
+              "kotlinx-coroutines-core",
+              "1.10.2",
+              "1",
+              new ArrayList<>()
             );
 
             String yaml = generateYamlRecipe(result).toString();
@@ -52,11 +52,11 @@ class KotlinDeprecatedRecipeGeneratorTest {
         void includesMethodPattern() {
             List<DeprecatedMethod> methods = new ArrayList<>();
             methods.add(new DeprecatedMethod(
-                    "com.example.Foo bar(java.lang.String)",
-                    "baz(s)",
-                    List.of(),
-                    "my-lib-1",
-                    "@Deprecated(\"Use baz instead\", ReplaceWith(\"baz(s)\"), DeprecationLevel.WARNING)"
+              "com.example.Foo bar(java.lang.String)",
+              "baz(s)",
+              List.of(),
+              "my-lib-1",
+              "@Deprecated(\"Use baz instead\", ReplaceWith(\"baz(s)\"), DeprecationLevel.WARNING)"
             ));
             ScanResult result = new ScanResult("com.example", "my-lib", "1.0.0", "1", methods);
 
@@ -70,11 +70,11 @@ class KotlinDeprecatedRecipeGeneratorTest {
         void includesReplacement() {
             List<DeprecatedMethod> methods = new ArrayList<>();
             methods.add(new DeprecatedMethod(
-                    "com.example.Foo bar()",
-                    "newBar()",
-                    List.of(),
-                    "my-lib-1",
-                    "@Deprecated(\"Use newBar instead\", ReplaceWith(\"newBar()\"), DeprecationLevel.WARNING)"
+              "com.example.Foo bar()",
+              "newBar()",
+              List.of(),
+              "my-lib-1",
+              "@Deprecated(\"Use newBar instead\", ReplaceWith(\"newBar()\"), DeprecationLevel.WARNING)"
             ));
             ScanResult result = new ScanResult("com.example", "my-lib", "1.0.0", "1", methods);
 
@@ -87,11 +87,11 @@ class KotlinDeprecatedRecipeGeneratorTest {
         void includesImportsWhenPresent() {
             List<DeprecatedMethod> methods = new ArrayList<>();
             methods.add(new DeprecatedMethod(
-                    "com.example.Foo bar()",
-                    "Helper.create()",
-                    List.of("com.example.Helper", "com.example.util.Utils"),
-                    "my-lib-1",
-                    "@Deprecated(\"Use Helper.create instead\", ReplaceWith(\"Helper.create()\", \"com.example.Helper\", \"com.example.util.Utils\"), DeprecationLevel.WARNING)"
+              "com.example.Foo bar()",
+              "Helper.create()",
+              List.of("com.example.Helper", "com.example.util.Utils"),
+              "my-lib-1",
+              "@Deprecated(\"Use Helper.create instead\", ReplaceWith(\"Helper.create()\", \"com.example.Helper\", \"com.example.util.Utils\"), DeprecationLevel.WARNING)"
             ));
             ScanResult result = new ScanResult("com.example", "my-lib", "1.0.0", "1", methods);
 
@@ -106,11 +106,11 @@ class KotlinDeprecatedRecipeGeneratorTest {
         void omitsImportsWhenEmpty() {
             List<DeprecatedMethod> methods = new ArrayList<>();
             methods.add(new DeprecatedMethod(
-                    "com.example.Foo bar()",
-                    "baz()",
-                    List.of(),
-                    "my-lib-1",
-                    "@Deprecated(\"Use baz\", ReplaceWith(\"baz()\"), DeprecationLevel.WARNING)"
+              "com.example.Foo bar()",
+              "baz()",
+              List.of(),
+              "my-lib-1",
+              "@Deprecated(\"Use baz\", ReplaceWith(\"baz()\"), DeprecationLevel.WARNING)"
             ));
             ScanResult result = new ScanResult("com.example", "my-lib", "1.0.0", "1", methods);
 
@@ -123,11 +123,11 @@ class KotlinDeprecatedRecipeGeneratorTest {
         void includesClasspathFromResources() {
             List<DeprecatedMethod> methods = new ArrayList<>();
             methods.add(new DeprecatedMethod(
-                    "com.example.Foo bar()",
-                    "baz()",
-                    List.of(),
-                    "my-lib-1",
-                    "@Deprecated(\"Use baz\", ReplaceWith(\"baz()\"), DeprecationLevel.WARNING)"
+              "com.example.Foo bar()",
+              "baz()",
+              List.of(),
+              "my-lib-1",
+              "@Deprecated(\"Use baz\", ReplaceWith(\"baz()\"), DeprecationLevel.WARNING)"
             ));
             ScanResult result = new ScanResult("com.example", "my-lib", "1.0.0", "1", methods);
 
@@ -141,11 +141,11 @@ class KotlinDeprecatedRecipeGeneratorTest {
         void escapesSingleQuotesInYaml() {
             List<DeprecatedMethod> methods = new ArrayList<>();
             methods.add(new DeprecatedMethod(
-                    "com.example.Foo bar()",
-                    "it's working",
-                    List.of(),
-                    "my-lib-1",
-                    "@Deprecated(\"Use it's working\", ReplaceWith(\"it's working\"), DeprecationLevel.WARNING)"
+              "com.example.Foo bar()",
+              "it's working",
+              List.of(),
+              "my-lib-1",
+              "@Deprecated(\"Use it's working\", ReplaceWith(\"it's working\"), DeprecationLevel.WARNING)"
             ));
             ScanResult result = new ScanResult("com.example", "my-lib", "1.0.0", "1", methods);
 
