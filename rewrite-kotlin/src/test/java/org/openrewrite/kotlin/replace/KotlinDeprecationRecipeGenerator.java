@@ -89,7 +89,7 @@ public class KotlinDeprecationRecipeGenerator {
                 .toList();
         for (DeprecatedMethod method : methods) {
             yaml.append("  # ").append(method.deprecatedAnnotation()).append("\n");
-            yaml.append("  - org.openrewrite.kotlin.replace.ReplaceDeprecatedKotlinMethod:\n");
+            yaml.append("  - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:\n");
             yaml.append("      methodPattern: '").append(escapeYaml(method.methodPattern())).append("'\n");
             yaml.append("      replacement: '").append(escapeYaml(method.replacement())).append("'\n");
 

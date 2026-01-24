@@ -21,13 +21,13 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-class ReplaceDeprecatedKotlinMethodTest implements RewriteTest {
+class ReplaceKotlinMethodTest implements RewriteTest {
 
     @DocumentExample
     @Test
     void replaceCharToIntWithCode() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceDeprecatedKotlinMethod(
+          spec -> spec.recipe(new ReplaceKotlinMethod(
             "kotlin.Char toInt()",
             "code",
             null,
@@ -51,7 +51,7 @@ class ReplaceDeprecatedKotlinMethodTest implements RewriteTest {
     @Test
     void replaceWithExplicitThisReference() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceDeprecatedKotlinMethod(
+          spec -> spec.recipe(new ReplaceKotlinMethod(
             "kotlin.Char toInt()",
             "this.code",
             null,
@@ -75,7 +75,7 @@ class ReplaceDeprecatedKotlinMethodTest implements RewriteTest {
     @Test
     void noChangeWhenMethodDoesNotMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceDeprecatedKotlinMethod(
+          spec -> spec.recipe(new ReplaceKotlinMethod(
             "kotlin.Char toInt()",
             "code",
             null,
@@ -95,7 +95,7 @@ class ReplaceDeprecatedKotlinMethodTest implements RewriteTest {
     void replacePropertyStyleReplacement() {
         // Tests replacing a method with a property-style access
         rewriteRun(
-          spec -> spec.recipe(new ReplaceDeprecatedKotlinMethod(
+          spec -> spec.recipe(new ReplaceKotlinMethod(
             "kotlin.Char toInt()",
             "this.code",
             null,
@@ -119,7 +119,7 @@ class ReplaceDeprecatedKotlinMethodTest implements RewriteTest {
     @Test
     void replaceMultipleOccurrences() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceDeprecatedKotlinMethod(
+          spec -> spec.recipe(new ReplaceKotlinMethod(
             "kotlin.Char toInt()",
             "code",
             null,
@@ -143,7 +143,7 @@ class ReplaceDeprecatedKotlinMethodTest implements RewriteTest {
     @Test
     void preservesWhitespaceAndFormatting() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceDeprecatedKotlinMethod(
+          spec -> spec.recipe(new ReplaceKotlinMethod(
             "kotlin.Char toInt()",
             "code",
             null,

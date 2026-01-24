@@ -34,8 +34,6 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.Objects.requireNonNull;
-
 /**
  * Replaces deprecated Kotlin method calls based on {@code @Deprecated(replaceWith=ReplaceWith(...))} annotations.
  * <p>
@@ -45,7 +43,7 @@ import static java.util.Objects.requireNonNull;
 @Incubating(since = "8.43.0")
 @EqualsAndHashCode(callSuper = false)
 @Value
-public class ReplaceDeprecatedKotlinMethod extends Recipe {
+public class ReplaceKotlinMethod extends Recipe {
 
     private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("\\b(\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)\\b");
     private static final Pattern TEMPLATE_PLACEHOLDER = Pattern.compile("#\\{([^}]+)}");
@@ -79,8 +77,9 @@ public class ReplaceDeprecatedKotlinMethod extends Recipe {
     @Nullable
     List<String> classpathFromResources;
 
-    String displayName = "Replace deprecated Kotlin method";
-    String description = "Replaces deprecated Kotlin method calls based on `@Deprecated(replaceWith=ReplaceWith(...))` annotations.";
+    String displayName = "Replace Kotlin method";
+    String description = "Replaces Kotlin method calls based on `@Deprecated(replaceWith=ReplaceWith(...))` annotations.";
+    Set<String> tags = new HashSet<>(Arrays.asList("kotlin", "deprecated"));
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

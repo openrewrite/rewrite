@@ -26,19 +26,19 @@ description: >-
   `@Deprecated(replaceWith=ReplaceWith(...))` annotations.
 recipeList:
   # @Deprecated("Deprecated in favor of function with more precise name: defaultDeserializer", ReplaceWith("defaultDeserializer(defaultSerializerProvider)"), DeprecationLevel.WARNING)
-  - org.openrewrite.kotlin.replace.ReplaceDeprecatedKotlinMethod:
+  - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
       methodPattern: 'kotlinx.serialization.modules.PolymorphicModuleBuilder default(kotlin.Function1)'
       replacement: 'defaultDeserializer(defaultSerializerProvider)'
       classpathFromResources:
         - 'kotlinx-serialization-core-jvm-1'
   # @Deprecated("Deprecated in favor of overload with default parameter", ReplaceWith("getContextual(kclass)"), DeprecationLevel.HIDDEN)
-  - org.openrewrite.kotlin.replace.ReplaceDeprecatedKotlinMethod:
+  - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
       methodPattern: 'kotlinx.serialization.modules.SerializersModule getContextual(kotlin.reflect.KClass)'
       replacement: 'getContextual(kclass)'
       classpathFromResources:
         - 'kotlinx-serialization-core-jvm-1'
   # @Deprecated("Deprecated in favor of function with more precise name: polymorphicDefaultDeserializer", ReplaceWith("polymorphicDefaultDeserializer(baseClass, defaultDeserializerProvider)"), DeprecationLevel.WARNING)
-  - org.openrewrite.kotlin.replace.ReplaceDeprecatedKotlinMethod:
+  - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
       methodPattern: 'kotlinx.serialization.modules.SerializersModuleCollector polymorphicDefault(kotlin.reflect.KClass, kotlin.Function1)'
       replacement: 'polymorphicDefaultDeserializer(baseClass, defaultDeserializerProvider)'
       classpathFromResources:
