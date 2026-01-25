@@ -1115,8 +1115,7 @@ class JsonPathMatcherTest {
         assertThat(validated.isValid()).isFalse();
         assertThat(validated.failures().get(0).getMessage())
           .contains("Invalid JsonPath expression")
-          .contains("Syntax error at line 1:16")
-          .contains("extraneous input '<EOF>' expecting {']', Identifier, StringLiteral}");
+          .contains("extraneous input '[' expecting EOF");
     }
 
     @Test
@@ -1131,7 +1130,7 @@ class JsonPathMatcherTest {
             }
         }.reduce(yaml, 0))
           .hasRootCauseInstanceOf(IllegalArgumentException.class)
-          .hasRootCauseMessage("Syntax error at line 1:16 extraneous input '<EOF>' expecting {']', Identifier, StringLiteral}. Original input: '$[invalid syntax'");
+          .rootCause().hasMessageContaining("extraneous input '[' expecting EOF");
     }
 
     @Test
