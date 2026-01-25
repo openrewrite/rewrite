@@ -20,12 +20,14 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static java.util.Collections.sort;
 import static java.util.stream.Collectors.toList;
@@ -125,21 +127,20 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
 
     private Yaml.Block parseYamlValue(String value, String itemPrefix, String entryPrefix, Yaml.Scalar.Style style) {
         // Try to parse the value as YAML to detect if it's a complex structure (mapping/sequence)
-        return new YamlParser().parse(value)
+        return YamlParser.builder()
+                .build()
+                .parse(value)
                 .findFirst()
                 .filter(Yaml.Documents.class::isInstance)
                 .map(Yaml.Documents.class::cast)
                 .map(docs -> docs.getDocuments().get(0).getBlock())
-                .<Yaml.Block>map(block -> {
+                .<Yaml.Block>flatMap(block -> {
                     if (block instanceof Yaml.Mapping) {
                         // Calculate the base indentation for the new item
-                        String baseIndent = calculateBaseIndent(entryPrefix);
-                        return adjustMappingIndentation((Yaml.Mapping) block, itemPrefix, baseIndent);
-                    } else {
-                        // For scalars and other simple types, create a new scalar
-                        // preserving the style from existing entries
-                        return new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, null, value);
+                        String baseIndent = StringUtils.indent(entryPrefix.replace("\n", ""));
+                        return Optional.of(adjustMappingIndentation((Yaml.Mapping) block, itemPrefix, baseIndent));
                     }
+                    return Optional.empty();
                 })
                 .orElseGet(() -> new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, null, value));
     }
@@ -158,20 +159,10 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
                 String nestedFirstEntryPrefix = "\n" + nestedBaseIndent; // Nested mapping starts on new line
                 Yaml.Mapping nestedMapping = adjustMappingIndentation(
                         (Yaml.Mapping) entry.getValue(), nestedFirstEntryPrefix, nestedBaseIndent);
-                adjusted = adjusted.withValue(nestedMapping);
+                return adjusted.withValue(nestedMapping);
             }
             return adjusted;
         });
         return mapping.withEntries(adjustedEntries);
-    }
-
-    /**
-     * Extract the base indentation from the entry prefix.
-     * For a sequence entry with prefix "\n    " (newline + 4 spaces),
-     * the base indent is "    " (4 spaces).
-     */
-    private String calculateBaseIndent(String entryPrefix) {
-        int lastNewline = entryPrefix.lastIndexOf('\n');
-        return lastNewline >= 0 ? entryPrefix.substring(lastNewline + 1) : entryPrefix;
     }
 }
