@@ -132,19 +132,9 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
                 .map(docs -> docs.getDocuments().get(0).getBlock())
                 .<Yaml.Block>map(block -> {
                     if (block instanceof Yaml.Mapping) {
-                        // For mappings, adjust the prefix of all entries
-                        // First entry gets itemPrefix
-                        // Subsequent entries need proper indentation based on entryPrefix + additional indent
-                        Yaml.Mapping m = (Yaml.Mapping) block;
-                        String subsequentEntryPrefix = calculateSubsequentEntryPrefix(entryPrefix);
-                        List<Yaml.Mapping.Entry> adjustedEntries = ListUtils.map(m.getEntries(), (index, entry) -> {
-                            if (index == 0) {
-                                return entry.withPrefix(itemPrefix);
-                            } else {
-                                return entry.withPrefix(subsequentEntryPrefix);
-                            }
-                        });
-                        return m.withEntries(adjustedEntries);
+                        // Calculate the base indentation for the new item
+                        String baseIndent = calculateBaseIndent(entryPrefix);
+                        return adjustMappingIndentation((Yaml.Mapping) block, itemPrefix, baseIndent);
                     } else {
                         // For scalars and other simple types, create a new scalar
                         // preserving the style from existing entries
@@ -155,15 +145,33 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
     }
 
     /**
-     * Calculate the prefix for subsequent mapping entries based on the sequence entry's prefix.
-     * For a sequence entry with prefix "\n  " (newline + 2 spaces),
-     * subsequent mapping entries should have prefix "\n    " (newline + 4 spaces).
+     * Recursively adjust indentation for a mapping and all nested structures.
      */
-    private String calculateSubsequentEntryPrefix(String entryPrefix) {
-        // Extract the indentation from the entry prefix (everything after the last newline)
+    private Yaml.Mapping adjustMappingIndentation(Yaml.Mapping mapping, String firstEntryPrefix, String baseIndent) {
+        String subsequentEntryPrefix = "\n" + baseIndent + "  ";
+        List<Yaml.Mapping.Entry> adjustedEntries = ListUtils.map(mapping.getEntries(), (index, entry) -> {
+            String newPrefix = index == 0 ? firstEntryPrefix : subsequentEntryPrefix;
+            Yaml.Mapping.Entry adjusted = entry.withPrefix(newPrefix);
+            // Recursively adjust nested mappings in the value
+            if (entry.getValue() instanceof Yaml.Mapping) {
+                String nestedBaseIndent = baseIndent + "    "; // Add 4 more spaces for nested level
+                String nestedFirstEntryPrefix = "\n" + nestedBaseIndent; // Nested mapping starts on new line
+                Yaml.Mapping nestedMapping = adjustMappingIndentation(
+                        (Yaml.Mapping) entry.getValue(), nestedFirstEntryPrefix, nestedBaseIndent);
+                adjusted = adjusted.withValue(nestedMapping);
+            }
+            return adjusted;
+        });
+        return mapping.withEntries(adjustedEntries);
+    }
+
+    /**
+     * Extract the base indentation from the entry prefix.
+     * For a sequence entry with prefix "\n    " (newline + 4 spaces),
+     * the base indent is "    " (4 spaces).
+     */
+    private String calculateBaseIndent(String entryPrefix) {
         int lastNewline = entryPrefix.lastIndexOf('\n');
-        String baseIndent = lastNewline >= 0 ? entryPrefix.substring(lastNewline + 1) : entryPrefix;
-        // Add 2 more spaces for the mapping entries after the dash
-        return "\n" + baseIndent + "  ";
+        return lastNewline >= 0 ? entryPrefix.substring(lastNewline + 1) : entryPrefix;
     }
 }
