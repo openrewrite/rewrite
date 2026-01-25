@@ -73,9 +73,9 @@ public class JsonPathMatcher {
         JsonPathParser.JsonPathContext ctx = parse();
         // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
         ParseTree lastChild = ctx.children.get(ctx.children.size() - 1);
-        JsonPathParser.ExpressionContext stop = lastChild instanceof JsonPathParser.ExpressionContext
-                ? (JsonPathParser.ExpressionContext) lastChild
-                : null;
+        JsonPathParser.ExpressionContext stop = lastChild instanceof JsonPathParser.ExpressionContext ?
+                (JsonPathParser.ExpressionContext) lastChild :
+                null;
         @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, start, stop, false);
         Object result = v.visit(ctx);
 
