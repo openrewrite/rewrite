@@ -560,6 +560,21 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 });
             }
 
+            // Handle Spring dependency management plugin entries (dependency, dependencySet, mavenBom)
+            SpringDependencyManagementPluginEntry springDepMgmtEntry = new SpringDependencyManagementPluginEntry.Matcher()
+                    .groupId(groupId)
+                    .artifactId(artifactId)
+                    .get(getCursor())
+                    .orElse(null);
+            if (springDepMgmtEntry != null) {
+                // Only update if the version is NOT a variable (variables are handled by UpdateProperties/UpdateVariable)
+                String versionVar = springDepMgmtEntry.getVersionVariable();
+                if (versionVar == null) {
+                    m = springDepMgmtEntry.withGroupArtifactVersion(
+                            dependencyMatcher, null, null, newVersion, versionPattern, metadataFailures, ctx).getTree();
+                }
+            }
+
             if ("ext".equals(method.getSimpleName()) && getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().endsWith("settings.gradle")) {
                 // rare case that gradle versions are set via settings.gradle ext block (only possible for Groovy DSL)
                 m = (J.MethodInvocation) new JavaIsoVisitor<ExecutionContext>() {
