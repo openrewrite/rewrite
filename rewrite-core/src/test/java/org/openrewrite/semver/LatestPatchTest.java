@@ -38,6 +38,8 @@ class LatestPatchTest {
         assertThat(latestPatch.isValid("1.0", "1.0.1")).isTrue();
         assertThat(latestPatch.isValid("1.0.0", "1.1.0")).isFalse();
         assertThat(latestPatch.isValid("1.0.0", "2.0.0")).isFalse();
+        assertThat(latestPatch.isValid("1.0.x", "1.0.1")).isTrue();
+        assertThat(latestPatch.isValid("1.0.x", "1.1.0")).isFalse();
     }
 
     @Test
@@ -68,6 +70,9 @@ class LatestPatchTest {
         upgrade = latestPatch.upgrade("2.10.10.3.24", List.of("2.10.10.3.25"));
         assertThat(upgrade).isPresent();
         assertThat(upgrade.get()).isEqualTo("2.10.10.3.25");
+
+        assertThat(latestPatch.upgrade("1.0.x", List.of("1.0.1"))).isPresent();
+        assertThat(latestPatch.upgrade("1.0.x", List.of("1.1.0"))).isNotPresent();
     }
 
     @Test

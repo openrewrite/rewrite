@@ -69,8 +69,6 @@ public class LatestMinorTest {
 
         assertThat(latestMinor.upgrade("2.10.0", List.of("3.0.0"))).isNotPresent();
 
-        assertThat(latestMinor.upgrade("2.2.x", List.of("2.2.1"))).isPresent();
-        assertThat(latestMinor.upgrade("2.2.x", List.of("2.3.0"))).isPresent();
         assertThat(latestMinor.upgrade("2.x", List.of("2.9"))).isPresent();
         assertThat(latestMinor.upgrade("2.x", List.of("3.0"))).isNotPresent();
     }

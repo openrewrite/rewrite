@@ -46,14 +46,8 @@ public class LatestMinor implements VersionComparator {
                     .compare(null, v1, v2);
         }
 
-        Validated<XRange> xRange = XRange.build(currentVersion, metadataPattern);
-        if(xRange.isValid()) {
-            //noinspection ConstantConditions
-            return xRange.getValue().compare(currentVersion, v1, v2);
-        }
-
         //noinspection ConstantConditions
-        return TildeRange.build("~" + Semver.majorVersion(currentVersion) + "." + Semver.minorVersion(currentVersion), metadataPattern)
+        return TildeRange.build("~" + Semver.majorVersion(currentVersion), metadataPattern)
                 .getValue()
                 .compare(currentVersion, v1, v2);
     }
