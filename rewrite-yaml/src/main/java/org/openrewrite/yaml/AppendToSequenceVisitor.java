@@ -19,6 +19,7 @@ package org.openrewrite.yaml;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
@@ -115,9 +116,54 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
                 entries.set(lastEntryIndex, existingEntry.withTrailingCommaPrefix(""));
             }
         }
-        Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, null, value);
+
+        Yaml.Block newItem = parseYamlValue(value, itemPrefix, entryPrefix, style);
         Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
         entries.add(newEntry);
         return newSequence.withMarkers(existingSequence.getMarkers().addIfAbsent(new AlreadyReplaced(randomId(), value, value)));
+    }
+
+    private Yaml.Block parseYamlValue(String value, String itemPrefix, String entryPrefix, Yaml.Scalar.Style style) {
+        // Try to parse the value as YAML to detect if it's a complex structure (mapping/sequence)
+        return new YamlParser().parse(value)
+                .findFirst()
+                .filter(Yaml.Documents.class::isInstance)
+                .map(Yaml.Documents.class::cast)
+                .map(docs -> docs.getDocuments().get(0).getBlock())
+                .<Yaml.Block>map(block -> {
+                    if (block instanceof Yaml.Mapping) {
+                        // For mappings, adjust the prefix of all entries
+                        // First entry gets itemPrefix
+                        // Subsequent entries need proper indentation based on entryPrefix + additional indent
+                        Yaml.Mapping m = (Yaml.Mapping) block;
+                        String subsequentEntryPrefix = calculateSubsequentEntryPrefix(entryPrefix);
+                        List<Yaml.Mapping.Entry> adjustedEntries = ListUtils.map(m.getEntries(), (index, entry) -> {
+                            if (index == 0) {
+                                return entry.withPrefix(itemPrefix);
+                            } else {
+                                return entry.withPrefix(subsequentEntryPrefix);
+                            }
+                        });
+                        return m.withEntries(adjustedEntries);
+                    } else {
+                        // For scalars and other simple types, create a new scalar
+                        // preserving the style from existing entries
+                        return new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, null, value);
+                    }
+                })
+                .orElseGet(() -> new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, null, value));
+    }
+
+    /**
+     * Calculate the prefix for subsequent mapping entries based on the sequence entry's prefix.
+     * For a sequence entry with prefix "\n  " (newline + 2 spaces),
+     * subsequent mapping entries should have prefix "\n    " (newline + 4 spaces).
+     */
+    private String calculateSubsequentEntryPrefix(String entryPrefix) {
+        // Extract the indentation from the entry prefix (everything after the last newline)
+        int lastNewline = entryPrefix.lastIndexOf('\n');
+        String baseIndent = lastNewline >= 0 ? entryPrefix.substring(lastNewline + 1) : entryPrefix;
+        // Add 2 more spaces for the mapping entries after the dash
+        return "\n" + baseIndent + "  ";
     }
 }
