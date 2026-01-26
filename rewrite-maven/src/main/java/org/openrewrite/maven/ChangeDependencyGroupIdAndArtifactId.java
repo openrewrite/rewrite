@@ -119,7 +119,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
     }
 
     String description = "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before. " +
-                "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided.";
+                "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided. " +
+                "Exclusions that reference the old dependency coordinates will also be updated to match the new coordinates.";
 
     @Override
     public Validated<Object> validate() {
@@ -162,6 +163,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             Optional.ofNullable(newGroupId).orElse(oldGroupId),
                             Optional.ofNullable(newArtifactId).orElse(oldArtifactId),
                             newVersion, versionPattern).getVisitor());
+                }
+                // Update any exclusions that reference the old coordinates
+                if (newGroupId != null || newArtifactId != null) {
+                    doAfterVisit(new ChangeExclusion(
+                            oldGroupId, oldArtifactId,
+                            newGroupId, newArtifactId).getVisitor());
                 }
                 return super.visitDocument(document, ctx);
             }
