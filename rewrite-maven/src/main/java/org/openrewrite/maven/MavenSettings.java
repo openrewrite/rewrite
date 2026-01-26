@@ -279,10 +279,10 @@ public class MavenSettings {
             if (configuration == null) {
                 return null;
             }
-            ServerConfiguration config = new ServerConfiguration();
-            config.setHttpHeaders(ListUtils.map(configuration.httpHeaders, this::interpolate));
-            config.setTimeout(configuration.timeout);
-            return config;
+            return new ServerConfiguration(
+                    ListUtils.map(configuration.httpHeaders, this::interpolate),
+                    configuration.timeout
+            );
         }
 
         private HttpHeader interpolate(HttpHeader httpHeader) {
@@ -491,12 +491,5 @@ public class MavenSettings {
     public static class HttpHeader {
         String name;
         String value;
-
-        @JsonCreator
-        public HttpHeader(@JsonProperty("name") String name,
-                          @JsonProperty("value") String value) {
-            this.name = name;
-            this.value = value;
-        }
     }
 }
