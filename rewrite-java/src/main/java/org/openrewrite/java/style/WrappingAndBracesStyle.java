@@ -34,6 +34,7 @@ public class WrappingAndBracesStyle implements JavaStyle {
     ChainedMethodCalls chainedMethodCalls;
     MethodDeclarationParameters methodDeclarationParameters;
     MethodCallArguments methodCallArguments;
+    @Nullable RecordComponents recordComponents;
     @Nullable Annotations classAnnotations;
     @Nullable Annotations methodAnnotations;
     @Nullable Annotations fieldAnnotations;
@@ -52,6 +53,15 @@ public class WrappingAndBracesStyle implements JavaStyle {
                 LineWrapSetting.DoNotWrap,
                 emptyList(),
                 false) : chainedMethodCalls;
+    }
+
+    public RecordComponents getRecordComponents() {
+        //noinspection ConstantConditions
+        return recordComponents == null ? new RecordComponents(
+                LineWrapSetting.DoNotWrap,
+                false,
+                false,
+                false) : recordComponents;
     }
 
     @Value
@@ -121,6 +131,35 @@ public class WrappingAndBracesStyle implements JavaStyle {
     @Value
     @With
     public static class MethodCallArguments {
+        LineWrapSetting wrap;
+        Boolean alignWhenMultiline;
+        Boolean openNewLine;
+        Boolean closeNewLine;
+
+        public LineWrapSetting getWrap() {
+            //noinspection ConstantConditions
+            return wrap == null ? LineWrapSetting.DoNotWrap : wrap;
+        }
+
+        public Boolean getAlignWhenMultiline() {
+            //noinspection ConstantConditions
+            return alignWhenMultiline == null ? false : alignWhenMultiline;
+        }
+
+        public Boolean getOpenNewLine() {
+            //noinspection ConstantConditions
+            return openNewLine == null ? false : openNewLine;
+        }
+
+        public Boolean getCloseNewLine() {
+            //noinspection ConstantConditions
+            return closeNewLine == null ? false : closeNewLine;
+        }
+    }
+
+    @Value
+    @With
+    public static class RecordComponents {
         LineWrapSetting wrap;
         Boolean alignWhenMultiline;
         Boolean openNewLine;
