@@ -1761,6 +1761,85 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/760")
+    @Test
+    void doNotAddIfDependencyAlreadyExists() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("org.assertj:assertj-core:3.24.2", "org.junit.jupiter.api.Assertions")),
+          mavenProject("project",
+            srcTestJava(
+              java(
+                """
+                  import org.junit.jupiter.api.Assertions;
+                  public class MyTest {
+                      void test() {
+                          Assertions.assertTrue(true);
+                      }
+                  }
+                  """
+              )
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    testImplementation "org.assertj:assertj-core:3.24.2"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/760")
+    @Test
+    void doNotAddIfDependencyIsTransitivelyAvailable() {
+        // This test verifies that when acceptTransitive is true and the dependency is
+        // transitively available (via Spring Boot starter), it should not be added again
+        AddDependency addDep = new AddDependency("org.assertj", "assertj-core", "3.x", null, null, "org.junit.jupiter.api.Assertions", null, null, null, Boolean.TRUE);
+        rewriteRun(
+          spec -> spec.recipe(addDep),
+          mavenProject("project",
+            srcTestJava(
+              java(
+                """
+                  import org.junit.jupiter.api.Assertions;
+                  public class MyTest {
+                      void test() {
+                          Assertions.assertTrue(true);
+                      }
+                  }
+                  """
+              )
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                    id 'org.springframework.boot' version '3.2.0'
+                    id 'io.spring.dependency-management' version '1.1.4'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+                }
+                """
+            )
+          )
+        );
+    }
+
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null);
     }
