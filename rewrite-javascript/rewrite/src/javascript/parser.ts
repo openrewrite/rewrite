@@ -640,7 +640,7 @@ export class JavaScriptParserVisitor {
         return {
             kind: J.Kind.RightPadded,
             element: t,
-            after: trailing,
+            after: trailing ?? emptySpace,
             markers: markers ?? emptyMarkers
         };
     }
@@ -673,7 +673,7 @@ export class JavaScriptParserVisitor {
     private leftPadded<T extends J | J.Space | number | string | boolean>(before: J.Space, t: T, markers?: Markers): J.LeftPadded<T> {
         return {
             kind: J.Kind.LeftPadded,
-            before: before,
+            before: before ?? emptySpace,
             element: t,
             markers: markers ?? emptyMarkers
         };
