@@ -73,6 +73,11 @@ class LatestPatchTest {
 
         assertThat(latestPatch.upgrade("1.0.x", List.of("1.0.1"))).isPresent();
         assertThat(latestPatch.upgrade("1.0.x", List.of("1.1.0"))).isNotPresent();
+
+        // X-range versions without numeric minor - should not throw ValidationException
+        assertThat(latestPatch.upgrade("2.+", List.of("2.1"))).isPresent();
+        assertThat(latestPatch.upgrade("2.x", List.of("2.1"))).isPresent();
+        assertThat(latestPatch.upgrade("2.+", List.of("3.0"))).isNotPresent();
     }
 
     @Test
@@ -81,6 +86,9 @@ class LatestPatchTest {
         assertThat(latestPatch.compare("1.0", "1.0.0.1", "1.0.1")).isLessThan(0);
         assertThat(latestPatch.compare(null, "1.0", "latest.patch")).isNegative();
         assertThat(latestPatch.compare(null, "latest.patch", "1.0")).isPositive();
+        // Test X-range versions without numeric minor - these should not throw ValidationException
+        assertThat(latestPatch.compare("2.+", "2.0", "2.1")).isNegative();
+        assertThat(latestPatch.compare("2.x", "2.0", "2.1")).isNegative();
     }
 
     @Test
