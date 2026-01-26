@@ -196,6 +196,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 }
             }
         }
+        // Apply record component wrapping for records
+        if (j.getPadding().getPrimaryConstructor() != null) {
+            j = (J.ClassDeclaration) new WrapRecordComponents<>(style).visit(j, p, getCursor().getParentTreeCursor());
+        }
         return j;
     }
 
