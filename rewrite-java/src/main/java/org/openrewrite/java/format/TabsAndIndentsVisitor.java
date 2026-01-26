@@ -563,6 +563,12 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getChainedMethodCalls() != null && wrappingStyle.getChainedMethodCalls().getAlignWhenMultiline();
                 intelliJDefault = false;
                 break;
+            case METHOD_INVOCATION_ARGUMENT:
+            case NEW_CLASS_ARGUMENTS:
+                //noinspection ConstantConditions
+                isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getMethodCallArguments() != null && wrappingStyle.getMethodCallArguments().getAlignWhenMultiline();
+                intelliJDefault = false;
+                break;
             default:
                 isAlignedWhenMultipleFromStyle = () -> null;
                 intelliJDefault = false;
