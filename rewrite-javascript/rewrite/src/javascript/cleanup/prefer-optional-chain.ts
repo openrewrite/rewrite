@@ -54,7 +54,8 @@ export class PreferOptionalChain extends Recipe {
                 // Check if the false part is undefined
                 // Note: We only convert when the false part is undefined, not null,
                 // because optional chaining returns undefined (not null) when the target is nullish.
-                const falsePart = visited.falsePart.element;
+                // For tree types, the padded value IS the element (intersection type)
+                const falsePart = visited.falsePart as unknown as Expression;
                 const isUndefinedFalse = falsePart.kind === J.Kind.Identifier &&
                     (falsePart as J.Identifier).simpleName === 'undefined';
 
@@ -63,7 +64,8 @@ export class PreferOptionalChain extends Recipe {
                 }
 
                 // Check if the true part accesses a property/method on the condition
-                const truePart = visited.truePart.element;
+                // For tree types, the padded value IS the element (intersection type)
+                const truePart = visited.truePart as unknown as Expression;
                 const result = this.extractOptionalChainTarget(truePart, conditionName);
 
                 if (!result) {
@@ -118,8 +120,10 @@ export class PreferOptionalChain extends Recipe {
                 // Handle MethodInvocation: foo.bar()
                 if (expr.kind === J.Kind.MethodInvocation) {
                     const methodInvocation = expr as J.MethodInvocation;
-                    if (methodInvocation.select?.element.kind === J.Kind.Identifier) {
-                        const select = methodInvocation.select.element as J.Identifier;
+                    // For tree types, the padded value IS the element (intersection type)
+                    const selectExpr = methodInvocation.select as unknown as Expression | undefined;
+                    if (selectExpr?.kind === J.Kind.Identifier) {
+                        const select = selectExpr as J.Identifier;
                         if (select.simpleName === targetName) {
                             // Already has optional marker?
                             if (findMarker(select, JS.Markers.Optional)) {
@@ -131,17 +135,17 @@ export class PreferOptionalChain extends Recipe {
                                 id: randomId(),
                                 prefix: emptySpace
                             };
+                            // With intersection types, select IS the element (with padding mixed in)
+                            // Update markers on the element directly, preserving padding
                             return {
                                 ...methodInvocation,
                                 select: {
-                                    ...methodInvocation.select,
-                                    element: {
-                                        ...select,
-                                        markers: markers(
-                                            ...select.markers.markers,
-                                            optionalMarker
-                                        )
-                                    }
+                                    ...select,
+                                    markers: markers(
+                                        ...select.markers.markers,
+                                        optionalMarker
+                                    ),
+                                    padding: methodInvocation.select?.padding
                                 }
                             } as J.MethodInvocation;
                         }

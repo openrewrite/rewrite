@@ -89,7 +89,7 @@ describe('new mapping', () => {
                 } else if (newClass.class?.kind === J.Kind.FieldAccess) {
                     // This is the expected behavior - verify the field access
                     const fieldAccess = newClass.class as J.FieldAccess;
-                    expect(fieldAccess.name.element.simpleName).toBe('MyClass');
+                    expect(fieldAccess.name.simpleName).toBe('MyClass');
                 }
                 return super.visitNewClass(newClass, ctx);
             }

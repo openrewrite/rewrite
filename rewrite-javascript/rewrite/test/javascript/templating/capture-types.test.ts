@@ -111,7 +111,7 @@ describe('capture types', () => {
                 if (methodName.simpleName === 'toUpperCase' && method.select) {
                     // The select element is a string literal with natural type attribution from the parser
                     // Pass J element with type directly to template - type should be derived from the string type
-                    return template`${method.select.element}.toLowerCase()`.apply(method, this.cursor);
+                    return template`${method.select}.toLowerCase()`.apply(method, this.cursor);
                 }
                 return method;
             }
@@ -120,7 +120,7 @@ describe('capture types', () => {
             //language=typescript
             ...typescript('"hello".toUpperCase()', '"hello".toLowerCase()'),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                const methodType = (cu.statements[0].element as J.MethodInvocation).methodType!;
+                const methodType = (cu.statements[0] as unknown as J.MethodInvocation).methodType!;
                 expect((methodType.declaringType as Type.Class).fullyQualifiedName).toBe('String');
                 expect(methodType.name).toBe('toLowerCase');
             }

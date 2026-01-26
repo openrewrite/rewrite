@@ -83,16 +83,17 @@ export class AddParseIntRadix extends Recipe {
                         elements: [
                             {
                                 ...existingArg,
-                                after: {
-                                    ...existingArg.after,
-                                    whitespace: ''
+                                padding: {
+                                    ...existingArg.padding,
+                                    after: {
+                                        ...existingArg.padding.after,
+                                        whitespace: ''
+                                    }
                                 }
                             },
                             {
-                                kind: J.Kind.RightPadded,
-                                element: radixLiteral,
-                                after: existingArg.after,
-                                markers: emptyMarkers
+                                ...radixLiteral,
+                                padding: existingArg.padding
                             }
                         ]
                     }

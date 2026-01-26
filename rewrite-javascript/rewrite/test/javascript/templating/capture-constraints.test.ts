@@ -35,7 +35,7 @@ describe('Capture Constraints', () => {
         const gen = parser.parse({text: code, sourcePath: 'test.ts'});
         const cu = (await gen.next()).value;
         // @ts-ignore
-        const statement = cu.statements[0].element;
+        const statement = cu.statements[0];
         const result = statement.expression || statement;
         parseCache.set(code, result);
         return result;

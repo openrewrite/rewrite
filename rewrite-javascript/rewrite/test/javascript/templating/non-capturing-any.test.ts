@@ -38,7 +38,7 @@ describe('Non-Capturing any() Function', () => {
         const gen = parser.parse({text: code, sourcePath: 'test.ts'});
         const cu = (await gen.next()).value;
         // @ts-ignore
-        const statement = cu.statements[0].element;
+        const statement = cu.statements[0];
         // Handle expression statements
         if (statement.expression) {
             return statement.expression;
