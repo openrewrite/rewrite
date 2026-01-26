@@ -218,11 +218,17 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     List<Xml.CharData> piTexts = c.PI_TEXT().stream()
                             .map(piText -> convert(piText, (cdata, p) -> charData(cdata.getText(), false, p)))
                             .collect(toList());
-                    Xml.CharData piText = piTexts.get(0);
-                    if (piTexts.size() > 1) {
-                        StringBuilder sb = new StringBuilder();
-                        piTexts.forEach(it -> sb.append(it.getText()));
-                        piText = piText.withText(sb.toString());
+                    Xml.CharData piText;
+                    if (piTexts.isEmpty()) {
+                        // Handle edge case where no PI_TEXT tokens are present (e.g., during error recovery)
+                        piText = new Xml.CharData(randomId(), "", Markers.EMPTY, false, "", "");
+                    } else {
+                        piText = piTexts.get(0);
+                        if (piTexts.size() > 1) {
+                            StringBuilder sb = new StringBuilder();
+                            piTexts.forEach(it -> sb.append(it.getText()));
+                            piText = piText.withText(sb.toString());
+                        }
                     }
 
                     return new Xml.ProcessingInstruction(
@@ -336,23 +342,31 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         beforeTagDelimiterPrefix = prefix(ctx.SLASH_CLOSE());
                         advanceCursor(ctx.SLASH_CLOSE().getSymbol().getStopIndex() + 1);
                     } else {
-                        beforeTagDelimiterPrefix = prefix(ctx.CLOSE(0));
-                        advanceCursor(ctx.CLOSE(0).getSymbol().getStopIndex() + 1);
+                        TerminalNode close0 = ctx.CLOSE(0);
+                        if (close0 != null) {
+                            beforeTagDelimiterPrefix = prefix(close0);
+                            advanceCursor(close0.getSymbol().getStopIndex() + 1);
+                        } else {
+                            beforeTagDelimiterPrefix = "";
+                        }
 
                         content = ctx.content().stream()
                                 .map(this::visit)
+                                .filter(java.util.Objects::nonNull)
                                 .map(Content.class::cast)
                                 .collect(toList());
 
-                        String closeTagPrefix = prefix(ctx.OPEN(1));
+                        TerminalNode open1 = ctx.OPEN(1);
+                        String closeTagPrefix = open1 != null ? prefix(open1) : "";
                         advanceCursor(codePointCursor + 2);
 
+                        TerminalNode close1 = ctx.CLOSE(1);
                         closeTag = new Xml.Tag.Closing(
                                 randomId(),
                                 closeTagPrefix,
                                 Markers.EMPTY,
                                 convert(ctx.Name(1), (n, p) -> n.getText()),
-                                prefix(ctx.CLOSE(1))
+                                close1 != null ? prefix(close1) : ""
                         );
                         advanceCursor(codePointCursor + 1);
                     }
@@ -390,7 +404,9 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             Xml.Ident name = convert(c.Name(), (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.getText()));
             Xml.Ident externalId = null;
             List<Xml.Ident> internalSubset = null;
-            if (!c.externalid().getStart().equals(c.DTD_CLOSE().getSymbol())) {
+            Token externalIdStart = c.externalid() != null ? c.externalid().getStart() : null;
+            Token dtdCloseSymbol = c.DTD_CLOSE() != null ? c.DTD_CLOSE().getSymbol() : null;
+            if (externalIdStart != null && dtdCloseSymbol != null && !externalIdStart.equals(dtdCloseSymbol)) {
                 if (c.externalid().Name() != null) {
                     externalId = convert(c.externalid(),
                             (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.Name().getText()));
@@ -401,31 +417,33 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             }
 
             Xml.DocTypeDecl.ExternalSubsets externalSubsets = null;
-            if (c.intsubset() != null) {
+            if (c.intsubset() != null && c.DTD_SUBSET_OPEN() != null) {
                 String subsetPrefix = prefix(c.DTD_SUBSET_OPEN());
                 advanceCursor(c.DTD_SUBSET_OPEN().getSymbol().getStopIndex() + 1);
 
                 List<Xml.Element> elements = new ArrayList<>();
                 List<ParseTree> children = c.intsubset().children;
-                for (int i = 0; i < children.size(); i++) {
-                    ParserRuleContext element = (ParserRuleContext) children.get(i);
-                    // Markup declarations are not fully implemented.
-                    // n.getText() includes element subsets.
-                    Xml.Ident ident = convert(element, (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.getText()));
+                if (children != null) {
+                    for (int i = 0; i < children.size(); i++) {
+                        ParserRuleContext element = (ParserRuleContext) children.get(i);
+                        // Markup declarations are not fully implemented.
+                        // n.getText() includes element subsets.
+                        Xml.Ident ident = convert(element, (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.getText()));
 
-                    String beforeElementTag = "";
-                    if (i == children.size() - 1) {
-                        beforeElementTag = prefix(c.DTD_SUBSET_CLOSE());
-                        advanceCursor(c.DTD_SUBSET_CLOSE().getSymbol().getStopIndex() + 1);
+                        String beforeElementTag = "";
+                        if (i == children.size() - 1 && c.DTD_SUBSET_CLOSE() != null) {
+                            beforeElementTag = prefix(c.DTD_SUBSET_CLOSE());
+                            advanceCursor(c.DTD_SUBSET_CLOSE().getSymbol().getStopIndex() + 1);
+                        }
+
+                        elements.add(
+                                new Xml.Element(
+                                        randomId(),
+                                        prefix(element),
+                                        Markers.EMPTY,
+                                        singletonList(ident),
+                                        beforeElementTag));
                     }
-
-                    elements.add(
-                            new Xml.Element(
-                                    randomId(),
-                                    prefix(element),
-                                    Markers.EMPTY,
-                                    singletonList(ident),
-                                    beforeElementTag));
                 }
                 externalSubsets = new Xml.DocTypeDecl.ExternalSubsets(randomId(), subsetPrefix, Markers.EMPTY, elements);
             }

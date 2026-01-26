@@ -648,4 +648,47 @@ class XmlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/857")
+    @Test
+    void commentFollowedByElement() {
+        // Idempotency issue with comments and indents getting collapsed
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0"?>
+              <!--
+                 IBM Corp.
+                =================================================================
+              -->
+
+              <Definitions>
+                  <!---
+                          Attribute Dictionary Attribute Object (Parent Reference Object)
+                  -->
+              </Definitions>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/857")
+    @Test
+    void xmlPrologPreserved() {
+        // XML prolog should not disappear
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+              <wsdl:definitions xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+                      xmlns:tns="http://www.example.com/test"
+                      xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+                      <wsdl:types>
+                      </wsdl:types>
+              </wsdl:definitions>
+              """
+          )
+        );
+    }
+
 }
