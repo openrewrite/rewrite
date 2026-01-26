@@ -488,7 +488,8 @@ class PythonRpcSender:
         q.get_and_send(mi, lambda x: x.padding.type_parameters, lambda c: self._visit_container(c, q))
         q.get_and_send(mi, lambda x: x.name, lambda el: self._visit(el, q))
         q.get_and_send(mi, lambda x: x.padding.arguments, lambda c: self._visit_container(c, q))
-        q.get_and_send(mi, lambda x: x.method_type)
+        # method_type: serialize the JavaType.Method with all its fields
+        q.get_and_send(mi, lambda x: x.method_type, lambda t: self._visit_type(t, q) if t else None)
 
     def _visit_block(self, block, q: 'RpcSendQueue') -> None:
         # static is JRightPadded[bool], not just bool
@@ -843,7 +844,54 @@ class PythonRpcSender:
             keyword = keyword_map.get(java_type, str(java_type.name).lower())
             # Send keyword as a primitive value field
             q.get_and_send(java_type, lambda x, kw=keyword: kw)
-        # TODO: Add handling for other JavaType subtypes (Class, Method, Variable, etc.)
+
+        elif isinstance(java_type, JT.Method):
+            # Method: declaringType, name, flagsBitMap, returnType, parameterNames,
+            #         parameterTypes, thrownExceptions, annotations, defaultValue, declaredFormalTypeNames
+            q.get_and_send(java_type, lambda x: x._declaring_type, lambda t: self._visit_type(t, q))
+            q.get_and_send(java_type, lambda x: x._name)
+            q.get_and_send(java_type, lambda x: x._flags_bit_map)
+            q.get_and_send(java_type, lambda x: x._return_type, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: x._parameter_names or [], lambda s: s, None)
+            q.get_and_send_list(java_type, lambda x: x._parameter_types or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: x._thrown_exceptions or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: x._annotations or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: x._default_value or [], lambda s: s, None)
+            q.get_and_send_list(java_type, lambda x: x._declared_formal_type_names or [], lambda s: s, None)
+
+        elif isinstance(java_type, JT.Class):
+            # Class: flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype,
+            #        owningClass, annotations, interfaces, members, methods
+            q.get_and_send(java_type, lambda x: getattr(x, '_flags_bit_map', 0))
+            q.get_and_send(java_type, lambda x: getattr(x, '_kind', JT.FullyQualified.Kind.Class))
+            q.get_and_send(java_type, lambda x: getattr(x, '_fully_qualified_name', ''))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_type_parameters', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send(java_type, lambda x: getattr(x, '_supertype', None), lambda t: self._visit_type(t, q))
+            q.get_and_send(java_type, lambda x: getattr(x, '_owning_class', None), lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_annotations', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_interfaces', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_members', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_methods', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+
+        elif isinstance(java_type, JT.Unknown):
+            # Unknown has no additional fields
+            pass
+
+    def _type_signature(self, java_type) -> str:
+        """Generate a signature string for a JavaType, used as list item identifier."""
+        from rewrite.java.support_types import JavaType as JT
+
+        if java_type is None:
+            return ''
+        if isinstance(java_type, JT.Primitive):
+            return java_type.name
+        if isinstance(java_type, JT.Class):
+            return getattr(java_type, '_fully_qualified_name', str(id(java_type)))
+        if isinstance(java_type, JT.Method):
+            declaring = getattr(java_type, '_declaring_type', None)
+            declaring_name = self._type_signature(declaring) if declaring else ''
+            return f"{declaring_name}#{java_type._name}"
+        return str(id(java_type))
 
     def _visit_space(self, space: Space, q: 'RpcSendQueue') -> None:
         """Visit a Space object.
