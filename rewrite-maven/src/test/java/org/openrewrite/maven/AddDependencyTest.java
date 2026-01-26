@@ -2122,6 +2122,70 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1482")
+    @Test
+    void addDependencyWhenInRepoParentHasDependencyWithLowerVersionAddsToParent() {
+        // When an in-repo parent has a dependency with a lower version,
+        // AddDependency should upgrade the dependency in the parent POM
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.fasterxml.jackson.core:jackson-databind:2.17.3", null, "compile")),
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>root</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-databind</artifactId>
+                            <version>2.9.10.8</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>root</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-databind</artifactId>
+                            <version>2.17.3</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>child</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null, null);
     }
