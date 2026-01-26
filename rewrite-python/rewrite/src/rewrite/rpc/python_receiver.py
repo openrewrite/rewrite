@@ -515,15 +515,10 @@ class PythonRpcReceiver:
         return replace_if_changed(fa, target=target, name=name, type=type_)
 
     def _visit_method_invocation(self, mi, q: RpcReceiveQueue):
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.debug(f"_visit_method_invocation: before receiving fields, mi.padding.select type={type(mi.padding.select).__name__ if mi.padding and mi.padding.select else 'None'}")
         select = q.receive(mi.padding.select)
-        logger.debug(f"_visit_method_invocation: select type={type(select).__name__ if select else 'None'}, value={select}")
         type_parameters = q.receive(mi.padding.type_parameters)
         name = q.receive(mi.name)
         arguments = q.receive(mi.padding.arguments)
-        # method_type: receive without callback since sender also doesn't use callback
         method_type = q.receive(mi.method_type)
         return replace_if_changed(mi, select=select, type_parameters=type_parameters, name=name, arguments=arguments, method_type=method_type)
 
@@ -1144,21 +1139,14 @@ def _receive_search_result(marker, q: RpcReceiveQueue):
     """Codec for receiving SearchResult marker."""
     from rewrite.markers import SearchResult
     from uuid import UUID
-    import logging
-    logger = logging.getLogger(__name__)
 
     # SearchResult sends: id, description
     before_id = str(marker.id) if marker and marker.id else None
-    logger.debug(f"_receive_search_result: marker={marker}, before_id={before_id}")
     id_str = q.receive(before_id)
-    logger.debug(f"_receive_search_result: id_str={id_str}")
     description = q.receive(marker.description if marker else None)
-    logger.debug(f"_receive_search_result: description={description}")
 
     new_id = UUID(id_str) if id_str else (marker.id if marker else None)
-    result = SearchResult(_id=new_id, _description=description)
-    logger.debug(f"_receive_search_result: returning {result}")
-    return result
+    return SearchResult(_id=new_id, _description=description)
 
 
 def _receive_parse_exception_result(marker, q: RpcReceiveQueue):

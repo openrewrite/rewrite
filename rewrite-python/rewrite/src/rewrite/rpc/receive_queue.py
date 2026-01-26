@@ -134,12 +134,6 @@ class RpcReceiveQueue:
             The deserialized object, or None if deleted
         """
         message = self.take()
-
-        import logging
-        logger = logging.getLogger(__name__)
-        before_type = type(before).__name__ if before is not None else 'None'
-        logger.debug(f"RPC Receive: state={message.state.value}, valueType={message.value_type}, value={repr(message.value)[:50] if message.value else None}, before={before_type}")
-
         ref: Optional[int] = None
 
         if message.state == RpcObjectState.NO_CHANGE:
@@ -184,27 +178,21 @@ class RpcReceiveQueue:
         ref: Optional[int]
     ) -> Optional[T]:
         """Handle CHANGE state for an object."""
-        import logging
-        logger = logging.getLogger(__name__)
         after: Any
 
         if on_change is not None:
             after = on_change(before)
-            logger.debug(f"_do_change: used on_change, before={type(before).__name__ if before else None}, after={type(after).__name__ if after else None}")
         else:
             codec = self._get_codec(before)
             if codec is not None:
                 after = codec(before, self)
-                logger.debug(f"_do_change: used codec, before={type(before).__name__ if before else None}, after={type(after).__name__ if after else None}")
             elif message.value is not None:
                 if message.value_type:
                     after = {'kind': message.value_type, **message.value} if isinstance(message.value, dict) else message.value
                 else:
                     after = message.value
-                logger.debug(f"_do_change: used message.value, valueType={message.value_type}, after={type(after).__name__}")
             else:
                 after = before
-                logger.debug(f"_do_change: no codec/on_change/value, returning before={type(before).__name__ if before else None}")
 
         if ref is not None:
             self._refs[ref] = after
