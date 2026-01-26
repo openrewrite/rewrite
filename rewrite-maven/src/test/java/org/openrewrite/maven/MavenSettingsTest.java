@@ -968,13 +968,13 @@ class MavenSettingsTest {
               <server>
                 <id>maven-snapshots</id>
                 <configuration>
-                  <timeout>10000</timeout>
                   <httpHeaders>
                     <property>
                       <name>X-JFrog-Art-Api</name>
                       <value>myApiToken</value>
                     </property>
                   </httpHeaders>
+                  <timeout>10000</timeout>
                 </configuration>
               </server>
             </servers>
