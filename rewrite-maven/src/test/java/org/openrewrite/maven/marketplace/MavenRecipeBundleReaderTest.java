@@ -34,11 +34,9 @@ import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MavenRecipeBundleReaderTest {
-    // TODO: Figure out how to get this to work on Windows given it doesn't want to relinquish access
-    //  to the temp directories so they can be cleaned up
     @Issue("https://github.com/openrewrite/rewrite/issues/6487")
     @Test
-    void canInstallRewriteCore(@TempDir Path tempDir) {
+    void canInstallRewriteCore(@TempDir Path tempDir) throws Exception {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
         HttpSenderExecutionContextView.view(ctx).setHttpSender(new HttpUrlConnectionSender());
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
@@ -53,19 +51,19 @@ class MavenRecipeBundleReaderTest {
           Throwable::printStackTrace
         );
 
-        MavenRecipeBundleResolver resolver = new MavenRecipeBundleResolver(
+        try (MavenRecipeBundleResolver resolver = new MavenRecipeBundleResolver(
           ctx,
           downloader,
           RecipeClassLoader::new
-        );
+        )) {
+            RecipeBundle bundle = new RecipeBundle("maven", "org.openrewrite:rewrite-core", "8.70.0", null, null);
+            RecipeBundleReader reader = resolver.resolve(bundle);
 
-        RecipeBundle bundle = new RecipeBundle("maven", "org.openrewrite:rewrite-core", "8.70.0", null, null);
-        RecipeBundleReader reader = resolver.resolve(bundle);
-
-        RecipeMarketplace marketplace = reader.read();
-        assertThat(marketplace.getAllRecipes())
-          .isNotEmpty()
-          .as("rewrite-core should install and successfully list recipes")
-          .anyMatch(r -> r.getName().contains(org.openrewrite.text.Find.class.getName()));
+            RecipeMarketplace marketplace = reader.read();
+            assertThat(marketplace.getAllRecipes())
+              .isNotEmpty()
+              .as("rewrite-core should install and successfully list recipes")
+              .anyMatch(r -> r.getName().contains(org.openrewrite.text.Find.class.getName()));
+        }
     }
 }

@@ -66,23 +66,23 @@ public class RecipeListing implements Comparable<RecipeListing> {
     @With(AccessLevel.PACKAGE)
     private final RecipeBundle bundle;
 
-    public RecipeBundleReader resolve() {
-        if (marketplace != null) {
-            for (RecipeBundleResolver resolver : marketplace.getResolvers()) {
-                if (resolver.getEcosystem().equals(bundle.getPackageEcosystem())) {
-                    return resolver.resolve(bundle);
-                }
+    private RecipeBundleReader resolve(Collection<RecipeBundleResolver> resolvers) {
+        for (RecipeBundleResolver resolver : resolvers) {
+            if (resolver.getEcosystem().equals(bundle.getPackageEcosystem())) {
+                return resolver.resolve(bundle);
             }
         }
-        throw new IllegalStateException("This listing has not been configured with a resolver.");
+        throw new IllegalStateException(String.format("No available resolver for '%s' ecosystem", bundle.getPackageEcosystem()));
     }
 
-    public RecipeDescriptor describe() {
-        return resolve().describe(this);
+    public RecipeDescriptor describe(Collection<RecipeBundleResolver> resolvers) {
+        // noinspection resource
+        return resolve(resolvers).describe(this);
     }
 
-    public Recipe prepare(Map<String, Object> options) {
-        return resolve().prepare(this, options);
+    public Recipe prepare(Collection<RecipeBundleResolver> resolvers, Map<String, Object> options) {
+        // noinspection resource
+        return resolve(resolvers).prepare(this, options);
     }
 
     @Override

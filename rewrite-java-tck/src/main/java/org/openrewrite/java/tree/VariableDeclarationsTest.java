@@ -357,4 +357,49 @@ class VariableDeclarationsTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6577")
+    @Test
+    void finalModifierWithNewlineBeforeType() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method(final
+                              String param) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6577")
+    @Test
+    void finalModifierWithCRLFBeforeType() {
+        rewriteRun(
+          java(
+            "class Test {\r\n" +
+            "    void method(final\r\n" +
+            "                String param) {\r\n" +
+            "    }\r\n" +
+            "}"
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6577")
+    @Test
+    void multipleModifiersWithNewline() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  public static final
+                  String field = "";
+              }
+              """
+          )
+        );
+    }
 }

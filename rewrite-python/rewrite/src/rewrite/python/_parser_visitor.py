@@ -53,7 +53,7 @@ class ParserVisitor(ast.NodeVisitor):
     # UTF-8 BOM character
     _BOM = '\ufeff'
 
-    def __init__(self, source: str):
+    def __init__(self, source: str, file_path: Optional[str] = None):
         super().__init__()
         # Detect and strip UTF-8 BOM if present
         if source.startswith(self._BOM):
@@ -64,7 +64,7 @@ class ParserVisitor(ast.NodeVisitor):
 
         self._source = source
         self._parentheses_stack = []
-        self._type_mapping = PythonTypeMapping(source)
+        self._type_mapping = PythonTypeMapping(source, file_path)
 
         # Pre-compute byte-to-char mappings for lines with multi-byte characters
         self._byte_to_char = self._build_byte_to_char_mapping(source)
@@ -1699,6 +1699,8 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY
         )
 
+        method_type = self._type_mapping.method_invocation_type(node)
+
         return j.MethodInvocation(
             random_id(),
             prefix,
@@ -1708,7 +1710,7 @@ class ParserVisitor(ast.NodeVisitor):
             name if isinstance(name, j.Identifier) else j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "",
                                                                      None, None),
             args,
-            name.type if isinstance(name.type, JavaType.Method) else None,  # ty: ignore[possibly-missing-attribute]
+            method_type,
         )
 
     def __sort_call_arguments(self, call: ast.Call) -> List[Union[ast.expr, ast.keyword]]:
@@ -2023,11 +2025,13 @@ class ParserVisitor(ast.NodeVisitor):
         # Handle type parameters (Python 3.12+ PEP 695)
         type_params = getattr(node, 'type_params', None)
         if type_params:
-            type_parameters = JContainer(
+            type_parameters = j.TypeParameters(
+                random_id(),
                 self.__source_before('['),
+                Markers.EMPTY,
+                [],  # annotations
                 [self.__pad_list_element(self.__convert(tp), i == len(type_params) - 1, end_delim=']')
-                 for i, tp in enumerate(type_params)],
-                Markers.EMPTY
+                 for i, tp in enumerate(type_params)]
             )
         else:
             type_parameters = None
@@ -2323,8 +2327,6 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_Module(self, node: ast.Module) -> py.CompilationUnit:
-        self._type_mapping.resolve_types(node)
-
         cu = py.CompilationUnit(
             random_id(),
             Space.EMPTY,

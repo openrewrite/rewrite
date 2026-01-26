@@ -17,6 +17,7 @@ package org.openrewrite.kotlin.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -129,6 +130,54 @@ class EqualsMethodUsageTest implements RewriteTest {
               """,
             """
               val v = print(listOf("1").filter { e -> e == "1" })
+              """
+          )
+        );
+    }
+
+    /**
+     * Safe-call method invocations (obj?.equals(other)) should NOT be transformed to obj == other
+     * because they have different null semantics:
+     * - obj?.equals(other) returns Boolean? (null if obj is null)
+     * - obj == other returns Boolean (false if obj is null)
+     */
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1709")
+    @Test
+    void safeCallWithEqualsIsNotTransformed() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(obj: String?) {
+                  val result = obj?.equals("test")
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1709")
+    @Test
+    void safeCallWithEqualsAsStatementIsNotTransformed() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(obj: String?) {
+                  obj?.equals("test")
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1709")
+    @Test
+    void systemGetenvSafeCallIsNotTransformed() {
+        rewriteRun(
+          kotlin(
+            """
+              fun isCI(): Boolean? {
+                  return System.getenv("CI")?.equals("true")
+              }
               """
           )
         );

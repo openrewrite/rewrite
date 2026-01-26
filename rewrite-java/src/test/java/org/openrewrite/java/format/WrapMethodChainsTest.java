@@ -62,6 +62,7 @@ class WrapMethodChainsTest implements RewriteTest {
                   new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder"), false),
                   new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
                   new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
+                  null,
                   new WrappingAndBracesStyle.Annotations(WrapAlways),
                   new WrappingAndBracesStyle.Annotations(WrapAlways),
                   new WrappingAndBracesStyle.Annotations(WrapAlways),
@@ -449,6 +450,7 @@ class WrapMethodChainsTest implements RewriteTest {
                   null,
                   null,
                   null,
+                  null,
                   null))),
             null))),
           java(
@@ -544,6 +546,7 @@ class WrapMethodChainsTest implements RewriteTest {
                   null,
                   null,
                   null,
+                  null,
                   null))),
             null))),
           java(
@@ -614,6 +617,7 @@ class WrapMethodChainsTest implements RewriteTest {
                   new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
                   new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
                   new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
+                  null,
                   null,
                   null,
                   null,
@@ -696,6 +700,7 @@ class WrapMethodChainsTest implements RewriteTest {
                   null,
                   null,
                   null,
+                  null,
                   null))),
             null))),
           java(
@@ -752,6 +757,7 @@ class WrapMethodChainsTest implements RewriteTest {
                   new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
                   new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
                   new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
+                  null,
                   null,
                   null,
                   null,
@@ -835,6 +841,7 @@ class WrapMethodChainsTest implements RewriteTest {
                   null,
                   null,
                   null,
+                  null,
                   null))),
             null))),
           java(
@@ -899,6 +906,7 @@ class WrapMethodChainsTest implements RewriteTest {
                   null,
                   null,
                   null,
+                  null,
                   null))),
             null))),
           java(
@@ -952,6 +960,7 @@ class WrapMethodChainsTest implements RewriteTest {
                   new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("stream"), false),
                   new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
                   new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
+                  null,
                   null,
                   null,
                   null,
@@ -1034,6 +1043,7 @@ class WrapMethodChainsTest implements RewriteTest {
                   null,
                   null,
                   null,
+                  null,
                   null))),
             null))),
           java(
@@ -1081,6 +1091,7 @@ class WrapMethodChainsTest implements RewriteTest {
                   new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "stream"), false),
                   new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
                   new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
+                  null,
                   null,
                   null,
                   null,
@@ -1139,6 +1150,7 @@ class WrapMethodChainsTest implements RewriteTest {
                         null,
                         null,
                         null,
+                        null,
                         null))),
                     null).visit(formatted, p, getCursor().getParent());
                   return (J.CompilationUnit) new MergeSpacesVisitor().visit(cu, formatted);
@@ -1183,6 +1195,7 @@ class WrapMethodChainsTest implements RewriteTest {
                   new WrappingAndBracesStyle.ChainedMethodCalls(ChopIfTooLong, Arrays.asList("builder", "stream"), false),
                   new WrappingAndBracesStyle.MethodDeclarationParameters(WrapAlways, false, false, false),
                   new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
+                  null,
                   null,
                   null,
                   null,
