@@ -97,7 +97,9 @@ public class YamlResourceLoader implements ResourceLoader {
         this.recipeLoader = (recipeName, options) -> {
             RecipeListing listing = marketplace.findRecipe(recipeName);
             if (listing == null) {
-                throw new IllegalStateException("Unable to find recipe " + recipeName + " listed in " + source);
+                Map<Object, Object> withJsonType = options == null ? new HashMap<>() : new HashMap<>(options);
+                withJsonType.put("@c", recipeName);
+                return mapper.convertValue(withJsonType, Recipe.class);
             }
             return listing.prepare(resolvers, options == null ? emptyMap() : options);
         };
