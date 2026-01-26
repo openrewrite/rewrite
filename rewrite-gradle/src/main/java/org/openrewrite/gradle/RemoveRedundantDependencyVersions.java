@@ -451,7 +451,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     return constraint.getStrictVersion();
                                 }
                             }
-                            for (ResolvedDependency dependency : gdc.getDirectResolved()) {
+                            for (ResolvedDependency dependency : gdc.getResolved()) {
                                 if (dependency.getRequested().getVersion() == null && "org.springframework.boot".equals(dependency.getGroupId())) {
                                     return dependency.getVersion();
                                 }
