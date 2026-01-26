@@ -618,4 +618,115 @@ class YamlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/850")
+    @Test
+    void anchorInSequencePreservesDash() {
+        rewriteRun(
+          yaml(
+            """
+              generalTasks:
+              - &createTask
+                name: createTask
+                type: manipulator
+                stereoType: creater
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/850")
+    @Test
+    void anchorInSequenceAtRootLevel() {
+        // The issue shows:
+        // generalTasks:
+        // - &createTask   <- dash being removed
+        // This tests anchor on a sequence entry at root level
+        rewriteRun(
+          yaml(
+            """
+              generalTasks:
+              - &createTask
+                name: createTask
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/850")
+    @Test
+    void emptyYamlFileWithNewline() {
+        // File containing just a single newline should preserve it
+        rewriteRun(
+          yaml(
+            "\n",
+            SourceSpec::noTrim
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/850")
+    @Test
+    void emptyYamlFileWithMultipleNewlines() {
+        // File containing multiple newlines should preserve them
+        rewriteRun(
+          yaml(
+            "\n\n\n",
+            SourceSpec::noTrim
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/850")
+    @Test
+    void flowStyleJsonLikeSequence() {
+        // Issue: Colons being added out of the blue in JSON-like flow content
+        // application/json:
+        //   {
+        //     "MV7",    <- becomes "MV7":,
+        //     "7J04"    <- becomes "7J04":
+        //   }
+        rewriteRun(
+          yaml(
+            """
+              example:
+                application/json:
+                  {
+                    "MV7",
+                    "7J04"
+                  }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/850")
+    @Test
+    void singleBraceTemplateSyntaxQuoted() {
+        // Single-brace placeholders like {C App} look like flow mapping start
+        // When quoted, it's valid YAML
+        rewriteRun(
+          yaml(
+            """
+              swagger: '2.0'
+              host: "{C App}.colruyt.int/{C App}"
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/850")
+    @Test
+    void singleBraceTemplateSyntaxUnquoted() {
+        // Unquoted {C App} looks like flow mapping start but should be handled
+        // as a placeholder template, similar to Helm templates
+        rewriteRun(
+          yaml(
+            """
+              swagger: '2.0'
+              host: {C App}.colruyt.int/{C App}
+              """
+          )
+        );
+    }
 }
