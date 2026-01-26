@@ -37,6 +37,8 @@ import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.scanner.Scanner;
 import org.yaml.snakeyaml.scanner.ScannerImpl;
 
+import org.openrewrite.yaml.marker.OmitColon;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -52,6 +54,9 @@ public class YamlParser implements org.openrewrite.Parser {
     private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s+(@[^\n\r@]+@)");
     // Only match single-line Helm templates that don't span multiple lines
     private static final Pattern HELM_TEMPLATE_PATTERN = Pattern.compile("\\{\\{[^{}\\n\\r]*}}");
+    // Match single-brace placeholder templates like {C App} that contain at least one space
+    // These are invalid YAML but used by some tools as placeholders
+    private static final Pattern SINGLE_BRACE_TEMPLATE_PATTERN = Pattern.compile("\\{[A-Za-z][^{}\\n\\r]*\\s[^{}\\n\\r]*}");
 
     @Override
     public Stream<SourceFile> parse(@Language("yml") String... sources) {
@@ -95,6 +100,7 @@ public class YamlParser implements org.openrewrite.Parser {
         String yamlSource = source.readFully();
         Map<String, String> variableByUuid = new HashMap<>();
         Map<String, String> helmTemplateByUuid = new HashMap<>();
+        Map<String, String> singleBraceTemplateByUuid = new HashMap<>();
 
         // First, replace all Helm templates with UUIDs
         String processedSource = yamlSource;
@@ -107,6 +113,17 @@ public class YamlParser implements org.openrewrite.Parser {
         }
         helmMatcher.appendTail(helmBuffer);
         processedSource = helmBuffer.toString();
+
+        // Then, replace single-brace templates like {C App} with UUIDs
+        Matcher singleBraceMatcher = SINGLE_BRACE_TEMPLATE_PATTERN.matcher(processedSource);
+        StringBuffer singleBraceBuffer = new StringBuffer();
+        while (singleBraceMatcher.find()) {
+            String uuid = UUID.randomUUID().toString();
+            singleBraceTemplateByUuid.put(uuid, singleBraceMatcher.group());
+            singleBraceMatcher.appendReplacement(singleBraceBuffer, uuid);
+        }
+        singleBraceMatcher.appendTail(singleBraceBuffer);
+        processedSource = singleBraceBuffer.toString();
 
         // Then, replace @variable@ patterns with UUIDs
         StringBuilder yamlSourceWithPlaceholders = new StringBuilder();
@@ -308,6 +325,12 @@ public class YamlParser implements org.openrewrite.Parser {
                                 scalarValue = scalarValue.replace(entry.getKey(), entry.getValue());
                             }
                         }
+                        // Then restore any single-brace template UUIDs
+                        for (Map.Entry<String, String> entry : singleBraceTemplateByUuid.entrySet()) {
+                            if (scalarValue.contains(entry.getKey())) {
+                                scalarValue = scalarValue.replace(entry.getKey(), entry.getValue());
+                            }
+                        }
                         // Then check for variable UUIDs (these are exact matches)
                         if (variableByUuid.containsKey(scalarValue)) {
                             scalarValue = variableByUuid.get(scalarValue);
@@ -470,7 +493,7 @@ public class YamlParser implements org.openrewrite.Parser {
             }
 
             Yaml.Documents result = new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, suffix, documents);
-            if (helmTemplateByUuid.isEmpty() && variableByUuid.isEmpty()) {
+            if (helmTemplateByUuid.isEmpty() && variableByUuid.isEmpty() && singleBraceTemplateByUuid.isEmpty()) {
                 return result;
             }
 
@@ -482,6 +505,11 @@ public class YamlParser implements org.openrewrite.Parser {
                     }
                     String result = text;
                     for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
+                        if (result.contains(entry.getKey())) {
+                            result = result.replace(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    for (Map.Entry<String, String> entry : singleBraceTemplateByUuid.entrySet()) {
                         if (result.contains(entry.getKey())) {
                             result = result.replace(entry.getKey(), entry.getValue());
                         }
@@ -669,7 +697,13 @@ public class YamlParser implements org.openrewrite.Parser {
                 key = (Yaml.Alias) block;
             } else {
                 String keySuffix = block.getPrefix();
-                block = block.withPrefix(keySuffix.substring(commentAwareIndexOf(':', keySuffix) + 1));
+                int colonIndex = commentAwareIndexOf(':', keySuffix);
+                // In flow mappings like { "MV7", "7J04" }, entries may lack explicit colons.
+                // Only omit colon when we're in a flow mapping (has opening brace)
+                // AND there's no colon in the keySuffix. For block mappings or when anchors
+                // consume the colon, we assume the colon was present.
+                boolean omitColon = colonIndex == -1 && startBracePrefix != null;
+                block = block.withPrefix(keySuffix.substring(colonIndex + 1));
 
                 // Begin moving whitespace from the key to the entry that contains the key
                 String originalKeyPrefix = key.getPrefix();
@@ -683,8 +717,9 @@ public class YamlParser implements org.openrewrite.Parser {
                         commentAwareIndexOf(':', originalKeyPrefix)) + 1;
                 String entryPrefix = originalKeyPrefix.substring(entryPrefixStartIndex);
                 String beforeMappingValueIndicator = keySuffix.substring(0,
-                        Math.max(commentAwareIndexOf(':', keySuffix), 0));
-                entries.add(new Yaml.Mapping.Entry(randomId(), entryPrefix, Markers.EMPTY, key, beforeMappingValueIndicator, block));
+                        Math.max(colonIndex, 0));
+                Markers markers = omitColon ? Markers.EMPTY.addIfAbsent(new OmitColon(randomId())) : Markers.EMPTY;
+                entries.add(new Yaml.Mapping.Entry(randomId(), entryPrefix, markers, key, beforeMappingValueIndicator, block));
                 key = null;
             }
         }
