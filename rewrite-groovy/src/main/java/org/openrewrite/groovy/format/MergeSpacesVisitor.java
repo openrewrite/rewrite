@@ -1766,7 +1766,7 @@ public class MergeSpacesVisitor extends GroovyVisitor<Object> {
         return u.withMarkers(visitMarkers(u.getMarkers(), newErroneous.getMarkers()));
     }
 
-    @ToBeRemoved(after = "30-02-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    @ToBeRemoved(after = "2026-02-30", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
     private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {
