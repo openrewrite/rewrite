@@ -171,6 +171,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (!valueMatches(exp, oldAttributeValue) || newAttributeValue.equals(((J.Literal) exp).getValueSource())) {
                         return as;
                     }
+                    // If appendArray is true and attribute is an array, convert literal to array and append
+                    if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
+                        return as.withAssignment(createNewArrayWithExistingAndNew(annotation, (J.Literal) exp, getAttributeValues()));
+                    }
                     return as.withAssignment(createAnnotationLiteral(annotation, newAttributeValue));
                 }
                 if (exp instanceof J.FieldAccess) {
@@ -195,6 +199,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     }
                     if (!valueMatches(literal, oldAttributeValue) || newAttributeValue.equals(literal.getValueSource())) {
                         return literal;
+                    }
+                    // If appendArray is true and attribute is an array, convert literal to array and append
+                    if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
+                        return createNewArrayWithExistingAndNew(annotation, literal, getAttributeValues());
                     }
                     return createAnnotationLiteral(annotation, newAttributeValue);
                 }
@@ -250,6 +258,23 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 //noinspection ConstantConditions
                 return (J.Assignment) JavaTemplate.<J.Annotation>apply(name + " = " + (parameter instanceof J ? "#{any()}" : "#{}"), getCursor(), annotation.getCoordinates().replaceArguments(), parameter)
                         .getArguments().get(0);
+            }
+
+            private J.NewArray createNewArrayWithExistingAndNew(J.Annotation annotation, J.Literal existingLiteral, List<String> newValues) {
+                List<Expression> initializer = new ArrayList<>();
+                // Add the existing literal value first
+                initializer.add(existingLiteral.withPrefix(SINGLE_SPACE));
+                // Add new values, skipping duplicates
+                for (String attribute : newValues) {
+                    if (!attributeNameOrValIsAlreadyPresent(initializer, singleton(attribute))) {
+                        initializer.add(new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attribute, maybeQuoteStringArgument(annotation, attribute), null, JavaType.Primitive.String));
+                    }
+                }
+                // Use a template to create the array structure, then replace the initializer
+                //noinspection ConstantConditions
+                J.NewArray template = (J.NewArray) JavaTemplate.<J.Annotation>apply("{#{any()}}", getCursor(), annotation.getCoordinates().replaceArguments(), existingLiteral)
+                        .getArguments().get(0);
+                return template.withInitializer(initializer);
             }
         });
     }
