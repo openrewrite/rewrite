@@ -296,6 +296,47 @@ class SourcePositionServiceTest implements RewriteTest {
         );
     }
 
+    @Test
+    void correctlyCalculatesIndentWithTabs() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+
+              @Nullable
+              SourcePositionService service;
+
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  service = cu.service(SourcePositionService.class);
+                  return super.visitCompilationUnit(cu, ctx);
+              }
+
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "x".equals(v.getSimpleName()))) {
+                      // Tab-indented variable should report indent of 2 (two tabs)
+                      Span span = service.positionOf(getCursor());
+                      assertThat(span.getColSpan().getIndent()).isEqualTo(2);
+                  }
+                  if (multiVariable.getVariables().stream().anyMatch(v -> "y".equals(v.getSimpleName()))) {
+                      // Single tab indent should report indent of 1
+                      Span span = service.positionOf(getCursor());
+                      assertThat(span.getColSpan().getIndent()).isEqualTo(1);
+                  }
+                  return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+          })),
+          java(
+            // Using tabs for indentation (represented as \t)
+            "class Test {\n" +
+            "\tvoid method() {\n" +
+            "\t\tint x = 1;\n" +
+            "\t}\n" +
+            "\tint y = 2;\n" +
+            "}\n"
+          )
+        );
+    }
+
     private static  <T extends J> T minimize(T tree) {
         tree = (T) new MinimumViableSpacingVisitor<>(null).visit(tree, -1);
         return (T) new SpacesVisitor<>(IntelliJ.spaces(), null, null, IntelliJ.wrappingAndBraces().withKeepWhenFormatting(IntelliJ.wrappingAndBraces().getKeepWhenFormatting().withLineBreaks(false)), null).visit(tree, -1);

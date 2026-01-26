@@ -304,7 +304,7 @@ public class SourcePositionService {
                         }
                     } else {
                         startCol.incrementAndGet();
-                        if (indenting.get() && c == ' ') {
+                        if (indenting.get() && (c == ' ' || c == '\t')) {
                             rowIndent.incrementAndGet();
                         } else {
                             indenting.set(false);
@@ -329,7 +329,7 @@ public class SourcePositionService {
                     indenting.set(true);
                 } else {
                     startCol.incrementAndGet();
-                    if (indenting.get() && c == ' ') {
+                    if (indenting.get() && (c == ' ' || c == '\t')) {
                         rowIndent.incrementAndGet();
                     } else {
                         indenting.set(false);
