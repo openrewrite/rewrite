@@ -175,7 +175,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     try {
                         JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                         if (sourceFile != null) {
-                            int alignTo = getCursor().firstEnclosing(JavaSourceFile.class).service(SourcePositionService.class).positionOf(annotatedCursor, annotated).getStartColumn() - 1;
+                            int alignTo = getCursor().firstEnclosing(JavaSourceFile.class).service(SourcePositionService.class).positionOf(annotatedCursor, annotated).getColSpan().getStartColumn() - 1;
                             getCursor().getParentTreeCursor().putMessage("lastIndent", alignTo);
                             return indentTo(space, alignTo, loc);
                         }
@@ -271,7 +271,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                             positionService = sourceFile.service(SourcePositionService.class);
                             ColSpan colSpan = positionService.columnsOf(getCursor(), control.getInit().get(0));
-                            getCursor().putMessage("lastIndent", colSpan.getStartColumn() - colSpan.getRowIndent() - 1 + indent);
+                            getCursor().putMessage("lastIndent", colSpan.getStartColumn() - colSpan.getIndent() - 1 + indent);
                             getCursor().putMessage("indentType", IndentType.ALIGN);
                         }
                         elem = visitAndCast(elem, p);
@@ -312,7 +312,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                                 sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                                 positionService = sourceFile.service(SourcePositionService.class);
                                 ColSpan colSpan = positionService.columnsOf(getCursor().getParentTreeCursor(), getChainStarterSelect((JRightPadded<Expression>) right).getElement());
-                                getCursor().getParentTreeCursor().putMessage("chainedIndent", colSpan.getEndColumn() - colSpan.getRowIndent() - 1 + indent);
+                                getCursor().getParentTreeCursor().putMessage("chainedIndent", colSpan.getEndColumn() - colSpan.getIndent() - 1 + indent);
                             } else {
                                 getCursor().getParentTreeCursor().putMessage("chainedIndent", chainedIndent);
                             }
@@ -442,7 +442,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     if (!container.getBefore().getLastWhitespace().contains("\n")) {
                         colSpan = positionService.columnsOf(getCursor().getParentTreeCursor(), ((J.MethodDeclaration) getCursor().getParentTreeCursor().getValue()).getPadding().getParameters());
                         getCursor().putMessage("indentType", IndentType.ALIGN);
-                        getCursor().putMessage("lastIndent", indent + colSpan.getEndColumn() - colSpan.getRowIndent() + 1);
+                        getCursor().putMessage("lastIndent", indent + colSpan.getEndColumn() - colSpan.getIndent() + 1);
                     } else {
                         getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
                     }
@@ -452,7 +452,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     if (!alignWith.getPrefix().getLastWhitespace().contains("\n")) {
                         colSpan = positionService.columnsOf(getCursor(), alignWith);
                         getCursor().putMessage("indentType", IndentType.ALIGN);
-                        getCursor().putMessage("lastIndent", indent + colSpan.getStartColumn() - colSpan.getRowIndent() - 1);
+                        getCursor().putMessage("lastIndent", indent + colSpan.getStartColumn() - colSpan.getIndent() - 1);
                     } else {
                         getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
                     }
@@ -505,7 +505,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 if (evaluate(() -> wrappingStyle.getTextBlocks().getAlignWhenMultiline(), false)) {
                     if (!literal.getPrefix().getLastWhitespace().contains("\n")) {
                         ColSpan colSpan = positionService.columnsOf(getCursor(), literal);
-                        indent += colSpan.getStartColumn() - colSpan.getRowIndent() - 1; // since position is index-1-based
+                        indent += colSpan.getStartColumn() - colSpan.getIndent() - 1; // since position is index-1-based
                     }
                 } else {
                     indent += 2;

@@ -25,11 +25,8 @@ import lombok.Value;
 @Builder
 public class Span {
     int startLine;
-    int startColumn;
     int endLine;
-    int endColumn;
-    int maxColumn;
-    int rowIndent;
+    ColSpan colSpan;
 
     /**
      * Tracks the beginning and ending of a given LST element in source code
@@ -40,15 +37,6 @@ public class Span {
         int startColumn;
         int endColumn;
         int maxColumn;
-        int rowIndent;
-    }
-
-    public ColSpan asColSpan() {
-        return ColSpan.builder()
-                .startColumn(startColumn)
-                .endColumn(endColumn)
-                .maxColumn(maxColumn)
-                .rowIndent(rowIndent)
-                .build();
+        int indent;
     }
 }

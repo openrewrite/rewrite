@@ -119,28 +119,28 @@ class SourcePositionServiceTest implements RewriteTest {
 
               private void assertResult(int line, int column, int endLine, int endColumn, int maxColumn, int rowIndent) {
                   assertThat(service.positionOf(getCursor()))
-                    .isEqualTo(Span.builder().startLine(line).startColumn(column).endLine(endLine).maxColumn(maxColumn).endColumn(endColumn).rowIndent(rowIndent).build());
+                    .isEqualTo(Span.builder().startLine(line).endLine(endLine).colSpan(Span.ColSpan.builder().startColumn(column).maxColumn(maxColumn).endColumn(endColumn).indent(rowIndent).build()).build());
               }
 
               private void assertResult(J j, int line, int column, int endLine, int endColumn, int maxColumn, int rowIndent) {
                   assertThat(service.positionOf(getCursor(), j))
-                    .isEqualTo(Span.builder().startLine(line).startColumn(column).endLine(endLine).maxColumn(maxColumn).endColumn(endColumn).rowIndent(rowIndent).build());
+                    .isEqualTo(Span.builder().startLine(line).endLine(endLine).colSpan(Span.ColSpan.builder().startColumn(column).maxColumn(maxColumn).endColumn(endColumn).indent(rowIndent).build()).build());
               }
 
               private void assertResult(JContainer<Statement> j, int line, int column, int endLine, int endColumn, int maxColumn, int rowIndent) {
                   assertThat(service.positionOf(getCursor(), j))
-                    .isEqualTo(Span.builder().startLine(line).startColumn(column).endLine(endLine).maxColumn(maxColumn).endColumn(endColumn).rowIndent(rowIndent).build());
+                    .isEqualTo(Span.builder().startLine(line).endLine(endLine).colSpan(Span.ColSpan.builder().startColumn(column).maxColumn(maxColumn).endColumn(endColumn).indent(rowIndent).build()).build());
               }
 
               private void assertMinimizedResult(int line, int column, int endLine, int endColumn, int maxColumn, int rowIndent) {
                   assertThat(service.positionOf(new Cursor(getCursor().getParent(), minimize(getCursor().getValue()))))
-                    .isEqualTo(Span.builder().startLine(line).startColumn(column).endLine(endLine).maxColumn(maxColumn).endColumn(endColumn).rowIndent(rowIndent).build());
+                    .isEqualTo(Span.builder().startLine(line).endLine(endLine).colSpan(Span.ColSpan.builder().startColumn(column).maxColumn(maxColumn).endColumn(endColumn).indent(rowIndent).build()).build());
               }
 
               private void assertMinimizedResult(Function<J, JContainer<Statement>> find, int line, int column, int endLine, int endColumn, int maxColumn, int rowIndent) {
                   J minimized = minimize(getCursor().getValue());
                   assertThat(service.positionOf(new Cursor(getCursor().getParent(), minimized), find.apply(minimized)))
-                    .isEqualTo(Span.builder().startLine(line).startColumn(column).endLine(endLine).maxColumn(maxColumn).endColumn(endColumn).rowIndent(rowIndent).build());
+                    .isEqualTo(Span.builder().startLine(line).endLine(endLine).colSpan(Span.ColSpan.builder().startColumn(column).maxColumn(maxColumn).endColumn(endColumn).indent(rowIndent).build()).build());
               }
           })),
           java(
@@ -203,17 +203,17 @@ class SourcePositionServiceTest implements RewriteTest {
                       J.MethodDeclaration method = getCursor().firstEnclosing(J.MethodDeclaration.class);
                       if (method != null) {
                           if ("method1".equals(method.getSimpleName())) {
-                              assertThat(service.positionOf(getCursor())).isEqualTo(Span.builder().startLine(6).startColumn(9).endLine(6).maxColumn(18).endColumn(18).rowIndent(8).build());
+                              assertThat(service.positionOf(getCursor())).isEqualTo(Span.builder().startLine(6).endLine(6).colSpan(Span.ColSpan.builder().startColumn(9).maxColumn(18).endColumn(18).indent(8).build()).build());
                               J.VariableDeclarations removedComment = multiVariable.withPrefix(multiVariable.getPrefix().withComments(emptyList()));
-                              assertThat(service.positionOf(new Cursor(getCursor().getParent(), removedComment))).isEqualTo(Span.builder().startLine(5).startColumn(9).endLine(5).maxColumn(18).endColumn(18).rowIndent(8).build());
-                              assertThat(service.positionOf(new Cursor(getCursor().getParent(), removedComment), removedComment)).isEqualTo(Span.builder().startLine(5).startColumn(9).endLine(5).maxColumn(18).endColumn(18).rowIndent(8).build());
+                              assertThat(service.positionOf(new Cursor(getCursor().getParent(), removedComment))).isEqualTo(Span.builder().startLine(5).endLine(5).colSpan(Span.ColSpan.builder().startColumn(9).maxColumn(18).endColumn(18).indent(8).build()).build());
+                              assertThat(service.positionOf(new Cursor(getCursor().getParent(), removedComment), removedComment)).isEqualTo(Span.builder().startLine(5).endLine(5).colSpan(Span.ColSpan.builder().startColumn(9).maxColumn(18).endColumn(18).indent(8).build()).build());
 
                               //When the cursor does not contain the referential equal object, we throw
                               assertThrows(IllegalArgumentException.class, () -> assertThat(service.positionOf(getCursor(), removedComment)));
                               assertThrows(IllegalArgumentException.class, () -> assertThat(service.positionOf(getCursor().getParentTreeCursor(), removedComment)));
                           }
                           if ("method2".equals(method.getSimpleName())) {
-                              assertThat(service.positionOf(getCursor())).isEqualTo(Span.builder().startLine(10).startColumn(9).endLine(10).maxColumn(18).endColumn(18).rowIndent(8).build());
+                              assertThat(service.positionOf(getCursor())).isEqualTo(Span.builder().startLine(10).endLine(10).colSpan(Span.ColSpan.builder().startColumn(9).maxColumn(18).endColumn(18).indent(8).build()).build());
                           }
                       }
                   }
@@ -264,12 +264,12 @@ class SourcePositionServiceTest implements RewriteTest {
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   if ("method1".equals(method.getSimpleName())) {
                       //This is the modified method, so doing getCursor is enough here.
-                      assertThat(service.positionOf(getCursor())).isEqualTo(Span.builder().startLine(4).startColumn(5).endLine(7).maxColumn(40).endColumn(6).rowIndent(4).build());
+                      assertThat(service.positionOf(getCursor())).isEqualTo(Span.builder().startLine(4).endLine(7).colSpan(Span.ColSpan.builder().startColumn(5).maxColumn(40).endColumn(6).indent(4).build()).build());
                   } else if ("method2".equals(method.getSimpleName())) {
                       //The parent cursor (= block of class declaration) contains the modified method1 and in order to be used by the position calculation, you must pass that one.
-                      assertThat(service.positionOf(getCursor().getParentTreeCursor(), method)).isEqualTo(Span.builder().startLine(9).startColumn(5).endLine(11).maxColumn(28).endColumn(6).rowIndent(4).build());
+                      assertThat(service.positionOf(getCursor().getParentTreeCursor(), method)).isEqualTo(Span.builder().startLine(9).endLine(11).colSpan(Span.ColSpan.builder().startColumn(5).maxColumn(28).endColumn(6).indent(4).build()).build());
                       //Just passing this cursor is not enough for the accurate positioning as the modified element in not in this cursor and the service will start top down from JavaSourceFile -> no updated method is used.
-                      assertThat(service.positionOf(getCursor(), method)).isEqualTo(Span.builder().startLine(12).startColumn(5).endLine(14).maxColumn(28).endColumn(6).rowIndent(4).build());
+                      assertThat(service.positionOf(getCursor(), method)).isEqualTo(Span.builder().startLine(12).endLine(14).colSpan(Span.ColSpan.builder().startColumn(5).maxColumn(28).endColumn(6).indent(4).build()).build());
                   }
                   return super.visitMethodDeclaration(method, ctx);
               }

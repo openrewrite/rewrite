@@ -79,7 +79,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public ColSpan columnsOf(Cursor cursor) {
-        return positionOfChild(cursor, cursor.getValue(), getColSpanPrintCursor(cursor)).asColSpan();
+        return positionOfChild(cursor, cursor.getValue(), getColSpanPrintCursor(cursor)).getColSpan();
     }
 
     /**
@@ -88,7 +88,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public ColSpan columnsOf(Cursor cursor, JContainer<? extends J> container) {
-        return positionOfChild(cursor, container, getColSpanPrintCursor(cursor)).asColSpan();
+        return positionOfChild(cursor, container, getColSpanPrintCursor(cursor)).getColSpan();
     }
 
     /**
@@ -97,7 +97,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public ColSpan columnsOf(Cursor cursor, JRightPadded<J> rightPadded) {
-        return positionOfChild(cursor, rightPadded, getColSpanPrintCursor(cursor)).asColSpan();
+        return positionOfChild(cursor, rightPadded, getColSpanPrintCursor(cursor)).getColSpan();
     }
 
     /**
@@ -106,7 +106,7 @@ public class SourcePositionService {
      * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public ColSpan columnsOf(Cursor cursor, J child) {
-        return positionOfChild(cursor, child, getColSpanPrintCursor(cursor)).asColSpan();
+        return positionOfChild(cursor, child, getColSpanPrintCursor(cursor)).getColSpan();
     }
 
     /**
@@ -201,7 +201,8 @@ public class SourcePositionService {
         AtomicBoolean printing = new AtomicBoolean(false);
         AtomicBoolean found = new AtomicBoolean(false);
         JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
-            @Nullable J foundJ = null;
+            @Nullable
+            J foundJ = null;
 
             @Override
             protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, PrintOutputCapture<TreeVisitor<?, ?>> p) {
@@ -290,14 +291,16 @@ public class SourcePositionService {
                         startLine.incrementAndGet();
                         startCol.set(1);
                         rowIndent.set(0);
-                        indenting.set(true);;
+                        indenting.set(true);
+                        ;
                     } else if (c == '\r') {
                         // Skip \r in \r\n
                         if (i + 1 >= text.length() || text.charAt(i + 1) != '\n') {
                             startLine.incrementAndGet();
                             startCol.set(1);
                             rowIndent.set(0);
-                            indenting.set(true);;
+                            indenting.set(true);
+                            ;
                         }
                     } else {
                         startCol.incrementAndGet();
@@ -372,11 +375,14 @@ public class SourcePositionService {
 
             return Span.builder()
                     .startLine(printEntireSourceFile ? startLine.get() : -1)
-                    .startColumn(startCol.get() + indent)
                     .endLine(printEntireSourceFile ? startLine.get() + lines : -1)
-                    .endColumn(col)
-                    .maxColumn(maxColumn)
-                    .rowIndent(rowIndent.get())
+                    .colSpan(
+                            ColSpan.builder()
+                                    .startColumn(startCol.get() + indent)
+                                    .endColumn(col)
+                                    .maxColumn(maxColumn)
+                                    .indent(rowIndent.get())
+                                    .build())
                     .build();
         }
         throw new IllegalArgumentException("The child was not found in the sourceFile. Are you sure the passed in cursor's value contains the child and you are not searching for a mutated element in a non-mutated Cursor value?");
