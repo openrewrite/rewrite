@@ -217,6 +217,10 @@ class RpcSendQueue:
         from rewrite.java.support_types import JavaType
         if isinstance(obj, JavaType.Primitive):
             return 'org.openrewrite.java.tree.JavaType$Primitive'
+        if isinstance(obj, JavaType.Method):
+            return 'org.openrewrite.java.tree.JavaType$Method'
+        if isinstance(obj, JavaType.Class):
+            return 'org.openrewrite.java.tree.JavaType$Class'
 
         # Other enums don't need type info (they're serialized by name)
         if isinstance(obj, Enum):

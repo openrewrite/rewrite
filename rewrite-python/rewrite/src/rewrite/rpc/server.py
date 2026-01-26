@@ -214,7 +214,7 @@ def parse_python_source(source: str, path: str = "<unknown>") -> dict:
         tree = ast.parse(source_for_ast, path)
 
         # Convert to OpenRewrite LST
-        cu = ParserVisitor(source).visit(tree)
+        cu = ParserVisitor(source, path).visit(tree)
         cu = cu.replace(source_path=Path(path))
         cu = cu.replace(markers=Markers.EMPTY)
 
@@ -418,6 +418,14 @@ def handle_reset(params: dict) -> bool:
     _execution_contexts.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
+
+    # Reset TyLspClient if it was initialized
+    try:
+        from rewrite.python.ty_client import TyLspClient
+        TyLspClient.reset()
+    except ImportError:
+        pass  # ty not available
+
     logger.info("Reset: cleared all cached state")
     return True
 
@@ -1056,6 +1064,13 @@ def main():
             logger.error(f"Fatal error: {e}")
             traceback.print_exc()
             break
+
+    # Shutdown TyLspClient if it was initialized
+    try:
+        from rewrite.python.ty_client import TyLspClient
+        TyLspClient.reset()
+    except ImportError:
+        pass  # ty not available
 
     logger.info("Python RPC server shutting down...")
 

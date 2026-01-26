@@ -262,33 +262,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         for (SearchResults.Row searchResult : searchMarkers) {
             searchResults.insertRow(ctx, searchResult);
         }
-
-        if (hierarchical) {
-            recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
-        }
-    }
-
-    private void recordSourceFileResult(@Nullable String beforePath, @Nullable String afterPath, List<Recipe> recipeStack, Long effortSeconds, ExecutionContext ctx) {
-        if (recipeStack.size() <= 1) {
-            // No reason to record the synthetic root recipe which contains the recipe run
-            return;
-        }
-        String parentName;
-        if (recipeStack.size() == 2) {
-            // Record the parent name as blank rather than CompositeRecipe when the parent is the synthetic root recipe
-            parentName = "";
-        } else {
-            parentName = recipeStack.get(recipeStack.size() - 2).getName();
-        }
-        Recipe recipe = recipeStack.get(recipeStack.size() - 1);
-        sourcesFileResults.insertRow(ctx, new SourcesFileResults.Row(
-                beforePath,
-                afterPath,
-                parentName,
-                recipe.getName(),
-                effortSeconds,
-                cycle));
-        recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
     }
 
     private @Nullable SourceFile handleError(Recipe recipe, SourceFile sourceFile, @Nullable SourceFile after,
@@ -324,6 +297,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     @NonFinal
     @Nullable
     transient Boolean isScanningRecipe;
+
     private boolean isScanningRequired() {
         if (isScanningRecipe == null) {
             isScanningRecipe = isScanningRequired(recipe);
@@ -335,7 +309,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         if (recipe instanceof ScanningRecipe) {
             // DeclarativeRecipe is technically a ScanningRecipe, but it only needs the
             // scanning phase if it or one of its sub-recipes or preconditions is a ScanningRecipe
-            if(recipe instanceof DeclarativeRecipe) {
+            if (recipe instanceof DeclarativeRecipe) {
                 for (Recipe precondition : ((DeclarativeRecipe) recipe).getPreconditions()) {
                     if (isScanningRequired(precondition)) {
                         return true;
