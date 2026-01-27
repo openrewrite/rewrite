@@ -22,17 +22,21 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindJVMTestSuites;
 import org.openrewrite.gradle.trait.JvmTestSuite;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 
+import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.singletonList;
@@ -137,6 +141,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     public static class Scanned {
         Map<JavaProject, Boolean> usingType = new HashMap<>();
         Map<JavaProject, Set<String>> configurationsByProject = new HashMap<>();
+        // Track which scripts apply which other scripts (for both direct and indirect application)
+        Map<Path, Set<Path>> scriptApplications = new HashMap<>();
+        // Track which scripts have dependencies {} blocks
+        Set<Path> scriptsWithDependenciesBlocks = new HashSet<>();
     }
 
     @Override
@@ -174,6 +182,44 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
                             configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"));
                 });
+
+                // Scan for "apply from:" statements and dependencies {} blocks
+                if (tree instanceof JavaSourceFile && IsBuildGradle.matches(sourceFile.getSourcePath())) {
+                    MethodMatcher dependenciesMatcher = new MethodMatcher("* dependencies(..)");
+                    new JavaIsoVisitor<ExecutionContext>() {
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                            // Look for apply(from: "file.gradle") patterns
+                            if ("apply".equals(method.getSimpleName()) && !method.getArguments().isEmpty()) {
+                                for (Expression arg : method.getArguments()) {
+                                    if (arg instanceof G.MapEntry) {
+                                        G.MapEntry mapEntry = (G.MapEntry) arg;
+                                        if (mapEntry.getKey() instanceof J.Literal &&
+                                            "from".equals(((J.Literal) mapEntry.getKey()).getValue()) &&
+                                            mapEntry.getValue() instanceof J.Literal) {
+                                            Object fromValue = ((J.Literal) mapEntry.getValue()).getValue();
+                                            if (fromValue instanceof String) {
+                                                Path currentDir = sourceFile.getSourcePath().getParent();
+                                                if (currentDir != null) {
+                                                    Path appliedScript = currentDir.resolve((String) fromValue).normalize();
+                                                    acc.scriptApplications
+                                                            .computeIfAbsent(sourceFile.getSourcePath(), k -> new HashSet<>())
+                                                            .add(appliedScript);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            // Look for dependencies {} blocks using MethodMatcher
+                            else if (dependenciesMatcher.matches(method, true)) {
+                                acc.scriptsWithDependenciesBlocks.add(sourceFile.getSourcePath());
+                            }
+                            return super.visitMethodInvocation(method, ctx);
+                        }
+                    }.visit(tree, ctx);
+                }
+
                 return tree;
             }
         };
@@ -190,6 +236,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return (J) tree;
                         }
                         JavaSourceFile s = (JavaSourceFile) tree;
+
+                        // Determine if this file should get the dependency added
+                        // Skip if this file applies other scripts that have dependencies blocks
+                        if (appliesScriptsWithDependenciesBlocks(s.getSourcePath(), acc)) {
+                            return s;
+                        }
+
                         Optional<JavaProject> maybeJp = s.getMarkers().findFirst(JavaProject.class);
                         Optional<GradleProject> maybeGp = s.getMarkers().findFirst(GradleProject.class);
                         if (!maybeJp.isPresent() ||
@@ -231,6 +284,38 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         }
 
                         return s;
+                    }
+
+                    /**
+                     * Check if a script applies other scripts (directly or transitively) that have dependencies blocks.
+                     * If so, we should skip adding the dependency to this script and let the applied script handle it.
+                     */
+                    private boolean appliesScriptsWithDependenciesBlocks(Path scriptPath, Scanned acc) {
+                        Set<Path> visited = new HashSet<>();
+                        return hasTransitiveAppliedScriptWithDependenciesBlock(scriptPath, acc, visited);
+                    }
+
+                    private boolean hasTransitiveAppliedScriptWithDependenciesBlock(Path scriptPath, Scanned acc, Set<Path> visited) {
+                        if (!visited.add(scriptPath)) {
+                            return false; // Already visited, avoid cycles
+                        }
+
+                        Set<Path> appliedScripts = acc.scriptApplications.get(scriptPath);
+                        if (appliedScripts == null || appliedScripts.isEmpty()) {
+                            return false;
+                        }
+
+                        for (Path appliedScript : appliedScripts) {
+                            // If the applied script has a dependencies block, prefer it
+                            if (acc.scriptsWithDependenciesBlocks.contains(appliedScript)) {
+                                return true;
+                            }
+                            // Check transitively applied scripts
+                            if (hasTransitiveAppliedScriptWithDependenciesBlock(appliedScript, acc, visited)) {
+                                return true;
+                            }
+                        }
+                        return false;
                     }
 
                     private boolean isTopLevel(Cursor cursor) {
