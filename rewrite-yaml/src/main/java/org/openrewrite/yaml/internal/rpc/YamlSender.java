@@ -45,10 +45,19 @@ public class YamlSender extends YamlVisitor<RpcSendQueue> {
 
     @Override
     public Yaml visitDocument(Yaml.Document document, RpcSendQueue q) {
+        q.getAndSendList(document, Yaml.Document::getDirectives, dir -> dir.getId(),
+                dir -> visit(dir, q));
         q.getAndSend(document, Yaml.Document::isExplicit);
         q.getAndSend(document, Yaml.Document::getBlock, b -> visit(b, q));
         q.getAndSend(document, Yaml.Document::getEnd, e -> visit(e, q));
         return document;
+    }
+
+    @Override
+    public Yaml visitDirective(Yaml.Directive directive, RpcSendQueue q) {
+        q.getAndSend(directive, Yaml.Directive::getValue);
+        q.getAndSend(directive, Yaml.Directive::getSuffix);
+        return directive;
     }
 
     @Override

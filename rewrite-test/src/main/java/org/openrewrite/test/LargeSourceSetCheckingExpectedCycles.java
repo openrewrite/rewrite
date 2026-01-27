@@ -120,7 +120,8 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
             } else if (cyclesThatResultedInChanges != expectedCyclesThatMakeChanges) {
                 fail("Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges > 1 ? "s" : "") + ", " +
                      "but took " + cyclesThatResultedInChanges + " cycle" + (cyclesThatResultedInChanges > 1 ? "s" : "") + ". " +
-                     "This usually indicates the recipe is making changes after it should have stabilized.");
+                     "This usually indicates the recipe is making changes after it should have stabilized.\n" +
+                     "https://docs.openrewrite.org/authoring-recipes/recipe-conventions-and-best-practices#stay-single-cycle");
             }
         }
     }
