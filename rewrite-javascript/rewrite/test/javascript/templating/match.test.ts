@@ -13,30 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { fromVisitor, RecipeSpec } from "../../../src/test";
-import { Cursor } from "../../../src";
+import {fromVisitor, RecipeSpec} from "../../../src/test";
+import {Cursor} from "../../../src";
 import {
+    JavaScriptVisitor,
     capture,
     JavaScriptParser,
-    JavaScriptVisitor,
     pattern,
     rewrite,
     template,
     typescript
 } from "../../../src/javascript";
-import { Expression, J } from "../../../src/java";
-import { castDraft, create as produce } from "mutative";
+import {Expression, J} from "../../../src/java";
+import {castDraft, create as produce} from "mutative";
 
 describe('match extraction', () => {
     const spec = new RecipeSpec();
 
     test('extract parts of a binary expression using string names', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
                 if (binary.operator.element === J.Binary.Type.Addition) {
 
                     // Create a pattern that matches "a + b"
-                    const m = await pattern`${"left"} + ${"right"}`.match(binary, this.cursor);
+                    const m = pattern`${"left"} + ${"right"}`.match(binary, this.cursor);
                     if (m) {
                         // Extract the captured parts
                         // Create a new binary expression with the swapped operands
@@ -61,14 +61,14 @@ describe('match extraction', () => {
     test('extract parts of a binary expression using capture objects', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
 
-            override async visitBinary(binary: J.Binary, _p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, _p: any): J | undefined {
                 // Create capture objects
                 const left = capture(), right = capture();
 
                 // Create a pattern that matches "a + b" using the capture objects
-                const m = await pattern`${left} + ${right}`.match(binary, this.cursor);
+                const m = pattern`${left} + ${right}`.match(binary, this.cursor);
                 if (m) {
-                    return await template`${right} + ${left}`.apply(binary, this.cursor, { values: m });
+                    return template`${right} + ${left}`.apply(binary, this.cursor, { values: m });
                 }
                 return binary;
             }
@@ -82,14 +82,14 @@ describe('match extraction', () => {
 
     test('extract parts of a binary expression using replace function', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
 
                 const swapOperands = rewrite(() => ({
                     before: pattern`${capture('left')} + ${capture('right')}`,
                     after: template`${capture('right')} + ${capture('left')}`
                 })
                 );
-                return await swapOperands.tryOn(this.cursor, binary);
+                return swapOperands.tryOn(this.cursor, binary);
             }
         });
 
@@ -101,13 +101,13 @@ describe('match extraction', () => {
 
     test('extract parts of a binary expression using unnamed captures', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
                 if (binary.operator.element === J.Binary.Type.Addition) {
                     // Create capture objects without explicit names
                     const { left, right } = { left: capture<Expression>(), right: capture<Expression>() };
 
                     // Create a pattern that matches "a + b" using the capture objects
-                    const m = await pattern`${left} + ${right}`.match(binary, this.cursor);
+                    const m = pattern`${left} + ${right}`.match(binary, this.cursor);
                     if (m) {
                         // Extract the captured parts
                         const leftValue = m.get(left);
@@ -134,13 +134,13 @@ describe('match extraction', () => {
 
     test('extract parts using inline named captures', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
                 if (binary.operator.element === J.Binary.Type.Addition) {
                     // Use inline named captures
-                    const m = await pattern`${capture('left')} + ${capture('right')}`.match(binary, this.cursor);
+                    const m = pattern`${capture('left')} + ${capture('right')}`.match(binary, this.cursor);
                     if (m) {
                         // Can retrieve by string name
-                        return await template`${capture('right')} + ${capture('left')}`.apply(binary, this.cursor, { values: m });
+                        return template`${capture('right')} + ${capture('left')}`.apply(binary, this.cursor, { values: m });
                     }
                 }
                 return binary;
@@ -166,15 +166,14 @@ describe('match extraction', () => {
         // Create dummy code to trigger pattern parsing (which requires workspace creation)
         const testCode = 'const result = 1 + 2;';
         const parser = new JavaScriptParser();
-        const parseGen = parser.parse({ text: testCode, sourcePath: 'test.ts' });
-        const cu = (await parseGen.next()).value;
+        const cu = parser.parseOne({ text: testCode, sourcePath: 'test.ts' });
 
         // Try to match - this should fail because npm install will fail for non-existent package
         await expect(async () => {
-            await (new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, _p: any): Promise<J | undefined> {
+            (new class extends JavaScriptVisitor<any> {
+                override visitBinary(binary: J.Binary, _p: any): J | undefined {
                     // This should throw when trying to create workspace
-                    await pat.match(binary, new Cursor(binary, undefined));
+                    pat.match(binary, new Cursor(binary, undefined));
                     return binary;
                 }
             }).visit(cu, undefined);

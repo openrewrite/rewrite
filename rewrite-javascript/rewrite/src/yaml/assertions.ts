@@ -20,7 +20,7 @@ import {Yaml} from "./tree";
 export function yaml(before: string | null, after?: AfterRecipeText): SourceSpec<Yaml.Documents> {
     return {
         kind: Yaml.Kind.Documents,
-        before: before,
+        before,
         after: dedentAfter(after),
         ext: 'yaml',
         parser: () => new YamlParser()

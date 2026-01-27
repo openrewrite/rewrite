@@ -14,12 +14,18 @@
  * limitations under the License.
  */
 
-import {RecipeSpec, fromVisitor} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {fromVisitor, RecipeSpec} from "../../../src/test";
+import {
+    capture,
+    flattenBlock,
+    JavaScriptVisitor,
+    pattern,
+    rewrite,
+    template,
+    typescript
+} from "../../../src/javascript";
 import {ExecutionContext} from "../../../src";
-import {JavaScriptVisitor} from "../../../src/javascript/visitor";
 import {J} from "../../../src/java";
-import {rewrite, pattern, template, capture, flattenBlock} from "../../../src/javascript/templating";
 
 describe('flattenBlock', () => {
     test('flattens block statements into parent block', async () => {
@@ -30,8 +36,8 @@ describe('flattenBlock', () => {
         const cb = capture('cb');
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
-            override async visitReturn(ret: J.Return, ctx: ExecutionContext): Promise<J | undefined> {
-                const result = await rewrite(() => ({
+            override visitReturn(ret: J.Return, ctx: ExecutionContext): J | undefined {
+                const result = rewrite(() => ({
                     before: pattern`return ${cond} || ${arr}.some(${cb})`,
                     after: template`{
                         if (${cond}) return true;
@@ -79,8 +85,8 @@ describe('flattenBlock', () => {
         const cb = capture('cb');
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
-            override async visitReturn(ret: J.Return, ctx: ExecutionContext): Promise<J | undefined> {
-                const result = await rewrite(() => ({
+            override visitReturn(ret: J.Return, ctx: ExecutionContext): J | undefined {
+                const result = rewrite(() => ({
                     before: pattern`return ${cond} || ${arr}.some(${cb})`,
                     after: template`{
                         if (${cond}) return true;

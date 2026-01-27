@@ -42,8 +42,8 @@ export class AddParseIntRadix extends Recipe {
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
 
-            protected async visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): Promise<J | undefined> {
-                const visited = await super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
+            protected visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J | undefined {
+                const visited = super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
 
                 // Check if this is a call to parseInt
                 if (visited.select) {

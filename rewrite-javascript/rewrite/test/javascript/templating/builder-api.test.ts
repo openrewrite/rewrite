@@ -47,7 +47,7 @@ describe('Builder API', () => {
                 .build();
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+                override visitLiteral(literal: J.Literal, p: any): J | undefined {
                     if (literal.valueSource === '1') {
                         return builderTmpl.apply(literal, this.cursor);
                     }
@@ -75,7 +75,7 @@ describe('Builder API', () => {
             const tmpl = builder.build();
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+                override visitLiteral(literal: J.Literal, p: any): J | undefined {
                     if (literal.valueSource === '1') {
                         const values = new Map([['value', literal]]);
                         return tmpl.apply(literal, this.cursor, { values });
@@ -144,7 +144,7 @@ describe('Builder API', () => {
 
             // Verify the template generates the expected code
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+                override visitLiteral(literal: J.Literal, p: any): J | undefined {
                     if (literal.valueSource === '1') {
                         return tmpl.apply(literal, this.cursor);
                     }
@@ -200,8 +200,8 @@ describe('Builder API', () => {
                 .build();
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    const match = await builderPat.match(binary, this.cursor);
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    const match = builderPat.match(binary, this.cursor);
                     if (match) {
                         const leftExpr = match.get(left)!;
                         const rightExpr = match.get(right)!;
@@ -233,8 +233,8 @@ describe('Builder API', () => {
 
             // Verify the pattern matches and captures arguments correctly
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    const match = await pat.match(methodInvocation, this.cursor);
+                override visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): J | undefined {
+                    const match = pat.match(methodInvocation, this.cursor);
                     if (match) {
                         // Verify all three captures were matched
                         const arg0 = match.get(captures[0]);
@@ -328,8 +328,8 @@ describe('Builder API', () => {
                 .build();
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    const match = await pat.match(binary, this.cursor);
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    const match = pat.match(binary, this.cursor);
                     if (match) {
                         return tmpl.apply(binary, this.cursor, { values: match });
                     }
@@ -366,8 +366,8 @@ describe('Builder API', () => {
             const tmpl = tmplBuilder.build();
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    const match = await pat.match(invocation, this.cursor);
+                override visitMethodInvocation(invocation: J.MethodInvocation, p: any): J | undefined {
+                    const match = pat.match(invocation, this.cursor);
                     if (match) {
                         return tmpl.apply(invocation, this.cursor, { values: match });
                     }

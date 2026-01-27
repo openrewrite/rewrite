@@ -98,7 +98,7 @@ export class JavaScriptTypeMapping {
                 return Type.unknownType;
             }
             // Skip instantiated types ONLY if they're not type references
-            // Type references like Array<string>, Promise<T> are instantiated but should be mapped
+            // Type references like Array<string>, T are instantiated but should be mapped
             // Other instantiated types (like object literals) should return unknown
             if (objectFlags & ts.ObjectFlags.Instantiated) {
                 const isTypeReference = objectFlags & ts.ObjectFlags.Reference;
@@ -177,7 +177,7 @@ export class JavaScriptTypeMapping {
                             const parameterized = {
                                 kind: Type.Kind.Parameterized,
                                 type: classType,
-                                typeParameters: typeParameters,
+                                typeParameters,
                                 fullyQualifiedName: classType.fullyQualifiedName,
                                 toJSON: function () {
                                     return Type.signature(this);
@@ -590,15 +590,15 @@ export class JavaScriptTypeMapping {
         const method = {
             kind: Type.Kind.Method,
             flags: 0, // FIXME - determine flags
-            declaringType: declaringType,
-            name: name,
+            declaringType,
+            name,
             returnType: this.getType(returnType),
-            parameterNames: parameterNames,
-            parameterTypes: parameterTypes,
+            parameterNames,
+            parameterTypes,
             thrownExceptions: [], // JavaScript doesn't have checked exceptions
             annotations: [],
             defaultValue: undefined,
-            declaredFormalTypeNames: declaredFormalTypeNames,
+            declaredFormalTypeNames,
             toJSON: function () {
                 return Type.signature(this);
             }
@@ -1059,8 +1059,8 @@ export class JavaScriptTypeMapping {
         return {
             kind: Type.Kind.Class,
             flags: 0, // TODO - determine flags
-            classKind: classKind,
-            fullyQualifiedName: fullyQualifiedName,
+            classKind,
+            fullyQualifiedName,
             typeParameters: [],
             annotations: [],
             interfaces: [],
@@ -1311,7 +1311,7 @@ export class JavaScriptTypeMapping {
         // Shell-cache: Create stub, cache it, then populate (prevents cycles)
         const gtv = {
             kind: Type.Kind.GenericTypeVariable,
-            name: name,
+            name,
             variance: Type.GenericTypeVariable.Variance.Invariant,
             bounds: []
         } as Type.GenericTypeVariable;
@@ -1413,9 +1413,9 @@ export class JavaScriptTypeMapping {
             flags: 0,
             declaringType: functionClass,
             name: 'apply',
-            returnType: returnType,
-            parameterNames: parameterNames,
-            parameterTypes: parameterTypes,
+            returnType,
+            parameterNames,
+            parameterTypes,
             thrownExceptions: [],
             annotations: [],
             defaultValue: undefined,

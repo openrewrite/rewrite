@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-import {Recipe} from "../../recipe";
-import {produceAsync, TreeVisitor} from "../../visitor";
+import {Recipe, RecipeVisitor} from "../../recipe";
 import {ExecutionContext} from "../../execution";
 import {JavaScriptVisitor, JS} from "../index";
 import {J} from "../../java";
@@ -44,10 +43,10 @@ export class OrderImports extends Recipe {
     readonly description = "Sort imports by category and module path. Categories: side-effect, namespace, default, named, type. Within each category, imports are sorted alphabetically by module path. Named specifiers within each import are also sorted alphabetically.";
 
 
-    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editor(): Promise<RecipeVisitor> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
 
-            protected async visitJsCompilationUnit(cu: JS.CompilationUnit, p: ExecutionContext): Promise<J | undefined> {
+            protected visitJsCompilationUnit(cu: JS.CompilationUnit, _p: ExecutionContext): J | undefined {
                 const importCount = this.countImports(cu);
                 if (importCount === 0) {
                     return cu;
@@ -88,7 +87,7 @@ export class OrderImports extends Recipe {
                     return originalImportPosition[aPadded.element.id] - originalImportPosition[bPadded.element.id];
                 });
 
-                const cuWithImportsSorted = await produceAsync(cu, async draft => {
+                const cuWithImportsSorted = produce(cu, draft => {
                     draft.statements = [...sortedSpecifiers, ...restStatements];
                 });
 

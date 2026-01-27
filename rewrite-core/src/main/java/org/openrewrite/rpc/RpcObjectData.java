@@ -15,7 +15,6 @@
  */
 package org.openrewrite.rpc;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -25,6 +24,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -34,9 +34,15 @@ import java.util.Map;
 
 /**
  * A single piece of data in a tree, which can be a marker, leaf value, tree element, etc.
+ * <p>
+ * Serialized as a compact array: [state, valueType, value, ref?, trace?]
+ * - 3 elements when ref is null and trace is null
+ * - 4 elements when ref is present but trace is null
+ * - 5 elements when trace is present
  */
 @Value
-@NoArgsConstructor(force = true, access = AccessLevel.PRIVATE, onConstructor_ = @JsonCreator)
+@NoArgsConstructor(force = true, access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class RpcObjectData {
     private static final ObjectMapper mapper = JsonMapper.builder()
             // to be able to construct classes that have @Data and a single field
@@ -93,6 +99,14 @@ public class RpcObjectData {
         this.trace = trace ? Trace.traceSender() : null;
     }
 
+    /**
+     * Creates an RpcObjectData with a pre-existing trace string.
+     * Used during deserialization when the trace is already known.
+     */
+    public static RpcObjectData create(State state, @Nullable String valueType, @Nullable Object value, @Nullable Integer ref, @Nullable String trace) {
+        return new RpcObjectData(state, valueType, value, ref, trace);
+    }
+
     public RpcObjectData withoutTrace() {
         return new RpcObjectData(state, valueType, value, ref, false);
     }
@@ -126,6 +140,17 @@ public class RpcObjectData {
         ADD,
         DELETE,
         CHANGE,
-        END_OF_OBJECT
+        END_OF_OBJECT;
+
+        public static State from(int ordinal) {
+            switch (ordinal) {
+                case 0: return NO_CHANGE;
+                case 1: return ADD;
+                case 2: return DELETE;
+                case 3: return CHANGE;
+                case 4: return END_OF_OBJECT;
+                default: throw new IllegalArgumentException("Unknown state ordinal: " + ordinal);
+            }
+        }
     }
 }

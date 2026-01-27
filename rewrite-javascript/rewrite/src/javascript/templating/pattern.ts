@@ -215,7 +215,7 @@ export class Pattern {
      * @returns The cached or newly computed pattern AST
      * @internal
      */
-    async getAstPattern(): Promise<J> {
+    getAstPattern(): J {
         // Level 1: Instance cache (fastest path)
         if (this._cachedAstPattern) {
             return this._cachedAstPattern;
@@ -245,7 +245,7 @@ export class Pattern {
         }
 
         // Level 3: Compute via TemplateEngine (slow path)
-        const result = await TemplateEngine.getPatternTree(
+        const result = TemplateEngine.getPatternTree(
             this.templateParts,
             this.captures,
             contextStatements,
@@ -271,13 +271,13 @@ export class Pattern {
      * @example
      * ```typescript
      * // Normal match
-     * const match = await pattern.match(node, cursor);
+     * const match = pattern.match(node, cursor);
      *
      * // Debug this specific call
-     * const match = await pattern.match(node, cursor, { debug: true });
+     * const match = pattern.match(node, cursor, { debug: true });
      * ```
      */
-    async match(tree: J, cursor: Cursor, options?: MatchOptions): Promise<MatchResult | undefined> {
+    match(tree: J, cursor: Cursor, options?: MatchOptions): MatchResult | undefined {
         // Three-level precedence: call > pattern > global
         const debugEnabled =
             options?.debug !== undefined
@@ -288,8 +288,8 @@ export class Pattern {
 
         if (debugEnabled) {
             // Use matchWithExplanation and log the result
-            const result = await this.matchWithExplanation(tree, cursor);
-            await this.logMatchResult(tree, cursor, result);
+            const result = this.matchWithExplanation(tree, cursor);
+            this.logMatchResult(tree, cursor, result);
 
             if (result.matched) {
                 // result.result is the MatchResult class instance
@@ -301,7 +301,7 @@ export class Pattern {
 
         // Fast path - no debug
         const matcher = new Matcher(this, tree, cursor);
-        const success = await matcher.matches();
+        const success = matcher.matches();
         if (!success) {
             return undefined;
         }
@@ -314,7 +314,7 @@ export class Pattern {
      * Formats and logs the match result to stderr.
      * @private
      */
-    private async logMatchResult(tree: J, cursor: Cursor | undefined, result: MatchAttemptResult): Promise<void> {
+    private logMatchResult(tree: J, cursor: Cursor | undefined, result: MatchAttemptResult): void {
         const patternSource = this.getPatternSource();
         const patternId = `Pattern #${this.patternId}`;
         const nodeKind = (tree as any).kind || 'unknown';
@@ -333,7 +333,7 @@ export class Pattern {
         let treeStr: string;
         try {
             const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
-            treeStr = await printer.print(tree);
+            treeStr = printer.print(tree);
         } catch (e) {
             treeStr = '(tree printing unavailable)';
         }
@@ -525,7 +525,7 @@ export class Pattern {
      * @example
      * const x = capture('x');
      * const pat = pattern`console.log(${x})`;
-     * const attempt = await pat.matchWithExplanation(node, cursor);
+     * const attempt = pat.matchWithExplanation(node, cursor);
      * if (attempt.matched) {
      *     console.log('Matched!');
      *     console.log('Captured x:', attempt.result.get('x'));
@@ -534,11 +534,11 @@ export class Pattern {
      *     console.log('Debug log:', attempt.debugLog);
      * }
      */
-    async matchWithExplanation(
+    matchWithExplanation(
         tree: J,
         cursor: Cursor,
         debugOptions?: DebugOptions
-    ): Promise<MatchAttemptResult> {
+    ): MatchAttemptResult {
         // Default to full debug logging if not specified
         const options: DebugOptions = {
             enabled: true,
@@ -548,7 +548,7 @@ export class Pattern {
         };
 
         const matcher = new Matcher(this, tree, cursor, options);
-        const success = await matcher.matches();
+        const success = matcher.matches();
 
         if (success) {
             // Match succeeded - return MatchResult with debug info
@@ -579,7 +579,7 @@ export class Pattern {
  * @example
  * const x = capture('x');
  * const pat = pattern`foo(${x})`;
- * const match = await pat.match(someNode);
+ * const match = pat.match(someNode, cursor);
  * if (match) {
  *     const captured = match.get('x');  // Get by name
  *     // or
@@ -590,7 +590,7 @@ export class Pattern {
  * // Variadic captures return arrays
  * const args = capture({ variadic: true });
  * const pat = pattern`foo(${args})`;
- * const match = await pat.match(methodInvocation);
+ * const match = pat.match(methodInvocation, cursor);
  * if (match) {
  *     const capturedArgs = match.get(args);  // Returns J[] for variadic captures
  * }
@@ -711,9 +711,9 @@ class Matcher {
      *
      * @returns true if the pattern matches, false otherwise
      */
-    async matches(): Promise<boolean> {
+    matches(): boolean {
         if (!this.patternAst) {
-            this.patternAst = await this.pattern.getAstPattern();
+            this.patternAst = this.pattern.getAstPattern();
         }
 
         return this.matchNode(this.patternAst, this.ast);
@@ -841,7 +841,7 @@ class Matcher {
      * @param target The target node
      * @returns true if the pattern matches the target, false otherwise
      */
-    private async matchNode(pattern: J, target: J): Promise<boolean> {
+    private matchNode(pattern: J, target: J): boolean {
         // Always delegate to the comparator visitor, which handles:
         // - Capture detection and constraint evaluation
         // - Kind checking
@@ -873,7 +873,7 @@ class Matcher {
             : new PatternMatchingComparator(matcherCallbacks, lenientTypeMatching);
         // Pass cursors to allow constraints to navigate to root
         // Pattern cursor is undefined (pattern is the root), target cursor is provided by user
-        const result = await comparator.compare(pattern, target, undefined, this.cursor);
+        const result = comparator.compare(pattern, target, undefined, this.cursor);
 
         // If match failed and no explanation was set, provide a generic one
         if (!result && this.debugOptions.enabled && !this.explanation) {

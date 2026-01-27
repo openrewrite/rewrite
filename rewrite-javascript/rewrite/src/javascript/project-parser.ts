@@ -205,7 +205,7 @@ export class ProjectParser {
         const detector = Autodetect.detector();
         for (const sf of sourceFiles) {
             if (sf.kind === JS.Kind.CompilationUnit) {
-                await detector.sample(sf);
+                detector.sample(sf);
             }
         }
         return detector.build();
@@ -341,7 +341,7 @@ export class ProjectParser {
                 // Sample all parsed files and build Autodetect marker
                 const detector = Autodetect.detector();
                 for (const sf of parsedFiles) {
-                    await detector.sample(sf);
+                    detector.sample(sf);
                 }
                 const autodetectMarker = detector.build();
                 this.log(`Auto-detected styles: indent=${detector.getTabsAndIndentsStyle().indentSize}, ` +

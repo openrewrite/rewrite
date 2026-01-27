@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-import {Recipe} from "../../recipe";
-import {TreeVisitor} from "../../visitor";
+import {Recipe, RecipeVisitor} from "../../recipe";
 import {ExecutionContext} from "../../execution";
 import {AutoformatVisitor} from "../format";
 
@@ -37,7 +36,7 @@ export class AutoFormat extends Recipe {
     readonly displayName = "Auto-format JavaScript/TypeScript code";
     readonly description = "Format JavaScript and TypeScript code using formatting rules auto-detected from the project's existing code style.";
 
-    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+    async editor(): Promise<RecipeVisitor> {
         // AutoformatVisitor looks up styles from source file markers
         return new AutoformatVisitor();
     }

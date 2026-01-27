@@ -17,7 +17,6 @@ package org.openrewrite.internal;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.PrintOutputCapture;
@@ -27,7 +26,8 @@ import org.openrewrite.jgit.attributes.AttributesNodeProvider;
 import org.openrewrite.jgit.diff.DiffEntry;
 import org.openrewrite.jgit.diff.DiffFormatter;
 import org.openrewrite.jgit.diff.RawTextComparator;
-import org.openrewrite.jgit.internal.storage.dfs.*;
+import org.openrewrite.jgit.internal.storage.dfs.DfsRepositoryDescription;
+import org.openrewrite.jgit.internal.storage.dfs.InMemoryRepository;
 import org.openrewrite.jgit.lib.*;
 import org.openrewrite.marker.GitTreeEntry;
 import org.openrewrite.quark.Quark;

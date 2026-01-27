@@ -28,9 +28,11 @@ import {
     TypedTree,
     TypeTree,
     VariableDeclarator,
-    registerJavaExtensionKinds
+    registerJavaExtensionKinds,
+    registerAsyncJavaExtensionKinds,
+    AsyncJavaVisitor
 } from "../java";
-import {JavaScriptVisitor} from "./visitor";
+import {JavaScriptVisitor, AsyncJavaScriptVisitor} from "./visitor";
 
 export interface JS extends J {
 }
@@ -62,7 +64,6 @@ export namespace JS {
         ImportType: "org.openrewrite.javascript.tree.JS$ImportType",
         ImportTypeAttributes: "org.openrewrite.javascript.tree.JS$ImportTypeAttributes",
         IndexSignatureDeclaration: "org.openrewrite.javascript.tree.JS$IndexSignatureDeclaration",
-        IndexType: "org.openrewrite.javascript.tree.JS$IndexedAccessType$IndexType",
         IndexedAccessType: "org.openrewrite.javascript.tree.JS$IndexedAccessType",
         IndexedAccessTypeIndexType: "org.openrewrite.javascript.tree.JS$IndexedAccessType$IndexType",
         InferType: "org.openrewrite.javascript.tree.JS$InferType",
@@ -971,6 +972,34 @@ function javascriptVisitorAdapter<P>(visitor: JavaVisitor<P>): JavaVisitor<P> {
 }
 
 registerJavaExtensionKinds(Object.values(JS.Kind), javascriptVisitorAdapter);
+
+function asyncJavascriptVisitorAdapter<P>(visitor: AsyncJavaVisitor<P>): AsyncJavaVisitor<P> {
+    const adaptedVisitor = new AsyncJavaScriptVisitor<P>();
+
+    // Walk up the prototype chain of the visitor to get all overridden methods
+    let proto = Object.getPrototypeOf(visitor);
+    while (proto && proto !== AsyncJavaVisitor.prototype) {
+        Object.getOwnPropertyNames(proto).forEach(name => {
+            const descriptor = Object.getOwnPropertyDescriptor(proto, name);
+            if (descriptor && typeof descriptor.value === 'function' && name !== 'constructor') {
+                // Copy the method, binding it to jsVisitor
+                (adaptedVisitor as any)[name] = descriptor.value.bind(adaptedVisitor);
+            }
+        });
+        proto = Object.getPrototypeOf(proto);
+    }
+
+    // Also copy any instance properties
+    Object.keys(visitor).forEach(key => {
+        if (!(key in adaptedVisitor)) {
+            (adaptedVisitor as any)[key] = (visitor as any)[key];
+        }
+    });
+
+    return adaptedVisitor;
+}
+
+registerAsyncJavaExtensionKinds(Object.values(JS.Kind), asyncJavascriptVisitorAdapter);
 
 export function isJavaScript(tree: any): tree is JS {
     return KindValues.has(tree["kind"]);

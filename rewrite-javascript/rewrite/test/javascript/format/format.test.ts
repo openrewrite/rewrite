@@ -289,11 +289,11 @@ describe('AutoformatVisitor', () => {
         // This test simulates what happens when the templating system replaces a node
         // and calls maybeAutoFormat() on just that subtree
         const visitor = new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
+            override visitMethodInvocation(methodInvocation: any, p: any): any {
                 // Only format the logger.info() call, simulating a template replacement
                 if (methodInvocation.name?.simpleName === 'info') {
                     // Format just this subtree (this is what causes the bug)
-                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent);
+                    return autoFormat(methodInvocation, p, undefined, this.cursor.parent);
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
@@ -616,11 +616,11 @@ expect(recipe).toBeNull(); // Multiple matches`
         // This test verifies that when template replaces a top-level method invocation,
         // the result doesn't get incorrectly indented.
         const visitor = new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
+            override visitMethodInvocation(methodInvocation: any, p: any): any {
                 // Only format the slice() call
                 if (methodInvocation.name?.simpleName === 'slice') {
                     // Format just this subtree - simulates template replacement
-                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent);
+                    return autoFormat(methodInvocation, p, undefined, this.cursor.parent);
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }

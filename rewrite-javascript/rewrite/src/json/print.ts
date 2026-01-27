@@ -20,65 +20,65 @@ import {Cursor} from "../tree";
 import {Markers} from "../markers";
 
 class JsonPrinter extends JsonVisitor<PrintOutputCapture> {
-    protected async visitArray(array: Json.Array, p: PrintOutputCapture): Promise<Json | undefined> {
-        await this.beforeSyntax(array, p);
+    protected visitArray(array: Json.Array, p: PrintOutputCapture): Json | undefined {
+        this.beforeSyntax(array, p);
         p.append('[');
-        await this.visitRightPaddedWithSuffix(array.values, ",", p);
+        this.visitRightPaddedWithSuffix(array.values, ",", p);
         p.append(']');
         this.afterSyntax(array, p);
         return array;
     }
 
-    protected async visitDocument(document: Json.Document, p: PrintOutputCapture): Promise<Json | undefined> {
-        await this.beforeSyntax(document, p);
-        await this.visit(document.value, p);
-        await this.visitSpace(document.eof, p);
+    protected visitDocument(document: Json.Document, p: PrintOutputCapture): Json | undefined {
+        this.beforeSyntax(document, p);
+        this.visit(document.value, p);
+        this.visitSpace(document.eof, p);
         this.afterSyntax(document, p);
         return document;
     }
 
-    protected async visitEmpty(empty: Json.Empty, p: PrintOutputCapture): Promise<Json | undefined> {
-        await this.beforeSyntax(empty, p);
+    protected visitEmpty(empty: Json.Empty, p: PrintOutputCapture): Json | undefined {
+        this.beforeSyntax(empty, p);
         this.afterSyntax(empty, p);
         return empty;
     }
 
-    protected async visitIdentifier(identifier: Json.Identifier, p: PrintOutputCapture): Promise<Json | undefined> {
-        await this.beforeSyntax(identifier, p);
+    protected visitIdentifier(identifier: Json.Identifier, p: PrintOutputCapture): Json | undefined {
+        this.beforeSyntax(identifier, p);
         p.append(identifier.name);
         this.afterSyntax(identifier, p);
         return identifier;
     }
 
-    protected async visitLiteral(literal: Json.Literal, p: PrintOutputCapture): Promise<Json | undefined> {
-        await this.beforeSyntax(literal, p);
+    protected visitLiteral(literal: Json.Literal, p: PrintOutputCapture): Json | undefined {
+        this.beforeSyntax(literal, p);
         p.append(literal.source);
         this.afterSyntax(literal, p);
         return literal;
     }
 
-    protected async visitMember(member: Json.Member, p: PrintOutputCapture): Promise<Json | undefined> {
-        await this.beforeSyntax(member, p);
-        await this.visitRightPadded(member.key, p);
+    protected visitMember(member: Json.Member, p: PrintOutputCapture): Json | undefined {
+        this.beforeSyntax(member, p);
+        this.visitRightPadded(member.key, p);
         p.append(':');
-        await this.visit(member.value, p);
+        this.visit(member.value, p);
         this.afterSyntax(member, p);
         return member;
     }
 
-    protected async visitObject(jsonObject: Json.Object, p: PrintOutputCapture): Promise<Json | undefined> {
-        await this.beforeSyntax(jsonObject, p);
+    protected visitObject(jsonObject: Json.Object, p: PrintOutputCapture): Json | undefined {
+        this.beforeSyntax(jsonObject, p);
         p.append('{');
-        await this.visitRightPaddedWithSuffix(jsonObject.members, ",", p);
+        this.visitRightPaddedWithSuffix(jsonObject.members, ",", p);
         p.append('}');
         this.afterSyntax(jsonObject, p);
         return jsonObject;
     }
 
-    public async visitSpace(space: Json.Space, p: PrintOutputCapture): Promise<Json.Space> {
+    public visitSpace(space: Json.Space, p: PrintOutputCapture): Json.Space {
         p.append(space.whitespace);
         for (const comment of space.comments) {
-            await this.visitMarkers(comment.markers, p);
+            this.visitMarkers(comment.markers, p);
             if (comment.multiline) {
                 p.append(`/*${comment.text}*/`);
             } else {
@@ -89,27 +89,27 @@ class JsonPrinter extends JsonVisitor<PrintOutputCapture> {
         return space;
     }
 
-    private async visitRightPaddedWithSuffix(nodes: Json.RightPadded<Json>[], suffixBetween: string, p: PrintOutputCapture): Promise<void> {
+    private visitRightPaddedWithSuffix(nodes: Json.RightPadded<Json>[], suffixBetween: string, p: PrintOutputCapture): void {
         for (let i = 0; i < nodes.length; i++) {
             const node = nodes[i];
-            await this.visit(node.element, p);
-            await this.visitSpace(node.after, p);
+            this.visit(node.element, p);
+            this.visitSpace(node.after, p);
             if (i < nodes.length - 1) {
                 p.append(suffixBetween);
             }
         }
     }
 
-    private async beforeSyntax(json: Json, p: PrintOutputCapture): Promise<void> {
-        await this.beforeSyntaxWithMarkers(json.prefix, json.markers, p);
+    private beforeSyntax(json: Json, p: PrintOutputCapture): void {
+        this.beforeSyntaxWithMarkers(json.prefix, json.markers, p);
     }
 
-    private async beforeSyntaxWithMarkers(prefix: Json.Space, markers: Markers, p: PrintOutputCapture): Promise<void> {
+    private beforeSyntaxWithMarkers(prefix: Json.Space, markers: Markers, p: PrintOutputCapture): void {
         for (const marker of markers.markers) {
             p.append(p.markerPrinter.beforePrefix(marker, new Cursor(marker, this.cursor), this.jsonMarkerWrapper));
         }
-        await this.visitSpace(prefix, p);
-        await this.visitMarkers(markers, p);
+        this.visitSpace(prefix, p);
+        this.visitMarkers(markers, p);
         for (const marker of markers.markers) {
             p.append(p.markerPrinter.beforeSyntax(marker, new Cursor(marker, this.cursor), this.jsonMarkerWrapper));
         }

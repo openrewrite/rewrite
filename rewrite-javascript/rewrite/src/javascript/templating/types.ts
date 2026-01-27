@@ -149,7 +149,7 @@ export interface CaptureOptions<T = any> {
      * - Ensuring pattern parses with correct type context
      *
      * Can be specified as:
-     * - A string type annotation (e.g., "boolean", "string", "number", "Promise<any>", "User[]")
+     * - A string type annotation (e.g., "boolean", "string", "number", "any", "User[]")
      * - A Type instance from the AST (the type will be inferred from the Type)
      *
      * @example
@@ -157,7 +157,7 @@ export interface CaptureOptions<T = any> {
      * // Match promise chains with proper type attribution
      * const chain = capture({
      *   name: 'chain',
-     *   type: 'Promise<any>',  // TypeScript will attribute this as Promise type
+     *   type: 'any',  // TypeScript will attribute this as Promise type
      *   constraint: (call: J.MethodInvocation) => {
      *     // Validate promise chain structure
      *     return call.name.simpleName === 'then';
@@ -393,10 +393,10 @@ export interface MatchOptions {
      * @example
      * ```typescript
      * // Debug just this call
-     * const match = await pattern.match(node, cursor, { debug: true });
+     * const match = pattern.match(node, cursor, { debug: true });
      *
      * // Disable debug for this call even if pattern or global debug is on
-     * const match = await pattern.match(node, cursor, { debug: false });
+     * const match = pattern.match(node, cursor, { debug: false });
      * ```
      */
     debug?: boolean;
@@ -494,16 +494,16 @@ export interface ApplyOptions {
      * @example
      * ```typescript
      * // Using MatchResult from pattern matching
-     * const match = await pattern.match(node, cursor);
-     * await template.apply(node, cursor, { values: match });
+     * const match = pattern.match(node, cursor);
+     * template.apply(node, cursor, { values: match });
      *
      * // Using a Map
-     * await template.apply(node, cursor, {
+     * template.apply(node, cursor, {
      *     values: new Map([['x', someNode]])
      * });
      *
      * // Using a plain object
-     * await template.apply(node, cursor, {
+     * template.apply(node, cursor, {
      *     values: { x: someNode }
      * });
      * ```
@@ -522,9 +522,9 @@ export interface RewriteRule {
      * @param node The AST node to try matching and transforming
      * @returns The transformed node if a pattern matched, or `undefined` if no pattern matched.
      *          When using in a visitor, always use the `|| node` pattern to return the original
-     *          node when there's no match: `return await rule.tryOn(this.cursor, node) || node;`
+     *          node when there's no match: `return rule.tryOn(this.cursor, node) || node;`
      */
-    tryOn(cursor: Cursor, node: J): Promise<J | undefined>;
+    tryOn(cursor: Cursor, node: J): J | undefined;
 
     /**
      * Chains this rule with another rule, creating a composite rule that applies both transformations sequentially.
@@ -646,7 +646,7 @@ export interface RewriteConfig {
      * }));
      * ```
      */
-    preMatch?: (node: J, context: PreMatchContext) => boolean | Promise<boolean>;
+    preMatch?: (node: J, context: PreMatchContext) => boolean;
 
     /**
      * Optional predicate evaluated AFTER pattern matching succeeds.
@@ -670,7 +670,7 @@ export interface RewriteConfig {
      * }));
      * ```
      */
-    postMatch?: (node: J, context: PostMatchContext) => boolean | Promise<boolean>;
+    postMatch?: (node: J, context: PostMatchContext) => boolean;
 }
 
 /**

@@ -28,9 +28,8 @@ describe('Pattern Debugging', () => {
         parser = new JavaScriptParser();
     });
 
-    async function parseExpression(code: string): Promise<J> {
-        const gen = parser.parse({text: code, sourcePath: 'test.ts'});
-        const cu = (await gen.next()).value as JS.CompilationUnit;
+    function parseExpression(code: string): J {
+        const cu = parser.parseOne({text: code, sourcePath: 'test.ts'}) as JS.CompilationUnit;
         const statement = cu.statements[0].element;
         return isExpressionStatement(statement) ? statement.expression : statement;
     }
@@ -38,9 +37,9 @@ describe('Pattern Debugging', () => {
     test('successful match returns matched=true with result', async () => {
         const x = capture('x');
         const pat = pattern`console.log(${x})`;
-        const node = await parseExpression('console.log(42)');
+        const node = parseExpression('console.log(42)');
 
-        const attempt = await pat.matchWithExplanation(node, undefined!);
+        const attempt = pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(true);
         expect(attempt.result).toBeDefined();
@@ -51,9 +50,9 @@ describe('Pattern Debugging', () => {
 
     test('failed match returns matched=false with explanation', async () => {
         const pat = pattern`42`;
-        const node = await parseExpression('"string"');
+        const node = parseExpression('"string"');
 
-        const attempt = await pat.matchWithExplanation(node, undefined!);
+        const attempt = pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(false);
         expect(attempt.result).toBeUndefined();
@@ -71,9 +70,9 @@ describe('Pattern Debugging', () => {
             }
         });
         const pat = pattern`${value}`;
-        const node = await parseExpression('42');
+        const node = parseExpression('42');
 
-        const result = await pat.matchWithExplanation(node, undefined!);
+        const result = pat.matchWithExplanation(node, undefined!);
 
         expect(result.matched).toBe(false);
         expect(result.explanation).toBeDefined();
@@ -86,9 +85,9 @@ describe('Pattern Debugging', () => {
             constraint: (node: J) => true
         });
         const pat = pattern`${value}`;
-        const node = await parseExpression('42');
+        const node = parseExpression('42');
 
-        const result = await pat.matchWithExplanation(node, undefined!);
+        const result = pat.matchWithExplanation(node, undefined!);
 
         expect(result.matched).toBe(true);
         expect(result.debugLog).toBeDefined();
@@ -106,9 +105,9 @@ describe('Pattern Debugging', () => {
 
     test('path tracking shows location of mismatch in binary expression', async () => {
         const pat = pattern`x + 42`;
-        const node = await parseExpression('x + "wrong"');
+        const node = parseExpression('x + "wrong"');
 
-        const attempt = await pat.matchWithExplanation(node, undefined!);
+        const attempt = pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();
@@ -126,9 +125,9 @@ describe('Pattern Debugging', () => {
 
     test('path tracking captures property path to mismatch', async () => {
         const pat = pattern`[1, 2, 3]`;
-        const node = await parseExpression('[1, 2, "wrong"]');
+        const node = parseExpression('[1, 2, "wrong"]');
 
-        const attempt = await pat.matchWithExplanation(node, undefined!);
+        const attempt = pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();
@@ -155,8 +154,8 @@ describe('Pattern Debugging', () => {
         const pat = pattern`console.log(${args})`;
 
         // Try with 1 argument (should fail)
-        const node = await parseExpression('console.log(42)');
-        const attempt = await pat.matchWithExplanation(node, undefined!);
+        const node = parseExpression('console.log(42)');
+        const attempt = pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(false);
 
@@ -179,9 +178,9 @@ describe('Pattern Debugging', () => {
     test('deeply nested pattern shows multi-level path', async () => {
         // Use object in a context where it's an expression (as function argument)
         const pat = pattern`foo({a: 1, b: {c: 2}})`;
-        const node = await parseExpression('foo({a: 1, b: {c: "wrong"}})');
+        const node = parseExpression('foo({a: 1, b: {c: "wrong"}})');
 
-        const attempt = await pat.matchWithExplanation(node, undefined!);
+        const attempt = pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();
@@ -225,9 +224,9 @@ describe('Pattern Debugging', () => {
 
     test('debug logging can be selectively disabled', async () => {
         const pat = pattern`console.log(42)`;
-        const node = await parseExpression('console.log(42)');
+        const node = parseExpression('console.log(42)');
 
-        const result = await pat.matchWithExplanation(node, undefined!, {
+        const result = pat.matchWithExplanation(node, undefined!, {
             enabled: true,
             logComparison: false,
             logConstraints: false
@@ -249,14 +248,13 @@ describe('Pattern Debugging', () => {
         const pat = pattern`const {${name}} = obj;`;
 
         // Target has two variables, pattern expects one
-        const gen = parser.parse({
+        const cu = parser.parseOne({
             text: 'const {a, b} = obj;',
             sourcePath: 'test.ts'
-        });
-        const cu = (await gen.next()).value as JS.CompilationUnit;
+        }) as JS.CompilationUnit;
         const statement = cu.statements[0].element;
 
-        const attempt = await pat.matchWithExplanation(statement, undefined!);
+        const attempt = pat.matchWithExplanation(statement, undefined!);
 
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();
@@ -278,9 +276,9 @@ describe('Pattern Debugging', () => {
 
     test('path tracking includes property name for value mismatch', async () => {
         const pat = pattern`console.log(42)`;
-        const node = await parseExpression('console.error(42)');
+        const node = parseExpression('console.error(42)');
 
-        const attempt = await pat.matchWithExplanation(node, undefined!);
+        const attempt = pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();

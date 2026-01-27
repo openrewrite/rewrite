@@ -25,8 +25,8 @@ describe("jsx mapping", () => {
                             `
                         ),
                         afterRecipe: async cu => {
-                            await (new class extends JavaScriptVisitor<any> {
-                                protected async visitJsxTag(tag: JSX.Tag, _: any): Promise<J | undefined> {
+                            (new class extends JavaScriptVisitor<any> {
+                                protected visitJsxTag(tag: JSX.Tag, _: any): J | undefined {
                                     const ident = tag.openName.element as J.Identifier;
                                     expect(Type.isClass(ident.type)).toBeTruthy();
                                     expect((ident.type as Type.Class).supertype?.fullyQualifiedName).toContain('Component');
@@ -80,21 +80,21 @@ describe("jsx mapping", () => {
                         ),
                         afterRecipe: async cu => {
                             let foundButton = false;
-                            await (new class extends JavaScriptVisitor<any> {
-                                async visitIdentifier(identifier: J.Identifier, _: any): Promise<J | undefined> {
+                            (new class extends JavaScriptVisitor<any> {
+                                visitIdentifier(identifier: J.Identifier, _: any): J | undefined {
                                     if (identifier.simpleName === 'Button' && identifier.type) {
                                         foundButton = true;
                                         // Assert that imported Button has function type
                                         expect(Type.isFunctionType(identifier.type)).toBeTruthy();
                                         const funcType = identifier.type as Type.Class;
                                         expect(funcType.fullyQualifiedName).toBe('𝑓');
-
+                                
                                         // Check it has the correct structure
                                         expect(funcType.typeParameters.length).toBe(1); // R only (no params)
                                         const returnTypeParam = funcType.typeParameters[0] as Type.GenericTypeVariable;
                                         expect(returnTypeParam.name).toBe('R');
                                         expect(returnTypeParam.variance).toBe(Type.GenericTypeVariable.Variance.Covariant);
-
+                                
                                         // Check apply method
                                         expect(funcType.methods.length).toBe(1);
                                         const applyMethod = funcType.methods[0];

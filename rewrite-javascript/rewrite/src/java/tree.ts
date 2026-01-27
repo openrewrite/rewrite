@@ -792,7 +792,7 @@ export function space(whitespace: string): J.Space {
     return {
         kind: J.Kind.Space,
         comments: [],
-        whitespace: whitespace,
+        whitespace,
     };
 }
 
@@ -892,7 +892,7 @@ export namespace TypedTree {
     registerTypeGetter(J.Kind.Empty, () => Type.unknownType);
     registerTypeGetter(J.Kind.MultiCatch, (tree: J.MultiCatch) => {
         const bounds = tree.alternatives.map(a => getType(a.element));
-        return {kind: Type.Kind.Union, bounds: bounds};
+        return {kind: Type.Kind.Union, bounds};
     });
     registerTypeGetter(J.Kind.NullableType, (tree: J.NullableType) => getType(tree.typeTree.element));
     registerTypeGetter(J.Kind.Wildcard, () => Type.unknownType);

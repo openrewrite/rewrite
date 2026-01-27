@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 import {Cursor, isTree, SourceFile} from "../tree";
-import {mapAsync, updateIfChanged} from "../util";
-import {TreeVisitor, ValidRecipeReturnType} from "../visitor";
+import {mapAsync, mapSync, updateIfChanged} from "../util";
+import {TreeVisitor, AsyncTreeVisitor, ValidRecipeReturnType} from "../visitor";
 import {Expression, isSpace, J, NameTree, Statement, TypedTree, TypeTree} from "./tree";
 import {create, Draft, rawReturn} from "mutative";
 import {Type} from "./type";
@@ -23,6 +23,7 @@ import {Type} from "./type";
 const javaKindValues = new Set(Object.values(J.Kind));
 
 const extendedJavaKinds = new Map<string, <P>(visitor: JavaVisitor<P>) => JavaVisitor<P>>();
+const extendedAsyncJavaKinds = new Map<string, <P>(visitor: AsyncJavaVisitor<P>) => AsyncJavaVisitor<P>>();
 
 /**
  * Register additional kind values for interfaces that extend J.
@@ -39,11 +40,1414 @@ export function registerJavaExtensionKinds(
     }
 }
 
+/**
+ * Register additional kind values for async visitors that extend J.
+ * @param kinds - Array of kind values to register
+ * @param adapter - Adapter function to transform an AsyncJavaVisitor to, for example, an AsyncJavaScriptVisitor
+ */
+export function registerAsyncJavaExtensionKinds(
+    kinds: readonly string[],
+    adapter: <P>(visitor: AsyncJavaVisitor<P>) => AsyncJavaVisitor<P>
+): void {
+    for (const kind of kinds) {
+        extendedAsyncJavaKinds.set(kind, adapter);
+    }
+}
+
 export function isJava(tree: any): tree is J {
     return javaKindValues.has(tree["kind"]) || extendedJavaKinds.has(tree["kind"]);
 }
 
 export class JavaVisitor<P> extends TreeVisitor<J, P> {
+    // protected javadocVisitor: any | null = null;
+
+    isAcceptable(sourceFile: SourceFile): boolean {
+        return isJava(sourceFile);
+    }
+
+    // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
+    protected visitExpression(expression: Expression, p: P): J | undefined {
+        return expression;
+    }
+
+    // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
+    protected visitStatement(statement: Statement, p: P): J | undefined {
+        return statement;
+    }
+
+    // noinspection JSUnusedLocalSymbols
+    public visitSpace(space: J.Space, p: P): J.Space {
+        return space;
+    }
+
+    // noinspection JSUnusedLocalSymbols
+    protected visitType(javaType: Type | undefined, p: P): Type | undefined {
+        return javaType;
+    }
+
+    // noinspection JSUnusedLocalSymbols
+    protected visitTypeName<N extends NameTree>(nameTree: N, p: P): N {
+        return nameTree;
+    }
+
+    protected visitAnnotatedType(annotatedType: J.AnnotatedType, p: P): J | undefined {
+        const expression = this.visitExpression(annotatedType, p);
+        if (!expression?.kind || expression.kind !== J.Kind.AnnotatedType) {
+            return expression;
+        }
+        annotatedType = expression as J.AnnotatedType;
+
+        const updates = {
+            prefix: this.visitSpace(annotatedType.prefix, p),
+            markers: this.visitMarkers(annotatedType.markers, p),
+            annotations: mapSync(annotatedType.annotations, a => this.visitDefined<J.Annotation>(a, p)),
+            typeExpression: this.visitDefined(annotatedType.typeExpression, p) as TypedTree
+        };
+        return updateIfChanged(annotatedType, updates);
+    }
+
+    protected visitAnnotation(annotation: J.Annotation, p: P): J | undefined {
+        const expression = this.visitExpression(annotation, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Annotation) {
+            return expression;
+        }
+        annotation = expression as J.Annotation;
+
+        const updates = {
+            prefix: this.visitSpace(annotation.prefix, p),
+            markers: this.visitMarkers(annotation.markers, p),
+            annotationType: this.visitTypeName(annotation.annotationType, p),
+            arguments: this.visitOptionalContainer(annotation.arguments, p)
+        };
+        return updateIfChanged(annotation, updates);
+    }
+
+    protected visitArrayAccess(arrayAccess: J.ArrayAccess, p: P): J | undefined {
+        const expression = this.visitExpression(arrayAccess, p);
+        if (!expression?.kind || expression.kind !== J.Kind.ArrayAccess) {
+            return expression;
+        }
+        arrayAccess = expression as J.ArrayAccess;
+
+        const updates = {
+            prefix: this.visitSpace(arrayAccess.prefix, p),
+            markers: this.visitMarkers(arrayAccess.markers, p),
+            indexed: this.visitDefined(arrayAccess.indexed, p) as Expression,
+            dimension: this.visitDefined(arrayAccess.dimension, p) as J.ArrayDimension
+        };
+        return updateIfChanged(arrayAccess, updates);
+    }
+
+    protected visitArrayDimension(arrayDimension: J.ArrayDimension, p: P): J | undefined {
+        const updates = {
+            prefix: this.visitSpace(arrayDimension.prefix, p),
+            markers: this.visitMarkers(arrayDimension.markers, p),
+            index: this.visitRightPadded(arrayDimension.index, p)
+        };
+        return updateIfChanged(arrayDimension, updates);
+    }
+
+
+    protected visitArrayType(arrayType: J.ArrayType, p: P): J | undefined {
+        const expression = this.visitExpression(arrayType, p);
+        if (!expression?.kind || expression.kind !== J.Kind.ArrayType) {
+            return expression;
+        }
+        arrayType = expression as J.ArrayType;
+
+        const updates: any = {
+            prefix: this.visitSpace(arrayType.prefix, p),
+            markers: this.visitMarkers(arrayType.markers, p),
+            elementType: this.visitDefined(arrayType.elementType, p) as TypedTree,
+            dimension: this.visitLeftPadded(arrayType.dimension, p),
+            type: this.visitType(arrayType.type, p)
+        };
+        if (arrayType.annotations) {
+            updates.annotations = mapSync(arrayType.annotations, a => this.visitDefined<J.Annotation>(a, p));
+        }
+        return updateIfChanged(arrayType, updates);
+    }
+
+    protected visitAssert(anAssert: J.Assert, p: P): J | undefined {
+        const statement = this.visitStatement(anAssert, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Assert) {
+            return statement;
+        }
+        anAssert = statement as J.Assert;
+
+        const updates = {
+            prefix: this.visitSpace(anAssert.prefix, p),
+            markers: this.visitMarkers(anAssert.markers, p),
+            condition: this.visitDefined(anAssert.condition, p) as Expression,
+            detail: this.visitOptionalLeftPadded(anAssert.detail, p)
+        };
+        return updateIfChanged(anAssert, updates);
+    }
+
+    protected visitAssignment(assignment: J.Assignment, p: P): J | undefined {
+        const expression = this.visitExpression(assignment, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Assignment) {
+            return expression;
+        }
+        assignment = expression as J.Assignment;
+
+        const statement = this.visitStatement(assignment, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Assignment) {
+            return statement;
+        }
+        assignment = statement as J.Assignment;
+
+        const updates = {
+            prefix: this.visitSpace(assignment.prefix, p),
+            markers: this.visitMarkers(assignment.markers, p),
+            variable: this.visitDefined(assignment.variable, p) as Expression,
+            assignment: this.visitLeftPadded(assignment.assignment, p),
+            type: this.visitType(assignment.type, p)
+        };
+        return updateIfChanged(assignment, updates);
+    }
+
+    protected visitAssignmentOperation(assignOp: J.AssignmentOperation, p: P): J | undefined {
+        const expression = this.visitExpression(assignOp, p);
+        if (!expression?.kind || expression.kind !== J.Kind.AssignmentOperation) {
+            return expression;
+        }
+        assignOp = expression as J.AssignmentOperation;
+
+        const updates = {
+            prefix: this.visitSpace(assignOp.prefix, p),
+            markers: this.visitMarkers(assignOp.markers, p),
+            variable: this.visitDefined(assignOp.variable, p) as Expression,
+            operator: this.visitLeftPadded(assignOp.operator, p),
+            assignment: this.visitDefined(assignOp.assignment, p) as Expression,
+            type: this.visitType(assignOp.type, p)
+        };
+        return updateIfChanged(assignOp, updates);
+    }
+
+    protected visitBinary(binary: J.Binary, p: P): J | undefined {
+        const expression = this.visitExpression(binary, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Binary) {
+            return expression;
+        }
+        binary = expression as J.Binary;
+
+        const updates = {
+            prefix: this.visitSpace(binary.prefix, p),
+            markers: this.visitMarkers(binary.markers, p),
+            left: this.visitDefined(binary.left, p) as Expression,
+            operator: this.visitLeftPadded(binary.operator, p),
+            right: this.visitDefined(binary.right, p) as Expression,
+            type: this.visitType(binary.type, p)
+        };
+        return updateIfChanged(binary, updates);
+    }
+
+    protected visitBlock(block: J.Block, p: P): J | undefined {
+        const updates = {
+            prefix: this.visitSpace(block.prefix, p),
+            markers: this.visitMarkers(block.markers, p),
+            static: this.visitRightPadded(block.static, p),
+            statements: mapSync(block.statements, stmt => this.visitRightPadded(stmt, p)),
+            end: this.visitSpace(block.end, p)
+        };
+        return updateIfChanged(block, updates);
+    }
+
+    protected visitBreak(breakStatement: J.Break, p: P): J | undefined {
+        const statement = this.visitStatement(breakStatement, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Break) {
+            return statement;
+        }
+        breakStatement = statement as J.Break;
+
+        const updates: any = {
+            prefix: this.visitSpace(breakStatement.prefix, p),
+            markers: this.visitMarkers(breakStatement.markers, p)
+        };
+        if (breakStatement.label) {
+            updates.label = this.visitDefined(breakStatement.label, p) as J.Identifier;
+        }
+        return updateIfChanged(breakStatement, updates);
+    }
+
+    protected visitCase(aCase: J.Case, p: P): J | undefined {
+        const statement = this.visitStatement(aCase, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Case) {
+            return statement;
+        }
+        aCase = statement as J.Case;
+
+        const updates: any = {
+            prefix: this.visitSpace(aCase.prefix, p),
+            markers: this.visitMarkers(aCase.markers, p),
+            caseLabels: this.visitContainer(aCase.caseLabels, p),
+            statements: this.visitContainer(aCase.statements, p),
+            body: this.visitOptionalRightPadded(aCase.body, p)
+        };
+        if (aCase.guard) {
+            updates.guard = this.visitDefined(aCase.guard, p) as Expression;
+        }
+        return updateIfChanged(aCase, updates);
+    }
+
+    protected visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): J | undefined {
+        const statement = this.visitStatement(classDecl, p);
+        if (!statement?.kind || statement.kind !== J.Kind.ClassDeclaration) {
+            return statement;
+        }
+        classDecl = statement as J.ClassDeclaration;
+
+        const updates: any = {
+            prefix: this.visitSpace(classDecl.prefix, p),
+            markers: this.visitMarkers(classDecl.markers, p),
+            leadingAnnotations: mapSync(classDecl.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p)),
+            modifiers: mapSync(classDecl.modifiers, m => this.visitDefined<J.Modifier>(m, p)),
+            classKind: this.visitDefined(classDecl.classKind, p) as J.ClassDeclaration.Kind,
+            name: this.visitDefined(classDecl.name, p) as J.Identifier,
+            typeParameters: this.visitOptionalContainer(classDecl.typeParameters, p),
+            primaryConstructor: this.visitOptionalContainer(classDecl.primaryConstructor, p),
+            extends: this.visitOptionalLeftPadded(classDecl.extends, p),
+            implements: this.visitOptionalContainer(classDecl.implements, p),
+            permitting: this.visitOptionalContainer(classDecl.permitting, p),
+            body: this.visitDefined(classDecl.body, p) as J.Block,
+            type: this.visitType(classDecl.type, p) as Type.Class | undefined
+        };
+        return updateIfChanged(classDecl, updates);
+    }
+
+    protected visitClassDeclarationKind(kind: J.ClassDeclaration.Kind, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(kind.prefix, p),
+            markers: this.visitMarkers(kind.markers, p),
+            annotations: mapSync(kind.annotations, a => this.visitDefined<J.Annotation>(a, p))
+        };
+        return updateIfChanged(kind, updates);
+    }
+
+    protected visitCompilationUnit(cu: J.CompilationUnit, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(cu.prefix, p),
+            markers: this.visitMarkers(cu.markers, p),
+            packageDeclaration: this.visitRightPadded(cu.packageDeclaration, p) as J.RightPadded<J.Package>,
+            imports: mapSync(cu.imports, imp => this.visitRightPadded(imp, p)),
+            classes: mapSync(cu.classes, cls => this.visitDefined(cls, p) as J.ClassDeclaration),
+            eof: this.visitSpace(cu.eof, p)
+        };
+        return updateIfChanged(cu, updates);
+    }
+
+    protected visitContinue(continueStatement: J.Continue, p: P): J | undefined {
+        const statement = this.visitStatement(continueStatement, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Continue) {
+            return statement;
+        }
+        continueStatement = statement as J.Continue;
+
+        const updates: any = {
+            prefix: this.visitSpace(continueStatement.prefix, p),
+            markers: this.visitMarkers(continueStatement.markers, p)
+        };
+        if (continueStatement.label) {
+            updates.label = this.visitDefined(continueStatement.label, p) as J.Identifier;
+        }
+        return updateIfChanged(continueStatement, updates);
+    }
+
+    protected visitControlParentheses<T extends J>(controlParens: J.ControlParentheses<T>, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(controlParens.prefix, p),
+            markers: this.visitMarkers(controlParens.markers, p),
+            tree: this.visitRightPadded(controlParens.tree, p)
+        };
+        return updateIfChanged(controlParens, updates);
+    }
+
+    protected visitDeconstructionPattern(pattern: J.DeconstructionPattern, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(pattern.prefix, p),
+            markers: this.visitMarkers(pattern.markers, p),
+            deconstructor: this.visitDefined(pattern.deconstructor, p) as Expression,
+            nested: this.visitContainer(pattern.nested, p),
+            type: this.visitType(pattern.type, p)
+        };
+        return updateIfChanged(pattern, updates);
+    }
+
+    protected visitDoWhileLoop(doWhileLoop: J.DoWhileLoop, p: P): J | undefined {
+        const statement = this.visitStatement(doWhileLoop, p);
+        if (!statement?.kind || statement.kind !== J.Kind.DoWhileLoop) {
+            return statement;
+        }
+        doWhileLoop = statement as J.DoWhileLoop;
+
+        const updates: any = {
+            prefix: this.visitSpace(doWhileLoop.prefix, p),
+            markers: this.visitMarkers(doWhileLoop.markers, p),
+            body: this.visitRightPadded(doWhileLoop.body, p),
+            whileCondition: this.visitLeftPadded(doWhileLoop.whileCondition, p)
+        };
+        return updateIfChanged(doWhileLoop, updates);
+    }
+
+    protected visitEmpty(empty: J.Empty, p: P): J | undefined {
+        const expression = this.visitExpression(empty, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Empty) {
+            return expression;
+        }
+        empty = expression as J.Empty;
+
+        const statement = this.visitStatement(empty, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Empty) {
+            return statement;
+        }
+        empty = statement as J.Empty;
+
+        const updates: any = {
+            prefix: this.visitSpace(empty.prefix, p),
+            markers: this.visitMarkers(empty.markers, p)
+        };
+        return updateIfChanged(empty, updates);
+    }
+
+    protected visitEnumValue(enumValue: J.EnumValue, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(enumValue.prefix, p),
+            markers: this.visitMarkers(enumValue.markers, p),
+            annotations: mapSync(enumValue.annotations, a => this.visitDefined<J.Annotation>(a, p)),
+            name: this.visitDefined(enumValue.name, p) as J.Identifier
+        };
+        if (enumValue.initializer) {
+            updates.initializer = this.visitDefined(enumValue.initializer, p) as J.NewClass;
+        }
+        return updateIfChanged(enumValue, updates);
+    }
+
+    protected visitEnumValueSet(enumValueSet: J.EnumValueSet, p: P): J | undefined {
+        const statement = this.visitStatement(enumValueSet, p);
+        if (!statement?.kind || statement.kind !== J.Kind.EnumValueSet) {
+            return statement;
+        }
+        enumValueSet = statement as J.EnumValueSet;
+
+        const updates: any = {
+            prefix: this.visitSpace(enumValueSet.prefix, p),
+            markers: this.visitMarkers(enumValueSet.markers, p),
+            enums: mapSync(enumValueSet.enums, e => this.visitRightPadded(e, p))
+        };
+        return updateIfChanged(enumValueSet, updates);
+    }
+
+    protected visitErroneous(erroneous: J.Erroneous, p: P): J | undefined {
+        const expression = this.visitExpression(erroneous, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Erroneous) {
+            return expression;
+        }
+        erroneous = expression as J.Erroneous;
+
+        const statement = this.visitStatement(erroneous, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Erroneous) {
+            return statement;
+        }
+        erroneous = statement as J.Erroneous;
+
+        const updates: any = {
+            prefix: this.visitSpace(erroneous.prefix, p),
+            markers: this.visitMarkers(erroneous.markers, p)
+        };
+        return updateIfChanged(erroneous, updates);
+    }
+
+    protected visitFieldAccess(fieldAccess: J.FieldAccess, p: P): J | undefined {
+        const expression = this.visitExpression(fieldAccess, p);
+        if (!expression?.kind || expression.kind !== J.Kind.FieldAccess) {
+            return expression;
+        }
+        fieldAccess = expression as J.FieldAccess;
+
+        const statement = this.visitStatement(fieldAccess, p);
+        if (!statement?.kind || statement.kind !== J.Kind.FieldAccess) {
+            return statement;
+        }
+        fieldAccess = statement as J.FieldAccess;
+
+        const updates: any = {
+            prefix: this.visitSpace(fieldAccess.prefix, p),
+            markers: this.visitMarkers(fieldAccess.markers, p),
+            target: this.visitDefined(fieldAccess.target, p) as Expression,
+            name: this.visitLeftPadded(fieldAccess.name, p),
+            type: this.visitType(fieldAccess.type, p)
+        };
+        return updateIfChanged(fieldAccess, updates);
+    }
+
+    protected visitForEachLoop(forLoop: J.ForEachLoop, p: P): J | undefined {
+        const statement = this.visitStatement(forLoop, p);
+        if (!statement?.kind || statement.kind !== J.Kind.ForEachLoop) {
+            return statement;
+        }
+        forLoop = statement as J.ForEachLoop;
+
+        const updates: any = {
+            prefix: this.visitSpace(forLoop.prefix, p),
+            markers: this.visitMarkers(forLoop.markers, p),
+            control: this.visitDefined(forLoop.control, p) as J.ForEachLoop.Control,
+            body: this.visitRightPadded(forLoop.body, p)
+        };
+        return updateIfChanged(forLoop, updates);
+    }
+
+    protected visitForEachLoopControl(control: J.ForEachLoop.Control, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(control.prefix, p),
+            markers: this.visitMarkers(control.markers, p),
+            variable: this.visitRightPadded(control.variable, p),
+            iterable: this.visitRightPadded(control.iterable, p)
+        };
+        return updateIfChanged(control, updates);
+    }
+
+    protected visitForLoop(forLoop: J.ForLoop, p: P): J | undefined {
+        const statement = this.visitStatement(forLoop, p);
+        if (!statement?.kind || statement.kind !== J.Kind.ForLoop) {
+            return statement;
+        }
+        forLoop = statement as J.ForLoop;
+
+        const updates: any = {
+            prefix: this.visitSpace(forLoop.prefix, p),
+            markers: this.visitMarkers(forLoop.markers, p),
+            control: this.visitDefined(forLoop.control, p) as J.ForLoop.Control,
+            body: this.visitRightPadded(forLoop.body, p)
+        };
+        return updateIfChanged(forLoop, updates);
+    }
+
+    protected visitForLoopControl(control: J.ForLoop.Control, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(control.prefix, p),
+            markers: this.visitMarkers(control.markers, p),
+            init: mapSync(control.init, i => this.visitRightPadded(i, p)),
+            condition: this.visitOptionalRightPadded(control.condition, p),
+            update: mapSync(control.update, u => this.visitRightPadded(u, p))
+        };
+        return updateIfChanged(control, updates);
+    }
+
+    protected visitIdentifier(ident: J.Identifier, p: P): J | undefined {
+        const expression = this.visitExpression(ident, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Identifier) {
+            return expression;
+        }
+        ident = expression as J.Identifier;
+
+        const updates: any = {
+            prefix: this.visitSpace(ident.prefix, p),
+            markers: this.visitMarkers(ident.markers, p),
+            annotations: mapSync(ident.annotations, a => this.visitDefined<J.Annotation>(a, p)),
+            type: this.visitType(ident.type, p),
+            fieldType: this.visitType(ident.fieldType, p) as Type.Variable | undefined
+        };
+        return updateIfChanged(ident, updates);
+    }
+
+    protected visitIf(iff: J.If, p: P): J | undefined {
+        const statement = this.visitStatement(iff, p);
+        if (!statement?.kind || statement.kind !== J.Kind.If) {
+            return statement;
+        }
+        iff = statement as J.If;
+
+        const updates: any = {
+            prefix: this.visitSpace(iff.prefix, p),
+            markers: this.visitMarkers(iff.markers, p),
+            ifCondition: this.visitDefined(iff.ifCondition, p) as J.ControlParentheses<Expression>,
+            thenPart: this.visitRightPadded(iff.thenPart, p)
+        };
+        if (iff.elsePart) {
+            updates.elsePart = this.visitDefined(iff.elsePart, p) as J.If.Else;
+        }
+        return updateIfChanged(iff, updates);
+    }
+
+    protected visitElse(anElse: J.If.Else, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(anElse.prefix, p),
+            markers: this.visitMarkers(anElse.markers, p),
+            body: this.visitRightPadded(anElse.body, p)
+        };
+        return updateIfChanged(anElse, updates);
+    }
+
+    protected visitImport(anImport: J.Import, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(anImport.prefix, p),
+            markers: this.visitMarkers(anImport.markers, p),
+            static: this.visitLeftPadded(anImport.static, p),
+            qualid: this.visitDefined(anImport.qualid, p) as J.FieldAccess,
+            alias: this.visitOptionalLeftPadded(anImport.alias, p)
+        };
+        return updateIfChanged(anImport, updates);
+    }
+
+    protected visitInstanceOf(instanceOf: J.InstanceOf, p: P): J | undefined {
+        const expression = this.visitExpression(instanceOf, p);
+        if (!expression?.kind || expression.kind !== J.Kind.InstanceOf) {
+            return expression;
+        }
+        instanceOf = expression as J.InstanceOf;
+
+        const updates: any = {
+            prefix: this.visitSpace(instanceOf.prefix, p),
+            markers: this.visitMarkers(instanceOf.markers, p),
+            expression: this.visitRightPadded(instanceOf.expression, p),
+            class: this.visitDefined(instanceOf.class, p) as J,
+            type: this.visitType(instanceOf.type, p)
+        };
+        if (instanceOf.pattern) {
+            updates.pattern = this.visitDefined(instanceOf.pattern, p) as J;
+        }
+        if (instanceOf.modifier) {
+            updates.modifier = this.visitDefined(instanceOf.modifier, p) as J.Modifier;
+        }
+        return updateIfChanged(instanceOf, updates);
+    }
+
+    protected visitIntersectionType(intersectionType: J.IntersectionType, p: P): J | undefined {
+        const expression = this.visitExpression(intersectionType, p);
+        if (!expression?.kind || expression.kind !== J.Kind.IntersectionType) {
+            return expression;
+        }
+        intersectionType = expression as J.IntersectionType;
+
+        const updates: any = {
+            prefix: this.visitSpace(intersectionType.prefix, p),
+            markers: this.visitMarkers(intersectionType.markers, p),
+            bounds: this.visitContainer(intersectionType.bounds, p)
+        };
+        return updateIfChanged(intersectionType, updates);
+    }
+
+    protected visitLabel(label: J.Label, p: P): J | undefined {
+        const statement = this.visitStatement(label, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Label) {
+            return statement;
+        }
+        label = statement as J.Label;
+
+        const updates: any = {
+            prefix: this.visitSpace(label.prefix, p),
+            markers: this.visitMarkers(label.markers, p),
+            label: this.visitRightPadded(label.label, p),
+            statement: this.visitDefined(label.statement, p) as Statement
+        };
+        return updateIfChanged(label, updates);
+    }
+
+    protected visitLambda(lambda: J.Lambda, p: P): J | undefined {
+        const expression = this.visitExpression(lambda, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Lambda) {
+            return expression;
+        }
+        lambda = expression as J.Lambda;
+
+        const statement = this.visitStatement(lambda, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Lambda) {
+            return statement;
+        }
+        lambda = statement as J.Lambda;
+
+        const updates: any = {
+            prefix: this.visitSpace(lambda.prefix, p),
+            markers: this.visitMarkers(lambda.markers, p),
+            parameters: this.visitDefined(lambda.parameters, p) as J.Lambda.Parameters,
+            arrow: this.visitSpace(lambda.arrow, p),
+            body: this.visitDefined(lambda.body, p) as Statement | Expression,
+            type: this.visitType(lambda.type, p)
+        };
+        return updateIfChanged(lambda, updates);
+    }
+
+    protected visitLambdaParameters(params: J.Lambda.Parameters, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(params.prefix, p),
+            markers: this.visitMarkers(params.markers, p),
+            parameters: mapSync(params.parameters, param => this.visitRightPadded(param, p))
+        };
+        return updateIfChanged(params, updates);
+    }
+
+    protected visitLiteral(literal: J.Literal, p: P): J | undefined {
+        const expression = this.visitExpression(literal, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Literal) {
+            return expression;
+        }
+        literal = expression as J.Literal;
+
+        const updates: any = {
+            prefix: this.visitSpace(literal.prefix, p),
+            markers: this.visitMarkers(literal.markers, p),
+            type: this.visitType(literal.type, p) as Type.Primitive | undefined
+        };
+        return updateIfChanged(literal, updates);
+    }
+
+    protected visitMemberReference(memberRef: J.MemberReference, p: P): J | undefined {
+        const expression = this.visitExpression(memberRef, p);
+        if (!expression?.kind || expression.kind !== J.Kind.MemberReference) {
+            return expression;
+        }
+        memberRef = expression as J.MemberReference;
+
+        const updates: any = {
+            prefix: this.visitSpace(memberRef.prefix, p),
+            markers: this.visitMarkers(memberRef.markers, p),
+            containing: this.visitRightPadded(memberRef.containing, p),
+            typeParameters: this.visitOptionalContainer(memberRef.typeParameters, p),
+            reference: this.visitLeftPadded(memberRef.reference, p),
+            type: this.visitType(memberRef.type, p),
+            methodType: this.visitType(memberRef.methodType, p) as Type.Method | undefined,
+            variableType: this.visitType(memberRef.variableType, p) as Type.Variable | undefined
+        };
+        return updateIfChanged(memberRef, updates);
+    }
+
+    protected visitMethodDeclaration(method: J.MethodDeclaration, p: P): J | undefined {
+        const statement = this.visitStatement(method, p);
+        if (!statement?.kind || statement.kind !== J.Kind.MethodDeclaration) {
+            return statement;
+        }
+        method = statement as J.MethodDeclaration;
+
+        const updates: any = {
+            prefix: this.visitSpace(method.prefix, p),
+            markers: this.visitMarkers(method.markers, p),
+            leadingAnnotations: mapSync(method.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p)),
+            modifiers: mapSync(method.modifiers, m => this.visitDefined<J.Modifier>(m, p)),
+            nameAnnotations: mapSync(method.nameAnnotations, a => this.visitDefined<J.Annotation>(a, p)),
+            name: this.visitDefined(method.name, p),
+            parameters: this.visitContainer(method.parameters, p),
+            throws: method.throws && this.visitContainer(method.throws, p),
+            body: method.body && this.visitDefined(method.body, p) as J.Block,
+            defaultValue: this.visitOptionalLeftPadded(method.defaultValue, p),
+            methodType: this.visitType(method.methodType, p) as Type.Method | undefined
+        };
+        if (method.typeParameters) {
+            updates.typeParameters = this.visitDefined(method.typeParameters, p) as J.TypeParameters;
+        }
+        if (method.returnTypeExpression) {
+            updates.returnTypeExpression = this.visitDefined(method.returnTypeExpression, p) as TypedTree;
+        }
+        return updateIfChanged(method, updates);
+    }
+
+    protected visitMethodInvocation(method: J.MethodInvocation, p: P): J | undefined {
+        const expression = this.visitExpression(method, p);
+        if (!expression?.kind || expression.kind !== J.Kind.MethodInvocation) {
+            return expression;
+        }
+        method = expression as J.MethodInvocation;
+
+        const statement = this.visitStatement(method, p);
+        if (!statement?.kind || statement.kind !== J.Kind.MethodInvocation) {
+            return statement;
+        }
+        method = statement as J.MethodInvocation;
+
+        const updates: any = {
+            prefix: this.visitSpace(method.prefix, p),
+            markers: this.visitMarkers(method.markers, p),
+            select: this.visitOptionalRightPadded(method.select, p),
+            typeParameters: this.visitOptionalContainer(method.typeParameters, p),
+            name: this.visitDefined(method.name, p) as J.Identifier,
+            arguments: this.visitContainer(method.arguments, p),
+            methodType: this.visitType(method.methodType, p) as Type.Method | undefined
+        };
+        return updateIfChanged(method, updates);
+    }
+
+    protected visitModifier(modifier: J.Modifier, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(modifier.prefix, p),
+            markers: this.visitMarkers(modifier.markers, p),
+            annotations: mapSync(modifier.annotations, a => this.visitDefined<J.Annotation>(a, p))
+        };
+        return updateIfChanged(modifier, updates);
+    }
+
+    protected visitMultiCatch(multiCatch: J.MultiCatch, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(multiCatch.prefix, p),
+            markers: this.visitMarkers(multiCatch.markers, p),
+            alternatives: mapSync(multiCatch.alternatives, alt => this.visitRightPadded(alt, p))
+        };
+        return updateIfChanged(multiCatch, updates);
+    }
+
+    protected visitNewArray(newArray: J.NewArray, p: P): J | undefined {
+        const expression = this.visitExpression(newArray, p);
+        if (!expression?.kind || expression.kind !== J.Kind.NewArray) {
+            return expression;
+        }
+        newArray = expression as J.NewArray;
+
+        const updates: any = {
+            prefix: this.visitSpace(newArray.prefix, p),
+            markers: this.visitMarkers(newArray.markers, p),
+            dimensions: mapSync(newArray.dimensions, dim => this.visitDefined<J.ArrayDimension>(dim, p)),
+            initializer: this.visitOptionalContainer(newArray.initializer, p),
+            type: this.visitType(newArray.type, p)
+        };
+        if (newArray.typeExpression) {
+            updates.typeExpression = this.visitDefined(newArray.typeExpression, p) as TypedTree;
+        }
+        return updateIfChanged(newArray, updates);
+    }
+
+    protected visitNewClass(newClass: J.NewClass, p: P): J | undefined {
+        const expression = this.visitExpression(newClass, p);
+        if (!expression?.kind || expression.kind !== J.Kind.NewClass) {
+            return expression;
+        }
+        newClass = expression as J.NewClass;
+
+        const updates: any = {
+            prefix: this.visitSpace(newClass.prefix, p),
+            markers: this.visitMarkers(newClass.markers, p),
+            new: this.visitSpace(newClass.new, p),
+            arguments: this.visitContainer(newClass.arguments, p),
+            constructorType: this.visitType(newClass.constructorType, p) as Type.Method | undefined
+        };
+        if (newClass.enclosing) {
+            updates.enclosing = this.visitRightPadded(newClass.enclosing, p);
+        }
+        if (newClass.class) {
+            updates.class = this.visitDefined(newClass.class, p) as TypedTree;
+        }
+        if (newClass.body) {
+            updates.body = this.visitDefined(newClass.body, p) as J.Block;
+        }
+        return updateIfChanged(newClass, updates);
+    }
+
+    protected visitNullableType(nullableType: J.NullableType, p: P): J | undefined {
+        const expression = this.visitExpression(nullableType, p);
+        if (!expression?.kind || expression.kind !== J.Kind.NullableType) {
+            return expression;
+        }
+        nullableType = expression as J.NullableType;
+
+        const updates: any = {
+            prefix: this.visitSpace(nullableType.prefix, p),
+            markers: this.visitMarkers(nullableType.markers, p),
+            annotations: mapSync(nullableType.annotations, a => this.visitDefined<J.Annotation>(a, p)),
+            typeTree: this.visitRightPadded(nullableType.typeTree, p)
+        };
+        return updateIfChanged(nullableType, updates);
+    }
+
+    protected visitPackage(aPackage: J.Package, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(aPackage.prefix, p),
+            markers: this.visitMarkers(aPackage.markers, p),
+            expression: this.visitDefined(aPackage.expression, p) as Expression
+        };
+        if (aPackage.annotations) {
+            updates.annotations = mapSync(aPackage.annotations, a => this.visitDefined<J.Annotation>(a, p));
+        }
+        return updateIfChanged(aPackage, updates);
+    }
+
+    protected visitParameterizedType(parameterizedType: J.ParameterizedType, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(parameterizedType.prefix, p),
+            markers: this.visitMarkers(parameterizedType.markers, p),
+            class: this.visitTypeName(parameterizedType.class, p),
+            typeParameters: this.visitOptionalContainer(parameterizedType.typeParameters, p),
+            type: this.visitType(parameterizedType.type, p)
+        };
+        return updateIfChanged(parameterizedType, updates);
+    }
+
+    protected visitParentheses<T extends J>(parentheses: J.Parentheses<T>, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(parentheses.prefix, p),
+            markers: this.visitMarkers(parentheses.markers, p),
+            tree: this.visitRightPadded(parentheses.tree, p)
+        };
+        return updateIfChanged(parentheses, updates);
+    }
+
+    protected visitParenthesizedTypeTree(parTypeTree: J.ParenthesizedTypeTree, p: P): J | undefined {
+        const expression = this.visitExpression(parTypeTree, p);
+        if (!expression?.kind || expression.kind !== J.Kind.ParenthesizedTypeTree) {
+            return expression;
+        }
+        parTypeTree = expression as J.ParenthesizedTypeTree;
+
+        const updates: any = {
+            prefix: this.visitSpace(parTypeTree.prefix, p),
+            markers: this.visitMarkers(parTypeTree.markers, p),
+            annotations: mapSync(parTypeTree.annotations, a => this.visitDefined<J.Annotation>(a, p)),
+            parenthesizedType: this.visitDefined(parTypeTree.parenthesizedType, p) as J.Parentheses<TypeTree>
+        };
+        return updateIfChanged(parTypeTree, updates);
+    }
+
+    protected visitPrimitive(primitive: J.Primitive, p: P): J | undefined {
+        const expression = this.visitExpression(primitive, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Primitive) {
+            return expression;
+        }
+        primitive = expression as J.Primitive;
+
+        const updates: any = {
+            prefix: this.visitSpace(primitive.prefix, p),
+            markers: this.visitMarkers(primitive.markers, p),
+            type: this.visitType(primitive.type, p) as Type.Primitive
+        };
+        return updateIfChanged(primitive, updates);
+    }
+
+    protected visitReturn(ret: J.Return, p: P): J | undefined {
+        const statement = this.visitStatement(ret, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Return) {
+            return statement;
+        }
+        ret = statement as J.Return;
+
+        const updates: any = {
+            prefix: this.visitSpace(ret.prefix, p),
+            markers: this.visitMarkers(ret.markers, p)
+        };
+        if (ret.expression) {
+            updates.expression = this.visitDefined(ret.expression, p) as Expression;
+        }
+        return updateIfChanged(ret, updates);
+    }
+
+    protected visitSwitch(aSwitch: J.Switch, p: P): J | undefined {
+        const statement = this.visitStatement(aSwitch, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Switch) {
+            return statement;
+        }
+        aSwitch = statement as J.Switch;
+
+        const updates: any = {
+            prefix: this.visitSpace(aSwitch.prefix, p),
+            markers: this.visitMarkers(aSwitch.markers, p),
+            selector: this.visitDefined(aSwitch.selector, p) as J.ControlParentheses<Expression>,
+            cases: this.visitDefined(aSwitch.cases, p) as J.Block
+        };
+        return updateIfChanged(aSwitch, updates);
+    }
+
+    protected visitSwitchExpression(switchExpr: J.SwitchExpression, p: P): J | undefined {
+        const expression = this.visitExpression(switchExpr, p);
+        if (!expression?.kind || expression.kind !== J.Kind.SwitchExpression) {
+            return expression;
+        }
+        switchExpr = expression as J.SwitchExpression;
+
+        const updates: any = {
+            prefix: this.visitSpace(switchExpr.prefix, p),
+            markers: this.visitMarkers(switchExpr.markers, p),
+            selector: this.visitDefined(switchExpr.selector, p) as J.ControlParentheses<Expression>,
+            cases: this.visitDefined(switchExpr.cases, p) as J.Block,
+            type: this.visitType(switchExpr.type, p)
+        };
+        return updateIfChanged(switchExpr, updates);
+    }
+
+    protected visitSynchronized(sync: J.Synchronized, p: P): J | undefined {
+        const statement = this.visitStatement(sync, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Synchronized) {
+            return statement;
+        }
+        sync = statement as J.Synchronized;
+
+        const updates: any = {
+            prefix: this.visitSpace(sync.prefix, p),
+            markers: this.visitMarkers(sync.markers, p),
+            lock: this.visitDefined(sync.lock, p) as J.ControlParentheses<Expression>,
+            body: this.visitDefined(sync.body, p) as J.Block
+        };
+        return updateIfChanged(sync, updates);
+    }
+
+    protected visitTernary(ternary: J.Ternary, p: P): J | undefined {
+        const expression = this.visitExpression(ternary, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Ternary) {
+            return expression;
+        }
+        ternary = expression as J.Ternary;
+
+        const statement = this.visitStatement(ternary, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Ternary) {
+            return statement;
+        }
+        ternary = statement as J.Ternary;
+
+        const updates: any = {
+            prefix: this.visitSpace(ternary.prefix, p),
+            markers: this.visitMarkers(ternary.markers, p),
+            condition: this.visitDefined(ternary.condition, p) as Expression,
+            truePart: this.visitLeftPadded(ternary.truePart, p),
+            falsePart: this.visitLeftPadded(ternary.falsePart, p),
+            type: this.visitType(ternary.type, p)
+        };
+        return updateIfChanged(ternary, updates);
+    }
+
+    protected visitThrow(thrown: J.Throw, p: P): J | undefined {
+        const statement = this.visitStatement(thrown, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Throw) {
+            return statement;
+        }
+        thrown = statement as J.Throw;
+
+        const updates: any = {
+            prefix: this.visitSpace(thrown.prefix, p),
+            markers: this.visitMarkers(thrown.markers, p),
+            exception: this.visitDefined(thrown.exception, p) as Expression
+        };
+        return updateIfChanged(thrown, updates);
+    }
+
+    protected visitTry(tryable: J.Try, p: P): J | undefined {
+        const statement = this.visitStatement(tryable, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Try) {
+            return statement;
+        }
+        tryable = statement as J.Try;
+
+        const updates: any = {
+            prefix: this.visitSpace(tryable.prefix, p),
+            markers: this.visitMarkers(tryable.markers, p),
+            resources: this.visitOptionalContainer(tryable.resources, p),
+            body: this.visitDefined(tryable.body, p) as J.Block,
+            catches: mapSync(tryable.catches, c => this.visitDefined<J.Try.Catch>(c, p)),
+            finally: this.visitOptionalLeftPadded(tryable.finally, p)
+        };
+        return updateIfChanged(tryable, updates);
+    }
+
+    protected visitTryResource(resource: J.Try.Resource, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(resource.prefix, p),
+            markers: this.visitMarkers(resource.markers, p),
+            variableDeclarations: this.visitDefined(resource.variableDeclarations, p) as TypedTree
+        };
+        return updateIfChanged(resource, updates);
+    }
+
+    protected visitTryCatch(tryCatch: J.Try.Catch, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(tryCatch.prefix, p),
+            markers: this.visitMarkers(tryCatch.markers, p),
+            parameter: this.visitDefined(tryCatch.parameter, p) as J.ControlParentheses<J.VariableDeclarations>,
+            body: this.visitDefined(tryCatch.body, p) as J.Block
+        };
+        return updateIfChanged(tryCatch, updates);
+    }
+
+    protected visitTypeCast(typeCast: J.TypeCast, p: P): J | undefined {
+        const expression = this.visitExpression(typeCast, p);
+        if (!expression?.kind || expression.kind !== J.Kind.TypeCast) {
+            return expression;
+        }
+        typeCast = expression as J.TypeCast;
+
+        const updates: any = {
+            prefix: this.visitSpace(typeCast.prefix, p),
+            markers: this.visitMarkers(typeCast.markers, p),
+            class: this.visitDefined(typeCast.class, p) as J.ControlParentheses<TypedTree>,
+            expression: this.visitDefined(typeCast.expression, p) as Expression
+        };
+        return updateIfChanged(typeCast, updates);
+    }
+
+    protected visitTypeParameter(typeParam: J.TypeParameter, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(typeParam.prefix, p),
+            markers: this.visitMarkers(typeParam.markers, p),
+            annotations: mapSync(typeParam.annotations, a => this.visitDefined<J.Annotation>(a, p)),
+            modifiers: mapSync(typeParam.modifiers, m => this.visitDefined<J.Modifier>(m, p)),
+            name: this.visitDefined(typeParam.name, p) as J.Identifier,
+            bounds: this.visitOptionalContainer(typeParam.bounds, p)
+        };
+        return updateIfChanged(typeParam, updates);
+    }
+
+    protected visitTypeParameters(typeParams: J.TypeParameters, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(typeParams.prefix, p),
+            markers: this.visitMarkers(typeParams.markers, p),
+            annotations: mapSync(typeParams.annotations, a => this.visitDefined<J.Annotation>(a, p)),
+            typeParameters: mapSync(typeParams.typeParameters, tp => this.visitRightPadded(tp, p))
+        };
+        return updateIfChanged(typeParams, updates);
+    }
+
+    protected visitUnary(unary: J.Unary, p: P): J | undefined {
+        const expression = this.visitExpression(unary, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Unary) {
+            return expression;
+        }
+        unary = expression as J.Unary;
+
+        const statement = this.visitStatement(unary, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Unary) {
+            return statement;
+        }
+        unary = statement as J.Unary;
+
+        const updates: any = {
+            prefix: this.visitSpace(unary.prefix, p),
+            markers: this.visitMarkers(unary.markers, p),
+            operator: this.visitLeftPadded(unary.operator, p),
+            expression: this.visitDefined(unary.expression, p) as Expression,
+            type: this.visitType(unary.type, p)
+        };
+        return updateIfChanged(unary, updates);
+    }
+
+    protected visitUnknown(unknown: J.Unknown, p: P): J | undefined {
+        const expression = this.visitExpression(unknown, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Unknown) {
+            return expression;
+        }
+        unknown = expression as J.Unknown;
+
+        const statement = this.visitStatement(unknown, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Unknown) {
+            return statement;
+        }
+        unknown = statement as J.Unknown;
+
+        const updates: any = {
+            prefix: this.visitSpace(unknown.prefix, p),
+            markers: this.visitMarkers(unknown.markers, p),
+            source: this.visitDefined(unknown.source, p) as J.UnknownSource
+        };
+        return updateIfChanged(unknown, updates);
+    }
+
+    protected visitUnknownSource(source: J.UnknownSource, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(source.prefix, p),
+            markers: this.visitMarkers(source.markers, p)
+        };
+        return updateIfChanged(source, updates);
+    }
+
+    protected visitVariableDeclarations(varDecls: J.VariableDeclarations, p: P): J | undefined {
+        const statement = this.visitStatement(varDecls, p);
+        if (!statement?.kind || statement.kind !== J.Kind.VariableDeclarations) {
+            return statement;
+        }
+        varDecls = statement as J.VariableDeclarations;
+
+        const updates: any = {
+            prefix: this.visitSpace(varDecls.prefix, p),
+            markers: this.visitMarkers(varDecls.markers, p),
+            leadingAnnotations: mapSync(varDecls.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p)),
+            modifiers: mapSync(varDecls.modifiers, m => this.visitDefined<J.Modifier>(m, p)),
+            variables: mapSync(varDecls.variables, v => this.visitRightPadded(v, p))
+        };
+        if (varDecls.typeExpression) {
+            updates.typeExpression = this.visitDefined(varDecls.typeExpression, p) as TypedTree;
+        }
+        if (varDecls.varargs) {
+            updates.varargs = this.visitSpace(varDecls.varargs, p);
+        }
+        return updateIfChanged(varDecls, updates);
+    }
+
+    protected visitVariable(variable: J.VariableDeclarations.NamedVariable, p: P): J | undefined {
+        const updates: any = {
+            prefix: this.visitSpace(variable.prefix, p),
+            markers: this.visitMarkers(variable.markers, p),
+            name: this.visitDefined(variable.name, p) as J.Identifier,
+            dimensionsAfterName: mapSync(variable.dimensionsAfterName, dim => this.visitLeftPadded(dim, p)),
+            initializer: this.visitOptionalLeftPadded(variable.initializer, p),
+            variableType: this.visitType(variable.variableType, p) as Type.Variable | undefined
+        };
+        return updateIfChanged(variable, updates);
+    }
+
+    protected visitWhileLoop(whileLoop: J.WhileLoop, p: P): J | undefined {
+        const statement = this.visitStatement(whileLoop, p);
+        if (!statement?.kind || statement.kind !== J.Kind.WhileLoop) {
+            return statement;
+        }
+        whileLoop = statement as J.WhileLoop;
+
+        const updates: any = {
+            prefix: this.visitSpace(whileLoop.prefix, p),
+            markers: this.visitMarkers(whileLoop.markers, p),
+            condition: this.visitDefined(whileLoop.condition, p) as J.ControlParentheses<Expression>,
+            body: this.visitRightPadded(whileLoop.body, p)
+        };
+        return updateIfChanged(whileLoop, updates);
+    }
+
+    protected visitWildcard(wildcard: J.Wildcard, p: P): J | undefined {
+        const expression = this.visitExpression(wildcard, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Wildcard) {
+            return expression;
+        }
+        wildcard = expression as J.Wildcard;
+
+        const updates: any = {
+            prefix: this.visitSpace(wildcard.prefix, p),
+            markers: this.visitMarkers(wildcard.markers, p),
+            bound: this.visitOptionalLeftPadded(wildcard.bound, p)
+        };
+        if (wildcard.boundedType) {
+            updates.boundedType = this.visitTypeName(wildcard.boundedType, p);
+        }
+        return updateIfChanged(wildcard, updates);
+    }
+
+    protected visitYield(aYield: J.Yield, p: P): J | undefined {
+        const statement = this.visitStatement(aYield, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Yield) {
+            return statement;
+        }
+        aYield = statement as J.Yield;
+
+        const updates: any = {
+            prefix: this.visitSpace(aYield.prefix, p),
+            markers: this.visitMarkers(aYield.markers, p),
+            value: this.visitDefined(aYield.value, p) as Expression
+        };
+        return updateIfChanged(aYield, updates);
+    }
+
+    protected visitOptionalRightPadded<T extends J | boolean>(right: J.RightPadded<T> | undefined, p: P): J.RightPadded<T> | undefined {
+        return right ? this.visitRightPadded(right, p) : undefined;
+    }
+
+    public visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: P): J.RightPadded<T> | undefined {
+        this.cursor = new Cursor(right, this.cursor);
+        const element = isTree(right.element) ? this.visitDefined(right.element, p) as T : right.element;
+        const after = this.visitSpace(right.after, p);
+        const markers = this.visitMarkers(right.markers, p);
+        this.cursor = this.cursor.parent!;
+        if (element === undefined) {
+            return undefined;
+        }
+        return updateIfChanged(right, {element, after, markers});
+    }
+
+    protected visitOptionalLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T> | undefined, p: P): J.LeftPadded<T> | undefined {
+        return left ? this.visitLeftPadded(left, p) : undefined;
+    }
+
+    public visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): J.LeftPadded<T> | undefined {
+        this.cursor = new Cursor(left, this.cursor);
+        const before = this.visitSpace(left.before, p);
+        let element: T | undefined = left.element;
+        if (isTree(left.element)) {
+            element = this.visitDefined(left.element, p) as T | undefined;
+        } else if (isSpace(left.element)) {
+            element = this.visitSpace(left.element, p) as T;
+        }
+        const markers = this.visitMarkers(left.markers, p);
+        this.cursor = this.cursor.parent!;
+        if (element === undefined) {
+            return undefined;
+        }
+        return updateIfChanged(left, {before, element, markers});
+    }
+
+    protected visitOptionalContainer<T extends J>(container: J.Container<T> | undefined, p: P): J.Container<T> | undefined {
+        return container ? this.visitContainer(container, p) : undefined;
+    }
+
+    public visitContainer<T extends J>(container: J.Container<T>, p: P): J.Container<T> {
+        this.cursor = new Cursor(container, this.cursor);
+        const before = this.visitSpace(container.before, p);
+        const elements = mapSync(container.elements, e => this.visitRightPadded(e, p));
+        const markers = this.visitMarkers(container.markers, p);
+        this.cursor = this.cursor.parent!;
+        return updateIfChanged(container, {before, elements, markers});
+    }
+
+    protected produceJava<J2 extends J>(
+        before: J2,
+        p: P,
+        recipe?: (draft: Draft<J2>) =>
+            ValidRecipeReturnType<Draft<J2>> |
+            PromiseLike<ValidRecipeReturnType<Draft<J2>>>
+    ): J2 {
+        const [draft, finishDraft] = create(before);
+        (draft as Draft<J>).prefix = this.visitSpace(before!.prefix, p);
+        (draft as Draft<J>).markers = this.visitMarkers(before!.markers, p);
+        if (recipe) {
+            recipe(draft);
+        }
+        return finishDraft() as J2;
+    }
+
+    protected accept(t: J, p: P): J | undefined {
+        switch (t.kind) {
+            case J.Kind.AnnotatedType:
+                return this.visitAnnotatedType(t as J.AnnotatedType, p);
+            case J.Kind.Annotation:
+                return this.visitAnnotation(t as J.Annotation, p);
+            case J.Kind.ArrayAccess:
+                return this.visitArrayAccess(t as J.ArrayAccess, p);
+            case J.Kind.ArrayDimension:
+                return this.visitArrayDimension(t as J.ArrayDimension, p);
+            case J.Kind.ArrayType:
+                return this.visitArrayType(t as J.ArrayType, p);
+            case J.Kind.Assert:
+                return this.visitAssert(t as J.Assert, p);
+            case J.Kind.Assignment:
+                return this.visitAssignment(t as J.Assignment, p);
+            case J.Kind.AssignmentOperation:
+                return this.visitAssignmentOperation(t as J.AssignmentOperation, p);
+            case J.Kind.Binary:
+                return this.visitBinary(t as J.Binary, p);
+            case J.Kind.Block:
+                return this.visitBlock(t as J.Block, p);
+            case J.Kind.Break:
+                return this.visitBreak(t as J.Break, p);
+            case J.Kind.Case:
+                return this.visitCase(t as J.Case, p);
+            case J.Kind.ClassDeclaration:
+                return this.visitClassDeclaration(t as J.ClassDeclaration, p);
+            case J.Kind.ClassDeclarationKind:
+                return this.visitClassDeclarationKind(t as J.ClassDeclaration.Kind, p);
+            case J.Kind.CompilationUnit:
+                return this.visitCompilationUnit(t as J.CompilationUnit, p);
+            case J.Kind.Continue:
+                return this.visitContinue(t as J.Continue, p);
+            case J.Kind.ControlParentheses:
+                return this.visitControlParentheses(t as J.ControlParentheses<J>, p);
+            case J.Kind.DeconstructionPattern:
+                return this.visitDeconstructionPattern(t as J.DeconstructionPattern, p);
+            case J.Kind.DoWhileLoop:
+                return this.visitDoWhileLoop(t as J.DoWhileLoop, p);
+            case J.Kind.Empty:
+                return this.visitEmpty(t as J.Empty, p);
+            case J.Kind.EnumValue:
+                return this.visitEnumValue(t as J.EnumValue, p);
+            case J.Kind.EnumValueSet:
+                return this.visitEnumValueSet(t as J.EnumValueSet, p);
+            case J.Kind.Erroneous:
+                return this.visitErroneous(t as J.Erroneous, p);
+            case J.Kind.FieldAccess:
+                return this.visitFieldAccess(t as J.FieldAccess, p);
+            case J.Kind.ForEachLoop:
+                return this.visitForEachLoop(t as J.ForEachLoop, p);
+            case J.Kind.ForEachLoopControl:
+                return this.visitForEachLoopControl(t as J.ForEachLoop.Control, p);
+            case J.Kind.ForLoop:
+                return this.visitForLoop(t as J.ForLoop, p);
+            case J.Kind.ForLoopControl:
+                return this.visitForLoopControl(t as J.ForLoop.Control, p);
+            case J.Kind.Identifier:
+                return this.visitIdentifier(t as J.Identifier, p);
+            case J.Kind.If:
+                return this.visitIf(t as J.If, p);
+            case J.Kind.IfElse:
+                return this.visitElse(t as J.If.Else, p);
+            case J.Kind.Import:
+                return this.visitImport(t as J.Import, p);
+            case J.Kind.InstanceOf:
+                return this.visitInstanceOf(t as J.InstanceOf, p);
+            case J.Kind.IntersectionType:
+                return this.visitIntersectionType(t as J.IntersectionType, p);
+            case J.Kind.Label:
+                return this.visitLabel(t as J.Label, p);
+            case J.Kind.Lambda:
+                return this.visitLambda(t as J.Lambda, p);
+            case J.Kind.LambdaParameters:
+                return this.visitLambdaParameters(t as J.Lambda.Parameters, p);
+            case J.Kind.Literal:
+                return this.visitLiteral(t as J.Literal, p);
+            case J.Kind.MemberReference:
+                return this.visitMemberReference(t as J.MemberReference, p);
+            case J.Kind.MethodDeclaration:
+                return this.visitMethodDeclaration(t as J.MethodDeclaration, p);
+            case J.Kind.MethodInvocation:
+                return this.visitMethodInvocation(t as J.MethodInvocation, p);
+            case J.Kind.Modifier:
+                return this.visitModifier(t as J.Modifier, p);
+            case J.Kind.MultiCatch:
+                return this.visitMultiCatch(t as J.MultiCatch, p);
+            case J.Kind.NewArray:
+                return this.visitNewArray(t as J.NewArray, p);
+            case J.Kind.NewClass:
+                return this.visitNewClass(t as J.NewClass, p);
+            case J.Kind.NullableType:
+                return this.visitNullableType(t as J.NullableType, p);
+            case J.Kind.Package:
+                return this.visitPackage(t as J.Package, p);
+            case J.Kind.ParameterizedType:
+                return this.visitParameterizedType(t as J.ParameterizedType, p);
+            case J.Kind.Parentheses:
+                return this.visitParentheses(t as J.Parentheses<J>, p);
+            case J.Kind.ParenthesizedTypeTree:
+                return this.visitParenthesizedTypeTree(t as J.ParenthesizedTypeTree, p);
+            case J.Kind.Primitive:
+                return this.visitPrimitive(t as J.Primitive, p);
+            case J.Kind.Return:
+                return this.visitReturn(t as J.Return, p);
+            case J.Kind.Switch:
+                return this.visitSwitch(t as J.Switch, p);
+            case J.Kind.SwitchExpression:
+                return this.visitSwitchExpression(t as J.SwitchExpression, p);
+            case J.Kind.Synchronized:
+                return this.visitSynchronized(t as J.Synchronized, p);
+            case J.Kind.Ternary:
+                return this.visitTernary(t as J.Ternary, p);
+            case J.Kind.Throw:
+                return this.visitThrow(t as J.Throw, p);
+            case J.Kind.Try:
+                return this.visitTry(t as J.Try, p);
+            case J.Kind.TryResource:
+                return this.visitTryResource(t as J.Try.Resource, p);
+            case J.Kind.TryCatch:
+                return this.visitTryCatch(t as J.Try.Catch, p);
+            case J.Kind.TypeCast:
+                return this.visitTypeCast(t as J.TypeCast, p);
+            case J.Kind.TypeParameter:
+                return this.visitTypeParameter(t as J.TypeParameter, p);
+            case J.Kind.TypeParameters:
+                return this.visitTypeParameters(t as J.TypeParameters, p);
+            case J.Kind.Unary:
+                return this.visitUnary(t as J.Unary, p);
+            case J.Kind.Unknown:
+                return this.visitUnknown(t as J.Unknown, p);
+            case J.Kind.UnknownSource:
+                return this.visitUnknownSource(t as J.UnknownSource, p);
+            case J.Kind.VariableDeclarations:
+                return this.visitVariableDeclarations(t as J.VariableDeclarations, p);
+            case J.Kind.NamedVariable:
+                return this.visitVariable(t as J.VariableDeclarations.NamedVariable, p);
+            case J.Kind.WhileLoop:
+                return this.visitWhileLoop(t as J.WhileLoop, p);
+            case J.Kind.Wildcard:
+                return this.visitWildcard(t as J.Wildcard, p);
+            case J.Kind.Yield:
+                return this.visitYield(t as J.Yield, p);
+            default:
+                // Check for extended kinds (e.g., JS kinds)
+                const adapter = extendedJavaKinds.get(t.kind);
+                if (adapter) {
+                    const adaptedVisitor = adapter(this);
+                    return adaptedVisitor.visit(t, p);
+                }
+                return t;
+        }
+    }
+}
+
+export class AsyncJavaVisitor<P> extends AsyncTreeVisitor<J, P> {
     // protected javadocVisitor: any | null = null;
 
     async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
@@ -1421,7 +2825,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             case J.Kind.Yield:
                 return this.visitYield(t as J.Yield, p);
             default:
-                const adapter = extendedJavaKinds.get(t.kind)
+                const adapter = extendedAsyncJavaKinds.get(t.kind)
                 if (adapter) {
                     return adapter(this).visit(t, p);
                 }

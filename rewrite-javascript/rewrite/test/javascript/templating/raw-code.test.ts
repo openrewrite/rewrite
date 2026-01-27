@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, raw, rewrite, template, typescript, _} from "../../../src/javascript";
+import {_, JavaScriptVisitor, capture, pattern, raw, rewrite, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 
 describe('raw() function', () => {
@@ -26,7 +26,7 @@ describe('raw() function', () => {
             const msg = capture('msg');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
                     if ((method.select?.element as J.Identifier)?.simpleName === 'console' &&
                         (method.name as J.Identifier).simpleName === 'log') {
                         return template`logger.${raw(methodName)}(${msg})`.apply(method, this.cursor, {
@@ -54,7 +54,7 @@ describe('raw() function', () => {
             const msg = capture('msg');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
+                override visitMethodInvocation(invocation: J.MethodInvocation, p: any): J | undefined {
                     if ((invocation.select?.element as J.Identifier)?.simpleName === 'logger' &&
                         (invocation.name as J.Identifier).simpleName === 'info') {
                         return template`${raw(obj)}.${raw(method)}(${msg})`.apply(invocation, this.cursor, {
@@ -81,7 +81,7 @@ describe('raw() function', () => {
             const value = capture('value');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
                     if (binary.operator.element === J.Binary.Type.Equal) {
                         return template`${value} ${raw(operator)} threshold`.apply(binary, this.cursor, {
                             values: new Map([
@@ -114,8 +114,8 @@ describe('raw() function', () => {
             }));
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, method) || method;
+                override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
+                    return rule.tryOn(this.cursor, method) || method;
                 }
             });
 
@@ -135,7 +135,7 @@ describe('raw() function', () => {
             const value = capture('value');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
                     if (binary.operator.element === J.Binary.Type.LessThan &&
                         (binary.left as J.Identifier)?.simpleName === 'age') {
                         return template`${raw(prefix)}.age < ${value}`.apply(binary, this.cursor, {
@@ -165,7 +165,7 @@ describe('raw() function', () => {
             const msg = _('msg');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
                     if ((method.select?.element as J.Identifier)?.simpleName === 'console' &&
                         (method.name as J.Identifier).simpleName === 'log') {
                         // Template is constructed with the dynamic log level from recipe option
@@ -193,9 +193,9 @@ describe('raw() function', () => {
             const msg = capture('msg');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
                     // Pattern with raw() for dynamic method name matching
-                    const m = await pattern`console.${raw(methodName)}(${msg})`.match(method, this.cursor);
+                    const m = pattern`console.${raw(methodName)}(${msg})`.match(method, this.cursor);
                     if (m) {
                         return template`logger.info(${msg})`.apply(method, this.cursor, {values: m});
                     }
@@ -218,9 +218,9 @@ describe('raw() function', () => {
             const msg = capture('msg');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
                     // Use raw() in pattern to match specific method
-                    const m = await pattern`logger.${raw(oldMethod)}(${msg})`.match(method, this.cursor);
+                    const m = pattern`logger.${raw(oldMethod)}(${msg})`.match(method, this.cursor);
                     if (m) {
                         // Use raw() in template to replace with different method
                         return template`logger.${raw(newMethod)}(${msg})`.apply(method, this.cursor, {values: m});
@@ -249,8 +249,8 @@ describe('raw() function', () => {
             }));
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                    return await rule.tryOn(this.cursor, binary) || binary;
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
+                    return rule.tryOn(this.cursor, binary) || binary;
                 }
             });
 
@@ -269,9 +269,9 @@ describe('raw() function', () => {
             const msg = capture('msg');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
+                override visitMethodInvocation(invocation: J.MethodInvocation, p: any): J | undefined {
                     // Pattern with multiple raw() calls
-                    const m = await pattern`${raw(obj)}.${raw(method)}(${msg})`.match(invocation, this.cursor);
+                    const m = pattern`${raw(obj)}.${raw(method)}(${msg})`.match(invocation, this.cursor);
                     if (m) {
                         return template`logger.info(${msg})`.apply(invocation, this.cursor, {values: m});
                     }
@@ -294,9 +294,9 @@ describe('raw() function', () => {
             const value = capture('value');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                override visitBinary(binary: J.Binary, p: any): J | undefined {
                     // Pattern matching property access with raw() prefix
-                    const m = await pattern`${raw(prefix)}.${field} < ${value}`.match(binary, this.cursor);
+                    const m = pattern`${raw(prefix)}.${field} < ${value}`.match(binary, this.cursor);
                     if (m) {
                         return template`${raw(prefix)}.${field} >= ${value}`.apply(binary, this.cursor, {values: m});
                     }

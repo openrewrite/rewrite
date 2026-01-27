@@ -32,7 +32,7 @@ export class ScanningEditor extends ScanningRecipe<{ count: number }> {
 
     async scanner(acc: { count: number }): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends PlainTextVisitor<ExecutionContext> {
-            async visitText(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+            visitText(text: PlainText, _ctx: ExecutionContext): PlainText | undefined {
                 acc.count++;
                 return text;
             }
@@ -41,7 +41,7 @@ export class ScanningEditor extends ScanningRecipe<{ count: number }> {
 
     async editorWithData(acc: { count: number }): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends PlainTextVisitor<ExecutionContext> {
-            async visitText(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+            visitText(text: PlainText, _ctx: ExecutionContext): PlainText | undefined {
                 // Append the count from scanning to the text
                 return {
                     ...text,

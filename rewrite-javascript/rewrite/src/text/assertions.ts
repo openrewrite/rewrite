@@ -19,7 +19,7 @@ import {PlainText, PlainTextParser} from ".";
 export function text(before: string | null, after?: AfterRecipeText): SourceSpec<PlainText> {
     return {
         kind: PlainText.Kind.PlainText,
-        before: before,
+        before,
         after: dedentAfter(after),
         ext: 'txt',
         parser: () => new PlainTextParser()

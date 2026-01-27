@@ -17,9 +17,9 @@ import {emptySpace, Json, JsonVisitor} from "../../src/json";
 import {emptyMarkers, randomId, Tree} from "../../src";
 
 class SetEmptySpace extends JsonVisitor<number> {
-    protected async visitEmpty(empty: Json.Empty, p: number): Promise<Json | undefined> {
+    protected visitEmpty(empty: Json.Empty, p: number): Json | undefined {
         return this.produceJson<Json.Empty>(
-            await super.visitEmpty(empty, p), p,
+            super.visitEmpty(empty, p), p,
             draft => {
                 draft.prefix.whitespace = " "
             }
@@ -32,13 +32,13 @@ describe('visiting JSON', () => {
     test('preVisit', async () => {
         const partialDocument = {kind: Json.Kind.Document};
         const visitor = new class extends JsonVisitor<number> {
-            protected async preVisit(j: Json, p: number): Promise<Json | undefined> {
-                return this.produceJson<Json>(j, p, async draft => {
+            protected preVisit(j: Json, p: number): Json | undefined {
+                return this.produceJson<Json>(j, p, draft => {
                     draft.id = randomId();
                 });
             }
         }
-        expect((await visitor.visit(partialDocument as Tree, 0))?.id).toBeDefined();
+        expect((visitor.visit(partialDocument as Tree, 0))?.id).toBeDefined();
     });
 
     test('calls super', async () => {
@@ -59,7 +59,7 @@ describe('visiting JSON', () => {
             eof: emptySpace,
         }
 
-        const after = await new SetEmptySpace().visit<Json.Document>(json, 0)
+        const after = new SetEmptySpace().visit<Json.Document>(json, 0)
         expect(after!.value.prefix.whitespace).toBe(' ')
     });
 });

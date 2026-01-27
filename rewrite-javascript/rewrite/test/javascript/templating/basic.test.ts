@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Cursor } from "../../../src";
-import { capture, Pattern, pattern } from "../../../src/javascript";
+import {Cursor} from "../../../src";
+import {capture, Pattern, pattern} from "../../../src/javascript";
 
 describe('templating basics', () => {
     describe('match', () => {
@@ -33,7 +33,7 @@ describe('templating basics', () => {
     describe('Matcher', () => {
         test('matches returns false in initial implementation', async () => {
             const node = {} as any;
-            const m = await pattern`${capture()} + ${capture()}`.match(node, new Cursor(node, undefined));
+            const m = pattern`${capture()} + ${capture()}`.match(node, new Cursor(node, undefined));
             expect(m).toBeFalsy();
         });
     });

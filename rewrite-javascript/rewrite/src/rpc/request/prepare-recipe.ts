@@ -15,14 +15,22 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {MessageConnection} from "vscode-jsonrpc/node";
-import {Recipe, RecipeDescriptor, ScanningRecipe} from "../../recipe";
+import {Recipe, RecipeDescriptor, RecipeVisitor, ScanningRecipe} from "../../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {Check} from "../../preconditions";
 import {RpcRecipe} from "../recipe";
-import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {withMetrics} from "./metrics";
 import {RecipeMarketplace} from "../../marketplace";
+
+/**
+ * A no-op recipe that does nothing. Used for performance testing.
+ */
+class NoopRecipe extends Recipe {
+    name = "org.openrewrite.noop";
+    displayName = "Do nothing";
+    description = "Default no-op recipe, does nothing.";
+}
 
 export class PrepareRecipe {
     constructor(private readonly id: string, private readonly options?: any) {
@@ -41,14 +49,20 @@ export class PrepareRecipe {
                 (context) => async (request) => {
                     context.target = request.id;
                     const id = snowflake.generate();
-                    const recipeCtor = marketplace.findRecipe(request.id);
-                    if (!recipeCtor) {
-                        throw new Error(`Could not find recipe with id ${request.id}`);
+
+                    let recipe: Recipe;
+                    if (request.id === "noop") {
+                        recipe = new NoopRecipe();
+                    } else {
+                        const recipeCtor = marketplace.findRecipe(request.id);
+                        if (!recipeCtor) {
+                            throw new Error(`Could not find recipe with id ${request.id}`);
+                        }
+                        if (!recipeCtor[1]) {
+                            throw new Error(`Recipe ${request.id} was installed without a constructor`);
+                        }
+                        recipe = new recipeCtor[1](request.options);
                     }
-                    if (!recipeCtor[1]) {
-                        throw new Error(`Recipe ${request.id} was installed without a constructor`);
-                    }
-                    let recipe = new recipeCtor[1](request.options);
 
                     const editPreconditions: Precondition[] = [];
                     recipe = await this.optimizePreconditions(recipe, "edit", editPreconditions);
@@ -59,12 +73,12 @@ export class PrepareRecipe {
                     preparedRecipes.set(id, recipe);
 
                     const result = {
-                        id: id,
+                        id,
                         descriptor: await recipe.descriptor(),
                         editVisitor: `edit:${id}`,
-                        editPreconditions: editPreconditions,
+                        editPreconditions,
                         scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
-                        scanPreconditions: scanPreconditions
+                        scanPreconditions
                     };
 
                     return result;
@@ -79,7 +93,7 @@ export class PrepareRecipe {
      * precondition passes.
      */
     private static async optimizePreconditions(recipe: Recipe, phase: "edit" | "scan", preconditions: Precondition[]): Promise<Recipe> {
-        let visitor: TreeVisitor<any, ExecutionContext>;
+        let visitor: RecipeVisitor;
         if (phase === "edit") {
             visitor = await recipe.editor();
         } else if (phase === "scan") {
@@ -98,12 +112,12 @@ export class PrepareRecipe {
                     recipe,
                     phase === "edit" ?
                         {
-                            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                            async editor(): Promise<RecipeVisitor> {
                                 return visitor.v;
                             }
                         } :
                         {
-                            async scanner(acc: any): Promise<TreeVisitor<any, ExecutionContext>> {
+                            async scanner(acc: any): Promise<RecipeVisitor> {
                                 const checkVisitor = await (recipe as ScanningRecipe<any>).scanner(acc);
                                 return (checkVisitor as Check<any>).v;
                             }
@@ -117,7 +131,7 @@ export class PrepareRecipe {
         return recipe;
     }
 
-    private static visitorTypePrecondition(preconditions: Precondition[], v: TreeVisitor<any, ExecutionContext>): Precondition[] {
+    private static visitorTypePrecondition(preconditions: Precondition[], v: RecipeVisitor): Precondition[] {
         let treeType: string | undefined;
 
         // Use CommonJS require to defer loading and avoid circular dependencies

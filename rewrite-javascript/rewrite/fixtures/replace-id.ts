@@ -25,13 +25,13 @@ export class ReplaceId extends Recipe {
 
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
-            protected async preVisit(tree: J, _p: ExecutionContext): Promise<J | undefined> {
+            protected preVisit(tree: J, _p: ExecutionContext): J | undefined {
                 const [draft, finishDraft] = create(tree);
                 draft.id = randomId();
                 return finishDraft();
             }
 
-            protected async visitMarkers(markers: Markers, p: ExecutionContext): Promise<Markers> {
+            protected visitMarkers(markers: Markers, p: ExecutionContext): Markers {
                 const [draft, finishDraft] = create(markers);
                 draft.id = randomId();
                 return super.visitMarkers(finishDraft(), p);

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, ExecutionContext, Recipe, TreeVisitor} from '../..';
+import {AsyncTreeVisitor, Cursor, ExecutionContext, Recipe, TreeVisitor} from '../..';
 import {J, Statement} from '../../java';
 import {PostMatchContext, PreMatchContext, RewriteConfig, RewriteRule} from './types';
 import {MatchResult, Pattern} from './pattern';
@@ -27,15 +27,15 @@ class RewriteRuleImpl implements RewriteRule {
     constructor(
         private readonly before: Pattern[],
         private readonly after: Template | ((match: MatchResult) => Template),
-        private readonly preMatch?: (node: J, context: PreMatchContext) => boolean | Promise<boolean>,
-        private readonly postMatch?: (node: J, context: PostMatchContext) => boolean | Promise<boolean>
+        private readonly preMatch?: (node: J, context: PreMatchContext) => boolean,
+        private readonly postMatch?: (node: J, context: PostMatchContext) => boolean
     ) {
     }
 
-    async tryOn(cursor: Cursor, node: J): Promise<J | undefined> {
+    tryOn(cursor: Cursor, node: J): J | undefined {
         // Evaluate preMatch before attempting any pattern matching
         if (this.preMatch) {
-            const preMatchResult = await this.preMatch(node, { cursor });
+            const preMatchResult = this.preMatch(node, { cursor });
             if (!preMatchResult) {
                 return undefined; // Early exit - don't attempt pattern matching
             }
@@ -43,11 +43,11 @@ class RewriteRuleImpl implements RewriteRule {
 
         for (const pattern of this.before) {
             // Pass cursor to pattern.match() for context-aware capture constraints
-            const match = await pattern.match(node, cursor);
+            const match = pattern.match(node, cursor);
             if (match) {
                 // Evaluate postMatch after structural match succeeds
                 if (this.postMatch) {
-                    const postMatchResult = await this.postMatch(node, { cursor, captures: match });
+                    const postMatchResult = this.postMatch(node, { cursor, captures: match });
                     if (!postMatchResult) {
                         continue; // Pattern matched but postMatch failed, try next pattern
                     }
@@ -59,10 +59,10 @@ class RewriteRuleImpl implements RewriteRule {
                 if (typeof this.after === 'function') {
                     // Call the function to get a template, then apply it
                     const template = this.after(match);
-                    result = await template.apply(node, cursor, { values: match });
+                    result = template.apply(node, cursor, { values: match });
                 } else {
                     // Use template.apply() as before
-                    result = await this.after.apply(node, cursor, { values: match });
+                    result = this.after.apply(node, cursor, { values: match });
                 }
 
                 if (result) {
@@ -84,10 +84,10 @@ class RewriteRuleImpl implements RewriteRule {
                 super([], () => undefined as unknown as Template);
             }
 
-            async tryOn(cursor: Cursor, node: J): Promise<J | undefined> {
-                const firstResult = await first.tryOn(cursor, node);
+            tryOn(cursor: Cursor, node: J): J | undefined {
+                const firstResult = first.tryOn(cursor, node);
                 if (firstResult !== undefined) {
-                    const secondResult = await next.tryOn(cursor, firstResult);
+                    const secondResult = next.tryOn(cursor, firstResult);
                     return secondResult ?? firstResult;
                 }
                 return undefined;
@@ -104,12 +104,12 @@ class RewriteRuleImpl implements RewriteRule {
                 super([], () => undefined as unknown as Template);
             }
 
-            async tryOn(cursor: Cursor, node: J): Promise<J | undefined> {
-                const firstResult = await first.tryOn(cursor, node);
+            tryOn(cursor: Cursor, node: J): J | undefined {
+                const firstResult = first.tryOn(cursor, node);
                 if (firstResult !== undefined) {
                     return firstResult;
                 }
-                return await alternative.tryOn(cursor, node);
+                return alternative.tryOn(cursor, node);
             }
         })();
     }
@@ -147,13 +147,13 @@ class RewriteRuleImpl implements RewriteRule {
  * @example
  * // Using in a visitor - IMPORTANT: use `|| node` to handle undefined when no match
  * class MyVisitor extends JavaScriptVisitor<any> {
- *     override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+ *     override visitBinary(binary: J.Binary, p: any): J | undefined {
  *         const rule = rewrite(() => ({
  *             before: pattern`${capture('a')} + ${capture('b')}`,
  *             after: template`${capture('b')} + ${capture('a')}`
  *         }));
  *         // tryOn() returns undefined if no pattern matches, so always use || node
- *         return await rule.tryOn(this.cursor, binary) || binary;
+ *         return rule.tryOn(this.cursor, binary) || binary;
  *     }
  * }
  */
@@ -181,9 +181,13 @@ export function rewrite(
  * This allows recipes to be used in the same chaining pattern as other rewrite rules,
  * enabling composition with `andThen()`.
  *
+ * Note: This function is async because it needs to resolve the recipe's editor visitor.
+ * The returned RewriteRule is synchronous. Currently only supports sync visitors
+ * (TreeVisitor subclasses). AsyncTreeVisitor subclasses are not yet supported.
+ *
  * @param recipe The recipe whose editor will be used to transform nodes
  * @param ctx The execution context to pass to the recipe's editor
- * @returns A RewriteRule that applies the recipe's editor to nodes
+ * @returns A Promise that resolves to a RewriteRule that applies the recipe's editor to nodes
  *
  * @example
  * ```typescript
@@ -193,7 +197,7 @@ export function rewrite(
  *     description = "Transforms code.";
  *
  *     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
- *         return new MyVisitor();
+ *         return new MyVisitor();  // Must be a sync visitor (extends TreeVisitor, not AsyncTreeVisitor)
  *     }
  * }
  *
@@ -204,15 +208,23 @@ export function rewrite(
  *         after: template`${capture('b')} + ${capture('a')}`
  *     }));
  *
- *     const rule2 = fromRecipe(new MyRecipe(), p);
+ *     // fromRecipe is async, so await it to get the rule
+ *     const rule2 = await fromRecipe(new MyRecipe(), p);
  *
- *     // Chain the pattern-based rule with the recipe
+ *     // Chain the pattern-based rule with the recipe rule
  *     const combined = rule1.andThen(rule2);
- *     return await combined.tryOn(this.cursor, binary) || binary;
+ *     return combined.tryOn(this.cursor, binary) || binary;
  * }
  * ```
  */
-export const fromRecipe = (recipe: Recipe, ctx: ExecutionContext): RewriteRule => {
+export const fromRecipe = async (recipe: Recipe, ctx: ExecutionContext): Promise<RewriteRule> => {
+    // Resolve the visitor upfront
+    const visitor = await recipe.editor();
+    const isAsync = visitor instanceof AsyncTreeVisitor;
+
+    // Return a RewriteRule that uses the pre-resolved visitor
+    // Note: For async visitors, tryOn() will return a Promise at runtime.
+    // The caller must handle this appropriately (e.g., await in an async context).
     return new (class extends RewriteRuleImpl {
         constructor() {
             // Pass empty patterns and a function that will never be called
@@ -220,12 +232,17 @@ export const fromRecipe = (recipe: Recipe, ctx: ExecutionContext): RewriteRule =
             super([], () => undefined as unknown as Template);
         }
 
-        async tryOn(cursor: Cursor, tree: J): Promise<J | undefined> {
-            const visitor = await recipe.editor();
-            const result = await visitor.visit<J>(tree, ctx, cursor);
-
-            // Return undefined if the visitor didn't change the node
-            return result !== tree ? result : undefined;
+        tryOn(cursor: Cursor, tree: J): J | undefined {
+            if (isAsync) {
+                // For async visitors, return a Promise (caller must await)
+                // TypeScript interface says sync, but runtime behavior is async
+                return (visitor as AsyncTreeVisitor<any, any>).visit<J>(tree, ctx, cursor)
+                    .then(result => result !== tree ? result : undefined) as any;
+            } else {
+                // For sync visitors, call synchronously
+                const result = (visitor as TreeVisitor<any, any>).visit<J>(tree, ctx, cursor);
+                return result !== tree ? result : undefined;
+            }
         }
     })();
 }
@@ -243,7 +260,7 @@ export const fromRecipe = (recipe: Recipe, ctx: ExecutionContext): RewriteRule =
  *
  * @example
  * ```typescript
- * override async visitReturn(ret: J.Return, ctx: ExecutionContext): Promise<J | undefined> {
+ * override visitReturn(ret: J.Return, ctx: ExecutionContext): J | undefined {
  *     const result = await rewrite(() => ({
  *         before: pattern`return #{cond} || #{arr}.some(#{cb})`,
  *         after: template`{
@@ -268,7 +285,7 @@ export function flattenBlock<P>(
 ): J.Block {
     // Create a visitor that will flatten this specific block when found in a parent block
     const flattenVisitor = new class extends JavaScriptVisitor<P> {
-        protected override async visitBlock(parentBlock: J.Block, p: P): Promise<J | undefined> {
+        protected override visitBlock(parentBlock: J.Block, p: P): J | undefined {
             let modified = false;
             const newStatements: typeof parentBlock.statements = [];
 

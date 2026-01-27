@@ -24,132 +24,134 @@ export * from "../reference";
 export {RewriteRpc} from "./rewrite-rpc";
 
 RpcCodecs.registerCodec(TreeKind.Checksum, {
-    async rpcReceive(before: Checksum, q: RpcReceiveQueue): Promise<Checksum> {
+    rpcReceive(before: Checksum, q: RpcReceiveQueue): Checksum {
         return updateIfChanged(before, {
-            algorithm: await q.receive(before.algorithm),
-            value: await q.receive(before.value),
+            algorithm: q.receive(before.algorithm),
+            value: q.receive(before.value),
         });
     },
 
-    async rpcSend(after: Checksum, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, c => c.algorithm);
-        await q.getAndSend(after, c => c.value);
+    rpcSend(after: Checksum, q: RpcSendQueue): void {
+        q.getAndSend(after, c => c.algorithm);
+        q.getAndSend(after, c => c.value);
     }
 });
 
 RpcCodecs.registerCodec(TreeKind.FileAttributes, {
-    async rpcReceive(before: FileAttributes, q: RpcReceiveQueue): Promise<FileAttributes> {
+    rpcReceive(before: FileAttributes, q: RpcReceiveQueue): FileAttributes {
         return updateIfChanged(before, {
-            creationDate: await q.receive(before.creationDate),
-            lastModifiedTime: await q.receive(before.lastModifiedTime),
-            lastAccessTime: await q.receive(before.lastAccessTime),
-            isReadable: await q.receive(before.isReadable),
-            isWritable: await q.receive(before.isWritable),
-            isExecutable: await q.receive(before.isExecutable),
-            size: await q.receive(before.size),
+            creationDate: q.receive(before.creationDate),
+            lastModifiedTime: q.receive(before.lastModifiedTime),
+            lastAccessTime: q.receive(before.lastAccessTime),
+            isReadable: q.receive(before.isReadable),
+            isWritable: q.receive(before.isWritable),
+            isExecutable: q.receive(before.isExecutable),
+            size: q.receive(before.size),
         });
     },
 
-    async rpcSend(after: FileAttributes, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.creationDate);
-        await q.getAndSend(after, a => a.lastModifiedTime);
-        await q.getAndSend(after, a => a.lastAccessTime);
-        await q.getAndSend(after, a => a.isReadable);
-        await q.getAndSend(after, a => a.isWritable);
-        await q.getAndSend(after, a => a.isExecutable);
-        await q.getAndSend(after, a => a.size);
+    rpcSend(after: FileAttributes, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.creationDate);
+        q.getAndSend(after, a => a.lastModifiedTime);
+        q.getAndSend(after, a => a.lastAccessTime);
+        q.getAndSend(after, a => a.isReadable);
+        q.getAndSend(after, a => a.isWritable);
+        q.getAndSend(after, a => a.isExecutable);
+        q.getAndSend(after, a => a.size);
     }
 });
 
 RpcCodecs.registerCodec(MarkersKind.Markers, {
-    async rpcReceive(before: Markers, q: RpcReceiveQueue): Promise<Markers> {
-        return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            markers: (await q.receiveList(before.markers))!,
-        });
+    rpcReceive(before: Markers, q: RpcReceiveQueue): Markers {
+        // inlined `updateIfChanged()` for performance
+        const id = q.receive(before.id)!;
+        const markers = q.receiveList(before.markers)!;
+        return id === before.id && markers === before.markers
+            ? before
+            : { ...before, id, markers };
     },
 
-    async rpcSend(after: Markers, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, m => m.id);
-        await q.getAndSendList(after, m => m.markers.map(marker => asRef(marker)), m => m.id);
+    rpcSend(after: Markers, q: RpcSendQueue): void {
+        q.getAndSend(after, m => m.id);
+        q.getAndSendList(after, m => m.markers.map(marker => asRef(marker)), m => m.id);
     }
 });
 
 // Register codecs for all Java markers with additional properties
 RpcCodecs.registerCodec(MarkersKind.SearchResult, {
-    async rpcReceive(before: SearchResult, q: RpcReceiveQueue): Promise<SearchResult> {
+    rpcReceive(before: SearchResult, q: RpcReceiveQueue): SearchResult {
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            description: await q.receive(before.description),
+            id: q.receive(before.id),
+            description: q.receive(before.description),
         });
     },
 
-    async rpcSend(after: SearchResult, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.description);
+    rpcSend(after: SearchResult, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.description);
     }
 });
 
 RpcCodecs.registerCodec(MarkersKind.MarkupError, {
-    async rpcReceive(before: MarkupError, q: RpcReceiveQueue): Promise<MarkupError> {
+    rpcReceive(before: MarkupError, q: RpcReceiveQueue): MarkupError {
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            message: await q.receive(before.message),
-            detail: await q.receive(before.detail),
+            id: q.receive(before.id),
+            message: q.receive(before.message),
+            detail: q.receive(before.detail),
         });
     },
 
-    async rpcSend(after: MarkupError, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.message);
-        await q.getAndSend(after, a => a.detail);
+    rpcSend(after: MarkupError, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.message);
+        q.getAndSend(after, a => a.detail);
     }
 });
 
 RpcCodecs.registerCodec(MarkersKind.MarkupWarn, {
-    async rpcReceive(before: MarkupWarn, q: RpcReceiveQueue): Promise<MarkupWarn> {
+    rpcReceive(before: MarkupWarn, q: RpcReceiveQueue): MarkupWarn {
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            message: await q.receive(before.message),
-            detail: await q.receive(before.detail),
+            id: q.receive(before.id),
+            message: q.receive(before.message),
+            detail: q.receive(before.detail),
         });
     },
 
-    async rpcSend(after: MarkupWarn, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.message);
-        await q.getAndSend(after, a => a.detail);
+    rpcSend(after: MarkupWarn, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.message);
+        q.getAndSend(after, a => a.detail);
     }
 });
 
 RpcCodecs.registerCodec(MarkersKind.MarkupInfo, {
-    async rpcReceive(before: MarkupInfo, q: RpcReceiveQueue): Promise<MarkupInfo> {
+    rpcReceive(before: MarkupInfo, q: RpcReceiveQueue): MarkupInfo {
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            message: await q.receive(before.message),
-            detail: await q.receive(before.detail),
+            id: q.receive(before.id),
+            message: q.receive(before.message),
+            detail: q.receive(before.detail),
         });
     },
 
-    async rpcSend(after: MarkupInfo, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.message);
-        await q.getAndSend(after, a => a.detail);
+    rpcSend(after: MarkupInfo, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.message);
+        q.getAndSend(after, a => a.detail);
     }
 });
 
 RpcCodecs.registerCodec(MarkersKind.MarkupDebug, {
-    async rpcReceive(before: MarkupDebug, q: RpcReceiveQueue): Promise<MarkupDebug> {
+    rpcReceive(before: MarkupDebug, q: RpcReceiveQueue): MarkupDebug {
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            message: await q.receive(before.message),
-            detail: await q.receive(before.detail),
+            id: q.receive(before.id),
+            message: q.receive(before.message),
+            detail: q.receive(before.detail),
         });
     },
 
-    async rpcSend(after: MarkupDebug, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.message);
-        await q.getAndSend(after, a => a.detail);
+    rpcSend(after: MarkupDebug, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.message);
+        q.getAndSend(after, a => a.detail);
     }
 });

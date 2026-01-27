@@ -267,8 +267,8 @@ describe('method mapping', () => {
                             `
                         ),
                         afterRecipe: async cu => {
-                            await (new class extends JavaScriptVisitor<any> {
-                                protected async visitMethodInvocation(method: J.MethodInvocation, _: any): Promise<J | undefined> {
+                            (new class extends JavaScriptVisitor<any> {
+                                protected visitMethodInvocation(method: J.MethodInvocation, _: any): J | undefined {
                                     expect(method.methodType?.name).toEqual('map')
                                     return method;
                                 }

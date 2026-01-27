@@ -22,11 +22,11 @@ describe('capture types', () => {
 
     test('capture with string type annotation', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
                 // Create a capture with a type annotation
                 const x = capture({type: 'boolean'});
                 const pat = pattern`${x} || false`;
-                const match = await pat.match(binary, this.cursor);
+                const match = pat.match(binary, this.cursor);
 
                 if (match) {
                     // Replace with a simpler expression
@@ -43,11 +43,11 @@ describe('capture types', () => {
 
     test('template with capture type generates properly typed AST', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
                 // Create a capture with a type annotation
                 const condition = capture({type: 'boolean'});
                 const pat = pattern`${condition} && true`;
-                const match = await pat.match(binary, this.cursor);
+                const match = pat.match(binary, this.cursor);
 
                 if (match) {
                     // Use the capture in a template - type should be preserved
@@ -64,12 +64,12 @@ describe('capture types', () => {
 
     test('multiple captures with different types', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
                 // Create captures with different type annotations
                 const x = capture({type: 'number'});
                 const y = capture({type: 'number'});
                 const pat = pattern`${x} + ${y}`;
-                const match = await pat.match(binary, this.cursor);
+                const match = pat.match(binary, this.cursor);
 
                 if (match) {
                     // Swap the operands
@@ -86,11 +86,11 @@ describe('capture types', () => {
 
     test('capture without type still works', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
                 // Create a capture without a type annotation
                 const x = capture();
                 const pat = pattern`${x} + 1`;
-                const match = await pat.match(binary, this.cursor);
+                const match = pat.match(binary, this.cursor);
 
                 if (match) {
                     return template`${x} * 2`.apply(binary, this.cursor, { values: match });
@@ -106,7 +106,7 @@ describe('capture types', () => {
 
     test('type derivation from J element in template', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+            override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
                 const methodName = method.name as J.Identifier;
                 if (methodName.simpleName === 'toUpperCase' && method.select) {
                     // The select element is a string literal with natural type attribution from the parser
@@ -129,7 +129,7 @@ describe('capture types', () => {
 
     test('type derivation from multiple J elements', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
                 if (binary.operator.element === J.Binary.Type.Addition) {
                     // Both operands are number literals with natural type attribution from the parser
                     // Pass both operands as J elements - types should be derived from the number types
@@ -146,11 +146,11 @@ describe('capture types', () => {
 
     test('Type.Primitive.Boolean maps to boolean', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
                 // Create a capture with Type.Primitive.Boolean
                 const condition = capture({type: Type.Primitive.Boolean});
                 const pat = pattern`${condition} && true`;
-                const match = await pat.match(binary, this.cursor);
+                const match = pat.match(binary, this.cursor);
 
                 if (match) {
                     return template`!${condition}`.apply(binary, this.cursor, { values: match });
@@ -166,11 +166,11 @@ describe('capture types', () => {
 
     test('Type.Primitive.String maps to string', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
                 // Create a capture with Type.Primitive.String
                 const str = capture({type: Type.Primitive.String});
                 const pat = pattern`${str} + ""`;
-                const match = await pat.match(binary, this.cursor);
+                const match = pat.match(binary, this.cursor);
 
                 if (match) {
                     return template`${str}`.apply(binary, this.cursor, { values: match });
@@ -186,11 +186,11 @@ describe('capture types', () => {
 
     test('Type.Primitive.Double maps to number', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+            override visitBinary(binary: J.Binary, p: any): J | undefined {
                 // Create a capture with Type.Primitive.Double
                 const num = capture({type: Type.Primitive.Double});
                 const pat = pattern`${num} + 0`;
-                const match = await pat.match(binary, this.cursor);
+                const match = pat.match(binary, this.cursor);
 
                 if (match) {
                     return template`${num}`.apply(binary, this.cursor, { values: match });
@@ -206,7 +206,7 @@ describe('capture types', () => {
 
     test('Type.Array renders component type plus []', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+            override visitMethodInvocation(method: J.MethodInvocation, p: any): J | undefined {
                 const methodName = method.name as J.Identifier;
                 if (methodName.simpleName === 'oldMethod') {
                     // Create an array type: string[]
@@ -219,7 +219,7 @@ describe('capture types', () => {
                     // Use the array type in a capture within a pattern
                     const arr = capture({type: arrayType});
                     const pat = pattern`oldMethod(${arr})`;
-                    const match = await pat.match(method, this.cursor);
+                    const match = pat.match(method, this.cursor);
 
                     if (match) {
                         return template`newMethod(${arr})`.apply(method, this.cursor, { values: match });

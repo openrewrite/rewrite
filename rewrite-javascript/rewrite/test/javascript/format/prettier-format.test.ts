@@ -29,7 +29,6 @@ import {
     packageJson,
     prettierFormat,
     prettierStyle,
-    PrettierStyle,
     typescript
 } from "../../../src/javascript";
 import {PrettierConfigLoader} from "../../../src/javascript/format/prettier-config-loader";
@@ -46,7 +45,7 @@ const defaultPrettierStyle = prettierStyle(randomId(), {});
 
 describe('AutoformatVisitor with Prettier', () => {
     const prettierSpec = new RecipeSpec()
-    // Use Prettier for these tests by passing PrettierStyle
+    // Use Prettier for these tests by passing PrettierStyle - requires async visitor
     prettierSpec.recipe = fromVisitor(new AutoformatVisitor(undefined, [defaultPrettierStyle]));
 
     test('formats basic code with Prettier', () => {
@@ -67,10 +66,10 @@ describe('AutoformatVisitor with Prettier', () => {
         // Note: Prettier's default tabWidth is 2, so the formatted line will have
         // 2-space indentation even if surrounding code has different indentation.
         const visitor = new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
+            override visitMethodInvocation(methodInvocation: any, p: any): any {
                 // Only format the info() call to simulate template replacement
                 if (methodInvocation.name?.simpleName === 'info') {
-                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, [defaultPrettierStyle]);
+                    return autoFormat(methodInvocation, p, undefined, this.cursor.parent, [defaultPrettierStyle]);
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
@@ -114,9 +113,9 @@ describe('AutoformatVisitor with Prettier', () => {
     test('subtree formatting in nested block with Prettier', async () => {
         // This tests the pruning in nested blocks
         const visitor = new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(methodInvocation: any, p: any): Promise<any> {
+            override visitMethodInvocation(methodInvocation: any, p: any): any {
                 if (methodInvocation.name?.simpleName === 'slice') {
-                    return await autoFormat(methodInvocation, p, undefined, this.cursor.parent, [defaultPrettierStyle]);
+                    return autoFormat(methodInvocation, p, undefined, this.cursor.parent, [defaultPrettierStyle]);
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
@@ -176,7 +175,7 @@ describe('AutoformatVisitor with Prettier', () => {
         // - Prettier fixes the spacing in just the formatted call, not surrounding statements
         // This simulates what visitors often do: modify an AST node and then format it
         const visitor = new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): Promise<J | undefined> {
+            override visitMethodInvocation(methodInvocation: J.MethodInvocation, p: any): J | undefined {
                 // Change console.log() to console.info() and format
                 if (methodInvocation.name?.simpleName === 'log') {
                     // Modify the method name from 'log' to 'info'
@@ -188,7 +187,7 @@ describe('AutoformatVisitor with Prettier', () => {
                         }
                     };
                     // Format the modified node - this is the typical pattern in visitors
-                    return await autoFormat(modified, p, undefined, this.cursor.parent, [defaultPrettierStyle]);
+                    return autoFormat(modified, p, undefined, this.cursor.parent, [defaultPrettierStyle]);
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
@@ -256,13 +255,13 @@ describe('Prettier eof handling', () => {
         expect(sourceFile.eof.whitespace).toBe('');
 
         // Format with Prettier
-        const formatted = await prettierFormat(sourceFile, { semi: true });
+        const formatted = prettierFormat(sourceFile, { semi: true });
 
         // Prettier adds trailing newline - this is stored in eof
         expect(formatted.eof.whitespace).toBe('\n');
 
         // Verify the printed output reflects this
-        const formattedPrinted = await TreePrinters.print(formatted);
+        const formattedPrinted = TreePrinters.print(formatted);
         expect(formattedPrinted).toBe('const x = 1;\n');
     });
 
@@ -279,13 +278,13 @@ describe('Prettier eof handling', () => {
         expect(sourceFile.eof.whitespace).toBe('\n');
 
         // Format with Prettier
-        const formatted = await prettierFormat(sourceFile, { semi: true });
+        const formatted = prettierFormat(sourceFile, { semi: true });
 
         // Formatted eof still has just one newline
         expect(formatted.eof.whitespace).toBe('\n');
 
         // Verify we don't get double newline in output
-        const formattedPrinted = await TreePrinters.print(formatted);
+        const formattedPrinted = TreePrinters.print(formatted);
         expect(formattedPrinted).toBe('const x = 1;\n');
         expect(formattedPrinted.endsWith('\n\n')).toBe(false);
     });
@@ -307,7 +306,7 @@ describe('Prettier marker reconciliation', () => {
         expect(originalHasSemicolon).toBe(false);
 
         // Format with Prettier (semi: true by default adds semicolons)
-        const formatted = await prettierFormat(sourceFile, { semi: true });
+        const formatted = prettierFormat(sourceFile, { semi: true });
 
         // Check if the formatted tree has the Semicolon marker
         const formattedStatements = (formatted as any).statements as J.RightPadded<Statement>[];
@@ -334,7 +333,7 @@ describe('Prettier marker reconciliation', () => {
         expect(originalHasSemicolon).toBe(true);
 
         // Format with Prettier
-        const formatted = await prettierFormat(sourceFile, { semi: true });
+        const formatted = prettierFormat(sourceFile, { semi: true });
 
         // Semicolon marker should still be present
         const formattedStatements = (formatted as any).statements as J.RightPadded<Statement>[];
@@ -557,10 +556,10 @@ describe('Prettier stopAfter support', () => {
         // This test verifies that stopAfter works with Prettier formatting.
         // We format a Lambda but stop after the parameters, leaving the body unformatted.
         const visitor = new class extends JavaScriptVisitor<any> {
-            override async visitLambda(lambda: J.Lambda, p: any): Promise<J | undefined> {
+            override visitLambda(lambda: J.Lambda, p: any): J | undefined {
                 // Format the lambda but stop after parameters
                 // The body should remain with its original (bad) formatting
-                return await autoFormat(lambda, p, lambda.parameters, this.cursor.parent, [defaultPrettierStyle]);
+                return autoFormat(lambda, p, lambda.parameters, this.cursor.parent, [defaultPrettierStyle]);
             }
         }();
 
@@ -584,13 +583,13 @@ describe('Prettier stopAfter support', () => {
     test('stopAfter with deeply nested node', async () => {
         // Test stopAfter with a more complex case: stop after a specific parameter
         const visitor = new class extends JavaScriptVisitor<any> {
-            override async visitLambda(lambda: J.Lambda, p: any): Promise<J | undefined> {
+            override visitLambda(lambda: J.Lambda, p: any): J | undefined {
                 // Get the first parameter to use as stopAfter
                 const params = lambda.parameters as J.Lambda.Parameters;
                 if (params.parameters.length > 0) {
                     const firstParam = params.parameters[0].element;
                     // Format the lambda but stop after the first parameter
-                    return await autoFormat(lambda, p, firstParam, this.cursor.parent, [defaultPrettierStyle]);
+                    return autoFormat(lambda, p, firstParam, this.cursor.parent, [defaultPrettierStyle]);
                 }
                 return lambda;
             }

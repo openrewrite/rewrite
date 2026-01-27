@@ -17,44 +17,44 @@ import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {PlainText} from "./tree";
 import {updateIfChanged} from "../util";
 
-async function receiveSnippet(before: PlainText.Snippet, q: RpcReceiveQueue): Promise<PlainText.Snippet | undefined> {
+function receiveSnippet(before: PlainText.Snippet, q: RpcReceiveQueue): PlainText.Snippet | undefined {
     return updateIfChanged(before, {
-        id: await q.receive(before.id),
-        markers: await q.receive(before.markers),
-        text: await q.receive(before.text),
+        id: q.receive(before.id),
+        markers: q.receiveMarkers(before.markers),
+        text: q.receive(before.text),
     });
 }
 
 // Register codec for all PlainText AST node types
 for (const kind of Object.values(PlainText.Kind)) {
     RpcCodecs.registerCodec(kind as string, {
-        async rpcReceive(before: PlainText, q: RpcReceiveQueue): Promise<PlainText> {
+        rpcReceive(before: PlainText, q: RpcReceiveQueue): PlainText {
             return updateIfChanged(before, {
-                id: await q.receive(before.id),
-                markers: await q.receive(before.markers),
-                sourcePath: await q.receive(before.sourcePath),
-                charsetName: await q.receive(before.charsetName),
-                charsetBomMarked: await q.receive(before.charsetBomMarked),
-                checksum: await q.receive(before.checksum),
-                fileAttributes: await q.receive(before.fileAttributes),
-                text: await q.receive(before.text),
-                snippets: (await q.receiveList(before.snippets, snippet => receiveSnippet(snippet, q)))!,
+                id: q.receive(before.id),
+                markers: q.receiveMarkers(before.markers),
+                sourcePath: q.receive(before.sourcePath),
+                charsetName: q.receive(before.charsetName),
+                charsetBomMarked: q.receive(before.charsetBomMarked),
+                checksum: q.receive(before.checksum),
+                fileAttributes: q.receive(before.fileAttributes),
+                text: q.receive(before.text),
+                snippets: q.receiveListDefined(before.snippets, snippet => receiveSnippet(snippet, q)),
             });
         },
 
-        async rpcSend(after: PlainText, q: RpcSendQueue): Promise<void> {
-            await q.getAndSend(after, p => p.id);
-            await q.getAndSend(after, p => p.markers);
-            await q.getAndSend(after, p => p.sourcePath);
-            await q.getAndSend(after, p => p.charsetName);
-            await q.getAndSend(after, p => p.charsetBomMarked);
-            await q.getAndSend(after, p => p.checksum);
-            await q.getAndSend(after, p => p.fileAttributes);
-            await q.getAndSend(after, p => p.text);
-            await q.getAndSendList(after, a => a.snippets, s => s.id, async (snippet) => {
-                await q.getAndSend(snippet, p => p.id);
-                await q.getAndSend(snippet, p => p.markers);
-                await q.getAndSend(snippet, p => p.text);
+        rpcSend(after: PlainText, q: RpcSendQueue): void {
+            q.getAndSend(after, p => p.id);
+            q.getAndSend(after, p => p.markers);
+            q.getAndSend(after, p => p.sourcePath);
+            q.getAndSend(after, p => p.charsetName);
+            q.getAndSend(after, p => p.charsetBomMarked);
+            q.getAndSend(after, p => p.checksum);
+            q.getAndSend(after, p => p.fileAttributes);
+            q.getAndSend(after, p => p.text);
+            q.getAndSendList(after, a => a.snippets, s => s.id, async (snippet) => {
+                q.getAndSend(snippet, p => p.id);
+                q.getAndSend(snippet, p => p.markers);
+                q.getAndSend(snippet, p => p.text);
             });
         }
     }, PlainText.Kind.PlainText);

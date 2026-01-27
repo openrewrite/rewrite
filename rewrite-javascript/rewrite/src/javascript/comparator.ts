@@ -44,13 +44,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param parentCursor2 Optional parent cursor for the target tree (for navigating to root)
      * @returns true if the trees match, false otherwise
      */
-    async compare(tree1: J, tree2: J, parentCursor1?: Cursor, parentCursor2?: Cursor): Promise<boolean> {
+    compare(tree1: J, tree2: J, parentCursor1?: Cursor, parentCursor2?: Cursor): boolean {
         this.match = true;
         // Initialize targetCursor with parent if provided, otherwise undefined (will be set by visit())
         this.targetCursor = parentCursor2;
         // Initialize this.cursor (pattern cursor) with parent if provided
         this.cursor = parentCursor1 || new Cursor(undefined, undefined);
-        await this.visit(tree1, tree2);
+        this.visit(tree1, tree2);
         return this.match;
     }
 
@@ -126,13 +126,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param visitor Function to visit each element pair (no need to return anything)
      * @returns undefined, modifying this.match if a mismatch occurs
      */
-    protected async visitArrayProperty<T>(
+    protected visitArrayProperty<T>(
         parent: J,
         propertyName: string,
         array1: T[],
         array2: T[],
-        visitor: (item1: T, item2: T, index: number) => Promise<void>
-    ): Promise<void> {
+        visitor: (item1: T, item2: T, index: number) => void
+    ): void {
         // Check length mismatch
         if (array1.length !== array2.length) {
             this.arrayLengthMismatch(propertyName);
@@ -141,7 +141,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Visit each element in lock step
         for (let i = 0; i < array1.length; i++) {
-            await visitor(array1[i], array2[i], i);
+            visitor(array1[i], array2[i], i);
             if (!this.match) return;
         }
     }
@@ -156,14 +156,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param otherContainer The container from the second tree
      * @returns The container from the first tree
      */
-    protected async visitContainerProperty<T extends J>(
+    protected visitContainerProperty<T extends J>(
         propertyName: string,
         container: J.Container<T>,
         otherContainer: J.Container<T>
-    ): Promise<J.Container<T>> {
+    ): J.Container<T> {
         // Default implementation just calls visitContainer
         // Subclasses can override to add property context
-        await this.visitContainer(container, otherContainer as any);
+        this.visitContainer(container, otherContainer as any);
         return container;
     }
 
@@ -176,14 +176,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param otherRightPadded The RightPadded from the second tree
      * @returns The RightPadded from the first tree
      */
-    protected async visitRightPaddedProperty<T extends J | boolean>(
+    protected visitRightPaddedProperty<T extends J | boolean>(
         propertyName: string,
         rightPadded: J.RightPadded<T>,
         otherRightPadded: J.RightPadded<T>
-    ): Promise<J.RightPadded<T>> {
+    ): J.RightPadded<T> {
         // Default implementation just calls visitRightPadded
         // Subclasses can override to add property context
-        return await this.visitRightPadded(rightPadded, otherRightPadded as any);
+        return this.visitRightPadded(rightPadded, otherRightPadded as any);
     }
 
     /**
@@ -195,14 +195,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param otherLeftPadded The LeftPadded from the second tree
      * @returns The LeftPadded from the first tree
      */
-    protected async visitLeftPaddedProperty<T extends J | J.Space | number | string | boolean>(
+    protected visitLeftPaddedProperty<T extends J | J.Space | number | string | boolean>(
         propertyName: string,
         leftPadded: J.LeftPadded<T>,
         otherLeftPadded: J.LeftPadded<T>
-    ): Promise<J.LeftPadded<T>> {
+    ): J.LeftPadded<T> {
         // Default implementation just calls visitLeftPadded
         // Subclasses can override to add property context
-        return await this.visitLeftPadded(leftPadded, otherLeftPadded as any);
+        return this.visitLeftPadded(leftPadded, otherLeftPadded as any);
     }
 
     /**
@@ -214,7 +214,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param propertyName Optional property name for error reporting
      * @returns The visited property value from the first tree
      */
-    protected async visitProperty(j: any, other: any, propertyName?: string): Promise<any> {
+    protected visitProperty(j: any, other: any, propertyName?: string): any {
         // Handle null/undefined (but not other falsy values like 0, false, '')
         if (j == null || other == null) {
             if (j !== other) {
@@ -227,21 +227,21 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Check wrappers by kind
         if (kind === J.Kind.RightPadded) {
-            return propertyName ? await this.visitRightPaddedProperty(propertyName, j, other) :
-                await this.visitRightPadded(j, other);
+            return propertyName ? this.visitRightPaddedProperty(propertyName, j, other) :
+                this.visitRightPadded(j, other);
         }
 
         if (kind === J.Kind.LeftPadded) {
-            return propertyName ? await this.visitLeftPaddedProperty(propertyName, j, other) :
-                await this.visitLeftPadded(j, other);
+            return propertyName ? this.visitLeftPaddedProperty(propertyName, j, other) :
+                this.visitLeftPadded(j, other);
         }
 
         if (kind === J.Kind.Container) {
             // Use visitContainerProperty when propertyName is provided for proper context tracking
             if (propertyName) {
-                return await this.visitContainerProperty(propertyName, j, other);
+                return this.visitContainerProperty(propertyName, j, other);
             }
-            return await this.visitContainer(j, other);
+            return this.visitContainer(j, other);
         }
 
         // Check if it's a Space (skip comparison)
@@ -251,12 +251,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Check if it's a Type node
         if (Type.isType(j)) {
-            return await this.visitType(j, other);
+            return this.visitType(j, other);
         }
 
         // Check if it's a Tree node (has a kind property with a string value)
         if (kind !== undefined && typeof kind === 'string') {
-            return await this.visit(j, other);
+            return this.visit(j, other);
         }
 
         // For primitive values, compare directly
@@ -275,7 +275,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The corresponding element from the second tree
      * @returns The visited element from the first tree
      */
-    protected async visitElement<T extends J>(j: T, other: T): Promise<T> {
+    protected visitElement<T extends J>(j: T, other: T): T {
         if (!this.match) return j;
 
         // Check if kinds match
@@ -283,8 +283,8 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
             return this.kindMismatch();
         }
 
-        // Iterate over all properties
-        for (const key of Object.keys(j)) {
+        // Iterate over all properties using for...in (avoids Object.keys() allocation)
+        for (const key in j) {
             // Skip internal/private properties, id property, and markers property
             if (key.startsWith('_') || key === 'kind'  || key === 'id' || key === 'markers') {
                 continue;
@@ -300,12 +300,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
                 }
 
                 for (let i = 0; i < jValue.length; i++) {
-                    await this.visitProperty(jValue[i], otherValue[i], `${key}[${i}]`);
+                    this.visitProperty(jValue[i], otherValue[i], `${key}[${i}]`);
                     if (!this.match) return j;
                 }
             } else {
                 // Visit the property (which will handle wrappers, trees, primitives, etc.)
-                await this.visitProperty(jValue, otherValue, key);
+                this.visitProperty(jValue, otherValue, key);
 
                 if (!this.match) return j;
             }
@@ -314,7 +314,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         return j;
     }
 
-    override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
+    override visit<R extends J>(j: Tree, p: J, parent?: Cursor): R | undefined {
         // If we've already found a mismatch, abort further processing
         if (!this.match) return j as R;
 
@@ -329,7 +329,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         this.targetCursor = new Cursor(p, this.targetCursor);
         try {
             // Continue with normal visitation, passing the other node as context
-            return await super.visit(j, p);
+            return super.visit(j, p);
         } finally {
             this.targetCursor = savedTargetCursor;
         }
@@ -341,7 +341,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * Pushes the wrapper onto the cursor stack so captures can access it.
      * Also updates targetCursor in parallel.
      */
-    public async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: J): Promise<J.RightPadded<T>> {
+    public visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: J): J.RightPadded<T> {
         if (!this.match) return right;
 
         // Extract the other element if it's also a RightPadded
@@ -357,7 +357,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         try {
             // Call visitProperty without propertyName to avoid pushing spurious 'element' path entries
             // The property context should be provided through visitRightPaddedProperty() if needed
-            await this.visitProperty(right.element, otherElement);
+            this.visitProperty(right.element, otherElement);
         } finally {
             this.cursor = savedCursor;
             this.targetCursor = savedTargetCursor;
@@ -372,7 +372,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * Pushes the wrapper onto the cursor stack so captures can access it.
      * Also updates targetCursor in parallel.
      */
-    public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: J): Promise<J.LeftPadded<T>> {
+    public visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: J): J.LeftPadded<T> {
         if (!this.match) return left;
 
         // Extract the other element if it's also a LeftPadded
@@ -388,7 +388,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         try {
             // Call visitProperty without propertyName to avoid pushing spurious 'element' path entries
             // The property context should be provided through visitLeftPaddedProperty() if needed
-            await this.visitProperty(left.element, otherElement);
+            this.visitProperty(left.element, otherElement);
         } finally {
             this.cursor = savedCursor;
             this.targetCursor = savedTargetCursor;
@@ -403,7 +403,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * Pushes the wrapper onto the cursor stack so captures can access it.
      * Also updates targetCursor in parallel.
      */
-    public async visitContainer<T extends J>(container: J.Container<T>, p: J): Promise<J.Container<T>> {
+    public visitContainer<T extends J>(container: J.Container<T>, p: J): J.Container<T> {
         if (!this.match) return container;
 
         // Extract the other elements if it's also a Container
@@ -423,7 +423,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         this.targetCursor = otherContainer ? new Cursor(otherContainer, this.targetCursor) : this.targetCursor;
         try {
             for (let i = 0; i < container.elements.length; i++) {
-                await this.visitProperty(container.elements[i], otherElements[i]);
+                this.visitProperty(container.elements[i], otherElements[i]);
                 if (!this.match) return container;
             }
         } finally {
@@ -441,7 +441,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other binary expression to compare with
      * @returns The visited binary expression, or undefined if the visit was aborted
      */
-    override async visitBinary(binary: J.Binary, other: J): Promise<J | undefined> {
+    override visitBinary(binary: J.Binary, other: J): J | undefined {
         return this.visitElement(binary, other as J.Binary);
     }
 
@@ -452,7 +452,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other identifier to compare with
      * @returns The visited identifier, or undefined if the visit was aborted
      */
-    override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
+    override visitIdentifier(identifier: J.Identifier, other: J): J | undefined {
         return this.visitElement(identifier, other as J.Identifier);
     }
 
@@ -463,7 +463,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other literal to compare with
      * @returns The visited literal, or undefined if the visit was aborted
      */
-    override async visitLiteral(literal: J.Literal, other: J): Promise<J | undefined> {
+    override visitLiteral(literal: J.Literal, other: J): J | undefined {
         return this.visitElement(literal, other as J.Literal);
     }
 
@@ -474,7 +474,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other block to compare with
      * @returns The visited block, or undefined if the visit was aborted
      */
-    override async visitBlock(block: J.Block, other: J): Promise<J | undefined> {
+    override visitBlock(block: J.Block, other: J): J | undefined {
         return this.visitElement(block, other as J.Block);
     }
 
@@ -485,7 +485,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other compilation unit to compare with
      * @returns The visited compilation unit, or undefined if the visit was aborted
      */
-    override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, other: J): Promise<J | undefined> {
+    override visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, other: J): J | undefined {
         return this.visitElement(compilationUnit, other as JS.CompilationUnit);
     }
 
@@ -496,7 +496,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other alias to compare with
      * @returns The visited alias, or undefined if the visit was aborted
      */
-    override async visitAlias(alias: JS.Alias, other: J): Promise<J | undefined> {
+    override visitAlias(alias: JS.Alias, other: J): J | undefined {
         return this.visitElement(alias, other as JS.Alias);
     }
 
@@ -507,7 +507,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other arrow function to compare with
      * @returns The visited arrow function, or undefined if the visit was aborted
      */
-    override async visitArrowFunction(arrowFunction: JS.ArrowFunction, other: J): Promise<J | undefined> {
+    override visitArrowFunction(arrowFunction: JS.ArrowFunction, other: J): J | undefined {
         return this.visitElement(arrowFunction, other as JS.ArrowFunction);
     }
 
@@ -518,7 +518,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other await expression to compare with
      * @returns The visited await expression, or undefined if the visit was aborted
      */
-    override async visitAwait(await_: JS.Await, other: J): Promise<J | undefined> {
+    override visitAwait(await_: JS.Await, other: J): J | undefined {
         return this.visitElement(await_, other as JS.Await);
     }
 
@@ -529,7 +529,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other JSX tag to compare with
      * @returns The visited JSX tag, or undefined if the visit was aborted
      */
-    override async visitJsxTag(element: JSX.Tag, other: J): Promise<J | undefined> {
+    override visitJsxTag(element: JSX.Tag, other: J): J | undefined {
         return this.visitElement(element, other as JSX.Tag);
     }
 
@@ -540,7 +540,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other JSX attribute to compare with
      * @returns The visited JSX attribute, or undefined if the visit was aborted
      */
-    override async visitJsxAttribute(attribute: JSX.Attribute, other: J): Promise<J | undefined> {
+    override visitJsxAttribute(attribute: JSX.Attribute, other: J): J | undefined {
         return this.visitElement(attribute, other as JSX.Attribute);
     }
 
@@ -551,7 +551,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other JSX spread attribute to compare with
      * @returns The visited JSX spread attribute, or undefined if the visit was aborted
      */
-    override async visitJsxSpreadAttribute(spread: JSX.SpreadAttribute, other: J): Promise<J | undefined> {
+    override visitJsxSpreadAttribute(spread: JSX.SpreadAttribute, other: J): J | undefined {
         return this.visitElement(spread, other as JSX.SpreadAttribute);
     }
 
@@ -562,7 +562,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other JSX expression to compare with
      * @returns The visited JSX expression, or undefined if the visit was aborted
      */
-    override async visitJsxEmbeddedExpression(expr: JSX.EmbeddedExpression, other: J): Promise<J | undefined> {
+    override visitJsxEmbeddedExpression(expr: JSX.EmbeddedExpression, other: J): J | undefined {
         return this.visitElement(expr, other as JSX.EmbeddedExpression);
     }
 
@@ -573,7 +573,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other JSX namespaced name to compare with
      * @returns The visited JSX namespaced name, or undefined if the visit was aborted
      */
-    override async visitJsxNamespacedName(ns: JSX.NamespacedName, other: J): Promise<J | undefined> {
+    override visitJsxNamespacedName(ns: JSX.NamespacedName, other: J): J | undefined {
         return this.visitElement(ns, other as JSX.NamespacedName);
     }
 
@@ -584,7 +584,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other conditional type to compare with
      * @returns The visited conditional type, or undefined if the visit was aborted
      */
-    override async visitConditionalType(conditionalType: JS.ConditionalType, other: J): Promise<J | undefined> {
+    override visitConditionalType(conditionalType: JS.ConditionalType, other: J): J | undefined {
         return this.visitElement(conditionalType, other as JS.ConditionalType);
     }
 
@@ -595,7 +595,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other delete expression to compare with
      * @returns The visited delete expression, or undefined if the visit was aborted
      */
-    override async visitDelete(delete_: JS.Delete, other: J): Promise<J | undefined> {
+    override visitDelete(delete_: JS.Delete, other: J): J | undefined {
         return this.visitElement(delete_, other as JS.Delete);
     }
 
@@ -606,7 +606,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other expression statement to compare with
      * @returns The visited expression statement, or undefined if the visit was aborted
      */
-    override async visitExpressionStatement(expressionStatement: JS.ExpressionStatement, other: J): Promise<J | undefined> {
+    override visitExpressionStatement(expressionStatement: JS.ExpressionStatement, other: J): J | undefined {
         return this.visitElement(expressionStatement, other as JS.ExpressionStatement);
     }
 
@@ -617,7 +617,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other expression with type arguments to compare with
      * @returns The visited expression with type arguments, or undefined if the visit was aborted
      */
-    override async visitExpressionWithTypeArguments(expressionWithTypeArguments: JS.ExpressionWithTypeArguments, other: J): Promise<J | undefined> {
+    override visitExpressionWithTypeArguments(expressionWithTypeArguments: JS.ExpressionWithTypeArguments, other: J): J | undefined {
         return this.visitElement(expressionWithTypeArguments, other as JS.ExpressionWithTypeArguments);
     }
 
@@ -628,7 +628,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other function call to compare with
      * @returns The visited function call, or undefined if the visit was aborted
      */
-    override async visitFunctionCall(functionCall: JS.FunctionCall, other: J): Promise<J | undefined> {
+    override visitFunctionCall(functionCall: JS.FunctionCall, other: J): J | undefined {
         return this.visitElement(functionCall, other as JS.FunctionCall);
     }
 
@@ -639,7 +639,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other function type to compare with
      * @returns The visited function type, or undefined if the visit was aborted
      */
-    override async visitFunctionType(functionType: JS.FunctionType, other: J): Promise<J | undefined> {
+    override visitFunctionType(functionType: JS.FunctionType, other: J): J | undefined {
         return this.visitElement(functionType, other as JS.FunctionType);
     }
 
@@ -650,7 +650,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other infer type to compare with
      * @returns The visited infer type, or undefined if the visit was aborted
      */
-    override async visitInferType(inferType: JS.InferType, other: J): Promise<J | undefined> {
+    override visitInferType(inferType: JS.InferType, other: J): J | undefined {
         return this.visitElement(inferType, other as JS.InferType);
     }
 
@@ -661,7 +661,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other import type to compare with
      * @returns The visited import type, or undefined if the visit was aborted
      */
-    override async visitImportType(importType: JS.ImportType, other: J): Promise<J | undefined> {
+    override visitImportType(importType: JS.ImportType, other: J): J | undefined {
         return this.visitElement(importType, other as JS.ImportType);
     }
 
@@ -672,7 +672,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other import declaration to compare with
      * @returns The visited import declaration, or undefined if the visit was aborted
      */
-    override async visitImportDeclaration(jsImport: JS.Import, other: J): Promise<J | undefined> {
+    override visitImportDeclaration(jsImport: JS.Import, other: J): J | undefined {
         return this.visitElement(jsImport, other as JS.Import);
     }
 
@@ -683,7 +683,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other import clause to compare with
      * @returns The visited import clause, or undefined if the visit was aborted
      */
-    override async visitImportClause(importClause: JS.ImportClause, other: J): Promise<J | undefined> {
+    override visitImportClause(importClause: JS.ImportClause, other: J): J | undefined {
         return this.visitElement(importClause, other as JS.ImportClause);
     }
 
@@ -694,7 +694,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other named imports to compare with
      * @returns The visited named imports, or undefined if the visit was aborted
      */
-    override async visitNamedImports(namedImports: JS.NamedImports, other: J): Promise<J | undefined> {
+    override visitNamedImports(namedImports: JS.NamedImports, other: J): J | undefined {
         return this.visitElement(namedImports, other as JS.NamedImports);
     }
 
@@ -705,7 +705,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other import specifier to compare with
      * @returns The visited import specifier, or undefined if the visit was aborted
      */
-    override async visitImportSpecifier(importSpecifier: JS.ImportSpecifier, other: J): Promise<J | undefined> {
+    override visitImportSpecifier(importSpecifier: JS.ImportSpecifier, other: J): J | undefined {
         return this.visitElement(importSpecifier, other as JS.ImportSpecifier);
     }
 
@@ -716,7 +716,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other import attributes to compare with
      * @returns The visited import attributes, or undefined if the visit was aborted
      */
-    override async visitImportAttributes(importAttributes: JS.ImportAttributes, other: J): Promise<J | undefined> {
+    override visitImportAttributes(importAttributes: JS.ImportAttributes, other: J): J | undefined {
         return this.visitElement(importAttributes, other as JS.ImportAttributes);
     }
 
@@ -727,7 +727,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other import type attributes to compare with
      * @returns The visited import type attributes, or undefined if the visit was aborted
      */
-    override async visitImportTypeAttributes(importTypeAttributes: JS.ImportTypeAttributes, other: J): Promise<J | undefined> {
+    override visitImportTypeAttributes(importTypeAttributes: JS.ImportTypeAttributes, other: J): J | undefined {
         return this.visitElement(importTypeAttributes, other as JS.ImportTypeAttributes);
     }
 
@@ -738,7 +738,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other import attribute to compare with
      * @returns The visited import attribute, or undefined if the visit was aborted
      */
-    override async visitImportAttribute(importAttribute: JS.ImportAttribute, other: J): Promise<J | undefined> {
+    override visitImportAttribute(importAttribute: JS.ImportAttribute, other: J): J | undefined {
         return this.visitElement(importAttribute, other as JS.ImportAttribute);
     }
 
@@ -749,7 +749,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other binary expression to compare with
      * @returns The visited binary expression, or undefined if the visit was aborted
      */
-    override async visitBinaryExtensions(jsBinary: JS.Binary, other: J): Promise<J | undefined> {
+    override visitBinaryExtensions(jsBinary: JS.Binary, other: J): J | undefined {
         return this.visitElement(jsBinary, other as JS.Binary);
     }
 
@@ -760,7 +760,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other literal type to compare with
      * @returns The visited literal type, or undefined if the visit was aborted
      */
-    override async visitLiteralType(literalType: JS.LiteralType, other: J): Promise<J | undefined> {
+    override visitLiteralType(literalType: JS.LiteralType, other: J): J | undefined {
         return this.visitElement(literalType, other as JS.LiteralType);
     }
 
@@ -771,7 +771,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other mapped type to compare with
      * @returns The visited mapped type, or undefined if the visit was aborted
      */
-    override async visitMappedType(mappedType: JS.MappedType, other: J): Promise<J | undefined> {
+    override visitMappedType(mappedType: JS.MappedType, other: J): J | undefined {
         return this.visitElement(mappedType, other as JS.MappedType);
     }
 
@@ -782,7 +782,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other keys remapping to compare with
      * @returns The visited keys remapping, or undefined if the visit was aborted
      */
-    override async visitMappedTypeKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, other: J): Promise<J | undefined> {
+    override visitMappedTypeKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, other: J): J | undefined {
         return this.visitElement(keysRemapping, other as JS.MappedType.KeysRemapping);
     }
 
@@ -793,7 +793,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other mapped type parameter to compare with
      * @returns The visited mapped type parameter, or undefined if the visit was aborted
      */
-    override async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.Parameter, other: J): Promise<J | undefined> {
+    override visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.Parameter, other: J): J | undefined {
         return this.visitElement(mappedTypeParameter, other as JS.MappedType.Parameter);
     }
 
@@ -804,7 +804,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other object binding declarations to compare with
      * @returns The visited object binding declarations, or undefined if the visit was aborted
      */
-    override async visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, other: J): Promise<J | undefined> {
+    override visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, other: J): J | undefined {
         return this.visitElement(objectBindingPattern, other as JS.ObjectBindingPattern);
     }
 
@@ -815,7 +815,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other property assignment to compare with
      * @returns The visited property assignment, or undefined if the visit was aborted
      */
-    override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, other: J): Promise<J | undefined> {
+    override visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, other: J): J | undefined {
         return this.visitElement(propertyAssignment, other as JS.PropertyAssignment);
     }
 
@@ -826,7 +826,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other satisfies expression to compare with
      * @returns The visited satisfies expression, or undefined if the visit was aborted
      */
-    override async visitSatisfiesExpression(satisfiesExpression: JS.SatisfiesExpression, other: J): Promise<J | undefined> {
+    override visitSatisfiesExpression(satisfiesExpression: JS.SatisfiesExpression, other: J): J | undefined {
         return this.visitElement(satisfiesExpression, other as JS.SatisfiesExpression);
     }
 
@@ -837,7 +837,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other scoped variable declarations to compare with
      * @returns The visited scoped variable declarations, or undefined if the visit was aborted
      */
-    override async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, other: J): Promise<J | undefined> {
+    override visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, other: J): J | undefined {
         return this.visitElement(scopedVariableDeclarations, other as JS.ScopedVariableDeclarations);
     }
 
@@ -848,7 +848,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other shebang to compare with
      * @returns The visited shebang, or undefined if the visit was aborted
      */
-    override async visitShebang(shebang: JS.Shebang, other: J): Promise<J | undefined> {
+    override visitShebang(shebang: JS.Shebang, other: J): J | undefined {
         return this.visitElement(shebang, other as JS.Shebang);
     }
 
@@ -859,7 +859,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other spread expression to compare with
      * @returns The visited spread expression, or undefined if the visit was aborted
      */
-    override async visitSpread(spread: JS.Spread, other: J): Promise<J | undefined> {
+    override visitSpread(spread: JS.Spread, other: J): J | undefined {
         return this.visitElement(spread, other as JS.Spread);
     }
 
@@ -870,7 +870,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other statement expression to compare with
      * @returns The visited statement expression, or undefined if the visit was aborted
      */
-    override async visitStatementExpression(statementExpression: JS.StatementExpression, other: J): Promise<J | undefined> {
+    override visitStatementExpression(statementExpression: JS.StatementExpression, other: J): J | undefined {
         return this.visitElement(statementExpression, other as JS.StatementExpression);
     }
 
@@ -881,7 +881,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other tagged template expression to compare with
      * @returns The visited tagged template expression, or undefined if the visit was aborted
      */
-    override async visitTaggedTemplateExpression(taggedTemplateExpression: JS.TaggedTemplateExpression, other: J): Promise<J | undefined> {
+    override visitTaggedTemplateExpression(taggedTemplateExpression: JS.TaggedTemplateExpression, other: J): J | undefined {
         return this.visitElement(taggedTemplateExpression, other as JS.TaggedTemplateExpression);
     }
 
@@ -892,7 +892,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other template expression to compare with
      * @returns The visited template expression, or undefined if the visit was aborted
      */
-    override async visitTemplateExpression(templateExpression: JS.TemplateExpression, other: J): Promise<J | undefined> {
+    override visitTemplateExpression(templateExpression: JS.TemplateExpression, other: J): J | undefined {
         return this.visitElement(templateExpression, other as JS.TemplateExpression);
     }
 
@@ -903,7 +903,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other template expression span to compare with
      * @returns The visited template expression span, or undefined if the visit was aborted
      */
-    override async visitTemplateExpressionSpan(span: JS.TemplateExpression.Span, other: J): Promise<J | undefined> {
+    override visitTemplateExpressionSpan(span: JS.TemplateExpression.Span, other: J): J | undefined {
         return this.visitElement(span, other as JS.TemplateExpression.Span);
     }
 
@@ -914,7 +914,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other tuple to compare with
      * @returns The visited tuple, or undefined if the visit was aborted
      */
-    override async visitTuple(tuple: JS.Tuple, other: J): Promise<J | undefined> {
+    override visitTuple(tuple: JS.Tuple, other: J): J | undefined {
         return this.visitElement(tuple, other as JS.Tuple);
     }
 
@@ -925,7 +925,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other type declaration to compare with
      * @returns The visited type declaration, or undefined if the visit was aborted
      */
-    override async visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, other: J): Promise<J | undefined> {
+    override visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, other: J): J | undefined {
         return this.visitElement(typeDeclaration, other as JS.TypeDeclaration);
     }
 
@@ -936,7 +936,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other typeof expression to compare with
      * @returns The visited typeof expression, or undefined if the visit was aborted
      */
-    override async visitTypeOf(typeOf: JS.TypeOf, other: J): Promise<J | undefined> {
+    override visitTypeOf(typeOf: JS.TypeOf, other: J): J | undefined {
         return this.visitElement(typeOf, other as JS.TypeOf);
     }
 
@@ -947,7 +947,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other type tree expression to compare with
      * @returns The visited type tree expression, or undefined if the visit was aborted
      */
-    override async visitTypeTreeExpression(typeTreeExpression: JS.TypeTreeExpression, other: J): Promise<J | undefined> {
+    override visitTypeTreeExpression(typeTreeExpression: JS.TypeTreeExpression, other: J): J | undefined {
         return this.visitElement(typeTreeExpression, other as JS.TypeTreeExpression);
     }
 
@@ -958,7 +958,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other as expression to compare with
      * @returns The visited as expression, or undefined if the visit was aborted
      */
-    override async visitAs(as_: JS.As, other: J): Promise<J | undefined> {
+    override visitAs(as_: JS.As, other: J): J | undefined {
         return this.visitElement(as_, other as JS.As);
     }
 
@@ -969,7 +969,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other assignment operation to compare with
      * @returns The visited assignment operation, or undefined if the visit was aborted
      */
-    override async visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, other: J): Promise<J | undefined> {
+    override visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, other: J): J | undefined {
         return this.visitElement(assignmentOperation, other as JS.AssignmentOperation);
     }
 
@@ -980,7 +980,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other indexed access type to compare with
      * @returns The visited indexed access type, or undefined if the visit was aborted
      */
-    override async visitIndexedAccessType(indexedAccessType: JS.IndexedAccessType, other: J): Promise<J | undefined> {
+    override visitIndexedAccessType(indexedAccessType: JS.IndexedAccessType, other: J): J | undefined {
         return this.visitElement(indexedAccessType, other as JS.IndexedAccessType);
     }
 
@@ -991,7 +991,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other index type to compare with
      * @returns The visited index type, or undefined if the visit was aborted
      */
-    override async visitIndexedAccessTypeIndexType(indexType: JS.IndexedAccessType.IndexType, other: J): Promise<J | undefined> {
+    override visitIndexedAccessTypeIndexType(indexType: JS.IndexedAccessType.IndexType, other: J): J | undefined {
         return this.visitElement(indexType, other as JS.IndexedAccessType.IndexType);
     }
 
@@ -1002,7 +1002,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other type query to compare with
      * @returns The visited type query, or undefined if the visit was aborted
      */
-    override async visitTypeQuery(typeQuery: JS.TypeQuery, other: J): Promise<J | undefined> {
+    override visitTypeQuery(typeQuery: JS.TypeQuery, other: J): J | undefined {
         return this.visitElement(typeQuery, other as JS.TypeQuery);
     }
 
@@ -1013,7 +1013,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other type info to compare with
      * @returns The visited type info, or undefined if the visit was aborted
      */
-    override async visitTypeInfo(typeInfo: JS.TypeInfo, other: J): Promise<J | undefined> {
+    override visitTypeInfo(typeInfo: JS.TypeInfo, other: J): J | undefined {
         return this.visitElement(typeInfo, other as JS.TypeInfo);
     }
 
@@ -1024,7 +1024,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other computed property name to compare with
      * @returns The visited computed property name, or undefined if the visit was aborted
      */
-    override async visitComputedPropertyName(computedPropertyName: JS.ComputedPropertyName, other: J): Promise<J | undefined> {
+    override visitComputedPropertyName(computedPropertyName: JS.ComputedPropertyName, other: J): J | undefined {
         return this.visitElement(computedPropertyName, other as JS.ComputedPropertyName);
     }
 
@@ -1035,7 +1035,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other type operator to compare with
      * @returns The visited type operator, or undefined if the visit was aborted
      */
-    override async visitTypeOperator(typeOperator: JS.TypeOperator, other: J): Promise<J | undefined> {
+    override visitTypeOperator(typeOperator: JS.TypeOperator, other: J): J | undefined {
         return this.visitElement(typeOperator, other as JS.TypeOperator);
     }
 
@@ -1046,7 +1046,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other type predicate to compare with
      * @returns The visited type predicate, or undefined if the visit was aborted
      */
-    override async visitTypePredicate(typePredicate: JS.TypePredicate, other: J): Promise<J | undefined> {
+    override visitTypePredicate(typePredicate: JS.TypePredicate, other: J): J | undefined {
         return this.visitElement(typePredicate, other as JS.TypePredicate);
     }
 
@@ -1057,7 +1057,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other union to compare with
      * @returns The visited union, or undefined if the visit was aborted
      */
-    override async visitUnion(union: JS.Union, other: J): Promise<J | undefined> {
+    override visitUnion(union: JS.Union, other: J): J | undefined {
         return this.visitElement(union, other as JS.Union);
     }
 
@@ -1068,7 +1068,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other intersection to compare with
      * @returns The visited intersection, or undefined if the visit was aborted
      */
-    override async visitIntersection(intersection: JS.Intersection, other: J): Promise<J | undefined> {
+    override visitIntersection(intersection: JS.Intersection, other: J): J | undefined {
         return this.visitElement(intersection, other as JS.Intersection);
     }
 
@@ -1079,7 +1079,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other annotated type to compare with
      * @returns The visited annotated type, or undefined if the visit was aborted
      */
-    override async visitAnnotatedType(annotatedType: J.AnnotatedType, other: J): Promise<J | undefined> {
+    override visitAnnotatedType(annotatedType: J.AnnotatedType, other: J): J | undefined {
         return this.visitElement(annotatedType, other as J.AnnotatedType);
     }
 
@@ -1090,7 +1090,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other annotation to compare with
      * @returns The visited annotation, or undefined if the visit was aborted
      */
-    override async visitAnnotation(annotation: J.Annotation, other: J): Promise<J | undefined> {
+    override visitAnnotation(annotation: J.Annotation, other: J): J | undefined {
         return this.visitElement(annotation, other as J.Annotation);
     }
 
@@ -1101,7 +1101,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other array access expression to compare with
      * @returns The visited array access expression, or undefined if the visit was aborted
      */
-    override async visitArrayAccess(arrayAccess: J.ArrayAccess, other: J): Promise<J | undefined> {
+    override visitArrayAccess(arrayAccess: J.ArrayAccess, other: J): J | undefined {
         return this.visitElement(arrayAccess, other as J.ArrayAccess);
     }
 
@@ -1112,7 +1112,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other array dimension to compare with
      * @returns The visited array dimension, or undefined if the visit was aborted
      */
-    override async visitArrayDimension(arrayDimension: J.ArrayDimension, other: J): Promise<J | undefined> {
+    override visitArrayDimension(arrayDimension: J.ArrayDimension, other: J): J | undefined {
         return this.visitElement(arrayDimension, other as J.ArrayDimension);
     }
 
@@ -1123,7 +1123,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other array type to compare with
      * @returns The visited array type, or undefined if the visit was aborted
      */
-    override async visitArrayType(arrayType: J.ArrayType, other: J): Promise<J | undefined> {
+    override visitArrayType(arrayType: J.ArrayType, other: J): J | undefined {
         return this.visitElement(arrayType, other as J.ArrayType);
     }
 
@@ -1134,7 +1134,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other assert statement to compare with
      * @returns The visited assert statement, or undefined if the visit was aborted
      */
-    override async visitAssert(anAssert: J.Assert, other: J): Promise<J | undefined> {
+    override visitAssert(anAssert: J.Assert, other: J): J | undefined {
         return this.visitElement(anAssert, other as J.Assert);
     }
 
@@ -1145,7 +1145,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other assignment expression to compare with
      * @returns The visited assignment expression, or undefined if the visit was aborted
      */
-    override async visitAssignment(assignment: J.Assignment, other: J): Promise<J | undefined> {
+    override visitAssignment(assignment: J.Assignment, other: J): J | undefined {
         return this.visitElement(assignment, other as J.Assignment);
     }
 
@@ -1156,7 +1156,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other assignment operation expression to compare with
      * @returns The visited assignment operation expression, or undefined if the visit was aborted
      */
-    override async visitAssignmentOperation(assignOp: J.AssignmentOperation, other: J): Promise<J | undefined> {
+    override visitAssignmentOperation(assignOp: J.AssignmentOperation, other: J): J | undefined {
         return this.visitElement(assignOp, other as J.AssignmentOperation);
     }
 
@@ -1167,7 +1167,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other break statement to compare with
      * @returns The visited break statement, or undefined if the visit was aborted
      */
-    override async visitBreak(breakStatement: J.Break, other: J): Promise<J | undefined> {
+    override visitBreak(breakStatement: J.Break, other: J): J | undefined {
         return this.visitElement(breakStatement, other as J.Break);
     }
 
@@ -1178,7 +1178,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other case statement to compare with
      * @returns The visited case statement, or undefined if the visit was aborted
      */
-    override async visitCase(aCase: J.Case, other: J): Promise<J | undefined> {
+    override visitCase(aCase: J.Case, other: J): J | undefined {
         return this.visitElement(aCase, other as J.Case);
     }
 
@@ -1189,7 +1189,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other class declaration to compare with
      * @returns The visited class declaration, or undefined if the visit was aborted
      */
-    override async visitClassDeclaration(classDecl: J.ClassDeclaration, other: J): Promise<J | undefined> {
+    override visitClassDeclaration(classDecl: J.ClassDeclaration, other: J): J | undefined {
         return this.visitElement(classDecl, other as J.ClassDeclaration);
     }
 
@@ -1200,7 +1200,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other class declaration kind to compare with
      * @returns The visited class declaration kind, or undefined if the visit was aborted
      */
-    override async visitClassDeclarationKind(kind: J.ClassDeclaration.Kind, other: J): Promise<J | undefined> {
+    override visitClassDeclarationKind(kind: J.ClassDeclaration.Kind, other: J): J | undefined {
         return this.visitElement(kind, other as J.ClassDeclaration.Kind);
     }
 
@@ -1211,7 +1211,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other compilation unit to compare with
      * @returns The visited compilation unit, or undefined if the visit was aborted
      */
-    override async visitCompilationUnit(compilationUnit: J.CompilationUnit, other: J): Promise<J | undefined> {
+    override visitCompilationUnit(compilationUnit: J.CompilationUnit, other: J): J | undefined {
         return this.visitElement(compilationUnit, other as J.CompilationUnit);
     }
 
@@ -1222,7 +1222,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other continue statement to compare with
      * @returns The visited continue statement, or undefined if the visit was aborted
      */
-    override async visitContinue(continueStatement: J.Continue, other: J): Promise<J | undefined> {
+    override visitContinue(continueStatement: J.Continue, other: J): J | undefined {
         return this.visitElement(continueStatement, other as J.Continue);
     }
 
@@ -1233,7 +1233,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other control parentheses to compare with
      * @returns The visited control parentheses, or undefined if the visit was aborted
      */
-    override async visitControlParentheses<T extends J>(controlParens: J.ControlParentheses<T>, other: J): Promise<J | undefined> {
+    override visitControlParentheses<T extends J>(controlParens: J.ControlParentheses<T>, other: J): J | undefined {
         return this.visitElement(controlParens, other as J.ControlParentheses<T>);
     }
 
@@ -1244,7 +1244,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other deconstruction pattern to compare with
      * @returns The visited deconstruction pattern, or undefined if the visit was aborted
      */
-    override async visitDeconstructionPattern(pattern: J.DeconstructionPattern, other: J): Promise<J | undefined> {
+    override visitDeconstructionPattern(pattern: J.DeconstructionPattern, other: J): J | undefined {
         return this.visitElement(pattern, other as J.DeconstructionPattern);
     }
 
@@ -1255,7 +1255,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other do-while loop to compare with
      * @returns The visited do-while loop, or undefined if the visit was aborted
      */
-    override async visitDoWhileLoop(doWhileLoop: J.DoWhileLoop, other: J): Promise<J | undefined> {
+    override visitDoWhileLoop(doWhileLoop: J.DoWhileLoop, other: J): J | undefined {
         return this.visitElement(doWhileLoop, other as J.DoWhileLoop);
     }
 
@@ -1266,7 +1266,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other empty statement to compare with
      * @returns The visited empty statement, or undefined if the visit was aborted
      */
-    override async visitEmpty(empty: J.Empty, other: J): Promise<J | undefined> {
+    override visitEmpty(empty: J.Empty, other: J): J | undefined {
         return this.visitElement(empty, other as J.Empty);
     }
 
@@ -1277,7 +1277,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other enum value to compare with
      * @returns The visited enum value, or undefined if the visit was aborted
      */
-    override async visitEnumValue(enumValue: J.EnumValue, other: J): Promise<J | undefined> {
+    override visitEnumValue(enumValue: J.EnumValue, other: J): J | undefined {
         return this.visitElement(enumValue, other as J.EnumValue);
     }
 
@@ -1288,7 +1288,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other enum value set to compare with
      * @returns The visited enum value set, or undefined if the visit was aborted
      */
-    override async visitEnumValueSet(enumValueSet: J.EnumValueSet, other: J): Promise<J | undefined> {
+    override visitEnumValueSet(enumValueSet: J.EnumValueSet, other: J): J | undefined {
         return this.visitElement(enumValueSet, other as J.EnumValueSet);
     }
 
@@ -1299,7 +1299,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other erroneous node to compare with
      * @returns The visited erroneous node, or undefined if the visit was aborted
      */
-    override async visitErroneous(erroneous: J.Erroneous, other: J): Promise<J | undefined> {
+    override visitErroneous(erroneous: J.Erroneous, other: J): J | undefined {
         return this.visitElement(erroneous, other as J.Erroneous);
     }
 
@@ -1310,7 +1310,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other field access expression to compare with
      * @returns The visited field access expression, or undefined if the visit was aborted
      */
-    override async visitFieldAccess(fieldAccess: J.FieldAccess, other: J): Promise<J | undefined> {
+    override visitFieldAccess(fieldAccess: J.FieldAccess, other: J): J | undefined {
         return this.visitElement(fieldAccess, other as J.FieldAccess);
     }
 
@@ -1321,7 +1321,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other for-each loop to compare with
      * @returns The visited for-each loop, or undefined if the visit was aborted
      */
-    override async visitForEachLoop(forEachLoop: J.ForEachLoop, other: J): Promise<J | undefined> {
+    override visitForEachLoop(forEachLoop: J.ForEachLoop, other: J): J | undefined {
         return this.visitElement(forEachLoop, other as J.ForEachLoop);
     }
 
@@ -1332,7 +1332,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other for-each loop control to compare with
      * @returns The visited for-each loop control, or undefined if the visit was aborted
      */
-    override async visitForEachLoopControl(control: J.ForEachLoop.Control, other: J): Promise<J | undefined> {
+    override visitForEachLoopControl(control: J.ForEachLoop.Control, other: J): J | undefined {
         return this.visitElement(control, other as J.ForEachLoop.Control);
     }
 
@@ -1343,7 +1343,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other for loop to compare with
      * @returns The visited for loop, or undefined if the visit was aborted
      */
-    override async visitForLoop(forLoop: J.ForLoop, other: J): Promise<J | undefined> {
+    override visitForLoop(forLoop: J.ForLoop, other: J): J | undefined {
         return this.visitElement(forLoop, other as J.ForLoop);
     }
 
@@ -1354,7 +1354,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other for loop control to compare with
      * @returns The visited for loop control, or undefined if the visit was aborted
      */
-    override async visitForLoopControl(control: J.ForLoop.Control, other: J): Promise<J | undefined> {
+    override visitForLoopControl(control: J.ForLoop.Control, other: J): J | undefined {
         return this.visitElement(control, other as J.ForLoop.Control);
     }
 
@@ -1365,7 +1365,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other if statement to compare with
      * @returns The visited if statement, or undefined if the visit was aborted
      */
-    override async visitIf(ifStatement: J.If, other: J): Promise<J | undefined> {
+    override visitIf(ifStatement: J.If, other: J): J | undefined {
         return this.visitElement(ifStatement, other as J.If);
     }
 
@@ -1376,7 +1376,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other else statement to compare with
      * @returns The visited else statement, or undefined if the visit was aborted
      */
-    override async visitElse(elseStatement: J.If.Else, other: J): Promise<J | undefined> {
+    override visitElse(elseStatement: J.If.Else, other: J): J | undefined {
         return this.visitElement(elseStatement, other as J.If.Else);
     }
 
@@ -1387,7 +1387,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other import statement to compare with
      * @returns The visited import statement, or undefined if the visit was aborted
      */
-    override async visitImport(importStatement: J.Import, other: J): Promise<J | undefined> {
+    override visitImport(importStatement: J.Import, other: J): J | undefined {
         return this.visitElement(importStatement, other as J.Import);
     }
 
@@ -1398,7 +1398,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other instanceof expression to compare with
      * @returns The visited instanceof expression, or undefined if the visit was aborted
      */
-    override async visitInstanceOf(instanceOf: J.InstanceOf, other: J): Promise<J | undefined> {
+    override visitInstanceOf(instanceOf: J.InstanceOf, other: J): J | undefined {
         return this.visitElement(instanceOf, other as J.InstanceOf);
     }
 
@@ -1409,7 +1409,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other intersection type to compare with
      * @returns The visited intersection type, or undefined if the visit was aborted
      */
-    override async visitIntersectionType(intersectionType: J.IntersectionType, other: J): Promise<J | undefined> {
+    override visitIntersectionType(intersectionType: J.IntersectionType, other: J): J | undefined {
         return this.visitElement(intersectionType, other as J.IntersectionType);
     }
 
@@ -1420,7 +1420,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other label statement to compare with
      * @returns The visited label statement, or undefined if the visit was aborted
      */
-    override async visitLabel(label: J.Label, other: J): Promise<J | undefined> {
+    override visitLabel(label: J.Label, other: J): J | undefined {
         return this.visitElement(label, other as J.Label);
     }
 
@@ -1431,7 +1431,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other lambda expression to compare with
      * @returns The visited lambda expression, or undefined if the visit was aborted
      */
-    override async visitLambda(lambda: J.Lambda, other: J): Promise<J | undefined> {
+    override visitLambda(lambda: J.Lambda, other: J): J | undefined {
         return this.visitElement(lambda, other as J.Lambda);
     }
 
@@ -1442,7 +1442,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other lambda parameters to compare with
      * @returns The visited lambda parameters, or undefined if the visit was aborted
      */
-    override async visitLambdaParameters(parameters: J.Lambda.Parameters, other: J): Promise<J | undefined> {
+    override visitLambdaParameters(parameters: J.Lambda.Parameters, other: J): J | undefined {
         return this.visitElement(parameters, other as J.Lambda.Parameters);
     }
 
@@ -1453,7 +1453,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other member reference to compare with
      * @returns The visited member reference, or undefined if the visit was aborted
      */
-    override async visitMemberReference(memberReference: J.MemberReference, other: J): Promise<J | undefined> {
+    override visitMemberReference(memberReference: J.MemberReference, other: J): J | undefined {
         return this.visitElement(memberReference, other as J.MemberReference);
     }
 
@@ -1464,7 +1464,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other method declaration to compare with
      * @returns The visited method declaration, or undefined if the visit was aborted
      */
-    override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): Promise<J | undefined> {
+    override visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): J | undefined {
         return this.visitElement(methodDeclaration, other as J.MethodDeclaration);
     }
 
@@ -1475,7 +1475,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other method invocation to compare with
      * @returns The visited method invocation, or undefined if the visit was aborted
      */
-    override async visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): Promise<J | undefined> {
+    override visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): J | undefined {
         return this.visitElement(methodInvocation, other as J.MethodInvocation);
     }
 
@@ -1486,7 +1486,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other modifier to compare with
      * @returns The visited modifier, or undefined if the visit was aborted
      */
-    override async visitModifier(modifier: J.Modifier, other: J): Promise<J | undefined> {
+    override visitModifier(modifier: J.Modifier, other: J): J | undefined {
         return this.visitElement(modifier, other as J.Modifier);
     }
 
@@ -1497,7 +1497,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other multi-catch expression to compare with
      * @returns The visited multi-catch expression, or undefined if the visit was aborted
      */
-    override async visitMultiCatch(multiCatch: J.MultiCatch, other: J): Promise<J | undefined> {
+    override visitMultiCatch(multiCatch: J.MultiCatch, other: J): J | undefined {
         return this.visitElement(multiCatch, other as J.MultiCatch);
     }
 
@@ -1508,7 +1508,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other new array expression to compare with
      * @returns The visited new array expression, or undefined if the visit was aborted
      */
-    override async visitNewArray(newArray: J.NewArray, other: J): Promise<J | undefined> {
+    override visitNewArray(newArray: J.NewArray, other: J): J | undefined {
         return this.visitElement(newArray, other as J.NewArray);
     }
 
@@ -1519,7 +1519,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other new class expression to compare with
      * @returns The visited new class expression, or undefined if the visit was aborted
      */
-    override async visitNewClass(newClass: J.NewClass, other: J): Promise<J | undefined> {
+    override visitNewClass(newClass: J.NewClass, other: J): J | undefined {
         return this.visitElement(newClass, other as J.NewClass);
     }
 
@@ -1530,7 +1530,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other nullable type to compare with
      * @returns The visited nullable type, or undefined if the visit was aborted
      */
-    override async visitNullableType(nullableType: J.NullableType, other: J): Promise<J | undefined> {
+    override visitNullableType(nullableType: J.NullableType, other: J): J | undefined {
         return this.visitElement(nullableType, other as J.NullableType);
     }
 
@@ -1541,7 +1541,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other package declaration to compare with
      * @returns The visited package declaration, or undefined if the visit was aborted
      */
-    override async visitPackage(packageDeclaration: J.Package, other: J): Promise<J | undefined> {
+    override visitPackage(packageDeclaration: J.Package, other: J): J | undefined {
         return this.visitElement(packageDeclaration, other as J.Package);
     }
 
@@ -1552,7 +1552,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other parameterized type to compare with
      * @returns The visited parameterized type, or undefined if the visit was aborted
      */
-    override async visitParameterizedType(parameterizedType: J.ParameterizedType, other: J): Promise<J | undefined> {
+    override visitParameterizedType(parameterizedType: J.ParameterizedType, other: J): J | undefined {
         return this.visitElement(parameterizedType, other as J.ParameterizedType);
     }
 
@@ -1563,7 +1563,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other parentheses expression to compare with
      * @returns The visited parentheses expression, or undefined if the visit was aborted
      */
-    override async visitParentheses(parentheses: J.Parentheses<J>, other: J): Promise<J | undefined> {
+    override visitParentheses(parentheses: J.Parentheses<J>, other: J): J | undefined {
         return this.visitElement(parentheses, other as J.Parentheses<J>);
     }
 
@@ -1574,7 +1574,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other parenthesized type tree to compare with
      * @returns The visited parenthesized type tree, or undefined if the visit was aborted
      */
-    override async visitParenthesizedTypeTree(parenthesizedTypeTree: J.ParenthesizedTypeTree, other: J): Promise<J | undefined> {
+    override visitParenthesizedTypeTree(parenthesizedTypeTree: J.ParenthesizedTypeTree, other: J): J | undefined {
         return this.visitElement(parenthesizedTypeTree, other as J.ParenthesizedTypeTree);
     }
 
@@ -1585,7 +1585,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other primitive type to compare with
      * @returns The visited primitive type, or undefined if the visit was aborted
      */
-    override async visitPrimitive(primitive: J.Primitive, other: J): Promise<J | undefined> {
+    override visitPrimitive(primitive: J.Primitive, other: J): J | undefined {
         return this.visitElement(primitive, other as J.Primitive);
     }
 
@@ -1596,7 +1596,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other return statement to compare with
      * @returns The visited return statement, or undefined if the visit was aborted
      */
-    override async visitReturn(returnStatement: J.Return, other: J): Promise<J | undefined> {
+    override visitReturn(returnStatement: J.Return, other: J): J | undefined {
         return this.visitElement(returnStatement, other as J.Return);
     }
 
@@ -1607,7 +1607,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other switch statement to compare with
      * @returns The visited switch statement, or undefined if the visit was aborted
      */
-    override async visitSwitch(switchStatement: J.Switch, other: J): Promise<J | undefined> {
+    override visitSwitch(switchStatement: J.Switch, other: J): J | undefined {
         return this.visitElement(switchStatement, other as J.Switch);
     }
 
@@ -1618,7 +1618,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other switch expression to compare with
      * @returns The visited switch expression, or undefined if the visit was aborted
      */
-    override async visitSwitchExpression(switchExpression: J.SwitchExpression, other: J): Promise<J | undefined> {
+    override visitSwitchExpression(switchExpression: J.SwitchExpression, other: J): J | undefined {
         return this.visitElement(switchExpression, other as J.SwitchExpression);
     }
 
@@ -1629,7 +1629,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other synchronized statement to compare with
      * @returns The visited synchronized statement, or undefined if the visit was aborted
      */
-    override async visitSynchronized(synchronizedStatement: J.Synchronized, other: J): Promise<J | undefined> {
+    override visitSynchronized(synchronizedStatement: J.Synchronized, other: J): J | undefined {
         return this.visitElement(synchronizedStatement, other as J.Synchronized);
     }
 
@@ -1640,7 +1640,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other ternary expression to compare with
      * @returns The visited ternary expression, or undefined if the visit was aborted
      */
-    override async visitTernary(ternary: J.Ternary, other: J): Promise<J | undefined> {
+    override visitTernary(ternary: J.Ternary, other: J): J | undefined {
         return this.visitElement(ternary, other as J.Ternary);
     }
 
@@ -1651,7 +1651,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other throw statement to compare with
      * @returns The visited throw statement, or undefined if the visit was aborted
      */
-    override async visitThrow(throwStatement: J.Throw, other: J): Promise<J | undefined> {
+    override visitThrow(throwStatement: J.Throw, other: J): J | undefined {
         return this.visitElement(throwStatement, other as J.Throw);
     }
 
@@ -1662,7 +1662,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other try statement to compare with
      * @returns The visited try statement, or undefined if the visit was aborted
      */
-    override async visitTry(tryStatement: J.Try, other: J): Promise<J | undefined> {
+    override visitTry(tryStatement: J.Try, other: J): J | undefined {
         return this.visitElement(tryStatement, other as J.Try);
     }
 
@@ -1673,7 +1673,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other try resource to compare with
      * @returns The visited try resource, or undefined if the visit was aborted
      */
-    override async visitTryResource(resource: J.Try.Resource, other: J): Promise<J | undefined> {
+    override visitTryResource(resource: J.Try.Resource, other: J): J | undefined {
         return this.visitElement(resource, other as J.Try.Resource);
     }
 
@@ -1684,7 +1684,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other try catch block to compare with
      * @returns The visited try catch block, or undefined if the visit was aborted
      */
-    override async visitTryCatch(tryCatch: J.Try.Catch, other: J): Promise<J | undefined> {
+    override visitTryCatch(tryCatch: J.Try.Catch, other: J): J | undefined {
         return this.visitElement(tryCatch, other as J.Try.Catch);
     }
 
@@ -1695,7 +1695,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other type cast expression to compare with
      * @returns The visited type cast expression, or undefined if the visit was aborted
      */
-    override async visitTypeCast(typeCast: J.TypeCast, other: J): Promise<J | undefined> {
+    override visitTypeCast(typeCast: J.TypeCast, other: J): J | undefined {
         return this.visitElement(typeCast, other as J.TypeCast);
     }
 
@@ -1706,7 +1706,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other type parameter to compare with
      * @returns The visited type parameter, or undefined if the visit was aborted
      */
-    override async visitTypeParameter(typeParameter: J.TypeParameter, other: J): Promise<J | undefined> {
+    override visitTypeParameter(typeParameter: J.TypeParameter, other: J): J | undefined {
         return this.visitElement(typeParameter, other as J.TypeParameter);
     }
 
@@ -1717,7 +1717,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other type parameters to compare with
      * @returns The visited type parameters, or undefined if the visit was aborted
      */
-    override async visitTypeParameters(typeParameters: J.TypeParameters, other: J): Promise<J | undefined> {
+    override visitTypeParameters(typeParameters: J.TypeParameters, other: J): J | undefined {
         return this.visitElement(typeParameters, other as J.TypeParameters);
     }
 
@@ -1728,7 +1728,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other unary expression to compare with
      * @returns The visited unary expression, or undefined if the visit was aborted
      */
-    override async visitUnary(unary: J.Unary, other: J): Promise<J | undefined> {
+    override visitUnary(unary: J.Unary, other: J): J | undefined {
         return this.visitElement(unary, other as J.Unary);
     }
 
@@ -1739,7 +1739,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other unknown node to compare with
      * @returns The visited unknown node, or undefined if the visit was aborted
      */
-    override async visitUnknown(unknown: J.Unknown, other: J): Promise<J | undefined> {
+    override visitUnknown(unknown: J.Unknown, other: J): J | undefined {
         return this.visitElement(unknown, other as J.Unknown);
     }
 
@@ -1750,7 +1750,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other unknown source to compare with
      * @returns The visited unknown source, or undefined if the visit was aborted
      */
-    override async visitUnknownSource(unknownSource: J.UnknownSource, other: J): Promise<J | undefined> {
+    override visitUnknownSource(unknownSource: J.UnknownSource, other: J): J | undefined {
         return this.visitElement(unknownSource, other as J.UnknownSource);
     }
 
@@ -1761,7 +1761,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other variable declarations to compare with
      * @returns The visited variable declarations, or undefined if the visit was aborted
      */
-    override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): Promise<J | undefined> {
+    override visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): J | undefined {
         return this.visitElement(variableDeclarations, other as J.VariableDeclarations);
     }
 
@@ -1772,7 +1772,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other variable declaration to compare with
      * @returns The visited variable declaration, or undefined if the visit was aborted
      */
-    override async visitVariable(variable: J.VariableDeclarations.NamedVariable, other: J): Promise<J | undefined> {
+    override visitVariable(variable: J.VariableDeclarations.NamedVariable, other: J): J | undefined {
         return this.visitElement(variable, other as J.VariableDeclarations.NamedVariable);
     }
 
@@ -1783,7 +1783,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other while loop to compare with
      * @returns The visited while loop, or undefined if the visit was aborted
      */
-    override async visitWhileLoop(whileLoop: J.WhileLoop, other: J): Promise<J | undefined> {
+    override visitWhileLoop(whileLoop: J.WhileLoop, other: J): J | undefined {
         return this.visitElement(whileLoop, other as J.WhileLoop);
     }
 
@@ -1794,7 +1794,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other wildcard to compare with
      * @returns The visited wildcard, or undefined if the visit was aborted
      */
-    override async visitWildcard(wildcard: J.Wildcard, other: J): Promise<J | undefined> {
+    override visitWildcard(wildcard: J.Wildcard, other: J): J | undefined {
         return this.visitElement(wildcard, other as J.Wildcard);
     }
 
@@ -1805,7 +1805,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other yield statement to compare with
      * @returns The visited yield statement, or undefined if the visit was aborted
      */
-    override async visitYield(yieldStatement: J.Yield, other: J): Promise<J | undefined> {
+    override visitYield(yieldStatement: J.Yield, other: J): J | undefined {
         return this.visitElement(yieldStatement, other as J.Yield);
     }
 
@@ -1816,7 +1816,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other void expression to compare with
      * @returns The visited void expression, or undefined if the visit was aborted
      */
-    override async visitVoid(void_: JS.Void, other: J): Promise<J | undefined> {
+    override visitVoid(void_: JS.Void, other: J): J | undefined {
         return this.visitElement(void_, other as JS.Void);
     }
 
@@ -1827,7 +1827,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other with statement to compare with
      * @returns The visited with statement, or undefined if the visit was aborted
      */
-    override async visitWithStatement(withStatement: JS.WithStatement, other: J): Promise<J | undefined> {
+    override visitWithStatement(withStatement: JS.WithStatement, other: J): J | undefined {
         return this.visitElement(withStatement, other as JS.WithStatement);
     }
 
@@ -1838,7 +1838,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other index signature declaration to compare with
      * @returns The visited index signature declaration, or undefined if the visit was aborted
      */
-    override async visitIndexSignatureDeclaration(indexSignatureDeclaration: JS.IndexSignatureDeclaration, other: J): Promise<J | undefined> {
+    override visitIndexSignatureDeclaration(indexSignatureDeclaration: JS.IndexSignatureDeclaration, other: J): J | undefined {
         return this.visitElement(indexSignatureDeclaration, other as JS.IndexSignatureDeclaration);
     }
 
@@ -1849,7 +1849,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other for-of loop to compare with
      * @returns The visited for-of loop, or undefined if the visit was aborted
      */
-    override async visitForOfLoop(forOfLoop: JS.ForOfLoop, other: J): Promise<J | undefined> {
+    override visitForOfLoop(forOfLoop: JS.ForOfLoop, other: J): J | undefined {
         return this.visitElement(forOfLoop, other as JS.ForOfLoop);
     }
 
@@ -1860,7 +1860,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other for-in loop to compare with
      * @returns The visited for-in loop, or undefined if the visit was aborted
      */
-    override async visitForInLoop(forInLoop: JS.ForInLoop, other: J): Promise<J | undefined> {
+    override visitForInLoop(forInLoop: JS.ForInLoop, other: J): J | undefined {
         return this.visitElement(forInLoop, other as JS.ForInLoop);
     }
 
@@ -1871,7 +1871,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other namespace declaration to compare with
      * @returns The visited namespace declaration, or undefined if the visit was aborted
      */
-    override async visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, other: J): Promise<J | undefined> {
+    override visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, other: J): J | undefined {
         return this.visitElement(namespaceDeclaration, other as JS.NamespaceDeclaration);
     }
 
@@ -1882,7 +1882,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other type literal to compare with
      * @returns The visited type literal, or undefined if the visit was aborted
      */
-    override async visitTypeLiteral(typeLiteral: JS.TypeLiteral, other: J): Promise<J | undefined> {
+    override visitTypeLiteral(typeLiteral: JS.TypeLiteral, other: J): J | undefined {
         return this.visitElement(typeLiteral, other as JS.TypeLiteral);
     }
 
@@ -1893,7 +1893,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other binding element to compare with
      * @returns The visited binding element, or undefined if the visit was aborted
      */
-    override async visitBindingElement(bindingElement: JS.BindingElement, other: J): Promise<J | undefined> {
+    override visitBindingElement(bindingElement: JS.BindingElement, other: J): J | undefined {
         return this.visitElement(bindingElement, other as JS.BindingElement);
     }
 
@@ -1904,7 +1904,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other array binding pattern to compare with
      * @returns The visited array binding pattern, or undefined if the visit was aborted
      */
-    override async visitArrayBindingPattern(arrayBindingPattern: JS.ArrayBindingPattern, other: J): Promise<J | undefined> {
+    override visitArrayBindingPattern(arrayBindingPattern: JS.ArrayBindingPattern, other: J): J | undefined {
         return this.visitElement(arrayBindingPattern, other as JS.ArrayBindingPattern);
     }
 
@@ -1915,7 +1915,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other export declaration to compare with
      * @returns The visited export declaration, or undefined if the visit was aborted
      */
-    override async visitExportDeclaration(exportDeclaration: JS.ExportDeclaration, other: J): Promise<J | undefined> {
+    override visitExportDeclaration(exportDeclaration: JS.ExportDeclaration, other: J): J | undefined {
         return this.visitElement(exportDeclaration, other as JS.ExportDeclaration);
     }
 
@@ -1926,7 +1926,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other export assignment to compare with
      * @returns The visited export assignment, or undefined if the visit was aborted
      */
-    override async visitExportAssignment(exportAssignment: JS.ExportAssignment, other: J): Promise<J | undefined> {
+    override visitExportAssignment(exportAssignment: JS.ExportAssignment, other: J): J | undefined {
         return this.visitElement(exportAssignment, other as JS.ExportAssignment);
     }
 
@@ -1937,7 +1937,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other named exports to compare with
      * @returns The visited named exports, or undefined if the visit was aborted
      */
-    override async visitNamedExports(namedExports: JS.NamedExports, other: J): Promise<J | undefined> {
+    override visitNamedExports(namedExports: JS.NamedExports, other: J): J | undefined {
         return this.visitElement(namedExports, other as JS.NamedExports);
     }
 
@@ -1948,7 +1948,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other export specifier to compare with
      * @returns The visited export specifier, or undefined if the visit was aborted
      */
-    override async visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, other: J): Promise<J | undefined> {
+    override visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, other: J): J | undefined {
         return this.visitElement(exportSpecifier, other as JS.ExportSpecifier);
     }
 
@@ -1959,7 +1959,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The other computed property method declaration to compare with
      * @returns The visited computed property method declaration, or undefined if the visit was aborted
      */
-    override async visitComputedPropertyMethodDeclaration(computedPropMethod: JS.ComputedPropertyMethodDeclaration, other: J): Promise<J | undefined> {
+    override visitComputedPropertyMethodDeclaration(computedPropMethod: JS.ComputedPropertyMethodDeclaration, other: J): J | undefined {
         return this.visitElement(computedPropMethod, other as JS.ComputedPropertyMethodDeclaration);
     }
 }
@@ -2014,7 +2014,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         return tree;
     }
 
-    override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
+    override visit<R extends J>(j: Tree, p: J, parent?: Cursor): R | undefined {
         // If we've already found a mismatch, abort further processing
         if (!this.match) return j as R;
 
@@ -2029,7 +2029,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         this.targetCursor = new Cursor(unwrappedP, this.targetCursor);
         try {
             // Call the grandparent's visit to do actual visitation without the kind check
-            return await JavaScriptVisitor.prototype.visit.call(this, unwrappedJ, unwrappedP) as R | undefined;
+            return JavaScriptVisitor.prototype.visit.call(this, unwrappedJ, unwrappedP) as R | undefined;
         } finally {
             this.targetCursor = savedTargetCursor;
         }
@@ -2043,7 +2043,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * - `x => x + 1` matches `x => { return x + 1; }`
      * - `(x, y) => x + y` matches `(x, y) => { return x + y; }`
      */
-    override async visitArrowFunction(arrowFunction: JS.ArrowFunction, other: J): Promise<J | undefined> {
+    override visitArrowFunction(arrowFunction: JS.ArrowFunction, other: J): J | undefined {
         if (!this.match) return arrowFunction;
 
         if (other.kind !== JS.Kind.ArrowFunction) {
@@ -2067,11 +2067,11 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
                     return this.arrayLengthMismatch(key);
                 }
                 for (let i = 0; i < jValue.length; i++) {
-                    await this.visitProperty(jValue[i], otherValue[i]);
+                    this.visitProperty(jValue[i], otherValue[i]);
                     if (!this.match) return arrowFunction;
                 }
             } else {
-                await this.visitProperty(jValue, otherValue);
+                this.visitProperty(jValue, otherValue);
                 if (!this.match) return arrowFunction;
             }
         }
@@ -2083,7 +2083,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             return this.arrayLengthMismatch('lambda.parameters.parameters');
         }
         for (let i = 0; i < params1.length; i++) {
-            await this.visitProperty(params1[i], params2[i]);
+            this.visitProperty(params1[i], params2[i]);
             if (!this.match) return arrowFunction;
         }
 
@@ -2097,11 +2097,11 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         if (expr1 && expr2) {
             // Both have extractable expressions - compare them
-            await this.visit(expr1, expr2);
+            this.visit(expr1, expr2);
         } else {
             // At least one is not a simple expression or block-with-return
             // Fall back to exact comparison
-            await this.visit(body1, body2);
+            this.visit(body1, body2);
         }
 
         return arrowFunction;
@@ -2114,7 +2114,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * Examples:
      * - `x => x + 1` matches `(x) => x + 1`
      */
-    override async visitLambdaParameters(parameters: J.Lambda.Parameters, other: J): Promise<J | undefined> {
+    override visitLambdaParameters(parameters: J.Lambda.Parameters, other: J): J | undefined {
         if (!this.match) return parameters;
 
         if (other.kind !== J.Kind.LambdaParameters) {
@@ -2138,11 +2138,11 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
                     return this.arrayLengthMismatch(key);
                 }
                 for (let i = 0; i < jValue.length; i++) {
-                    await this.visitProperty(jValue[i], otherValue[i]);
+                    this.visitProperty(jValue[i], otherValue[i]);
                     if (!this.match) return parameters;
                 }
             } else {
-                await this.visitProperty(jValue, otherValue);
+                this.visitProperty(jValue, otherValue);
                 if (!this.match) return parameters;
             }
         }
@@ -2158,7 +2158,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * - `{ x }` matches `{ x: x }`
      * - `{ x: x, y: y }` matches `{ x, y }`
      */
-    override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, other: J): Promise<J | undefined> {
+    override visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, other: J): J | undefined {
         if (!this.match) return propertyAssignment;
 
         if (other.kind !== JS.Kind.PropertyAssignment) {
@@ -2174,7 +2174,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         // Names must match
         if (!propName || !otherPropName || propName !== otherPropName) {
             // Can't do semantic comparison without identifiers, fall back to exact comparison
-            return await super.visitPropertyAssignment(propertyAssignment, other);
+            return super.visitPropertyAssignment(propertyAssignment, other);
         }
 
         // Detect shorthand (no initializer) vs longhand (has initializer)
@@ -2183,7 +2183,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         if (isShorthand1 === isShorthand2) {
             // Both shorthand or both longhand - use base comparison
-            return await super.visitPropertyAssignment(propertyAssignment, other);
+            return super.visitPropertyAssignment(propertyAssignment, other);
         }
 
         // One is shorthand, one is longhand - check semantic equivalence
@@ -2251,7 +2251,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * When lenientTypeMatching is enabled, null vs Type comparisons are allowed
      * (where one value is null/undefined and the other is a Type object).
      */
-    protected override async visitProperty(j: any, other: any, propertyName?: string): Promise<any> {
+    protected override visitProperty(j: any, other: any, propertyName?: string): any {
         // Handle null/undefined with lenient type matching
         if (this.lenientTypeMatching && (j == null || other == null)) {
             if (j !== other) {
@@ -2352,7 +2352,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * When types match semantically, we allow matching even if one has a receiver
      * and the other doesn't (e.g., `isDate(x)` vs `util.isDate(x)`).
      */
-    override async visitMethodInvocation(method: J.MethodInvocation, other: J): Promise<J | undefined> {
+    override visitMethodInvocation(method: J.MethodInvocation, other: J): J | undefined {
         if (other.kind !== J.Kind.MethodInvocation) {
             return this.kindMismatch();
         }
@@ -2434,7 +2434,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             }
 
             if (method.select && otherMethod.select) {
-                await this.visitRightPaddedProperty('select', method.select, otherMethod.select as any);
+                this.visitRightPaddedProperty('select', method.select, otherMethod.select as any);
                 if (!this.match) return method;
             }
         }
@@ -2446,7 +2446,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         }
 
         if (method.typeParameters && otherMethod.typeParameters) {
-            await this.visitContainerProperty('typeParameters', method.typeParameters, otherMethod.typeParameters);
+            this.visitContainerProperty('typeParameters', method.typeParameters, otherMethod.typeParameters);
             if (!this.match) return method;
         }
 
@@ -2454,12 +2454,12 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         // If we determined we can skip name check (same FQN method, possibly aliased), skip it
         // This allows matching aliased imports where names differ but types are the same
         if (!canSkipNameCheck) {
-            await this.visit(method.name, otherMethod.name);
+            this.visit(method.name, otherMethod.name);
             if (!this.match) return method;
         }
 
         // Compare arguments
-        await this.visitContainerProperty('arguments', method.arguments, otherMethod.arguments);
+        this.visitContainerProperty('arguments', method.arguments, otherMethod.arguments);
         if (!this.match) return method;
 
         return method;
@@ -2470,7 +2470,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * 1. Type checking for field access
      * 2. Semantic equivalence between `undefined` identifier and void expressions
      */
-    override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
+    override visitIdentifier(identifier: J.Identifier, other: J): J | undefined {
         // Check if this identifier is "undefined" and the other is a void expression
         if (identifier.simpleName === 'undefined' && (other as any).kind === JS.Kind.Void) {
             // Both evaluate to undefined, so they match
@@ -2509,26 +2509,26 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * When lenientTypeMatching is true, patterns without typeExpression can match
      * code with typeExpression.
      */
-    override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): Promise<J | undefined> {
+    override visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): J | undefined {
         const otherVariableDeclarations = other as J.VariableDeclarations;
 
         // Visit leading annotations
-        await this.visitArrayProperty(
+        this.visitArrayProperty(
             variableDeclarations,
             'leadingAnnotations',
             variableDeclarations.leadingAnnotations,
             otherVariableDeclarations.leadingAnnotations,
-            async (ann1, ann2) => { await this.visit(ann1, ann2); }
+            (ann1, ann2) => { this.visit(ann1, ann2); }
         );
         if (!this.match) return variableDeclarations;
 
         // Visit modifiers
-        await this.visitArrayProperty(
+        this.visitArrayProperty(
             variableDeclarations,
             'modifiers',
             variableDeclarations.modifiers,
             otherVariableDeclarations.modifiers,
-            async (mod1, mod2) => { await this.visit(mod1, mod2); }
+            (mod1, mod2) => { this.visit(mod1, mod2); }
         );
         if (!this.match) return variableDeclarations;
 
@@ -2540,7 +2540,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             // In lenient mode, skip type comparison and continue
         } else if (variableDeclarations.typeExpression && otherVariableDeclarations.typeExpression) {
             // Both have typeExpression, visit them
-            await this.visit(variableDeclarations.typeExpression, otherVariableDeclarations.typeExpression);
+            this.visit(variableDeclarations.typeExpression, otherVariableDeclarations.typeExpression);
             if (!this.match) return variableDeclarations;
         }
 
@@ -2550,12 +2550,12 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         }
 
         // Compare variables
-        await this.visitArrayProperty(
+        this.visitArrayProperty(
             variableDeclarations,
             'variables',
             variableDeclarations.variables,
             otherVariableDeclarations.variables,
-            async (var1, var2) => { await this.visitRightPadded(var1, var2 as any); }
+            (var1, var2) => { this.visitRightPadded(var1, var2 as any); }
         );
         if (!this.match) return variableDeclarations;
 
@@ -2567,26 +2567,26 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * When lenientTypeMatching is true, patterns without returnTypeExpression can match
      * code with returnTypeExpression.
      */
-    override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): Promise<J | undefined> {
+    override visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): J | undefined {
         const otherMethodDeclaration = other as J.MethodDeclaration;
 
         // Visit leading annotations
-        await this.visitArrayProperty(
+        this.visitArrayProperty(
             methodDeclaration,
             'leadingAnnotations',
             methodDeclaration.leadingAnnotations,
             otherMethodDeclaration.leadingAnnotations,
-            async (ann1, ann2) => { await this.visit(ann1, ann2); }
+            (ann1, ann2) => { this.visit(ann1, ann2); }
         );
         if (!this.match) return methodDeclaration;
 
         // Visit modifiers
-        await this.visitArrayProperty(
+        this.visitArrayProperty(
             methodDeclaration,
             'modifiers',
             methodDeclaration.modifiers,
             otherMethodDeclaration.modifiers,
-            async (mod1, mod2) => { await this.visit(mod1, mod2); }
+            (mod1, mod2) => { this.visit(mod1, mod2); }
         );
         if (!this.match) return methodDeclaration;
 
@@ -2596,7 +2596,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         }
 
         if (methodDeclaration.typeParameters && otherMethodDeclaration.typeParameters) {
-            await this.visit(methodDeclaration.typeParameters, otherMethodDeclaration.typeParameters);
+            this.visit(methodDeclaration.typeParameters, otherMethodDeclaration.typeParameters);
             if (!this.match) return methodDeclaration;
         }
 
@@ -2608,16 +2608,16 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             // In lenient mode, skip type comparison and continue
         } else if (methodDeclaration.returnTypeExpression && otherMethodDeclaration.returnTypeExpression) {
             // Both have returnTypeExpression, visit them
-            await this.visit(methodDeclaration.returnTypeExpression, otherMethodDeclaration.returnTypeExpression);
+            this.visit(methodDeclaration.returnTypeExpression, otherMethodDeclaration.returnTypeExpression);
             if (!this.match) return methodDeclaration;
         }
 
         // Visit name
-        await this.visit(methodDeclaration.name, otherMethodDeclaration.name);
+        this.visit(methodDeclaration.name, otherMethodDeclaration.name);
         if (!this.match) return methodDeclaration;
 
         // Compare parameters
-        await this.visitContainer(methodDeclaration.parameters, otherMethodDeclaration.parameters as any);
+        this.visitContainer(methodDeclaration.parameters, otherMethodDeclaration.parameters as any);
         if (!this.match) return methodDeclaration;
 
         // Visit throws if present
@@ -2626,7 +2626,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         }
 
         if (methodDeclaration.throws && otherMethodDeclaration.throws) {
-            await this.visitContainer(methodDeclaration.throws, otherMethodDeclaration.throws as any);
+            this.visitContainer(methodDeclaration.throws, otherMethodDeclaration.throws as any);
             if (!this.match) return methodDeclaration;
         }
 
@@ -2636,7 +2636,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         }
 
         if (methodDeclaration.body && otherMethodDeclaration.body) {
-            await this.visit(methodDeclaration.body, otherMethodDeclaration.body);
+            this.visit(methodDeclaration.body, otherMethodDeclaration.body);
             if (!this.match) return methodDeclaration;
         }
 
@@ -2653,7 +2653,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * - `void(0)` matches `undefined`
      * - `void 1` matches `undefined`
      */
-    override async visitVoid(voidExpr: JS.Void, other: J): Promise<J | undefined> {
+    override visitVoid(voidExpr: JS.Void, other: J): J | undefined {
         if (!this.match) return voidExpr;
 
         // Check if the other is an undefined identifier
@@ -2679,20 +2679,20 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * - `255` matches `0b11111111`
      * - `1000` matches `1e3`
      */
-    override async visitLiteral(literal: J.Literal, other: J): Promise<J | undefined> {
+    override visitLiteral(literal: J.Literal, other: J): J | undefined {
         if (!this.match) return literal;
 
         if ((other as any).kind !== J.Kind.Literal) {
-            return await super.visitLiteral(literal, other);
+            return super.visitLiteral(literal, other);
         }
 
         const otherLiteral = other as J.Literal;
 
         // Only compare value and type, ignoring valueSource (text representation) and unicodeEscapes
-        await this.visitProperty(literal.value, otherLiteral.value, 'value');
+        this.visitProperty(literal.value, otherLiteral.value, 'value');
         if (!this.match) return literal;
 
-        await this.visitProperty(literal.type, otherLiteral.type, 'type');
+        this.visitProperty(literal.type, otherLiteral.type, 'type');
         if (!this.match) return literal;
 
         return literal;

@@ -38,11 +38,13 @@ describe("RPC queues", () => {
         };
 
         const sq = new RpcSendQueue(new ReferenceMap(), Json.Kind.Document, false);
-        const batch = await sq.generate(afterWrapper, beforeWrapper);
-        expect(batch.length).toBeGreaterThan(0);
+        const rawMessages = await sq.generate(afterWrapper, beforeWrapper);
+        expect(rawMessages.length).toBeGreaterThan(0);
 
-        const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
-        const received = await rq.receive(beforeWrapper) as Wrapper;
+        // Wrap in a single batch for the receive queue
+        const batches = [rawMessages];
+        const rq = new RpcReceiveQueue(batches, new Map(), undefined);
+        const received = rq.receive(beforeWrapper) as Wrapper;
 
         // Verify the wrapper's id stayed the same
         expect(received.id).toBe("test");

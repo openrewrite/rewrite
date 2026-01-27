@@ -52,16 +52,16 @@ export interface OmitParentheses extends Marker {
 
 // Register codecs for all Java markers with additional properties
 RpcCodecs.registerCodec(J.Markers.TrailingComma, {
-    async rpcReceive(before: TrailingComma, q: RpcReceiveQueue): Promise<TrailingComma> {
+    rpcReceive(before: TrailingComma, q: RpcReceiveQueue): TrailingComma {
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            suffix: await q.receive(before.suffix),
+            id: q.receive(before.id),
+            suffix: q.receive(before.suffix),
         });
     },
 
-    async rpcSend(after: TrailingComma, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.suffix);
+    rpcSend(after: TrailingComma, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.suffix);
     }
 });
 
@@ -72,14 +72,14 @@ export function registerMarkerCodec<M extends Marker>(
     kind: M["kind"]
 ) {
     RpcCodecs.registerCodec(kind, {
-        async rpcReceive(before: M, q: RpcReceiveQueue): Promise<M> {
+        rpcReceive(before: M, q: RpcReceiveQueue): M {
             return updateIfChanged(before, {
-                id: await q.receive(before.id),
+                id: q.receive(before.id),
             } as Partial<M>);
         },
 
-        async rpcSend(after: M, q: RpcSendQueue): Promise<void> {
-            await q.getAndSend(after, a => a.id);
+        rpcSend(after: M, q: RpcSendQueue): void {
+            q.getAndSend(after, a => a.id);
         }
     });
 }
