@@ -145,7 +145,7 @@ class ReplaceKotlinMethodTest implements RewriteTest {
     void replaceConstructorCall() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceKotlinMethod(
-            "Holder <constructor>(kotlin.Int)",
+            "Holder <init>(kotlin.Int)",
             "listOf(value)",
             null,
             null
