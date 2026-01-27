@@ -84,7 +84,8 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
         if (from.getTag() != null) {
             p.append(":");
             visit(from.getTag(), p);
-        } else if (from.getDigest() != null) {
+        }
+        if (from.getDigest() != null) {
             p.append("@");
             visit(from.getDigest(), p);
         }
