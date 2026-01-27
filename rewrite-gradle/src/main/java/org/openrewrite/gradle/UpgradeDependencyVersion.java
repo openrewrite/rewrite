@@ -130,6 +130,33 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         Map<GroupArtifact, @Nullable Object> gaToNewVersion = new HashMap<>();
 
         Map<String, Map<GroupArtifact, Set<String>>> configurationPerGAPerModule = new HashMap<>();
+
+        /**
+         * Maps variable/property name to all candidate versions found for artifacts using that variable.
+         * Used to select the minimum compatible version when a variable is shared by multiple artifacts.
+         */
+        Map<String, Set<String>> variableVersionCandidates = new HashMap<>();
+
+        /**
+         * Gets the minimum version from all candidates for a given variable.
+         * When multiple artifacts share a version variable but have different maximum available versions,
+         * we must select the minimum to ensure all artifacts can resolve.
+         *
+         * @param variableName the variable/property name
+         * @param comparator version comparator to use for ordering
+         * @return the minimum version, or null if no candidates exist
+         */
+        @Nullable
+        String getMinimumVersion(String variableName, VersionComparator comparator) {
+            Set<String> candidates = variableVersionCandidates.get(variableName);
+            if (candidates == null || candidates.isEmpty()) {
+                return null;
+            }
+            return candidates.stream()
+                    .filter(v -> v != null)
+                    .min((v1, v2) -> comparator.compare(null, v1, v2))
+                    .orElse(null);
+        }
     }
 
     @Override
@@ -207,6 +234,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             String newVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                     .select(ga, "dependencyManagement", UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
                             acc.gaToNewVersion.put(ga, newVersion);
+
+                            // Track version candidate for shared variable resolution
+                            if (versionVar != null && newVersion != null) {
+                                acc.variableVersionCandidates
+                                        .computeIfAbsent(versionVar, k -> new HashSet<>())
+                                        .add(newVersion);
+                            }
                         } catch (MavenDownloadingException e) {
                             acc.gaToNewVersion.put(ga, e);
                         }
@@ -233,22 +267,44 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             .add(configName);
                 }
 
+                String versionVar = gradleDependency.getVersionVariable();
+
                 if (!acc.gaToNewVersion.containsKey(ga) && shouldResolveVersion(groupId, artifactId)) {
                     try {
                         String newVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                 .select(ga, configName, UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
 
-                        String versionVar = gradleDependency.getVersionVariable();
                         if (versionVar != null) {
                             acc.versionPropNameToGA
                                     .computeIfAbsent(versionVar, k -> new HashMap<>())
                                     .computeIfAbsent(ga, k -> new HashSet<>())
                                     .add(configName);
+
+                            // Track version candidate for shared variable resolution
+                            if (newVersion != null) {
+                                acc.variableVersionCandidates
+                                        .computeIfAbsent(versionVar, k -> new HashSet<>())
+                                        .add(newVersion);
+                            }
                         }
 
                         acc.gaToNewVersion.put(ga, newVersion);
                     } catch (MavenDownloadingException e) {
                         acc.gaToNewVersion.put(ga, e);
+                    }
+                } else if (versionVar != null && shouldResolveVersion(groupId, artifactId)) {
+                    // Artifact already resolved - still need to track version for this variable
+                    acc.versionPropNameToGA
+                            .computeIfAbsent(versionVar, k -> new HashMap<>())
+                            .computeIfAbsent(ga, k -> new HashSet<>())
+                            .add(configName);
+
+                    // Add the already-resolved version as a candidate for this variable
+                    Object resolved = acc.gaToNewVersion.get(ga);
+                    if (resolved instanceof String) {
+                        acc.variableVersionCandidates
+                                .computeIfAbsent(versionVar, k -> new HashSet<>())
+                                .add((String) resolved);
                     }
                 }
             }
@@ -364,19 +420,27 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         @Override
         public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             if (acc.versionPropNameToGA.containsKey(entry.getKey())) {
-                GroupArtifact ga = acc.versionPropNameToGA.get(entry.getKey()).keySet().stream().findFirst().orElse(null);
-                if (ga == null || !dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
+                // Check if ANY artifact using this property matches the dependency matcher
+                Map<GroupArtifact, Set<String>> gasUsingProperty = acc.versionPropNameToGA.get(entry.getKey());
+                boolean anyMatch = gasUsingProperty.keySet().stream()
+                        .anyMatch(ga -> dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()));
+                if (!anyMatch) {
                     return entry;
                 }
-                Object result = acc.gaToNewVersion.get(ga);
-                if (result == null || result instanceof Exception) {
-                    return entry;
-                }
+
                 VersionComparator versionComparator = getVersionComparator();
                 if (versionComparator == null) {
                     return entry;
                 }
-                Optional<String> finalVersion = versionComparator.upgrade(entry.getValue().getText(), singletonList((String) result));
+
+                // Get the minimum version from all artifacts using this property
+                // This ensures all artifacts can resolve when they share a version property
+                String minVersion = acc.getMinimumVersion(entry.getKey(), versionComparator);
+                if (minVersion == null) {
+                    return entry;
+                }
+
+                Optional<String> finalVersion = versionComparator.upgrade(entry.getValue().getText(), singletonList(minVersion));
                 return finalVersion.map(v -> entry.withValue(entry.getValue().withText(v))).orElse(entry);
             }
             return entry;
@@ -542,28 +606,19 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     return prop.getTree();
                                 }
 
-                                Map.Entry<GroupArtifact, Set<String>> gaWithConfigs =
-                                        acc.variableNames.get(variableName).entrySet().iterator().next();
-
-                                try {
-                                    GroupArtifact ga = gaWithConfigs.getKey();
-                                    DependencyVersionSelector dependencyVersionSelector =
-                                            new DependencyVersionSelector(metadataFailures, gradleProject, null);
-
-                                    String selectedVersion;
-                                    try {
-                                        selectedVersion = dependencyVersionSelector.select(ga, null, newVersion, versionPattern, execCtx);
-                                    } catch (MavenDownloadingException e) {
-                                        if (!gaWithConfigs.getValue().contains("classpath")) {
-                                            throw e;
-                                        }
-                                        selectedVersion = dependencyVersionSelector.select(ga, "classpath", newVersion, versionPattern, execCtx);
-                                    }
-                                    return prop.withValue(selectedVersion).getTree();
-                                } catch (MavenDownloadingException e) {
-                                    // No change on error
+                                VersionComparator versionComparator = getVersionComparator();
+                                if (versionComparator == null) {
                                     return prop.getTree();
                                 }
+
+                                // Get the minimum version from all artifacts using this variable
+                                // This ensures all artifacts can resolve when they share a version variable
+                                String selectedVersion = acc.getMinimumVersion(variableName, versionComparator);
+                                if (selectedVersion == null) {
+                                    return prop.getTree();
+                                }
+
+                                return prop.withValue(selectedVersion).getTree();
                             })
                             .visitNonNull(cu, ctx);
                 }
