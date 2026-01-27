@@ -2538,26 +2538,14 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    /**
-     * When multiple dependencies share the same version property and are upgraded with a wildcard pattern,
-     * the recipe should select the minimum compatible version across all artifacts to ensure all
-     * dependencies can be resolved.
-     * <p>
-     * This test simulates the Spring Cloud scenario where different artifacts have different max patch versions:
-     * - spring-cloud-commons has versions up to 4.2.4
-     * - spring-cloud-starter-consul-config only has versions up to 4.2.3
-     * <p>
-     * If both use the same property and we upgrade with `4.2.x`, the property should be set to 4.2.3
-     * (the minimum compatible version), not 4.2.4 (which would break consul-config).
-     *
-     * @see <a href="https://github.com/moderneinc/customer-requests/issues/1761">Customer issue</a>
-     */
+
     @Test
     @Issue("https://github.com/moderneinc/customer-requests/issues/1761")
     void upgradeMultipleArtifactsWithSharedPropertySelectsMinimumVersion() {
         // Using real Spring Cloud artifacts where:
         // - spring-cloud-commons has 4.2.4 available
         // - spring-cloud-starter-consul-config only has up to 4.2.3
+        // we can only upgrade to the minimum (4.2.3)
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "*", "4.2.x", null, false, null)),
           pomXml(

@@ -154,9 +154,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 if (isProperty(requestedVersion)) {
                                     String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
                                     ResolvedPom pom = getResolutionResult().getPom();
-                                    Path sourcePath = pom.getRequested().getProperties().containsKey(propertyName)
-                                            ? pom.getRequested().getSourcePath()
-                                            : findParentPomSourcePath(getResolutionResult().getParent(), propertyName);
+                                    Path sourcePath = pom.getRequested().getProperties().containsKey(propertyName) ?
+                                            pom.getRequested().getSourcePath() :
+                                            findParentPomSourcePath(getResolutionResult().getParent(), propertyName);
 
                                     if (sourcePath != null) {
                                         // When dependencies share a property, we need to track all their version constraints.
