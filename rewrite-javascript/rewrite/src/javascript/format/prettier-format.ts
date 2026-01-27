@@ -38,14 +38,20 @@ import {updateIfChanged} from "../../util";
  * @returns Synchronous format function
  */
 function loadPrettierFormattingSync(version?: string): { format: (source: string, options: any) => string } {
-    if (version) {
-        // Ensure the version is installed and get it from cache
-        return loadPrettierVersionSync(version);
-    }
-
     // Use bundled Prettier with sync wrapper
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const prettierSync = require('@prettier/sync');
+
+    if (version) {
+        // Try to load the specific version from cache, fall back to bundled if not available
+        try {
+            return loadPrettierVersionSync(version);
+        } catch {
+            // Version not cached - fall back to bundled Prettier
+            return prettierSync;
+        }
+    }
+
     return prettierSync;
 }
 
