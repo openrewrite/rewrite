@@ -20,11 +20,11 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.Implicit;
-import org.openrewrite.kotlin.marker.OmitBraces;
 import org.openrewrite.kotlin.marker.SingleExpressionBlock;
 import org.openrewrite.kotlin.marker.TrailingLambdaArgument;
 import org.openrewrite.kotlin.style.TabsAndIndentsStyle;
@@ -156,7 +156,8 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         if (parent != null && parent.getValue() instanceof J.Annotation) {
             parent.getParentOrThrow().putMessage("afterAnnotation", true);
         } else if (loc == Space.Location.BLOCK_PREFIX &&
-                ((J.Block) value).getMarkers().findFirst(OmitBraces.class).isPresent() &&
+                   (((J.Block) value).getMarkers().findFirst(OmitBraces.class).isPresent() ||
+                   ((J.Block) value).getMarkers().findFirst(org.openrewrite.kotlin.marker.OmitBraces.class).isPresent()) &&
                 ((J.Block) value).getStatements().isEmpty()) {
             return space;
         } else if (parent != null && !getCursor().getParentOrThrow().getPath(J.Annotation.class::isInstance).hasNext()) {

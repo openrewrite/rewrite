@@ -18,15 +18,19 @@ from rewrite.category import CategoryDescriptor
 from rewrite.marketplace import Python
 
 from .remove_pass import RemovePass
+from .change_import import ChangeImport
 
 # Category constants for Python recipes
 # Use these when decorating recipes with @recipe(category=...)
 # Note: Also defined in remove_pass.py to avoid circular imports
 Cleanup = [*Python, CategoryDescriptor(display_name="Cleanup")]
+Imports = [*Python, CategoryDescriptor(display_name="Imports")]
 
 __all__ = [
     "RemovePass",
+    "ChangeImport",
     # Category constants
     "Python",
     "Cleanup",
+    "Imports",
 ]

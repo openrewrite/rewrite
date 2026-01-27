@@ -71,9 +71,15 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     }
 
     public Yaml visitDocument(Yaml.Document document, P p) {
-        return document.withBlock((Yaml.Block) visit(document.getBlock(), p))
+        return document
+                .withDirectives(ListUtils.map(document.getDirectives(), d -> visitAndCast(d, p)))
+                .withBlock((Yaml.Block) visit(document.getBlock(), p))
                 .withEnd((Yaml.Document.End) visit(document.getEnd(), p))
                 .withMarkers(visitMarkers(document.getMarkers(), p));
+    }
+
+    public Yaml visitDirective(Yaml.Directive directive, P p) {
+        return directive.withMarkers(visitMarkers(directive.getMarkers(), p));
     }
 
     public Yaml visitDocumentEnd(Yaml.Document.End end, P p) {

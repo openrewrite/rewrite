@@ -17,6 +17,7 @@ package org.openrewrite.test.internal;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -269,63 +270,47 @@ class RecipeWithNameOption extends Recipe {
         this.name = name;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Recipe with name option";
-    }
+    @Getter
+    final String displayName = "Recipe with name option";
 
-    @Override
-    public String getDescription() {
-        return "A fancy description.";
-    }
+    @Getter
+    final String description = "A fancy description.";
 }
 
 @NullMarked
 class RecipeWithDescriptionListOfLinks extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Recipe with name option";
-    }
+    @Getter
+    final String displayName = "Recipe with name option";
 
-    @Override
-    public String getDescription() {
-        return """
+    @Getter
+    final String description = """
           A fancy description.
           For more information, see:
             - [link 1](https://example.com/link1)
             - [link 2](https://example.com/link2)""";
-    }
 }
 
 @NullMarked
 class RecipeWithDescriptionListOfDescribedLinks extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Recipe with name option";
-    }
+    @Getter
+    final String displayName = "Recipe with name option";
 
-    @Override
-    public String getDescription() {
-        return """
+    @Getter
+    final String description = """
           A fancy description.
           For more information, see:
             - First Resource [link 1](https://example.com/link1).
             - Second Resource [link 2](https://example.com/link2).""";
-    }
 }
 
 @NullMarked
 class RecipeWithDescriptionNotEndingWithPeriod extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Recipe with name option";
-    }
+    @Getter
+    final String displayName = "Recipe with name option";
 
-    @Override
-    public String getDescription() {
-        return "A fancy description";
-    }
+    @Getter
+    final String description = "A fancy description";
 }

@@ -28,9 +28,25 @@ files in the rewrite package.
 """
 
 import ast
+import keyword
 import sys
 from pathlib import Path
 from typing import List, Tuple, Optional
+
+
+# Python reserved keywords that can't be used as parameter names
+PYTHON_RESERVED = set(keyword.kwlist) | {'type'}  # 'type' is soft keyword in 3.12+
+
+
+def to_public_name(name: str) -> str:
+    """
+    Convert internal field name to public parameter name.
+    Strips underscore prefix, adding trailing underscore for reserved keywords.
+    """
+    public_name = name.lstrip('_')
+    if public_name in PYTHON_RESERVED:
+        return public_name + '_'  # Add trailing underscore per Python convention
+    return public_name
 
 
 def extract_dataclass_fields(node: ast.ClassDef) -> List[Tuple[str, str, bool]]:
@@ -54,6 +70,179 @@ def extract_dataclass_fields(node: ast.ClassDef) -> List[Tuple[str, str, bool]]:
     return fields
 
 
+def extract_classvar_fields(node: ast.ClassDef) -> List[Tuple[str, str]]:
+    """
+    Extract ClassVar field information from a dataclass.
+
+    Returns list of (name, type_annotation) tuples for ClassVar fields.
+    """
+    fields = []
+    for item in node.body:
+        if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+            field_name = item.target.id
+            if isinstance(item.annotation, ast.Subscript):
+                if isinstance(item.annotation.value, ast.Name):
+                    if item.annotation.value.id == "ClassVar":
+                        field_type = ast.unparse(item.annotation)
+                        fields.append((field_name, field_type))
+    return fields
+
+
+def extract_explicit_init(node: ast.ClassDef) -> Optional[List[Tuple[str, str]]]:
+    """
+    Extract parameters from an explicit __init__ method if present.
+
+    Returns list of (name, type_annotation) tuples, or None if no explicit __init__.
+    """
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef) and item.name == "__init__":
+            params = []
+            for arg in item.args.args:
+                if arg.arg == "self":
+                    continue
+                if arg.annotation:
+                    param_type = ast.unparse(arg.annotation)
+                else:
+                    param_type = "Any"
+                params.append((arg.arg, param_type))
+            return params
+    return None
+
+
+def has_explicit_replace(node: ast.ClassDef) -> bool:
+    """
+    Check if a class has an explicit replace method defined.
+
+    Returns True if the class defines its own replace method, False if it should
+    inherit from parent class.
+    """
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef) and item.name == "replace":
+            return True
+    return False
+
+
+def extract_property_methods(node: ast.ClassDef) -> List[Tuple[str, str]]:
+    """
+    Extract @property methods from a class.
+
+    Returns list of (name, return_type) tuples.
+    """
+    properties = []
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef):
+            # Check if it's a property
+            is_property = any(
+                isinstance(d, ast.Name) and d.id == "property"
+                for d in item.decorator_list
+            )
+            if is_property and item.returns:
+                return_type = ast.unparse(item.returns)
+                properties.append((item.name, return_type))
+    return properties
+
+
+def extract_class_methods(node: ast.ClassDef) -> List[Tuple[str, List[Tuple[str, str]], str]]:
+    """
+    Extract @classmethod methods from a class.
+
+    Returns list of (name, params, return_type) tuples.
+    """
+    methods = []
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef):
+            is_classmethod = any(
+                isinstance(d, ast.Name) and d.id == "classmethod"
+                for d in item.decorator_list
+            )
+            if is_classmethod and item.returns:
+                params = []
+                for arg in item.args.args[1:]:  # Skip 'cls'
+                    if arg.annotation:
+                        param_type = ast.unparse(arg.annotation)
+                    else:
+                        param_type = "Any"
+                    params.append((arg.arg, param_type))
+                return_type = ast.unparse(item.returns)
+                methods.append((item.name, params, return_type))
+    return methods
+
+
+def extract_regular_methods(node: ast.ClassDef) -> List[Tuple[str, List[Tuple[str, str]], str]]:
+    """
+    Extract regular methods from a class (not __init__, __eq__, etc.).
+
+    Returns list of (name, params, return_type) tuples.
+    """
+    methods = []
+    skip_methods = {'__init__', '__eq__', '__hash__', 'replace'}
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef):
+            if item.name in skip_methods or item.name.startswith('_'):
+                continue
+            # Skip property and classmethod
+            is_special = any(
+                isinstance(d, ast.Name) and d.id in ("property", "classmethod", "staticmethod", "abstractmethod")
+                for d in item.decorator_list
+            )
+            if is_special:
+                continue
+            if item.returns:
+                params = []
+                for arg in item.args.args[1:]:  # Skip 'self'
+                    if arg.annotation:
+                        param_type = ast.unparse(arg.annotation)
+                    else:
+                        param_type = "Any"
+                    params.append((arg.arg, param_type))
+                return_type = ast.unparse(item.returns)
+                methods.append((item.name, params, return_type))
+    return methods
+
+
+def extract_abstract_methods(node: ast.ClassDef) -> List[Tuple[str, List[Tuple[str, str]], str]]:
+    """
+    Extract @abstractmethod methods from a class (excluding properties).
+
+    Returns list of (name, params, return_type) tuples.
+    """
+    methods = []
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef):
+            is_abstract = any(
+                isinstance(d, ast.Name) and d.id == "abstractmethod"
+                for d in item.decorator_list
+            )
+            # Skip if also a property (those are handled by extract_property_methods)
+            is_property = any(
+                isinstance(d, ast.Name) and d.id == "property"
+                for d in item.decorator_list
+            )
+            if is_abstract and not is_property and item.returns:
+                params = []
+                for arg in item.args.args[1:]:  # Skip 'self'
+                    if arg.annotation:
+                        param_type = ast.unparse(arg.annotation)
+                    else:
+                        param_type = "Any"
+                    params.append((arg.arg, param_type))
+                return_type = ast.unparse(item.returns)
+                methods.append((item.name, params, return_type))
+    return methods
+
+
+def is_dataclass(node: ast.ClassDef) -> bool:
+    """Check if a class is decorated with @dataclass (any variant)."""
+    for decorator in node.decorator_list:
+        # @dataclass or @dataclass()
+        if isinstance(decorator, ast.Name) and decorator.id == "dataclass":
+            return True
+        if isinstance(decorator, ast.Call):
+            if isinstance(decorator.func, ast.Name) and decorator.func.id == "dataclass":
+                return True
+    return False
+
+
 def is_frozen_dataclass(node: ast.ClassDef) -> bool:
     """Check if a class is decorated with @dataclass(frozen=True)."""
     for decorator in node.decorator_list:
@@ -66,6 +255,33 @@ def is_frozen_dataclass(node: ast.ClassDef) -> bool:
     return False
 
 
+def is_abc_base_class(node: ast.ClassDef) -> bool:
+    """
+    Check if a class is an ABC-like base class (inherits from known base types
+    like J, Statement, Expression, TypedTree, etc.) but is not a dataclass.
+
+    These are typically abstract base classes like TypeTree, NameTree, TypedTree.
+    """
+    if is_frozen_dataclass(node):
+        return False
+
+    # Known base types that indicate this is an ABC or generic class
+    known_bases = {
+        'J', 'Statement', 'Expression', 'TypedTree', 'NameTree', 'TypeTree', 'Loop', 'MethodCall',
+        'ABC', 'Py', 'PyStatement', 'PyExpression',
+        'Tree', 'SourceFile', 'Generic'  # For rewrite/tree.py classes
+    }
+
+    for base in node.bases:
+        if isinstance(base, ast.Name) and base.id in known_bases:
+            return True
+        # Handle Generic[T] style bases
+        if isinstance(base, ast.Subscript) and isinstance(base.value, ast.Name):
+            if base.value.id in known_bases:
+                return True
+    return False
+
+
 def get_class_bases(node: ast.ClassDef) -> str:
     """Get the base classes as a string."""
     if not node.bases:
@@ -73,27 +289,303 @@ def get_class_bases(node: ast.ClassDef) -> str:
     return ", ".join(ast.unparse(base) for base in node.bases)
 
 
-def extract_imports(tree: ast.Module) -> List[str]:
-    """Extract import statements from the module."""
+def extract_enum_members(node: ast.ClassDef) -> List[str]:
+    """Extract enum member names from an Enum class."""
+    members = []
+    for item in node.body:
+        if isinstance(item, ast.Assign) and len(item.targets) == 1:
+            target = item.targets[0]
+            if isinstance(target, ast.Name):
+                members.append(target.id)
+    return members
+
+
+def generate_nested_class_stub(node: ast.ClassDef, indent: str = "") -> List[str]:
+    """Generate stub for a nested class (enum, dataclass, or plain class)."""
+    lines = []
+    bases = get_class_bases(node)
+
+    # Check what kind of class this is
+    is_enum = any(isinstance(base, ast.Name) and base.id == 'Enum' for base in node.bases)
+
+    if is_enum:
+        if bases:
+            lines.append(f"{indent}class {node.name}({bases}):")
+        else:
+            lines.append(f"{indent}class {node.name}:")
+
+        # Extract and include enum members - members are instances of the enum class
+        members = extract_enum_members(node)
+        if members:
+            for member in members:
+                lines.append(f"{indent}    {member}: {node.name}")
+        else:
+            lines.append(f"{indent}    pass")
+    elif is_dataclass(node):
+        # Use the full dataclass stub generator
+        lines.extend(generate_stub_class(node, indent))
+    else:
+        # Plain class - generate class header with fields, properties, and methods
+        if bases:
+            lines.append(f"{indent}class {node.name}({bases}):")
+        else:
+            lines.append(f"{indent}class {node.name}:")
+
+        has_content = False
+
+        # Check for nested classes
+        for item in node.body:
+            if isinstance(item, ast.ClassDef):
+                lines.extend(generate_nested_class_stub(item, indent + "    "))
+                lines.append("")
+                has_content = True
+
+        # Extract class-level field annotations (like _t: JContainer[J3])
+        for item in node.body:
+            if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                type_str = ast.unparse(item.annotation)
+                lines.append(f"{indent}    {item.target.id}: {type_str}")
+                has_content = True
+
+        if has_content:
+            lines.append("")
+
+        # Extract properties
+        properties = extract_property_methods(node)
+        for name, return_type in properties:
+            lines.append(f"{indent}    @property")
+            lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
+            has_content = True
+
+        # Extract methods (regular methods skip 'replace', so handle it separately)
+        methods = extract_regular_methods(node)
+        for name, params, return_type in methods:
+            if params:
+                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
+                lines.append(f"{indent}    def {name}(self, {params_str}) -> {return_type}: ...")
+            else:
+                lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
+            has_content = True
+
+        # Handle replace method explicitly with its actual return type
+        if has_explicit_replace(node):
+            replace_return_type = get_replace_return_type(node)
+            if replace_return_type:
+                lines.append(f"{indent}    def replace(self, **kwargs: Any) -> {replace_return_type}: ...")
+                has_content = True
+
+        if not has_content:
+            lines.append(f"{indent}    pass")
+
+    return lines
+
+
+def generate_abc_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
+    """Generate stub content for an ABC-like base class."""
+    lines = []
+
+    bases = get_class_bases(node)
+    if bases:
+        lines.append(f"{indent}class {node.name}({bases}):")
+    else:
+        lines.append(f"{indent}class {node.name}:")
+
+    has_content = False
+
+    # Generate nested classes first (enums, dataclasses, plain classes)
+    for item in node.body:
+        if isinstance(item, ast.ClassDef):
+            nested_lines = generate_nested_class_stub(item, indent + "    ")
+            lines.extend(nested_lines)
+            lines.append("")
+            has_content = True
+
+    # Check for any methods that should be included
+    methods = extract_regular_methods(node)
+    properties = extract_property_methods(node)
+    classmethods = extract_class_methods(node)
+    abstract_methods = extract_abstract_methods(node)
+
+    if methods or properties or classmethods or abstract_methods:
+        for name, return_type in properties:
+            lines.append(f"{indent}    @property")
+            lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
+        for name, params, return_type in classmethods:
+            lines.append(f"{indent}    @classmethod")
+            if params:
+                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
+                lines.append(f"{indent}    def {name}(cls, {params_str}) -> {return_type}: ...")
+            else:
+                lines.append(f"{indent}    def {name}(cls) -> {return_type}: ...")
+        for name, params, return_type in abstract_methods:
+            if params:
+                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
+                lines.append(f"{indent}    def {name}(self, {params_str}) -> {return_type}: ...")
+            else:
+                lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
+        for name, params, return_type in methods:
+            if params:
+                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
+                lines.append(f"{indent}    def {name}(self, {params_str}) -> {return_type}: ...")
+            else:
+                lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
+        has_content = True
+
+    # Add replace method stub for ABC base classes that explicitly define it
+    # EXCEPT for the root Tree class - its replace(**kwargs) -> Tree signature
+    # conflicts with typed replace() methods in subclasses, and all subclasses
+    # either define their own replace or inherit from a class that does
+    if has_explicit_replace(node) and node.name != 'Tree':
+        replace_return_type = get_replace_return_type(node)
+        if replace_return_type:
+            lines.append(f"{indent}    def replace(self, **kwargs: Any) -> {replace_return_type}: ...")
+            has_content = True
+
+    if not has_content:
+        lines.append(f"{indent}    pass")
+
+    return lines
+
+
+def get_replace_return_type(node: ast.ClassDef) -> Optional[str]:
+    """
+    Get the return type of an explicit replace method in a class.
+
+    Returns the return type as a string, or None if not found.
+    """
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef) and item.name == "replace" and item.returns:
+            return ast.unparse(item.returns)
+    return None
+
+
+def extract_typevars(tree: ast.Module) -> List[str]:
+    """
+    Extract TypeVar declarations from the module.
+
+    Returns list of TypeVar declaration strings like "P = TypeVar('P')".
+    """
+    typevars = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target = node.targets[0]
+            if isinstance(target, ast.Name) and isinstance(node.value, ast.Call):
+                if isinstance(node.value.func, ast.Name) and node.value.func.id == 'TypeVar':
+                    # Found a TypeVar declaration
+                    typevars.append(ast.unparse(node))
+    return typevars
+
+
+def extract_imports(tree: ast.Module, current_package: str = "") -> List[Tuple[str, bool]]:
+    """
+    Extract import statements from the module.
+
+    Returns list of (import_statement, should_reexport) tuples.
+    Sibling module imports (same package) should be re-exported.
+    """
     imports = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                imports.append(f"import {alias.name}" + (f" as {alias.asname}" if alias.asname else ""))
+                imp = f"import {alias.name}" + (f" as {alias.asname}" if alias.asname else "")
+                imports.append((imp, False))
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
-            names = ", ".join(
-                alias.name + (f" as {alias.asname}" if alias.asname else "")
-                for alias in node.names
-            )
             level = "." * node.level
-            imports.append(f"from {level}{module} import {names}")
+
+            # Check if this is a sibling module import (same package)
+            # e.g., for current_package="rewrite.python", module="rewrite.python.support_types" is sibling
+            is_sibling = False
+            if current_package and level == "":  # absolute import
+                is_sibling = module.startswith(current_package + ".")
+            elif level == ".":  # relative import from same package
+                is_sibling = True
+
+            # Build import statement, using X as X pattern for re-exports
+            if is_sibling:
+                names = ", ".join(
+                    f"{alias.name} as {alias.asname or alias.name}"
+                    for alias in node.names
+                    if alias.name != "*"  # star imports handled separately
+                )
+            else:
+                names = ", ".join(
+                    alias.name + (f" as {alias.asname}" if alias.asname else "")
+                    for alias in node.names
+                )
+
+            if names:  # Skip if only star import
+                imports.append((f"from {level}{module} import {names}", is_sibling))
     return imports
+
+
+def find_star_import_source(tree: ast.Module, source_path: Path) -> Optional[Path]:
+    """
+    Find the source file for a relative star import (from .module import *).
+
+    Returns the path to the source file, or None if no star import found.
+    """
+    for node in tree.body:
+        if isinstance(node, ast.ImportFrom) and node.level == 1:  # relative import
+            for alias in node.names:
+                if alias.name == "*":
+                    # Found `from .module import *`
+                    module_name = node.module
+                    if module_name:
+                        sibling = source_path.parent / f"{module_name}.py"
+                        if sibling.exists():
+                            return sibling
+    return None
+
+
+def get_classes_from_file(source_path: Path) -> List[Tuple[str, str]]:
+    """
+    Get all class names and their base classes from a Python file.
+
+    Returns list of (class_name, bases_string) tuples.
+    """
+    with open(source_path) as f:
+        source = f.read()
+
+    tree = ast.parse(source)
+    classes = []
+
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
+            bases = get_class_bases(node)
+            classes.append((node.name, bases))
+
+    return classes
+
+
+def get_typevar_names_from_file(source_path: Path) -> List[str]:
+    """
+    Get all TypeVar names from a Python file.
+
+    Returns list of TypeVar names like ['P', 'T', 'J2'].
+    """
+    with open(source_path) as f:
+        source = f.read()
+
+    tree = ast.parse(source)
+    typevar_names = []
+
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target = node.targets[0]
+            if isinstance(target, ast.Name) and isinstance(node.value, ast.Call):
+                if isinstance(node.value.func, ast.Name) and node.value.func.id == 'TypeVar':
+                    typevar_names.append(target.id)
+
+    return typevar_names
 
 
 def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
     """Generate stub content for a single dataclass."""
     lines = []
+
+    # Add @dataclass decorator for frozen immutable instances
+    lines.append(f"{indent}@dataclass(frozen=True)")
 
     # Class declaration
     bases = get_class_bases(node)
@@ -103,35 +595,137 @@ def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
         lines.append(f"{indent}class {node.name}:")
 
     fields = extract_dataclass_fields(node)
+    classvar_fields = extract_classvar_fields(node)
 
-    # Check for nested classes that are also dataclasses
-    nested_classes = []
+    # Check for nested classes (dataclasses, enums, and plain classes)
+    nested_dataclasses = []
+    nested_enums = []
+    nested_plain_classes = []
     for item in node.body:
-        if isinstance(item, ast.ClassDef) and is_frozen_dataclass(item):
-            nested_classes.append(item)
+        if isinstance(item, ast.ClassDef):
+            if is_dataclass(item):
+                nested_dataclasses.append(item)
+            elif any(isinstance(base, ast.Name) and base.id == 'Enum' for base in item.bases):
+                nested_enums.append(item)
+            else:
+                # Plain nested class (like PaddingHelper)
+                nested_plain_classes.append(item)
 
-    # Generate nested class stubs first
-    for nested in nested_classes:
+    # Generate nested enum stubs first (with enum members)
+    for nested in nested_enums:
+        bases = get_class_bases(nested)
+        if bases:
+            lines.append(f"{indent}    class {nested.name}({bases}):")
+        else:
+            lines.append(f"{indent}    class {nested.name}:")
+
+        # Extract and include enum members - members are instances of the enum class
+        members = extract_enum_members(nested)
+        if members:
+            for member in members:
+                lines.append(f"{indent}        {member}: {nested.name}")
+        else:
+            lines.append(f"{indent}        pass")
+        lines.append("")
+
+    # Generate nested dataclass stubs
+    for nested in nested_dataclasses:
         nested_lines = generate_stub_class(nested, indent + "    ")
         lines.extend(nested_lines)
         lines.append("")
 
-    # Field declarations
-    for name, type_str, has_default in fields:
+    # Generate nested plain class stubs (like PaddingHelper)
+    for nested in nested_plain_classes:
+        nested_lines = generate_nested_class_stub(nested, indent + "    ")
+        lines.extend(nested_lines)
+        lines.append("")
+
+    # ClassVar declarations (like EMPTY)
+    for name, type_str in classvar_fields:
         lines.append(f"{indent}    {name}: {type_str}")
+
+    if classvar_fields:
+        lines.append("")
+
+    # Field declarations with underscore-prefixed names for dataclass
+    # These are the actual field names the dataclass uses
+    for name, type_str, has_default in fields:
+        if has_default:
+            lines.append(f"{indent}    {name}: {type_str} = ...")
+        else:
+            lines.append(f"{indent}    {name}: {type_str}")
 
     if fields:
         lines.append("")
 
-    # Generate typed replace() method
-    lines.append(f"{indent}    def replace(")
-    lines.append(f"{indent}        self,")
-    lines.append(f"{indent}        *,")
-    for name, type_str, has_default in fields:
-        lines.append(f"{indent}        {name}: {type_str} = ...,")
-    lines.append(f"{indent}    ) -> Self: ...")
+    # Generate replace() method stub with actual return type
+    if has_explicit_replace(node):
+        replace_return_type = get_replace_return_type(node)
+        if replace_return_type:
+            lines.append(f"{indent}    def replace(self, **kwargs: Any) -> {replace_return_type}: ...")
+        else:
+            lines.append(f"{indent}    def replace(self, **kwargs: Any) -> Self: ...")
+    else:
+        lines.append(f"{indent}    def replace(self, **kwargs: Any) -> Self: ...")
+
+    # Generate classmethod stubs
+    classmethods = extract_class_methods(node)
+    if classmethods:
+        lines.append("")
+        for name, params, return_type in classmethods:
+            lines.append(f"{indent}    @classmethod")
+            if params:
+                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
+                lines.append(f"{indent}    def {name}(cls, {params_str}) -> {return_type}: ...")
+            else:
+                lines.append(f"{indent}    def {name}(cls) -> {return_type}: ...")
+
+    # Generate property stubs
+    properties = extract_property_methods(node)
+    if properties:
+        lines.append("")
+        for name, return_type in properties:
+            lines.append(f"{indent}    @property")
+            lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
+
+    # Generate regular method stubs
+    methods = extract_regular_methods(node)
+    if methods:
+        lines.append("")
+        for name, params, return_type in methods:
+            if params:
+                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
+                lines.append(f"{indent}    def {name}(self, {params_str}) -> {return_type}: ...")
+            else:
+                lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
 
     return lines
+
+
+def get_package_from_path(source_path: Path) -> str:
+    """
+    Determine the Python package name from the source file path.
+
+    E.g., .../src/rewrite/python/tree.py -> rewrite.python
+    """
+    parts = source_path.parts
+    # Find 'src' followed by 'rewrite' to identify the package root
+    # This handles absolute paths where 'rewrite' may appear multiple times
+    for i, part in enumerate(parts):
+        if part == 'src' and i + 1 < len(parts) and parts[i + 1] == 'rewrite':
+            # Package is everything from 'rewrite' (after 'src') to parent of the file
+            package_parts = parts[i + 1:-1]
+            return '.'.join(package_parts)
+    # Fallback: find last occurrence of 'rewrite' in path
+    try:
+        # Reverse search to find the last 'rewrite'
+        for i in range(len(parts) - 1, -1, -1):
+            if parts[i] == 'rewrite':
+                package_parts = parts[i:-1]
+                return '.'.join(package_parts)
+    except ValueError:
+        pass
+    return ""
 
 
 def generate_stub_content(source_path: Path) -> str:
@@ -140,27 +734,74 @@ def generate_stub_content(source_path: Path) -> str:
         source = f.read()
 
     tree = ast.parse(source)
+    current_package = get_package_from_path(source_path)
+
+    # Check if we need TypeVar
+    typevars = extract_typevars(tree)
+    typevar_import = ", TypeVar, Generic" if typevars else ""
 
     stub_lines = [
         "# Auto-generated stub file for IDE autocomplete support.",
         "# Do not edit manually - regenerate with: python scripts/generate_stubs.py",
         "",
-        "from typing import Any, ClassVar, List, Optional, Self",
+        "from dataclasses import dataclass",
+        f"from typing import Any, ClassVar, List, Optional{typevar_import}",
+        "from typing_extensions import Self",
         "from uuid import UUID",
+        "import weakref",
         "",
     ]
 
+    # Add TypeVar declarations
+    if typevars:
+        for tv in typevars:
+            stub_lines.append(tv)
+        stub_lines.append("")
+
     # Find additional imports we might need
-    imports = extract_imports(tree)
-    for imp in imports:
+    imports = extract_imports(tree, current_package)
+    for imp, _ in imports:
         # Skip __future__ imports and typing imports (we add our own)
         if "__future__" in imp or "from typing import" in imp:
             continue
         # Add imports that might be needed for type annotations
-        if "from rewrite" in imp or "from pathlib" in imp or "from enum" in imp:
+        # Include: rewrite modules, pathlib, enum, datetime, abc, and relative module imports (from . import X)
+        if ("from rewrite" in imp or "from pathlib" in imp or "from enum" in imp or
+            "from datetime" in imp or "from abc" in imp or imp.startswith("from . import")):
             stub_lines.append(imp)
 
     stub_lines.append("")
+
+    # Handle star imports - import and re-export classes and TypeVars from the source module
+    # Using "X as X" pattern tells type checkers to re-export the names
+    star_import_source = find_star_import_source(tree, source_path)
+    if star_import_source:
+        # Get the relative module name
+        module_name = star_import_source.stem  # e.g., "support_types"
+        exported_classes = get_classes_from_file(star_import_source)
+        exported_typevars = get_typevar_names_from_file(star_import_source)
+
+        # Combine classes and TypeVars for re-export
+        all_exports = []
+        for tv in exported_typevars:
+            all_exports.append(f"{tv} as {tv}")
+        for name, _ in exported_classes:
+            all_exports.append(f"{name} as {name}")
+
+        if all_exports:
+            # Add explicit import with re-export pattern
+            stub_lines.append(f"from .{module_name} import (")
+            for exp in all_exports:
+                stub_lines.append(f"    {exp},")
+            stub_lines.append(")")
+            stub_lines.append("")
+
+    # Find all ABC-like base classes at module level (before dataclasses)
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and is_abc_base_class(node):
+            class_lines = generate_abc_stub_class(node)
+            stub_lines.extend(class_lines)
+            stub_lines.append("")
 
     # Find all frozen dataclasses at module level
     for node in tree.body:
@@ -194,9 +835,9 @@ def generate_stub_file(source_path: Path) -> Optional[Path]:
 
 
 def find_lst_files(base_path: Path) -> List[Path]:
-    """Find all tree.py and support_types.py files in the package."""
+    """Find all tree.py, support_types.py, markers.py, and parser.py files in the package."""
     files = []
-    for pattern in ["**/tree.py", "**/support_types.py", "**/markers.py"]:
+    for pattern in ["**/tree.py", "**/support_types.py", "**/markers.py", "**/parser.py"]:
         files.extend(base_path.glob(pattern))
     return files
 

@@ -79,6 +79,13 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
                "Attempts to merge the copied value into the new key if it already exists. " +
                "By default, attempts to create the new key if it does not exist.";
 
+    @Override
+    public Validated<Object> validate() {
+        return super.validate()
+                .and(JsonPathMatcher.validate("oldKeyPath", oldKeyPath))
+                .and(JsonPathMatcher.validate("newKey", newKey));
+    }
+
     @JsonCreator
     public CopyValue(String oldKeyPath, @Nullable String oldFilePath, String newKey, @Nullable String newFilePath, @Nullable Boolean createNewKeys) {
         this.oldKeyPath = oldKeyPath;

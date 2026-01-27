@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -28,15 +29,11 @@ import org.openrewrite.style.Style;
 
 public class Spaces extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Spaces";
-    }
+    @Getter
+    final String displayName = "Spaces";
 
-    @Override
-    public String getDescription() {
-        return "Format whitespace in Java code.";
-    }
+    @Getter
+    final String description = "Format whitespace in Java code.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

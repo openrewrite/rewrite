@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import traceback
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import List, ClassVar, cast, TYPE_CHECKING, Callable, TypeVar, Type, Optional, Dict, Any
 from uuid import UUID
 
@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from .parser import Parser
     from .visitor import Cursor
 
-from .utils import random_id, list_map
+from .utils import random_id, list_map, replace_if_changed
 
 
 class Marker(ABC):
@@ -20,18 +20,8 @@ class Marker(ABC):
         ...
 
     def replace(self, **kwargs) -> 'Marker':
-        """Replace fields on this marker using dataclasses.replace."""
-        mapped_kwargs = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_'):
-                private_key = f'_{key}'
-                if hasattr(self, private_key):
-                    mapped_kwargs[private_key] = value
-                else:
-                    mapped_kwargs[key] = value
-            else:
-                mapped_kwargs[key] = value
-        return replace(self, **mapped_kwargs)
+        """Replace fields on this marker, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
     def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
         return ''
@@ -63,18 +53,8 @@ class Markers:
         return self._markers
 
     def replace(self, **kwargs) -> 'Markers':
-        """Replace fields on this Markers instance using dataclasses.replace."""
-        mapped_kwargs = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_'):
-                private_key = f'_{key}'
-                if hasattr(self, private_key):
-                    mapped_kwargs[private_key] = value
-                else:
-                    mapped_kwargs[key] = value
-            else:
-                mapped_kwargs[key] = value
-        return replace(self, **mapped_kwargs)
+        """Replace fields on this Markers instance, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
     def find_first(self, cls: Type[M]) -> Optional[M]:
         for marker in self.markers:

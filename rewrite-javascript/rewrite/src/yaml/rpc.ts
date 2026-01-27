@@ -40,10 +40,18 @@ class YamlSender extends YamlVisitor<RpcSendQueue> {
     }
 
     protected visitDocument(document: Yaml.Document, q: RpcSendQueue): Yaml | undefined {
+        q.getAndSendList(document, d => d.directives, dir => dir.id,
+            dir => this.visit(dir, q));
         q.getAndSend(document, d => d.explicit);
         q.getAndSend(document, d => d.block, b => this.visit(b, q));
         q.getAndSend(document, d => d.end, e => this.visit(e, q));
         return document;
+    }
+
+    protected visitDirective(directive: Yaml.Directive, q: RpcSendQueue): Yaml | undefined {
+        q.getAndSend(directive, d => d.value);
+        q.getAndSend(directive, d => d.suffix);
+        return directive;
     }
 
     protected visitDocumentEnd(end: Yaml.DocumentEnd, q: RpcSendQueue): Yaml | undefined {
@@ -127,6 +135,9 @@ class YamlReceiver {
             case Yaml.Kind.Document:
                 result = this.visitDocument(result as Yaml.Document, q);
                 break;
+            case Yaml.Kind.Directive:
+                result = this.visitDirective(result as Yaml.Directive, q);
+                break;
             case Yaml.Kind.DocumentEnd:
                 result = this.visitDocumentEnd(result as Yaml.DocumentEnd, q);
                 break;
@@ -182,11 +193,20 @@ class YamlReceiver {
 
     protected visitDocument(document: Yaml.Document, q: RpcReceiveQueue): Yaml | undefined {
         return updateIfChanged(document, {
+            directives: q.receiveListDefined(document.directives,
+                dir => this.visit(dir, q) as Yaml.Directive),
             explicit: q.receive(document.explicit),
             block: q.receive(document.block,
                 b => this.visit(b, q) as Yaml.Block),
             end: q.receive(document.end,
                 e => this.visit(e, q) as Yaml.DocumentEnd),
+        });
+    }
+
+    protected visitDirective(directive: Yaml.Directive, q: RpcReceiveQueue): Yaml | undefined {
+        return updateIfChanged(directive, {
+            value: q.receive(directive.value),
+            suffix: q.receive(directive.suffix),
         });
     }
 

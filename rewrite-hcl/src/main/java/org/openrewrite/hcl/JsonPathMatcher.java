@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.openrewrite.hcl.internal.ThrowingErrorListener;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
@@ -110,7 +111,14 @@ public class JsonPathMatcher {
     }
 
     private JsonPathParser jsonPath() {
-        return new JsonPathParser(new CommonTokenStream(new JsonPathLexer(CharStreams.fromString(this.jsonPath))));
+        ThrowingErrorListener errorListener = new ThrowingErrorListener(this.jsonPath);
+        JsonPathLexer lexer = new JsonPathLexer(CharStreams.fromString(this.jsonPath));
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(errorListener);
+        JsonPathParser parser = new JsonPathParser(new CommonTokenStream(lexer));
+        parser.removeErrorListeners();
+        parser.addErrorListener(errorListener);
+        return parser;
     }
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})

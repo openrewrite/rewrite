@@ -17,7 +17,8 @@ import {PrintOutputCapture, TreePrinters} from "../print";
 import {YamlVisitor} from "./visitor";
 import {printTag, Yaml} from "./tree";
 import {Cursor} from "../tree";
-import {Markers} from "../markers";
+import {findMarker, Markers} from "../markers";
+import "./markers"; // Ensures Yaml.Markers is defined
 
 class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
 
@@ -35,6 +36,9 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
 
     protected visitDocument(document: Yaml.Document, p: PrintOutputCapture): Yaml | undefined {
         this.beforeSyntax(document, p);
+        for (const directive of document.directives) {
+            this.visit(directive, p);
+        }
         if (document.explicit) {
             p.append("---");
         }
@@ -42,6 +46,15 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         this.visit(document.end, p);
         this.afterSyntax(document, p);
         return document;
+    }
+
+    protected visitDirective(directive: Yaml.Directive, p: PrintOutputCapture): Yaml | undefined {
+        this.beforeSyntax(directive, p);
+        p.append('%');
+        p.append(directive.value);
+        p.append(directive.suffix);
+        this.afterSyntax(directive, p);
+        return directive;
     }
 
     protected visitDocumentEnd(end: Yaml.DocumentEnd, p: PrintOutputCapture): Yaml | undefined {
@@ -76,7 +89,9 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         this.beforeSyntax(entry, p);
         this.visit(entry.key, p);
         p.append(entry.beforeMappingValueIndicator);
-        p.append(':');
+        if (!findMarker(entry, Yaml.Markers.OmitColon)) {
+            p.append(':');
+        }
         this.visit(entry.value, p);
         this.afterSyntax(entry, p);
         return entry;

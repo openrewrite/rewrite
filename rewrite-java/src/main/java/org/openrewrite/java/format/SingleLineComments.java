@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -24,15 +25,11 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TextComment;
 
 public class SingleLineComments extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Single line comments begin with a whitespace";
-    }
+    @Getter
+    final String displayName = "Single line comments begin with a whitespace";
 
-    @Override
-    public String getDescription() {
-        return "Write `// hi` instead of `//hi`.";
-    }
+    @Getter
+    final String description = "Write `// hi` instead of `//hi`.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.hcl;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
@@ -24,15 +25,11 @@ import org.openrewrite.hcl.tree.Space;
 import org.openrewrite.marker.Markers;
 
 public class ReplaceLegacyAttributeIndexSyntax extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Replace legacy attribute index syntax";
-    }
+    @Getter
+    final String displayName = "Replace legacy attribute index syntax";
 
-    @Override
-    public String getDescription() {
-        return "Replace legacy attribute index syntax (`.0`) with the new syntax (`[0]`).";
-    }
+    @Getter
+    final String description = "Replace legacy attribute index syntax (`.0`) with the new syntax (`[0]`).";
 
     @Override
     public HclVisitor<ExecutionContext> getVisitor() {

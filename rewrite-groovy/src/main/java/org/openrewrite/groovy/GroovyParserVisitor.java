@@ -16,6 +16,7 @@
 package org.openrewrite.groovy;
 
 import groovy.lang.GroovySystem;
+import groovy.transform.Canonical;
 import groovy.transform.Field;
 import groovy.transform.Generated;
 import groovy.transform.Immutable;
@@ -673,7 +674,11 @@ public class GroovyParserVisitor {
                         body = bodyVisitor.visit(method.getCode());
                     }
                 } else {
-                    body = bodyVisitor.visit(method.getCode());
+                    if (annotations.stream().anyMatch(a -> TypeUtils.isOfClassType(a.getAnnotationType().getType(), "groovy.transform.Synchronized"))) {
+                        body = bodyVisitor.visit(((SynchronizedStatement) method.getCode()).getCode());
+                    } else {
+                        body = bodyVisitor.visit(method.getCode());
+                    }
                 }
             }
 
@@ -2429,7 +2434,7 @@ public class GroovyParserVisitor {
             Space space = whitespace();
             J.FieldAccess qualid = TypeTree.build(name()).withPrefix(space);
             JLeftPadded<J.Identifier> alias = null;
-            if (sourceStartsWith("as")) {
+            if (sourceStartsWith("as", "\n", " ")) {
                 alias = padLeft(sourceBefore("as"), new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), name(), null, null));
             }
             return maybeSemicolon(new J.Import(randomId(), importPrefix, Markers.EMPTY, statik, qualid, alias));
@@ -2440,6 +2445,10 @@ public class GroovyParserVisitor {
         return maybeSemicolon(groovyVisitor.pollQueue());
     }
 
+    // The groovy compiler discards these annotations in favour of other transform annotations,
+    // so they must be parsed by hand when found in source.
+    private static final Class<?>[] DISCARDED_TRANSFORM_ANNOTATIONS = {Canonical.class, Immutable.class, groovy.transform.Synchronized.class};
+
     public List<J.Annotation> visitAndGetAnnotations(AnnotatedNode node, RewriteGroovyClassVisitor classVisitor) {
         if (node.getAnnotations().isEmpty()) {
             return emptyList();
@@ -2447,10 +2456,10 @@ public class GroovyParserVisitor {
 
         List<J.Annotation> paramAnnotations = new ArrayList<>(node.getAnnotations().size());
         for (AnnotationNode annotationNode : node.getAnnotations()) {
-            // The groovy compiler can add or remove annotations for AST transformations.
-            // Because @groovy.transform.Immutable is discarded in favour of other transform annotations, the removed annotation must be parsed by hand.
-            if (sourceStartsWith("@" + Immutable.class.getSimpleName()) || sourceStartsWith("@" + Immutable.class.getCanonicalName())) {
-                paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(Immutable.class)), classVisitor));
+            for (Class<?> discarded : DISCARDED_TRANSFORM_ANNOTATIONS) {
+                if (sourceStartsWith("@" + discarded.getSimpleName()) || sourceStartsWith("@" + discarded.getCanonicalName())) {
+                    paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(discarded)), classVisitor));
+                }
             }
 
             if (appearsInSource(annotationNode)) {

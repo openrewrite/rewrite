@@ -15,20 +15,17 @@
  */
 package org.openrewrite.hcl.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 
 public class AutoFormat extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Format HCL code";
-    }
+    @Getter
+    final String displayName = "Format HCL code";
 
-    @Override
-    public String getDescription() {
-        return "Format HCL code using a standard comprehensive set of HCL formatting recipes.";
-    }
+    @Getter
+    final String description = "Format HCL code using a standard comprehensive set of HCL formatting recipes.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

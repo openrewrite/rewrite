@@ -44,10 +44,7 @@ public class RepositoryContainsFile extends ScanningRecipe<AtomicBoolean> {
                "contains a specific file or files matching a pattern. If present all files in the repository are marked " +
                "with a `SearchResult` marker. If you want to get only the matching file as a search result, use `FindSourceFiles` instead.";
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ZERO;
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ZERO;
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {

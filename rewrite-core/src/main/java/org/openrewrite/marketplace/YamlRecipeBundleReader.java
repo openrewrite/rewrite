@@ -23,6 +23,7 @@ import org.openrewrite.config.YamlResourceLoader;
 
 import java.io.InputStream;
 import java.net.URI;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Properties;
 
@@ -33,8 +34,8 @@ public class YamlRecipeBundleReader implements RecipeBundleReader {
     private final @Getter RecipeBundle bundle;
     private final YamlResourceLoader yamlLoader;
 
-    public YamlRecipeBundleReader(RecipeBundle bundle, InputStream yamlLoader, URI source, Properties properties) {
-        this.yamlLoader = new YamlResourceLoader(yamlLoader, source, properties);
+    public YamlRecipeBundleReader(RecipeBundle bundle, InputStream yamlLoader, URI source, Properties properties, RecipeMarketplace marketplace, Collection<RecipeBundleResolver> resolvers) {
+        this.yamlLoader = new YamlResourceLoader(yamlLoader, source, properties, marketplace, resolvers);
         this.bundle = bundle;
     }
 

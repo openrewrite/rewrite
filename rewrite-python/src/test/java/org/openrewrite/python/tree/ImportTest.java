@@ -66,6 +66,7 @@ class ImportTest implements RewriteTest {
       "from .mod import  foo",
       "from ...mod import  foo",
       "from ....mod import  foo",
+      "from ......mod import foo",
     })
     void localImport(@Language("py") String arg) {
         rewriteRun(

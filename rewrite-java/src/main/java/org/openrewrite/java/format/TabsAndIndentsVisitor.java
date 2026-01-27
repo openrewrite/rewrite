@@ -563,6 +563,12 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getChainedMethodCalls() != null && wrappingStyle.getChainedMethodCalls().getAlignWhenMultiline();
                 intelliJDefault = false;
                 break;
+            case METHOD_INVOCATION_ARGUMENT:
+            case NEW_CLASS_ARGUMENTS:
+                //noinspection ConstantConditions
+                isAlignedWhenMultipleFromStyle = () -> wrappingStyle.getMethodCallArguments() != null && wrappingStyle.getMethodCallArguments().getAlignWhenMultiline();
+                intelliJDefault = false;
+                break;
             default:
                 isAlignedWhenMultipleFromStyle = () -> null;
                 intelliJDefault = false;
@@ -819,7 +825,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         CONTINUATION_INDENT
     }
 
-    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    @ToBeRemoved(after = "2026-01-30", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
     private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {

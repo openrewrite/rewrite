@@ -19,16 +19,17 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.tree.K;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class RemovePluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
+public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
     String pluginId;
 
     MethodMatcher buildPluginsContainerMatcher = new MethodMatcher("RewriteGradleProject plugins(..)");
@@ -46,73 +47,131 @@ public class RemovePluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
         J.Block b = super.visitBlock(block, executionContext);
 
-        J.MethodInvocation m = getCursor().firstEnclosing(J.MethodInvocation.class);
-        if (m != null && buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m)) {
-            b = b.withStatements(ListUtils.map(b.getStatements(), statement -> {
-                if (!(statement instanceof J.MethodInvocation ||
-                        (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation))) {
-                    return statement;
-                }
-
-                J.MethodInvocation m2 = (J.MethodInvocation) (statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement);
-                if (buildPluginMatcher.matches(m2) || settingsPluginMatcher.matches(m2)) {
-                    if (m2.getArguments().get(0) instanceof J.Literal && pluginId.equals(((J.Literal) m2.getArguments().get(0)).getValue())) {
-                        return null;
-                    }
-                } else if (buildPluginWithVersionMatcher.matches(m2) || settingsPluginWithVersionMatcher.matches(m2)) {
-                    if (m2.getSelect() instanceof J.MethodInvocation &&
-                            ((J.MethodInvocation) m2.getSelect()).getArguments().get(0) instanceof J.Literal &&
-                            pluginId.equals(((J.Literal) ((J.MethodInvocation) m2.getSelect()).getArguments().get(0)).getValue())) {
-                        return null;
-                    }
-                } else if (buildPluginWithApplyMatcher.matches(m2) || settingsPluginWithApplyMatcher.matches(m2)) {
-                    if (buildPluginMatcher.matches(m2.getSelect()) || settingsPluginMatcher.matches(m2.getSelect())) {
-                        if (m2.getSelect() instanceof J.MethodInvocation &&
-                                ((J.MethodInvocation) m2.getSelect()).getArguments().get(0) instanceof J.Literal &&
-                                pluginId.equals(((J.Literal) ((J.MethodInvocation) m2.getSelect()).getArguments().get(0)).getValue())) {
-                            return null;
-                        }
-                    } else if (buildPluginWithVersionMatcher.matches(m2.getSelect()) || settingsPluginWithVersionMatcher.matches(m2.getSelect())) {
-                        if (m2.getSelect() instanceof J.MethodInvocation &&
-                                (buildPluginMatcher.matches(((J.MethodInvocation) m2.getSelect()).getSelect()) || settingsPluginMatcher.matches(((J.MethodInvocation) m2.getSelect()).getSelect()))) {
-                            if (((J.MethodInvocation) m2.getSelect()).getSelect() instanceof J.MethodInvocation &&
-                                    ((J.MethodInvocation) ((J.MethodInvocation) m2.getSelect()).getSelect()).getArguments().get(0) instanceof J.Literal &&
-                                    pluginId.equals(((J.Literal) ((J.MethodInvocation) ((J.MethodInvocation) m2.getSelect()).getSelect()).getArguments().get(0)).getValue())) {
-                                return null;
-                            }
-                        }
-                    }
-                }
-
-                return statement;
-            }));
+        J.MethodInvocation enclosingMethod = getCursor().firstEnclosing(J.MethodInvocation.class);
+        if (enclosingMethod == null) {
+            return b;
         }
 
-        return b;
+        boolean isKotlin = getCursor().firstEnclosing(K.CompilationUnit.class) != null;
+        boolean isPluginsBlock = isKotlin ?
+                "plugins".equals(enclosingMethod.getSimpleName()) :
+                buildPluginsContainerMatcher.matches(enclosingMethod) || settingsPluginsContainerMatcher.matches(enclosingMethod);
+        if (!isPluginsBlock) {
+            return b;
+        }
+
+        return b.withStatements(ListUtils.map(b.getStatements(), statement -> {
+            J.MethodInvocation m;
+            if (statement instanceof J.MethodInvocation) {
+                m = (J.MethodInvocation) statement;
+            } else if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation) {
+                m = (J.MethodInvocation) ((J.Return) statement).getExpression();
+            } else {
+                return statement;
+            }
+
+            // Check for id("pluginId")
+            if (isIdMethodInvocation(m, isKotlin)) {
+                if (isPluginLiteral(m.getArguments().get(0))) {
+                    return null;
+                }
+            }
+            // Check for id("pluginId").version("...")
+            else if (isVersionMethodInvocation(m, isKotlin)) {
+                if (m.getSelect() instanceof J.MethodInvocation &&
+                        isPluginLiteral(((J.MethodInvocation) m.getSelect()).getArguments().get(0))) {
+                    return null;
+                }
+            }
+            // Check for id("pluginId").apply(...) or id("pluginId").version("...").apply(...)
+            else if (isApplyMethodInvocation(m, isKotlin)) {
+                if (isIdMethodInvocation(m.getSelect(), isKotlin)) {
+                    if (m.getSelect() instanceof J.MethodInvocation &&
+                            isPluginLiteral(((J.MethodInvocation) m.getSelect()).getArguments().get(0))) {
+                        return null;
+                    }
+                } else if (isVersionMethodInvocation(m.getSelect(), isKotlin)) {
+                    if (m.getSelect() instanceof J.MethodInvocation &&
+                            isIdMethodInvocation(((J.MethodInvocation) m.getSelect()).getSelect(), isKotlin)) {
+                        if (((J.MethodInvocation) m.getSelect()).getSelect() instanceof J.MethodInvocation &&
+                                isPluginLiteral(((J.MethodInvocation) ((J.MethodInvocation) m.getSelect()).getSelect()).getArguments().get(0))) {
+                            return null;
+                        }
+                    }
+                }
+            }
+
+            return statement;
+        }));
+    }
+
+    private boolean isPluginLiteral(Expression expression) {
+        return expression instanceof J.Literal &&
+                pluginId.equals(((J.Literal) expression).getValue());
+    }
+
+    private boolean isIdMethodInvocation(@Nullable Expression expr, boolean isKotlin) {
+        if (!(expr instanceof J.MethodInvocation)) {
+            return false;
+        }
+        J.MethodInvocation m = (J.MethodInvocation) expr;
+        return isKotlin ?
+                "id".equals(m.getSimpleName()) :
+                (buildPluginMatcher.matches(m) || settingsPluginMatcher.matches(m));
+    }
+
+    private boolean isVersionMethodInvocation(@Nullable Expression expr, boolean isKotlin) {
+        if (!(expr instanceof J.MethodInvocation)) {
+            return false;
+        }
+        J.MethodInvocation m = (J.MethodInvocation) expr;
+        return isKotlin ?
+                "version".equals(m.getSimpleName()) :
+                (buildPluginWithVersionMatcher.matches(m) || settingsPluginWithVersionMatcher.matches(m));
+    }
+
+    private boolean isApplyMethodInvocation(@Nullable Expression expr, boolean isKotlin) {
+        if (!(expr instanceof J.MethodInvocation)) {
+            return false;
+        }
+        J.MethodInvocation m = (J.MethodInvocation) expr;
+        return isKotlin ?
+                "apply".equals(m.getSimpleName()) :
+                (buildPluginWithApplyMatcher.matches(m) || settingsPluginWithApplyMatcher.matches(m));
     }
 
     @Override
-    public  J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+    public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
         J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
 
-        if (buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m)) {
+        boolean isKotlin = getCursor().firstEnclosing(K.CompilationUnit.class) != null;
+
+        // Check for empty plugins{} block
+        boolean isPluginsMethod = isKotlin ?
+                "plugins".equals(m.getSimpleName()) :
+                (buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m));
+
+        if (isPluginsMethod) {
             if (m.getArguments().get(0) instanceof J.Lambda &&
                     ((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block &&
                     ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().isEmpty()) {
-                //noinspection DataFlowIssue
                 return null;
             }
-        } else if(applyPluginMatcher.matches(m)) {
+        }
+        // Check for TOP-LEVEL apply plugin: "..." or apply(plugin = "...")
+        else if ((isKotlin && "apply".equals(m.getSimpleName())) || (!isKotlin && applyPluginMatcher.matches(m))) {
             for (Expression arg : m.getArguments()) {
-                if(arg instanceof G.MapEntry) {
+                if (arg instanceof G.MapEntry) {
                     G.MapEntry me = (G.MapEntry) arg;
-                    if(me.getKey() instanceof J.Literal && me.getValue() instanceof J.Literal) {
-                        J.Literal pluginLiteral = (J.Literal) me.getKey();
-                        J.Literal pluginIdLiteral = (J.Literal) me.getValue();
-                        if("plugin".equals(pluginLiteral.getValue()) && pluginId.equals(pluginIdLiteral.getValue())) {
-                            //noinspection DataFlowIssue
-                            return null;
-                        }
+                    if (me.getKey() instanceof J.Literal && "plugin".equals(((J.Literal) me.getKey()).getValue()) &&
+                            me.getValue() instanceof J.Literal && pluginId.equals(((J.Literal) me.getValue()).getValue())) {
+                        return null;
+                    }
+                } else if (arg instanceof J.Assignment) {
+                    J.Assignment as = (J.Assignment) arg;
+                    if (as.getVariable() instanceof J.Identifier && "plugin".equals(((J.Identifier) as.getVariable()).getSimpleName()) &&
+                            as.getAssignment() instanceof J.Literal && pluginId.equals(((J.Literal) as.getAssignment()).getValue())) {
+                        return null;
                     }
                 }
             }

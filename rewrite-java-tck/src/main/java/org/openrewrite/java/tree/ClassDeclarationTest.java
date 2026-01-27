@@ -16,12 +16,14 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MinimumJava17;
+import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -275,5 +277,135 @@ class ClassDeclarationTest implements RewriteTest {
             """.replaceAll("/[*]@@[*]/", suffix)
           )
         );
+    }
+
+    @Issue("https://openjdk.org/jeps/512")
+    @MinimumJava25
+    @Nested
+    class ImplicitClasses implements RewriteTest {
+
+        @Test
+        void implicitClassWithMainMethod() {
+            rewriteRun(
+              java(
+                """
+                  void main() {
+                      System.out.println("Hello from implicit class!");
+                  }
+                  """,
+                spec -> spec.path("com/example/Main.java")
+              )
+            );
+        }
+
+        @Test
+        void implicitClassWithAbundantSpacing() {
+            rewriteRun(
+              java(
+                """
+
+                  void main() {
+
+                      System.out.println("Hello from implicit class!");
+
+                  }
+
+                  """,
+                spec -> spec.path("com/example/Main.java")
+              )
+            );
+        }
+
+        @Test
+        void implicitClassWithMultipleMethods() {
+            rewriteRun(
+              java(
+                """
+                  void main() {
+                      greet("World");
+                  }
+
+                  void greet(String name) {
+                      System.out.println("Hello, " + name + "!");
+                  }
+                  """,
+                spec -> spec.path("com/example/Main.java")
+              )
+            );
+        }
+
+        @Test
+        void implicitClassWithFields() {
+            rewriteRun(
+              java(
+                """
+                  String greeting = "Hello";
+
+                  void main() {
+                      System.out.println(greeting + ", World!");
+                  }
+                  """,
+                spec -> spec.path("com/example/Main.java")
+              )
+            );
+        }
+
+        @Test
+        void implicitClassUtilizingJavaBase() {
+            rewriteRun(
+              java(
+                """
+                  void main() {
+                      List<String> names = new ArrayList<>();
+                      names.add("Alice");
+                      names.add("Bob");
+                      System.out.println(names);
+                  }
+                  """,
+                spec -> spec.path("com/example/Main.java")
+              )
+            );
+        }
+
+        @Test
+        void implicitClassWithConstructor() {
+            rewriteRun(
+              java(
+                """
+                  private String name;
+
+                  Main(String name) {
+                      this.name = name;
+                  }
+
+                  void main() {
+                      System.out.println("Name: " + name);
+                  }
+                  """,
+                spec -> spec.path("com/example/Main.java")
+              )
+            );
+        }
+
+        @Test
+        void implicitClassWithInnerClass() {
+            rewriteRun(
+              java(
+                """
+                  void main() {
+                      Helper helper = new Helper();
+                      helper.help();
+                  }
+
+                  class Helper {
+                      void help() {
+                          System.out.println("Helping!");
+                      }
+                  }
+                  """,
+                spec -> spec.path("com/example/Main.java")
+              )
+            );
+        }
     }
 }

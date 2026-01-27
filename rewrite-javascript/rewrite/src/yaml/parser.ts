@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import {emptyMarkers, markers, MarkersKind, ParseExceptionResult} from "../markers";
+import {omitColon} from "./markers";
 import {Parser, ParserInput, parserInputRead, Parsers} from "../parser";
 import {randomId} from "../uuid";
 import {SourceFile} from "../tree";
@@ -83,6 +84,7 @@ class YamlCstReader {
     parse(): Omit<Yaml.Documents, "sourcePath"> {
         const documents: Yaml.Document[] = [];
         let pendingPrefix = "";
+        let pendingDirectives: Yaml.Directive[] = [];
 
         for (let i = 0; i < this.cstTokens.length; i++) {
             const token = this.cstTokens[i];
@@ -96,15 +98,31 @@ class YamlCstReader {
                     docEnd = nextToken as CstDocumentEnd;
                     i++; // Skip the doc-end in the main loop
                 }
-                const {doc, afterEnd} = this.convertDocument(cstDoc, docEnd, pendingPrefix);
+                const {doc, afterEnd} = this.convertDocument(cstDoc, docEnd, pendingPrefix, pendingDirectives);
                 documents.push(doc);
                 pendingPrefix = afterEnd;  // Content after ... becomes next doc's prefix
+                pendingDirectives = [];    // Reset directives for next document
             } else if (token.type === 'doc-end') {
                 // Standalone doc-end without preceding document
                 const docEnd = token as CstDocumentEnd;
                 pendingPrefix += this.concatenateSources(docEnd.end || []);
+            } else if (token.type === 'directive') {
+                // Directive token (e.g., %YAML 1.2 or %TAG !yaml! tag:yaml.org,2002:)
+                // Look ahead for trailing newline/whitespace to use as suffix
+                let suffix = "";
+                while (i + 1 < this.cstTokens.length) {
+                    const nextToken = this.cstTokens[i + 1];
+                    if (nextToken.type === 'newline' || nextToken.type === 'space') {
+                        suffix += (nextToken as CstSourceToken).source;
+                        i++;
+                    } else {
+                        break;
+                    }
+                }
+                pendingDirectives.push(this.convertDirective((token as any).source as string, pendingPrefix, suffix));
+                pendingPrefix = "";  // Prefix consumed by directive
             } else if (token.type === 'comment' || token.type === 'newline' || token.type === 'space') {
-                // Content before document (comments, whitespace) becomes document prefix
+                // Content before document (comments, whitespace) becomes document prefix or directive prefix
                 pendingPrefix += (token as CstSourceToken).source;
             }
         }
@@ -119,7 +137,23 @@ class YamlCstReader {
         };
     }
 
-    private convertDocument(cstDoc: CstDocument, cstDocEnd?: CstDocumentEnd, pendingPrefix: string = ""): {doc: Yaml.Document, afterEnd: string} {
+    private convertDirective(source: string, prefix: string, suffix: string): Yaml.Directive {
+        // Directive source is like "%YAML 1.2" (without trailing newline in CST)
+        // The suffix is provided from looking ahead at subsequent tokens
+        // Remove the leading '%'
+        const value = source.substring(1);
+
+        return {
+            kind: Yaml.Kind.Directive,
+            id: randomId(),
+            prefix,
+            markers: emptyMarkers,
+            value,
+            suffix
+        };
+    }
+
+    private convertDocument(cstDoc: CstDocument, cstDocEnd?: CstDocumentEnd, pendingPrefix: string = "", directives: Yaml.Directive[] = []): {doc: Yaml.Document, afterEnd: string} {
         // Extract prefix from document start tokens
         // The document prefix is content BEFORE the --- marker
         // Content AFTER --- goes into the block's first entry
@@ -167,6 +201,7 @@ class YamlCstReader {
                 id: randomId(),
                 prefix,
                 markers: emptyMarkers,
+                directives,
                 explicit,
                 block,
                 end
@@ -609,12 +644,15 @@ class YamlCstReader {
             value = this.createEmptyScalar(afterColonSpace);
         }
 
+        // In flow mappings like { "MV7", "7J04" }, entries may lack explicit colons
+        const entryMarkers = seenColon ? emptyMarkers : markers(omitColon());
+
         return {
             entry: {
                 kind: Yaml.Kind.MappingEntry,
                 id: randomId(),
                 prefix,
-                markers: emptyMarkers,
+                markers: entryMarkers,
                 key,
                 beforeMappingValueIndicator,
                 value

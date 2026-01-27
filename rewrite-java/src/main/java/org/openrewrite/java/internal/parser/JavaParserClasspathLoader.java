@@ -19,6 +19,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaParser;
 
 import java.nio.file.Path;
+import java.util.Collection;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Prepares classpath resources for use by {@link JavaParser}.
@@ -34,4 +37,11 @@ public interface JavaParserClasspathLoader {
      */
     @Nullable
     Path load(String artifactName);
+
+    /**
+     * @return The artifact identifiers available from this loader, for use in diagnostic messages.
+     */
+    default Collection<String> availableArtifacts() {
+        return emptyList();
+    }
 }

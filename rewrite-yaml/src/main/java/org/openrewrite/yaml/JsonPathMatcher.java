@@ -19,12 +19,14 @@ import lombok.EqualsAndHashCode;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.openrewrite.yaml.internal.ThrowingErrorListener;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
+import org.openrewrite.Validated;
 import org.openrewrite.yaml.internal.grammar.JsonPathLexer;
 import org.openrewrite.yaml.internal.grammar.JsonPathParser;
 import org.openrewrite.yaml.internal.grammar.JsonPathParserBaseVisitor;
@@ -52,6 +54,24 @@ public class JsonPathMatcher {
 
     public JsonPathMatcher(String jsonPath) {
         this.jsonPath = jsonPath;
+    }
+
+    public static Validated<String> validate(String property, String jsonPath) {
+        // "$" and "$." are valid and mean "root" - they're handled as special cases in recipes
+        if ("$".equals(jsonPath) || "$.".equals(jsonPath)) {
+            return Validated.valid(property, jsonPath);
+        }
+        try {
+            new JsonPathMatcher(jsonPath).parse();
+            return Validated.valid(property, jsonPath);
+        } catch (Throwable t) {
+            return Validated.invalid(
+                    property,
+                    jsonPath,
+                    "Invalid JsonPath expression. " + t.getMessage(),
+                    t
+            );
+        }
     }
 
     public <T> Optional<T> find(Cursor cursor) {
@@ -138,7 +158,14 @@ public class JsonPathMatcher {
     }
 
     private JsonPathParser jsonPath() {
-        return new JsonPathParser(new CommonTokenStream(new JsonPathLexer(CharStreams.fromString(this.jsonPath))));
+        ThrowingErrorListener errorListener = new ThrowingErrorListener(this.jsonPath);
+        JsonPathLexer lexer = new JsonPathLexer(CharStreams.fromString(this.jsonPath));
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(errorListener);
+        JsonPathParser parser = new JsonPathParser(new CommonTokenStream(lexer));
+        parser.removeErrorListeners();
+        parser.addErrorListener(errorListener);
+        return parser;
     }
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})

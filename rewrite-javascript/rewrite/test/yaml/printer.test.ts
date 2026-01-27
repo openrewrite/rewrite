@@ -51,6 +51,7 @@ describe('printing YAML', () => {
             id: randomId(),
             prefix: "",
             markers: emptyMarkers,
+            directives: [],
             explicit: false,
             block: scalar,
             end: documentEnd
@@ -95,6 +96,7 @@ describe('printing YAML', () => {
             id: randomId(),
             prefix: "",
             markers: emptyMarkers,
+            directives: [],
             explicit: false,
             block: scalar,
             end: documentEnd
@@ -139,6 +141,7 @@ describe('printing YAML', () => {
             id: randomId(),
             prefix: "",
             markers: emptyMarkers,
+            directives: [],
             explicit: false,
             block: scalar,
             end: documentEnd
@@ -216,6 +219,7 @@ describe('printing YAML', () => {
             id: randomId(),
             prefix: "",
             markers: emptyMarkers,
+            directives: [],
             explicit: false,
             block: mapping,
             end: documentEnd
@@ -282,6 +286,7 @@ describe('printing YAML', () => {
             id: randomId(),
             prefix: "",
             markers: emptyMarkers,
+            directives: [],
             explicit: false,
             block: sequence,
             end: documentEnd
@@ -326,6 +331,7 @@ describe('printing YAML', () => {
             id: randomId(),
             prefix: "",
             markers: emptyMarkers,
+            directives: [],
             explicit: true,
             block: scalar,
             end: documentEnd
@@ -370,6 +376,7 @@ describe('printing YAML', () => {
             id: randomId(),
             prefix: "",
             markers: emptyMarkers,
+            directives: [],
             explicit: false,
             block: scalar,
             end: documentEnd
@@ -423,6 +430,7 @@ describe('printing YAML', () => {
             id: randomId(),
             prefix: "",
             markers: emptyMarkers,
+            directives: [],
             explicit: false,
             block: scalar,
             end: documentEnd
@@ -473,6 +481,7 @@ describe('printing YAML', () => {
             id: randomId(),
             prefix: "",
             markers: emptyMarkers,
+            directives: [],
             explicit: false,
             block: alias,
             end: documentEnd
@@ -560,6 +569,7 @@ describe('printing YAML', () => {
             id: randomId(),
             prefix: "",
             markers: emptyMarkers,
+            directives: [],
             explicit: false,
             block: sequence,
             end: documentEnd
