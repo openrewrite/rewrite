@@ -237,25 +237,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
     @EqualsAndHashCode(callSuper = false)
     @Value
-    static class BellwetherDecoratedRecipe extends Recipe implements DelegatingRecipe {
+    static class BellwetherDecoratedRecipe extends DecoratedRecipe {
 
         DeclarativeRecipe.PreconditionBellwether bellwether;
         Recipe delegate;
-
-        @Override
-        public String getName() {
-            return delegate.getName();
-        }
-
-        @Override
-        public String getDisplayName() {
-            return delegate.getDisplayName();
-        }
-
-        @Override
-        public String getDescription() {
-            return delegate.getDescription();
-        }
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -266,54 +251,14 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         public List<Recipe> getRecipeList() {
             return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
         }
-
-        @Override
-        public boolean causesAnotherCycle() {
-            return delegate.causesAnotherCycle();
-        }
-
-        @Override
-        public Validated<Object> validate() {
-            return delegate.validate();
-        }
     }
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    static class BellwetherDecoratedScanningRecipe<T> extends ScanningRecipe<T> implements DelegatingRecipe {
+    static class BellwetherDecoratedScanningRecipe<T> extends DecoratedScanningRecipe<T> {
 
         DeclarativeRecipe.PreconditionBellwether bellwether;
         ScanningRecipe<T> delegate;
-
-        @Override
-        public String getName() {
-            return delegate.getName();
-        }
-
-        @Override
-        public String getDisplayName() {
-            return delegate.getDisplayName();
-        }
-
-        @Override
-        public String getDescription() {
-            return delegate.getDescription();
-        }
-
-        @Override
-        public T getInitialValue(ExecutionContext ctx) {
-            return delegate.getInitialValue(ctx);
-        }
-
-        @Override
-        public TreeVisitor<?, ExecutionContext> getScanner(T acc) {
-            return delegate.getScanner(acc);
-        }
-
-        @Override
-        public Collection<? extends SourceFile> generate(T acc, ExecutionContext ctx) {
-            return delegate.generate(acc, ctx);
-        }
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor(T acc) {
@@ -321,18 +266,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         }
 
         @Override
-        public boolean causesAnotherCycle() {
-            return delegate.causesAnotherCycle();
-        }
-
-        @Override
         public List<Recipe> getRecipeList() {
             return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
-        }
-
-        @Override
-        public Validated<Object> validate() {
-            return delegate.validate();
         }
     }
 

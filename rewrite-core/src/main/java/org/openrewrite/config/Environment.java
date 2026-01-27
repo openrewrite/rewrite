@@ -213,17 +213,36 @@ public class Environment {
         }
 
         if (recipe instanceof DeclarativeRecipe) {
-            Function<String, @Nullable Recipe> loadFunction = key -> {
-                if (dependencyRecipes.containsKey(key)) {
-                    return dependencyRecipes.get(key);
-                }
-                for (ResourceLoader resourceLoader : resourceLoaders) {
-                    Recipe r = resourceLoader.loadRecipe(key, details);
-                    if (r != null) {
-                        return r;
+            Map<String, Recipe> recipeCache = new HashMap<>(dependencyRecipes);
+            Function<String, @Nullable Recipe> loadFunction = new Function<String, Recipe>() {
+                @Override
+                public @Nullable Recipe apply(String key) {
+                    Recipe cached = recipeCache.get(key);
+                    if (cached != null) {
+                        return cached;
                     }
+
+                    Recipe r = null;
+                    for (ResourceLoader resourceLoader : resourceLoaders) {
+                        r = resourceLoader.loadRecipe(key, details);
+                        if (r != null) {
+                            break;
+                        }
+                    }
+
+                    if (r == null) {
+                        return null;
+                    }
+
+                    recipeCache.put(key, r);
+
+                    // Now initialize if it's a DeclarativeRecipe
+                    if (r instanceof DeclarativeRecipe) {
+                        ((DeclarativeRecipe) r).initialize(this);
+                    }
+
+                    return r;
                 }
-                return null;
             };
             ((DeclarativeRecipe) recipe).initialize(loadFunction);
         }
