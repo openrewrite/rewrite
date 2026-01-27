@@ -237,7 +237,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
     @EqualsAndHashCode(callSuper = false)
     @Value
-    static class BellwetherDecoratedRecipe extends Recipe implements Recipe.DelegatingRecipe {
+    static class BellwetherDecoratedRecipe extends Recipe implements DelegatingRecipe {
 
         DeclarativeRecipe.PreconditionBellwether bellwether;
         Recipe delegate;
@@ -340,7 +340,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    static class BellwetherDecoratedScanningRecipe<T> extends ScanningRecipe<T> implements Recipe.DelegatingRecipe {
+    static class BellwetherDecoratedScanningRecipe<T> extends ScanningRecipe<T> implements DelegatingRecipe {
 
         DeclarativeRecipe.PreconditionBellwether bellwether;
         ScanningRecipe<T> delegate;
