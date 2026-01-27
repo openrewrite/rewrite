@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
@@ -445,16 +446,20 @@ public class MavenSettings {
         ServerConfiguration configuration;
     }
 
-    @SuppressWarnings("DefaultAnnotationParam")
+    @EqualsAndHashCode
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @ToString
+    @With
+    @JsonIgnoreProperties("httpHeaders")
     public static class ServerConfiguration {
         @Nullable
-        private List<HttpHeader> httpHeaders;
+        List<HttpHeader> httpHeaders;
 
         /**
          * Timeout in milliseconds for reading connecting to and reading from the connection.
          */
         @Nullable
-        private Long timeout;
+        Long timeout;
 
         @JsonCreator
         public ServerConfiguration() {
@@ -474,14 +479,6 @@ public class MavenSettings {
         @JacksonXmlProperty(localName = "timeout")
         public @Nullable Long getTimeout() {
             return this.timeout;
-        }
-
-        public void setHttpHeaders(@Nullable List<HttpHeader> httpHeaders) {
-            this.httpHeaders = httpHeaders;
-        }
-
-        public void setTimeout(@Nullable Long timeout) {
-            this.timeout = timeout;
         }
     }
 
