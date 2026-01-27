@@ -193,4 +193,105 @@ class FromTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void fromWithTagAndDigest() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:22.04@sha256:abc123def456
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
+                assertThat(from.getTag()).isNotNull();
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
+                assertThat(from.getDigest()).isNotNull();
+                assertThat(((Docker.Literal) from.getDigest().getContents().getFirst()).getText()).isEqualTo("sha256:abc123def456");
+            })
+          )
+        );
+    }
+
+    @Test
+    void fromWithDigestOnly() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu@sha256:abc123def456
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
+                assertThat(from.getTag()).isNull();
+                assertThat(from.getDigest()).isNotNull();
+                assertThat(((Docker.Literal) from.getDigest().getContents().getFirst()).getText()).isEqualTo("sha256:abc123def456");
+            })
+          )
+        );
+    }
+
+    @Test
+    void fromWithTagAndDigestAndAs() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:22.04@sha256:abc123 AS base
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
+                assertThat(from.getTag()).isNotNull();
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
+                assertThat(from.getDigest()).isNotNull();
+                assertThat(((Docker.Literal) from.getDigest().getContents().getFirst()).getText()).isEqualTo("sha256:abc123");
+                assertThat(from.getAs()).isNotNull();
+                assertThat(from.getAs().getName().getText()).isEqualTo("base");
+            })
+          )
+        );
+    }
+
+    @Test
+    void fromWithRegistryTagAndDigest() {
+        rewriteRun(
+          docker(
+            """
+              FROM my.registry.com/ubuntu:22.04@sha256:abc123
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("my.registry.com/ubuntu");
+                assertThat(from.getTag()).isNotNull();
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
+                assertThat(from.getDigest()).isNotNull();
+                assertThat(((Docker.Literal) from.getDigest().getContents().getFirst()).getText()).isEqualTo("sha256:abc123");
+            })
+          )
+        );
+    }
+
+    @Test
+    void fromWithEnvVarTagAndDigest() {
+        rewriteRun(
+          docker(
+            """
+              ARG TAG=22.04
+              FROM ubuntu:${TAG}@sha256:abc123
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getLast().getFrom();
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
+
+                // Tag should contain the env var
+                assertThat(from.getTag()).isNotNull();
+                assertThat(from.getTag().getContents().getFirst()).isInstanceOf(Docker.EnvironmentVariable.class);
+                assertThat(((Docker.EnvironmentVariable) from.getTag().getContents().getFirst()).getName()).isEqualTo("TAG");
+
+                assertThat(from.getDigest()).isNotNull();
+                assertThat(((Docker.Literal) from.getDigest().getContents().getFirst()).getText()).isEqualTo("sha256:abc123");
+            })
+          )
+        );
+    }
 }

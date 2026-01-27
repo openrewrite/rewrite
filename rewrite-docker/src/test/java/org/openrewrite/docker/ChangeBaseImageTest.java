@@ -15,6 +15,7 @@
  */
 package org.openrewrite.docker;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
@@ -356,5 +357,245 @@ class ChangeBaseImageTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Nested
+    class EnvironmentVariables implements RewriteTest {
+
+        @Test
+        void matchesImageWithEnvironmentVariableInTag() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeBaseImage("ubuntu:*", "ubuntu:22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:${TAG}
+                  RUN apt-get update
+                  """,
+                """
+                  FROM ubuntu:22.04
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void matchesImageWithEnvironmentVariableInDigest() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeBaseImage("ubuntu@*", "ubuntu:22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu@${DIGEST}
+                  RUN apt-get update
+                  """,
+                """
+                  FROM ubuntu:22.04
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void matchesImageWithEnvironmentVariableInName() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeBaseImage("*:20.04", "ubuntu:22.04", null, null)),
+              docker(
+                """
+                  FROM ${IMAGE_NAME}:20.04
+                  RUN apt-get update
+                  """,
+                """
+                  FROM ubuntu:22.04
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void matchesBothLiteralAndEnvironmentVariableImages() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeBaseImage("ubuntu:*", "ubuntu:22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04 AS base
+                  FROM ubuntu:${TAG} AS builder
+                  """,
+                """
+                  FROM ubuntu:22.04 AS base
+                  FROM ubuntu:22.04 AS builder
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doesNotMatchWhenNeitherPatternNorImageCanMatch() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeBaseImage("alpine:*", "alpine:3.18", null, null)),
+              docker(
+                """
+                  FROM ubuntu:${TAG}
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void matchesFullyParameterizedImageWithWildcard() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeBaseImage("*", "ubuntu:22.04", null, null)),
+              docker(
+                """
+                  FROM ${REGISTRY}/${IMAGE}:${TAG}
+                  RUN apt-get update
+                  """,
+                """
+                  FROM ubuntu:22.04
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    class TagAndDigest implements RewriteTest {
+
+        @Test
+        void changeImageWithTagAndDigestToNewTag() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04@*", "ubuntu:22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123def456
+                  RUN apt-get update
+                  """,
+                """
+                  FROM ubuntu:22.04
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void changeImageWithTagAndDigestToNewDigest() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04@*", "ubuntu@sha256:newdigest789", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123def456
+                  RUN apt-get update
+                  """,
+                """
+                  FROM ubuntu@sha256:newdigest789
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void changeImageWithTagAndDigestToNewTagAndDigest() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04@*", "ubuntu:22.04@sha256:newdigest789", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123def456
+                  RUN apt-get update
+                  """,
+                """
+                  FROM ubuntu:22.04@sha256:newdigest789
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void matchImageWithTagAndDigestUsingWildcards() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeBaseImage("ubuntu:*@*", "ubuntu:22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123
+                  FROM ubuntu:18.04@sha256:def456
+                  FROM alpine:latest
+                  """,
+                """
+                  FROM ubuntu:22.04
+                  FROM ubuntu:22.04
+                  FROM alpine:latest
+                  """
+              )
+            );
+        }
+
+        @Test
+        void changeImageWithTagAndDigestPreservesAs() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04@*", "ubuntu:22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123 AS builder
+                  RUN apt-get update
+                  """,
+                """
+                  FROM ubuntu:22.04 AS builder
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void changeImageWithTagAndDigestPreservesPlatform() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeBaseImage("ubuntu:20.04@*", "ubuntu:22.04", null, null)),
+              docker(
+                """
+                  FROM --platform=linux/amd64 ubuntu:20.04@sha256:abc123
+                  RUN apt-get update
+                  """,
+                """
+                  FROM --platform=linux/amd64 ubuntu:22.04
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void changeImageWithRegistryTagAndDigest() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeBaseImage("my.registry.com/ubuntu:*@*", "my.registry.com/ubuntu:22.04", null, null)),
+              docker(
+                """
+                  FROM my.registry.com/ubuntu:20.04@sha256:abc123
+                  RUN apt-get update
+                  """,
+                """
+                  FROM my.registry.com/ubuntu:22.04
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void noChangeWhenTagDoesNotMatch() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeBaseImage("ubuntu:18.04@*", "ubuntu:22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
     }
 }

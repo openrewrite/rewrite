@@ -1801,7 +1801,7 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(new MergeYaml(
-              "$.",
+              "$",
               // language=yaml
               """
                 script: |
@@ -3163,7 +3163,7 @@ class MergeYamlTest implements RewriteTest {
     void lastEntryShouldKeepItsComment() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
-            "$.",
+            "$",
             "imagePullPolicy: Always",
             true,
             null,

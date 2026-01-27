@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import {emptyMarkers, markers, MarkersKind, ParseExceptionResult} from "../markers";
+import {omitColon} from "./markers";
 import {Parser, ParserInput, parserInputRead, Parsers} from "../parser";
 import {randomId} from "../uuid";
 import {SourceFile} from "../tree";
@@ -639,12 +640,15 @@ class YamlCstReader {
             value = this.createEmptyScalar(afterColonSpace);
         }
 
+        // In flow mappings like { "MV7", "7J04" }, entries may lack explicit colons
+        const entryMarkers = seenColon ? emptyMarkers : markers(omitColon());
+
         return {
             entry: {
                 kind: Yaml.Kind.MappingEntry,
                 id: randomId(),
                 prefix,
-                markers: emptyMarkers,
+                markers: entryMarkers,
                 key,
                 beforeMappingValueIndicator,
                 value

@@ -24,6 +24,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ObjectMappers;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.RecipeLoader;
+import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
@@ -417,6 +418,46 @@ public class YamlResourceLoader implements ResourceLoader {
     private void addInvalidRecipeValidation(Consumer<Validated<Object>> addValidation, String recipeName,
                                             @Nullable Object recipeArgs, String message) {
         addValidation.accept(Validated.invalid(recipeName, recipeArgs, message));
+    }
+
+    public Collection<RecipeListing> listRecipeListings(RecipeBundle bundle) {
+        Collection<Map<String, Object>> resources = loadResources(ResourceType.Recipe);
+        List<RecipeListing> recipeListings = new ArrayList<>(resources.size());
+        for (Map<String, Object> yaml : resources) {
+            if (!yaml.containsKey("name")) {
+                continue;
+            }
+
+            @Language("markdown") String name = (String) yaml.get("name");
+
+            @Language("markdown")
+            String displayName = (String) yaml.get("displayName");
+            if (displayName == null) {
+                displayName = name;
+            }
+
+            @Language("markdown")
+            String description = (String) yaml.get("description");
+
+            String estimatedEffortPerOccurrenceStr = (String) yaml.get("estimatedEffortPerOccurrence");
+            Duration estimatedEffortPerOccurrence = null;
+            if (estimatedEffortPerOccurrenceStr != null) {
+                estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
+            }
+
+            recipeListings.add(new RecipeListing(
+                    null,
+                    name,
+                    displayName,
+                    description,
+                    estimatedEffortPerOccurrence,
+                    emptyList(),
+                    emptyList(),
+                    0,
+                    bundle
+            ));
+        }
+        return recipeListings;
     }
 
     @Override

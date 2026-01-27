@@ -57,8 +57,8 @@ public class JsonPathMatcher {
     }
 
     public static Validated<String> validate(String property, String jsonPath) {
-        // "$" and "$." are valid and mean "root" - they're handled as special cases in recipes
-        if ("$".equals(jsonPath) || "$.".equals(jsonPath)) {
+        // "$" is valid and means "root" - handled as special cases in recipes
+        if ("$".equals(jsonPath)) {
             return Validated.valid(property, jsonPath);
         }
         try {
@@ -91,7 +91,10 @@ public class JsonPathMatcher {
         }
         JsonPathParser.JsonPathContext ctx = parse();
         // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
-        JsonPathParser.ExpressionContext stop = (JsonPathParser.ExpressionContext) ctx.children.get(ctx.children.size() - 1);
+        ParseTree lastChild = ctx.children.get(ctx.children.size() - 1);
+        JsonPathParser.ExpressionContext stop = lastChild instanceof JsonPathParser.ExpressionContext ?
+                (JsonPathParser.ExpressionContext) lastChild :
+                null;
         @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathYamlVisitor(cursorPath, start, stop, false);
         Object result = v.visit(ctx);
 
@@ -152,14 +155,24 @@ public class JsonPathMatcher {
 
     private JsonPathParser.JsonPathContext parse() {
         if (parsed == null) {
-            parsed = jsonPath().jsonPath();
+            // "$" is a special case meaning "root" - handle like "$"
+            String pathToParse = "$".equals(jsonPath) ? "$" : jsonPath;
+            JsonPathParser parser = jsonPath(pathToParse);
+            parsed = parser.jsonPath();
+            // Ensure all input was consumed
+            if (parser.getCurrentToken().getType() != org.antlr.v4.runtime.Token.EOF) {
+                throw new IllegalArgumentException(
+                        "Syntax error at line 1:" + parser.getCurrentToken().getCharPositionInLine() +
+                        " extraneous input '" + parser.getCurrentToken().getText() +
+                        "' expecting EOF. Original input: '" + jsonPath + "'");
+            }
         }
         return parsed;
     }
 
-    private JsonPathParser jsonPath() {
+    private JsonPathParser jsonPath(String path) {
         ThrowingErrorListener errorListener = new ThrowingErrorListener(this.jsonPath);
-        JsonPathLexer lexer = new JsonPathLexer(CharStreams.fromString(this.jsonPath));
+        JsonPathLexer lexer = new JsonPathLexer(CharStreams.fromString(path));
         lexer.removeErrorListeners();
         lexer.addErrorListener(errorListener);
         JsonPathParser parser = new JsonPathParser(new CommonTokenStream(lexer));
