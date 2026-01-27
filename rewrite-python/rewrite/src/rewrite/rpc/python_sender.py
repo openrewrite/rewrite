@@ -4,7 +4,6 @@ Python RPC Sender that mirrors Java's PythonSender structure.
 This uses the visitor pattern with pre_visit handling common fields (id, prefix, markers)
 and type-specific visit methods handling only additional fields.
 """
-import sys
 from typing import Any
 
 from rewrite import Markers
@@ -18,12 +17,6 @@ from rewrite.python.tree import (
     TypeAlias, YieldFrom, UnionType, VariableScope, Del, SpecialParameter,
     Star, NamedArgument, TypeHintedExpression, ErrorFrom, MatchCase, Slice
 )
-
-_DEBUG_SENDER = False
-
-def _debug(msg: str) -> None:
-    if _DEBUG_SENDER:
-        print(f"[SENDER] {msg}", file=sys.stderr, flush=True)
 
 
 class PythonRpcSender:
@@ -59,8 +52,6 @@ class PythonRpcSender:
         """Visit a tree node, dispatching to appropriate visitor method."""
         if tree is None:
             return
-
-        _debug(f"_visit: {type(tree).__name__}")
 
         # First handle common J fields via pre_visit
         # ExpressionStatement and StatementExpression delegate prefix/markers to their child, so skip them
@@ -327,22 +318,14 @@ class PythonRpcSender:
         q.get_and_send(ef, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
 
     def _visit_match_case(self, mc: MatchCase, q: 'RpcSendQueue') -> None:
-        _debug(f"_visit_match_case: id={mc.id}")
         q.get_and_send(mc, lambda x: x.pattern, lambda el: self._visit(el, q))
-        _debug("_visit_match_case: sent pattern")
         q.get_and_send(mc, lambda x: x.padding.guard, lambda el: self._visit_left_padded(el, q))
-        _debug("_visit_match_case: sent guard")
         q.get_and_send(mc, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
-        _debug("_visit_match_case: done")
 
     def _visit_match_case_pattern(self, p: MatchCase.Pattern, q: 'RpcSendQueue') -> None:
-        _debug(f"_visit_match_case_pattern: kind={p.kind}, children_count={len(p.children) if p.children else 0}")
         q.get_and_send(p, lambda x: x.kind)
-        _debug("_visit_match_case_pattern: sent kind")
         q.get_and_send(p, lambda x: x.padding.children, lambda el: self._visit_container(el, q))
-        _debug("_visit_match_case_pattern: sent children")
         q.get_and_send(p, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
-        _debug("_visit_match_case_pattern: done")
 
     def _visit_slice(self, slice_: Slice, q: 'RpcSendQueue') -> None:
         q.get_and_send(slice_, lambda x: x.padding.start, lambda el: self._visit_right_padded(el, q))
@@ -360,7 +343,7 @@ class PythonRpcSender:
             AssignmentOperation, Unary, Ternary, Lambda, Empty, Throw,
             Assert, Break, Continue, WhileLoop, ForEachLoop, Switch, Case, Annotation, Import,
             Binary, Parentheses, ControlParentheses, NewArray, Modifier, Yield,
-            ParameterizedType
+            ParameterizedType, TypeParameter, TypeParameters
         )
 
         # For Java types, we need to handle their specific fields
@@ -450,6 +433,10 @@ class PythonRpcSender:
             self._visit_j_yield(j, q)
         elif isinstance(j, ParameterizedType):
             self._visit_j_parameterized_type(j, q)
+        elif isinstance(j, TypeParameter):
+            self._visit_j_type_parameter(j, q)
+        elif isinstance(j, TypeParameters):
+            self._visit_j_type_parameters(j, q)
 
     def _visit_identifier(self, ident, q: 'RpcSendQueue') -> None:
         # Java Identifier sends: annotations (list), simpleName, type (ref), fieldType (ref)
@@ -484,7 +471,8 @@ class PythonRpcSender:
         q.get_and_send(mi, lambda x: x.padding.type_parameters, lambda c: self._visit_container(c, q))
         q.get_and_send(mi, lambda x: x.name, lambda el: self._visit(el, q))
         q.get_and_send(mi, lambda x: x.padding.arguments, lambda c: self._visit_container(c, q))
-        q.get_and_send(mi, lambda x: x.method_type)
+        # method_type: serialize the JavaType.Method with all its fields
+        q.get_and_send(mi, lambda x: x.method_type, lambda t: self._visit_type(t, q) if t else None)
 
     def _visit_block(self, block, q: 'RpcSendQueue') -> None:
         # static is JRightPadded[bool], not just bool
@@ -771,6 +759,27 @@ class PythonRpcSender:
         q.get_and_send(pt, lambda x: x.padding.type_parameters, lambda c: self._visit_container(c, q))
         q.get_and_send(pt, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
 
+    def _visit_j_type_parameter(self, tp, q: 'RpcSendQueue') -> None:
+        # Java TypeParameter: annotations (list), modifiers (list), name (Expression), bounds (JContainer)
+        q.get_and_send_list(tp, lambda x: x.annotations,
+                           lambda a: a.id,
+                           lambda a: self._visit(a, q))
+        q.get_and_send_list(tp, lambda x: x.modifiers,
+                           lambda m: m.id,
+                           lambda m: self._visit(m, q))
+        q.get_and_send(tp, lambda x: x.name, lambda el: self._visit(el, q))
+        q.get_and_send(tp, lambda x: x.padding.bounds if hasattr(x, 'padding') and hasattr(x.padding, 'bounds') else None,
+                      lambda c: self._visit_container(c, q) if c else None)
+
+    def _visit_j_type_parameters(self, tps, q: 'RpcSendQueue') -> None:
+        # Java TypeParameters: annotations (list), typeParameters (list of JRightPadded)
+        q.get_and_send_list(tps, lambda x: x.annotations,
+                           lambda a: a.id,
+                           lambda a: self._visit(a, q))
+        q.get_and_send_list(tps, lambda x: x.padding.type_parameters,
+                           lambda rp: rp.element.id,
+                           lambda rp: self._visit_right_padded(rp, q))
+
     # Helper methods for Space, JRightPadded, JLeftPadded, JContainer
 
     def _visit_markers(self, markers: Markers, q: 'RpcSendQueue') -> None:
@@ -818,7 +827,54 @@ class PythonRpcSender:
             keyword = keyword_map.get(java_type, str(java_type.name).lower())
             # Send keyword as a primitive value field
             q.get_and_send(java_type, lambda x, kw=keyword: kw)
-        # TODO: Add handling for other JavaType subtypes (Class, Method, Variable, etc.)
+
+        elif isinstance(java_type, JT.Method):
+            # Method: declaringType, name, flagsBitMap, returnType, parameterNames,
+            #         parameterTypes, thrownExceptions, annotations, defaultValue, declaredFormalTypeNames
+            q.get_and_send(java_type, lambda x: x._declaring_type, lambda t: self._visit_type(t, q))
+            q.get_and_send(java_type, lambda x: x._name)
+            q.get_and_send(java_type, lambda x: x._flags_bit_map)
+            q.get_and_send(java_type, lambda x: x._return_type, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: x._parameter_names or [], lambda s: s, None)
+            q.get_and_send_list(java_type, lambda x: x._parameter_types or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: x._thrown_exceptions or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: x._annotations or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: x._default_value or [], lambda s: s, None)
+            q.get_and_send_list(java_type, lambda x: x._declared_formal_type_names or [], lambda s: s, None)
+
+        elif isinstance(java_type, JT.Class):
+            # Class: flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype,
+            #        owningClass, annotations, interfaces, members, methods
+            q.get_and_send(java_type, lambda x: getattr(x, '_flags_bit_map', 0))
+            q.get_and_send(java_type, lambda x: getattr(x, '_kind', JT.FullyQualified.Kind.Class))
+            q.get_and_send(java_type, lambda x: getattr(x, '_fully_qualified_name', ''))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_type_parameters', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send(java_type, lambda x: getattr(x, '_supertype', None), lambda t: self._visit_type(t, q))
+            q.get_and_send(java_type, lambda x: getattr(x, '_owning_class', None), lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_annotations', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_interfaces', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_members', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_methods', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+
+        elif isinstance(java_type, JT.Unknown):
+            # Unknown has no additional fields
+            pass
+
+    def _type_signature(self, java_type) -> str:
+        """Generate a signature string for a JavaType, used as list item identifier."""
+        from rewrite.java.support_types import JavaType as JT
+
+        if java_type is None:
+            return ''
+        if isinstance(java_type, JT.Primitive):
+            return java_type.name
+        if isinstance(java_type, JT.Class):
+            return getattr(java_type, '_fully_qualified_name', str(id(java_type)))
+        if isinstance(java_type, JT.Method):
+            declaring = getattr(java_type, '_declaring_type', None)
+            declaring_name = self._type_signature(declaring) if declaring else ''
+            return f"{declaring_name}#{java_type._name}"
+        return str(id(java_type))
 
     def _visit_space(self, space: Space, q: 'RpcSendQueue') -> None:
         """Visit a Space object.
@@ -876,12 +932,9 @@ class PythonRpcSender:
         """Visit a JContainer wrapper."""
         if container is None:
             return
-        elements = container.padding.elements if container else []
-        _debug(f"_visit_container: {len(elements)} elements")
         q.get_and_send(container, lambda x: x.before, lambda space: self._visit_space(space, q))
         # Use padding.elements to get JRightPadded list, not unwrapped elements
         q.get_and_send_list(container, lambda x: x.padding.elements,
                            lambda el: el.element.id,
                            lambda el: self._visit_right_padded(el, q))
         q.get_and_send(container, lambda x: x.markers)
-        _debug("_visit_container: done")

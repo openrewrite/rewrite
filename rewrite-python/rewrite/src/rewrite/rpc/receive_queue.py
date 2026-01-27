@@ -134,10 +134,6 @@ class RpcReceiveQueue:
             The deserialized object, or None if deleted
         """
         message = self.take()
-
-        if self._trace and message.trace:
-            print(f"RPC Receive: {message}")
-
         ref: Optional[int] = None
 
         if message.state == RpcObjectState.NO_CHANGE:

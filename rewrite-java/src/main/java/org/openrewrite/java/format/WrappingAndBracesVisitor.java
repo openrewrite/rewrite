@@ -196,6 +196,10 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 }
             }
         }
+        // Apply record component wrapping for records
+        if (j.getPadding().getPrimaryConstructor() != null) {
+            j = (J.ClassDeclaration) new WrapRecordComponents<>(style).visit(j, p, getCursor().getParentTreeCursor());
+        }
         return j;
     }
 
@@ -279,7 +283,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return ListUtils.mapFirst(modifiers, mod -> requireNonNull(mod).withPrefix(wrapElement(mod.getPrefix(), whitespace, annotationsStyle)));
     }
 
-    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    @ToBeRemoved(after = "2026-01-30", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
     private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {

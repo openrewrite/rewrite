@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {isDirective, isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser} from "../../src/yaml";
-import {printer} from "../../src";
+import {findMarker, printer} from "../../src";
 import {RecipeSpec} from "../../src/test";
 
 async function parseAndPrint(yaml: string): Promise<string> {
@@ -429,5 +429,78 @@ key: value`);
         // then
         const doc = docs.documents[0];
         expect(doc.directives.length).toBe(0);
+    });
+});
+
+describe('Flow mappings without colons (OmitColon marker)', () => {
+
+    test('flow mapping entries without colons roundtrip', async () => {
+        // Flow mappings like { "MV7", "7J04" } have entries without explicit colons
+        const yaml = `example:
+  application/json:
+    {
+      "MV7",
+      "7J04"
+    }
+`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
+    });
+
+    test('flow mapping entries without colons have OmitColon marker', async () => {
+        const docs = await parseYaml(`obj: {"MV7", "7J04"}`);
+        const mapping = docs.documents[0].block as Yaml.Mapping;
+        const flowMapping = mapping.entries[0].value as Yaml.Mapping;
+
+        // Each entry in the flow mapping should have an OmitColon marker
+        for (const entry of flowMapping.entries) {
+            const omitColonMarker = findMarker(entry, Yaml.Markers.OmitColon);
+            expect(omitColonMarker).toBeDefined();
+        }
+    });
+
+    test('flow mapping entries with colons do not have OmitColon marker', async () => {
+        const docs = await parseYaml(`obj: {a: 1, b: 2}`);
+        const mapping = docs.documents[0].block as Yaml.Mapping;
+        const flowMapping = mapping.entries[0].value as Yaml.Mapping;
+
+        // Each entry in the flow mapping should NOT have an OmitColon marker
+        for (const entry of flowMapping.entries) {
+            const omitColonMarker = findMarker(entry, Yaml.Markers.OmitColon);
+            expect(omitColonMarker).toBeUndefined();
+        }
+    });
+
+    test('simple inline flow mapping without colons', async () => {
+        const yaml = `obj: {"key1", "key2"}`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
+    });
+
+    test('mixed flow mapping with and without colons', async () => {
+        // Note: This is technically invalid YAML mixing styles, but we test roundtrip
+        const yaml = `obj: {a: 1, "standalone"}`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
+    });
+});
+
+describe('Single-brace template syntax', () => {
+
+    test('quoted single-brace templates roundtrip', async () => {
+        // Single-brace placeholders like {C App} are sometimes used as placeholders
+        // When quoted, they're valid YAML strings
+        const yaml = `swagger: '2.0'
+host: "{C App}.colruyt.int/{C App}"`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
+    });
+
+    test('unquoted single-brace templates roundtrip', async () => {
+        // Unquoted {C App} patterns should also be handled correctly
+        const yaml = `swagger: '2.0'
+host: {C App}.colruyt.int/{C App}`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
     });
 });

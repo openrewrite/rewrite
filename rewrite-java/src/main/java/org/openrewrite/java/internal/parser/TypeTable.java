@@ -43,6 +43,7 @@ import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipException;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.sort;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
@@ -604,6 +605,16 @@ public class TypeTable implements JavaParserClasspathLoader {
             }
         }
         return null;
+    }
+
+    @Override
+    public Collection<String> availableArtifacts() {
+        List<String> available = new ArrayList<>(classesDirByArtifact.size());
+        for (GroupArtifactVersion gav : classesDirByArtifact.keySet()) {
+            available.add(gav.getArtifactId() + "-" + gav.getVersion());
+        }
+        sort(available);
+        return available;
     }
 
     public static class Writer implements AutoCloseable {

@@ -122,7 +122,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         return (J) tree;
     }
 
-    @ToBeRemoved(after = "30-11-2025", reason = "Replace me with org.openrewrite.style.StyleHelper.addStyleMarker now available in parent runtime")
+    @ToBeRemoved(after = "2025-11-30", reason = "Replace me with org.openrewrite.style.StyleHelper.addStyleMarker now available in parent runtime")
     private static <T extends SourceFile> T addStyleMarker(T t, List<NamedStyles> styles) {
         if (!styles.isEmpty()) {
             Set<NamedStyles> newNamedStyles = new HashSet<>(styles);

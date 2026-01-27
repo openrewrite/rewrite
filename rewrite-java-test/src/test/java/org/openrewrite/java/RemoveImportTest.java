@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
 
@@ -782,6 +783,45 @@ class RemoveImportTest implements RewriteTest {
                   Map<Integer, Integer> m = new ConcurrentHashMap<>();
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1521")
+    @Test
+    void unfoldedStarImportHasTypeAttribution() {
+        rewriteRun(
+          spec -> spec.recipes(
+            removeImport("java.util.List"),
+            new ChangeType("java.util.Set", "java.util.HashSet", null)
+          ),
+          java(
+            """
+              package a;
+
+              import java.util.*;
+
+              public class A {
+                  Set<Integer> s;
+              }
+              """,
+            """
+              package a;
+
+              import java.util.HashSet;
+
+              public class A {
+                  HashSet<Integer> s;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                // Verify the unfolded import has proper type attribution
+                assertThat(cu.getImports()).hasSize(1);
+                assertThat(cu.getImports().getFirst().getQualid().getType())
+                  .isInstanceOf(JavaType.FullyQualified.class);
+                assertThat(((JavaType.FullyQualified) cu.getImports().getFirst().getQualid().getType())
+                  .getFullyQualifiedName()).isEqualTo("java.util.HashSet");
+            })
           )
         );
     }
