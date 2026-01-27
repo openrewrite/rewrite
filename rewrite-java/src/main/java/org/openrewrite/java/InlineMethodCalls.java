@@ -103,30 +103,31 @@ public class InlineMethodCalls extends Recipe {
             private void removeAndAddImports(MethodCall method, Set<String> templateImports, Set<String> templateStaticImports) {
                 Set<String> originalImports = findOriginalImports(method);
 
-                // Remove regular and static imports that are no longer needed
+                // Only remove imports that are explicitly being replaced (i.e., original imports
+                // that have a replacement in the template imports/static imports).
+                // Don't remove imports that might still be used by the replacement template.
                 for (String originalImport : originalImports) {
-                    if (!templateImports.contains(originalImport) &&
-                            !templateStaticImports.contains(originalImport)) {
+                    // Check if this import is being replaced by a different import for the same simple name
+                    String simpleName = originalImport.substring(originalImport.lastIndexOf('.') + 1);
+                    boolean hasReplacement = templateImports.stream()
+                            .anyMatch(ti -> ti.endsWith("." + simpleName) && !ti.equals(originalImport));
+                    if (hasReplacement) {
                         maybeRemoveImport(originalImport);
                     }
                 }
 
                 // Add new regular imports needed by the template
                 for (String importStr : templateImports) {
-                    if (!originalImports.contains(importStr)) {
-                        maybeAddImport(importStr);
-                    }
+                    maybeAddImport(importStr);
                 }
 
                 // Add new static imports needed by the template
                 for (String staticImport : templateStaticImports) {
-                    if (!originalImports.contains(staticImport)) {
-                        int lastDot = staticImport.lastIndexOf('.');
-                        if (0 < lastDot) {
-                            maybeAddImport(
-                                    staticImport.substring(0, lastDot),
-                                    staticImport.substring(lastDot + 1));
-                        }
+                    int lastDot = staticImport.lastIndexOf('.');
+                    if (0 < lastDot) {
+                        maybeAddImport(
+                                staticImport.substring(0, lastDot),
+                                staticImport.substring(lastDot + 1));
                     }
                 }
             }
@@ -186,8 +187,10 @@ public class InlineMethodCalls extends Recipe {
                     templateBuilder.javaParser(JavaParser.fromJavaVersion()
                             .classpathFromResources(ctx, classpathFromResources.toArray(new String[0])));
                 }
-                return templateBuilder.build()
+                J applied = templateBuilder.build()
                         .apply(cursor, methodCall.getCoordinates().replace(), parameters);
+                // Preserve the original prefix (leading whitespace and comments)
+                return applied.withPrefix(methodCall.getPrefix());
             }
 
             private String createTemplateString(MethodCall original, JavaType.Method methodType) {

@@ -556,4 +556,49 @@ class InlineMethodCallsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void preservesImportWhenTypeStillUsedInReplacement() {
+        // Verifies that imports are not removed when the replacement still uses the same type
+        rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "Wrapper createList()",
+              "new ArrayList<String>()",
+              Set.of("java.util.ArrayList"),
+              null,
+              null)),
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              class Wrapper {
+                  @Deprecated
+                  public static List<String> createList() {
+                      return new ArrayList<>();
+                  }
+
+                  void usage() {
+                      List<String> list = Wrapper.createList();
+                  }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              class Wrapper {
+                  @Deprecated
+                  public static List<String> createList() {
+                      return new ArrayList<>();
+                  }
+
+                  void usage() {
+                      List<String> list = new ArrayList<String>();
+                  }
+              }
+              """
+          )
+        );
+    }
 }
