@@ -107,9 +107,7 @@ public class JsonPathMatcher {
 
     private JsonPathParser.JsonPathContext parse() {
         if (parsed == null) {
-            // "$." is a special case meaning "root" - handle like "$"
-            String pathToParse = "$.".equals(jsonPath) ? "$" : jsonPath;
-            JsonPathParser parser = new JsonPathParser(new CommonTokenStream(new JsonPathLexer(CharStreams.fromString(pathToParse))));
+            JsonPathParser parser = new JsonPathParser(new CommonTokenStream(new JsonPathLexer(CharStreams.fromString(jsonPath))));
             parsed = parser.jsonPath();
             // Ensure all input was consumed
             if (parser.getCurrentToken().getType() != org.antlr.v4.runtime.Token.EOF) {

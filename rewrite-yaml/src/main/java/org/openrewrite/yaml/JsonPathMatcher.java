@@ -57,8 +57,8 @@ public class JsonPathMatcher {
     }
 
     public static Validated<String> validate(String property, String jsonPath) {
-        // "$" and "$." are valid and mean "root" - they're handled as special cases in recipes
-        if ("$".equals(jsonPath) || "$.".equals(jsonPath)) {
+        // "$" is valid and means "root" - handled as special cases in recipes
+        if ("$".equals(jsonPath)) {
             return Validated.valid(property, jsonPath);
         }
         try {
@@ -155,8 +155,8 @@ public class JsonPathMatcher {
 
     private JsonPathParser.JsonPathContext parse() {
         if (parsed == null) {
-            // "$." is a special case meaning "root" - handle like "$"
-            String pathToParse = "$.".equals(jsonPath) ? "$" : jsonPath;
+            // "$" is a special case meaning "root" - handle like "$"
+            String pathToParse = "$".equals(jsonPath) ? "$" : jsonPath;
             JsonPathParser parser = jsonPath(pathToParse);
             parsed = parser.jsonPath();
             // Ensure all input was consumed
