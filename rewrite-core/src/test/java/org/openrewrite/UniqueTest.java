@@ -16,10 +16,13 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.text.ChangeText;
+import org.openrewrite.text.PlainText;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
@@ -27,78 +30,111 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Properties;
 
+import static org.openrewrite.Unique.unique;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class UniqueTest implements RewriteTest {
+
+    /**
+     * A simplified recipe that appends content to a text file.
+     * Uses Unique to ensure only one instance with the same content parameter makes changes.
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    static class UniqueAppend extends Recipe {
+        String content;
+
+        @Override
+        public String getDisplayName() {
+            return "Unique append";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Appends content to test.txt with Unique behavior";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return unique(this, new TreeVisitor<>() {
+                @Override
+                public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    if (tree instanceof PlainText plainText) {
+                        return plainText.withText(plainText.getText() + content);
+                    }
+                    return tree;
+                }
+            });
+        }
+    }
 
     @Test
     void onlyFirstRecipeWithSharedUniquePreconditionMakesChanges() {
         Recipe recipe = new Recipe() {
             @Override
             public String getDisplayName() {
-                return "First";
+                return "Test Unique with identical recipes";
             }
 
             @Override
             public String getDescription() {
-                return "If Unique works correctly the result of this recipe should be a text file that says \"first\"";
+                return "UniqueAppend uses Unique, so when included multiple times only the first makes changes";
             }
 
             @Override
             public List<Recipe> getRecipeList() {
-                Unique unique = new Unique();
+                // Create two identical UniqueAppend instances
+                // Because UniqueAppend uses Unique and equals() for comparison,
+                // only the first will execute
                 return List.of(
-                  new Unique.UniqueDecoratedRecipe(new ChangeText("first"), unique),
-                  new Unique.UniqueDecoratedRecipe(new ChangeText("second"), unique)
+                  new UniqueAppend("first"),
+                  new UniqueAppend("first")
                 );
             }
         };
 
         rewriteRun(
-          spec -> spec.recipe(recipe).validateRecipeSerialization(false),
-          text(
-            """
-              """,
-            """
-              first
-              """
-          )
+          spec -> spec
+            .recipe(recipe)
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1)
+            .validateRecipeSerialization(false),
+          text("", "first")
         );
     }
 
     @Test
-    void onlyFirstRecipeWithUniqueDecoratesMakesChanges() {
-        // Using Unique.decorate() on the same recipe instance returns a wrapper that shares a Unique instance
-        ChangeText changeText = new ChangeText("decorated");
+    void differentRecipeInstancesCanBothMakeChanges() {
         Recipe recipe = new Recipe() {
             @Override
             public String getDisplayName() {
-                return "Test Unique.decorate()";
+                return "Test Unique with different recipes";
             }
 
             @Override
             public String getDescription() {
-                return "If Unique.decorate() works correctly, only the first decorated instance makes changes";
+                return "UniqueAppend instances with different arguments are not equal, so both execute";
             }
 
             @Override
             public List<Recipe> getRecipeList() {
+                // Create two UniqueAppend instances with different content
+                // Because they have different content, they are not equal,
+                // so both will execute
                 return List.of(
-                  Unique.decorate(changeText),
-                  Unique.decorate(changeText)
+                  new UniqueAppend("first "),
+                  new UniqueAppend("second")
                 );
             }
         };
 
         rewriteRun(
-          spec -> spec.recipe(recipe).validateRecipeSerialization(false),
-          text(
-            """
-              """,
-            """
-              decorated
-              """
-          )
+          spec -> spec
+            .recipe(recipe)
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1)
+            .validateRecipeSerialization(false),
+          text("", "first second")
         );
     }
 
@@ -150,6 +186,7 @@ class UniqueTest implements RewriteTest {
     void yamlRecipeWithUniquePreconditionAcrossDifferentYamlFiles() {
         // This test demonstrates that even when recipes are loaded from different YAML sources,
         // the Unique precondition ensures only the first instance makes changes.
+        // For this to work Environment must ensure that declarative recipes with the same name are the same instance
         String childYaml = """
           ---
           type: specs.openrewrite.org/v1beta/recipe

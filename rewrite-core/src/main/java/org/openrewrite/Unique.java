@@ -17,28 +17,70 @@ package org.openrewrite;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.SearchResult;
 
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.Map;
 
-import static java.util.Collections.*;
 
 public class Unique extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Unique";
-    }
+    @Getter
+    String displayName = "Unique";
 
-    @Override
-    public String getDescription() {
-        return "Used as a precondition to ensure that only one instance of a recipe makes changes. " +
-                "Accidentally including multiple copies of the same large composite recipes is a common mistake. " +
-                "A mistake that can be mitigated by use of this precondition." +
-                "This does nothing useful when run on its own.";
-    }
+    @Language("markdown")
+    @Getter
+    String description = "Used as a precondition to ensure that a recipe attempts to make changes only once. " +
+            "Accidentally including multiple copies/instances of the same large composite recipes is a common mistake. " +
+            "A mistake that can be mitigated by use of this precondition. " +
+            "This recipe does nothing useful run on its own.\n\n" +
+            "## Usage in Java recipes\n\n" +
+            "Wrap visitors with `Unique.unique(this, visitor)` to ensure only the first *equivalent* recipe instance makes changes:\n\n" +
+            "```java\n" +
+            "@Override\n" +
+            "public TreeVisitor<?, ExecutionContext> getVisitor() {\n" +
+            "    return unique(this, new TreeVisitor<Tree, ExecutionContext>() {\n" +
+            "        @Override\n" +
+            "        public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {\n" +
+            "            // Your transformation logic\n" +
+            "            return tree;\n" +
+            "        }\n" +
+            "    });\n" +
+            "}\n" +
+            "```\n\n" +
+            "For scanning recipes, wrap both the scanner and visitor:\n\n" +
+            "```java\n" +
+            "@Override\n" +
+            "public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean acc) {\n" +
+            "    return unique(this, new TreeVisitor<Tree, ExecutionContext>() {\n" +
+            "        // Scanner logic\n" +
+            "    });\n" +
+            "}\n\n" +
+            "@Override\n" +
+            "public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean acc) {\n" +
+            "    return unique(this, new TreeVisitor<Tree, ExecutionContext>() {\n" +
+            "        // Visitor logic\n" +
+            "    });\n" +
+            "}\n" +
+            "```\n\n" +
+            "**Note:** Uniqueness is determined by the recipe's `equals()` and `hashCode()` methods. " +
+            "If uniqueness isn't working as expected, ensure your recipe class properly implements these methods. " +
+            "The easiest way is to use Lombok's `@Value` annotation on your recipe class, which automatically " +
+            "generates correct `equals()` and `hashCode()` implementations based on all fields.\n\n" +
+            "## Usage in YAML recipes\n\n" +
+            "Add `org.openrewrite.Unique` as a precondition:\n\n" +
+            "```yaml\n" +
+            "---\n" +
+            "type: specs.openrewrite.org/v1beta/recipe\n" +
+            "name: com.example.Append\n" +
+            "displayName: My recipe\n" +
+            "preconditions:\n" +
+            "  - org.openrewrite.Unique\n" +
+            "recipeList:\n" +
+            "  - org.openrewrite.text.AppendToTextFile:\n" +
+            "      relativeFileName: report.txt\n" +
+            "      content: 'Recipe executed'\n" +
+            "```";
 
     @Nullable Integer recipeIndex;
 
@@ -62,75 +104,66 @@ public class Unique extends Recipe {
         };
     }
 
-    private static final Map<Recipe, Recipe> recipeToDecorated = new HashMap<>();
-
     /**
      * Wrap the provided recipe in a Unique precondition shared amongst all equivalent instances.
-     * Recipes which do not override equals() & hashCode() get the default identity comparison and so will each get their own
+     * Recipes which do not override equals() or hashCode() get the default identity comparison and so will each get their own
      * Unique, which defeats the purpose.
-     * As most recipes are wrapped in @Value
      */
-    public static Recipe decorate(Recipe recipe) {
-        return recipeToDecorated.computeIfAbsent(recipe, k -> {
-            if (recipe instanceof UniqueDecoratedRecipe || recipe instanceof UniqueDecoratedScanningRecipe) {
-                return recipe;
-            }
-            if (recipe instanceof ScanningRecipe) {
-                return new UniqueDecoratedScanningRecipe<>((ScanningRecipe<?>) recipe);
-            }
-            return new UniqueDecoratedRecipe(recipe);
-        });
+    public static Unique unique(Recipe recipe, ExecutionContext ctx) {
+        return ctx.computeMessageIfAbsent(Unique.class.getName(), key -> new HashMap<Recipe, Unique>())
+                .computeIfAbsent(recipe, k -> new Unique());
     }
 
+    /**
+     * Evaluate whether the recipe is allowed to make changes according to the unique precondition.
+     * Uses the recipe's equals()/hashCode() to identify equivalent instances and ensures only
+     * the first instance encountered (based on recipe position) is allowed to make changes.
+     *
+     * @param recipe the recipe to check for uniqueness
+     * @param ctx the execution context containing the recipe position and unique instance cache
+     * @return true if this is the first equivalent recipe instance and it should make changes, false otherwise
+     */
+    public static boolean isUnique(Recipe recipe, ExecutionContext ctx) {
+        return ctx.computeMessageIfAbsent(Unique.class.getName(), key -> new HashMap<Recipe, Unique>())
+                .computeIfAbsent(recipe, k -> new Unique())
+                .isAllowedToMakeChanges(ctx);
+    }
 
-
-    @AllArgsConstructor
-    public static class UniqueDecoratedRecipe extends DecoratedRecipe {
-        @Getter
-        Recipe delegate;
-
-        Unique unique;
-
-        public UniqueDecoratedRecipe(Recipe delegate) {
-            this.delegate = delegate;
-            this.unique = new Unique();
-        }
-
-        @Override
-        public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return Preconditions.check(unique, delegate.getVisitor());
-        }
+    /**
+     * Look up or create a Unique instance for the provided recipe, using its equals()/hashCode() method to identify it,
+     * and return a visitor wrapped in a precondition which ensures that only one gets to make changes in a recipe run.
+     * @param recipe recipe to be made unique
+     * @param treeVisitor the visitor to wrap in a unique precondition
+     * @return visitor wrapped in unique precondition
+     */
+    public static TreeVisitor<?, ExecutionContext> unique(Recipe recipe, TreeVisitor<?, ExecutionContext> treeVisitor) {
+        return new UniqueDecoratedVisitor(recipe, treeVisitor);
     }
 
     @AllArgsConstructor
-    public static class UniqueDecoratedScanningRecipe<T> extends DecoratedScanningRecipe<T> {
-        @Getter
-        ScanningRecipe<T> delegate;
-
-        Unique unique;
-
-        public UniqueDecoratedScanningRecipe(ScanningRecipe<T> delegate) {
-            this.delegate = delegate;
-            this.unique = new Unique();
-        }
-
+    public static class UniqueDecoratedVisitor extends TreeVisitor<Tree, ExecutionContext> {
+        Recipe recipe;
+        TreeVisitor<?, ExecutionContext> delegate;
 
         @Override
-        public TreeVisitor<?, ExecutionContext> getScanner(T acc) {
-            return Preconditions.check(unique, delegate.getScanner(acc));
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+            return delegate.isAcceptable(sourceFile, ctx);
         }
 
         @Override
-        public Collection<? extends SourceFile> generate(T acc, ExecutionContext ctx) {
-            if (unique.isAllowedToMakeChanges(ctx)) {
-                return delegate.generate(acc, ctx);
+        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (isUnique(recipe, ctx)) {
+                return delegate.visit(tree, ctx);
             }
-            return emptyList();
+            return tree;
         }
 
         @Override
-        public TreeVisitor<?, ExecutionContext> getVisitor(T acc) {
-            return Preconditions.check(unique, delegate.getVisitor(acc));
+        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
+            if (isUnique(recipe, ctx)) {
+                return delegate.visit(tree, ctx, parent);
+            }
+            return tree;
         }
     }
 }
