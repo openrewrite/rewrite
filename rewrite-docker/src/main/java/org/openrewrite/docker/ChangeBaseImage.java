@@ -96,7 +96,7 @@ public class ChangeBaseImage extends Recipe {
                     }
                 }
 
-                // Add tag or digest
+                // Add tag and/or digest
                 if (f.getTag() != null) {
                     imageTextBuilder.append(":");
                     for (Docker.ArgumentContent content : f.getTag().getContents()) {
@@ -107,7 +107,8 @@ public class ChangeBaseImage extends Recipe {
                             hasEnvironmentVariable = true;
                         }
                     }
-                } else if (f.getDigest() != null) {
+                }
+                if (f.getDigest() != null) {
                     imageTextBuilder.append("@");
                     for (Docker.ArgumentContent content : f.getDigest().getContents()) {
                         if (content instanceof Docker.Literal) {
