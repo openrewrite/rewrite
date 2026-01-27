@@ -225,6 +225,9 @@ public class Environment {
                         Recipe r = resourceLoader.loadRecipe(key, details);
                         if (r != null) {
                             nameToRecipe.put(key, r);
+                            if (r instanceof DeclarativeRecipe) {
+                                ((DeclarativeRecipe) r).initialize(this);
+                            }
                             return r;
                         }
                     }
