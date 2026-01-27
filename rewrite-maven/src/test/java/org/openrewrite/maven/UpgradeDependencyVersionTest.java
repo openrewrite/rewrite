@@ -2540,7 +2540,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
 
     @Test
-    @Issue("https://github.com/moderneinc/customer-requests/issues/1761")
     void upgradeMultipleArtifactsWithSharedPropertySelectsMinimumVersion() {
         // Using real Spring Cloud artifacts where:
         // - spring-cloud-commons has 4.2.4 available
