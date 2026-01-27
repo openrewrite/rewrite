@@ -82,15 +82,17 @@ public class ChangeBaseImage extends Recipe {
                 Docker.From f = super.visitFrom(from, ctx);
 
                 // Reconstruct the full image name from imageName, tag, and digest
+                // Use a wildcard placeholder for environment variables to allow glob matching
                 StringBuilder imageTextBuilder = new StringBuilder();
+                boolean hasEnvironmentVariable = false;
 
                 // Add image name
                 for (Docker.ArgumentContent content : f.getImageName().getContents()) {
                     if (content instanceof Docker.Literal) {
                         imageTextBuilder.append(((Docker.Literal) content).getText());
                     } else if (content instanceof Docker.EnvironmentVariable) {
-                        // For environment variables, we can't know the actual value, so skip matching
-                        return f;
+                        imageTextBuilder.append("*");
+                        hasEnvironmentVariable = true;
                     }
                 }
 
@@ -101,7 +103,8 @@ public class ChangeBaseImage extends Recipe {
                         if (content instanceof Docker.Literal) {
                             imageTextBuilder.append(((Docker.Literal) content).getText());
                         } else if (content instanceof Docker.EnvironmentVariable) {
-                            return f;
+                            imageTextBuilder.append("*");
+                            hasEnvironmentVariable = true;
                         }
                     }
                 } else if (f.getDigest() != null) {
@@ -110,15 +113,27 @@ public class ChangeBaseImage extends Recipe {
                         if (content instanceof Docker.Literal) {
                             imageTextBuilder.append(((Docker.Literal) content).getText());
                         } else if (content instanceof Docker.EnvironmentVariable) {
-                            return f;
+                            imageTextBuilder.append("*");
+                            hasEnvironmentVariable = true;
                         }
                     }
                 }
 
                 String imageText = imageTextBuilder.toString();
 
-                if (!StringUtils.matchesGlob(imageText, oldImageName)) {
-                    return f;
+                // When environment variables are present, we need to check if both
+                // the constructed text (with wildcards) AND the pattern can match each other
+                if (hasEnvironmentVariable) {
+                    // Both must be able to match each other for a valid match
+                    // e.g., "ubuntu:*" pattern matches "ubuntu:*" text (from ubuntu:${TAG})
+                    if (!StringUtils.matchesGlob(imageText, oldImageName) &&
+                        !StringUtils.matchesGlob(oldImageName, imageText)) {
+                        return f;
+                    }
+                } else {
+                    if (!StringUtils.matchesGlob(imageText, oldImageName)) {
+                        return f;
+                    }
                 }
 
                 // Get the current platform flag value, if any
