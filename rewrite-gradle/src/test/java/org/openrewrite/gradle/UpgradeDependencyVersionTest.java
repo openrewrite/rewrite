@@ -2309,15 +2309,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    /**
-     * When multiple artifacts share a version variable and have different maximum available versions,
-     * the recipe should select the minimum compatible version that works for ALL artifacts.
-     * <p>
-     * spring-cloud-commons has versions up to 4.2.4
-     * spring-cloud-starter-consul-config only has versions up to 4.2.3
-     * <p>
-     * When upgrading to 4.2.x, the variable should be set to 4.2.3 (not 4.2.4) so both artifacts resolve.
-     */
     @Test
     void upgradeMultipleArtifactsWithSharedVariableSelectsMinimumVersion() {
         rewriteRun(
