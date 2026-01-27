@@ -481,13 +481,13 @@ function getNodeSummary(node: J): string | undefined {
  *     // Create as a field - it tracks state across calls
  *     private debug = new LstDebugPrinter();
  *
- *     async visitBlock(block: J.Block, p: P) {
+ *     visitBlock(block: J.Block, p: P) {
  *         // Log this node with automatic indentation based on cursor depth
  *         this.debug.log(block, this.cursor, "visiting block");
  *         return super.visitBlock(block, p);
  *     }
  *
- *     async visitMethodInvocation(mi: J.MethodInvocation, p: P) {
+ *     visitMethodInvocation(mi: J.MethodInvocation, p: P) {
  *         this.debug.log(mi, this.cursor);
  *         return super.visitMethodInvocation(mi, p);
  *     }
@@ -1208,7 +1208,7 @@ export function debugPrintCursorPath(cursor: Cursor, options?: LstDebugOptions):
  *         this.debug = createDebugPrinter(enableDebug);
  *     }
  *
- *     async visitBlock(block: J.Block, p: P) {
+ *     visitBlock(block: J.Block, p: P) {
  *         this.debug?.log(block, this.cursor);
  *         return super.visitBlock(block, p);
  *     }
