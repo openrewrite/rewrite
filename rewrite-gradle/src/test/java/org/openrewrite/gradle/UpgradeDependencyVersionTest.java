@@ -2357,9 +2357,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    /**
-     * Same test as above but using gradle.properties instead of ext block.
-     */
     @Test
     void upgradeMultipleArtifactsWithSharedPropertyInGradlePropertiesSelectsMinimumVersion() {
         rewriteRun(
