@@ -3,7 +3,8 @@ parser grammar JsonPathParser;
 options { tokenVocab=JsonPathLexer; }
 
 jsonPath
-    : ROOT? expression+
+    : ROOT expression*
+    | expression+
     ;
 
 expression
