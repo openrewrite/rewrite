@@ -205,11 +205,33 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 if (atIndex >= 0 && !foundAt) {
                     // Split at @
                     foundAt = true;
-                    String imagePart = text.substring(0, atIndex);
+                    String beforeAt = text.substring(0, atIndex);
                     String digestPart = text.substring(atIndex + 1);
 
-                    if (!imagePart.isEmpty()) {
-                        imageNameContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, imagePart, null));
+                    // Check for : in the part before @ (handles image:tag@digest)
+                    int colonInBeforeAt = beforeAt.indexOf(':');
+                    if (colonInBeforeAt >= 0 && !foundColon) {
+                        // We have image:tag@digest
+                        foundColon = true;
+                        String imagePart = beforeAt.substring(0, colonInBeforeAt);
+                        String tagPart = beforeAt.substring(colonInBeforeAt + 1);
+
+                        if (!imagePart.isEmpty()) {
+                            imageNameContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, imagePart, null));
+                        }
+                        if (!tagPart.isEmpty()) {
+                            tagContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tagPart, null));
+                        }
+                    } else {
+                        // Just image@digest (no tag)
+                        if (!beforeAt.isEmpty()) {
+                            if (foundColon) {
+                                // Content before @ goes to tag (we already found : earlier)
+                                tagContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, beforeAt, null));
+                            } else {
+                                imageNameContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, beforeAt, null));
+                            }
+                        }
                     }
                     if (!digestPart.isEmpty()) {
                         digestContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, digestPart, null));
