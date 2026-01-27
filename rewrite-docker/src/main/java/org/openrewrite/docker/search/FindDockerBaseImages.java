@@ -24,6 +24,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.DockerIsoVisitor;
 import org.openrewrite.docker.table.DockerBaseImages;
+import org.openrewrite.docker.trait.DockerImage;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.SearchResult;
@@ -58,9 +59,11 @@ public class FindDockerBaseImages extends Recipe {
             public Docker.From visitFrom(Docker.From from, ExecutionContext ctx) {
                 Docker.From f = super.visitFrom(from, ctx);
 
-                String imageName = extractText(f.getImageName());
+                // Use DockerImage trait for accessing image components
+                DockerImage image = new DockerImage.Matcher().require(getCursor());
+
+                String imageName = image.getImageName();
                 if (imageName == null) {
-                    // Contains unresolved environment variables
                     return f;
                 }
 
@@ -69,10 +72,10 @@ public class FindDockerBaseImages extends Recipe {
                     return f;
                 }
 
-                String tag = extractText(f.getTag());
-                String digest = extractText(f.getDigest());
-                String platform = getPlatformFlag(f);
-                String stageName = getAsName(f);
+                String tag = image.getTag();
+                String digest = image.getDigest();
+                String platform = image.getPlatform();
+                String stageName = image.getStageName();
 
                 // Insert row into data table
                 dockerBaseImages.insertRow(ctx, new DockerBaseImages.Row(
@@ -94,46 +97,6 @@ public class FindDockerBaseImages extends Recipe {
 
                 // Mark the FROM instruction as a search result
                 return SearchResult.found(f, message);
-            }
-
-            private @Nullable String extractText(Docker.@Nullable Argument arg) {
-                if (arg == null) {
-                    return null;
-                }
-                StringBuilder builder = new StringBuilder();
-                for (Docker.ArgumentContent content : arg.getContents()) {
-                    if (content instanceof Docker.Literal) {
-                        builder.append(((Docker.Literal) content).getText());
-                    } else if (content instanceof Docker.EnvironmentVariable) {
-                        Docker.EnvironmentVariable env = (Docker.EnvironmentVariable) content;
-                        // Include the variable reference as-is (e.g., ${VAR} or $VAR)
-                        if (env.isBraced()) {
-                            builder.append("${").append(env.getName()).append("}");
-                        } else {
-                            builder.append("$").append(env.getName());
-                        }
-                    }
-                }
-                return builder.toString();
-            }
-
-            private @Nullable String getPlatformFlag(Docker.From from) {
-                if (from.getFlags() == null) {
-                    return null;
-                }
-                for (Docker.Flag flag : from.getFlags()) {
-                    if ("platform".equals(flag.getName()) && flag.getValue() != null) {
-                        return extractText(flag.getValue());
-                    }
-                }
-                return null;
-            }
-
-            private @Nullable String getAsName(Docker.From from) {
-                if (from.getAs() == null) {
-                    return null;
-                }
-                return from.getAs().getName().getText();
             }
         };
     }

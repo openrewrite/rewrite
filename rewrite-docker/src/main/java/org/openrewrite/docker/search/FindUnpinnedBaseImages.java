@@ -17,11 +17,11 @@ package org.openrewrite.docker.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.DockerIsoVisitor;
+import org.openrewrite.docker.trait.DockerImage;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.marker.SearchResult;
 
@@ -53,43 +53,29 @@ public class FindUnpinnedBaseImages extends Recipe {
             public Docker.From visitFrom(Docker.From from, ExecutionContext ctx) {
                 Docker.From f = super.visitFrom(from, ctx);
 
-                String imageName = extractText(f.getImageName());
-                if (imageName == null) {
-                    return f; // Contains environment variables
-                }
+                // Use DockerImage trait for semantic analysis
+                DockerImage image = new DockerImage.Matcher().require(getCursor());
 
-                // Skip "scratch" base image - it's a special case
-                if ("scratch".equals(imageName)) {
+                // Skip images with environment variables in the name (can't analyze statically)
+                if (image.imageNameHasEnvironmentVariables()) {
                     return f;
                 }
 
-                String tag = extractText(f.getTag());
-                String digest = extractText(f.getDigest());
+                // Skip "scratch" base image - it's a special case
+                if (image.isScratch()) {
+                    return f;
+                }
 
-                // Check for latest tag or no tag (and no digest)
-                if (digest == null && (tag == null || "latest".equals(tag))) {
-                    String message = tag == null ?
+                // Check if unpinned and get the reason
+                DockerImage.UnpinnedReason reason = image.getUnpinnedReason();
+                if (reason != null) {
+                    String message = reason == DockerImage.UnpinnedReason.IMPLICIT_LATEST ?
                             "Uses implicit 'latest' tag" :
                             "Uses 'latest' tag";
                     return SearchResult.found(f, message);
                 }
 
                 return f;
-            }
-
-            private @Nullable String extractText(Docker.@Nullable Argument arg) {
-                if (arg == null) {
-                    return null;
-                }
-                StringBuilder builder = new StringBuilder();
-                for (Docker.ArgumentContent content : arg.getContents()) {
-                    if (content instanceof Docker.Literal) {
-                        builder.append(((Docker.Literal) content).getText());
-                    } else if (content instanceof Docker.EnvironmentVariable) {
-                        return null;
-                    }
-                }
-                return builder.toString();
             }
         };
     }

@@ -19,9 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.docker.trait.DockerImage;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 
 import static java.util.Collections.singletonList;
@@ -101,58 +101,32 @@ public class ChangeImageTag extends Recipe {
             public Docker.From visitFrom(Docker.From from, ExecutionContext ctx) {
                 Docker.From f = super.visitFrom(from, ctx);
 
-                // Extract image name text, using wildcard for environment variables
-                String imageNameText = extractArgumentText(f.getImageName());
-                boolean imageNameHasEnvVar = containsEnvironmentVariable(f.getImageName());
+                // Use DockerImage trait for matching
+                DockerImage image = new DockerImage.Matcher().require(getCursor());
 
                 // Match image name against pattern
-                if (imageNameHasEnvVar) {
-                    // Bidirectional matching for env vars
-                    if (!StringUtils.matchesGlob(imageNameText, imageNamePattern) &&
-                        !StringUtils.matchesGlob(imageNamePattern, imageNameText)) {
-                        return f;
-                    }
-                } else if (!StringUtils.matchesGlob(imageNameText, imageNamePattern)) {
+                if (!image.imageNameMatches(imageNamePattern)) {
                     return f;
                 }
 
-                // Extract current tag/digest text
-                String currentTagText = f.getTag() != null ? extractArgumentText(f.getTag()) : null;
-                String currentDigestText = f.getDigest() != null ? extractArgumentText(f.getDigest()) : null;
-
                 // Match old tag pattern if specified
                 if (oldTagPattern != null) {
-                    if (currentTagText == null) {
-                        return f; // No tag to match
-                    }
-                    boolean tagHasEnvVar = containsEnvironmentVariable(f.getTag());
-                    if (tagHasEnvVar) {
-                        if (!StringUtils.matchesGlob(currentTagText, oldTagPattern) &&
-                            !StringUtils.matchesGlob(oldTagPattern, currentTagText)) {
-                            return f;
-                        }
-                    } else if (!StringUtils.matchesGlob(currentTagText, oldTagPattern)) {
+                    if (f.getTag() == null || !image.tagMatches(oldTagPattern)) {
                         return f;
                     }
                 }
 
                 // Match old digest pattern if specified
                 if (oldDigestPattern != null) {
-                    if (currentDigestText == null) {
-                        return f; // No digest to match
-                    }
-                    boolean digestHasEnvVar = containsEnvironmentVariable(f.getDigest());
-                    if (digestHasEnvVar) {
-                        if (!StringUtils.matchesGlob(currentDigestText, oldDigestPattern) &&
-                            !StringUtils.matchesGlob(oldDigestPattern, currentDigestText)) {
-                            return f;
-                        }
-                    } else if (!StringUtils.matchesGlob(currentDigestText, oldDigestPattern)) {
+                    if (f.getDigest() == null || !image.digestMatches(oldDigestPattern)) {
                         return f;
                     }
                 }
 
                 // Check if change is needed
+                String currentTagText = image.getTagForMatching();
+                String currentDigestText = image.getDigestForMatching();
+
                 if (newTag != null) {
                     if (newTag.equals(currentTagText) && f.getDigest() == null) {
                         return f; // Already has the desired tag
@@ -164,7 +138,7 @@ public class ChangeImageTag extends Recipe {
                 }
 
                 // Determine quote style from existing tag/digest or image name
-                Docker.Literal.QuoteStyle quoteStyle = getQuoteStyle(f);
+                Docker.Literal.QuoteStyle quoteStyle = image.getPreferredQuoteStyle();
 
                 // Apply the new tag or digest
                 if (newTag != null) {
@@ -176,59 +150,6 @@ public class ChangeImageTag extends Recipe {
                 }
             }
         };
-    }
-
-    private String extractArgumentText(Docker.Argument arg) {
-        StringBuilder sb = new StringBuilder();
-        for (Docker.ArgumentContent content : arg.getContents()) {
-            if (content instanceof Docker.Literal) {
-                sb.append(((Docker.Literal) content).getText());
-            } else if (content instanceof Docker.EnvironmentVariable) {
-                sb.append("*");
-            }
-        }
-        return sb.toString();
-    }
-
-    private boolean containsEnvironmentVariable(Docker.@Nullable Argument arg) {
-        if (arg == null) {
-            return false;
-        }
-        for (Docker.ArgumentContent content : arg.getContents()) {
-            if (content instanceof Docker.EnvironmentVariable) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private Docker.Literal.@Nullable QuoteStyle getQuoteStyle(Docker.From from) {
-        // Try tag first, then digest, then image name
-        if (from.getTag() != null) {
-            Docker.Literal.QuoteStyle style = getQuoteStyleFromArg(from.getTag());
-            if (style != null) {
-                return style;
-            }
-        }
-        if (from.getDigest() != null) {
-            Docker.Literal.QuoteStyle style = getQuoteStyleFromArg(from.getDigest());
-            if (style != null) {
-                return style;
-            }
-        }
-        return getQuoteStyleFromArg(from.getImageName());
-    }
-
-    private Docker.Literal.@Nullable QuoteStyle getQuoteStyleFromArg(Docker.Argument arg) {
-        for (Docker.ArgumentContent content : arg.getContents()) {
-            if (content instanceof Docker.Literal) {
-                Docker.Literal.QuoteStyle style = ((Docker.Literal) content).getQuoteStyle();
-                if (style != null) {
-                    return style;
-                }
-            }
-        }
-        return null;
     }
 
     private Docker.Argument createArgument(String text, Docker.Literal.@Nullable QuoteStyle quoteStyle) {
