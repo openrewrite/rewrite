@@ -130,10 +130,8 @@ public class ChangeBaseImage extends Recipe {
                         !StringUtils.matchesGlob(oldImageName, imageText)) {
                         return f;
                     }
-                } else {
-                    if (!StringUtils.matchesGlob(imageText, oldImageName)) {
-                        return f;
-                    }
+                } else if (!StringUtils.matchesGlob(imageText, oldImageName)) {
+                    return f;
                 }
 
                 // Get the current platform flag value, if any
