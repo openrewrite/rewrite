@@ -148,14 +148,23 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         try {
                             String newerVersion = MavenDependency.findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), getResolutionResult(), metadataFailures,
                                     versionComparator, ctx);
-                            if (newerVersion != null) {
-                                Optional<Xml.Tag> version = tag.getChild("version");
-                                if (version.isPresent()) {
-                                    String requestedVersion = d.getRequested().getVersion();
-                                    if (isProperty(requestedVersion)) {
-                                        String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
-                                        if (!getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
-                                            storeParentPomProperty(getResolutionResult().getParent(), propertyName, newerVersion);
+                            Optional<Xml.Tag> version = tag.getChild("version");
+                            if (version.isPresent()) {
+                                String requestedVersion = d.getRequested().getVersion();
+                                if (isProperty(requestedVersion)) {
+                                    String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
+                                    ResolvedPom pom = getResolutionResult().getPom();
+                                    Path sourcePath = pom.getRequested().getProperties().containsKey(propertyName)
+                                            ? pom.getRequested().getSourcePath()
+                                            : findParentPomSourcePath(getResolutionResult().getParent(), propertyName);
+
+                                    if (sourcePath != null) {
+                                        // When dependencies share a property, we need to track all their version constraints.
+                                        // If there's a newer version, use it. Otherwise, use the current version as a constraint
+                                        // to prevent other artifacts from pushing the shared property to an incompatible version.
+                                        String versionToRecord = newerVersion != null ? newerVersion : d.getVersion();
+                                        if (versionToRecord != null && versionComparator.isValid(null, versionToRecord)) {
+                                            accumulator.addPropertyVersionCandidate(sourcePath, propertyName, versionToRecord);
                                         }
                                     }
                                 }
@@ -169,26 +178,19 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             /**
-             * Recursively look for a parent POM that's still part of the sources, which contains the version property.
-             * If found, store the property in the accumulator, such that we can update that source file later.
-             * @param currentMavenResolutionResult the current Maven resolution result parent to search for the property
-             * @param propertyName the name of the property to update, if found in any the parent pom source file
-             * @param newerVersion the resolved newer version that any matching parent pom property should be updated to
+             * Find the source path of a parent POM that contains the given property.
              */
-            private void storeParentPomProperty(@Nullable MavenResolutionResult currentMavenResolutionResult, String propertyName, String newerVersion) {
-                if (currentMavenResolutionResult == null) {
-                    return; // No parent contained the property; might then be in the same source file, or an import BOM
+            private @Nullable Path findParentPomSourcePath(@Nullable MavenResolutionResult parent, String propertyName) {
+                while (parent != null) {
+                    Pom pom = parent.getPom().getRequested();
+                    if (pom.getSourcePath() != null && pom.getProperties().containsKey(propertyName)) {
+                        return pom.getSourcePath();
+                    }
+                    parent = parent.getParent();
                 }
-                Pom pom = currentMavenResolutionResult.getPom().getRequested();
-                if (pom.getSourcePath() == null) {
-                    return; // Not a source file, so nothing to update
-                }
-                if (pom.getProperties().containsKey(propertyName)) {
-                    accumulator.pomProperties.add(new PomProperty(pom.getSourcePath(), propertyName, newerVersion));
-                    return; // Property found, so no further searching is needed
-                }
-                storeParentPomProperty(currentMavenResolutionResult.getParent(), propertyName, newerVersion);
+                return null;
             }
+
         };
     }
 
@@ -229,15 +231,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 try {
                     if (isPropertyTag()) {
                         Path pomSourcePath = getResolutionResult().getPom().getRequested().getSourcePath();
-                        for (PomProperty pomProperty : accumulator.pomProperties) {
-                            if (pomProperty.pomFilePath.equals(pomSourcePath) &&
-                                pomProperty.propertyName.equals(tag.getName())) {
-                                Optional<String> value = tag.getValue();
-                                if (!value.isPresent() || !value.get().equals(pomProperty.propertyValue)) {
-                                    doAfterVisit(new ChangeTagValueVisitor<>(tag, pomProperty.propertyValue));
-                                    maybeUpdateModel();
-                                }
-                                break;
+                        String resolvedVersion = accumulator.getResolvedPropertyVersion(
+                                pomSourcePath, tag.getName(), versionComparator);
+                        if (resolvedVersion != null) {
+                            Optional<String> value = tag.getValue();
+                            if (!value.isPresent() || !value.get().equals(resolvedVersion)) {
+                                doAfterVisit(new ChangeTagValueVisitor<>(tag, resolvedVersion));
+                                maybeUpdateModel();
                             }
                         }
                     } else if (isDependencyTag(groupId, artifactId)) {
@@ -322,6 +322,18 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), ctx);
                     if (newerVersion != null) {
                         if (t.getChild("version").isPresent()) {
+                            // Check if the version is a property that may be shared by multiple artifacts
+                            String requestedVersion = d.getRequested().getVersion();
+                            if (isProperty(requestedVersion)) {
+                                String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
+                                Path pomSourcePath = getResolutionResult().getPom().getRequested().getSourcePath();
+                                String resolvedVersion = accumulator.getResolvedPropertyVersion(
+                                        pomSourcePath, propertyName, versionComparator);
+                                if (resolvedVersion != null) {
+                                    // Use the minimum version that works for all artifacts sharing this property
+                                    newerVersion = resolvedVersion;
+                                }
+                            }
                             t = changeChildTagValue(t, "version", newerVersion, overrideManagedVersion, ctx);
                         } else if (Boolean.TRUE.equals(overrideManagedVersion)) {
                             ResolvedManagedDependency dm = findManagedDependency(t);
@@ -548,13 +560,43 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Value
     public static class Accumulator {
         Set<GroupArtifact> projectArtifacts = new HashSet<>();
-        Set<PomProperty> pomProperties = new HashSet<>();
+        /**
+         * Maps property keys (path + property name) to all candidate versions found.
+         * When multiple dependencies share the same property but have different max versions,
+         * we need to select the minimum version that works for all of them.
+         */
+        Map<PropertyKey, Set<String>> pomPropertyVersionCandidates = new HashMap<>();
+
+        /**
+         * Add a candidate version for a property. Multiple artifacts may contribute different
+         * versions, and we'll select the minimum during the visitor phase.
+         */
+        void addPropertyVersionCandidate(Path pomFilePath, String propertyName, String version) {
+            pomPropertyVersionCandidates
+                    .computeIfAbsent(new PropertyKey(pomFilePath, propertyName), k -> new HashSet<>())
+                    .add(version);
+        }
+
+        /**
+         * Get the resolved version for a property. When multiple candidate versions exist
+         * (from different artifacts sharing the same property), returns the minimum version
+         * to ensure all artifacts can be resolved.
+         */
+        @Nullable String getResolvedPropertyVersion(Path pomFilePath, String propertyName, VersionComparator comparator) {
+            Set<String> candidates = pomPropertyVersionCandidates.get(new PropertyKey(pomFilePath, propertyName));
+            if (candidates == null || candidates.isEmpty()) {
+                return null;
+            }
+            // Select the minimum version so all artifacts using this property can be resolved
+            return candidates.stream()
+                    .min((v1, v2) -> comparator.compare(null, v1, v2))
+                    .orElse(null);
+        }
     }
 
     @Value
-    public static class PomProperty {
+    public static class PropertyKey {
         Path pomFilePath;
         String propertyName;
-        String propertyValue;
     }
 }
