@@ -15,11 +15,13 @@
  */
 package org.openrewrite.maven;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class AddAnnotationProcessorTest implements RewriteTest {
@@ -44,7 +46,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-
+              
                   <build>
                       <plugins>
                           <plugin>
@@ -72,7 +74,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-
+              
                   <build>
                       <plugins>
                           <plugin>
@@ -113,7 +115,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-
+              
                   <build>
                       <plugins>
                           <plugin>
@@ -147,7 +149,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-
+              
                   <build>
                       <plugins>
                           <plugin>
@@ -274,5 +276,1602 @@ class AddAnnotationProcessorTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Nested
+    class SingleModuleProject {
+
+        @Test
+        void addToExistingPluginInBuildPlugins() {
+            // Single-module: plugin exists in build/plugins with annotationProcessorPaths
+            // Expected: adds new path to build/plugins
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                  
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <annotationProcessorPaths>
+                                          <path>
+                                              <groupId>org.mapstruct</groupId>
+                                              <artifactId>mapstruct-processor</artifactId>
+                                          </path>
+                                      </annotationProcessorPaths>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                  
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <annotationProcessorPaths>
+                                          <path>
+                                              <groupId>org.mapstruct</groupId>
+                                              <artifactId>mapstruct-processor</artifactId>
+                                          </path>
+                                          <path>
+                                              <groupId>org.projectlombok</groupId>
+                                              <artifactId>lombok-mapstruct-binding</artifactId>
+                                              <version>0.2.0</version>
+                                          </path>
+                                      </annotationProcessorPaths>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void createPluginWhenOnlyInPluginManagement() {
+            // Single-module: plugin only exists in pluginManagement
+            // Expected: creates new plugin in build/plugins (pluginManagement unchanged)
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                  
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <source>17</source>
+                                          <target>17</target>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                  
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <source>17</source>
+                                          <target>17</target>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>org.apache.maven.plugins</groupId>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <annotationProcessorPaths>
+                                          <path>
+                                              <groupId>org.projectlombok</groupId>
+                                              <artifactId>lombok-mapstruct-binding</artifactId>
+                                              <version>0.2.0</version>
+                                          </path>
+                                      </annotationProcessorPaths>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void createPluginWhenMissing() {
+            // Single-module: no maven-compiler-plugin anywhere
+            // Expected: creates plugin in build/plugins with only annotationProcessorPaths
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                  
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-surefire-plugin</artifactId>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                  
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-surefire-plugin</artifactId>
+                              </plugin>
+                              <plugin>
+                                  <groupId>org.apache.maven.plugins</groupId>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <annotationProcessorPaths>
+                                          <path>
+                                              <groupId>org.projectlombok</groupId>
+                                              <artifactId>lombok-mapstruct-binding</artifactId>
+                                              <version>0.2.0</version>
+                                          </path>
+                                      </annotationProcessorPaths>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void createBuildSectionWhenMissing() {
+            // Single-module: no build section at all
+            // Expected: creates entire build/plugins/plugin structure
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <groupId>org.apache.maven.plugins</groupId>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <annotationProcessorPaths>
+                                          <path>
+                                              <groupId>org.projectlombok</groupId>
+                                              <artifactId>lombok-mapstruct-binding</artifactId>
+                                              <version>0.2.0</version>
+                                          </path>
+                                      </annotationProcessorPaths>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void addToBuildPluginsWhenInBothLocations() {
+            // Single-module: plugin exists in both build/plugins AND pluginManagement
+            // Expected: adds to build/plugins only (consistent with single-module behavior)
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                  
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <source>17</source>
+                                          <target>17</target>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <annotationProcessorPaths>
+                                          <path>
+                                              <groupId>org.mapstruct</groupId>
+                                              <artifactId>mapstruct-processor</artifactId>
+                                          </path>
+                                      </annotationProcessorPaths>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                  
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <source>17</source>
+                                          <target>17</target>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <annotationProcessorPaths>
+                                          <path>
+                                              <groupId>org.mapstruct</groupId>
+                                              <artifactId>mapstruct-processor</artifactId>
+                                          </path>
+                                          <path>
+                                              <groupId>org.projectlombok</groupId>
+                                              <artifactId>lombok-mapstruct-binding</artifactId>
+                                              <version>0.2.0</version>
+                                          </path>
+                                      </annotationProcessorPaths>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    class CombinedAggregatorAndParent {
+
+        @Test
+        void addToExistingPluginInPluginManagement() {
+            // Multi-module: root pom has plugin in pluginManagement with annotationProcessorPaths
+            // Expected: adds path to pluginManagement, child unchanged
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                  
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <annotationProcessorPaths>
+                                              <path>
+                                                  <groupId>org.mapstruct</groupId>
+                                                  <artifactId>mapstruct-processor</artifactId>
+                                              </path>
+                                          </annotationProcessorPaths>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                  
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <annotationProcessorPaths>
+                                              <path>
+                                                  <groupId>org.mapstruct</groupId>
+                                                  <artifactId>mapstruct-processor</artifactId>
+                                              </path>
+                                              <path>
+                                                  <groupId>org.projectlombok</groupId>
+                                                  <artifactId>lombok-mapstruct-binding</artifactId>
+                                                  <version>0.2.0</version>
+                                              </path>
+                                          </annotationProcessorPaths>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """
+              ),
+              mavenProject("child",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>child</artifactId>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void createInPluginManagementWhenOnlyInBuildPlugins() {
+            // Multi-module: root has plugin only in build/plugins
+            // Expected: creates in pluginManagement, leaves build/plugins alone
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                  
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <source>17</source>
+                                      <target>17</target>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                  
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <source>17</source>
+                                      <target>17</target>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>org.apache.maven.plugins</groupId>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <annotationProcessorPaths>
+                                              <path>
+                                                  <groupId>org.projectlombok</groupId>
+                                                  <artifactId>lombok-mapstruct-binding</artifactId>
+                                                  <version>0.2.0</version>
+                                              </path>
+                                          </annotationProcessorPaths>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """
+              ),
+              mavenProject("child",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>child</artifactId>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void createPluginManagementWhenMissing() {
+            // Multi-module: root has no maven-compiler-plugin anywhere
+            // Expected: creates pluginManagement with the plugin
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>org.apache.maven.plugins</groupId>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <annotationProcessorPaths>
+                                              <path>
+                                                  <groupId>org.projectlombok</groupId>
+                                                  <artifactId>lombok-mapstruct-binding</artifactId>
+                                                  <version>0.2.0</version>
+                                              </path>
+                                          </annotationProcessorPaths>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """
+              ),
+              mavenProject("child",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>child</artifactId>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void leaveChildPluginsUntouched() {
+            // Multi-module: child module has its own maven-compiler-plugin
+            // Expected: child remains untouched, only root gets pluginManagement entry
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>org.apache.maven.plugins</groupId>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <annotationProcessorPaths>
+                                              <path>
+                                                  <groupId>org.projectlombok</groupId>
+                                                  <artifactId>lombok-mapstruct-binding</artifactId>
+                                                  <version>0.2.0</version>
+                                              </path>
+                                          </annotationProcessorPaths>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """
+              ),
+              mavenProject("child",
+                pomXml(
+                  // Child has its own plugin config - should NOT be modified
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>child</artifactId>
+                    
+                        <build>
+                            <plugins>
+                                <plugin>
+                                    <artifactId>maven-compiler-plugin</artifactId>
+                                    <configuration>
+                                        <annotationProcessorPaths>
+                                            <path>
+                                                <groupId>org.mapstruct</groupId>
+                                                <artifactId>mapstruct-processor</artifactId>
+                                            </path>
+                                        </annotationProcessorPaths>
+                                    </configuration>
+                                </plugin>
+                            </plugins>
+                        </build>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void childIsUntouched() {
+            // Multi-module: child module has no maven-compiler-plugin
+            // Expected: child remains untouched, only root gets pluginManagement entry
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>org.apache.maven.plugins</groupId>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <annotationProcessorPaths>
+                                              <path>
+                                                  <groupId>org.projectlombok</groupId>
+                                                  <artifactId>lombok-mapstruct-binding</artifactId>
+                                                  <version>0.2.0</version>
+                                              </path>
+                                          </annotationProcessorPaths>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """
+              ),
+              mavenProject("child",
+                pomXml(
+                  // Child has nothing - should NOT be modified
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>child</artifactId>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void addOnlyToPluginManagementWhenInBothLocations() {
+            // Multi-module: root has plugin in both build/plugins and pluginManagement
+            // Expected: adds only to pluginManagement
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                  
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <source>17</source>
+                                          <target>17</target>
+                                          <annotationProcessorPaths>
+                                              <path>
+                                                  <groupId>org.mapstruct</groupId>
+                                                  <artifactId>mapstruct-processor</artifactId>
+                                              </path>
+                                          </annotationProcessorPaths>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                  
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <source>17</source>
+                                          <target>17</target>
+                                          <annotationProcessorPaths>
+                                              <path>
+                                                  <groupId>org.mapstruct</groupId>
+                                                  <artifactId>mapstruct-processor</artifactId>
+                                              </path>
+                                              <path>
+                                                  <groupId>org.projectlombok</groupId>
+                                                  <artifactId>lombok-mapstruct-binding</artifactId>
+                                                  <version>0.2.0</version>
+                                              </path>
+                                          </annotationProcessorPaths>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """
+              ),
+              mavenProject("child",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>child</artifactId>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void upgradeVersionInPluginManagement() {
+            // Multi-module: root has processor with older version in pluginManagement
+            // Expected: upgrades version in pluginManagement
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                  
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <annotationProcessorPaths>
+                                              <path>
+                                                  <groupId>org.projectlombok</groupId>
+                                                  <artifactId>lombok-mapstruct-binding</artifactId>
+                                                  <version>0.1.0</version>
+                                              </path>
+                                          </annotationProcessorPaths>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                  
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <annotationProcessorPaths>
+                                              <path>
+                                                  <groupId>org.projectlombok</groupId>
+                                                  <artifactId>lombok-mapstruct-binding</artifactId>
+                                                  <version>0.2.0</version>
+                                              </path>
+                                          </annotationProcessorPaths>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """
+              ),
+              mavenProject("child",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>child</artifactId>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void orphanModuleGetsOwnPluginConfiguration() {
+            // Combined aggregator/parent scenario with an orphan module
+            // Root is aggregator+parent for child module
+            // module-orphan has NO parent in reactor -> should get build/plugins directly
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                          <module>module-orphan</module>
+                      </modules>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>child</module>
+                          <module>module-orphan</module>
+                      </modules>
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>org.apache.maven.plugins</groupId>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <annotationProcessorPaths>
+                                              <path>
+                                                  <groupId>org.projectlombok</groupId>
+                                                  <artifactId>lombok-mapstruct-binding</artifactId>
+                                                  <version>0.2.0</version>
+                                              </path>
+                                          </annotationProcessorPaths>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """
+              ),
+              mavenProject("child",
+                pomXml(
+                  // Child has parent in reactor - should NOT be modified
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>child</artifactId>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("module-orphan",
+                pomXml(
+                  // Orphan module has NO parent in reactor -> gets build/plugins directly
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>module-orphan</artifactId>
+                        <version>1</version>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>module-orphan</artifactId>
+                        <version>1</version>
+                        <build>
+                            <plugins>
+                                <plugin>
+                                    <groupId>org.apache.maven.plugins</groupId>
+                                    <artifactId>maven-compiler-plugin</artifactId>
+                                    <configuration>
+                                        <annotationProcessorPaths>
+                                            <path>
+                                                <groupId>org.projectlombok</groupId>
+                                                <artifactId>lombok-mapstruct-binding</artifactId>
+                                                <version>0.2.0</version>
+                                            </path>
+                                        </annotationProcessorPaths>
+                                    </configuration>
+                                </plugin>
+                            </plugins>
+                        </build>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+    }
+
+    @Nested
+    class SeparatedAggregatorAndParent {
+
+        @Test
+        void addToParentNotAggregator() {
+            // Aggregator POM should NOT be modified
+            // Parent POM (separate from aggregator) should get pluginManagement entry
+            // Child modules remain unchanged
+            rewriteRun(
+              pomXml(
+                // Aggregator - should NOT be modified (no parent references to it)
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>aggregator</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>parent</module>
+                          <module>module-a</module>
+                      </modules>
+                  </project>
+                  """
+              ),
+              mavenProject("parent",
+                pomXml(
+                  // Parent POM - should get pluginManagement
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                        <packaging>pom</packaging>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                        <packaging>pom</packaging>
+                        <build>
+                            <pluginManagement>
+                                <plugins>
+                                    <plugin>
+                                        <groupId>org.apache.maven.plugins</groupId>
+                                        <artifactId>maven-compiler-plugin</artifactId>
+                                        <configuration>
+                                            <annotationProcessorPaths>
+                                                <path>
+                                                    <groupId>org.projectlombok</groupId>
+                                                    <artifactId>lombok-mapstruct-binding</artifactId>
+                                                    <version>0.2.0</version>
+                                                </path>
+                                            </annotationProcessorPaths>
+                                        </configuration>
+                                    </plugin>
+                                </plugins>
+                            </pluginManagement>
+                        </build>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("module-a",
+                pomXml(
+                  // Child with parent - should NOT be modified
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                            <relativePath>../parent</relativePath>
+                        </parent>
+                        <artifactId>module-a</artifactId>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void aggregatorUnchangedWhenSeparateParentExists() {
+            // Explicit test that aggregator is NOT modified when children use a separate parent
+            // Even if aggregator has maven-compiler-plugin, it should NOT be modified
+            rewriteRun(
+              pomXml(
+                // Aggregator with existing compiler plugin - should NOT be modified
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>aggregator</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>parent</module>
+                          <module>module-a</module>
+                      </modules>
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <source>17</source>
+                                      <target>17</target>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """
+              ),
+              mavenProject("parent",
+                pomXml(
+                  // Parent POM - should get pluginManagement
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                        <packaging>pom</packaging>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                        <packaging>pom</packaging>
+                        <build>
+                            <pluginManagement>
+                                <plugins>
+                                    <plugin>
+                                        <groupId>org.apache.maven.plugins</groupId>
+                                        <artifactId>maven-compiler-plugin</artifactId>
+                                        <configuration>
+                                            <annotationProcessorPaths>
+                                                <path>
+                                                    <groupId>org.projectlombok</groupId>
+                                                    <artifactId>lombok-mapstruct-binding</artifactId>
+                                                    <version>0.2.0</version>
+                                                </path>
+                                            </annotationProcessorPaths>
+                                        </configuration>
+                                    </plugin>
+                                </plugins>
+                            </pluginManagement>
+                        </build>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("module-a",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                            <relativePath>../parent</relativePath>
+                        </parent>
+                        <artifactId>module-a</artifactId>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void orphanModuleInSeparatedStructure() {
+            // Orphan module (no parent in reactor) gets build/plugins directly
+            // Parent POM also gets pluginManagement for its children
+            rewriteRun(
+              pomXml(
+                // Aggregator - should NOT be modified
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>aggregator</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>parent</module>
+                          <module>module-a</module>
+                          <module>module-orphan</module>
+                      </modules>
+                  </project>
+                  """
+              ),
+              mavenProject("parent",
+                pomXml(
+                  // Parent POM - should get pluginManagement
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                        <packaging>pom</packaging>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                        <packaging>pom</packaging>
+                        <build>
+                            <pluginManagement>
+                                <plugins>
+                                    <plugin>
+                                        <groupId>org.apache.maven.plugins</groupId>
+                                        <artifactId>maven-compiler-plugin</artifactId>
+                                        <configuration>
+                                            <annotationProcessorPaths>
+                                                <path>
+                                                    <groupId>org.projectlombok</groupId>
+                                                    <artifactId>lombok-mapstruct-binding</artifactId>
+                                                    <version>0.2.0</version>
+                                                </path>
+                                            </annotationProcessorPaths>
+                                        </configuration>
+                                    </plugin>
+                                </plugins>
+                            </pluginManagement>
+                        </build>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("module-a",
+                pomXml(
+                  // Child with parent - should NOT be modified
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                            <relativePath>../parent</relativePath>
+                        </parent>
+                        <artifactId>module-a</artifactId>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("module-orphan",
+                pomXml(
+                  // Orphan module (no parent in reactor) -> gets build/plugins directly
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>module-orphan</artifactId>
+                        <version>1</version>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>module-orphan</artifactId>
+                        <version>1</version>
+                        <build>
+                            <plugins>
+                                <plugin>
+                                    <groupId>org.apache.maven.plugins</groupId>
+                                    <artifactId>maven-compiler-plugin</artifactId>
+                                    <configuration>
+                                        <annotationProcessorPaths>
+                                            <path>
+                                                <groupId>org.projectlombok</groupId>
+                                                <artifactId>lombok-mapstruct-binding</artifactId>
+                                                <version>0.2.0</version>
+                                            </path>
+                                        </annotationProcessorPaths>
+                                    </configuration>
+                                </plugin>
+                            </plugins>
+                        </build>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void addToExistingPluginInSeparatedParent() {
+            // Parent POM already has maven-compiler-plugin in pluginManagement
+            // Expected: adds annotation processor path to existing config
+            rewriteRun(
+              pomXml(
+                // Aggregator - should NOT be modified
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>aggregator</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>parent</module>
+                          <module>module-a</module>
+                      </modules>
+                  </project>
+                  """
+              ),
+              mavenProject("parent",
+                pomXml(
+                  // Parent POM with existing compiler plugin - should get annotation processor added
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                        <packaging>pom</packaging>
+                        <build>
+                            <pluginManagement>
+                                <plugins>
+                                    <plugin>
+                                        <artifactId>maven-compiler-plugin</artifactId>
+                                        <configuration>
+                                            <source>17</source>
+                                            <target>17</target>
+                                            <annotationProcessorPaths>
+                                                <path>
+                                                    <groupId>org.mapstruct</groupId>
+                                                    <artifactId>mapstruct-processor</artifactId>
+                                                </path>
+                                            </annotationProcessorPaths>
+                                        </configuration>
+                                    </plugin>
+                                </plugins>
+                            </pluginManagement>
+                        </build>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                        <packaging>pom</packaging>
+                        <build>
+                            <pluginManagement>
+                                <plugins>
+                                    <plugin>
+                                        <artifactId>maven-compiler-plugin</artifactId>
+                                        <configuration>
+                                            <source>17</source>
+                                            <target>17</target>
+                                            <annotationProcessorPaths>
+                                                <path>
+                                                    <groupId>org.mapstruct</groupId>
+                                                    <artifactId>mapstruct-processor</artifactId>
+                                                </path>
+                                                <path>
+                                                    <groupId>org.projectlombok</groupId>
+                                                    <artifactId>lombok-mapstruct-binding</artifactId>
+                                                    <version>0.2.0</version>
+                                                </path>
+                                            </annotationProcessorPaths>
+                                        </configuration>
+                                    </plugin>
+                                </plugins>
+                            </pluginManagement>
+                        </build>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("module-a",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                            <relativePath>../parent</relativePath>
+                        </parent>
+                        <artifactId>module-a</artifactId>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void multipleParentsWithSharedChildren() {
+            // Complex scenario: multiple parent POMs in reactor
+            // Each parent should get pluginManagement (deduplicated)
+            rewriteRun(
+              pomXml(
+                // Aggregator - should NOT be modified
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>aggregator</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>parent-a</module>
+                          <module>parent-b</module>
+                          <module>module-a1</module>
+                          <module>module-a2</module>
+                          <module>module-b1</module>
+                      </modules>
+                  </project>
+                  """
+              ),
+              mavenProject("parent-a",
+                pomXml(
+                  // Parent A - should get pluginManagement
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent-a</artifactId>
+                        <version>1</version>
+                        <packaging>pom</packaging>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent-a</artifactId>
+                        <version>1</version>
+                        <packaging>pom</packaging>
+                        <build>
+                            <pluginManagement>
+                                <plugins>
+                                    <plugin>
+                                        <groupId>org.apache.maven.plugins</groupId>
+                                        <artifactId>maven-compiler-plugin</artifactId>
+                                        <configuration>
+                                            <annotationProcessorPaths>
+                                                <path>
+                                                    <groupId>org.projectlombok</groupId>
+                                                    <artifactId>lombok-mapstruct-binding</artifactId>
+                                                    <version>0.2.0</version>
+                                                </path>
+                                            </annotationProcessorPaths>
+                                        </configuration>
+                                    </plugin>
+                                </plugins>
+                            </pluginManagement>
+                        </build>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("parent-b",
+                pomXml(
+                  // Parent B - should also get pluginManagement
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent-b</artifactId>
+                        <version>1</version>
+                        <packaging>pom</packaging>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent-b</artifactId>
+                        <version>1</version>
+                        <packaging>pom</packaging>
+                        <build>
+                            <pluginManagement>
+                                <plugins>
+                                    <plugin>
+                                        <groupId>org.apache.maven.plugins</groupId>
+                                        <artifactId>maven-compiler-plugin</artifactId>
+                                        <configuration>
+                                            <annotationProcessorPaths>
+                                                <path>
+                                                    <groupId>org.projectlombok</groupId>
+                                                    <artifactId>lombok-mapstruct-binding</artifactId>
+                                                    <version>0.2.0</version>
+                                                </path>
+                                            </annotationProcessorPaths>
+                                        </configuration>
+                                    </plugin>
+                                </plugins>
+                            </pluginManagement>
+                        </build>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("module-a1",
+                pomXml(
+                  // Child of parent-a - should NOT be modified
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent-a</artifactId>
+                            <version>1</version>
+                            <relativePath>../parent-a</relativePath>
+                        </parent>
+                        <artifactId>module-a1</artifactId>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("module-a2",
+                pomXml(
+                  // Child of parent-a - should NOT be modified
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent-a</artifactId>
+                            <version>1</version>
+                            <relativePath>../parent-a</relativePath>
+                        </parent>
+                        <artifactId>module-a2</artifactId>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("module-b1",
+                pomXml(
+                  // Child of parent-b - should NOT be modified
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent-b</artifactId>
+                            <version>1</version>
+                            <relativePath>../parent-b</relativePath>
+                        </parent>
+                        <artifactId>module-b1</artifactId>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
     }
 }
