@@ -55,7 +55,7 @@ public interface MavenArtifactCache {
         // to ensure the cache reflects the latest locally-published artifact
         String datedSnapshotVersion = dependency.getDatedSnapshotVersion();
         if (dependency.getVersion().endsWith("-SNAPSHOT") &&
-            (datedSnapshotVersion == null || datedSnapshotVersion.endsWith("-SNAPSHOT"))) {
+            (datedSnapshotVersion == null || dependency.getVersion().equals(datedSnapshotVersion))) {
             try {
                 if (artifactStream != null) {
                     Path artifact = putArtifact(dependency, artifactStream.call(), onError);
