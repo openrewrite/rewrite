@@ -16,7 +16,6 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -110,7 +109,6 @@ class HelmTemplateParsingTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Invalid YAML syntax with Helm template expressions")
     @Test
     void parseHelmTemplateWithFunctions() {
         rewriteRun(
@@ -131,7 +129,6 @@ class HelmTemplateParsingTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Invalid YAML syntax with Helm template expressions")
     @Test
     void parseHelmTemplateWithRange() {
         rewriteRun(
@@ -213,7 +210,6 @@ class HelmTemplateParsingTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Invalid YAML syntax with Helm template expressions")
     @Test
     void parseHelmTemplateWithToYaml() {
         rewriteRun(
@@ -439,6 +435,84 @@ class HelmTemplateParsingTest implements RewriteTest {
                             value: {{ add .Values.baseWorkers .Values.extraWorkers | quote }}
                           - name: TIMEOUT_SECONDS
                             value: {{ mul .Values.timeoutMinutes 60 | quote }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void parseHelmTemplateAtFileStart() {
+        rewriteRun(
+          yaml(
+            """
+              {{- $imageRepository := .Values.backstage.image.repository }}
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: {{ $imageRepository }}-service
+              """
+          )
+        );
+    }
+
+    @Test
+    void parseMultipleConsecutiveStandaloneHelmLines() {
+        rewriteRun(
+          yaml(
+            """
+              {{- $repo := .Values.image.repository }}
+              {{- $tag := .Values.image.tag }}
+              apiVersion: v1
+              metadata:
+                name: test
+              """
+          )
+        );
+    }
+
+    @Test
+    void parseStandaloneHelmAtEndOfMapping() {
+        rewriteRun(
+          yaml(
+            """
+              metadata:
+                labels:
+                  {{- include "mychart.labels" . | nindent 6 }}
+              spec:
+                replicas: 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void parseNestedStandaloneHelm() {
+        rewriteRun(
+          yaml(
+            """
+              spec:
+                containers:
+                  - name: app
+                    {{- if .Values.resources }}
+                    resources:
+                      {{- toYaml .Values.resources | nindent 10 }}
+                    {{- end }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void helmConditionalBlock() {
+        rewriteRun(
+          yaml(
+            """
+              apiVersion: v1
+              kind: Service
+              metadata:
+                {{ if .Release.Name }}
+                a: 1
+                {{ end }}
               """
           )
         );
