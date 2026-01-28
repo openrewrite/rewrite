@@ -57,6 +57,10 @@ public class YamlParser implements org.openrewrite.Parser {
     // Match single-brace placeholder templates like {C App} that contain at least one space
     // These are invalid YAML but used by some tools as placeholders
     private static final Pattern SINGLE_BRACE_TEMPLATE_PATTERN = Pattern.compile("\\{[A-Za-z][^{}\\n\\r]*\\s[^{}\\n\\r]*}");
+    // Match placeholder values starting with multiple asterisks like "*** REMOVED ***"
+    // These are invalid YAML aliases but used as credential placeholders
+    private static final Pattern ASTERISK_PLACEHOLDER_PATTERN = Pattern.compile(":\\s+(\\*{2,}[^\n\r]*)");
+
     @Override
     public Stream<SourceFile> parse(@Language("yml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
@@ -139,6 +143,23 @@ public class YamlParser implements org.openrewrite.Parser {
             variableByUuid.put(uuid, variableMatcher.group(1));
             yamlSourceWithPlaceholders.append(uuid);
             pos = variableMatcher.end(1);
+        }
+
+        if (pos < processedSource.length()) {
+            yamlSourceWithPlaceholders.append(processedSource, pos, processedSource.length());
+        }
+
+        // Then, replace asterisk placeholder patterns like "*** REMOVED ***" with UUIDs
+        processedSource = yamlSourceWithPlaceholders.toString();
+        yamlSourceWithPlaceholders = new StringBuilder();
+        Matcher asteriskMatcher = ASTERISK_PLACEHOLDER_PATTERN.matcher(processedSource);
+        pos = 0;
+        while (pos < processedSource.length() && asteriskMatcher.find(pos)) {
+            yamlSourceWithPlaceholders.append(processedSource, pos, asteriskMatcher.start(1));
+            String uuid = UUID.randomUUID().toString();
+            variableByUuid.put(uuid, asteriskMatcher.group(1));
+            yamlSourceWithPlaceholders.append(uuid);
+            pos = asteriskMatcher.end(1);
         }
 
         if (pos < processedSource.length()) {
