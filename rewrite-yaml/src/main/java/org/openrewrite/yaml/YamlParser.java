@@ -57,7 +57,6 @@ public class YamlParser implements org.openrewrite.Parser {
     // Match single-brace placeholder templates like {C App} that contain at least one space
     // These are invalid YAML but used by some tools as placeholders
     private static final Pattern SINGLE_BRACE_TEMPLATE_PATTERN = Pattern.compile("\\{[A-Za-z][^{}\\n\\r]*\\s[^{}\\n\\r]*}");
-
     @Override
     public Stream<SourceFile> parse(@Language("yml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
@@ -113,6 +112,11 @@ public class YamlParser implements org.openrewrite.Parser {
         }
         helmMatcher.appendTail(helmBuffer);
         processedSource = helmBuffer.toString();
+
+        // Convert standalone Helm template lines (lines where a UUID is the only content)
+        // to YAML comments so they don't create structurally invalid YAML
+        processedSource = convertStandaloneHelmLinesToComments(
+                processedSource, helmTemplateByUuid.keySet());
 
         // Then, replace single-brace templates like {C App} with UUIDs
         Matcher singleBraceMatcher = SINGLE_BRACE_TEMPLATE_PATTERN.matcher(processedSource);
@@ -501,7 +505,11 @@ public class YamlParser implements org.openrewrite.Parser {
                     }
                     String result = text;
                     for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
-                        if (result.contains(entry.getKey())) {
+                        // Check comment-wrapped form first (standalone Helm lines converted to #uuid)
+                        String commentKey = "#" + entry.getKey();
+                        if (result.contains(commentKey)) {
+                            result = result.replace(commentKey, entry.getValue());
+                        } else if (result.contains(entry.getKey())) {
                             result = result.replace(entry.getKey(), entry.getValue());
                         }
                     }
@@ -645,6 +653,116 @@ public class YamlParser implements org.openrewrite.Parser {
         return -1;
     }
 
+
+    /**
+     * After Helm templates have been replaced with UUIDs, lines consisting entirely
+     * of a UUID are standalone control flow directives. A bare UUID on its own line
+     * creates invalid YAML, so we prepend # to make it a YAML comment.
+     */
+    private static String convertStandaloneHelmLinesToComments(
+            String source,
+            Set<String> helmUuids) {
+        if (helmUuids.isEmpty()) {
+            return source;
+        }
+
+        StringBuilder result = new StringBuilder(source.length());
+
+        boolean inBlockScalar = false;
+        int blockScalarBaseIndent = -1;
+
+        int i = 0;
+        while (i < source.length()) {
+            int lineEnd = i;
+            while (lineEnd < source.length() && source.charAt(lineEnd) != '\n' && source.charAt(lineEnd) != '\r') {
+                lineEnd++;
+            }
+
+            String lineContent = source.substring(i, lineEnd);
+            String trimmed = lineContent.trim();
+            int indent = leadingSpaceCount(lineContent);
+
+            if (inBlockScalar) {
+                if (!trimmed.isEmpty() && indent <= blockScalarBaseIndent) {
+                    inBlockScalar = false;
+                } else {
+                    result.append(lineContent);
+                    i = appendNewline(source, lineEnd, result);
+                    continue;
+                }
+            }
+
+            if (helmUuids.contains(trimmed)) {
+                result.append(lineContent, 0, indent);
+                result.append('#');
+                result.append(trimmed);
+            } else {
+                result.append(lineContent);
+                if (isBlockScalarIndicator(trimmed)) {
+                    inBlockScalar = true;
+                    blockScalarBaseIndent = indent;
+                }
+            }
+
+            i = appendNewline(source, lineEnd, result);
+        }
+
+        return result.toString();
+    }
+
+    private static int appendNewline(String source, int lineEnd, StringBuilder result) {
+        if (lineEnd < source.length()) {
+            result.append(source.charAt(lineEnd));
+            lineEnd++;
+            if (lineEnd < source.length() && source.charAt(lineEnd - 1) == '\r' && source.charAt(lineEnd) == '\n') {
+                result.append(source.charAt(lineEnd));
+                lineEnd++;
+            }
+        }
+        return lineEnd;
+    }
+
+    private static boolean isBlockScalarIndicator(String trimmedLine) {
+        // A block scalar indicator line ends with | or > (optionally followed by
+        // chomp/indent modifiers like +, -, or a digit) after a colon
+        int colonIndex = trimmedLine.indexOf(':');
+        if (colonIndex == -1) {
+            return false;
+        }
+        String afterColon = trimmedLine.substring(colonIndex + 1).trim();
+        // Strip trailing comment
+        int commentIndex = afterColon.indexOf(" #");
+        if (commentIndex != -1) {
+            afterColon = afterColon.substring(0, commentIndex).trim();
+        }
+        if (afterColon.isEmpty()) {
+            return false;
+        }
+        char first = afterColon.charAt(0);
+        if (first != '|' && first != '>') {
+            return false;
+        }
+        // Check that remaining chars (if any) are valid block scalar modifiers
+        for (int j = 1; j < afterColon.length(); j++) {
+            char c = afterColon.charAt(j);
+            if (c != '+' && c != '-' && !Character.isDigit(c)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static int leadingSpaceCount(String line) {
+        int count = 0;
+        for (int j = 0; j < line.length(); j++) {
+            if (line.charAt(j) == ' ') {
+                count++;
+            } else {
+                break;
+            }
+        }
+        return count;
+    }
 
     @Override
     public boolean accept(Path path) {
