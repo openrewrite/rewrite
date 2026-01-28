@@ -79,6 +79,35 @@ class LocalMavenArtifactCacheTest {
     }
 
     @Test
+    void snapshotSuffixedDatedVersionIsAlwaysRefreshed(@TempDir Path tempDir) throws Exception {
+        cache = new LocalMavenArtifactCache(tempDir);
+        // Simulates a bug where datedSnapshotVersion is set to the SNAPSHOT version string
+        // instead of null — should still be treated as mutable
+        ResolvedDependency snapshot = ResolvedDependency.builder()
+                .gav(new ResolvedGroupArtifactVersion(null, "org.example", "my-recipes",
+                        "1.0.0-SNAPSHOT", "1.0.0-SNAPSHOT"))
+                .requested(Dependency.builder()
+                        .gav(new GroupArtifactVersion("org.example", "my-recipes", "1.0.0-SNAPSHOT"))
+                        .build())
+                .dependencies(emptyList())
+                .licenses(emptyList())
+                .depth(0)
+                .build();
+
+        Path first = cache.computeArtifact(snapshot,
+                () -> new ByteArrayInputStream("v1".getBytes(StandardCharsets.UTF_8)),
+                Throwable::printStackTrace);
+        assertThat(first).exists();
+        assertThat(Files.readString(first)).isEqualTo("v1");
+
+        Path second = cache.computeArtifact(snapshot,
+                () -> new ByteArrayInputStream("v2".getBytes(StandardCharsets.UTF_8)),
+                Throwable::printStackTrace);
+        assertThat(second).isEqualTo(first);
+        assertThat(Files.readString(second)).isEqualTo("v2");
+    }
+
+    @Test
     void datedSnapshotIsNotRefreshed(@TempDir Path tempDir) throws Exception {
         cache = new LocalMavenArtifactCache(tempDir);
         ResolvedDependency dated = datedSnapshotDependency();
