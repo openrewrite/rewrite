@@ -513,7 +513,22 @@ class HelmTemplateParsingTest implements RewriteTest {
                 {{ if .Release.Name }}
                 a: 1
                 {{ end }}
-              """
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                // Standalone Helm directives are not their own LST nodes.
+                // They are preserved as text in the prefix of adjacent nodes.
+                var root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                var metadata = (Yaml.Mapping) root.getEntries().get(2).getValue();
+                var aEntry = metadata.getEntries().getFirst();
+
+                // {{ if .Release.Name }} becomes prefix text on the next mapping entry
+                assertThat(aEntry.getPrefix()).contains("{{ if .Release.Name }}");
+
+                // {{ end }} has no following sibling in the mapping, so it flows
+                // into the Document.End prefix
+                var docEnd = docs.getDocuments().getFirst().getEnd();
+                assertThat(docEnd.getPrefix()).contains("{{ end }}");
+            })
           )
         );
     }

@@ -57,9 +57,6 @@ public class YamlParser implements org.openrewrite.Parser {
     // Match single-brace placeholder templates like {C App} that contain at least one space
     // These are invalid YAML but used by some tools as placeholders
     private static final Pattern SINGLE_BRACE_TEMPLATE_PATTERN = Pattern.compile("\\{[A-Za-z][^{}\\n\\r]*\\s[^{}\\n\\r]*}");
-    // Prefix used to convert standalone Helm template lines (control flow directives) to YAML comments
-    private static final String HELM_STANDALONE_COMMENT_PREFIX = "#__helm_standalone__";
-
     @Override
     public Stream<SourceFile> parse(@Language("yml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
@@ -103,7 +100,6 @@ public class YamlParser implements org.openrewrite.Parser {
         Map<String, String> variableByUuid = new HashMap<>();
         Map<String, String> helmTemplateByUuid = new HashMap<>();
         Map<String, String> singleBraceTemplateByUuid = new HashMap<>();
-        Map<String, String> helmStandaloneByMarker = new HashMap<>();
 
         // First, replace all Helm templates with UUIDs
         String processedSource = yamlSource;
@@ -120,7 +116,7 @@ public class YamlParser implements org.openrewrite.Parser {
         // Convert standalone Helm template lines (lines where a UUID is the only content)
         // to YAML comments so they don't create structurally invalid YAML
         processedSource = convertStandaloneHelmLinesToComments(
-                processedSource, helmTemplateByUuid, helmStandaloneByMarker);
+                processedSource, helmTemplateByUuid.keySet());
 
         // Then, replace single-brace templates like {C App} with UUIDs
         Matcher singleBraceMatcher = SINGLE_BRACE_TEMPLATE_PATTERN.matcher(processedSource);
@@ -497,7 +493,7 @@ public class YamlParser implements org.openrewrite.Parser {
             }
 
             Yaml.Documents result = new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, suffix, documents);
-            if (helmTemplateByUuid.isEmpty() && variableByUuid.isEmpty() && singleBraceTemplateByUuid.isEmpty() && helmStandaloneByMarker.isEmpty()) {
+            if (helmTemplateByUuid.isEmpty() && variableByUuid.isEmpty() && singleBraceTemplateByUuid.isEmpty()) {
                 return result;
             }
 
@@ -508,14 +504,12 @@ public class YamlParser implements org.openrewrite.Parser {
                         return text;
                     }
                     String result = text;
-                    // First restore standalone Helm comment markers (these appear in prefix text as comments)
-                    for (Map.Entry<String, String> entry : helmStandaloneByMarker.entrySet()) {
-                        if (result.contains(entry.getKey())) {
-                            result = result.replace(entry.getKey(), entry.getValue());
-                        }
-                    }
                     for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
-                        if (result.contains(entry.getKey())) {
+                        // Check comment-wrapped form first (standalone Helm lines converted to #uuid)
+                        String commentKey = "#" + entry.getKey();
+                        if (result.contains(commentKey)) {
+                            result = result.replace(commentKey, entry.getValue());
+                        } else if (result.contains(entry.getKey())) {
                             result = result.replace(entry.getKey(), entry.getValue());
                         }
                     }
@@ -661,22 +655,17 @@ public class YamlParser implements org.openrewrite.Parser {
 
 
     /**
-     * After Helm templates have been replaced with UUIDs, some lines may consist
-     * entirely of a UUID (with optional surrounding whitespace). These "standalone"
-     * Helm lines represent control flow directives (if/else/end/range/with/include)
-     * that don't produce YAML values. A bare UUID on its own line creates invalid
-     * YAML structure, so we convert them to YAML comments that SnakeYAML will
-     * preserve in prefix text.
+     * After Helm templates have been replaced with UUIDs, lines consisting entirely
+     * of a UUID are standalone control flow directives. A bare UUID on its own line
+     * creates invalid YAML, so we prepend # to make it a YAML comment.
      */
     private static String convertStandaloneHelmLinesToComments(
             String source,
-            Map<String, String> helmTemplateByUuid,
-            Map<String, String> helmStandaloneByMarker) {
-        if (helmTemplateByUuid.isEmpty()) {
+            Set<String> helmUuids) {
+        if (helmUuids.isEmpty()) {
             return source;
         }
 
-        Set<String> uuids = new HashSet<>(helmTemplateByUuid.keySet());
         StringBuilder result = new StringBuilder(source.length());
 
         boolean inBlockScalar = false;
@@ -684,7 +673,6 @@ public class YamlParser implements org.openrewrite.Parser {
 
         int i = 0;
         while (i < source.length()) {
-            // Find end of current line (before newline characters)
             int lineEnd = i;
             while (lineEnd < source.length() && source.charAt(lineEnd) != '\n' && source.charAt(lineEnd) != '\r') {
                 lineEnd++;
@@ -694,33 +682,22 @@ public class YamlParser implements org.openrewrite.Parser {
             String trimmed = lineContent.trim();
             int indent = leadingSpaceCount(lineContent);
 
-            // Track block scalar context
             if (inBlockScalar) {
                 if (!trimmed.isEmpty() && indent <= blockScalarBaseIndent) {
                     inBlockScalar = false;
                 } else {
-                    // Inside block scalar: append line as-is, don't convert to comment
                     result.append(lineContent);
                     i = appendNewline(source, lineEnd, result);
                     continue;
                 }
             }
 
-            if (uuids.contains(trimmed)) {
-                // Standalone Helm line: convert UUID to comment marker
-                String uuid = trimmed;
-                String original = helmTemplateByUuid.remove(uuid);
-                uuids.remove(uuid);
-                String marker = HELM_STANDALONE_COMMENT_PREFIX + uuid;
-                helmStandaloneByMarker.put(marker, original);
-
-                // Preserve leading whitespace, replace UUID with comment marker
+            if (helmUuids.contains(trimmed)) {
                 result.append(lineContent, 0, indent);
-                result.append(marker);
+                result.append('#');
+                result.append(trimmed);
             } else {
                 result.append(lineContent);
-
-                // Check if this line starts a block scalar
                 if (isBlockScalarIndicator(trimmed)) {
                     inBlockScalar = true;
                     blockScalarBaseIndent = indent;
