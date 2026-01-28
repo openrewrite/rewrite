@@ -181,9 +181,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
-        // Allow when configuration is explicitly provided OR when source files were scanned
+        // Allow when configuration is explicitly provided, when onlyIfUsing is not set (default to "implementation"),
+        // or when source files were scanned
         boolean hasExplicitConfiguration = !StringUtils.isBlank(configuration);
-        return Preconditions.check(hasExplicitConfiguration || !acc.configurationsByProject.isEmpty(),
+        return Preconditions.check(hasExplicitConfiguration || onlyIfUsing == null || !acc.configurationsByProject.isEmpty(),
                 Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
 
                     @Override
@@ -198,10 +199,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         if (!maybeGp.isPresent()) {
                             return s;
                         }
-                        // When configuration needs to be inferred, require JavaProject and source set info
-                        if (!hasExplicitConfiguration) {
+                        // When configuration needs to be inferred and onlyIfUsing is set, require JavaProject and source set info
+                        if (!hasExplicitConfiguration && onlyIfUsing != null) {
                             if (!maybeJp.isPresent() ||
-                                    (onlyIfUsing != null && !acc.usingType.getOrDefault(maybeJp.get(), false)) ||
+                                    !acc.usingType.getOrDefault(maybeJp.get(), false) ||
                                     !acc.configurationsByProject.containsKey(maybeJp.get())) {
                                 return s;
                             }
