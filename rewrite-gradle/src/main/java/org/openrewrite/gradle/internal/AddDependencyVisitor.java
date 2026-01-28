@@ -340,7 +340,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 J.MethodInvocation dependencies;
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
                 if (isKotlinDsl) {
-                    dependencies = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)))), null, ctx)
+                    dependencies = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)), true)), null, ctx)
                             .findFirst()
                             .map(K.CompilationUnit.class::cast)
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
@@ -367,7 +367,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 J.MethodInvocation dependency;
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
                 if (isKotlinDsl) {
-                    dependency = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)))), null, ctx)
+                    dependency = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)), true)), null, ctx)
                             .findFirst()
                             .map(K.CompilationUnit.class::cast)
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
