@@ -514,6 +514,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         JRightPadded<Statement> enumSet = null;
         if (!jcEnums.isEmpty()) {
             Tree lastConstant = jcEnums.get(jcEnums.size() - 1);
+            Space whitespaceBeforeConstants = whitespace();
             List<JRightPadded<J.EnumValue>> enumValues = convertAll(jcEnums, commaDelim, t -> {
                 if (t != lastConstant) {
                     return whitespace();
@@ -543,7 +544,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             enumSet = padRight(
                     new J.EnumValueSet(
                             randomId(),
-                            EMPTY,
+                            whitespaceBeforeConstants,
                             Markers.EMPTY,
                             enumValues,
                             skip(";") != null
