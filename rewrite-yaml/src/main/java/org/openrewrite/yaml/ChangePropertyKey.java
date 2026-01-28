@@ -21,7 +21,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.search.FindProperty;
 import org.openrewrite.yaml.tree.Yaml;
@@ -132,14 +131,14 @@ public class ChangePropertyKey extends Recipe {
                     .collect(joining("."));
 
             if (newPropertyKey.startsWith(oldPropertyKey) &&
-                    (matchesWithMatcher(prop, newKeyMatcher) ||
-                     matchesWithMatcher(prop, newKeyWildcardMatcher) ||
+                    (newKeyMatcher.matchesGlob(prop) ||
+                     newKeyWildcardMatcher.matchesGlob(prop) ||
                      childMatchesNewPropertyKey(entry, prop))) {
                 return e;
             }
 
             String propertyToTest = newPropertyKey;
-            if (matchesWithMatcher(prop, oldKeyMatcher)) {
+            if (oldKeyMatcher.matchesGlob(prop)) {
                 Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                 while (propertyEntriesLeftToRight.hasNext()) {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
@@ -158,9 +157,9 @@ public class ChangePropertyKey extends Recipe {
                 }
             } else {
                 String parentProp = prop.substring(0, prop.length() - e.getKey().getValue().length()).replaceAll(".$", "");
-                if (matchesWithMatcher(prop, oldKeyWildcardMatcher) &&
-                        !(matchesWithMatcher(parentProp, oldKeyWildcardMatcher) ||
-                          matchesWithMatcher(parentProp, oldKeyMatcher)) &&
+                if (oldKeyWildcardMatcher.matchesGlob(prop) &&
+                        !(oldKeyWildcardMatcher.matchesGlob(parentProp) ||
+                          oldKeyMatcher.matchesGlob(parentProp)) &&
                         noneMatchExcluded(prop)) {
                     Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                     while (propertyEntriesLeftToRight.hasNext()) {
@@ -242,10 +241,6 @@ public class ChangePropertyKey extends Recipe {
             }
         }
         return true;
-    }
-
-    private static boolean matchesWithMatcher(String string, NameCaseConvention.Compiled matcher) {
-        return matcher.matchesGlob(string);
     }
 
     private List<String> excludedSubKeys() {
