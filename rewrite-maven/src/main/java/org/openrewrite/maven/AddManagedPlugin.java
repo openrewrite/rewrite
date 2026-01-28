@@ -19,18 +19,15 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
-import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.xml.AddToTagVisitor;
-import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.XPathMatcher;
-import org.openrewrite.xml.tree.Xml;
-
-import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class AddPlugin extends Recipe {
+public class AddManagedPlugin extends Recipe {
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
             example = "org.openrewrite.maven")
@@ -82,17 +79,17 @@ public class AddPlugin extends Recipe {
     @Nullable
     String filePattern;
 
-    String displayName = "Add Maven plugin";
+    String displayName = "Add Managed Maven plugin";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, version);
     }
 
-    String description = "Add the specified Maven plugin to the pom.xml.";
+    String description = "Add the specified Maven plugin to the Plugin Managed of the pom.xml.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new AddPluginVisitor(false, groupId, artifactId, version, configuration, dependencies, executions, filePattern);
+        return new AddPluginVisitor(true, groupId, artifactId, version, configuration, dependencies, executions, filePattern);
     }
 }
