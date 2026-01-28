@@ -23,10 +23,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.style.EmptyForInitializerPadStyle;
-import org.openrewrite.java.style.EmptyForIteratorPadStyle;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.SpacesStyle;
+import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
@@ -34,7 +31,9 @@ import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
@@ -48,41 +47,73 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     protected final EmptyForIteratorPadStyle emptyForIteratorPadStyle;
     @Nullable
     protected final Tree stopAfter;
-    protected final boolean removeCustomLineBreaks;
+    protected final WrappingAndBracesStyle wrappingAndBracesStyle;
 
-    public SpacesVisitor(SourceFile sourceFile, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
-        this(sourceFile.getMarkers().findAll(NamedStyles.class), removeCustomLineBreaks, stopAfter);
+    public SpacesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        this(sourceFile.getMarkers().findAll(NamedStyles.class), stopAfter);
     }
 
-    public SpacesVisitor(List<NamedStyles> styles, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
-        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), stopAfter, removeCustomLineBreaks);
+    public SpacesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
+        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces), stopAfter);
     }
 
+    @Deprecated
     public SpacesVisitor(SpacesStyle spacesStyle, @Nullable Tree stopAfter) {
-        this(spacesStyle, null, null, stopAfter, false);
-    }
-
-    public SpacesVisitor(SpacesStyle spacesStyle, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
-        this(spacesStyle, null, null, stopAfter, removeCustomLineBreaks);
+        this(spacesStyle, null, null, stopAfter);
     }
 
     @Deprecated
     public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter) {
-        this(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, stopAfter, false);
+        this(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, IntelliJ.wrappingAndBraces(), stopAfter);
     }
 
-    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter, boolean removeCustomLineBreaks) {
+    @Deprecated
+    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, WrappingAndBracesStyle wrappingAndBracesStyle, @Nullable Tree stopAfter) {
         this.spacesStyle = spacesStyle;
         this.emptyForInitializerPadStyle = emptyForInitializerPadStyle;
         this.emptyForIteratorPadStyle = emptyForIteratorPadStyle;
         this.stopAfter = stopAfter;
-        this.removeCustomLineBreaks = removeCustomLineBreaks;
+        this.wrappingAndBracesStyle = wrappingAndBracesStyle;
+    }
+
+    @Override
+    public @Nullable <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, P p) {
+        if (container == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+        if (getCursor().getNearestMessage("stop") != null) {
+            return container;
+        }
+        setCursor(new Cursor(getCursor(), container));
+
+        Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
+        Map<String, Object> messages = new HashMap<>();
+        messages.put("containerLocation", loc);
+        messages.put("empty", container.getElements().stream().allMatch(element -> element instanceof J.Empty));
+        messages.put("size", container.getElements().size());
+        List<JRightPadded<J2>> js = ListUtils.map(container.getPadding().getElements(), (index, t) -> {
+            messages.put("index", index);
+            setCursor(new Cursor(getCursor(), t, messages));
+            t = visitRightPadded(t, loc.getElementLocation(), p);
+            setCursor(getCursor().getParent());
+            return t;
+        });
+
+        setCursor(getCursor().getParent());
+
+        return js == container.getPadding().getElements() && before == container.getBefore() ?
+                container :
+                JContainer.build(before, js, container.getMarkers());
     }
 
     @Override
     public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
         if (right == null || !(right.getElement() instanceof J)) {
             return super.visitRightPadded(right, loc, p);
+        }
+        if (getCursor().getNearestMessage("stop") != null) {
+            return right;
         }
 
         Cursor cursor = getCursor();
@@ -93,10 +124,10 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
         ContainerPosition beforePosition;
         ContainerPosition afterPosition;
-        JContainer.Location containerLocation = cursor.getMessage("location");
-        int index = -1;
-        int size = -1;
-        boolean emptyContainer = false;
+        JContainer.Location containerLocation = cursor.getMessage("containerLocation");
+        Integer index = cursor.getMessage("index");
+        Integer size = cursor.getMessage("size");
+        boolean emptyContainer = Boolean.TRUE.equals(cursor.getMessage("empty"));
 
         switch (loc) {
             case LANGUAGE_EXTENSION:
@@ -220,9 +251,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     } else if (atomicIndex.get() > 0) {
                         before = evaluate(() -> spacesStyle.getOther().getAfterComma(), true) ? " " : "";
                     }
-                    if (atomicIndex.get() == atomicSize.get() - 1) {
-                        after = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
-                    } else if (atomicIndex.get() >= 0) {
+                    if (atomicIndex.get() != atomicSize.get() - 1 && atomicIndex.get() >= 0) {
                         after = evaluate(() -> spacesStyle.getOther().getBeforeComma(), false) ? " " : "";
                     }
                 } else {
@@ -231,6 +260,18 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     }
                     after = "";
                 }
+                break;
+            case IF_ELSE:
+                if (right.getElement() instanceof J.If) {
+                    break;
+                }
+                //Falling through on purpose here
+            case IF_THEN:
+                if (right.getElement() instanceof J.Block) {
+                    break;
+                }
+                before = " ";
+                after = "";
                 break;
             case LAMBDA_PARAM:
                 parent = cursor.getValue();
@@ -244,38 +285,38 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     index = params.getTypeParameters().indexOf(right.getElement());
                     size = params.getTypeParameters().size();
                     containerLocation = JContainer.Location.TYPE_PARAMETERS;
-                    break;
                 }
-                //if not we can fall through to the container handling
-            case METHOD_DECLARATION_PARAMETER:
-            case RECORD_STATE_VECTOR:
-            case METHOD_INVOCATION_ARGUMENT:
-            case NEW_CLASS_ARGUMENTS:
-            case ANNOTATION_ARGUMENT:
-            case TYPE_BOUND:
-            case NEW_ARRAY_INITIALIZER:
-            case TRY_RESOURCE:
-                JContainer<J> container = cursor.getValue();
-                index = container.getElements().indexOf(right.getElement());
-                size = container.getElements().size();
-                emptyContainer = container.getElements().stream().allMatch(element -> element instanceof J.Empty);
                 break;
+            case BLOCK_STATEMENT:
             case METHOD_SELECT:
                 after = "";
                 break;
             case INSTANCEOF:
                 after = " ";
                 break;
+            case NAMED_VARIABLE:
+                parentTreeCursor = getCursor().getParentTreeCursor();
+                // The after is stored on the inner VariableDeclaration$NamedVariable when not the last element
+                if (parentTreeCursor.getValue() instanceof J.Try.Resource) {
+                    parentTreeCursor = parentTreeCursor.getParent();
+                    if (parentTreeCursor != null) {
+                        containerLocation = parentTreeCursor.getMessage("containerLocation");
+                        index = parentTreeCursor.getMessage("index");
+                        size = parentTreeCursor.getMessage("size");
+                        emptyContainer = Boolean.TRUE.equals(parentTreeCursor.getMessage("empty"));
+                        break;
+                    }
+                }
+                //Falling through on purpose here
             default:
-                if (hasLineBreakInSpace(right.getAfter())) {
-                    after = right.getAfter().getWhitespace();
+                if (containerLocation != null || hasLineBreakInSpace(right.getAfter())) {
                     break;
                 }
                 after = "";
                 break;
         }
 
-        if (index >= 0 && containerLocation != null) {
+        if (index != null && size != null && index >= 0 && containerLocation != null) {
             if (emptyContainer) {
                 before = getMinimizedWhitespaceWithin(containerLocation, ContainerPosition.EMPTY);
                 after = "";
@@ -289,29 +330,29 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     afterPosition = ContainerPosition.CLOSE;
                 }
 
-                before = getMinimizedWhitespaceWithin(containerLocation, beforePosition);
-                after = getMinimizedWhitespaceWithin(containerLocation, afterPosition);
+                if (containerLocation != JContainer.Location.TRY_RESOURCES || right.getElement() instanceof J.Try.Resource) {
+                    before = getMinimizedWhitespaceWithin(containerLocation, beforePosition);
+                }
+                if (containerLocation != JContainer.Location.TRY_RESOURCES ||
+                        (afterPosition == ContainerPosition.CLOSE && right.getElement() instanceof J.Try.Resource) ||
+                        (afterPosition != ContainerPosition.CLOSE && right.getElement() instanceof J.VariableDeclarations.NamedVariable)
+                ) {
+                    after = getMinimizedWhitespaceWithin(containerLocation, afterPosition);
+                }
             }
+        }
+
+        if (containerLocation == null) {
+            setCursor(new Cursor(getCursor(), right));
+        }
+
+        if (before != null) {
+            getCursor().putMessage("before", before);
         }
 
         if (after != null) {
-            if (index != size - 1 && right.getElement() instanceof J.Try.Resource) {
-                //noinspection unchecked, ConstantConditions
-                right = right.withElement((T) new JavaIsoVisitor<String>() {
-
-                    @Override
-                    public @Nullable <B> JRightPadded<B> visitRightPadded(@Nullable JRightPadded<B> right, JRightPadded.Location loc, String p) {
-                        return right == null ? null : right.withAfter(minimizedLastComment(right.getAfter(), p));
-                    }
-                }.visit((Tree) right.getElement(), after));
-            } else {
-                right = right.withAfter(minimizedLastComment(right.getAfter(), after));
-            }
-        }
-
-        setCursor(new Cursor(getCursor(), right));
-        if (before != null) {
-            getCursor().putMessage("before", before);
+            Space afterSpace = minimizedLastComment(right.getAfter(), after);
+            right = afterSpace == right.getAfter() ? right : new JRightPadded<>(right.getElement(), afterSpace, right.getMarkers());
         }
 
         T t = right.getElement();
@@ -320,7 +361,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             t = visitAndCast((J) right.getElement(), p);
         }
 
-        setCursor(getCursor().getParent());
+        if (containerLocation == null) {
+            setCursor(getCursor().getParent());
+        }
         if (t == null) {
             //noinspection ConstantConditions
             return null;
@@ -339,6 +382,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         if (left == null) {
             //noinspection ConstantConditions
             return null;
+        }
+        if (getCursor().getNearestMessage("stop") != null) {
+            return left;
         }
 
         setCursor(new Cursor(getCursor(), left));
@@ -386,13 +432,13 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         if (space == null) {
             return super.visitSpace(null, loc, ctx);
         }
-        if (getCursor().getValue() instanceof JContainer) {
-            Arrays.stream(JContainer.Location.values()).filter(l -> l.getBeforeLocation() == loc).findFirst().ifPresent(l -> getCursor().computeMessageIfAbsent("location", __ -> l));
+        if (getCursor().getNearestMessage("stop") != null) {
+            return space;
         }
         String whitespace = null;
         String before = getCursor().pollNearestMessage("before");
         if (before != null) {
-            return super.visitSpace(minimizedSkipComments(space, before), loc, ctx);
+            return super.visitSpace(minimizedLastComment(space, before), loc, ctx);
         }
         Cursor parentTreeCursor;
         J parent;
@@ -443,25 +489,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 break;
             case PRIMITIVE_PREFIX:
                 parentTreeCursor = getCursor().getParentTreeCursor();
-                if (parentTreeCursor.getValue() instanceof J) {
-                    parent = parentTreeCursor.getValue();
-                    TypeTree type;
-                    if (parent instanceof J.MethodDeclaration) {
-                        J.MethodDeclaration m = (J.MethodDeclaration) parent;
-                        type = m.getReturnTypeExpression();
-                        if (m.getModifiers().isEmpty() && type == getCursor().getValue()) {
-                            whitespace = space.getWhitespace();
-                        }
-                    } else if (parent instanceof J.VariableDeclarations) {
-                        J.VariableDeclarations v = (J.VariableDeclarations) parent;
-                        type = v.getTypeExpression();
-                        if (v.getModifiers().isEmpty() && type == getCursor().getValue()) {
-                            whitespace = space.getWhitespace();
-                        }
+                if (Boolean.TRUE.equals(parentTreeCursor.pollMessage("annotated")) || Boolean.TRUE.equals(parentTreeCursor.pollMessage("has-modifier"))) {
+                    minimized = this::minimizedSkipComments;
+                    if (!space.getWhitespace().isEmpty()) {
+                        whitespace = " ";
                     }
-                }
-                if (whitespace == null && !space.getWhitespace().isEmpty()) {
-                    whitespace = " ";
                 }
                 break;
             case IDENTIFIER_PREFIX:
@@ -493,9 +525,10 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                         whitespace = " ";
                     }
                     if (modifiers != null && modifiers.indexOf((J.Modifier) getCursor().getValue()) == 0) {
-                        if (!StringUtils.hasLineBreak(space.getWhitespace()) && !space.getWhitespace().isEmpty()) {
+                        if (Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotated")) || !StringUtils.hasLineBreak(space.getWhitespace()) && !space.getWhitespace().isEmpty()) {
                             whitespace = " ";
                         }
+                        getCursor().getParentTreeCursor().putMessage("has-modifier", true);
                     }
                 }
                 break;
@@ -594,28 +627,13 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             case BLOCK_END:
                 J.Block block = getCursor().getValue();
                 if (getCursor().dropParentWhile(v -> !(v instanceof J.ClassDeclaration) && !Cursor.ROOT_VALUE.equals(v)).getMessage("singleLineEnum") == Boolean.TRUE) {
-                    if (block.getStatements().isEmpty()) {
-                        whitespace = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
-                    } else {
-                        whitespace = "";
-                    }
+                    whitespace = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
                     break;
                 } else if (block.getStatements().isEmpty() && block.getEnd().getComments().isEmpty()) {
                     parentTreeCursor = getCursor().getParentTreeCursor();
                     if (parentTreeCursor.getValue() instanceof J.ClassDeclaration || parentTreeCursor.getValue() instanceof J.MethodDeclaration) {
                         whitespace = evaluate(() -> spacesStyle.getWithin().getCodeBraces(), false) ? " " : "";
                     }
-                }
-                if (block.getStatements().isEmpty()) {
-                    if (StringUtils.countOccurrences(block.getEnd().getWhitespace(), "\n") > 3) {
-                        space = space.withWhitespace("\n\n\n" + block.getEnd().getWhitespace().substring(block.getEnd().getWhitespace().lastIndexOf("\n") + 1));
-                    }
-                    space = space.withComments(ListUtils.map(space.getComments(), comment -> {
-                        if (StringUtils.countOccurrences(comment.getSuffix(), "\n") > 3) {
-                            comment = comment.withSuffix("\n\n\n" + comment.getSuffix().substring(comment.getSuffix().lastIndexOf("\n") + 1));
-                        }
-                        return comment;
-                    }));
                 }
                 break;
             case BINARY_OPERATOR:
@@ -635,18 +653,22 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             case ANNOTATION_PREFIX:
                 boolean firstAnnotation = true;
                 parentTreeCursor = getCursor().getParentTreeCursor();
+                parentTreeCursor.putMessage("annotated", true);
                 if (parentTreeCursor.getValue() instanceof J.ClassDeclaration) {
                     firstAnnotation = ((J.ClassDeclaration) parentTreeCursor.getValue()).getLeadingAnnotations().indexOf(getCursor().getValue()) <= 0;
                 } else if (parentTreeCursor.getValue() instanceof J.MethodDeclaration) {
                     firstAnnotation = ((J.MethodDeclaration) parentTreeCursor.getValue()).getLeadingAnnotations().indexOf(getCursor().getValue()) <= 0;
                 } else if (parentTreeCursor.getValue() instanceof J.VariableDeclarations) {
                     firstAnnotation = ((J.VariableDeclarations) parentTreeCursor.getValue()).getLeadingAnnotations().indexOf(getCursor().getValue()) <= 0;
+                } else if (parentTreeCursor.getValue() instanceof J.EnumValue) {
+                    firstAnnotation = ((J.EnumValue) parentTreeCursor.getValue()).getAnnotations().indexOf(getCursor().getValue()) <= 0;
                 }
-                if (!firstAnnotation && space.getWhitespace().isEmpty() && (space.getComments().isEmpty() || space.getComments().get(space.getComments().size() - 1).getSuffix().isEmpty())) {
+                if (!firstAnnotation) {
                     whitespace = " ";
                 }
+                break;
             default:
-                if (!StringUtils.hasLineBreak(space.getWhitespace()) && !space.getWhitespace().isEmpty()) {
+                if (!space.getWhitespace().isEmpty() && (getCursor().getValue() instanceof TypeTree || !StringUtils.hasLineBreak(space.getWhitespace()))) {
                     whitespace = " ";
                 }
                 break;
@@ -759,7 +781,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
     private Space minimizedSkipComments(Space space, String whitespace) {
         if (space.getComments().isEmpty()) {
-            if (!removeCustomLineBreaks && StringUtils.hasLineBreak(space.getWhitespace())) {
+            if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && StringUtils.hasLineBreak(space.getWhitespace())) {
                 return space;
             }
             if (StringUtils.hasLineBreak(whitespace)) {
@@ -775,18 +797,33 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         //IntelliJ only formats last comments suffix.
         return minimizedSkipComments(space, whitespace).withComments(
                 ListUtils.mapLast(space.getComments(), comment -> {
-                    if (!StringUtils.hasLineBreak(comment.getSuffix())) {
+                    Cursor cursor = getCursor();
+                    if (!(cursor.getValue() instanceof JRightPadded)) {
+                        try {
+                            cursor = cursor.dropParentUntil(it -> it instanceof JRightPadded || it == Cursor.ROOT_VALUE);
+                        } catch (IllegalStateException e) {
+                            //There is no root cursor passed in chain.
+                            cursor = new Cursor(null, Cursor.ROOT_VALUE);
+                        }
+                    }
+                    Boolean trimCommentSuffix = null;
+                    if (!cursor.isRoot()) {
+                        JRightPadded<?> rightPadded = cursor.getValue();
+                        //We always trim suffixes of Right padded element comment
+                        trimCommentSuffix = rightPadded.getAfter() == space ? true : null;
+                        if (!Boolean.TRUE.equals(trimCommentSuffix) && cursor.getParent() != null && cursor.getParent().getValue() instanceof JContainer) {
+                            trimCommentSuffix = false;
+                        }
+                        if (!Boolean.TRUE.equals(trimCommentSuffix)) {
+                            cursor = cursor.getParentTreeCursor();
+                            trimCommentSuffix = cursor.getValue() instanceof J.Block || cursor.getValue() instanceof J.If || cursor.getValue() instanceof J.Case;
+                        }
+                    }
+                    if (Boolean.TRUE.equals(trimCommentSuffix) && !StringUtils.hasLineBreak(comment.getSuffix())) {
                         return comment.withSuffix(whitespace);
                     }
-                    if (removeCustomLineBreaks) {
-                        if (comment.isMultiline()) {
-                            Object parent = getCursor().getParentTreeCursor().getValue();
-                            if (!(parent instanceof J.Block || parent instanceof J.Case)) {
-                                return comment.withSuffix(whitespace);
-                            }
-                        }
-                        //Reduce to single new line
-                        return comment.withSuffix(comment.getSuffix().substring(comment.getSuffix().lastIndexOf('\n')));
+                    if (!evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && Boolean.TRUE.equals(trimCommentSuffix) && comment.isMultiline()) {
+                        return comment.withSuffix(whitespace);
                     }
                     return comment;
                 })
@@ -794,10 +831,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private @Nullable String getMinimizedWhitespaceWithin(JContainer.Location loc, ContainerPosition containerPosition) {
-        if (loc != JContainer.Location.TYPE_BOUNDS && loc != JContainer.Location.TRY_RESOURCES && loc != JContainer.Location.TYPE_PARAMETERS && containerPosition == ContainerPosition.AFTER_SEPARATOR) {
+        List<JContainer.Location> ignoreCommaStyle = Arrays.asList(JContainer.Location.TYPE_BOUNDS, JContainer.Location.TRY_RESOURCES, JContainer.Location.TYPE_PARAMETERS, JContainer.Location.IMPLEMENTS, JContainer.Location.THROWS);
+        if (containerPosition == ContainerPosition.AFTER_SEPARATOR && !ignoreCommaStyle.contains(loc)) {
             return evaluate(() -> spacesStyle.getOther().getAfterComma(), true) ? " " : "";
         }
-        if (loc != JContainer.Location.TYPE_BOUNDS && loc != JContainer.Location.TRY_RESOURCES && loc != JContainer.Location.TYPE_PARAMETERS && containerPosition == ContainerPosition.BEFORE_SEPARATOR) {
+        if (containerPosition == ContainerPosition.BEFORE_SEPARATOR && !ignoreCommaStyle.contains(loc)) {
             return evaluate(() -> spacesStyle.getOther().getBeforeComma(), true) ? " " : "";
         }
         switch (loc) {
@@ -824,13 +862,18 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     return evaluate(() -> spacesStyle.getOther().getAfterForSemicolon(), true) ? " " : "";
                 }
                 if (containerPosition == ContainerPosition.BEFORE_SEPARATOR) {
-                    JContainer<J.Try.Resource> resources = getCursor().getValue();
-                    if (!resources.getElements().isEmpty() && resources.getElements().get(0).isTerminatedWithSemicolon()) {
-                        return evaluate(() -> spacesStyle.getOther().getBeforeForSemicolon(), false) ? " " : "";
+                    if (getCursor().getValue() instanceof J.VariableDeclarations) {
+                        J.Try.Resource resource = getCursor().getParentTreeCursor().getValue();
+                        if (resource.isTerminatedWithSemicolon()) {
+                            return evaluate(() -> spacesStyle.getOther().getBeforeForSemicolon(), false) ? " " : "";
+                        }
                     }
-                    return "";
                 }
-                return evaluate(() -> spacesStyle.getWithin().getTryParentheses(), false) ? " " : "";
+                if (containerPosition == ContainerPosition.OPEN || containerPosition == ContainerPosition.EMPTY || containerPosition == ContainerPosition.CLOSE) {
+                    return evaluate(() -> spacesStyle.getWithin().getTryParentheses(), false) ? " " : "";
+                }
+
+                return null;
             case NEW_ARRAY_INITIALIZER:
                 if (containerPosition == ContainerPosition.EMPTY) {
                     return evaluate(() -> spacesStyle.getWithin().getEmptyArrayInitializerBraces(), false) ? " " : "";
@@ -856,6 +899,12 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     return " ";
                 }
                 return "";
+            case IMPLEMENTS:
+            case THROWS:
+                if (containerPosition == ContainerPosition.OPEN || containerPosition == ContainerPosition.AFTER_SEPARATOR) {
+                    return " "; // there is no intelliJ style existing for this
+                }
+                return ""; // there is no intelliJ style existing for this
         }
         return null;
     }
@@ -917,7 +966,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         OPEN, CLOSE, BEFORE_SEPARATOR, AFTER_SEPARATOR, EMPTY
     }
 
-    @ToBeRemoved(after = "2026-01-30", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    @ToBeRemoved(after = "2026-02-30", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
     private static <S extends Style> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles) {
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {
@@ -926,7 +975,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         return null;
     }
 
-    @ToBeRemoved(after = "2026-01-30", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    @ToBeRemoved(after = "2026-02-30", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
     private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {

@@ -196,8 +196,6 @@ public class Autodetect extends NamedStyles {
         private final IndentStatistic tabContinuationIndentFrequencies = new IndentStatistic();
         private final IndentStatistic deltaSpaceIndentFrequencies = new IndentStatistic();
         private long accumulateDepthCount = 0;
-        private int multilineAlignedToFirstArgument = 0;
-        private int multilineNotAlignedToFirstArgument = 0;
 
         @Getter
         private int depth = 0;
@@ -275,10 +273,7 @@ public class Autodetect extends NamedStyles {
                     tabSize,
                     tabSize,
                     continuationIndent,
-                    false,
-                    new TabsAndIndentsStyle.MethodDeclarationParameters(
-                            multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument),
-                    new TabsAndIndentsStyle.RecordComponents(multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument)
+                    false
             );
         }
     }
@@ -359,23 +354,10 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, IndentStatistics stats) {
             if (method.getParameters().size() > 1) {
-                int alignTo;
-                if (method.getParameters().get(0).getPrefix().getLastWhitespace().contains("\n")) {
-                    // Compare to the prefix of the first arg.
-                    alignTo = method.getParameters().get(0).getPrefix().getLastWhitespace().length() - 1;
-                } else {
-                    String source = method.print(getCursor().getParentOrThrow());
-                    alignTo = source.indexOf(method.getParameters().get(0).print(getCursor())) - 1;
-                }
                 List<Statement> parameters = method.getParameters();
                 for (int i = 1; i < parameters.size(); i++) {
                     if (parameters.get(i).getPrefix().getLastWhitespace().contains("\n")) {
-                        if (alignTo == parameters.get(i).getPrefix().getLastWhitespace().length() - 1) {
-                            stats.multilineAlignedToFirstArgument++;
-                        } else {
-                            stats.multilineNotAlignedToFirstArgument++;
-                            countIndents(parameters.get(i).getPrefix().getWhitespace(), true, stats);
-                        }
+                        countIndents(parameters.get(i).getPrefix().getWhitespace(), true, stats);
                     }
                 }
             }
@@ -1285,6 +1267,8 @@ public class Autodetect extends NamedStyles {
         int parameterAnnotationsWrapped = 0;
         int localVariableAnnotationsWrapped = 0;
         int enumFieldAnnotationsWrapped = 0;
+        int multilineAlignedToFirstArgument = 0;
+        int multilineNotAlignedToFirstArgument = 0;
 
         public WrappingAndBracesStyle getWrappingAndBracesStyle() {
             WrappingAndBracesStyle wrappingAndBracesStyle = IntelliJ.wrappingAndBraces();
@@ -1325,9 +1309,9 @@ public class Autodetect extends NamedStyles {
                 );
             }
             return wrappingAndBracesStyle
-                    .withIfStatement(new WrappingAndBracesStyle.IfStatement(
-                            elseOnNewLine > 0)
-                    );
+                    .withMethodDeclarationParameters(wrappingAndBracesStyle.getMethodDeclarationParameters().withAlignWhenMultiline(multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument))
+                    .withRecordComponents(wrappingAndBracesStyle.getRecordComponents().withAlignWhenMultiline(multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument))
+                    .withIfStatement(wrappingAndBracesStyle.getIfStatement().withElseOnNewLine(elseOnNewLine > 0));
         }
 
         private LineWrapSetting determineWrapping(int wrapsFound, LineWrapSetting defaultSetting) {
@@ -1379,6 +1363,26 @@ public class Autodetect extends NamedStyles {
                     wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getReturnTypeExpression().getPrefix());
                 } else {
                     wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getName().getPrefix());
+                }
+            }
+            if (method.getParameters().size() > 1) {
+                int alignTo;
+                if (method.getParameters().get(0).getPrefix().getLastWhitespace().contains("\n")) {
+                    // Compare to the prefix of the first arg.
+                    alignTo = method.getParameters().get(0).getPrefix().getLastWhitespace().length() - 1;
+                } else {
+                    String source = method.print(getCursor().getParentOrThrow());
+                    alignTo = source.indexOf(method.getParameters().get(0).print(getCursor())) - 1;
+                }
+                List<Statement> parameters = method.getParameters();
+                for (int i = 1; i < parameters.size(); i++) {
+                    if (parameters.get(i).getPrefix().getLastWhitespace().contains("\n")) {
+                        if (alignTo == parameters.get(i).getPrefix().getLastWhitespace().length() - 1) {
+                            wrappingAndBracesStatistics.multilineAlignedToFirstArgument++;
+                        } else {
+                            wrappingAndBracesStatistics.multilineNotAlignedToFirstArgument++;
+                        }
+                    }
                 }
             }
             return super.visitMethodDeclaration(method, wrappingAndBracesStatistics);

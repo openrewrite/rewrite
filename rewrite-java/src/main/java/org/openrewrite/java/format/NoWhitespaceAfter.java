@@ -41,6 +41,7 @@ public class NoWhitespaceAfter extends Recipe {
 
     private static class NoWhitespaceAfterVisitor extends JavaIsoVisitor<ExecutionContext> {
         SpacesStyle spacesStyle;
+        WrappingAndBracesStyle wrappingAndBracesStyle;
         NoWhitespaceAfterStyle noWhitespaceAfterStyle;
 
         @Nullable
@@ -60,6 +61,7 @@ public class NoWhitespaceAfter extends Recipe {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
                 spacesStyle = Style.from(SpacesStyle.class, cu, IntelliJ::spaces);
+                wrappingAndBracesStyle = Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces);
                 noWhitespaceAfterStyle = Style.from(NoWhitespaceAfterStyle.class, cu, Checkstyle::noWhitespaceAfterStyle);
                 emptyForInitializerPadStyle = Style.from(EmptyForInitializerPadStyle.class, cu);
                 emptyForIteratorPadStyle = Style.from(EmptyForIteratorPadStyle.class, cu);
@@ -71,7 +73,7 @@ public class NoWhitespaceAfter extends Recipe {
         public J.TypeCast visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
             J.TypeCast t = super.visitTypeCast(typeCast, ctx);
             if (Boolean.TRUE.equals(noWhitespaceAfterStyle.getTypecast())) {
-                t = (J.TypeCast) new SpacesVisitor<>(spacesStyle.withOther(spacesStyle.getOther().withAfterTypeCast(false)), emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(t, ctx);
+                t = (J.TypeCast) new SpacesVisitor<>(spacesStyle.withOther(spacesStyle.getOther().withAfterTypeCast(false)), emptyForInitializerPadStyle, emptyForIteratorPadStyle, wrappingAndBracesStyle, null).visitNonNull(t, ctx);
             }
             return t;
         }
@@ -80,7 +82,7 @@ public class NoWhitespaceAfter extends Recipe {
         public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
             J.MemberReference m = super.visitMemberReference(memberRef, ctx);
             if (Boolean.TRUE.equals(noWhitespaceAfterStyle.getMethodRef())) {
-                m = (J.MemberReference) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(m, ctx);
+                m = (J.MemberReference) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, wrappingAndBracesStyle, null).visitNonNull(m, ctx);
             }
             return m;
         }
@@ -113,7 +115,7 @@ public class NoWhitespaceAfter extends Recipe {
         public J.NewArray visitNewArray(J.NewArray newArray, ExecutionContext ctx) {
             J.NewArray n = super.visitNewArray(newArray, ctx);
             if (Boolean.TRUE.equals(noWhitespaceAfterStyle.getArrayInitializer())) {
-                n = (J.NewArray) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(n, ctx);
+                n = (J.NewArray) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, wrappingAndBracesStyle, null).visitNonNull(n, ctx);
             }
             return n;
         }
@@ -138,7 +140,7 @@ public class NoWhitespaceAfter extends Recipe {
                 (Boolean.TRUE.equals(noWhitespaceAfterStyle.getUnaryPlus()) && op == J.Unary.Type.Positive) ||
                 (Boolean.TRUE.equals(noWhitespaceAfterStyle.getUnaryMinus()) && op == J.Unary.Type.Negative)
             ) {
-                u = (J.Unary) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(u, ctx);
+                u = (J.Unary) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, wrappingAndBracesStyle, null).visitNonNull(u, ctx);
             }
             return u;
         }
@@ -169,7 +171,7 @@ public class NoWhitespaceAfter extends Recipe {
                 m = m.withName(m.getName().withPrefix(
                         m.getName().getPrefix().withWhitespace("")
                 ));
-                m = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null, false).visitNonNull(m, ctx);
+                m = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, wrappingAndBracesStyle, null).visitNonNull(m, ctx);
             }
             return m;
         }
