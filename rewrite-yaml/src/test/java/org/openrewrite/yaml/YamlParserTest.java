@@ -235,6 +235,37 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1463")
+    @Test
+    void asteriskPlaceholders() {
+        rewriteRun(
+          yaml(
+            """
+              database:
+                password: *** REMOVED ***
+                apiKey: **REDACTED**
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1463")
+    @Test
+    void asteriskPlaceholdersWithAnchors() {
+        // Ensure real anchors/aliases still work alongside asterisk placeholders
+        rewriteRun(
+          yaml(
+            """
+              defaults: &defaults
+                timeout: 30
+              production:
+                <<: *defaults
+                password: *** REMOVED ***
+              """
+          )
+        );
+    }
+
     @Test
     void pipeLiteralInASequenceWithDoubleQuotes() {
         rewriteRun(
