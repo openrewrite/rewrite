@@ -23,9 +23,9 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.HashMap;
 
-public class Deduplicate extends Recipe {
+public class Singleton extends Recipe {
     @Getter
-    String displayName = "Deduplicate";
+    String displayName = "Singleton";
 
     @Language("markdown")
     @Getter
@@ -35,11 +35,11 @@ public class Deduplicate extends Recipe {
             "If those recipes are marked with this precondition the performance penalty is limited. " +
             "This recipe does nothing useful run on its own.\n\n" +
             "## Usage in Java recipes\n\n" +
-            "Wrap visitors with `Deduplicate.deduplicate(this, visitor)` to ensure only the first *equivalent* recipe instance makes changes:\n\n" +
+            "Wrap visitors with `Singleton.singleton(this, visitor)` to ensure only the first *equivalent* recipe instance makes changes:\n\n" +
             "```java\n" +
             "@Override\n" +
-            "public TreeVisitor<?, ExecutionContext> getVisitor() {\n" +
-            "    return deduplicate(this, new TreeVisitor<Tree, ExecutionContext>() {\n" +
+            "public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {\n" +
+            "    return singleton(this, new TreeVisitor<Tree, ExecutionContext>() {\n" +
             "        @Override\n" +
             "        public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {\n" +
             "            // Your transformation logic\n" +
@@ -47,35 +47,34 @@ public class Deduplicate extends Recipe {
             "        }\n" +
             "    });\n" +
             "}\n" +
-            "```\n\n" +
-            "For scanning recipes, wrap both the scanner and visitor:\n\n" +
-            "```java\n" +
             "@Override\n" +
-            "public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean acc) {\n" +
-            "    return deduplicate(this, new TreeVisitor<Tree, ExecutionContext>() {\n" +
-            "        // Scanner logic\n" +
-            "    });\n" +
+            "public Collection<SourceFile> generate(Accumulator acc, ExecutionContext ctx) {\n" +
+            "    if (!isSingleton(this, ctx)) {\n" +
+            "        return Collections.emptyList();\n" +
+            "    }\n" +
+            "    // Generate new sources\n" +
+            "    return results;\n" +
             "}\n\n" +
             "@Override\n" +
-            "public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean acc) {\n" +
-            "    return deduplicate(this, new TreeVisitor<Tree, ExecutionContext>() {\n" +
+            "public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {\n" +
+            "    return singleton(this, new TreeVisitor<Tree, ExecutionContext>() {\n" +
             "        // Visitor logic\n" +
             "    });\n" +
             "}\n" +
             "```\n\n" +
-            "**Note:** Uniqueness is determined by the recipe's `equals()` and `hashCode()` methods. " +
-            "If uniqueness isn't working as expected, ensure your recipe class properly implements these methods. " +
+            "**Note:** Singleton status is determined by the recipe's `equals()` and `hashCode()` methods. " +
+            "If equivalent instances of a recipe are not considered singletons, ensure your recipe class correctly implements these methods. " +
             "The easiest way is to use Lombok's `@Value` annotation on your recipe class, which automatically " +
             "generates correct `equals()` and `hashCode()` implementations based on all fields.\n\n" +
             "## Usage in YAML recipes\n\n" +
-            "Add `org.openrewrite.Deduplicate` as a precondition:\n\n" +
+            "Add `org.openrewrite.Singleton` as a precondition:\n\n" +
             "```yaml\n" +
             "---\n" +
             "type: specs.openrewrite.org/v1beta/recipe\n" +
             "name: com.example.Append\n" +
             "displayName: My recipe\n" +
             "preconditions:\n" +
-            "  - org.openrewrite.Deduplicate\n" +
+            "  - org.openrewrite.Singleton\n" +
             "recipeList:\n" +
             "  - org.openrewrite.text.AppendToTextFile:\n" +
             "      relativeFileName: report.txt\n" +
@@ -84,7 +83,7 @@ public class Deduplicate extends Recipe {
 
     @Nullable Integer recipeIndex;
 
-    public boolean isAllowedToMakeChanges(ExecutionContext ctx) {
+    public boolean isSingleton(ExecutionContext ctx) {
         if (recipeIndex == null) {
             recipeIndex = ctx.getCycleDetails().getRecipePosition();
         }
@@ -96,7 +95,7 @@ public class Deduplicate extends Recipe {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (isAllowedToMakeChanges(ctx)) {
+                if (isSingleton(ctx)) {
                     return SearchResult.found(tree);
                 }
                 return tree;
@@ -105,43 +104,43 @@ public class Deduplicate extends Recipe {
     }
 
     /**
-     * Wrap the provided recipe in a Deduplicate precondition shared amongst all equivalent instances.
+     * Wrap the provided recipe in a Singleton precondition shared amongst all equivalent instances.
      * Recipes which do not override equals() or hashCode() get the default identity comparison and so will each get their own
-     * Deduplicate, which defeats the purpose.
+     * Singleton, which defeats the purpose.
      */
-    public static Deduplicate deduplicate(Recipe recipe, ExecutionContext ctx) {
-        return ctx.computeMessageIfAbsent(Deduplicate.class.getName(), key -> new HashMap<Recipe, Deduplicate>())
-                .computeIfAbsent(recipe, k -> new Deduplicate());
+    public static Singleton singleton(Recipe recipe, ExecutionContext ctx) {
+        return ctx.computeMessageIfAbsent(Singleton.class.getName(), key -> new HashMap<Recipe, Singleton>())
+                .computeIfAbsent(recipe, k -> new Singleton());
     }
 
     /**
-     * Evaluate whether the recipe is allowed to make changes according to the deduplicate precondition.
+     * Evaluate whether the recipe is allowed to make changes according to the singleton precondition.
      * Uses the recipe's equals()/hashCode() to identify equivalent instances and ensures only
      * the first instance encountered (based on recipe position) is allowed to make changes.
      *
      * @param recipe the recipe to check for uniqueness
-     * @param ctx the execution context containing the recipe position and deduplicate instance cache
+     * @param ctx the execution context containing the recipe position and singleton instance cache
      * @return true if this is the first equivalent recipe instance and it should make changes, false otherwise
      */
-    public static boolean isUnique(Recipe recipe, ExecutionContext ctx) {
-        return ctx.computeMessageIfAbsent(Deduplicate.class.getName(), key -> new HashMap<Recipe, Deduplicate>())
-                .computeIfAbsent(recipe, k -> new Deduplicate())
-                .isAllowedToMakeChanges(ctx);
+    public static boolean isSingleton(Recipe recipe, ExecutionContext ctx) {
+        return ctx.computeMessageIfAbsent(Singleton.class.getName(), key -> new HashMap<Recipe, Singleton>())
+                .computeIfAbsent(recipe, k -> new Singleton())
+                .isSingleton(ctx);
     }
 
     /**
-     * Look up or create a Deduplicate instance for the provided recipe, using its equals()/hashCode() method to identify it,
+     * Look up or create a Singleton instance for the provided recipe, using its equals()/hashCode() method to identify it,
      * and return a visitor wrapped in a precondition which ensures that only one gets to make changes in a recipe run.
      * @param recipe recipe to be made unique
-     * @param treeVisitor the visitor to wrap in a deduplicate precondition
-     * @return visitor wrapped in deduplicate precondition
+     * @param treeVisitor the visitor to wrap in a singleton precondition
+     * @return visitor wrapped in singleton precondition
      */
-    public static TreeVisitor<?, ExecutionContext> deduplicate(Recipe recipe, TreeVisitor<?, ExecutionContext> treeVisitor) {
-        return new UniqueDecoratedVisitor(recipe, treeVisitor);
+    public static TreeVisitor<?, ExecutionContext> singleton(Recipe recipe, TreeVisitor<?, ExecutionContext> treeVisitor) {
+        return new SingletonDecoratedVisitor(recipe, treeVisitor);
     }
 
     @AllArgsConstructor
-    public static class UniqueDecoratedVisitor extends TreeVisitor<Tree, ExecutionContext> {
+    public static class SingletonDecoratedVisitor extends TreeVisitor<Tree, ExecutionContext> {
         Recipe recipe;
         TreeVisitor<?, ExecutionContext> delegate;
 
@@ -152,7 +151,7 @@ public class Deduplicate extends Recipe {
 
         @Override
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-            if (isUnique(recipe, ctx)) {
+            if (isSingleton(recipe, ctx)) {
                 return delegate.visit(tree, ctx);
             }
             return tree;
@@ -160,7 +159,7 @@ public class Deduplicate extends Recipe {
 
         @Override
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
-            if (isUnique(recipe, ctx)) {
+            if (isSingleton(recipe, ctx)) {
                 return delegate.visit(tree, ctx, parent);
             }
             return tree;
