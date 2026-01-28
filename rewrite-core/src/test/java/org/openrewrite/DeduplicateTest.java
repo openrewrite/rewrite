@@ -30,14 +30,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Properties;
 
-import static org.openrewrite.Unique.unique;
+import static org.openrewrite.Deduplicate.deduplicate;
 import static org.openrewrite.test.SourceSpecs.text;
 
-class UniqueTest implements RewriteTest {
+class DeduplicateTest implements RewriteTest {
 
     /**
      * A simplified recipe that appends content to a text file.
-     * Uses Unique to ensure only one instance with the same content parameter makes changes.
+     * Uses Deduplicate to ensure only one instance with the same content parameter makes changes.
      */
     @Value
     @EqualsAndHashCode(callSuper = false)
@@ -46,17 +46,17 @@ class UniqueTest implements RewriteTest {
 
         @Override
         public String getDisplayName() {
-            return "Unique append";
+            return "Deduplicate append";
         }
 
         @Override
         public String getDescription() {
-            return "Appends content to test.txt with Unique behavior";
+            return "Appends content to test.txt with Deduplicate behavior";
         }
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return unique(this, new TreeVisitor<>() {
+            return deduplicate(this, new TreeVisitor<>() {
                 @Override
                 public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                     if (tree instanceof PlainText plainText) {
@@ -69,22 +69,22 @@ class UniqueTest implements RewriteTest {
     }
 
     @Test
-    void onlyFirstRecipeWithSharedUniquePreconditionMakesChanges() {
+    void onlyFirstRecipeWithSharedDeduplicatePreconditionMakesChanges() {
         Recipe recipe = new Recipe() {
             @Override
             public String getDisplayName() {
-                return "Test Unique with identical recipes";
+                return "Test Deduplicate with identical recipes";
             }
 
             @Override
             public String getDescription() {
-                return "UniqueAppend uses Unique, so when included multiple times only the first makes changes";
+                return "UniqueAppend uses Deduplicate, so when included multiple times only the first makes changes";
             }
 
             @Override
             public List<Recipe> getRecipeList() {
                 // Create two identical UniqueAppend instances
-                // Because UniqueAppend uses Unique and equals() for comparison,
+                // Because UniqueAppend uses Deduplicate and equals() for comparison,
                 // only the first will execute
                 return List.of(
                   new UniqueAppend("first"),
@@ -108,7 +108,7 @@ class UniqueTest implements RewriteTest {
         Recipe recipe = new Recipe() {
             @Override
             public String getDisplayName() {
-                return "Test Unique with different recipes";
+                return "Test Deduplicate with different recipes";
             }
 
             @Override
@@ -139,9 +139,9 @@ class UniqueTest implements RewriteTest {
     }
 
     @Test
-    void yamlRecipeWithUniquePreconditionIncludedMultipleTimes() {
-        // This test demonstrates that when a YAML recipe with org.openrewrite.Unique precondition.
-        // is included multiple times the unique instance is shared only the first gets to make changes.
+    void yamlRecipeWithDeduplicatePreconditionIncludedMultipleTimes() {
+        // This test demonstrates that when a YAML recipe with org.openrewrite.Deduplicate precondition.
+        // is included multiple times the deduplicate instance is shared only the first gets to make changes.
         rewriteRun(
           spec -> spec
             .cycles(1)
@@ -151,10 +151,10 @@ class UniqueTest implements RewriteTest {
               ---
               type: specs.openrewrite.org/v1beta/recipe
               name: org.openrewrite.ChildWithUniquePrecondition
-              displayName: Child recipe with Unique precondition
+              displayName: Child recipe with Deduplicate precondition
               description: This recipe should only run once when included multiple times.
               preconditions:
-                - org.openrewrite.Unique
+                - org.openrewrite.Deduplicate
               recipeList:
                 - org.openrewrite.text.AppendToTextFile:
                     relativeFileName: test.txt
@@ -183,18 +183,18 @@ class UniqueTest implements RewriteTest {
     }
 
     @Test
-    void yamlRecipeWithUniquePreconditionAcrossDifferentYamlFiles() {
+    void yamlRecipeWithDeduplicatePreconditionAcrossDifferentYamlFiles() {
         // This test demonstrates that even when recipes are loaded from different YAML sources,
-        // the Unique precondition ensures only the first instance makes changes.
+        // the Deduplicate precondition ensures only the first instance makes changes.
         // For this to work Environment must ensure that declarative recipes with the same name are the same instance
         String childYaml = """
           ---
           type: specs.openrewrite.org/v1beta/recipe
           name: org.openrewrite.ChildWithUniquePrecondition
-          displayName: Child recipe with Unique precondition
+          displayName: Child recipe with Deduplicate precondition
           description: This recipe should only run once when included multiple times.
           preconditions:
-            - org.openrewrite.Unique
+            - org.openrewrite.Deduplicate
           recipeList:
             - org.openrewrite.text.AppendToTextFile:
                 relativeFileName: test.txt

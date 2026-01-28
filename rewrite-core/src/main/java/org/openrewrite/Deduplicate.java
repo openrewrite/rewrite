@@ -23,23 +23,23 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.HashMap;
 
-
-public class Unique extends Recipe {
+public class Deduplicate extends Recipe {
     @Getter
-    String displayName = "Unique";
+    String displayName = "Deduplicate";
 
     @Language("markdown")
     @Getter
-    String description = "Used as a precondition to ensure that a recipe attempts to make changes only once. " +
+    String description =
+            "Used as a precondition to ensure that a recipe attempts to make changes only once. " +
             "Accidentally including multiple copies/instances of the same large composite recipes is a common mistake. " +
-            "A mistake that can be mitigated by use of this precondition. " +
+            "If those recipes are marked with this precondition the performance penalty is limited. " +
             "This recipe does nothing useful run on its own.\n\n" +
             "## Usage in Java recipes\n\n" +
-            "Wrap visitors with `Unique.unique(this, visitor)` to ensure only the first *equivalent* recipe instance makes changes:\n\n" +
+            "Wrap visitors with `Deduplicate.deduplicate(this, visitor)` to ensure only the first *equivalent* recipe instance makes changes:\n\n" +
             "```java\n" +
             "@Override\n" +
             "public TreeVisitor<?, ExecutionContext> getVisitor() {\n" +
-            "    return unique(this, new TreeVisitor<Tree, ExecutionContext>() {\n" +
+            "    return deduplicate(this, new TreeVisitor<Tree, ExecutionContext>() {\n" +
             "        @Override\n" +
             "        public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {\n" +
             "            // Your transformation logic\n" +
@@ -52,13 +52,13 @@ public class Unique extends Recipe {
             "```java\n" +
             "@Override\n" +
             "public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean acc) {\n" +
-            "    return unique(this, new TreeVisitor<Tree, ExecutionContext>() {\n" +
+            "    return deduplicate(this, new TreeVisitor<Tree, ExecutionContext>() {\n" +
             "        // Scanner logic\n" +
             "    });\n" +
             "}\n\n" +
             "@Override\n" +
             "public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean acc) {\n" +
-            "    return unique(this, new TreeVisitor<Tree, ExecutionContext>() {\n" +
+            "    return deduplicate(this, new TreeVisitor<Tree, ExecutionContext>() {\n" +
             "        // Visitor logic\n" +
             "    });\n" +
             "}\n" +
@@ -68,14 +68,14 @@ public class Unique extends Recipe {
             "The easiest way is to use Lombok's `@Value` annotation on your recipe class, which automatically " +
             "generates correct `equals()` and `hashCode()` implementations based on all fields.\n\n" +
             "## Usage in YAML recipes\n\n" +
-            "Add `org.openrewrite.Unique` as a precondition:\n\n" +
+            "Add `org.openrewrite.Deduplicate` as a precondition:\n\n" +
             "```yaml\n" +
             "---\n" +
             "type: specs.openrewrite.org/v1beta/recipe\n" +
             "name: com.example.Append\n" +
             "displayName: My recipe\n" +
             "preconditions:\n" +
-            "  - org.openrewrite.Unique\n" +
+            "  - org.openrewrite.Deduplicate\n" +
             "recipeList:\n" +
             "  - org.openrewrite.text.AppendToTextFile:\n" +
             "      relativeFileName: report.txt\n" +
@@ -105,38 +105,38 @@ public class Unique extends Recipe {
     }
 
     /**
-     * Wrap the provided recipe in a Unique precondition shared amongst all equivalent instances.
+     * Wrap the provided recipe in a Deduplicate precondition shared amongst all equivalent instances.
      * Recipes which do not override equals() or hashCode() get the default identity comparison and so will each get their own
-     * Unique, which defeats the purpose.
+     * Deduplicate, which defeats the purpose.
      */
-    public static Unique unique(Recipe recipe, ExecutionContext ctx) {
-        return ctx.computeMessageIfAbsent(Unique.class.getName(), key -> new HashMap<Recipe, Unique>())
-                .computeIfAbsent(recipe, k -> new Unique());
+    public static Deduplicate deduplicate(Recipe recipe, ExecutionContext ctx) {
+        return ctx.computeMessageIfAbsent(Deduplicate.class.getName(), key -> new HashMap<Recipe, Deduplicate>())
+                .computeIfAbsent(recipe, k -> new Deduplicate());
     }
 
     /**
-     * Evaluate whether the recipe is allowed to make changes according to the unique precondition.
+     * Evaluate whether the recipe is allowed to make changes according to the deduplicate precondition.
      * Uses the recipe's equals()/hashCode() to identify equivalent instances and ensures only
      * the first instance encountered (based on recipe position) is allowed to make changes.
      *
      * @param recipe the recipe to check for uniqueness
-     * @param ctx the execution context containing the recipe position and unique instance cache
+     * @param ctx the execution context containing the recipe position and deduplicate instance cache
      * @return true if this is the first equivalent recipe instance and it should make changes, false otherwise
      */
     public static boolean isUnique(Recipe recipe, ExecutionContext ctx) {
-        return ctx.computeMessageIfAbsent(Unique.class.getName(), key -> new HashMap<Recipe, Unique>())
-                .computeIfAbsent(recipe, k -> new Unique())
+        return ctx.computeMessageIfAbsent(Deduplicate.class.getName(), key -> new HashMap<Recipe, Deduplicate>())
+                .computeIfAbsent(recipe, k -> new Deduplicate())
                 .isAllowedToMakeChanges(ctx);
     }
 
     /**
-     * Look up or create a Unique instance for the provided recipe, using its equals()/hashCode() method to identify it,
+     * Look up or create a Deduplicate instance for the provided recipe, using its equals()/hashCode() method to identify it,
      * and return a visitor wrapped in a precondition which ensures that only one gets to make changes in a recipe run.
      * @param recipe recipe to be made unique
-     * @param treeVisitor the visitor to wrap in a unique precondition
-     * @return visitor wrapped in unique precondition
+     * @param treeVisitor the visitor to wrap in a deduplicate precondition
+     * @return visitor wrapped in deduplicate precondition
      */
-    public static TreeVisitor<?, ExecutionContext> unique(Recipe recipe, TreeVisitor<?, ExecutionContext> treeVisitor) {
+    public static TreeVisitor<?, ExecutionContext> deduplicate(Recipe recipe, TreeVisitor<?, ExecutionContext> treeVisitor) {
         return new UniqueDecoratedVisitor(recipe, treeVisitor);
     }
 
