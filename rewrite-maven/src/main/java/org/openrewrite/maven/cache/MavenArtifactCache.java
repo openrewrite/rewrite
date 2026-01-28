@@ -55,11 +55,9 @@ public interface MavenArtifactCache {
         // to ensure the cache reflects the latest locally-published artifact
         if (dependency.getVersion().endsWith("-SNAPSHOT") && dependency.getDatedSnapshotVersion() == null) {
             try {
-                if (artifactStream != null) {
-                    Path artifact = putArtifact(dependency, artifactStream.call(), onError);
-                    if (artifact != null) {
-                        return artifact;
-                    }
+                Path artifact = putArtifact(dependency, artifactStream.call(), onError);
+                if (artifact != null) {
+                    return artifact;
                 }
             } catch (Exception e) {
                 onError.accept(e);
@@ -69,9 +67,7 @@ public interface MavenArtifactCache {
         Path artifact = getArtifact(dependency);
         if (artifact == null) {
             try {
-                if (artifactStream != null) {
-                    artifact = putArtifact(dependency, artifactStream.call(), onError);
-                }
+                artifact = putArtifact(dependency, artifactStream.call(), onError);
             } catch (Exception e) {
                 onError.accept(e);
             }
