@@ -31,16 +31,10 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.maven.tree.Dependency;
-import org.openrewrite.maven.tree.DependencyNotation;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
@@ -48,11 +42,11 @@ import org.openrewrite.trait.VisitFunction2;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.*;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Tree.randomId;
 
 @Value
 public class GradleDependency implements Trait<J.MethodInvocation> {
@@ -1222,11 +1216,25 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 }
             }
 
-            if (!versionFound && firstArg instanceof G.MapLiteral) {
-                // TODO Add version entry to map literal
+            if (!versionFound) {
+                // Add a new version entry
+                if (!entries.isEmpty()) {
+                    G.MapEntry templateEntry = entries.get(entries.size() - 1);
+                    G.MapEntry versionEntry = createVersionMapEntry(newVersion, templateEntry);
+
+                    if (firstArg instanceof G.MapLiteral) {
+                        G.MapLiteral mapLiteral = (G.MapLiteral) firstArg;
+                        updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg ->
+                                mapLiteral.withElements(ListUtils.concat(mapLiteral.getElements(), versionEntry))));
+                    } else {
+                        // Map entries as separate arguments
+                        updated = m.withArguments(ListUtils.concat(m.getArguments(), versionEntry));
+                    }
+                }
             }
         } else if (firstArg instanceof J.Assignment) {
             List<Expression> updatedArgs = m.getArguments();
+            boolean versionFound = false;
             for (Expression updatedArg : updatedArgs) {
                 if (updatedArg instanceof J.Assignment) {
                     J.Assignment assignment = (J.Assignment) updatedArg;
@@ -1240,11 +1248,16 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                             updated = m.withArguments(ListUtils.map(m.getArguments(),
                                     arg -> arg == assignment ? updatedAssignment : arg));
                         }
+                        versionFound = true;
                         break;
                     }
                 }
             }
-            // TODO handle adding version when none exsits
+            if (!versionFound) {
+                // Add a new version assignment
+                J.Assignment versionAssignment = createVersionAssignment(newVersion);
+                updated = m.withArguments(ListUtils.concat(m.getArguments(), versionAssignment));
+            }
         } else if (firstArg instanceof K.StringTemplate) {
             // For StringTemplate, we convert to a simple string literal with the new version
             K.StringTemplate template = (K.StringTemplate) firstArg;
@@ -1263,6 +1276,53 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         }
 
         return updated == m ? this : new GradleDependency(new Cursor(cursor.getParent(), updated), resolvedDependency);
+    }
+
+    /**
+     * Creates a new G.MapEntry for version based on a template entry's style.
+     */
+    private static G.MapEntry createVersionMapEntry(String version, G.MapEntry template) {
+        // Determine the key style from template
+        Expression keyExpr;
+        if (template.getKey() instanceof J.Literal) {
+            J.Literal templateKey = (J.Literal) template.getKey();
+            String templateKeySource = templateKey.getValueSource();
+            String keySource;
+            if (templateKeySource != null && (templateKeySource.startsWith("'") || templateKeySource.startsWith("\""))) {
+                // Template uses quoted keys - use same quote style
+                char quote = templateKeySource.charAt(0);
+                keySource = quote + "version" + quote;
+            } else {
+                // Template uses unquoted keys
+                keySource = "version";
+            }
+            keyExpr = new J.Literal(randomId(), Space.EMPTY.withWhitespace(template.getKey().getPrefix().getLastWhitespace()), Markers.EMPTY, "version", keySource, null, JavaType.Primitive.String);
+        } else {
+            keyExpr = new J.Literal(randomId(), Space.EMPTY.withWhitespace(template.getKey().getPrefix().getLastWhitespace()), Markers.EMPTY, "version", "version", null, JavaType.Primitive.String);
+        }
+
+        // Determine value quote style from template
+        String valueSource = "'" + version + "'";
+        if (template.getValue() instanceof J.Literal) {
+            J.Literal templateValue = (J.Literal) template.getValue();
+            String templateValueSource = templateValue.getValueSource();
+            if (templateValueSource != null && templateValueSource.startsWith("\"")) {
+                valueSource = "\"" + version + "\"";
+            }
+        }
+        J.Literal valueExpr = new J.Literal(randomId(), Space.EMPTY.withWhitespace(template.getValue().getPrefix().getLastWhitespace()), Markers.EMPTY, version, valueSource, null, JavaType.Primitive.String);
+
+        return new G.MapEntry(randomId(), template.getPrefix().withWhitespace(" "), template.getMarkers(), template.getPadding().getKey().withElement(keyExpr), valueExpr, null);
+    }
+
+    /**
+     * Creates a new J.Assignment for version (Kotlin DSL style).
+     */
+    private static J.Assignment createVersionAssignment(String version) {
+        J.Identifier variable = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "version", null, null);
+        J.Literal valueExpr = new J.Literal(randomId(), Space.SINGLE_SPACE, Markers.EMPTY, version, "\"" + version + "\"", null, JavaType.Primitive.String);
+
+        return new J.Assignment(randomId(), Space.format(" "), Markers.EMPTY, variable, new JLeftPadded<>(Space.SINGLE_SPACE, valueExpr, Markers.EMPTY), null);
     }
 
     public static class Matcher extends GradleTraitMatcher<GradleDependency> {
