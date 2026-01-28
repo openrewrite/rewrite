@@ -61,9 +61,9 @@ public class FindProperties extends Recipe {
      * @return The set of found properties matching the propertyKey.
      */
     public static Set<Properties.Entry> find(Properties p, String propertyKey, @Nullable Boolean relaxedBinding) {
-        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding)
-                ? NameCaseConvention.LOWER_CAMEL
-                : NameCaseConvention.EXACT).compile(propertyKey);
+        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(propertyKey);
 
         PropertiesVisitor<Set<Properties.Entry>> findVisitor = new PropertiesVisitor<Set<Properties.Entry>>() {
             @Override
@@ -82,9 +82,9 @@ public class FindProperties extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding)
-                ? NameCaseConvention.LOWER_CAMEL
-                : NameCaseConvention.EXACT).compile(propertyKey);
+        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(propertyKey);
 
         return new PropertiesVisitor<ExecutionContext>() {
             @Override

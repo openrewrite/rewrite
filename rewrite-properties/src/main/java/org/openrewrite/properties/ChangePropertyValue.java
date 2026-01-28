@@ -71,9 +71,9 @@ public class ChangePropertyValue extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ChangePropertyValueVisitor<>((!Boolean.FALSE.equals(relaxedBinding)
-                ? NameCaseConvention.LOWER_CAMEL
-                : NameCaseConvention.EXACT).compile(propertyKey));
+        return new ChangePropertyValueVisitor<>((!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(propertyKey));
     }
 
     public class ChangePropertyValueVisitor<P> extends PropertiesVisitor<P> {

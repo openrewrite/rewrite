@@ -60,9 +60,9 @@ public class FindProperty extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding)
-                ? NameCaseConvention.LOWER_CAMEL
-                : NameCaseConvention.EXACT).compile(propertyKey);
+        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(propertyKey);
 
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
@@ -87,9 +87,9 @@ public class FindProperty extends Recipe {
     }
 
     public static Set<Yaml.Block> find(Yaml y, String propertyKey, @Nullable Boolean relaxedBinding) {
-        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding)
-                ? NameCaseConvention.LOWER_CAMEL
-                : NameCaseConvention.EXACT).compile(propertyKey);
+        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(propertyKey);
 
         YamlVisitor<Set<Yaml.Block>> findVisitor = new YamlIsoVisitor<Set<Yaml.Block>>() {
             @Override

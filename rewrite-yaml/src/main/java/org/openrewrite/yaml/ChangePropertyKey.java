@@ -99,9 +99,9 @@ public class ChangePropertyKey extends Recipe {
         private final List<NameCaseConvention.Compiled> exceptWildcardMatchers;
 
         ChangePropertyKeyVisitor() {
-            NameCaseConvention convention = !Boolean.FALSE.equals(relaxedBinding)
-                    ? NameCaseConvention.LOWER_CAMEL
-                    : NameCaseConvention.EXACT;
+            NameCaseConvention convention = !Boolean.FALSE.equals(relaxedBinding) ?
+                    NameCaseConvention.LOWER_CAMEL :
+                    NameCaseConvention.EXACT;
             this.oldKeyMatcher = convention.compile(oldPropertyKey);
             this.oldKeyWildcardMatcher = convention.compile(oldPropertyKey + ".*");
             this.newKeyMatcher = convention.compile(newPropertyKey);

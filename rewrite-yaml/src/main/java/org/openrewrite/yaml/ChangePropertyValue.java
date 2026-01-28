@@ -86,9 +86,9 @@ public class ChangePropertyValue extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding)
-                ? NameCaseConvention.LOWER_CAMEL
-                : NameCaseConvention.EXACT).compile(propertyKey);
+        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(propertyKey);
 
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
             @Override

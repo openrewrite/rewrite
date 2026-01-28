@@ -58,9 +58,9 @@ public class ChangePropertyKey extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding)
-                ? NameCaseConvention.LOWER_CAMEL
-                : NameCaseConvention.EXACT).compile(oldPropertyKey);
+        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(oldPropertyKey);
 
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
