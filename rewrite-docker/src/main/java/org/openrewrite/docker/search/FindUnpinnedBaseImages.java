@@ -47,6 +47,10 @@ public class FindUnpinnedBaseImages extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        DockerImage.Matcher matcher = new DockerImage.Matcher()
+                .excludeScratch()
+                .onlyUnpinned();
+
         return new DockerIsoVisitor<ExecutionContext>() {
 
             @Override
@@ -54,28 +58,22 @@ public class FindUnpinnedBaseImages extends Recipe {
                 Docker.From f = super.visitFrom(from, ctx);
 
                 // Use DockerImage trait for semantic analysis
-                DockerImage image = new DockerImage.Matcher().require(getCursor());
+                DockerImage image = matcher.get(getCursor()).orElse(null);
+                if (image == null) {
+                    return f;
+                }
 
                 // Skip images with environment variables in the name (can't analyze statically)
                 if (image.imageNameHasEnvironmentVariables()) {
                     return f;
                 }
 
-                // Skip "scratch" base image - it's a special case
-                if (image.isScratch()) {
-                    return f;
-                }
-
-                // Check if unpinned and get the reason
+                // Get the reason for being unpinned
                 DockerImage.UnpinnedReason reason = image.getUnpinnedReason();
-                if (reason != null) {
-                    String message = reason == DockerImage.UnpinnedReason.IMPLICIT_LATEST ?
-                            "Uses implicit 'latest' tag" :
-                            "Uses 'latest' tag";
-                    return SearchResult.found(f, message);
-                }
-
-                return f;
+                String message = reason == DockerImage.UnpinnedReason.IMPLICIT_LATEST ?
+                        "Uses implicit 'latest' tag" :
+                        "Uses 'latest' tag";
+                return SearchResult.found(f, message);
             }
         };
     }

@@ -26,7 +26,6 @@ import org.openrewrite.docker.DockerIsoVisitor;
 import org.openrewrite.docker.table.DockerBaseImages;
 import org.openrewrite.docker.trait.DockerImage;
 import org.openrewrite.docker.tree.Docker;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.SearchResult;
 
 @Value
@@ -54,21 +53,24 @@ public class FindDockerBaseImages extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        DockerImage.Matcher matcher = new DockerImage.Matcher();
+        if (imageNamePattern != null) {
+            matcher.imageName(imageNamePattern);
+        }
+
         return new DockerIsoVisitor<ExecutionContext>() {
             @Override
             public Docker.From visitFrom(Docker.From from, ExecutionContext ctx) {
                 Docker.From f = super.visitFrom(from, ctx);
 
                 // Use DockerImage trait for accessing image components
-                DockerImage image = new DockerImage.Matcher().require(getCursor());
-
-                String imageName = image.getImageName();
-                if (imageName == null) {
+                DockerImage image = matcher.get(getCursor()).orElse(null);
+                if (image == null) {
                     return f;
                 }
 
-                // Check if the image name matches the pattern (if specified)
-                if (imageNamePattern != null && !StringUtils.matchesGlob(imageName, imageNamePattern)) {
+                String imageName = image.getImageName();
+                if (imageName == null) {
                     return f;
                 }
 
