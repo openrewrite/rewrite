@@ -15,6 +15,7 @@
  */
 package org.openrewrite.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 
 import java.util.regex.Pattern;
@@ -53,7 +54,14 @@ public enum NameCaseConvention {
      * This is the standard Java and C++ constant variable naming convention.
      * This is also known as "SCREAMING_SNAKE_CASE".
      */
-    UPPER_UNDERSCORE;
+    UPPER_UNDERSCORE,
+
+    /**
+     * No transformation - returns the input string unchanged.
+     * Use this for exact matching without any case normalization.
+     */
+    @Incubating(since = "8.73.0")
+    EXACT;
 
     private static final Pattern CAMEL_CASE_SPLIT = Pattern.compile("[\\s_-]");
     private static final int uppercaseAbbreviationMinLength = 3;
@@ -189,6 +197,80 @@ public enum NameCaseConvention {
 
     public static boolean matchesRegexRelaxedBinding(String test, String pattern) {
         return LOWER_CAMEL.format(test).matches(LOWER_CAMEL.format(pattern));
+    }
+
+    /**
+     * Compiles a pattern for efficient repeated matching against this convention.
+     * The pattern is formatted once during compilation, avoiding repeated conversions
+     * when matching multiple test strings.
+     *
+     * @param pattern The pattern to compile
+     * @return A compiled pattern that can be used for efficient matching
+     * @see #matchesGlobRelaxedBinding(String, String)
+     */
+    @Incubating(since = "8.73.0")
+    public Compiled compile(String pattern) {
+        return new Compiled(this, pattern);
+    }
+
+    /**
+     * A compiled pattern for efficient repeated matching.
+     * <p>
+     * This is useful when matching multiple test strings against a constant pattern.
+     * The pattern is converted to the target convention once during construction,
+     * avoiding repeated conversions when calling {@link #matchesGlob(String)} or {@link #matchesRegex(String)}.
+     *
+     * @see NameCaseConvention#compile(String)
+     */
+    @Incubating(since = "8.73.0")
+    public static class Compiled {
+        private final NameCaseConvention convention;
+        private final String formattedPattern;
+        private volatile @Nullable Pattern compiledRegex;
+
+        private Compiled(NameCaseConvention convention, String pattern) {
+            this.convention = convention;
+            this.formattedPattern = convention.format(pattern);
+        }
+
+        /**
+         * Tests whether the given string equals the compiled pattern after formatting.
+         *
+         * @param test The string to test
+         * @return {@code true} if the formatted test string equals the formatted pattern
+         */
+        public boolean matches(String test) {
+            return convention.format(test).equals(formattedPattern);
+        }
+
+        /**
+         * Tests whether the given string matches the compiled pattern using glob matching.
+         *
+         * @param test The string to test
+         * @return {@code true} if the test string matches the pattern
+         */
+        public boolean matchesGlob(String test) {
+            return StringUtils.matchesGlob(convention.format(test), formattedPattern);
+        }
+
+        /**
+         * Tests whether the given string matches the compiled pattern using regex matching.
+         *
+         * @param test The string to test
+         * @return {@code true} if the test string matches the pattern
+         */
+        public boolean matchesRegex(String test) {
+            Pattern p = compiledRegex;
+            if (p == null) {
+                synchronized (this) {
+                    p = compiledRegex;
+                    if (p == null) {
+                        compiledRegex = p = Pattern.compile(formattedPattern);
+                    }
+                }
+            }
+            return p.matcher(convention.format(test)).matches();
+        }
     }
 
     private static String lowerHyphen(String str) {

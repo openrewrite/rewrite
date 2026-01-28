@@ -58,31 +58,26 @@ public class ChangePropertyKey extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ChangePropertyKeyVisitor<>();
-    }
+        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding)
+                ? NameCaseConvention.LOWER_CAMEL
+                : NameCaseConvention.EXACT).compile(oldPropertyKey);
 
-    public class ChangePropertyKeyVisitor<P> extends PropertiesVisitor<P> {
-        public ChangePropertyKeyVisitor() {
-        }
-
-        @Override
-        public Properties visitEntry(Properties.Entry entry, P p) {
-            if (Boolean.TRUE.equals(regex)) {
-                if (!Boolean.FALSE.equals(relaxedBinding) ?
-                        NameCaseConvention.matchesRegexRelaxedBinding(entry.getKey(), oldPropertyKey) :
-                        entry.getKey().matches(oldPropertyKey)) {
-                    entry = entry.withKey(entry.getKey().replaceFirst(oldPropertyKey, newPropertyKey))
-                            .withPrefix(entry.getPrefix());
+        return new PropertiesVisitor<ExecutionContext>() {
+            @Override
+            public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+                if (Boolean.TRUE.equals(regex)) {
+                    if (keyMatcher.matchesRegex(entry.getKey())) {
+                        entry = entry.withKey(entry.getKey().replaceFirst(oldPropertyKey, newPropertyKey))
+                                .withPrefix(entry.getPrefix());
+                    }
+                } else {
+                    if (keyMatcher.matches(entry.getKey())) {
+                        entry = entry.withKey(newPropertyKey)
+                                .withPrefix(entry.getPrefix());
+                    }
                 }
-            } else {
-                if (!Boolean.FALSE.equals(relaxedBinding) ?
-                        NameCaseConvention.equalsRelaxedBinding(entry.getKey(), oldPropertyKey) :
-                        entry.getKey().equals(oldPropertyKey)) {
-                    entry = entry.withKey(newPropertyKey)
-                            .withPrefix(entry.getPrefix());
-                }
+                return super.visitEntry(entry, ctx);
             }
-            return super.visitEntry(entry, p);
-        }
+        };
     }
 }
