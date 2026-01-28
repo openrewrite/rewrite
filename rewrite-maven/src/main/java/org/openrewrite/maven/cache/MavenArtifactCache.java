@@ -51,6 +51,21 @@ public interface MavenArtifactCache {
 
     default @Nullable Path computeArtifact(ResolvedDependency dependency, Callable<@Nullable InputStream> artifactStream,
                                  Consumer<Throwable> onError) {
+        // Non-dated SNAPSHOTs (e.g. from Maven Local) are mutable, so always re-fetch
+        // to ensure the cache reflects the latest locally-published artifact
+        if (dependency.getVersion().endsWith("-SNAPSHOT") && dependency.getDatedSnapshotVersion() == null) {
+            try {
+                if (artifactStream != null) {
+                    Path artifact = putArtifact(dependency, artifactStream.call(), onError);
+                    if (artifact != null) {
+                        return artifact;
+                    }
+                }
+            } catch (Exception e) {
+                onError.accept(e);
+            }
+            return getArtifact(dependency);
+        }
         Path artifact = getArtifact(dependency);
         if (artifact == null) {
             try {
