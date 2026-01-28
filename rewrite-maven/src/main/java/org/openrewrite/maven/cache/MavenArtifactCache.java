@@ -57,9 +57,11 @@ public interface MavenArtifactCache {
         if (dependency.getVersion().endsWith("-SNAPSHOT") &&
             (datedSnapshotVersion == null || datedSnapshotVersion.endsWith("-SNAPSHOT"))) {
             try {
-                Path artifact = putArtifact(dependency, artifactStream.call(), onError);
-                if (artifact != null) {
-                    return artifact;
+                if (artifactStream != null) {
+                    Path artifact = putArtifact(dependency, artifactStream.call(), onError);
+                    if (artifact != null) {
+                        return artifact;
+                    }
                 }
             } catch (Exception e) {
                 onError.accept(e);
@@ -69,7 +71,9 @@ public interface MavenArtifactCache {
         Path artifact = getArtifact(dependency);
         if (artifact == null) {
             try {
-                artifact = putArtifact(dependency, artifactStream.call(), onError);
+                if (artifactStream != null) {
+                    artifact = putArtifact(dependency, artifactStream.call(), onError);
+                }
             } catch (Exception e) {
                 onError.accept(e);
             }
