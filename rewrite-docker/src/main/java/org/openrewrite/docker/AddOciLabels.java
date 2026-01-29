@@ -151,9 +151,9 @@ public class AddOciLabels extends Recipe {
             recipes.add(new AddOrUpdateLabel(OCI_PREFIX + "version", version, true, null));
         }
         if (created != null && !created.isEmpty()) {
-            String timestamp = "now".equalsIgnoreCase(created)
-                    ? DateTimeFormatter.ISO_INSTANT.format(Instant.now())
-                    : created;
+            String timestamp = "now".equalsIgnoreCase(created) ?
+                    DateTimeFormatter.ISO_INSTANT.format(Instant.now()) :
+                    created;
             recipes.add(new AddOrUpdateLabel(OCI_PREFIX + "created", timestamp, true, null));
         }
         if (revision != null && !revision.isEmpty()) {
