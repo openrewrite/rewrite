@@ -440,7 +440,7 @@ class AutoFormatVisitorTest implements RewriteTest {
                         org.openrewrite.java.tree.Space.EMPTY,
                         org.openrewrite.marker.Markers.EMPTY,
                         org.openrewrite.java.tree.JRightPadded.build(false),
-                        java.util.Collections.singletonList(
+                        singletonList(
                             org.openrewrite.java.tree.JRightPadded.build(iff.getThenPart())
                         ),
                         org.openrewrite.java.tree.Space.EMPTY
@@ -519,7 +519,7 @@ class AutoFormatVisitorTest implements RewriteTest {
                         org.openrewrite.java.tree.Space.EMPTY,
                         org.openrewrite.marker.Markers.EMPTY,
                         org.openrewrite.java.tree.JRightPadded.build(false),
-                        java.util.Collections.singletonList(
+                        singletonList(
                             org.openrewrite.java.tree.JRightPadded.build(iff.getThenPart())
                         ),
                         org.openrewrite.java.tree.Space.EMPTY

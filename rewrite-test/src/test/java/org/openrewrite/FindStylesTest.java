@@ -25,9 +25,10 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -59,8 +60,8 @@ class FindStylesTest implements RewriteTest {
             "org.openrewrite.test.TestStyles",
             "Test Styles",
             "Test styles for unit testing",
-            Collections.emptySet(),
-            Collections.singletonList(testStyle)
+            emptySet(),
+            singletonList(testStyle)
         );
 
         // Parse a simple text file
@@ -102,8 +103,8 @@ class FindStylesTest implements RewriteTest {
             "org.openrewrite.test.IndentStyles",
             "Indent Styles",
             "Indent styles for unit testing",
-            Collections.emptySet(),
-            Collections.singletonList(indentStyle)
+            emptySet(),
+            singletonList(indentStyle)
         );
 
         AnotherTestStyle spacingStyle = new AnotherTestStyle(true, 2);
@@ -112,8 +113,8 @@ class FindStylesTest implements RewriteTest {
             "org.openrewrite.test.SpacingStyles",
             "Spacing Styles",
             "Spacing styles for unit testing",
-            Collections.emptySet(),
-            Collections.singletonList(spacingStyle)
+            emptySet(),
+            singletonList(spacingStyle)
         );
 
         // Parse a simple text file
