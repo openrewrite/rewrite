@@ -87,22 +87,41 @@ public class FindStyles extends Recipe {
     private static String stylesToYaml(List<NamedStyles> namedStylesList) {
         StringBuilder yaml = new StringBuilder();
 
-        for (NamedStyles namedStyles : namedStylesList) {
-            if (yaml.length() > 0) {
-                yaml.append("\n");
-            }
-            yaml.append("---\n");
-            yaml.append("type: specs.openrewrite.org/v1beta/style\n");
+        // Merge all NamedStyles into a single style definition
+        yaml.append("---\n");
+        yaml.append("type: specs.openrewrite.org/v1beta/style\n");
+
+        // Use the first style's name as the base, or create a merged name
+        if (namedStylesList.size() == 1) {
+            NamedStyles namedStyles = namedStylesList.get(0);
             yaml.append("name: ").append(namedStyles.getName()).append("\n");
             yaml.append("displayName: ").append(namedStyles.getDisplayName()).append("\n");
+        } else {
+            // For multiple styles, create a merged name
+            yaml.append("name: merged.styles\n");
+            yaml.append("displayName: Merged Styles\n");
+        }
 
+        // Collect all styles from all NamedStyles markers
+        boolean hasStyles = false;
+        for (NamedStyles namedStyles : namedStylesList) {
             Collection<Style> styles = namedStyles.getStyles();
             if (styles != null && !styles.isEmpty()) {
-                yaml.append("styleConfigs:\n");
-                for (Style style : styles) {
-                    String styleClassName = style.getClass().getName();
-                    yaml.append("  - ").append(styleClassName).append(":\n");
-                    appendStyleProperties(yaml, style, "      ");
+                hasStyles = true;
+                break;
+            }
+        }
+
+        if (hasStyles) {
+            yaml.append("styleConfigs:\n");
+            for (NamedStyles namedStyles : namedStylesList) {
+                Collection<Style> styles = namedStyles.getStyles();
+                if (styles != null) {
+                    for (Style style : styles) {
+                        String styleClassName = style.getClass().getName();
+                        yaml.append("  - ").append(styleClassName).append(":\n");
+                        appendStyleProperties(yaml, style, "      ");
+                    }
                 }
             }
         }

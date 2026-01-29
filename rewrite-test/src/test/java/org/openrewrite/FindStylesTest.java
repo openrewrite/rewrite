@@ -93,6 +93,71 @@ class FindStylesTest implements RewriteTest {
         assertThat(content).contains("useTabs: true");
     }
 
+    @Test
+    void multipleStylesAreMerged() {
+        // Create two different test styles in separate NamedStyles
+        TestStyle indentStyle = new TestStyle(4, false);
+        NamedStyles indentNamedStyles = new NamedStyles(
+            Tree.randomId(),
+            "org.openrewrite.test.IndentStyles",
+            "Indent Styles",
+            "Indent styles for unit testing",
+            Collections.emptySet(),
+            Collections.singletonList(indentStyle)
+        );
+
+        AnotherTestStyle spacingStyle = new AnotherTestStyle(true, 2);
+        NamedStyles spacingNamedStyles = new NamedStyles(
+            Tree.randomId(),
+            "org.openrewrite.test.SpacingStyles",
+            "Spacing Styles",
+            "Spacing styles for unit testing",
+            Collections.emptySet(),
+            Collections.singletonList(spacingStyle)
+        );
+
+        // Parse a simple text file
+        PlainText plainText = PlainTextParser.builder().build()
+            .parse("hello world!")
+            .map(PlainText.class::cast)
+            .findFirst()
+            .orElseThrow()
+            .withSourcePath(Paths.get("hello.txt"));
+
+        // Attach both styles
+        plainText = plainText.withMarkers(
+            plainText.getMarkers().add(indentNamedStyles).add(spacingNamedStyles)
+        );
+
+        // Run the recipe
+        FindStyles recipe = new FindStyles();
+        ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+        RecipeRun run = recipe.run(new InMemoryLargeSourceSet(List.of(plainText)), ctx);
+
+        // Verify the output contains a single merged YAML style
+        assertThat(run.getChangeset().getAllResults()).hasSize(1);
+        String content = run.getChangeset().getAllResults().get(0).getAfter().printAll();
+
+        // Should have only ONE style document (merged)
+        assertThat(content).contains("type: specs.openrewrite.org/v1beta/style");
+        assertThat(content).contains("name: merged.styles");
+        assertThat(content).contains("displayName: Merged Styles");
+        assertThat(content).contains("styleConfigs:");
+
+        // Should contain both style classes in the merged styleConfigs
+        assertThat(content).contains("org.openrewrite.FindStylesTest$TestStyle:");
+        assertThat(content).contains("indentSize: 4");
+        assertThat(content).contains("useTabs: false");
+
+        assertThat(content).contains("org.openrewrite.FindStylesTest$AnotherTestStyle:");
+        assertThat(content).contains("spaceAroundOperators: true");
+        assertThat(content).contains("blankLinesBeforeMethod: 2");
+
+        // Should NOT have multiple YAML documents (no second "---")
+        String yamlContent = content.substring(content.indexOf("---"));
+        assertThat(yamlContent.indexOf("---", 3)).isEqualTo(-1);
+    }
+
     /**
      * A simple test style class for testing purposes.
      */
@@ -111,6 +176,27 @@ class FindStylesTest implements RewriteTest {
 
         public boolean isUseTabs() {
             return useTabs;
+        }
+    }
+
+    /**
+     * Another test style class for testing merged styles.
+     */
+    private static class AnotherTestStyle implements Style {
+        private final boolean spaceAroundOperators;
+        private final int blankLinesBeforeMethod;
+
+        AnotherTestStyle(boolean spaceAroundOperators, int blankLinesBeforeMethod) {
+            this.spaceAroundOperators = spaceAroundOperators;
+            this.blankLinesBeforeMethod = blankLinesBeforeMethod;
+        }
+
+        public boolean isSpaceAroundOperators() {
+            return spaceAroundOperators;
+        }
+
+        public int getBlankLinesBeforeMethod() {
+            return blankLinesBeforeMethod;
         }
     }
 }
