@@ -40,6 +40,27 @@ public class FindDockerBaseImages extends Recipe {
     @Nullable
     String imageNamePattern;
 
+    @Option(displayName = "Tag pattern",
+            description = "A glob pattern to match against image tags. If not specified, all tags are matched.",
+            example = "20.*",
+            required = false)
+    @Nullable
+    String tagPattern;
+
+    @Option(displayName = "Digest pattern",
+            description = "A glob pattern to match against image digests. If not specified, all digests are matched.",
+            example = "sha256:*",
+            required = false)
+    @Nullable
+    String digestPattern;
+
+    @Option(displayName = "Platform pattern",
+            description = "A glob pattern to match against platform flags. If not specified, all platforms are matched.",
+            example = "linux/amd64",
+            required = false)
+    @Nullable
+    String platformPattern;
+
     @Override
     public String getDisplayName() {
         return "Find Docker base images";
@@ -55,6 +76,15 @@ public class FindDockerBaseImages extends Recipe {
         DockerImage.Matcher matcher = new DockerImage.Matcher();
         if (imageNamePattern != null) {
             matcher.imageName(imageNamePattern);
+        }
+        if (tagPattern != null) {
+            matcher.tag(tagPattern);
+        }
+        if (digestPattern != null) {
+            matcher.digest(digestPattern);
+        }
+        if (platformPattern != null) {
+            matcher.platform(platformPattern);
         }
         return matcher.asVisitor((image, ctx) -> {
             String imageName = image.getImageName();

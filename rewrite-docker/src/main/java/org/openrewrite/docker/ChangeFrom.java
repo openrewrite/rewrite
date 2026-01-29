@@ -33,7 +33,7 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ChangeBaseImage extends Recipe {
+public class ChangeFrom extends Recipe {
 
     @Option(displayName = "Old image name",
             description = "Glob pattern to match image names (without tag/digest).",
@@ -91,7 +91,7 @@ public class ChangeBaseImage extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change Docker base image";
+        return "Change Docker FROM";
     }
 
     @Override
@@ -127,108 +127,100 @@ public class ChangeBaseImage extends Recipe {
             matcher.platform(oldPlatform);
         }
 
-        return new DockerIsoVisitor<ExecutionContext>() {
-            @Override
-            public Docker.From visitFrom(Docker.From from, ExecutionContext ctx) {
-                Docker.From f = super.visitFrom(from, ctx);
+        return matcher.asVisitor((image, ctx) -> {
+            Docker.From f = image.getTree();
 
-                DockerImage image = matcher.get(getCursor()).orElse(null);
-                if (image == null) {
-                    return f;
-                }
+            // Check if any change is needed
+            String currentImageName = image.getImageNameForMatching();
+            String currentTag = image.getTagForMatching();
+            String currentDigest = image.getDigestForMatching();
+            String currentPlatform = image.getPlatform();
 
-                // Check if any change is needed
-                String currentImageName = image.getImageNameForMatching();
-                String currentTag = image.getTagForMatching();
-                String currentDigest = image.getDigestForMatching();
-                String currentPlatform = image.getPlatform();
+            boolean imageNameChanged = newImageName != null && !currentImageName.equals(newImageName);
+            boolean tagChanged = newTag != null && !newTag.equals(currentTag == null ? "" : currentTag);
+            boolean digestChanged = newDigest != null && !newDigest.equals(currentDigest == null ? "" : currentDigest);
+            boolean platformChanged = newPlatform != null && !Objects.equals(
+                    currentPlatform == null ? "" : currentPlatform,
+                    newPlatform);
 
-                boolean imageNameChanged = newImageName != null && !currentImageName.equals(newImageName);
-                boolean tagChanged = newTag != null && !newTag.equals(currentTag == null ? "" : currentTag);
-                boolean digestChanged = newDigest != null && !newDigest.equals(currentDigest == null ? "" : currentDigest);
-                boolean platformChanged = newPlatform != null && !Objects.equals(
-                        currentPlatform == null ? "" : currentPlatform,
-                        newPlatform);
-
-                if (!imageNameChanged && !tagChanged && !digestChanged && !platformChanged) {
-                    return f;
-                }
-
-                Docker.From result = f;
-
-                // Update platform flag if needed
-                if (platformChanged) {
-                    if (newPlatform.isEmpty()) {
-                        result = updatePlatformFlag(result, null);
-                    } else {
-                        result = updatePlatformFlag(result, newPlatform);
-                    }
-                }
-
-                // Get quote style from original
-                Docker.Literal.QuoteStyle quoteStyle = image.getQuoteStyle();
-
-                // Check if the original was a single content item (e.g., a single quoted string)
-                boolean wasSingleContent = f.getImageName().getContents().size() == 1 &&
-                        f.getTag() == null && f.getDigest() == null;
-
-                if (wasSingleContent) {
-                    // Keep as a single content item (don't split)
-                    String imagePart = newImageName != null ? newImageName : currentImageName;
-                    StringBuilder sb = new StringBuilder(imagePart);
-                    // For tag: null=keep existing, ""=remove, value=set
-                    if (newTag != null) {
-                        if (!newTag.isEmpty()) {
-                            sb.append(":").append(newTag);
-                        }
-                    } else if (currentTag != null) {
-                        sb.append(":").append(currentTag);
-                    }
-                    // For digest: null=keep existing, ""=remove, value=set
-                    if (newDigest != null) {
-                        if (!newDigest.isEmpty()) {
-                            sb.append("@").append(newDigest);
-                        }
-                    } else if (currentDigest != null) {
-                        sb.append("@").append(currentDigest);
-                    }
-                    Docker.ArgumentContent newContent = createContent(sb.toString(), quoteStyle);
-                    Docker.Argument newImageArg = f.getImageName().withContents(singletonList(newContent));
-                    return result.withImageName(newImageArg);
-                }
-
-                // Update image name: null=keep, value=set
-                if (newImageName != null) {
-                    Docker.ArgumentContent newImageContent = createContent(newImageName, quoteStyle);
-                    Docker.Argument newImageArg = f.getImageName().withContents(singletonList(newImageContent));
-                    result = result.withImageName(newImageArg);
-                }
-
-                // Update tag: null=keep, ""=remove, value=set
-                if (newTag != null) {
-                    if (newTag.isEmpty()) {
-                        result = result.withTag(null);
-                    } else {
-                        Docker.ArgumentContent newTagContent = createContent(newTag, quoteStyle);
-                        Docker.Argument newTagArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(newTagContent));
-                        result = result.withTag(newTagArg);
-                    }
-                }
-
-                // Update digest: null=keep, ""=remove, value=set
-                if (newDigest != null) {
-                    if (newDigest.isEmpty()) {
-                        result = result.withDigest(null);
-                    } else {
-                        Docker.ArgumentContent newDigestContent = createContent(newDigest, quoteStyle);
-                        Docker.Argument newDigestArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(newDigestContent));
-                        result = result.withDigest(newDigestArg);
-                    }
-                }
-
-                return result;
+            if (!imageNameChanged && !tagChanged && !digestChanged && !platformChanged) {
+                return f;
             }
-        };
+
+            Docker.From result = f;
+
+            // Update platform flag if needed
+            if (platformChanged) {
+                if (newPlatform.isEmpty()) {
+                    result = updatePlatformFlag(result, null);
+                } else {
+                    result = updatePlatformFlag(result, newPlatform);
+                }
+            }
+
+            // Get quote style from original
+            Docker.Literal.QuoteStyle quoteStyle = image.getQuoteStyle();
+
+            // Check if the original was a single content item (e.g., a single quoted string)
+            boolean wasSingleContent = f.getImageName().getContents().size() == 1 &&
+                    f.getTag() == null && f.getDigest() == null;
+
+            if (wasSingleContent) {
+                // Keep as a single content item (don't split)
+                String imagePart = newImageName != null ? newImageName : currentImageName;
+                StringBuilder sb = new StringBuilder(imagePart);
+                // For tag: null=keep existing, ""=remove, value=set
+                if (newTag != null) {
+                    if (!newTag.isEmpty()) {
+                        sb.append(":").append(newTag);
+                    }
+                } else if (currentTag != null) {
+                    sb.append(":").append(currentTag);
+                }
+                // For digest: null=keep existing, ""=remove, value=set
+                if (newDigest != null) {
+                    if (!newDigest.isEmpty()) {
+                        sb.append("@").append(newDigest);
+                    }
+                } else if (currentDigest != null) {
+                    sb.append("@").append(currentDigest);
+                }
+                Docker.ArgumentContent newContent = createContent(sb.toString(), quoteStyle);
+                Docker.Argument newImageArg = f.getImageName().withContents(singletonList(newContent));
+                return result.withImageName(newImageArg);
+            }
+
+            // Update image name: null=keep, value=set
+            if (newImageName != null) {
+                Docker.ArgumentContent newImageContent = createContent(newImageName, quoteStyle);
+                Docker.Argument newImageArg = f.getImageName().withContents(singletonList(newImageContent));
+                result = result.withImageName(newImageArg);
+            }
+
+            // Update tag: null=keep, ""=remove, value=set
+            if (newTag != null) {
+                if (newTag.isEmpty()) {
+                    result = result.withTag(null);
+                } else {
+                    Docker.ArgumentContent newTagContent = createContent(newTag, quoteStyle);
+                    Docker.Argument newTagArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(newTagContent));
+                    result = result.withTag(newTagArg);
+                }
+            }
+
+            // Update digest: null=keep, ""=remove, value=set
+            if (newDigest != null) {
+                if (newDigest.isEmpty()) {
+                    result = result.withDigest(null);
+                } else {
+                    Docker.ArgumentContent newDigestContent = createContent(newDigest, quoteStyle);
+                    Docker.Argument newDigestArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(newDigestContent));
+                    result = result.withDigest(newDigestArg);
+                }
+            }
+
+            return result;
+        });
     }
 
     private Docker.ArgumentContent createContent(String text, Docker.Literal.@Nullable QuoteStyle quoteStyle) {
