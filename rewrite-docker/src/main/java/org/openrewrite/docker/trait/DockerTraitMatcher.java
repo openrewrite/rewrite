@@ -17,8 +17,6 @@ package org.openrewrite.docker.trait;
 
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
-import org.openrewrite.SourceFile;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.trait.SimpleTraitMatcher;
@@ -126,15 +124,15 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
      * When the text contains wildcards (from env vars), we need to check if either
      * the pattern matches the text OR the text (as a pattern) matches the pattern.
      *
-     * @param text The text to match (may contain wildcards from env vars)
-     * @param pattern The glob pattern to match against
+     * @param text       The text to match (may contain wildcards from env vars)
+     * @param pattern    The glob pattern to match against
      * @param hasEnvVars Whether the original text contained environment variables
      * @return true if there's a match in either direction
      */
     protected boolean matchesBidirectional(String text, String pattern, boolean hasEnvVars) {
         if (hasEnvVars) {
             return StringUtils.matchesGlob(text, pattern) ||
-                   StringUtils.matchesGlob(pattern, text);
+                    StringUtils.matchesGlob(pattern, text);
         }
         return StringUtils.matchesGlob(text, pattern);
     }

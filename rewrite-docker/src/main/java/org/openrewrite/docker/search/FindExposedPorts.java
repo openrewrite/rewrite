@@ -39,7 +39,7 @@ public class FindExposedPorts extends Recipe {
 
     @Option(displayName = "Port pattern",
             description = "A glob pattern to filter ports. For example, '80*' to find ports starting with 80. " +
-                          "If not specified, all `EXPOSE` instructions are matched.",
+                    "If not specified, all `EXPOSE` instructions are matched.",
             example = "80*",
             required = false)
     @Nullable
