@@ -98,6 +98,21 @@ class LambdaTest implements RewriteTest {
         );
     }
 
+    @Test
+    void closureParameterWithDefaultValue() {
+        rewriteRun(
+          groovy(
+            """
+              javadoc {
+                  options {
+                      group = 'WDK Language' -> 'com.symphony.bdk.workflow*'
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2168")
     @Test
     void closureNoArguments() {
