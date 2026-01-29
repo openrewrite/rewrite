@@ -196,15 +196,15 @@ public class Environment {
             }
         }
 
-        Map<String, Recipe> dependencyRecipes = new HashMap<>();
+        Map<String, Recipe> nameToRecipe = new HashMap<>();
         for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
             for (Recipe listedRecipe : dependencyResourceLoader.listRecipes()) {
-                dependencyRecipes.putIfAbsent(listedRecipe.getName(), listedRecipe);
+                nameToRecipe.putIfAbsent(listedRecipe.getName(), listedRecipe);
             }
         }
-        for (Recipe dependency : dependencyRecipes.values()) {
+        for (Recipe dependency : nameToRecipe.values()) {
             if (dependency instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) dependency).initialize(dependencyRecipes::get);
+                ((DeclarativeRecipe) dependency).initialize(nameToRecipe::get);
             }
         }
 
@@ -213,17 +213,26 @@ public class Environment {
         }
 
         if (recipe instanceof DeclarativeRecipe) {
-            Function<String, @Nullable Recipe> loadFunction = key -> {
-                if (dependencyRecipes.containsKey(key)) {
-                    return dependencyRecipes.get(key);
-                }
-                for (ResourceLoader resourceLoader : resourceLoaders) {
-                    Recipe r = resourceLoader.loadRecipe(key, details);
-                    if (r != null) {
-                        return r;
+            Function<String, @Nullable Recipe> loadFunction = new Function<String, Recipe>() {
+                @Override
+                public @Nullable Recipe apply(String key) {
+                    Recipe cached = nameToRecipe.get(key);
+                    if (cached != null) {
+                        return cached;
                     }
+
+                    for (ResourceLoader resourceLoader : resourceLoaders) {
+                        Recipe r = resourceLoader.loadRecipe(key, details);
+                        if (r != null) {
+                            nameToRecipe.put(key, r);
+                            if (r instanceof DeclarativeRecipe) {
+                                ((DeclarativeRecipe) r).initialize(this);
+                            }
+                            return r;
+                        }
+                    }
+                    return null;
                 }
-                return null;
             };
             ((DeclarativeRecipe) recipe).initialize(loadFunction);
         }

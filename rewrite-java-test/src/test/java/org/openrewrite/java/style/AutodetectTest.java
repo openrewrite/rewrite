@@ -95,9 +95,9 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var wrap = detector.build().getStyle(WrappingAndBracesStyle.class);
 
-        assertThat(tabsAndIndents.getMethodDeclarationParameters().getAlignWhenMultiple()).isTrue();
+        assertThat(wrap.getMethodDeclarationParameters().getAlignWhenMultiline()).isTrue();
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1221")

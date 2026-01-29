@@ -60,14 +60,16 @@ public class FindProperty extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(propertyKey);
+
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 String prop = getProperty(getCursor());
-                if (!Boolean.FALSE.equals(relaxedBinding) ?
-                        NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey) :
-                        StringUtils.matchesGlob(prop, propertyKey)) {
+                if (keyMatcher.matchesGlob(prop)) {
                     if (!Objects.isNull(propertyValue)) {
                         if (entry.getValue() instanceof Yaml.Scalar) {
                             Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
@@ -85,14 +87,16 @@ public class FindProperty extends Recipe {
     }
 
     public static Set<Yaml.Block> find(Yaml y, String propertyKey, @Nullable Boolean relaxedBinding) {
+        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(propertyKey);
+
         YamlVisitor<Set<Yaml.Block>> findVisitor = new YamlIsoVisitor<Set<Yaml.Block>>() {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Set<Yaml.Block> values) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, values);
                 String prop = getProperty(getCursor());
-                if (!Boolean.FALSE.equals(relaxedBinding) ?
-                        NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey) :
-                        StringUtils.matchesGlob(prop, propertyKey)) {
+                if (keyMatcher.matchesGlob(prop)) {
                     values.add(entry.getValue());
                 }
                 return e;
