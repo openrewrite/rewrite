@@ -22,7 +22,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.docker.DockerIsoVisitor;
 import org.openrewrite.docker.table.DockerBaseImages;
 import org.openrewrite.docker.trait.DockerImage;
 import org.openrewrite.docker.tree.Docker;
@@ -57,49 +56,38 @@ public class FindDockerBaseImages extends Recipe {
         if (imageNamePattern != null) {
             matcher.imageName(imageNamePattern);
         }
-
-        return new DockerIsoVisitor<ExecutionContext>() {
-            @Override
-            public Docker.From visitFrom(Docker.From from, ExecutionContext ctx) {
-                Docker.From f = super.visitFrom(from, ctx);
-
-                // Use DockerImage trait for accessing image components
-                DockerImage image = matcher.get(getCursor()).orElse(null);
-                if (image == null) {
-                    return f;
-                }
-
-                String imageName = image.getImageName();
-                if (imageName == null) {
-                    return f;
-                }
-
-                String tag = image.getTag();
-                String digest = image.getDigest();
-                String platform = image.getPlatform();
-                String stageName = image.getStageName();
-
-                // Insert row into data table
-                dockerBaseImages.insertRow(ctx, new DockerBaseImages.Row(
-                        getCursor().firstEnclosingOrThrow(Docker.File.class).getSourcePath().toString(),
-                        stageName,
-                        imageName,
-                        tag,
-                        digest,
-                        platform
-                ));
-
-                // Build message with image reference
-                String message = imageName;
-                if (digest != null) {
-                    message += "@" + digest;
-                } else if (tag != null) {
-                    message += ":" + tag;
-                }
-
-                // Mark the FROM instruction as a search result
-                return SearchResult.found(f, message);
+        return matcher.asVisitor((image, ctx) -> {
+            String imageName = image.getImageName();
+            Docker.From from = image.getTree();
+            if (imageName == null) {
+                return from;
             }
-        };
+
+            String tag = image.getTag();
+            String digest = image.getDigest();
+            String platform = image.getPlatform();
+            String stageName = image.getStageName();
+
+            // Insert row into data table
+            dockerBaseImages.insertRow(ctx, new DockerBaseImages.Row(
+                    image.getCursor().firstEnclosingOrThrow(Docker.File.class).getSourcePath().toString(),
+                    stageName,
+                    imageName,
+                    tag,
+                    digest,
+                    platform
+            ));
+
+            // Build message with image reference
+            String message = imageName;
+            if (digest != null) {
+                message += "@" + digest;
+            } else if (tag != null) {
+                message += ":" + tag;
+            }
+
+            // Mark the FROM instruction as a search result
+            return SearchResult.found(from, message);
+        });
     }
 }
