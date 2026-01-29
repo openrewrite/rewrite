@@ -171,6 +171,13 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         AtomicReference<MavenDownloadingExceptions> exceptions = new AtomicReference<>();
         try {
             ResolvedPom resolved = resolutionResult.getPom().resolve(ctx, downloader);
+
+            // Update projectPoms with the resolved Pom so child modules see changes made to parents
+            Path sourcePath = resolved.getRequested().getSourcePath();
+            if (sourcePath != null) {
+                projectPoms.put(sourcePath, resolved.getRequested());
+            }
+
             MavenResolutionResult mrr = resolutionResult
                     .withPom(resolved)
                     .withModules(ListUtils.map(resolutionResult.getModules(), module -> {
