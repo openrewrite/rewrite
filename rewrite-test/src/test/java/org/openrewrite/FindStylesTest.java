@@ -79,14 +79,18 @@ class FindStylesTest implements RewriteTest {
         ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
         RecipeRun run = recipe.run(new InMemoryLargeSourceSet(List.of(plainText)), ctx);
 
-        // Verify the output
+        // Verify the output contains valid OpenRewrite style YAML
         assertThat(run.getChangeset().getAllResults()).hasSize(1);
         String content = run.getChangeset().getAllResults().get(0).getAfter().printAll();
         assertThat(content).contains("~~(");
-        assertThat(content).contains("org.openrewrite.test.TestStyles");
-        assertThat(content).contains("TestStyle");
-        assertThat(content).contains("\"indentSize\" : 4");
-        assertThat(content).contains("\"useTabs\" : true");
+        // Check YAML structure
+        assertThat(content).contains("type: specs.openrewrite.org/v1beta/style");
+        assertThat(content).contains("name: org.openrewrite.test.TestStyles");
+        assertThat(content).contains("displayName: Test Styles");
+        assertThat(content).contains("styleConfigs:");
+        assertThat(content).contains("org.openrewrite.FindStylesTest$TestStyle:");
+        assertThat(content).contains("indentSize: 4");
+        assertThat(content).contains("useTabs: true");
     }
 
     /**

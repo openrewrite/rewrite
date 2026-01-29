@@ -15,7 +15,6 @@
  */
 package org.openrewrite;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import lombok.EqualsAndHashCode;
@@ -27,7 +26,6 @@ import org.openrewrite.style.Style;
 import org.openrewrite.table.StylesInUse;
 
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -35,8 +33,8 @@ import java.util.Map;
  * A diagnostic recipe that finds and reports the styles attached to each source file.
  * <p>
  * This is useful for troubleshooting style detection issues, such as when formatting
- * produces unexpected results. The styles are output as JSON in the SearchResult marker,
- * making them easy to analyze and potentially reuse in other recipes.
+ * produces unexpected results. The styles are output as valid OpenRewrite style YAML
+ * in the SearchResult marker, which can be directly used in a rewrite.yml configuration.
  */
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -46,7 +44,7 @@ public class FindStyles extends Recipe {
     String displayName = "Find styles";
 
     String description = "Find and report the styles attached to each source file. " +
-                         "Styles are output as JSON in a SearchResult marker for analysis and debugging.";
+                         "Styles are output as valid OpenRewrite style YAML that can be used directly in rewrite.yml configuration.";
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT)
@@ -65,50 +63,131 @@ public class FindStyles extends Recipe {
                         stylesInUse.insertRow(ctx, new StylesInUse.Row(
                                 sourceFile.getSourcePath().toString(),
                                 "(no styles attached)",
-                                "{}"
+                                ""
                         ));
                         return SearchResult.found(sourceFile, "No styles attached");
                     }
 
-                    String json = stylesToJson(namedStylesList);
+                    String yaml = stylesToYaml(namedStylesList);
                     String styleNames = getStyleNames(namedStylesList);
 
                     stylesInUse.insertRow(ctx, new StylesInUse.Row(
                             sourceFile.getSourcePath().toString(),
                             styleNames,
-                            json
+                            yaml
                     ));
 
-                    return SearchResult.found(sourceFile, json);
+                    return SearchResult.found(sourceFile, yaml);
                 }
                 return tree;
             }
         };
     }
 
-    private static String stylesToJson(List<NamedStyles> namedStylesList) {
-        try {
-            Map<String, Object> output = new LinkedHashMap<>();
-            for (NamedStyles namedStyles : namedStylesList) {
-                Map<String, Object> stylesMap = new LinkedHashMap<>();
-                stylesMap.put("displayName", namedStyles.getDisplayName());
-                stylesMap.put("description", namedStyles.getDescription());
+    private static String stylesToYaml(List<NamedStyles> namedStylesList) {
+        StringBuilder yaml = new StringBuilder();
 
-                Map<String, Object> individualStyles = new LinkedHashMap<>();
-                Collection<Style> styles = namedStyles.getStyles();
-                if (styles != null) {
-                    for (Style style : styles) {
-                        individualStyles.put(style.getClass().getSimpleName(), style);
-                    }
-                }
-                stylesMap.put("styles", individualStyles);
-
-                output.put(namedStyles.getName(), stylesMap);
+        for (NamedStyles namedStyles : namedStylesList) {
+            if (yaml.length() > 0) {
+                yaml.append("\n");
             }
-            return OBJECT_MAPPER.writeValueAsString(output);
-        } catch (JsonProcessingException e) {
-            return "{\"error\": \"" + e.getMessage().replace("\"", "\\\"") + "\"}";
+            yaml.append("---\n");
+            yaml.append("type: specs.openrewrite.org/v1beta/style\n");
+            yaml.append("name: ").append(namedStyles.getName()).append("\n");
+            yaml.append("displayName: ").append(namedStyles.getDisplayName()).append("\n");
+
+            Collection<Style> styles = namedStyles.getStyles();
+            if (styles != null && !styles.isEmpty()) {
+                yaml.append("styleConfigs:\n");
+                for (Style style : styles) {
+                    String styleClassName = style.getClass().getName();
+                    yaml.append("  - ").append(styleClassName).append(":\n");
+                    appendStyleProperties(yaml, style, "      ");
+                }
+            }
         }
+
+        return yaml.toString();
+    }
+
+    private static void appendStyleProperties(StringBuilder yaml, Object obj, String indent) {
+        try {
+            // Convert the style object to a Map using Jackson
+            @SuppressWarnings("unchecked")
+            Map<String, Object> props = OBJECT_MAPPER.convertValue(obj, Map.class);
+
+            for (Map.Entry<String, Object> entry : props.entrySet()) {
+                String key = entry.getKey();
+                Object value = entry.getValue();
+
+                if (value == null) {
+                    continue;
+                }
+
+                if (value instanceof Map) {
+                    yaml.append(indent).append(key).append(":\n");
+                    appendNestedMap(yaml, (Map<?, ?>) value, indent + "  ");
+                } else if (value instanceof List) {
+                    yaml.append(indent).append(key).append(":\n");
+                    appendList(yaml, (List<?>) value, indent + "  ");
+                } else {
+                    yaml.append(indent).append(key).append(": ").append(formatYamlValue(value)).append("\n");
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            yaml.append(indent).append("# Error serializing style: ").append(e.getMessage()).append("\n");
+        }
+    }
+
+    private static void appendNestedMap(StringBuilder yaml, Map<?, ?> map, String indent) {
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            String key = String.valueOf(entry.getKey());
+            Object value = entry.getValue();
+
+            if (value == null) {
+                continue;
+            }
+
+            if (value instanceof Map) {
+                yaml.append(indent).append(key).append(":\n");
+                appendNestedMap(yaml, (Map<?, ?>) value, indent + "  ");
+            } else if (value instanceof List) {
+                yaml.append(indent).append(key).append(":\n");
+                appendList(yaml, (List<?>) value, indent + "  ");
+            } else {
+                yaml.append(indent).append(key).append(": ").append(formatYamlValue(value)).append("\n");
+            }
+        }
+    }
+
+    private static void appendList(StringBuilder yaml, List<?> list, String indent) {
+        for (Object item : list) {
+            if (item instanceof Map) {
+                yaml.append(indent).append("-\n");
+                appendNestedMap(yaml, (Map<?, ?>) item, indent + "  ");
+            } else {
+                yaml.append(indent).append("- ").append(formatYamlValue(item)).append("\n");
+            }
+        }
+    }
+
+    private static String formatYamlValue(Object value) {
+        if (value instanceof String) {
+            String str = (String) value;
+            // Quote strings that contain special characters or could be misinterpreted
+            if (str.isEmpty() || str.contains(":") || str.contains("#") ||
+                str.contains("'") || str.contains("\"") || str.contains("\n") ||
+                str.startsWith(" ") || str.endsWith(" ") ||
+                "true".equalsIgnoreCase(str) || "false".equalsIgnoreCase(str) ||
+                "null".equalsIgnoreCase(str) || "yes".equalsIgnoreCase(str) ||
+                "no".equalsIgnoreCase(str) || "on".equalsIgnoreCase(str) ||
+                "off".equalsIgnoreCase(str)) {
+                // Use single quotes, escaping any existing single quotes
+                return "'" + str.replace("'", "''") + "'";
+            }
+            return str;
+        }
+        return String.valueOf(value);
     }
 
     private static String getStyleNames(List<NamedStyles> namedStylesList) {

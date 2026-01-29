@@ -37,8 +37,8 @@ public class StylesInUse extends DataTable<StylesInUse.Row> {
                 description = "The names of the styles attached to the file.")
         String styleNames;
 
-        @Column(displayName = "Styles JSON",
-                description = "The complete style configuration as JSON.")
-        String stylesJson;
+        @Column(displayName = "Styles YAML",
+                description = "The complete style configuration as OpenRewrite style YAML.")
+        String stylesYaml;
     }
 }
