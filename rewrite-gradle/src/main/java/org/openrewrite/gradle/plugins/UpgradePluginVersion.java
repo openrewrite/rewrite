@@ -115,12 +115,22 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
         if (!"version".equals(maybeVersion.getSimpleName())) {
             return false;
         }
+        // Walk up the method invocation chain to find "plugins" method
+        // This handles cases like: id(...) version "x.y.z" apply false
+        // where apply is between version and plugins
         Cursor parent = cursor.dropParentUntil(it -> (it instanceof J.MethodInvocation) || it == Cursor.ROOT_VALUE);
-        if (!(parent.getValue() instanceof J.MethodInvocation)) {
-            return false;
+        while (parent.getValue() instanceof J.MethodInvocation) {
+            J.MethodInvocation parentMethod = parent.getValue();
+            if ("plugins".equals(parentMethod.getSimpleName())) {
+                return true;
+            }
+            // Continue walking up the chain
+            parent = parent.dropParentUntil(it -> (it instanceof J.MethodInvocation) || it == Cursor.ROOT_VALUE);
+            if (parent.getValue() == Cursor.ROOT_VALUE) {
+                break;
+            }
         }
-        J.MethodInvocation maybePlugins = parent.getValue();
-        return "plugins".equals(maybePlugins.getSimpleName());
+        return false;
     }
 
     @Override

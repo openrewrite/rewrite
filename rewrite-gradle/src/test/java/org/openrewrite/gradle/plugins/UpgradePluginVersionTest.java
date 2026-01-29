@@ -352,4 +352,43 @@ class UpgradePluginVersionTest implements RewriteTest {
           )
         );
     }
+
+
+    @Test
+    void kotlinDslWithApplyFalse() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("com.github.johnrengelman.shadow", "7.1.x", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  id("com.github.johnrengelman.shadow") version "7.1.0" apply false
+              }
+              """,
+            """
+              plugins {
+                  id("com.github.johnrengelman.shadow") version "7.1.2" apply false
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyDslWithApplyFalse() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("com.github.johnrengelman.shadow", "7.1.x", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'com.github.johnrengelman.shadow' version '7.1.0' apply false
+              }
+              """,
+            """
+              plugins {
+                  id 'com.github.johnrengelman.shadow' version '7.1.2' apply false
+              }
+              """
+          )
+        );
+    }
 }
