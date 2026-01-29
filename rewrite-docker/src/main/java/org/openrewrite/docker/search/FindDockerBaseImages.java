@@ -23,7 +23,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.table.DockerBaseImages;
-import org.openrewrite.docker.trait.DockerImage;
+import org.openrewrite.docker.trait.DockerFrom;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.marker.SearchResult;
 
@@ -73,7 +73,7 @@ public class FindDockerBaseImages extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        DockerImage.Matcher matcher = new DockerImage.Matcher();
+        DockerFrom.Matcher matcher = new DockerFrom.Matcher();
         if (imageNamePattern != null) {
             matcher.imageName(imageNamePattern);
         }

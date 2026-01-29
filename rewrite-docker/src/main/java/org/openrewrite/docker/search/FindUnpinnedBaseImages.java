@@ -20,8 +20,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.docker.trait.DockerImage;
-import org.openrewrite.docker.tree.Docker;
+import org.openrewrite.docker.trait.DockerFrom;
 import org.openrewrite.marker.SearchResult;
 
 /**
@@ -46,7 +45,7 @@ public class FindUnpinnedBaseImages extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new DockerImage.Matcher()
+        return new DockerFrom.Matcher()
                 .excludeScratch()
                 .onlyUnpinned()
                 .asVisitor(image -> {
@@ -56,9 +55,9 @@ public class FindUnpinnedBaseImages extends Recipe {
                     }
 
                     // Get the reason for being unpinned
-                    DockerImage.UnpinnedReason reason = image.getUnpinnedReason();
+                    DockerFrom.UnpinnedReason reason = image.getUnpinnedReason();
 
-                    String message = reason == DockerImage.UnpinnedReason.IMPLICIT_LATEST ?
+                    String message = reason == DockerFrom.UnpinnedReason.IMPLICIT_LATEST ?
                             "Uses implicit 'latest' tag" :
                             "Uses 'latest' tag";
                     return SearchResult.found(image.getTree(), message);

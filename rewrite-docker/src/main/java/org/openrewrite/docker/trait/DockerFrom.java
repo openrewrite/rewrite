@@ -34,7 +34,7 @@ import org.openrewrite.trait.VisitFunction2;
  * along with matching capabilities that handle environment variables.
  */
 @RequiredArgsConstructor
-public class DockerImage implements Trait<Docker.From> {
+public class DockerFrom implements Trait<Docker.From> {
 
     @Getter
     private final Cursor cursor;
@@ -269,7 +269,7 @@ public class DockerImage implements Trait<Docker.From> {
     /**
      * Matcher for DockerImage traits with builder-style configuration.
      */
-    public static class Matcher extends DockerTraitMatcher<DockerImage> {
+    public static class Matcher extends DockerTraitMatcher<DockerFrom> {
         private @Nullable String imageNamePattern;
         private @Nullable String tagPattern;
         private @Nullable String digestPattern;
@@ -348,13 +348,13 @@ public class DockerImage implements Trait<Docker.From> {
         }
 
         @Override
-        protected @Nullable DockerImage test(Cursor cursor) {
+        protected @Nullable DockerFrom test(Cursor cursor) {
             Object value = cursor.getValue();
             if (!(value instanceof Docker.From)) {
                 return null;
             }
             Docker.From from = (Docker.From) value;
-            DockerImage image = new DockerImage(cursor);
+            DockerFrom image = new DockerFrom(cursor);
 
             // Check exclusions
             if (excludeScratch && image.isScratch()) {
@@ -402,11 +402,11 @@ public class DockerImage implements Trait<Docker.From> {
         }
 
         @Override
-        public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<DockerImage, P> visitor) {
+        public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<DockerFrom, P> visitor) {
             return new DockerVisitor<P>() {
                 @Override
                 public Docker visitFrom(Docker.From from, P p) {
-                    DockerImage image = test(getCursor());
+                    DockerFrom image = test(getCursor());
                     if (image != null) {
                         return (Docker) visitor.visit(image, p);
                     }
