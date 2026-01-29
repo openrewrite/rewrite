@@ -235,6 +235,37 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1463")
+    @Test
+    void asteriskPlaceholders() {
+        rewriteRun(
+          yaml(
+            """
+              database:
+                password: *** REMOVED ***
+                apiKey: **REDACTED**
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1463")
+    @Test
+    void asteriskPlaceholdersWithAnchors() {
+        // Ensure real anchors/aliases still work alongside asterisk placeholders
+        rewriteRun(
+          yaml(
+            """
+              defaults: &defaults
+                timeout: 30
+              production:
+                <<: *defaults
+                password: *** REMOVED ***
+              """
+          )
+        );
+    }
+
     @Test
     void pipeLiteralInASequenceWithDoubleQuotes() {
         rewriteRun(
@@ -726,6 +757,77 @@ class YamlParserTest implements RewriteTest {
               swagger: '2.0'
               host: {C App}.colruyt.int/{C App}
               """
+          )
+        );
+    }
+
+    @Test
+    void literalScalarTrailingNewlineInValue() {
+        // Literal (|) and folded (>) scalars should keep trailing newlines in their value
+        // The next entry's prefix should be just indentation, not include the newline
+        rewriteRun(
+          yaml(
+            """
+              parent:
+                message: |
+                  line1
+                  line2
+                next: value
+              """,
+            spec -> spec.afterRecipe(docs -> new YamlIsoVisitor<Integer>() {
+                @Override
+                public Yaml.Scalar visitScalar(Yaml.Scalar scalar, Integer ctx) {
+                    if (scalar.getStyle() == Yaml.Scalar.Style.LITERAL) {
+                        // Literal scalar value should end with newline
+                        assertThat(scalar.getValue()).endsWith("\n");
+                    }
+                    return super.visitScalar(scalar, ctx);
+                }
+
+                @Override
+                public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Integer ctx) {
+                    if ("next".equals(entry.getKey().getValue())) {
+                        // Entry following literal scalar has prefix with just indentation (no leading newline)
+                        assertThat(entry.getPrefix()).isEqualTo("  ");
+                    }
+                    return super.visitMappingEntry(entry, ctx);
+                }
+            }.visit(docs, 0))
+          )
+        );
+    }
+
+    @Test
+    void foldedScalarTrailingNewlineInValue() {
+        // Folded (>) scalars should also keep trailing newlines in their value
+        rewriteRun(
+          yaml(
+            """
+              parent:
+                description: >
+                  This is a folded
+                  multiline string.
+                status: active
+              """,
+            spec -> spec.afterRecipe(docs -> new YamlIsoVisitor<Integer>() {
+                @Override
+                public Yaml.Scalar visitScalar(Yaml.Scalar scalar, Integer ctx) {
+                    if (scalar.getStyle() == Yaml.Scalar.Style.FOLDED) {
+                        // Folded scalar value should end with newline
+                        assertThat(scalar.getValue()).endsWith("\n");
+                    }
+                    return super.visitScalar(scalar, ctx);
+                }
+
+                @Override
+                public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Integer ctx) {
+                    if ("status".equals(entry.getKey().getValue())) {
+                        // Entry following folded scalar has prefix with just indentation (no leading newline)
+                        assertThat(entry.getPrefix()).isEqualTo("  ");
+                    }
+                    return super.visitMappingEntry(entry, ctx);
+                }
+            }.visit(docs, 0))
           )
         );
     }

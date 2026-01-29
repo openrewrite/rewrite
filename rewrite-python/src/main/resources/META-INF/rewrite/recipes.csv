@@ -1,0 +1,2 @@
+ecosystem,packageName,name,displayName,description,recipeCount,category1,category2
+maven,org.openrewrite:rewrite-python,org.openrewrite.python.format.PythonSpaces,Formats spaces in Python code,Standardizes spaces in Python code. Currently limited to formatting method arguments.,1,Format,Python

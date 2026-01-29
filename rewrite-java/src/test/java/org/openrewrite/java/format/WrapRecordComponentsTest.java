@@ -17,40 +17,47 @@ package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Tree;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.version;
 import static org.openrewrite.style.LineWrapSetting.*;
-import static org.openrewrite.style.StyleHelper.fromStyles;
-import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class WrapRecordComponentsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-          List.of(
-            fromStyles(
-              new WrappingAndBracesStyle(
-                120,
-                new WrappingAndBracesStyle.IfStatement(false),
-                new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, Arrays.asList("builder", "newBuilder"), false),
-                new WrappingAndBracesStyle.MethodDeclarationParameters(DoNotWrap, false, false, false),
-                new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                new WrappingAndBracesStyle.RecordComponents(WrapAlways, false, true, false),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null))),
-          null)));
+        autoFormat(
+          spaces -> spaces,
+          wrapping -> wrapping.withRecordComponents(wrapping.getRecordComponents().withWrap(WrapAlways).withOpenNewLine(true))
+        ).accept(spec);
+    }
+
+    private static Consumer<RecipeSpec> autoFormat(UnaryOperator<SpacesStyle> spaces,
+                                                   UnaryOperator<WrappingAndBracesStyle> wrapping) {
+        return spec -> spec.recipe(new AutoFormat(null))
+          .parser(JavaParser.fromJavaVersion().styles(singletonList(
+            new NamedStyles(
+              Tree.randomId(), "test", "test", "test", emptySet(),
+              List.of(
+                spaces.apply(IntelliJ.spaces()),
+                wrapping.apply(IntelliJ.wrappingAndBraces().withKeepWhenFormatting(IntelliJ.wrappingAndBraces().getKeepWhenFormatting().withLineBreaks(false)))
+              )
+            )
+          )));
     }
 
     @DocumentExample
@@ -66,9 +73,9 @@ class WrapRecordComponentsTest implements RewriteTest {
                 """,
               """
                 record Person(
-                String name,
-                int age,
-                boolean active) {
+                        String name,
+                        int age,
+                        boolean active) {
                 }
                 """
             ),
@@ -89,8 +96,8 @@ class WrapRecordComponentsTest implements RewriteTest {
                 """,
               """
                 record Point(
-                int x,
-                int y) {
+                        int x,
+                        int y) {
                 }
                 """
             ),
@@ -136,8 +143,8 @@ class WrapRecordComponentsTest implements RewriteTest {
                 import java.util.Map;
 
                 record Container(
-                List<String> names,
-                Map<String, Integer> ages) {
+                        List<String> names,
+                        Map<String, Integer> ages) {
                 }
                 """
             ),
@@ -153,17 +160,13 @@ class WrapRecordComponentsTest implements RewriteTest {
           version(
             java(
               """
-                import org.jspecify.annotations.Nullable;
-
-                record Person(@Nullable String name, int age) {
+                record Person(@Deprecated String name, int age) {
                 }
                 """,
               """
-                import org.jspecify.annotations.Nullable;
-
                 record Person(
-                @Nullable String name,
-                int age) {
+                        @Deprecated String name,
+                        int age) {
                 }
                 """
             ),
@@ -176,23 +179,12 @@ class WrapRecordComponentsTest implements RewriteTest {
     void formatLongLinesOnly() {
         //language=java
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  50,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, List.of(), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(DoNotWrap, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  new WrappingAndBracesStyle.RecordComponents(ChopIfTooLong, false, true, false),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null))),
-            null))),
+          autoFormat(
+            spaces -> spaces,
+            wrapping -> wrapping
+              .withHardWrapAt(50)
+              .withRecordComponents(wrapping.getRecordComponents().withWrap(ChopIfTooLong).withOpenNewLine(true))
+          ),
           version(
             java(
               """
@@ -207,9 +199,9 @@ class WrapRecordComponentsTest implements RewriteTest {
                 }
 
                 record VeryLongRecordNameThatExceedsTheLimit(
-                String name,
-                int age,
-                boolean active) {
+                        String name,
+                        int age,
+                        boolean active) {
                 }
                 """
             ),
@@ -222,23 +214,10 @@ class WrapRecordComponentsTest implements RewriteTest {
     void preserveRecordWithLengthBelowThreshold() {
         //language=java
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, List.of(), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(DoNotWrap, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  new WrappingAndBracesStyle.RecordComponents(ChopIfTooLong, false, false, false),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null))),
-            null))),
+          autoFormat(
+            spaces -> spaces,
+            wrapping -> wrapping.withRecordComponents(wrapping.getRecordComponents().withWrap(ChopIfTooLong))
+          ),
           version(
             java(
               """
@@ -255,23 +234,10 @@ class WrapRecordComponentsTest implements RewriteTest {
     void openCloseNewLine() {
         //language=java
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(
-            List.of(
-              fromStyles(
-                new WrappingAndBracesStyle(
-                  120,
-                  new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, List.of(), false),
-                  new WrappingAndBracesStyle.MethodDeclarationParameters(DoNotWrap, false, false, false),
-                  new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                  new WrappingAndBracesStyle.RecordComponents(WrapAlways, false, false, true),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null))),
-            null))),
+          autoFormat(
+            spaces -> spaces,
+            wrapping -> wrapping.withRecordComponents(wrapping.getRecordComponents().withWrap(WrapAlways).withCloseNewLine(true))
+          ),
           version(
             java(
               """
@@ -280,8 +246,8 @@ class WrapRecordComponentsTest implements RewriteTest {
                 """,
               """
                 record Person(String name,
-                int age,
-                boolean active
+                              int age,
+                              boolean active
                 ) {
                 }
                 """
@@ -299,8 +265,8 @@ class WrapRecordComponentsTest implements RewriteTest {
             java(
               """
                 record Person(
-                    String name,
-                    int age) {
+                        String name,
+                        int age) {
                 }
                 """
             ),
