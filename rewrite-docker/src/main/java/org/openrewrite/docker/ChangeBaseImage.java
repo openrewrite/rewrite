@@ -54,6 +54,13 @@ public class ChangeBaseImage extends Recipe {
     @Nullable
     String oldDigest;
 
+    @Option(displayName = "Old platform",
+            description = "Only change images with this platform. If null, matches any platform.",
+            example = "linux/amd64",
+            required = false)
+    @Nullable
+    String oldPlatform;
+
     @Option(displayName = "New image name",
             description = "The new image name. If null, preserves the existing name.",
             example = "ubuntu",
@@ -74,13 +81,6 @@ public class ChangeBaseImage extends Recipe {
             required = false)
     @Nullable
     String newDigest;
-
-    @Option(displayName = "Old platform",
-            description = "Only change images with this platform. If null, matches any platform.",
-            example = "linux/amd64",
-            required = false)
-    @Nullable
-    String oldPlatform;
 
     @Option(displayName = "New platform",
             description = "The new platform. If null, preserves the existing platform. If empty, removes the platform flag.",
