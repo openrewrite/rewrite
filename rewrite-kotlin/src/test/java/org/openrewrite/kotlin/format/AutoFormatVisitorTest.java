@@ -419,9 +419,9 @@ class AutoFormatVisitorTest implements RewriteTest {
         // When no style is attached, it falls back to IntelliJ defaults (4 spaces).
         K.CompilationUnit cu = KotlinParser.builder().build()
           .parse("""
-            class MonitorConfigService {
-                private fun validateExpectedExecutionTime(expectedRunningTimeMinutes: Int) {
-                    if (expectedRunningTimeMinutes <= 0) throw BadRequestException("error")
+            class MyService {
+                private fun validateInput(value: Int) {
+                    if (value <= 0) throw IllegalArgumentException("error")
                 }
             }
             """)
@@ -456,10 +456,10 @@ class AutoFormatVisitorTest implements RewriteTest {
 
         // The indentation uses IntelliJ defaults (4 spaces) since no style is attached
         assertThat(actual).isEqualTo("""
-            class MonitorConfigService {
-                private fun validateExpectedExecutionTime(expectedRunningTimeMinutes: Int) {
-                    if (expectedRunningTimeMinutes <= 0) {
-                        throw BadRequestException("error")
+            class MyService {
+                private fun validateInput(value: Int) {
+                    if (value <= 0) {
+                        throw IllegalArgumentException("error")
                     }
                 }
             }
@@ -495,9 +495,9 @@ class AutoFormatVisitorTest implements RewriteTest {
         // Parse a file with 4-space indentation but attach 2-space style
         K.CompilationUnit cu = KotlinParser.builder().build()
           .parse("""
-            class MonitorConfigService {
-                private fun validateExpectedExecutionTime(expectedRunningTimeMinutes: Int) {
-                    if (expectedRunningTimeMinutes <= 0) throw BadRequestException("error")
+            class MyService {
+                private fun validateInput(value: Int) {
+                    if (value <= 0) throw IllegalArgumentException("error")
                 }
             }
             """)
@@ -536,10 +536,10 @@ class AutoFormatVisitorTest implements RewriteTest {
         // With 2-space style attached, the if statement and its contents get 2-space indentation.
         // This creates mixed indentation in the file.
         assertThat(actual).isEqualTo("""
-            class MonitorConfigService {
-                private fun validateExpectedExecutionTime(expectedRunningTimeMinutes: Int) {
-                  if (expectedRunningTimeMinutes <= 0) {
-                    throw BadRequestException("error")
+            class MyService {
+                private fun validateInput(value: Int) {
+                  if (value <= 0) {
+                    throw IllegalArgumentException("error")
                   }
                 }
             }

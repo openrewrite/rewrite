@@ -1162,15 +1162,14 @@ class AutodetectTest implements RewriteTest {
     @Issue("https://github.com/moderneinc/customer-requests/issues/1582")
     @Test
     void fourSpaceIndentDetection() {
-        // This test reproduces the customer issue where a file with 4-space indentation
-        // was reformatted to 2-space indentation after running CSA.
+        // This test verifies that a file with 4-space indentation is correctly detected.
         var cus = kp().parse(
           """
-            class MonitorConfigService {
-                private fun validateExpectedExecutionTime(expectedRunningTimeMinutes: Int) {
-                    logger.debug { "validating monitor expected execution time" }
-                    if (expectedRunningTimeMinutes <= 0) {
-                        throw BadRequestException("error")
+            class MyService {
+                private fun validateInput(value: Int) {
+                    logger.debug { "validating input" }
+                    if (value <= 0) {
+                        throw IllegalArgumentException("error")
                     }
                 }
             }
@@ -1190,16 +1189,16 @@ class AutodetectTest implements RewriteTest {
     @Issue("https://github.com/moderneinc/customer-requests/issues/1582")
     @Test
     void fourSpaceWithLambdaAndSingleLineIf() {
-        // Test the exact pattern from the customer issue:
+        // Test the pattern:
         // - A function with 4-space indentation
         // - Contains a lambda (logger.debug { ... })
         // - Contains a single-line if statement
         var cus = kp().parse(
           """
-            class MonitorConfigService {
-                private fun validateExpectedExecutionTime(expectedRunningTimeMinutes: Int) {
-                    logger.debug { "validating monitor expected execution time" }
-                    if (expectedRunningTimeMinutes <= 0) throw BadRequestException("error")
+            class MyService {
+                private fun validateInput(value: Int) {
+                    logger.debug { "validating input" }
+                    if (value <= 0) throw IllegalArgumentException("error")
                 }
             }
             """
@@ -1255,8 +1254,8 @@ class AutodetectTest implements RewriteTest {
           // File 3: 4-space indentation (fewer statements - minority)
           """
             class FourSpaceFile {
-                private fun validateExpectedExecutionTime(expectedRunningTimeMinutes: Int) {
-                    if (expectedRunningTimeMinutes <= 0) {
+                private fun validateInput(value: Int) {
+                    if (value <= 0) {
                         throw Exception("error")
                     }
                 }
