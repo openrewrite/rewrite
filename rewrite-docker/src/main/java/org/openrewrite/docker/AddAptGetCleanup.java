@@ -79,46 +79,16 @@ public class AddAptGetCleanup extends Recipe {
         return new DockerIsoVisitor<ExecutionContext>() {
             @Override
             public Docker.Run visitRun(Docker.Run run, ExecutionContext ctx) {
-                run = super.visitRun(run, ctx);
-
-                if (!(run.getCommand() instanceof Docker.ShellForm)) {
-                    return run;
+                Docker.Run r = super.visitRun(run, ctx);
+                if (r.getCommand() instanceof Docker.ShellForm) {
+                    Docker.ShellForm shellForm = (Docker.ShellForm) r.getCommand();
+                    String commandText = shellForm.getArgument().getText();
+                    if (APT_GET_INSTALL.matcher(commandText).find() && !CLEANUP_PATTERN.matcher(commandText).find()) {
+                        return r.withCommand(shellForm.withArgument(shellForm.getArgument().withText(commandText + cleanup)));
+                    }
                 }
+                return r;
 
-                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
-                String commandText = shellForm.getArgument().getText();
-
-                // Check if this contains apt-get install
-                Matcher installMatcher = APT_GET_INSTALL.matcher(commandText);
-                if (!installMatcher.find()) {
-                    return run;
-                }
-
-                // Check if cleanup is already present
-                Matcher cleanupMatcher = CLEANUP_PATTERN.matcher(commandText);
-                if (cleanupMatcher.find()) {
-                    return run;
-                }
-
-                // Add cleanup to the command
-                String newCommandText = commandText + cleanup;
-
-                Docker.Literal newLiteral = new Docker.Literal(
-                        randomId(),
-                        shellForm.getArgument().getPrefix(),
-                        shellForm.getArgument().getMarkers(),
-                        newCommandText,
-                        shellForm.getArgument().getQuoteStyle()
-                );
-
-                Docker.ShellForm newShellForm = new Docker.ShellForm(
-                        randomId(),
-                        shellForm.getPrefix(),
-                        Markers.EMPTY,
-                        newLiteral
-                );
-
-                return run.withCommand(newShellForm);
             }
         };
     }
