@@ -39,7 +39,7 @@ public class FindExposedPorts extends Recipe {
 
     @Option(displayName = "Port pattern",
             description = "A glob pattern to filter ports. For example, '80*' to find ports starting with 80. " +
-                          "If not specified, all EXPOSE instructions are matched.",
+                          "If not specified, all `EXPOSE` instructions are matched.",
             example = "80*",
             required = false)
     @Nullable
@@ -52,7 +52,7 @@ public class FindExposedPorts extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find all EXPOSE instructions in Dockerfiles and report the exposed ports.";
+        return "Find all `EXPOSE` instructions in Dockerfiles and report the exposed ports.";
     }
 
     @Override
@@ -114,21 +114,6 @@ public class FindExposedPorts extends Recipe {
                 }
 
                 return e;
-            }
-
-            private @Nullable String extractText(Docker.@Nullable Argument arg) {
-                if (arg == null) {
-                    return null;
-                }
-                StringBuilder builder = new StringBuilder();
-                for (Docker.ArgumentContent content : arg.getContents()) {
-                    if (content instanceof Docker.Literal) {
-                        builder.append(((Docker.Literal) content).getText());
-                    } else if (content instanceof Docker.EnvironmentVariable) {
-                        return null;
-                    }
-                }
-                return builder.toString();
             }
         };
     }

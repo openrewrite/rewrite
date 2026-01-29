@@ -18,21 +18,17 @@ package org.openrewrite.docker;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.docker.trait.DockerImage;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
 import java.util.Objects;
 
 import static java.util.Collections.singletonList;
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -40,14 +36,23 @@ import static org.openrewrite.Tree.randomId;
 public class ChangeBaseImage extends Recipe {
 
     @Option(displayName = "Old image name",
-            description = "The old image name to replace. Supports glob patterns.",
-            example = "ubuntu:20.04")
+            description = "Glob pattern to match image names (without tag/digest).",
+            example = "ubuntu")
     String oldImageName;
 
-    @Option(displayName = "New image name",
-            description = "The new image name to use.",
-            example = "ubuntu:22.04")
-    String newImageName;
+    @Option(displayName = "Old tag",
+            description = "Only match images with tags matching this glob pattern. If null, matches any tag or no tag.",
+            example = "20.*",
+            required = false)
+    @Nullable
+    String oldTag;
+
+    @Option(displayName = "Old digest",
+            description = "Only match images with digests matching this glob pattern. If null, matches any digest or no digest.",
+            example = "sha256:*",
+            required = false)
+    @Nullable
+    String oldDigest;
 
     @Option(displayName = "Old platform",
             description = "Only change images with this platform. If null, matches any platform.",
@@ -56,8 +61,29 @@ public class ChangeBaseImage extends Recipe {
     @Nullable
     String oldPlatform;
 
+    @Option(displayName = "New image name",
+            description = "The new image name. If null, preserves the existing name.",
+            example = "ubuntu",
+            required = false)
+    @Nullable
+    String newImageName;
+
+    @Option(displayName = "New tag",
+            description = "The new tag. If null, preserves the existing tag. If empty, removes the tag.",
+            example = "22.04",
+            required = false)
+    @Nullable
+    String newTag;
+
+    @Option(displayName = "New digest",
+            description = "The new digest. If null, preserves the existing digest. If empty, removes the digest.",
+            example = "sha256:abc123...",
+            required = false)
+    @Nullable
+    String newDigest;
+
     @Option(displayName = "New platform",
-            description = "Set the platform to this value. If null and oldPlatform is specified, removes the platform flag from matched images. If both oldPlatform and newPlatform are null, platform flags are preserved.",
+            description = "The new platform. If null, preserves the existing platform. If empty, removes the platform flag.",
             example = "linux/arm64",
             required = false)
     @Nullable
@@ -74,81 +100,57 @@ public class ChangeBaseImage extends Recipe {
     }
 
     @Override
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
+        if (newImageName == null && newTag == null && newDigest == null && newPlatform == null) {
+            validated = validated.and(Validated.invalid("options", null,
+                    "At least one of newImageName, newTag, newDigest, or newPlatform must be specified"));
+        }
+        if (newImageName != null && newImageName.isEmpty()) {
+            validated = validated.and(Validated.invalid("newImageName", newImageName,
+                    "newImageName cannot be empty; omit to preserve the existing name"));
+        }
+        return validated;
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        DockerImage.Matcher matcher = new DockerImage.Matcher()
+                .imageName(oldImageName);
+        if (oldTag != null) {
+            matcher.tag(oldTag);
+        }
+        if (oldDigest != null) {
+            matcher.digest(oldDigest);
+        }
+        if (oldPlatform != null) {
+            matcher.platform(oldPlatform);
+        }
+
         return new DockerIsoVisitor<ExecutionContext>() {
             @Override
             public Docker.From visitFrom(Docker.From from, ExecutionContext ctx) {
-                // Visit children first
                 Docker.From f = super.visitFrom(from, ctx);
 
-                // Reconstruct the full image name from imageName, tag, and digest
-                // Use a wildcard placeholder for environment variables to allow glob matching
-                StringBuilder imageTextBuilder = new StringBuilder();
-                boolean hasEnvironmentVariable = false;
-
-                // Add image name
-                for (Docker.ArgumentContent content : f.getImageName().getContents()) {
-                    if (content instanceof Docker.Literal) {
-                        imageTextBuilder.append(((Docker.Literal) content).getText());
-                    } else if (content instanceof Docker.EnvironmentVariable) {
-                        imageTextBuilder.append("*");
-                        hasEnvironmentVariable = true;
-                    }
-                }
-
-                // Add tag and/or digest
-                if (f.getTag() != null) {
-                    imageTextBuilder.append(":");
-                    for (Docker.ArgumentContent content : f.getTag().getContents()) {
-                        if (content instanceof Docker.Literal) {
-                            imageTextBuilder.append(((Docker.Literal) content).getText());
-                        } else if (content instanceof Docker.EnvironmentVariable) {
-                            imageTextBuilder.append("*");
-                            hasEnvironmentVariable = true;
-                        }
-                    }
-                }
-                if (f.getDigest() != null) {
-                    imageTextBuilder.append("@");
-                    for (Docker.ArgumentContent content : f.getDigest().getContents()) {
-                        if (content instanceof Docker.Literal) {
-                            imageTextBuilder.append(((Docker.Literal) content).getText());
-                        } else if (content instanceof Docker.EnvironmentVariable) {
-                            imageTextBuilder.append("*");
-                            hasEnvironmentVariable = true;
-                        }
-                    }
-                }
-
-                String imageText = imageTextBuilder.toString();
-
-                // When environment variables are present, we need to check if both
-                // the constructed text (with wildcards) AND the pattern can match each other
-                if (hasEnvironmentVariable) {
-                    // Both must be able to match each other for a valid match
-                    // e.g., "ubuntu:*" pattern matches "ubuntu:*" text (from ubuntu:${TAG})
-                    if (!StringUtils.matchesGlob(imageText, oldImageName) &&
-                        !StringUtils.matchesGlob(oldImageName, imageText)) {
-                        return f;
-                    }
-                } else if (!StringUtils.matchesGlob(imageText, oldImageName)) {
+                DockerImage image = matcher.get(getCursor()).orElse(null);
+                if (image == null) {
                     return f;
                 }
 
-                // Get the current platform flag value, if any
-                String currentPlatform = getPlatformFlag(f);
+                // Check if any change is needed
+                String currentImageName = image.getImageNameForMatching();
+                String currentTag = image.getTagForMatching();
+                String currentDigest = image.getDigestForMatching();
+                String currentPlatform = image.getPlatform();
 
-                // Check if oldPlatform is specified and matches
-                if (oldPlatform != null && !oldPlatform.equals(currentPlatform)) {
-                    return f;
-                }
+                boolean imageNameChanged = newImageName != null && !currentImageName.equals(newImageName);
+                boolean tagChanged = newTag != null && !newTag.equals(currentTag == null ? "" : currentTag);
+                boolean digestChanged = newDigest != null && !newDigest.equals(currentDigest == null ? "" : currentDigest);
+                boolean platformChanged = newPlatform != null && !Objects.equals(
+                        currentPlatform == null ? "" : currentPlatform,
+                        newPlatform);
 
-                boolean imageChanged = !imageText.equals(newImageName);
-                // Only consider platform changed if oldPlatform or newPlatform was explicitly set
-                boolean shouldChangePlatform = oldPlatform != null || newPlatform != null;
-                boolean platformChanged = shouldChangePlatform && !Objects.equals(currentPlatform, newPlatform);
-
-                if (!imageChanged && !platformChanged) {
+                if (!imageNameChanged && !tagChanged && !digestChanged && !platformChanged) {
                     return f;
                 }
 
@@ -156,49 +158,72 @@ public class ChangeBaseImage extends Recipe {
 
                 // Update platform flag if needed
                 if (platformChanged) {
-                    result = updatePlatformFlag(result, newPlatform);
+                    if (newPlatform.isEmpty()) {
+                        result = updatePlatformFlag(result, null);
+                    } else {
+                        result = updatePlatformFlag(result, newPlatform);
+                    }
                 }
 
-                // Update image if needed
-                if (imageChanged) {
-                    // Check if the original was a single content item (e.g., a single quoted string)
-                    boolean wasSingleContent = f.getImageName().getContents().size() == 1 &&
-                            f.getTag() == null && f.getDigest() == null;
+                // Get quote style from original
+                Docker.Literal.QuoteStyle quoteStyle = image.getQuoteStyle();
 
-                    if (wasSingleContent) {
-                        // Keep as a single content item (don't split)
-                        Docker.Literal.QuoteStyle quoteStyle = getQuoteStyle(f.getImageName());
-                        Docker.ArgumentContent newContent = createContent(newImageName, quoteStyle);
-                        Docker.Argument newImageArg = f.getImageName().withContents(singletonList(newContent));
-                        return result.withImageName(newImageArg);
+                // Check if the original was a single content item (e.g., a single quoted string)
+                boolean wasSingleContent = f.getImageName().getContents().size() == 1 &&
+                        f.getTag() == null && f.getDigest() == null;
+
+                if (wasSingleContent) {
+                    // Keep as a single content item (don't split)
+                    String imagePart = newImageName != null ? newImageName : currentImageName;
+                    StringBuilder sb = new StringBuilder(imagePart);
+                    // For tag: null=keep existing, ""=remove, value=set
+                    if (newTag != null) {
+                        if (!newTag.isEmpty()) {
+                            sb.append(":").append(newTag);
+                        }
+                    } else if (currentTag != null) {
+                        sb.append(":").append(currentTag);
                     }
+                    // For digest: null=keep existing, ""=remove, value=set
+                    if (newDigest != null) {
+                        if (!newDigest.isEmpty()) {
+                            sb.append("@").append(newDigest);
+                        }
+                    } else if (currentDigest != null) {
+                        sb.append("@").append(currentDigest);
+                    }
+                    Docker.ArgumentContent newContent = createContent(sb.toString(), quoteStyle);
+                    Docker.Argument newImageArg = f.getImageName().withContents(singletonList(newContent));
+                    return result.withImageName(newImageArg);
+                }
 
-                    // Split into components
-                    @Nullable String[] parts = parseNewImageName(newImageName);
-                    String newImage = requireNonNull(parts[0]);
-                    String newTag = parts[1];
-                    String newDigest = parts[2];
-
-                    // Check if the original used quotes
-                    Docker.Literal.QuoteStyle quoteStyle = getQuoteStyle(f.getImageName());
-
-                    // Create new image name argument
-                    Docker.ArgumentContent newImageContent = createContent(newImage, quoteStyle);
+                // Update image name: null=keep, value=set
+                if (newImageName != null) {
+                    Docker.ArgumentContent newImageContent = createContent(newImageName, quoteStyle);
                     Docker.Argument newImageArg = f.getImageName().withContents(singletonList(newImageContent));
                     result = result.withImageName(newImageArg);
+                }
 
-                    // Create new tag argument if present
-                    if (newTag != null) {
+                // Update tag: null=keep, ""=remove, value=set
+                if (newTag != null) {
+                    if (newTag.isEmpty()) {
+                        result = result.withTag(null);
+                    } else {
                         Docker.ArgumentContent newTagContent = createContent(newTag, quoteStyle);
                         Docker.Argument newTagArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(newTagContent));
-                        return result.withTag(newTagArg).withDigest(null);
+                        result = result.withTag(newTagArg);
                     }
-                    if (newDigest != null) {
+                }
+
+                // Update digest: null=keep, ""=remove, value=set
+                if (newDigest != null) {
+                    if (newDigest.isEmpty()) {
+                        result = result.withDigest(null);
+                    } else {
                         Docker.ArgumentContent newDigestContent = createContent(newDigest, quoteStyle);
                         Docker.Argument newDigestArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(newDigestContent));
-                        return result.withDigest(newDigestArg).withTag(null);
+                        result = result.withDigest(newDigestArg);
                     }
-                    return result.withTag(null).withDigest(null);
                 }
 
                 return result;
@@ -206,61 +231,8 @@ public class ChangeBaseImage extends Recipe {
         };
     }
 
-    private @Nullable String [] parseNewImageName(String fullImageName) {
-        String imageName;
-        String tag = null;
-        String digest = null;
-
-        // Check for digest first (takes precedence)
-        int atIndex = fullImageName.indexOf('@');
-        if (atIndex > 0) {
-            imageName = fullImageName.substring(0, atIndex);
-            digest = fullImageName.substring(atIndex + 1);
-        } else {
-            // Check for tag
-            int colonIndex = fullImageName.lastIndexOf(':');
-            if (colonIndex > 0) {
-                imageName = fullImageName.substring(0, colonIndex);
-                tag = fullImageName.substring(colonIndex + 1);
-            } else {
-                imageName = fullImageName;
-            }
-        }
-
-        return new @Nullable String[]{imageName, tag, digest};
-    }
-
-    private Docker.Literal.@Nullable QuoteStyle getQuoteStyle(Docker.Argument arg) {
-        for (Docker.ArgumentContent content : arg.getContents()) {
-            if (content instanceof Docker.Literal) {
-                Docker.Literal.QuoteStyle style = ((Docker.Literal) content).getQuoteStyle();
-                if (style != null) {
-                    return style;
-                }
-            }
-        }
-        return null;
-    }
-
     private Docker.ArgumentContent createContent(String text, Docker.Literal.@Nullable QuoteStyle quoteStyle) {
         return new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, quoteStyle);
-    }
-
-    private @Nullable String getPlatformFlag(Docker.From from) {
-        if (from.getFlags() == null) {
-            return null;
-        }
-
-        for (Docker.Flag flag : from.getFlags()) {
-            if ("platform".equals(flag.getName()) && flag.getValue() != null) {
-                for (Docker.ArgumentContent content : flag.getValue().getContents()) {
-                    if (content instanceof Docker.Literal) {
-                        return ((Docker.Literal) content).getText();
-                    }
-                }
-            }
-        }
-        return null;
     }
 
     private Docker.From updatePlatformFlag(Docker.From from, @Nullable String platform) {
