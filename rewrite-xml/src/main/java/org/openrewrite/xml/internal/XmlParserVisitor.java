@@ -218,11 +218,17 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     List<Xml.CharData> piTexts = c.PI_TEXT().stream()
                             .map(piText -> convert(piText, (cdata, p) -> charData(cdata.getText(), false, p)))
                             .collect(toList());
-                    Xml.CharData piText = piTexts.get(0);
-                    if (piTexts.size() > 1) {
-                        StringBuilder sb = new StringBuilder();
-                        piTexts.forEach(it -> sb.append(it.getText()));
-                        piText = piText.withText(sb.toString());
+                    Xml.CharData piText;
+                    if (piTexts.isEmpty()) {
+                        // Handle malformed processing instruction with no content
+                        piText = new Xml.CharData(randomId(), "", Markers.EMPTY, false, "", "");
+                    } else {
+                        piText = piTexts.get(0);
+                        if (piTexts.size() > 1) {
+                            StringBuilder sb = new StringBuilder();
+                            piTexts.forEach(it -> sb.append(it.getText()));
+                            piText = piText.withText(sb.toString());
+                        }
                     }
 
                     return new Xml.ProcessingInstruction(
@@ -347,14 +353,24 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         String closeTagPrefix = prefix(ctx.OPEN(1));
                         advanceCursor(codePointCursor + 2);
 
+                        // Handle malformed XML where closing tag name might be null
+                        String closeTagName = ctx.Name(1) != null
+                                ? convert(ctx.Name(1), (n, p) -> n.getText())
+                                : name;  // Fall back to opening tag name
+                        String beforeCloseTagDelimiter = ctx.CLOSE(1) != null
+                                ? prefix(ctx.CLOSE(1))
+                                : "";
+
                         closeTag = new Xml.Tag.Closing(
                                 randomId(),
                                 closeTagPrefix,
                                 Markers.EMPTY,
-                                convert(ctx.Name(1), (n, p) -> n.getText()),
-                                prefix(ctx.CLOSE(1))
+                                closeTagName,
+                                beforeCloseTagDelimiter
                         );
-                        advanceCursor(codePointCursor + 1);
+                        if (ctx.CLOSE(1) != null) {
+                            advanceCursor(codePointCursor + 1);
+                        }
                     }
 
                     return new Xml.Tag(randomId(), prefix, Markers.EMPTY, name, attributes,

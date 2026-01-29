@@ -204,6 +204,59 @@ class XmlParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/856")
+    @Test
+    void jspScriptletStartingWithTab() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <%@ page language="java" %>
+              <%	String logNr = null;
+              	logNr = "test";
+              %>
+              <html><body>test</body></html>
+              """,
+            spec -> spec.path("test.jsp")
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/856")
+    @Test
+    void jspCommentAtFileStart() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <%--When working with tags, choose the correct taglib--%>
+              <%@ taglib uri="webtag" prefix="web" %>
+              <html><body>test</body></html>
+              """,
+            spec -> spec.path("test.jsp")
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/856")
+    @Test
+    void jspWithNestedPercentGreaterThan() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <%@ page language="java" %>
+              <%
+                String s = "test%>notend";
+                out.println(s);
+              %>
+              <html><body>test</body></html>
+              """,
+            spec -> spec.path("test.jsp")
+          )
+        );
+    }
+
     @Test
     void lowerCaseDocType() {
         rewriteRun(

@@ -52,13 +52,22 @@ SPECIAL_OPEN      :  '<' QUESTION_MARK Name        -> pushMode(INSIDE_PROCESS_IN
 
 DTD_OPEN          :  '<!'                          -> pushMode(INSIDE_DTD) ;
 
-// JSP elements
+// JSP elements - handle %> inside Java string literals correctly
 JSP_COMMENT       :  '<%--' .*? '--%>' ;
-JSP_DECLARATION   :  '<%!' .*? '%>' ;
-JSP_EXPRESSION    :  '<%=' .*? '%>' ;
-JSP_SCRIPTLET     :  '<%' ~[@=!-] .*? '%>' ;  // Matches <% but not <%@, <%=, <%!, or <%--
+JSP_DECLARATION   :  '<%!' JSP_CONTENT '%>' ;
+JSP_EXPRESSION    :  '<%=' JSP_CONTENT '%>' ;
+JSP_SCRIPTLET     :  '<%' ~[@=!-] JSP_CONTENT '%>' ;  // Matches <% but not <%@, <%=, <%!, or <%--
 
 TEXT              :  ~[<&]+ ;  // match any 16 bit char other than < and &
+
+// Fragment to match JSP content, handling %> inside string literals
+fragment JSP_CONTENT
+    : ( ~[%"']                           // Any char except %, ", '
+      | '%' ~[>]                         // % not followed by >
+      | '"' (~["\\\r\n] | '\\' .)* '"'   // Double-quoted string (handles escapes)
+      | '\'' (~['\\\r\n] | '\\' .)* '\'' // Single-quoted string (handles escapes)
+      )*
+    ;
 
 fragment
 UTF_8_BOM_CHARS   : '\u00EF''\u00BB''\u00BF' ; // chars for UTF-8 read from a byte array.
