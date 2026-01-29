@@ -49,7 +49,8 @@ public class FindRootUser extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Finds containers that run as root user. This includes explicit `USER root` or `USER 0` instructions, " +
+        return "Finds containers that run as root user (CIS Docker Benchmark 4.1). " +
+                "This includes explicit `USER root` or `USER 0` instructions, " +
                 "and optionally containers with no `USER` instruction in the final stage (which default to root).";
     }
 

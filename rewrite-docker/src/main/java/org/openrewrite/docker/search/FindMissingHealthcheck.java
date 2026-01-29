@@ -39,7 +39,7 @@ public class FindMissingHealthcheck extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Finds Dockerfiles where the final stage is missing a `HEALTHCHECK` instruction. " +
+        return "Finds Dockerfiles where the final stage is missing a `HEALTHCHECK` instruction (CIS Docker Benchmark 4.6). " +
                 "Health checks help container orchestrators determine if a container is healthy and ready to receive traffic.";
     }
 
