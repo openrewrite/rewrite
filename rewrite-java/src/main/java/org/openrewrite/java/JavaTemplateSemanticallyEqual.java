@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
@@ -158,15 +157,11 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                 }
 
                 if (isAssignableTo(marker.getType(), ((TypedTree) j).getType())) {
-                    registerMatch(j, marker.getName());
+                    matchedParameters.put(j, marker.getName());
                     return true;
                 }
             }
             return false;
-        }
-
-        private void registerMatch(J j, @Nullable String name) {
-            matchedParameters.put(j, name);
         }
 
         @Override
@@ -203,6 +198,196 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         @Override
         protected boolean isAssignableTo(JavaType to, JavaType from) {
             return TypeUtils.isAssignableTo(to, from, TypeUtils.ComparisonContext.INFER);
+        }
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation template, J j) {
+            if (!isEqual.get()) {
+                return template;
+            }
+            if (!(j instanceof J.MethodInvocation)) {
+                isEqual.set(false);
+                return template;
+            }
+
+            J.MethodInvocation actual = (J.MethodInvocation) j;
+            JavaType.Method templateMethod = template.getMethodType();
+
+            // Check if this is a varargs method with a placeholder at varargs position
+            if (templateMethod != null &&
+                templateMethod.hasFlags(Flag.Varargs) &&
+                hasVarargsPlaceholder(template)) {
+
+                isEqual.set(matchWithVarargs(template, actual));
+                return template;
+            }
+
+            return super.visitMethodInvocation(template, j);
+        }
+
+        private boolean hasVarargsPlaceholder(J.MethodInvocation template) {
+            List<JRightPadded<Expression>> args = template.getPadding().getArguments().getPadding().getElements();
+            if (args.isEmpty()) {
+                return false;
+            }
+            JRightPadded<Expression> lastArg = args.get(args.size() - 1);
+            if (!(lastArg.getElement() instanceof J.Empty)) {
+                return false;
+            }
+            J.Empty empty = (J.Empty) lastArg.getElement();
+            if (!isTemplateParameterPlaceholder(empty)) {
+                return false;
+            }
+            TemplateParameter param = (TemplateParameter) empty.getMarkers().getMarkers().get(0);
+            return param.getType() instanceof JavaType.Array;
+        }
+
+        private boolean matchWithVarargs(J.MethodInvocation template, J.MethodInvocation actual) {
+            JavaType.Method templateMethod = template.getMethodType();
+            JavaType.Method actualMethod = actual.getMethodType();
+
+            // Check method name matches
+            if (!template.getSimpleName().equals(actual.getSimpleName())) {
+                return false;
+            }
+
+            // Check method types are present
+            if (templateMethod == null || actualMethod == null) {
+                return false;
+            }
+
+            // Check return type is assignable
+            if (!isAssignableTo(templateMethod.getReturnType(), actualMethod.getReturnType())) {
+                return false;
+            }
+
+            // Check static flag compatibility
+            boolean templateStatic = templateMethod.hasFlags(Flag.Static);
+            boolean actualStatic = actualMethod.hasFlags(Flag.Static);
+            if (templateStatic != actualStatic) {
+                return false;
+            }
+
+            // Check select expression
+            if (templateStatic) {
+                JavaType.FullyQualified templateDeclaringType = templateMethod.getDeclaringType();
+                JavaType.FullyQualified actualDeclaringType = actualMethod.getDeclaringType();
+                if (!isAssignableTo(
+                        templateDeclaringType instanceof JavaType.Parameterized ?
+                                ((JavaType.Parameterized) templateDeclaringType).getType() : templateDeclaringType,
+                        actualDeclaringType instanceof JavaType.Parameterized ?
+                                ((JavaType.Parameterized) actualDeclaringType).getType() : actualDeclaringType)) {
+                    return false;
+                }
+            } else {
+                if (nullMissMatch(template.getSelect(), actual.getSelect())) {
+                    return false;
+                }
+                if (template.getSelect() != null && actual.getSelect() != null) {
+                    visit(template.getSelect(), actual.getSelect());
+                    if (!isEqual.get()) {
+                        return false;
+                    }
+                }
+            }
+
+            List<JRightPadded<Expression>> templateArgs = template.getPadding().getArguments().getPadding().getElements();
+            List<JRightPadded<Expression>> actualArgs = actual.getPadding().getArguments().getPadding().getElements();
+
+            // Handle the case where actual has "no arguments" represented as a single J.Empty
+            boolean actualHasNoArgs = actualArgs.isEmpty() ||
+                    (actualArgs.size() == 1 && actualArgs.get(0).getElement() instanceof J.Empty &&
+                            !isTemplateParameterPlaceholder((J.Empty) actualArgs.get(0).getElement()));
+            if (actualHasNoArgs) {
+                actualArgs = emptyList();
+            }
+
+            int fixedArgCount = templateArgs.size() - 1; // All except the last varargs placeholder
+
+            // Check actual has at least the fixed arguments
+            if (actualArgs.size() < fixedArgCount) {
+                return false;
+            }
+
+            // Match fixed arguments
+            for (int i = 0; i < fixedArgCount; i++) {
+                visit(templateArgs.get(i).getElement(), actualArgs.get(i).getElement());
+                if (!isEqual.get()) {
+                    return false;
+                }
+            }
+
+            // Get the varargs placeholder and its element type
+            J.Empty varargsPlaceholder = (J.Empty) templateArgs.get(fixedArgCount).getElement();
+            TemplateParameter param = (TemplateParameter) varargsPlaceholder.getMarkers().getMarkers().get(0);
+            JavaType.Array arrayType = (JavaType.Array) param.getType();
+            JavaType elementType = arrayType.getElemType();
+
+            // Collect varargs elements
+            List<Expression> varargsElements = new ArrayList<>();
+            for (int i = fixedArgCount; i < actualArgs.size(); i++) {
+                Expression actualArg = actualArgs.get(i).getElement();
+
+                // Handle case where explicit array is passed to varargs position
+                if (i == fixedArgCount && actualArgs.size() == fixedArgCount + 1) {
+                    JavaType actualArgType = actualArg.getType();
+                    if (actualArgType instanceof JavaType.Array) {
+                        // Single array argument passed to varargs - match it directly
+                        if (isAssignableTo(arrayType, actualArgType)) {
+                            varargsElements.add(actualArg);
+                            break;
+                        }
+                    }
+                }
+
+                // Check each varargs element is assignable to the element type
+                if (actualArg instanceof TypedTree) {
+                    JavaType actualArgType = ((TypedTree) actualArg).getType();
+                    if (!isAssignableTo(elementType, actualArgType)) {
+                        return false;
+                    }
+                    varargsElements.add(actualArg);
+                } else {
+                    return false;
+                }
+            }
+
+            // Build the J.NewArray representing the matched varargs
+            J.NewArray currentVarargs = buildVarargsArray(varargsElements, arrayType);
+
+            // Check for named parameter reuse
+            if (param.getName() != null) {
+                for (Map.Entry<J, String> entry : matchedParameters.entrySet()) {
+                    if (param.getName().equals(entry.getValue())) {
+                        // Named parameter already matched - verify current matches previous
+                        return SemanticallyEqual.areEqual(entry.getKey(), currentVarargs);
+                    }
+                }
+            }
+
+            // Register the match
+            matchedParameters.put(currentVarargs, param.getName());
+            return true;
+        }
+
+        private J.NewArray buildVarargsArray(List<Expression> elements, JavaType.Array arrayType) {
+            JContainer<Expression> initializer = null;
+            if (!elements.isEmpty()) {
+                List<JRightPadded<Expression>> paddedElements = new ArrayList<>(elements.size());
+                for (Expression element : elements) {
+                    paddedElements.add(JRightPadded.build(element));
+                }
+                initializer = JContainer.build(paddedElements);
+            }
+            return new J.NewArray(
+                    randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    null, // typeExpression - not needed for matching purposes
+                    emptyList(), // dimensions
+                    initializer,
+                    arrayType
+            );
         }
     }
 }

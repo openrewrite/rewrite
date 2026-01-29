@@ -728,7 +728,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             "newTest1,newTest2",
             null,
             false,
-            true)),
+            false
+          )),
           java(
             """
               package org.example;
@@ -2365,4 +2366,120 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void respectsAppendArrayWhenGoingFromLiteralToArraySingle() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "bars",
+            "xyz",
+            null,
+            null,
+            true
+          )),
+          //language=java
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] bars() default {};
+              }
+              """,
+            SourceSpec::skip
+          ),
+          //language=java
+          java(
+            """
+              import org.example.Foo;
+              
+              @Foo(bars = "abc")
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+              
+              @Foo(bars = {"abc", "xyz"})
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void respectsAppendArrayWhenGoingFromLiteralToArrayMulti() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "bars",
+            "xyz,def",
+            null,
+            null,
+            true
+          )),
+          //language=java
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] bars() default {};
+              }
+              """,
+            SourceSpec::skip
+          ),
+          //language=java
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(bars = "abc")
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(bars = {"abc", "xyz", "def"})
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void respectsAppendArrayWhenGoingFromImplicitLiteralValueToArray() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "xyz",
+            null,
+            null,
+            true
+          )),
+          //language=java
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """,
+            SourceSpec::skip
+          ),
+          //language=java
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo("abc")
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo({"abc", "xyz"})
+              public class A {}
+              """
+          )
+        );
+    }
 }

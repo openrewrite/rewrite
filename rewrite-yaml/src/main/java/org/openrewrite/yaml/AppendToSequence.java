@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 
 import java.util.List;
 
@@ -61,6 +62,11 @@ public class AppendToSequence extends Recipe {
     }
 
     String description = "Append item to YAML sequence.";
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(JsonPathMatcher.validate("sequencePath", sequencePath));
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -130,4 +130,42 @@ class AutoFormatTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6514")
+    @Test
+    void multiLineTupleIndentation() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                list = [
+                       "one",
+                       "two"
+                ]
+              }
+              """,
+            """
+              locals {
+                list = [
+                  "one",
+                  "two"
+                ]
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void singleLineTuple() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                list = ["one", "two", "three"]
+              }
+              """
+          )
+        );
+    }
 }

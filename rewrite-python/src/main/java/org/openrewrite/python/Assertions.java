@@ -18,13 +18,95 @@ package org.openrewrite.python;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.tree.Py;
+import org.openrewrite.text.PlainText;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.function.Consumer;
+
+import static java.util.Objects.requireNonNull;
 
 public final class Assertions {
     private Assertions() {
+    }
+
+    /**
+     * Sets up a Python project with dependencies installed for type attribution.
+     * Similar to the JavaScript npm() helper, this creates a cached workspace
+     * with dependencies from pyproject.toml and symlinks the virtual environment.
+     *
+     * @param relativeTo The test directory where files should be written
+     * @param sources    Source specs including Python files and optionally pyproject.toml
+     * @return SourceSpecs wrapped in a directory context
+     */
+    public static SourceSpecs uv(Path relativeTo, SourceSpecs... sources) {
+        String pyprojectContent = null;
+
+        // First pass: find pyproject.toml content and write it
+        for (SourceSpecs multiSpec : sources) {
+            if (multiSpec instanceof SourceSpec) {
+                SourceSpec<?> spec = (SourceSpec<?>) multiSpec;
+                Path sourcePath = spec.getSourcePath();
+                if (sourcePath != null && "pyproject.toml".equals(sourcePath.toFile().getName())) {
+                    pyprojectContent = spec.getBefore();
+                    try {
+                        Path pyproject = relativeTo.resolve(sourcePath);
+                        Files.write(pyproject, requireNonNull(pyprojectContent).getBytes(StandardCharsets.UTF_8));
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Second pass: create workspace and symlink .venv
+        if (pyprojectContent != null) {
+            Path workspaceDir = DependencyWorkspace.getOrCreateWorkspace(pyprojectContent);
+            Path venvSource = workspaceDir.resolve(".venv");
+            Path venvTarget = relativeTo.resolve(".venv");
+
+            try {
+                if (Files.exists(venvSource) && !Files.exists(venvTarget)) {
+                    Files.createSymbolicLink(venvTarget, venvSource);
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to create symlink for .venv", e);
+            }
+        }
+
+        return SourceSpecs.dir(relativeTo.toString(), sources);
+    }
+
+    /**
+     * Creates a pyproject.toml source spec for use with uv().
+     * The content is treated as plain text since we only need to write it to disk
+     * for the Python dependency workspace to use.
+     */
+    public static SourceSpecs pyproject(@Language("toml") @Nullable String before) {
+        return pyproject(before, s -> {
+        });
+    }
+
+    /**
+     * Creates a pyproject.toml source spec for use with uv().
+     */
+    public static SourceSpecs pyproject(@Language("toml") @Nullable String before,
+                                        Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> text = new SourceSpec<>(
+                PlainText.class, null, org.openrewrite.text.PlainTextParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        text.path("pyproject.toml");
+        spec.accept(text);
+        return text;
     }
 
     public static SourceSpecs python(@Language("py") @Nullable String before) {

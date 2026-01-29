@@ -74,10 +74,7 @@ public class ChangeDependencyConfiguration extends Recipe {
         return super.validate().and(DependencyMatcher.build(groupId + ":" + artifactId));
     }
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(5);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

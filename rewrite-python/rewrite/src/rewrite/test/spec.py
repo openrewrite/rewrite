@@ -19,12 +19,10 @@ from __future__ import annotations
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional, TypeVar, Union, TYPE_CHECKING
+from typing import Callable, Optional, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from rewrite.tree import SourceFile
-
-T = TypeVar("T", bound="SourceFile")
 
 # Type alias for the "after" field:
 # - None: No change expected (recipe should not modify the file)
@@ -59,8 +57,8 @@ class SourceSpec:
     before: Optional[str]
     after: AfterRecipeText = None
     path: Optional[Path] = None
-    before_recipe: Optional[Callable[[T], Optional[T]]] = None
-    after_recipe: Optional[Callable[[T], None]] = None
+    before_recipe: Optional[Callable[["SourceFile"], Optional["SourceFile"]]] = None
+    after_recipe: Optional[Callable[["SourceFile"], None]] = None
     ext: str = "py"
 
 
@@ -114,8 +112,8 @@ def python(
     after: AfterRecipeText = None,
     *,
     path: Optional[Path] = None,
-    before_recipe: Optional[Callable[[T], Optional[T]]] = None,
-    after_recipe: Optional[Callable[[T], None]] = None,
+    before_recipe: Optional[Callable[["SourceFile"], Optional["SourceFile"]]] = None,
+    after_recipe: Optional[Callable[["SourceFile"], None]] = None,
 ) -> SourceSpec:
     """
     Create a SourceSpec for Python source code.

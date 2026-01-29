@@ -27,7 +27,7 @@ class AddKeyValueTest implements RewriteTest {
     @Test
     void shouldAppendSimpleValue() {
         rewriteRun(
-          spec -> spec.recipe(new AddKeyValue("$.", "key", "\"val\"", false)),
+          spec -> spec.recipe(new AddKeyValue("$", "key", "\"val\"", false)),
           //language=json
           json(
             """
@@ -108,7 +108,7 @@ class AddKeyValueTest implements RewriteTest {
     @Test
     void shouldNotAppendIfExists() {
         rewriteRun(
-          spec -> spec.recipe(new AddKeyValue("$.", "key", "\"val\"", false)),
+          spec -> spec.recipe(new AddKeyValue("$", "key", "\"val\"", false)),
           //language=json
           json(
             """
@@ -124,7 +124,7 @@ class AddKeyValueTest implements RewriteTest {
     void shouldAppendObject() {
         rewriteRun(
           spec -> spec.recipe(new AddKeyValue(
-            "$.", "key", """
+            "$", "key", """
                 { "a": "b" }
             """.trim(), false)),
           //language=json
@@ -152,7 +152,7 @@ class AddKeyValueTest implements RewriteTest {
     void shouldPrependObject() {
         rewriteRun(
           spec -> spec.recipe(new AddKeyValue(
-            "$.", "key", """
+            "$", "key", """
                 { "a": "b" }
             """.trim(), true)),
           //language=json

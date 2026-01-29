@@ -1,12 +1,60 @@
 import inspect
-from typing import Callable, TypeVar, List, Union
+from dataclasses import replace as dataclass_replace
+from typing import Any, Callable, TypeVar, List, Union, cast
 from uuid import UUID, uuid4
+
+T = TypeVar('T')
+
+
+def replace_if_changed(obj: T, **kwargs) -> T:
+    """Replace fields on a dataclass, returning the original if nothing changed.
+
+    Handles the convention where properties use public names (e.g., 'prefix')
+    but dataclass fields use private names (e.g., '_prefix').
+
+    Also handles Python keyword conflicts where parameters use trailing underscore
+    (e.g., 'from_' maps to field '_from').
+
+    This is critical for performance - visitor traversals call replace() on every
+    node, and returning the same object when nothing changes avoids unnecessary
+    allocations and GC pressure.
+
+    Args:
+        obj: The dataclass instance to potentially replace
+        **kwargs: Field names and their new values (public or private names)
+
+    Returns:
+        The original object if no values changed, otherwise a new instance
+    """
+    if not kwargs:
+        return obj
+
+    # Map public property names to private field names and check for changes
+    mapped_kwargs = {}
+    changed = False
+    for key, value in kwargs.items():
+        if not key.startswith('_'):
+            # Handle Python keyword conflicts: from_ -> _from
+            base_key = key.rstrip('_')
+            private_key = f'_{base_key}'
+            if hasattr(obj, private_key):
+                mapped_kwargs[private_key] = value
+                # Use 'or' for short-circuit evaluation - skips getattr() once changed is True
+                changed = changed or getattr(obj, private_key) is not value
+            else:
+                mapped_kwargs[key] = value
+                changed = changed or getattr(obj, key) is not value
+        else:
+            mapped_kwargs[key] = value
+            changed = changed or getattr(obj, key) is not value
+
+    # cast needed because Python lacks a public Dataclass protocol (see cpython#102395)
+    return cast(T, dataclass_replace(cast(Any, obj), **mapped_kwargs)) if changed else obj
 
 
 def random_id() -> UUID:
     return uuid4()
 
-T = TypeVar('T')
 
 # Define a type that allows both single and two-argument callables
 FnType = Union[Callable[[T], Union[T, None]], Callable[[T, int], Union[T, None]]]
@@ -38,7 +86,10 @@ def list_map(fn: FnType[T], lst: List[T]) -> List[T]:
         elif mapped_lst is not None:
             mapped_lst.append(original)
 
-    return mapped_lst if changed else lst  # type: ignore
+    if changed:
+        assert mapped_lst is not None
+        return mapped_lst
+    return lst
 
 
 def list_flat_map(fn: FlatMapFnType[T], lst: List[T]) -> List[T]:

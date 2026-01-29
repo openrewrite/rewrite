@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.BlankLinesStyle;
@@ -264,8 +265,30 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
         return tree.withPrefix(keepMaximumLines(tree.getPrefix(), max));
     }
 
-    private Space keepMaximumLines(Space prefix, int max) {
-        return prefix.withWhitespace(keepMaximumLines(prefix.getWhitespace(), max));
+    private Space keepMaximumLines(Space space, int max) {
+        if (space.getComments().isEmpty()) {
+            if (StringUtils.countOccurrences(space.getWhitespace(), "\n") > max) {
+                space = space.withWhitespace(StringUtils.repeat("\n", max + 1) + space.getWhitespace().substring(space.getWhitespace().lastIndexOf("\n") + 1));
+            }
+        } else {
+            int size = space.getComments().size();
+            if (StringUtils.countOccurrences(space.getWhitespace(), "\n") > style.getKeepMaximum().getInCode()) {
+                space = space.withWhitespace(StringUtils.repeat("\n", style.getKeepMaximum().getInCode() + 1) + space.getWhitespace().substring(space.getWhitespace().lastIndexOf("\n") + 1));
+            }
+            space = space.withComments(ListUtils.map(space.getComments(), (index, comment) -> {
+                if (index == size - 1) {
+                    if (StringUtils.countOccurrences(comment.getSuffix(), "\n") > max) {
+                        comment = comment.withSuffix(StringUtils.repeat("\n", max + 1) + comment.getSuffix().substring(comment.getSuffix().lastIndexOf("\n") + 1));
+                    }
+                } else {
+                    if (StringUtils.countOccurrences(comment.getSuffix(), "\n") > style.getKeepMaximum().getInCode()) {
+                        comment = comment.withSuffix(StringUtils.repeat("\n", style.getKeepMaximum().getInCode() + 1) + comment.getSuffix().substring(comment.getSuffix().lastIndexOf("\n") + 1));
+                    }
+                }
+                return comment;
+            }));
+        }
+        return space;
     }
 
     private String keepMaximumLines(String whitespace, int max) {
@@ -294,10 +317,10 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
             return prefix;
         }
         if (prefix.getComments().isEmpty() ||
-            prefix.getWhitespace().contains("\n") ||
-            prefix.getComments().get(0) instanceof Javadoc ||
-            (prefix.getComments().get(0).isMultiline() && prefix.getComments().get(0)
-                    .printComment(getCursor()).contains("\n"))) {
+                prefix.getWhitespace().contains("\n") ||
+                prefix.getComments().get(0) instanceof Javadoc ||
+                (prefix.getComments().get(0).isMultiline() && prefix.getComments().get(0)
+                        .printComment(getCursor()).contains("\n"))) {
             return prefix.withWhitespace(minimumLines(prefix.getWhitespace(), min));
         }
 
@@ -338,7 +361,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
         return super.postVisit(tree, p);
     }
 
-    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    @ToBeRemoved(after = "2026-02-30", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
     private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {

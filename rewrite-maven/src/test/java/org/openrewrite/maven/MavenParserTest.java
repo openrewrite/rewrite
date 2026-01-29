@@ -24,6 +24,7 @@ import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import okhttp3.tls.HandshakeCertificates;
 import okhttp3.tls.HeldCertificate;
+import org.assertj.core.api.Condition;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -4828,6 +4829,125 @@ class MavenParserTest implements RewriteTest {
                   .as("jackson-bom is jackson-core's parent pom, it is not a runtime dependency")
                   .isEmpty();
             })
+          )
+        );
+    }
+
+    @Test
+    void diamondProblem() {
+        rewriteRun(
+          mavenProject("grandparent",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>grandparent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <bouncycastle.version>1.79</bouncycastle.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.bouncycastle</groupId>
+                                <artifactId>bcprov-jdk18on</artifactId>
+                                <version>${bouncycastle.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """
+            )
+          ),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>grandparent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>parent</artifactId>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <!-- This property becomes inert as a result of the below managed dependency -->
+                        <bouncycastle.version>1.68</bouncycastle.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.bouncycastle</groupId>
+                                <artifactId>bcprov-jdk18on</artifactId>
+                                <!--
+                                    1. Managed dependencies DO NOT have their properties merged together. A new managed dependency, completely overlays everything that came before it.
+                                    2. A version-less managed dependency results in no version recommendations being applied
+                                  -->
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """
+            )
+          ),
+          mavenProject("dependent",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <artifactId>dependent</artifactId>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>grandparent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.bouncycastle</groupId>
+                        <artifactId>bcprov-jdk18on</artifactId>
+                      </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.example</groupId>
+                        <artifactId>dependent</artifactId>
+                        <version>1</version>
+                        <scope>test</scope>
+                      </dependency>
+                    </dependencies>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pom -> {
+                  assertThat(pom).isNotNull();
+                  Optional<MavenResolutionResult> maybeMrr = pom.getMarkers().findFirst(MavenResolutionResult.class);
+                  assertThat(maybeMrr).isPresent();
+
+                  MavenResolutionResult mrr = maybeMrr.get();
+                  assertThat(mrr.getDependencies().get(Scope.Test))
+                    .filteredOn(dep -> "org.bouncycastle".equals(dep.getGroupId()) && "bcprov-jdk18on".equals(dep.getArtifactId()))
+                    .singleElement()
+                    .extracting(ResolvedDependency::getVersion)
+                    .isEqualTo("1.79");
+              })
+            )
           )
         );
     }

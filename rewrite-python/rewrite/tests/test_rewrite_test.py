@@ -204,6 +204,9 @@ class TestRecipeSpecHooks:
         spec.rewrite_run(
             python(
                 """
+                from typing import Any, Dict, List, Optional, Callable, TypeVar
+                from uuid import UUID
+
                 x = 1
                 """,
                 after_recipe=after_hook,
