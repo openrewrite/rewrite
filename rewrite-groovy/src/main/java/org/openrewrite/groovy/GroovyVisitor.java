@@ -145,6 +145,20 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         return b.withType(visitType(b.getType(), p));
     }
 
+    public J visitTupleExpression(G.TupleExpression tuple, P p) {
+        G.TupleExpression t = tuple;
+        t = t.withPrefix(visitSpace(t.getPrefix(), GSpace.Location.TUPLE_PREFIX, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(t, p);
+        if (!(temp instanceof G.TupleExpression)) {
+            return temp;
+        } else {
+            t = (G.TupleExpression) temp;
+        }
+        t = t.getPadding().withVariables(visitContainer(t.getPadding().getVariables(), GContainer.Location.TUPLE_ELEMENTS, p));
+        return t.withType(visitType(t.getType(), p));
+    }
+
     public J visitRange(G.Range range, P p) {
         G.Range r = range;
         r = r.withPrefix(visitSpace(r.getPrefix(), GSpace.Location.RANGE_PREFIX, p));
