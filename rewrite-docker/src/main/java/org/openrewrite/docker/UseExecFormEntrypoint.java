@@ -55,9 +55,7 @@ import static org.openrewrite.Tree.randomId;
 public class UseExecFormEntrypoint extends Recipe {
 
     // Pattern to split command into tokens, respecting quoted strings
-    private static final Pattern TOKEN_PATTERN = Pattern.compile(
-            "\"([^\"]*)\"|'([^']*)'|(\\S+)"
-    );
+    private static final Pattern TOKEN_PATTERN = Pattern.compile("\"([^\"]*)\"|'([^']*)'|(\\S+)");
 
     @Option(displayName = "Convert ENTRYPOINT",
             description = "Whether to convert ENTRYPOINT instructions. Defaults to true.",
@@ -73,14 +71,14 @@ public class UseExecFormEntrypoint extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Use exec form for ENTRYPOINT and CMD";
+        return "Use exec form for `ENTRYPOINT` and `CMD`";
     }
 
     @Override
     public String getDescription() {
-        return "Converts shell form ENTRYPOINT and CMD instructions to exec form (JSON array). " +
+        return "Converts shell form `ENTRYPOINT` and `CMD` instructions to exec form (JSON array). " +
                 "Exec form is preferred because it runs the command as PID 1, allowing it to receive " +
-                "Unix signals properly. Shell form wraps commands in '/bin/sh -c' which can cause signal handling issues.";
+                "Unix signals properly. Shell form wraps commands in `/bin/sh -c` which can cause signal handling issues.";
     }
 
     @Override
@@ -91,34 +89,18 @@ public class UseExecFormEntrypoint extends Recipe {
         return new DockerIsoVisitor<ExecutionContext>() {
             @Override
             public Docker.Entrypoint visitEntrypoint(Docker.Entrypoint entrypoint, ExecutionContext ctx) {
-                if (!doEntrypoint) {
-                    return entrypoint;
+                if (doEntrypoint && entrypoint.getCommand() instanceof Docker.ShellForm) {
+                    return entrypoint.withCommand(convertToExecForm((Docker.ShellForm) entrypoint.getCommand()));
                 }
-
-                if (!(entrypoint.getCommand() instanceof Docker.ShellForm)) {
-                    return entrypoint;
-                }
-
-                Docker.ShellForm shellForm = (Docker.ShellForm) entrypoint.getCommand();
-                Docker.ExecForm execForm = convertToExecForm(shellForm);
-
-                return entrypoint.withCommand(execForm);
+                return entrypoint;
             }
 
             @Override
             public Docker.Cmd visitCmd(Docker.Cmd cmd, ExecutionContext ctx) {
-                if (!doCmd) {
-                    return cmd;
+                if (doCmd && cmd.getCommand() instanceof Docker.ShellForm) {
+                    return cmd.withCommand(convertToExecForm((Docker.ShellForm) cmd.getCommand()));
                 }
-
-                if (!(cmd.getCommand() instanceof Docker.ShellForm)) {
-                    return cmd;
-                }
-
-                Docker.ShellForm shellForm = (Docker.ShellForm) cmd.getCommand();
-                Docker.ExecForm execForm = convertToExecForm(shellForm);
-
-                return cmd.withCommand(execForm);
+                return cmd;
             }
 
             private Docker.ExecForm convertToExecForm(Docker.ShellForm shellForm) {
@@ -149,20 +131,15 @@ public class UseExecFormEntrypoint extends Recipe {
             private List<String> tokenize(String command) {
                 List<String> tokens = new ArrayList<>();
                 Matcher matcher = TOKEN_PATTERN.matcher(command.trim());
-
                 while (matcher.find()) {
-                    // Group 1: double-quoted string content
-                    // Group 2: single-quoted string content
-                    // Group 3: unquoted token
                     if (matcher.group(1) != null) {
-                        tokens.add(matcher.group(1));
+                        tokens.add(matcher.group(1)); // Group 1: double-quoted string content
                     } else if (matcher.group(2) != null) {
-                        tokens.add(matcher.group(2));
+                        tokens.add(matcher.group(2)); // Group 2: single-quoted string content
                     } else if (matcher.group(3) != null) {
-                        tokens.add(matcher.group(3));
+                        tokens.add(matcher.group(3)); // Group 3: unquoted token
                     }
                 }
-
                 return tokens;
             }
         };
