@@ -17,6 +17,7 @@ package org.openrewrite.docker.trait;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
@@ -37,58 +38,6 @@ public class DockerImage implements Trait<Docker.From> {
 
     @Getter
     private final Cursor cursor;
-
-    /**
-     * Returns the image reference with environment variables replaced by wildcards,
-     * suitable for glob matching. Format: name[:tag][@digest]
-     *
-     * @return The image reference for matching purposes
-     */
-    public String getImageReferenceForMatching() {
-        Docker.From from = getTree();
-        StringBuilder sb = new StringBuilder();
-        sb.append(new Matcher().extractTextForMatching(from.getImageName()));
-
-        if (from.getTag() != null) {
-            sb.append(":");
-            sb.append(new Matcher().extractTextForMatching(from.getTag()));
-        }
-        if (from.getDigest() != null) {
-            sb.append("@");
-            sb.append(new Matcher().extractTextForMatching(from.getDigest()));
-        }
-        return sb.toString();
-    }
-
-    /**
-     * Returns the full image reference with environment variables preserved.
-     * Format: name[:tag][@digest]
-     *
-     * @return The image reference with environment variables in original form, or null if extraction fails
-     */
-    public @Nullable String getImageReference() {
-        Docker.From from = getTree();
-        Matcher m = new Matcher();
-        String name = m.extractTextWithVariables(from.getImageName());
-        if (name == null) {
-            return null;
-        }
-
-        StringBuilder sb = new StringBuilder(name);
-        if (from.getTag() != null) {
-            String tag = m.extractTextWithVariables(from.getTag());
-            if (tag != null) {
-                sb.append(":").append(tag);
-            }
-        }
-        if (from.getDigest() != null) {
-            String digest = m.extractTextWithVariables(from.getDigest());
-            if (digest != null) {
-                sb.append("@").append(digest);
-            }
-        }
-        return sb.toString();
-    }
 
     /**
      * Returns the image name (without tag or digest).
@@ -274,42 +223,6 @@ public class DockerImage implements Trait<Docker.From> {
     }
 
     /**
-     * Returns the quote style from the first available source: tag, digest, or image name.
-     * This is useful when creating new tag/digest arguments that should match existing style.
-     *
-     * @return The quote style from tag, digest, or image name (in that order), or null if all are unquoted
-     */
-    public Docker.Literal.@Nullable QuoteStyle getPreferredQuoteStyle() {
-        Docker.From from = getTree();
-        Matcher m = new Matcher();
-        if (from.getTag() != null) {
-            Docker.Literal.QuoteStyle style = m.getQuoteStyle(from.getTag());
-            if (style != null) {
-                return style;
-            }
-        }
-        if (from.getDigest() != null) {
-            Docker.Literal.QuoteStyle style = m.getQuoteStyle(from.getDigest());
-            if (style != null) {
-                return style;
-            }
-        }
-        return m.getQuoteStyle(from.getImageName());
-    }
-
-    /**
-     * Checks if the full image reference matches the given glob pattern.
-     * Handles environment variables by performing bidirectional matching.
-     *
-     * @param pattern The glob pattern to match against (e.g., "ubuntu:*", "registry/alpine:3.*")
-     * @return true if the image matches the pattern
-     */
-    public boolean matches(String pattern) {
-        String text = getImageReferenceForMatching();
-        return new Matcher().matchesBidirectional(text, pattern, hasEnvironmentVariables());
-    }
-
-    /**
      * Checks if the image name (without tag/digest) matches the given glob pattern.
      *
      * @param pattern The glob pattern to match against
@@ -370,6 +283,7 @@ public class DockerImage implements Trait<Docker.From> {
          * @param pattern The glob pattern for image name
          * @return this matcher for chaining
          */
+        @Contract("_ -> this")
         public Matcher imageName(String pattern) {
             this.imageNamePattern = pattern;
             return this;
@@ -381,6 +295,7 @@ public class DockerImage implements Trait<Docker.From> {
          * @param pattern The glob pattern for tag
          * @return this matcher for chaining
          */
+        @Contract("_ -> this")
         public Matcher tag(String pattern) {
             this.tagPattern = pattern;
             return this;
@@ -392,6 +307,7 @@ public class DockerImage implements Trait<Docker.From> {
          * @param pattern The glob pattern for digest
          * @return this matcher for chaining
          */
+        @Contract("_ -> this")
         public Matcher digest(String pattern) {
             this.digestPattern = pattern;
             return this;
@@ -403,6 +319,7 @@ public class DockerImage implements Trait<Docker.From> {
          * @param pattern The glob pattern for platform
          * @return this matcher for chaining
          */
+        @Contract("_ -> this")
         public Matcher platform(String pattern) {
             this.platformPattern = pattern;
             return this;
@@ -413,6 +330,7 @@ public class DockerImage implements Trait<Docker.From> {
          *
          * @return this matcher for chaining
          */
+        @Contract("-> this")
         public Matcher excludeScratch() {
             this.excludeScratch = true;
             return this;
@@ -423,6 +341,7 @@ public class DockerImage implements Trait<Docker.From> {
          *
          * @return this matcher for chaining
          */
+        @Contract("-> this")
         public Matcher onlyUnpinned() {
             this.onlyUnpinned = true;
             return this;

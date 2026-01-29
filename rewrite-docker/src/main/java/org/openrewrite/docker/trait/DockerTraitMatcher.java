@@ -30,7 +30,7 @@ import org.openrewrite.trait.Trait;
  *
  * @param <U> The trait type this matcher produces
  */
-public abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher<U> {
+abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher<U> {
 
     /**
      * Extracts text from a Docker argument, replacing environment variables with wildcards
@@ -58,6 +58,7 @@ public abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTrait
      * @param arg The argument to extract text from, may be null
      * @return The literal text content, or null if the argument is null or contains environment variables
      */
+    @Contract(value = "null -> null", pure = true)
     protected @Nullable String extractText(Docker.@Nullable Argument arg) {
         if (arg == null) {
             return null;
@@ -80,6 +81,7 @@ public abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTrait
      * @param arg The argument to extract text from, may be null
      * @return The text content with environment variable references preserved, or null if arg is null
      */
+    @Contract(value = "null -> null; !null -> !null", pure = true)
     protected @Nullable String extractTextWithVariables(Docker.@Nullable Argument arg) {
         if (arg == null) {
             return null;
@@ -106,6 +108,7 @@ public abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTrait
      * @param arg The argument to check, may be null
      * @return true if the argument contains environment variables, false otherwise
      */
+    @Contract(value = "null -> false", pure = true)
     protected boolean hasEnvironmentVariables(Docker.@Nullable Argument arg) {
         if (arg == null) {
             return false;
@@ -152,29 +155,5 @@ public abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTrait
             }
         }
         return null;
-    }
-
-    /**
-     * Gets the Docker.File from the cursor path.
-     *
-     * @param cursor The cursor to search from
-     * @return The Docker.File, or null if not found
-     */
-    protected Docker.@Nullable File getDockerFile(Cursor cursor) {
-        SourceFile sourceFile = cursor.firstEnclosing(SourceFile.class);
-        if (sourceFile instanceof Docker.File) {
-            return (Docker.File) sourceFile;
-        }
-        return null;
-    }
-
-    /**
-     * Gets the Docker.Stage containing the current cursor position.
-     *
-     * @param cursor The cursor to search from
-     * @return The containing Stage, or null if not found
-     */
-    protected Docker.@Nullable Stage getStage(Cursor cursor) {
-        return cursor.firstEnclosing(Docker.Stage.class);
     }
 }

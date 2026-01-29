@@ -69,7 +69,6 @@ class DockerImageTest implements RewriteTest {
                     assertThat(image.getDigest()).isNull();
                     assertThat(image.getPlatform()).isEqualTo("linux/amd64");
                     assertThat(image.getStageName()).isEqualTo("builder");
-                    assertThat(image.getImageReference()).isEqualTo("my.registry.com/library/ubuntu:22.04");
                     return SearchResult.found(image.getTree());
                 })
               )),
@@ -94,7 +93,6 @@ class DockerImageTest implements RewriteTest {
                     assertThat(image.getImageName()).isEqualTo("ubuntu");
                     assertThat(image.getTag()).isNull();
                     assertThat(image.getDigest()).isEqualTo("sha256:abc123def456");
-                    assertThat(image.getImageReference()).isEqualTo("ubuntu@sha256:abc123def456");
                     assertThat(image.isUnpinned()).isFalse();
                     return SearchResult.found(image.getTree());
                 })
@@ -118,7 +116,6 @@ class DockerImageTest implements RewriteTest {
                     assertThat(image.getImageName()).isEqualTo("ubuntu");
                     assertThat(image.getTag()).isEqualTo("20.04");
                     assertThat(image.getDigest()).isEqualTo("sha256:abc123");
-                    assertThat(image.getImageReference()).isEqualTo("ubuntu:20.04@sha256:abc123");
                     return SearchResult.found(image.getTree());
                 })
               )),
@@ -247,8 +244,6 @@ class DockerImageTest implements RewriteTest {
                     assertThat(image.hasEnvironmentVariables()).isTrue();
                     assertThat(image.getImageName()).isEqualTo("ubuntu");
                     assertThat(image.getTag()).isEqualTo("${TAG}");
-                    assertThat(image.getImageReference()).isEqualTo("ubuntu:${TAG}");
-                    assertThat(image.getImageReferenceForMatching()).isEqualTo("ubuntu:*");
                     return SearchResult.found(image.getTree());
                 })
               )),
@@ -323,54 +318,6 @@ class DockerImageTest implements RewriteTest {
                   """,
                 """
                   ~~>FROM ubuntu:20.04
-                  FROM alpine:latest
-                  """
-              )
-            );
-        }
-
-        @Test
-        void matchesFullReferencePattern() {
-            rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() ->
-                new DockerImage.Matcher().asVisitor((image, ctx) -> {
-                    if (image.matches("ubuntu:*")) {
-                        return SearchResult.found(image.getTree());
-                    }
-                    return image.getTree();
-                })
-              )),
-              docker(
-                """
-                  FROM ubuntu:20.04
-                  FROM alpine:latest
-                  """,
-                """
-                  ~~>FROM ubuntu:20.04
-                  FROM alpine:latest
-                  """
-              )
-            );
-        }
-
-        @Test
-        void matchesBidirectionallyWithEnvVars() {
-            rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() ->
-                new DockerImage.Matcher().asVisitor((image, ctx) -> {
-                    if (image.matches("ubuntu:*")) {
-                        return SearchResult.found(image.getTree());
-                    }
-                    return image.getTree();
-                })
-              )),
-              docker(
-                """
-                  FROM ubuntu:${TAG}
-                  FROM alpine:latest
-                  """,
-                """
-                  ~~>FROM ubuntu:${TAG}
                   FROM alpine:latest
                   """
               )

@@ -57,6 +57,7 @@ public class FindUnpinnedBaseImages extends Recipe {
 
                     // Get the reason for being unpinned
                     DockerImage.UnpinnedReason reason = image.getUnpinnedReason();
+
                     String message = reason == DockerImage.UnpinnedReason.IMPLICIT_LATEST ?
                             "Uses implicit 'latest' tag" :
                             "Uses 'latest' tag";
