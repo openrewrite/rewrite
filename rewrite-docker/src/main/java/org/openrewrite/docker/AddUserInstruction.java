@@ -18,7 +18,10 @@ package org.openrewrite.docker;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
@@ -59,7 +62,7 @@ public class AddUserInstruction extends Recipe {
 
     @Option(displayName = "Skip if user exists",
             description = "If true (default), skip adding USER if the stage already has a USER instruction. " +
-                          "If false, always add the USER instruction at the end of the stage.",
+                    "If false, always add the USER instruction at the end of the stage.",
             required = false)
     @Nullable
     Boolean skipIfUserExists;
@@ -72,8 +75,8 @@ public class AddUserInstruction extends Recipe {
     @Override
     public String getDescription() {
         return "Adds a USER instruction to run the container as a non-root user. " +
-               "By default, adds to the final stage only and skips if a USER instruction already exists. " +
-               "This helps comply with CIS Docker Benchmark 4.1.";
+                "By default, adds to the final stage only and skips if a USER instruction already exists. " +
+                "This helps comply with CIS Docker Benchmark 4.1.";
     }
 
     @Override

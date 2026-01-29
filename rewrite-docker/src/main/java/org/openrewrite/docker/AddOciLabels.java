@@ -133,8 +133,8 @@ public class AddOciLabels extends Recipe {
     @Override
     public String getDescription() {
         return "Adds standard OCI (Open Container Initiative) image labels to a Dockerfile. " +
-               "These labels provide metadata about the image such as title, version, source, and license information. " +
-               "See https://github.com/opencontainers/image-spec/blob/main/annotations.md for the specification.";
+                "These labels provide metadata about the image such as title, version, source, and license information. " +
+                "See https://github.com/opencontainers/image-spec/blob/main/annotations.md for the specification.";
     }
 
     @Override

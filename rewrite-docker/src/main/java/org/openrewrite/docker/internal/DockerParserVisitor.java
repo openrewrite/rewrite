@@ -903,7 +903,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     skip(token);
                     List<Docker.ArgumentContent> contents = new ArrayList<>();
                     contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY,
-                        text.substring(1, text.length() - 1), Docker.Literal.QuoteStyle.DOUBLE));
+                            text.substring(1, text.length() - 1), Docker.Literal.QuoteStyle.DOUBLE));
                     values.add(new Docker.Argument(randomId(), pathPrefix, Markers.EMPTY, contents));
                 } else if (pathCtx.SINGLE_QUOTED_STRING() != null) {
                     token = pathCtx.SINGLE_QUOTED_STRING().getSymbol();
@@ -911,7 +911,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     skip(token);
                     List<Docker.ArgumentContent> contents = new ArrayList<>();
                     contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY,
-                        text.substring(1, text.length() - 1), Docker.Literal.QuoteStyle.SINGLE));
+                            text.substring(1, text.length() - 1), Docker.Literal.QuoteStyle.SINGLE));
                     values.add(new Docker.Argument(randomId(), pathPrefix, Markers.EMPTY, contents));
                 } else if (pathCtx.ENV_VAR() != null) {
                     token = pathCtx.ENV_VAR().getSymbol();
@@ -1595,7 +1595,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
      * Handles both single heredocs (RUN <<EOF ... EOF) and multiple heredocs
      * (RUN <<EOF1 cmd1 && <<EOF2 cmd2 ... EOF1 ... EOF2).
      *
-     * @param ctx the heredoc context
+     * @param ctx                the heredoc context
      * @param extractDestination if true, extract destination from preamble (for COPY/ADD)
      */
     private Docker.HeredocForm visitHeredocContext(DockerParser.HeredocContext ctx, boolean extractDestination) {

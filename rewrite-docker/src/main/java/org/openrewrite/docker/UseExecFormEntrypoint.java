@@ -79,8 +79,8 @@ public class UseExecFormEntrypoint extends Recipe {
     @Override
     public String getDescription() {
         return "Converts shell form ENTRYPOINT and CMD instructions to exec form (JSON array). " +
-               "Exec form is preferred because it runs the command as PID 1, allowing it to receive " +
-               "Unix signals properly. Shell form wraps commands in '/bin/sh -c' which can cause signal handling issues.";
+                "Exec form is preferred because it runs the command as PID 1, allowing it to receive " +
+                "Unix signals properly. Shell form wraps commands in '/bin/sh -c' which can cause signal handling issues.";
     }
 
     @Override

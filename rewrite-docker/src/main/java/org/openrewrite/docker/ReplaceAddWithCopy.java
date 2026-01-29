@@ -22,7 +22,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.tree.Docker;
-
 import org.openrewrite.internal.ListUtils;
 
 import java.util.Arrays;
@@ -64,8 +63,8 @@ public class ReplaceAddWithCopy extends Recipe {
     @Override
     public String getDescription() {
         return "Replaces ADD instructions with COPY where appropriate. " +
-               "ADD is only kept when the source is a URL or a tar archive that should be auto-extracted. " +
-               "Using COPY is preferred for transparency (CIS Docker Benchmark 4.9).";
+                "ADD is only kept when the source is a URL or a tar archive that should be auto-extracted. " +
+                "Using COPY is preferred for transparency (CIS Docker Benchmark 4.9).";
     }
 
     @Override
@@ -136,8 +135,8 @@ public class ReplaceAddWithCopy extends Recipe {
             private boolean isUrl(String source) {
                 String lower = source.toLowerCase();
                 return lower.startsWith("http://") ||
-                       lower.startsWith("https://") ||
-                       lower.startsWith("ftp://");
+                        lower.startsWith("https://") ||
+                        lower.startsWith("ftp://");
             }
 
             private boolean isTarArchive(String source) {

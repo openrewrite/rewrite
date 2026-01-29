@@ -63,7 +63,7 @@ public class CombineRunInstructions extends Recipe {
     @Override
     public String getDescription() {
         return "Combines consecutive RUN instructions into a single instruction to reduce image layers. " +
-               "Only shell form RUN instructions without flags are combined.";
+                "Only shell form RUN instructions without flags are combined.";
     }
 
     @Override

@@ -23,7 +23,6 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.tree.Docker;
-import org.openrewrite.docker.tree.Space;
 import org.openrewrite.marker.Markers;
 
 import java.util.regex.Matcher;
@@ -50,14 +49,10 @@ public class AddAptGetCleanup extends Recipe {
     private static final String DEFAULT_CLEANUP = " && rm -rf /var/lib/apt/lists/*";
 
     // Pattern to match apt-get install commands
-    private static final Pattern APT_GET_INSTALL = Pattern.compile(
-            "\\bapt-get\\s+(-[a-zA-Z]+\\s+)*install\\b"
-    );
+    private static final Pattern APT_GET_INSTALL = Pattern.compile("\\bapt-get\\s+(-[a-zA-Z]+\\s+)*install\\b");
 
     // Pattern to check if cleanup is already present
-    private static final Pattern CLEANUP_PATTERN = Pattern.compile(
-            "rm\\s+(-[a-zA-Z]+\\s+)*/var/lib/apt/lists"
-    );
+    private static final Pattern CLEANUP_PATTERN = Pattern.compile("rm\\s+(-[a-zA-Z]+\\s+)*/var/lib/apt/lists");
 
     @Option(displayName = "Cleanup command",
             description = "The cleanup command to append. Defaults to ' && rm -rf /var/lib/apt/lists/*'.",
@@ -74,7 +69,7 @@ public class AddAptGetCleanup extends Recipe {
     @Override
     public String getDescription() {
         return "Adds cleanup commands to apt-get RUN instructions to reduce Docker image size. " +
-               "By default, adds 'rm -rf /var/lib/apt/lists/*' to remove cached package lists.";
+                "By default, adds 'rm -rf /var/lib/apt/lists/*' to remove cached package lists.";
     }
 
     @Override
@@ -84,7 +79,7 @@ public class AddAptGetCleanup extends Recipe {
         return new DockerIsoVisitor<ExecutionContext>() {
             @Override
             public Docker.Run visitRun(Docker.Run run, ExecutionContext ctx) {
-                run = (Docker.Run) super.visitRun(run, ctx);
+                run = super.visitRun(run, ctx);
 
                 if (!(run.getCommand() instanceof Docker.ShellForm)) {
                     return run;
