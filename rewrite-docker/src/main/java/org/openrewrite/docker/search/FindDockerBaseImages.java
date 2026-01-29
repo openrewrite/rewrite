@@ -47,7 +47,7 @@ public class FindDockerBaseImages extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find all base images (FROM instructions) in Dockerfiles.";
+        return "Find all base images (`FROM` instructions) in Dockerfiles.";
     }
 
     @Override

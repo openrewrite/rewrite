@@ -35,9 +35,9 @@ import org.openrewrite.marker.SearchResult;
 @EqualsAndHashCode(callSuper = false)
 public class FindRootUser extends Recipe {
 
-    @Option(displayName = "Include missing USER",
+    @Option(displayName = "Include missing `USER`",
             description = "When true, also marks the final stage if no USER instruction is present (defaults to root). " +
-                          "When false, only marks explicit USER root/0 instructions.",
+                          "When false, only marks explicit `USER root/0` instructions.",
             required = false)
     @Nullable
     Boolean includeMissingUser;
@@ -50,7 +50,7 @@ public class FindRootUser extends Recipe {
     @Override
     public String getDescription() {
         return "Finds containers that run as root user. This includes explicit `USER root` or `USER 0` instructions, " +
-               "and optionally containers with no USER instruction in the final stage (which default to root).";
+               "and optionally containers with no `USER` instruction in the final stage (which default to root).";
     }
 
     @Override
