@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.docker.Assertions.docker;
 
 class AddOciLabelsTest implements RewriteTest {
@@ -161,27 +162,19 @@ class AddOciLabelsTest implements RewriteTest {
     }
 
     @Test
-    void noChangesWhenNoLabelsSpecified() {
-        rewriteRun(
-          spec -> spec.recipe(new AddOciLabels(
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null
-          )),
-          docker(
-            """
-              FROM ubuntu:22.04
-              RUN apt-get update
-              """
-          )
-        );
+    void validationFailsWhenNoLabelsSpecified() {
+        assertThat(new AddOciLabels(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        ).validate().isValid()).isFalse();
     }
 
     @Test

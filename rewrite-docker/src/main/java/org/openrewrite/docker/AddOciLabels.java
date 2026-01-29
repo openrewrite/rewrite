@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.Validated;
 
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -52,8 +53,6 @@ import java.util.List;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddOciLabels extends Recipe {
-
-    private static final String OCI_PREFIX = "org.opencontainers.image.";
 
     @Option(displayName = "Title",
             description = "Human-readable title of the image (org.opencontainers.image.title).",
@@ -136,6 +135,27 @@ public class AddOciLabels extends Recipe {
                 "These labels provide metadata about the image such as title, version, source, and license information. " +
                 "See https://github.com/opencontainers/image-spec/blob/main/annotations.md for the specification.";
     }
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(
+                Validated.test("labels", "At least one label must be specified",
+                        this, r ->
+                                (r.title != null && !r.title.isEmpty()) ||
+                                (r.description != null && !r.description.isEmpty()) ||
+                                (r.version != null && !r.version.isEmpty()) ||
+                                (r.created != null && !r.created.isEmpty()) ||
+                                (r.revision != null && !r.revision.isEmpty()) ||
+                                (r.source != null && !r.source.isEmpty()) ||
+                                (r.url != null && !r.url.isEmpty()) ||
+                                (r.vendor != null && !r.vendor.isEmpty()) ||
+                                (r.licenses != null && !r.licenses.isEmpty()) ||
+                                (r.authors != null && !r.authors.isEmpty())
+                )
+        );
+    }
+
+    private static final String OCI_PREFIX = "org.opencontainers.image.";
 
     @Override
     public List<Recipe> getRecipeList() {
