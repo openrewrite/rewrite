@@ -140,8 +140,8 @@ class FindStylesTest implements RewriteTest {
 
         // Should have only ONE style document (merged)
         assertThat(content).contains("type: specs.openrewrite.org/v1beta/style");
-        assertThat(content).contains("name: merged.styles");
-        assertThat(content).contains("displayName: Merged Styles");
+        assertThat(content).contains("name: MergedStyles");
+        assertThat(content).contains("displayName: Merged styles");
         assertThat(content).contains("styleConfigs:");
 
         // Should contain both style classes in the merged styleConfigs
