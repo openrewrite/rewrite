@@ -93,10 +93,10 @@ public class FindDockerBaseImages extends Recipe {
                 return from;
             }
 
+            String stageName = image.getStageName();
             String tag = image.getTag();
             String digest = image.getDigest();
             String platform = image.getPlatform();
-            String stageName = image.getStageName();
 
             // Insert row into data table
             dockerBaseImages.insertRow(ctx, new DockerBaseImages.Row(
@@ -110,10 +110,11 @@ public class FindDockerBaseImages extends Recipe {
 
             // Build message with image reference
             String message = imageName;
+            if (tag != null) {
+                message += ":" + tag;
+            }
             if (digest != null) {
                 message += "@" + digest;
-            } else if (tag != null) {
-                message += ":" + tag;
             }
 
             // Mark the FROM instruction as a search result

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.docker.trait;
 
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
@@ -25,7 +26,7 @@ import org.openrewrite.trait.Trait;
 
 /**
  * Base class for Docker trait matchers providing shared utilities for working with
- * Docker AST elements. Similar to {@link org.openrewrite.gradle.trait.GradleTraitMatcher}.
+ * Docker AST elements.
  *
  * @param <U> The trait type this matcher produces
  */
