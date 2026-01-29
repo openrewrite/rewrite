@@ -97,6 +97,51 @@ class AddDependencyTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
+    void onlyIfUsingTestScopeWithMainSource(String onlyIfUsing) {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing)),
+          mavenProject("project",
+            srcMainJava(
+              java(
+                """
+                  public class Main {
+                  }
+                  """
+              )
+            ),
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    testImplementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
     void onlyIfUsingSmokeTestScope(String onlyIfUsing) {
         AddDependency addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, onlyIfUsing, null, null, null, null);
         rewriteRun(

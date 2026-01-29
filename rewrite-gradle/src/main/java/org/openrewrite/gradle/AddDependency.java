@@ -168,11 +168,14 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 }
                 SourceFile sourceFile = (SourceFile) tree;
                 sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
-                    acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || usesType(sourceFile, ctx));
+                    boolean uses = usesType(sourceFile, ctx);
+                    acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || uses);
 
-                    Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
-                    sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
-                            configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"));
+                    if (uses) {
+                        Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
+                        sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
+                                configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"));
+                    }
                 });
                 return tree;
             }
