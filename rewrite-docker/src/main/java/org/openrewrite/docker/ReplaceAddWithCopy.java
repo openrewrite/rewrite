@@ -57,29 +57,28 @@ public class ReplaceAddWithCopy extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Replace ADD with COPY";
+        return "Replace `ADD` with `COPY`";
     }
 
     @Override
     public String getDescription() {
-        return "Replaces ADD instructions with COPY where appropriate. " +
-                "ADD is only kept when the source is a URL or a tar archive that should be auto-extracted. " +
-                "Using COPY is preferred for transparency (CIS Docker Benchmark 4.9).";
+        return "Replaces `ADD` instructions with `COPY` where appropriate. " +
+                "`ADD` is only kept when the source is a URL or a tar archive that should be auto-extracted. " +
+                "Using `COPY` is preferred for transparency (CIS Docker Benchmark 4.9).";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new DockerIsoVisitor<ExecutionContext>() {
+        return new DockerVisitor<ExecutionContext>() {
             @Override
-            public Docker.Add visitAdd(Docker.Add add, ExecutionContext ctx) {
-                add = (Docker.Add) super.visitAdd(add, ctx);
-
+            public Docker visitAdd(Docker.Add originalAdd, ExecutionContext ctx) {
+                Docker.Add add = (Docker.Add) super.visitAdd(originalAdd, ctx);
                 if (shouldKeepAsAdd(add)) {
                     return add;
                 }
 
                 // Convert ADD to COPY
-                Docker.Copy copy = new Docker.Copy(
+                return new Docker.Copy(
                         randomId(),
                         add.getPrefix(),
                         add.getMarkers(),
@@ -87,10 +86,6 @@ public class ReplaceAddWithCopy extends Recipe {
                         add.getFlags(),
                         add.getForm()
                 );
-
-                //noinspection DataFlowIssue - doAfterVisit accepts Docker types
-                doAfterVisit(new ReplaceAddWithCopyVisitor(add, copy));
-                return add;
             }
 
             private boolean shouldKeepAsAdd(Docker.Add add) {
@@ -149,23 +144,5 @@ public class ReplaceAddWithCopy extends Recipe {
                 return false;
             }
         };
-    }
-
-    private static class ReplaceAddWithCopyVisitor extends DockerIsoVisitor<ExecutionContext> {
-        private final Docker.Add addToReplace;
-        private final Docker.Copy copyReplacement;
-
-        ReplaceAddWithCopyVisitor(Docker.Add addToReplace, Docker.Copy copyReplacement) {
-            this.addToReplace = addToReplace;
-            this.copyReplacement = copyReplacement;
-        }
-
-        @Override
-        public Docker.Stage visitStage(Docker.Stage stage, ExecutionContext ctx) {
-            return stage.withInstructions(
-                    ListUtils.map(stage.getInstructions(),
-                            inst -> inst == addToReplace ? copyReplacement : inst)
-            );
-        }
     }
 }
