@@ -16,12 +16,18 @@
 package org.openrewrite.json;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.json.Assertions.json;
@@ -210,5 +216,52 @@ class JsonParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void accentedCharactersInValues() {
+        rewriteRun(
+          json(
+            """
+              {
+                "title_history": "Histoire",
+                "keyword_com": "Mot-cl\u00e9 / com...",
+                "keyword_doc": "Mot-cl\u00e9 / doc...",
+                "title_period": "P\u00e9riode"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doubleAsteriskInStringValue() {
+        rewriteRun(
+          json(
+            """
+              {
+                "name": "The existing CI name**",
+                "knowledge": "KBID"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noTrailingNewline() {
+        rewriteRun(
+          json("{\"a\": 1}")
+        );
+    }
+
+    @Test
+    void invalidJsonProducesParseError() {
+        ExecutionContext ctx = new InMemoryExecutionContext(e -> {});
+        List<SourceFile> results = JsonParser.builder().build()
+          .parse(ctx, "{\"offset\": %s, \"limit\": %s}")
+          .toList();
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0)).isInstanceOf(ParseError.class);
     }
 }

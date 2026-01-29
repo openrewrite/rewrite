@@ -20,7 +20,6 @@ import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
-import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.json.internal.grammar.JSON5BaseVisitor;
 import org.openrewrite.json.internal.grammar.JSON5Parser;
 import org.openrewrite.json.tree.*;
@@ -50,12 +49,12 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
     private int cursor = 0;
     private int codePointCursor = 0;
 
-    public JsonParserVisitor(Path path, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source) {
+    public JsonParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
         this.fileAttributes = fileAttributes;
-        this.source = source.readFully();
-        this.charset = source.getCharset();
-        this.charsetBomMarked = source.isCharsetBomMarked();
+        this.source = source;
+        this.charset = charset;
+        this.charsetBomMarked = charsetBomMarked;
     }
 
     @Override
@@ -254,8 +253,12 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
             });
         }
 
-        // visit numbers
-        return (JsonValue) super.visitValue(ctx);
+        // visit numbers, objects, arrays
+        JsonValue result = (JsonValue) super.visitValue(ctx);
+        if (result == null) {
+            throw new IllegalStateException("Unable to parse value at position " + ctx.getStart().getStartIndex());
+        }
+        return result;
     }
 
     private Space prefix(ParserRuleContext ctx) {
