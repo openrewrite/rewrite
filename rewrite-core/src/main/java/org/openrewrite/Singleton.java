@@ -34,6 +34,20 @@ public class Singleton extends Recipe {
             "Accidentally including multiple copies/instances of the same large composite recipes is a common mistake. " +
             "If those recipes are marked with this precondition the performance penalty is limited. " +
             "This recipe does nothing useful run on its own.\n\n" +
+            "## Usage in YAML recipes\n\n" +
+            "Add `org.openrewrite.Singleton` as a precondition:\n\n" +
+            "```yaml\n" +
+            "---\n" +
+            "type: specs.openrewrite.org/v1beta/recipe\n" +
+            "name: com.example.Append\n" +
+            "displayName: My recipe\n" +
+            "preconditions:\n" +
+            "  - org.openrewrite.Singleton\n" +
+            "recipeList:\n" +
+            "  - org.openrewrite.text.AppendToTextFile:\n" +
+            "      relativeFileName: report.txt\n" +
+            "      content: 'Recipe executed'\n" +
+            "```" +
             "## Usage in Java recipes\n\n" +
             "Wrap visitors with `Singleton.singleton(this, visitor)` to ensure only the first *equivalent* recipe instance makes changes:\n\n" +
             "```java\n" +
@@ -65,21 +79,7 @@ public class Singleton extends Recipe {
             "**Note:** Singleton status is determined by the recipe's `equals()` and `hashCode()` methods. " +
             "If equivalent instances of a recipe are not considered singletons, ensure your recipe class correctly implements these methods. " +
             "The easiest way is to use Lombok's `@Value` annotation on your recipe class, which automatically " +
-            "generates correct `equals()` and `hashCode()` implementations based on all fields.\n\n" +
-            "## Usage in YAML recipes\n\n" +
-            "Add `org.openrewrite.Singleton` as a precondition:\n\n" +
-            "```yaml\n" +
-            "---\n" +
-            "type: specs.openrewrite.org/v1beta/recipe\n" +
-            "name: com.example.Append\n" +
-            "displayName: My recipe\n" +
-            "preconditions:\n" +
-            "  - org.openrewrite.Singleton\n" +
-            "recipeList:\n" +
-            "  - org.openrewrite.text.AppendToTextFile:\n" +
-            "      relativeFileName: report.txt\n" +
-            "      content: 'Recipe executed'\n" +
-            "```";
+            "generates correct `equals()` and `hashCode()` implementations based on all fields.";
 
     @Nullable Integer recipeIndex;
 
