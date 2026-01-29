@@ -662,12 +662,13 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1522")
     @Test
-    void childModuleSeesParentManagedDependencyChange() {
+    void childModuleInheritsVersionPropertyChangeFromParent() {
         // When ChangeManagedDependencyGroupIdAndArtifactId modifies a managed dependency in
-        // a parent POM (A), the UpdateMavenModel should correctly propagate those changes
-        // to child modules (B) that depend on the managed dependency. The bug is that
-        // UpdateMavenModel downloads the parent POM from the repository instead of reusing
-        // the already-resolved (modified) parent POM.
+        // a parent POM that uses a version property, the property value should be updated
+        // even when only children use the managed dependency (not the parent itself).
+        // The bug is that UpdateMavenModel downloads the parent POM from the repository
+        // instead of reusing the already-resolved (modified) parent POM, so the property
+        // update isn't visible when resolving child modules.
         rewriteRun(
           spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
             "javax.activation",
@@ -675,6 +676,89 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "jakarta.activation",
             "jakarta.activation-api",
             "2.1.0"
+          )),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <properties>
+                      <activation.version>1.2.0</activation.version>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.activation</groupId>
+                              <artifactId>javax.activation-api</artifactId>
+                              <version>${activation.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <properties>
+                      <activation.version>2.1.0</activation.version>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>${activation.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent-project</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1522")
+    @Test
+    void childModuleWithManagedDependencySeesParentChange() {
+        // When the parent has a managed dependency and the child uses that managed dependency,
+        // changing the managed dependency coordinates should also change the child's dependency.
+        // This tests the scenario where UpdateMavenModel needs to propagate the parent's
+        // changes to the child module's resolution context.
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.1.0",
+            null,
+            false,
+            true // changeManagedDependency
           )),
           pomXml(
             """
