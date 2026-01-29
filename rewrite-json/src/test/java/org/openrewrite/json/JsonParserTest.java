@@ -211,4 +211,106 @@ class JsonParserTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/852")
+    @Test
+    void stringWithDoubleAsterisk() {
+        rewriteRun(
+          json(
+            """
+              {"pattern": "**/*.java"}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/852")
+    @Test
+    void stringWithDelimitersInside() {
+        rewriteRun(
+          json(
+            """
+              {
+                  "message": "Hello: World, how are {you}?",
+                  "array": ["item: one, two"]
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/852")
+    @Test
+    void stringWithCommentLikeSequences() {
+        rewriteRun(
+          json(
+            """
+              {
+                  "url": "https://example.com/path",
+                  "code": "/* not a comment */",
+                  "regex": "// pattern"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/852")
+    @Test
+    void stringWithEscapedQuotes() {
+        rewriteRun(
+          json(
+            """
+              {"nested": "He said \\"Hello\\""}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/852")
+    @Test
+    void stringWithPrintfAndTemplates() {
+        rewriteRun(
+          json(
+            """
+              {
+                  "printf": "Hello %s, count: %d",
+                  "freemarker": "<#if x>value</#if>"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/852")
+    @Test
+    void singleQuotedStringsWithSpecialChars() {
+        rewriteRun(
+          json(
+            """
+              {
+                  'pattern': '**/*.java',
+                  'url': 'https://example.com'
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/852")
+    @Test
+    void complexNestedWithSpecialStrings() {
+        rewriteRun(
+          json(
+            """
+              {
+                  "config": {
+                      "patterns": ["**/*.java", "src/**/*.ts"],
+                      "message": "Build: { status: 'ok' }"
+                  }
+              }
+              """
+          )
+        );
+    }
 }
