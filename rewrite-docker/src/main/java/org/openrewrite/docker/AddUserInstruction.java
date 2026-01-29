@@ -69,14 +69,13 @@ public class AddUserInstruction extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Add USER instruction";
+        return "Add `USER` instruction";
     }
 
     @Override
     public String getDescription() {
-        return "Adds a USER instruction to run the container as a non-root user. " +
-                "By default, adds to the final stage only and skips if a USER instruction already exists. " +
-                "This helps comply with CIS Docker Benchmark 4.1.";
+        return "Adds a `USER` instruction to run the container as a non-root user. " +
+                "By default, adds to the final stage only and skips if a `USER` instruction already exists.";
     }
 
     @Override
