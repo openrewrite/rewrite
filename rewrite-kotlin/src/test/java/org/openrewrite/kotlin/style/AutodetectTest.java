@@ -1159,7 +1159,6 @@ class AutodetectTest implements RewriteTest {
         assertThat(styles).isNotNull();
     }
 
-    @Issue("https://github.com/moderneinc/customer-requests/issues/1582")
     @Test
     void fourSpaceIndentDetection() {
         // This test verifies that a file with 4-space indentation is correctly detected.
@@ -1186,7 +1185,6 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
     }
 
-    @Issue("https://github.com/moderneinc/customer-requests/issues/1582")
     @Test
     void fourSpaceWithLambdaAndSingleLineIf() {
         // Test the pattern:
@@ -1214,7 +1212,6 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
     }
 
-    @Issue("https://github.com/moderneinc/customer-requests/issues/1582")
     @Test
     void mixedIndentProjectPrefersLargerSample() {
         // Test that when a project has files with different indentation styles,

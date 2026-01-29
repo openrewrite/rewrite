@@ -411,7 +411,6 @@ class AutoFormatVisitorTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/moderneinc/customer-requests/issues/1582")
     @Test
     void preserveFourSpaceIndentWhenAddingBraces() {
         // This test simulates what happens when a recipe (like NeedBraces) adds braces
@@ -466,7 +465,6 @@ class AutoFormatVisitorTest implements RewriteTest {
             """);
     }
 
-    @Issue("https://github.com/moderneinc/customer-requests/issues/1582")
     @Test
     void attachedStyleUsedForFormatting() {
         // This test documents the current behavior: when a project-wide style is
