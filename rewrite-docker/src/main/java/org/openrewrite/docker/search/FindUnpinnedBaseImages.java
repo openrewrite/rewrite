@@ -17,12 +17,10 @@ package org.openrewrite.docker.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.docker.DockerIsoVisitor;
-import org.openrewrite.docker.tree.Docker;
+import org.openrewrite.docker.trait.DockerFrom;
 import org.openrewrite.marker.SearchResult;
 
 /**
@@ -41,56 +39,23 @@ public class FindUnpinnedBaseImages extends Recipe {
     @Override
     public String getDescription() {
         return "Finds FROM instructions that use unpinned base images. " +
-               "Images without an explicit tag default to 'latest', which is not reproducible. " +
-               "Images pinned by digest are considered acceptable.";
+                "Images without an explicit tag default to 'latest', which is not reproducible. " +
+                "Images pinned by digest are considered acceptable.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new DockerIsoVisitor<ExecutionContext>() {
+        return new DockerFrom.Matcher()
+                .excludeScratch()
+                .onlyUnpinned()
+                .asVisitor(image -> {
+                    // Get the reason for being unpinned
+                    DockerFrom.UnpinnedReason reason = image.getUnpinnedReason();
 
-            @Override
-            public Docker.From visitFrom(Docker.From from, ExecutionContext ctx) {
-                Docker.From f = super.visitFrom(from, ctx);
-
-                String imageName = extractText(f.getImageName());
-                if (imageName == null) {
-                    return f; // Contains environment variables
-                }
-
-                // Skip "scratch" base image - it's a special case
-                if ("scratch".equals(imageName)) {
-                    return f;
-                }
-
-                String tag = extractText(f.getTag());
-                String digest = extractText(f.getDigest());
-
-                // Check for latest tag or no tag (and no digest)
-                if (digest == null && (tag == null || "latest".equals(tag))) {
-                    String message = tag == null ?
+                    String message = reason == DockerFrom.UnpinnedReason.IMPLICIT_LATEST ?
                             "Uses implicit 'latest' tag" :
                             "Uses 'latest' tag";
-                    return SearchResult.found(f, message);
-                }
-
-                return f;
-            }
-
-            private @Nullable String extractText(Docker.@Nullable Argument arg) {
-                if (arg == null) {
-                    return null;
-                }
-                StringBuilder builder = new StringBuilder();
-                for (Docker.ArgumentContent content : arg.getContents()) {
-                    if (content instanceof Docker.Literal) {
-                        builder.append(((Docker.Literal) content).getText());
-                    } else if (content instanceof Docker.EnvironmentVariable) {
-                        return null;
-                    }
-                }
-                return builder.toString();
-            }
-        };
+                    return SearchResult.found(image.getTree(), message);
+                });
     }
 }

@@ -23,7 +23,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.DockerIsoVisitor;
-import org.openrewrite.docker.table.DockerExposedPorts;
+import org.openrewrite.docker.table.ExposedPorts;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.SearchResult;
@@ -35,11 +35,11 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = false)
 public class FindExposedPorts extends Recipe {
 
-    transient DockerExposedPorts exposedPorts = new DockerExposedPorts(this);
+    transient ExposedPorts exposedPorts = new ExposedPorts(this);
 
     @Option(displayName = "Port pattern",
             description = "A glob pattern to filter ports. For example, '80*' to find ports starting with 80. " +
-                          "If not specified, all EXPOSE instructions are matched.",
+                          "If not specified, all `EXPOSE` instructions are matched.",
             example = "80*",
             required = false)
     @Nullable
@@ -52,7 +52,7 @@ public class FindExposedPorts extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find all EXPOSE instructions in Dockerfiles and report the exposed ports.";
+        return "Find all `EXPOSE` instructions in Dockerfiles and report the exposed ports.";
     }
 
     @Override
@@ -101,7 +101,7 @@ public class FindExposedPorts extends Recipe {
                         protocol = port.getProtocol() == Docker.Port.Protocol.UDP ? "udp" : "tcp";
                     }
 
-                    exposedPorts.insertRow(ctx, new DockerExposedPorts.Row(
+                    exposedPorts.insertRow(ctx, new ExposedPorts.Row(
                             sourceFile,
                             stageName,
                             portNumber,
@@ -114,21 +114,6 @@ public class FindExposedPorts extends Recipe {
                 }
 
                 return e;
-            }
-
-            private @Nullable String extractText(Docker.@Nullable Argument arg) {
-                if (arg == null) {
-                    return null;
-                }
-                StringBuilder builder = new StringBuilder();
-                for (Docker.ArgumentContent content : arg.getContents()) {
-                    if (content instanceof Docker.Literal) {
-                        builder.append(((Docker.Literal) content).getText());
-                    } else if (content instanceof Docker.EnvironmentVariable) {
-                        return null;
-                    }
-                }
-                return builder.toString();
             }
         };
     }
