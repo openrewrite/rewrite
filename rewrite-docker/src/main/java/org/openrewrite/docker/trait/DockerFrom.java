@@ -50,16 +50,6 @@ public class DockerFrom implements Trait<Docker.From> {
     }
 
     /**
-     * Returns the image name for matching purposes, with environment variables
-     * replaced by wildcards.
-     *
-     * @return The image name suitable for glob matching
-     */
-    public String getImageNameForMatching() {
-        return new Matcher().extractTextForMatching(getTree().getImageName());
-    }
-
-    /**
      * Returns the tag, or null if no tag is specified.
      * Environment variables are preserved in their original form.
      *
@@ -70,17 +60,6 @@ public class DockerFrom implements Trait<Docker.From> {
     }
 
     /**
-     * Returns the tag for matching purposes, with environment variables
-     * replaced by wildcards.
-     *
-     * @return The tag suitable for glob matching, or null if no tag
-     */
-    public @Nullable String getTagForMatching() {
-        Docker.Argument tag = getTree().getTag();
-        return tag != null ? new Matcher().extractTextForMatching(tag) : null;
-    }
-
-    /**
      * Returns the digest, or null if no digest is specified.
      * Environment variables are preserved in their original form.
      *
@@ -88,17 +67,6 @@ public class DockerFrom implements Trait<Docker.From> {
      */
     public @Nullable String getDigest() {
         return new Matcher().extractTextWithVariables(getTree().getDigest());
-    }
-
-    /**
-     * Returns the digest for matching purposes, with environment variables
-     * replaced by wildcards.
-     *
-     * @return The digest suitable for glob matching, or null if no digest
-     */
-    public @Nullable String getDigestForMatching() {
-        Docker.Argument digest = getTree().getDigest();
-        return digest != null ? new Matcher().extractTextForMatching(digest) : null;
     }
 
     /**
@@ -128,19 +96,6 @@ public class DockerFrom implements Trait<Docker.From> {
     public @Nullable String getStageName() {
         Docker.From.As as = getTree().getAs();
         return as != null ? as.getName().getText() : null;
-    }
-
-    /**
-     * Returns true if the image reference contains any environment variables.
-     *
-     * @return true if environment variables are present
-     */
-    public boolean hasEnvironmentVariables() {
-        Docker.From from = getTree();
-        Matcher m = new Matcher();
-        return m.hasEnvironmentVariables(from.getImageName()) ||
-               m.hasEnvironmentVariables(from.getTag()) ||
-               m.hasEnvironmentVariables(from.getDigest());
     }
 
     /**
@@ -204,16 +159,6 @@ public class DockerFrom implements Trait<Docker.From> {
     }
 
     /**
-     * Returns true if the image name contains environment variables.
-     * This is useful for skipping analysis when the image name cannot be statically determined.
-     *
-     * @return true if the image name contains environment variables
-     */
-    public boolean imageNameHasEnvironmentVariables() {
-        return new Matcher().hasEnvironmentVariables(getTree().getImageName());
-    }
-
-    /**
      * Returns the quote style used for the image name, if any.
      *
      * @return The quote style, or null if unquoted
@@ -229,8 +174,8 @@ public class DockerFrom implements Trait<Docker.From> {
      * @return true if the image name matches
      */
     public boolean imageNameMatches(String pattern) {
-        String text = getImageNameForMatching();
         Matcher m = new Matcher();
+        String text = m.extractTextForMatching(getTree().getImageName());
         return m.matchesBidirectional(text, pattern, m.hasEnvironmentVariables(getTree().getImageName()));
     }
 

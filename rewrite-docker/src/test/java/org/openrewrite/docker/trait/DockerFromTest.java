@@ -39,7 +39,6 @@ class DockerFromTest implements RewriteTest {
                 assertThat(image.getStageName()).isNull();
                 assertThat(image.isScratch()).isFalse();
                 assertThat(image.isUnpinned()).isFalse();
-                assertThat(image.hasEnvironmentVariables()).isFalse();
                 return SearchResult.found(image.getTree());
             })
           )),
@@ -235,49 +234,6 @@ class DockerFromTest implements RewriteTest {
 
     @Nested
     class EnvironmentVariables implements RewriteTest {
-
-        @Test
-        void detectsEnvironmentVariables() {
-            rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() ->
-                new DockerFrom.Matcher().asVisitor((image, ctx) -> {
-                    assertThat(image.hasEnvironmentVariables()).isTrue();
-                    assertThat(image.getImageName()).isEqualTo("ubuntu");
-                    assertThat(image.getTag()).isEqualTo("${TAG}");
-                    return SearchResult.found(image.getTree());
-                })
-              )),
-              docker(
-                """
-                  FROM ubuntu:${TAG}
-                  """,
-                """
-                  ~~>FROM ubuntu:${TAG}
-                  """
-              )
-            );
-        }
-
-        @Test
-        void detectsEnvironmentVariablesInImageName() {
-            rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() ->
-                new DockerFrom.Matcher().asVisitor((image, ctx) -> {
-                    assertThat(image.hasEnvironmentVariables()).isTrue();
-                    assertThat(image.getImageNameForMatching()).isEqualTo("*");
-                    return SearchResult.found(image.getTree());
-                })
-              )),
-              docker(
-                """
-                  FROM ${IMAGE}:20.04
-                  """,
-                """
-                  ~~>FROM ${IMAGE}:20.04
-                  """
-              )
-            );
-        }
 
         @Test
         void preservesUnbracedVariableForm() {

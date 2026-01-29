@@ -131,9 +131,9 @@ public class ChangeFrom extends Recipe {
             Docker.From f = image.getTree();
 
             // Check if any change is needed
-            String currentImageName = image.getImageNameForMatching();
-            String currentTag = image.getTagForMatching();
-            String currentDigest = image.getDigestForMatching();
+            String currentImageName = image.getImageName();
+            String currentTag = image.getTag();
+            String currentDigest = image.getDigest();
             String currentPlatform = image.getPlatform();
 
             boolean imageNameChanged = newImageName != null && !currentImageName.equals(newImageName);

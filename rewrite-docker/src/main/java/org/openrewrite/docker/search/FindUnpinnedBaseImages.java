@@ -49,11 +49,6 @@ public class FindUnpinnedBaseImages extends Recipe {
                 .excludeScratch()
                 .onlyUnpinned()
                 .asVisitor(image -> {
-                    // Skip images with environment variables in the name (can't analyze statically)
-                    if (image.imageNameHasEnvironmentVariables()) {
-                        return image.getTree();
-                    }
-
                     // Get the reason for being unpinned
                     DockerFrom.UnpinnedReason reason = image.getUnpinnedReason();
 
