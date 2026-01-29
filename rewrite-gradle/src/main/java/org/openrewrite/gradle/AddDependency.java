@@ -184,7 +184,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
-        return Preconditions.check(!acc.configurationsByProject.isEmpty(),
+        // Allow when configuration is explicitly provided, when onlyIfUsing is not set (default to "implementation"),
+        // or when source files were scanned
+        boolean hasExplicitConfiguration = !StringUtils.isBlank(configuration);
+        return Preconditions.check(hasExplicitConfiguration || onlyIfUsing == null || !acc.configurationsByProject.isEmpty(),
                 Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
 
                     @Override
@@ -195,27 +198,40 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         JavaSourceFile s = (JavaSourceFile) tree;
                         Optional<JavaProject> maybeJp = s.getMarkers().findFirst(JavaProject.class);
                         Optional<GradleProject> maybeGp = s.getMarkers().findFirst(GradleProject.class);
-                        if (!maybeJp.isPresent() ||
-                                (onlyIfUsing != null && !acc.usingType.getOrDefault(maybeJp.get(), false)) || !acc.configurationsByProject.containsKey(maybeJp.get()) ||
-                                !maybeGp.isPresent()) {
+
+                        if (!maybeGp.isPresent()) {
                             return s;
                         }
+                        // When configuration needs to be inferred and onlyIfUsing is set, require JavaProject and source set info
+                        if (!hasExplicitConfiguration && onlyIfUsing != null) {
+                            if (!maybeJp.isPresent() ||
+                                    !acc.usingType.getOrDefault(maybeJp.get(), false) ||
+                                    !acc.configurationsByProject.containsKey(maybeJp.get())) {
+                                return s;
+                            }
+                        }
 
-                        JavaProject jp = maybeJp.get();
+                        JavaProject jp = maybeJp.orElse(null);
                         GradleProject gp = maybeGp.get();
 
-                        Set<String> resolvedConfigurations = StringUtils.isBlank(configuration) ?
-                                acc.configurationsByProject.getOrDefault(jp, new HashSet<>()) :
-                                new HashSet<>(singletonList(configuration));
+                        Set<String> resolvedConfigurations = hasExplicitConfiguration ?
+                                new HashSet<>(singletonList(configuration)) :
+                                acc.configurationsByProject.getOrDefault(jp, new HashSet<>());
                         if (resolvedConfigurations.isEmpty()) {
                             resolvedConfigurations.add("implementation");
                         }
 
-                        GradleConfigurationFilter gradleConfigurationFilter = new GradleConfigurationFilter(gp, resolvedConfigurations);
-                        gradleConfigurationFilter.removeTransitiveConfigurations();
-                        gradleConfigurationFilter.removeConfigurationsContainingDependency(new GroupArtifact(groupId, artifactId));
-                        gradleConfigurationFilter.removeConfigurationsContainingTransitiveDependency(new GroupArtifact(groupId, artifactId));
-                        resolvedConfigurations = gradleConfigurationFilter.getFilteredConfigurations();
+                        // Only apply filtering when the configuration is known to the GradleProject
+                        // (which requires Java sources to have been scanned with the tooling API)
+                        boolean configurationKnown = resolvedConfigurations.stream()
+                                .anyMatch(c -> gp.getConfiguration(c) != null);
+                        if (configurationKnown) {
+                            GradleConfigurationFilter gradleConfigurationFilter = new GradleConfigurationFilter(gp, resolvedConfigurations);
+                            gradleConfigurationFilter.removeTransitiveConfigurations();
+                            gradleConfigurationFilter.removeConfigurationsContainingDependency(new GroupArtifact(groupId, artifactId));
+                            gradleConfigurationFilter.removeConfigurationsContainingTransitiveDependency(new GroupArtifact(groupId, artifactId));
+                            resolvedConfigurations = gradleConfigurationFilter.getFilteredConfigurations();
+                        }
 
                         if (resolvedConfigurations.isEmpty()) {
                             return s;
