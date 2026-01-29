@@ -22,11 +22,11 @@ import org.openrewrite.docker.table.DockerBaseImages;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-class FindDockerBaseImagesTest implements RewriteTest {
+class FindBaseImagesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindDockerBaseImages(null, null, null, null));
+        spec.recipe(new FindBaseImages(null, null, null, null));
     }
 
     @DocumentExample
@@ -56,7 +56,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void findBaseImageWithPattern() {
         rewriteRun(
-          spec -> spec.recipe(new FindDockerBaseImages("ubuntu*", null, null, null))
+          spec -> spec.recipe(new FindBaseImages("ubuntu*", null, null, null))
             .dataTableAsCsv(DockerBaseImages.class.getName(),
               //language=csv
               """
@@ -80,7 +80,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void noMatchWithPattern() {
         rewriteRun(
-          spec -> spec.recipe(new FindDockerBaseImages("alpine*", null, null, null)),
+          spec -> spec.recipe(new FindBaseImages("alpine*", null, null, null)),
           Assertions.docker(
             """
               FROM ubuntu:22.04
@@ -192,7 +192,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void filterByPatternInMultiStage() {
         rewriteRun(
-          spec -> spec.recipe(new FindDockerBaseImages("alpine*", null, null, null))
+          spec -> spec.recipe(new FindBaseImages("alpine*", null, null, null))
             .dataTableAsCsv(DockerBaseImages.class.getName(),
               //language=csv
               """
@@ -295,7 +295,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void filterByTagPattern() {
         rewriteRun(
-          spec -> spec.recipe(new FindDockerBaseImages(null, "22.*", null, null))
+          spec -> spec.recipe(new FindBaseImages(null, "22.*", null, null))
             .dataTableAsCsv(DockerBaseImages.class.getName(),
               //language=csv
               """
@@ -321,7 +321,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void filterByDigestPattern() {
         rewriteRun(
-          spec -> spec.recipe(new FindDockerBaseImages(null, null, "sha256:abc*", null))
+          spec -> spec.recipe(new FindBaseImages(null, null, "sha256:abc*", null))
             .dataTableAsCsv(DockerBaseImages.class.getName(),
               //language=csv
               """
@@ -345,7 +345,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void filterByPlatformPattern() {
         rewriteRun(
-          spec -> spec.recipe(new FindDockerBaseImages(null, null, null, "linux/arm*"))
+          spec -> spec.recipe(new FindBaseImages(null, null, null, "linux/arm*"))
             .dataTableAsCsv(DockerBaseImages.class.getName(),
               //language=csv
               """
@@ -369,7 +369,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void filterByMultiplePatterns() {
         rewriteRun(
-          spec -> spec.recipe(new FindDockerBaseImages("ubuntu*", "22.*", null, "linux/amd64"))
+          spec -> spec.recipe(new FindBaseImages("ubuntu*", "22.*", null, "linux/amd64"))
             .dataTableAsCsv(DockerBaseImages.class.getName(),
               //language=csv
               """
@@ -397,7 +397,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void noMatchWithTagPattern() {
         rewriteRun(
-          spec -> spec.recipe(new FindDockerBaseImages(null, "18.*", null, null)),
+          spec -> spec.recipe(new FindBaseImages(null, "18.*", null, null)),
           Assertions.docker(
             """
               FROM ubuntu:22.04

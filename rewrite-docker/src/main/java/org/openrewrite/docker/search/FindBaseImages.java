@@ -29,7 +29,7 @@ import org.openrewrite.marker.SearchResult;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class FindDockerBaseImages extends Recipe {
+public class FindBaseImages extends Recipe {
 
     transient DockerBaseImages dockerBaseImages = new DockerBaseImages(this);
 
