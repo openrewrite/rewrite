@@ -23,13 +23,11 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.tree.Docker;
-import org.openrewrite.docker.tree.Space;
-import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.openrewrite.Tree.randomId;
+import static java.util.stream.Collectors.joining;
 
 /**
  * Combines consecutive RUN instructions into a single RUN instruction.
@@ -50,20 +48,20 @@ public class CombineRunInstructions extends Recipe {
 
     @Option(displayName = "Separator",
             description = "The separator to use between combined commands. Defaults to ' && '.",
-            example = " && \\\\\\n    ",
+            example = " && ",
             required = false)
     @Nullable
     String separator;
 
     @Override
     public String getDisplayName() {
-        return "Combine consecutive RUN instructions";
+        return "Combine consecutive `RUN` instructions";
     }
 
     @Override
     public String getDescription() {
-        return "Combines consecutive RUN instructions into a single instruction to reduce image layers. " +
-                "Only shell form RUN instructions without flags are combined.";
+        return "Combines consecutive `RUN` instructions into a single instruction to reduce image layers. " +
+                "Only shell form `RUN` instructions without flags are combined.";
     }
 
     @Override
@@ -77,21 +75,14 @@ public class CombineRunInstructions extends Recipe {
                 List<Docker.Instruction> newInstructions = new ArrayList<>();
 
                 List<Docker.Run> consecutiveRuns = new ArrayList<>();
-                Space firstRunPrefix = null;
-
                 for (Docker.Instruction instruction : instructions) {
                     if (instruction instanceof Docker.Run && canCombine((Docker.Run) instruction)) {
-                        Docker.Run run = (Docker.Run) instruction;
-                        if (consecutiveRuns.isEmpty()) {
-                            firstRunPrefix = run.getPrefix();
-                        }
-                        consecutiveRuns.add(run);
+                        consecutiveRuns.add((Docker.Run) instruction);
                     } else {
                         // Flush any accumulated RUN instructions
                         if (!consecutiveRuns.isEmpty()) {
-                            newInstructions.add(combineRuns(consecutiveRuns, firstRunPrefix, sep));
+                            newInstructions.add(combineRuns(consecutiveRuns, sep));
                             consecutiveRuns.clear();
-                            firstRunPrefix = null;
                         }
                         newInstructions.add(instruction);
                     }
@@ -99,7 +90,7 @@ public class CombineRunInstructions extends Recipe {
 
                 // Flush any remaining RUN instructions
                 if (!consecutiveRuns.isEmpty()) {
-                    newInstructions.add(combineRuns(consecutiveRuns, firstRunPrefix, sep));
+                    newInstructions.add(combineRuns(consecutiveRuns, sep));
                 }
 
                 if (newInstructions.size() == instructions.size()) {
@@ -112,53 +103,22 @@ public class CombineRunInstructions extends Recipe {
 
             private boolean canCombine(Docker.Run run) {
                 // Only combine shell form RUN instructions
-                if (!(run.getCommand() instanceof Docker.ShellForm)) {
-                    return false;
-                }
-                // Don't combine if there are flags (like --mount, --network, etc.)
-                return run.getFlags() == null || run.getFlags().isEmpty();
+                return run.getCommand() instanceof Docker.ShellForm &&
+                        // Don't combine if there are flags (like --mount, --network, etc.)
+                        (run.getFlags() == null || run.getFlags().isEmpty());
             }
 
-            private Docker.Run combineRuns(List<Docker.Run> runs, @Nullable Space prefix, String sep) {
+            private Docker.Run combineRuns(List<Docker.Run> runs, String sep) {
+                Docker.Run firstRun = runs.get(0);
                 if (runs.size() == 1) {
-                    return runs.get(0);
+                    return firstRun;
                 }
 
-                StringBuilder combined = new StringBuilder();
-                for (int i = 0; i < runs.size(); i++) {
-                    Docker.Run run = runs.get(i);
-                    Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
-                    String commandText = shellForm.getArgument().getText();
-
-                    if (i > 0) {
-                        combined.append(sep);
-                    }
-                    combined.append(commandText);
-                }
-
-                Docker.Literal combinedLiteral = new Docker.Literal(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        combined.toString(),
-                        null
-                );
-
-                Docker.ShellForm combinedShellForm = new Docker.ShellForm(
-                        randomId(),
-                        Space.SINGLE_SPACE,
-                        Markers.EMPTY,
-                        combinedLiteral
-                );
-
-                return new Docker.Run(
-                        randomId(),
-                        prefix != null ? prefix : runs.get(0).getPrefix(),
-                        Markers.EMPTY,
-                        "RUN",
-                        null,
-                        combinedShellForm
-                );
+                String combined = runs.stream()
+                        .map(r -> ((Docker.ShellForm) r.getCommand()).getArgument().getText())
+                        .collect(joining(sep));
+                Docker.ShellForm command = (Docker.ShellForm) firstRun.getCommand();
+                return firstRun.withCommand(command.withArgument(command.getArgument().withText(combined)));
             }
         };
     }
