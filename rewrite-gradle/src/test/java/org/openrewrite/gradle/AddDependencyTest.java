@@ -1386,6 +1386,72 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void addWithExplicitConfigurationAndNoJavaSources() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, "implementation")),
+          mavenProject("project",
+            buildGradle(
+              """
+                plugins {
+                    id 'java'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id 'java'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addWithNoTypeFilterAndNoJavaSourcesDefaultsToImplementation() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, null)),
+          mavenProject("project",
+            buildGradle(
+              """
+                plugins {
+                    id 'java'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id 'java'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
     @Issue("https://github.com/moderneinc/customer-requests/issues/792")
     @Nested
     class AddToJVMTestSuite {

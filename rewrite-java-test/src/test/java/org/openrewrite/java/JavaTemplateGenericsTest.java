@@ -519,6 +519,47 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
+    void templateShouldNotMatchWhenWildcardCaptureBreaksAfterTemplate() {
+        // Simulates the AssertJMapRules.AbstractMapAssertContainsExactlyInAnyOrderEntriesOf Refaster rule.
+        // The before template matches mapAssert.isEqualTo(map), but when the map assert's value type
+        // is a wildcard (? extends Class<?>), the after template's containsExactlyInAnyOrderEntriesOf()
+        // produces uncompilable code due to Java's wildcard capture rules.
+        var beforeTemplate = JavaTemplate
+          .builder("#{mapAssert:any(org.assertj.core.api.AbstractMapAssert<?, ?, K, V>)}.isEqualTo(#{map:any(java.util.Map<? extends K, ? extends V>)})")
+          .bindType("org.assertj.core.api.AbstractMapAssert<?, ?, K, V>")
+          .genericTypes("K", "V")
+          .javaParser(JavaParser.fromJavaVersion().classpath("assertj-core"))
+          .build();
+
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return beforeTemplate.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.Map;
+              import static org.assertj.core.api.Assertions.assertThat;
+
+              class Test {
+                  Map<String, ? extends Class<?>> getArgumentDefinitions() {
+                      return Collections.singletonMap("arg", String.class);
+                  }
+                  void test() {
+                      // V binds to "? extends Class<?>" — containsExactlyInAnyOrderEntriesOf would not compile
+                      assertThat(getArgumentDefinitions()).isEqualTo(Collections.singletonMap("arg", String.class));
+                  }
+              }
+              """
+            // No expected output — the template should NOT match, so no SearchResult marker
+          )
+        );
+    }
+
+    @Test
     void memberReferenceToLambda() {
         //noinspection Convert2MethodRef
         rewriteRun(
