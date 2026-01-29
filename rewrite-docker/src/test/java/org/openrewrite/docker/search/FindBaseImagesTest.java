@@ -18,7 +18,7 @@ package org.openrewrite.docker.search;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.docker.Assertions;
-import org.openrewrite.docker.table.DockerBaseImages;
+import org.openrewrite.docker.table.BaseImages;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -33,7 +33,7 @@ class FindBaseImagesTest implements RewriteTest {
     @Test
     void findAllBaseImages() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -57,7 +57,7 @@ class FindBaseImagesTest implements RewriteTest {
     void findBaseImageWithPattern() {
         rewriteRun(
           spec -> spec.recipe(new FindBaseImages("ubuntu*", null, null, null))
-            .dataTableAsCsv(DockerBaseImages.class.getName(),
+            .dataTableAsCsv(BaseImages.class.getName(),
               //language=csv
               """
                 sourceFile,stageName,imageName,tag,digest,platform
@@ -93,7 +93,7 @@ class FindBaseImagesTest implements RewriteTest {
     @Test
     void findBaseImageWithDigest() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -116,7 +116,7 @@ class FindBaseImagesTest implements RewriteTest {
     @Test
     void findBaseImageWithPlatform() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -139,7 +139,7 @@ class FindBaseImagesTest implements RewriteTest {
     @Test
     void findBaseImageWithStageName() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -162,7 +162,7 @@ class FindBaseImagesTest implements RewriteTest {
     @Test
     void findMultipleBaseImages() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -193,7 +193,7 @@ class FindBaseImagesTest implements RewriteTest {
     void filterByPatternInMultiStage() {
         rewriteRun(
           spec -> spec.recipe(new FindBaseImages("alpine*", null, null, null))
-            .dataTableAsCsv(DockerBaseImages.class.getName(),
+            .dataTableAsCsv(BaseImages.class.getName(),
               //language=csv
               """
                 sourceFile,stageName,imageName,tag,digest,platform
@@ -222,7 +222,7 @@ class FindBaseImagesTest implements RewriteTest {
     @Test
     void findBaseImageWithAllDetails() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -245,7 +245,7 @@ class FindBaseImagesTest implements RewriteTest {
     @Test
     void findBaseImageWithoutTag() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -268,7 +268,7 @@ class FindBaseImagesTest implements RewriteTest {
     @Test
     void findBaseImageWithGlobalArg() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -296,7 +296,7 @@ class FindBaseImagesTest implements RewriteTest {
     void filterByTagPattern() {
         rewriteRun(
           spec -> spec.recipe(new FindBaseImages(null, "22.*", null, null))
-            .dataTableAsCsv(DockerBaseImages.class.getName(),
+            .dataTableAsCsv(BaseImages.class.getName(),
               //language=csv
               """
                 sourceFile,stageName,imageName,tag,digest,platform
@@ -322,7 +322,7 @@ class FindBaseImagesTest implements RewriteTest {
     void filterByDigestPattern() {
         rewriteRun(
           spec -> spec.recipe(new FindBaseImages(null, null, "sha256:abc*", null))
-            .dataTableAsCsv(DockerBaseImages.class.getName(),
+            .dataTableAsCsv(BaseImages.class.getName(),
               //language=csv
               """
                 sourceFile,stageName,imageName,tag,digest,platform
@@ -346,7 +346,7 @@ class FindBaseImagesTest implements RewriteTest {
     void filterByPlatformPattern() {
         rewriteRun(
           spec -> spec.recipe(new FindBaseImages(null, null, null, "linux/arm*"))
-            .dataTableAsCsv(DockerBaseImages.class.getName(),
+            .dataTableAsCsv(BaseImages.class.getName(),
               //language=csv
               """
                 sourceFile,stageName,imageName,tag,digest,platform
@@ -370,7 +370,7 @@ class FindBaseImagesTest implements RewriteTest {
     void filterByMultiplePatterns() {
         rewriteRun(
           spec -> spec.recipe(new FindBaseImages("ubuntu*", "22.*", null, "linux/amd64"))
-            .dataTableAsCsv(DockerBaseImages.class.getName(),
+            .dataTableAsCsv(BaseImages.class.getName(),
               //language=csv
               """
                 sourceFile,stageName,imageName,tag,digest,platform

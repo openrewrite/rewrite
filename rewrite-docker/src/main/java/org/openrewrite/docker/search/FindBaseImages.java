@@ -22,7 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.docker.table.DockerBaseImages;
+import org.openrewrite.docker.table.BaseImages;
 import org.openrewrite.docker.trait.DockerFrom;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.marker.SearchResult;
@@ -31,7 +31,7 @@ import org.openrewrite.marker.SearchResult;
 @EqualsAndHashCode(callSuper = false)
 public class FindBaseImages extends Recipe {
 
-    transient DockerBaseImages dockerBaseImages = new DockerBaseImages(this);
+    transient BaseImages baseImages = new BaseImages(this);
 
     @Option(displayName = "Image name pattern",
             description = "A glob pattern to match against base image names. If not specified, all base images are matched.",
@@ -99,7 +99,7 @@ public class FindBaseImages extends Recipe {
             String platform = image.getPlatform();
 
             // Insert row into data table
-            dockerBaseImages.insertRow(ctx, new DockerBaseImages.Row(
+            baseImages.insertRow(ctx, new BaseImages.Row(
                     image.getCursor().firstEnclosingOrThrow(Docker.File.class).getSourcePath().toString(),
                     stageName,
                     imageName,

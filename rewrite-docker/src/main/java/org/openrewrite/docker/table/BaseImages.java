@@ -21,9 +21,9 @@ import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
 
-public class DockerBaseImages extends DataTable<DockerBaseImages.Row> {
+public class BaseImages extends DataTable<BaseImages.Row> {
 
-    public DockerBaseImages(Recipe recipe) {
+    public BaseImages(Recipe recipe) {
         super(recipe,
                 "Docker base images",
                 "Records the base images found in Dockerfiles.");
