@@ -26,9 +26,7 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
 
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.Map;
+import java.util.*;
 
 import static java.util.Objects.requireNonNull;
 
@@ -271,6 +269,9 @@ public class ChangePackage extends Recipe {
                     }
                 }
 
+                // Handle star imports that could become ambiguous after package rename
+                sf = unfoldAmbiguousStarImports(sf, ctx);
+
                 j = sf;
             }
             //noinspection DataFlowIssue
@@ -389,6 +390,74 @@ public class ChangePackage extends Recipe {
                    !packageName.startsWith(newPackageName);
         }
 
+        /**
+         * After a package rename, star imports can become ambiguous if the new package contains
+         * types with the same simple name as types in other star-imported packages.
+         * When there are multiple star imports and one of them is from a renamed package,
+         * expand the renamed star import to explicit imports to avoid potential ambiguity.
+         */
+        private JavaSourceFile unfoldAmbiguousStarImports(JavaSourceFile sf, ExecutionContext ctx) {
+            // Collect all star imports and their packages
+            List<J.Import> starImports = new ArrayList<>();
+            Set<String> starImportPackages = new HashSet<>();
+            for (J.Import anImport : sf.getImports()) {
+                if (!anImport.isStatic() && "*".equals(anImport.getQualid().getSimpleName())) {
+                    starImports.add(anImport);
+                    starImportPackages.add(anImport.getPackageName());
+                }
+            }
+
+            // Need at least 2 star imports for potential ambiguity
+            if (starImports.size() < 2) {
+                return sf;
+            }
+
+            // Collect types used from each star-imported package
+            Map<String, Set<String>> typesUsedByPackage = new HashMap<>();
+            for (JavaType javaType : sf.getTypesInUse().getTypesInUse()) {
+                if (javaType instanceof JavaType.FullyQualified) {
+                    JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
+                    String pkg = fq.getPackageName();
+                    if (starImportPackages.contains(pkg)) {
+                        typesUsedByPackage.computeIfAbsent(pkg, k -> new HashSet<>())
+                                .add(fq.getClassName());
+                    }
+                }
+            }
+
+            // For each star import from a renamed package, expand to explicit imports
+            // to avoid potential ambiguity with other star imports
+            for (J.Import starImport : starImports) {
+                String importPkg = starImport.getPackageName();
+
+                // Only expand star imports from packages that match the rename target
+                // (either exact match or recursive subpackage match)
+                boolean isTargetPackage = importPkg.equals(newPackageName) ||
+                    (Boolean.TRUE.equals(recursive) && importPkg.startsWith(newPackageName + "."));
+                if (!isTargetPackage) {
+                    continue;
+                }
+
+                Set<String> typesUsedFromThisPackage = typesUsedByPackage.getOrDefault(importPkg, Collections.emptySet());
+                if (typesUsedFromThisPackage.isEmpty()) {
+                    continue;
+                }
+
+                // Expand the star import to explicit imports for types actually used
+                // This prevents potential ambiguity with types from other star imports
+                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(starImport.getTypeName(), true)
+                        .visitNonNull(sf, ctx, getCursor().getParentTreeCursor());
+
+                // Add explicit imports for types actually used from this package
+                for (String typeName : typesUsedFromThisPackage) {
+                    String fqn = importPkg + "." + typeName;
+                    sf = (JavaSourceFile) new AddImport<ExecutionContext>(fqn, null, false)
+                            .visitNonNull(sf, ctx, getCursor().getParentTreeCursor());
+                }
+            }
+
+            return sf;
+        }
     }
 
     @Value
