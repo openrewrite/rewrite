@@ -3333,4 +3333,176 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void mergeRecipePreconditionsInsertBeforeWithFoldedString() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              preconditions:
+                - org.openrewrite.Singleton
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "recipeList",
+            true
+          )),
+          yaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.FoldedStrip
+              displayName: Folded Strip
+              description: >-
+                Folded with strip.
+              recipeList:
+                - org.openrewrite.java.OrderImports
+              """,
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.FoldedStrip
+              displayName: Folded Strip
+              description: >-
+                Folded with strip.
+              preconditions:
+                - org.openrewrite.Singleton
+              recipeList:
+                - org.openrewrite.java.OrderImports
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeAfterLiteralString() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              newKey: newValue
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "nextKey",
+            true
+          )),
+          yaml(
+            """
+              description: |-
+                Literal with strip.
+              nextKey: value
+              """,
+            """
+              description: |-
+                Literal with strip.
+              newKey: newValue
+              nextKey: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeAfterNestedMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              newKey: newValue
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "nextKey",
+            true
+          )),
+          yaml(
+            """
+              config:
+                nested:
+                  deep: value
+              nextKey: value
+              """,
+            """
+              config:
+                nested:
+                  deep: value
+              newKey: newValue
+              nextKey: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeAfterSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              newKey: newValue
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "nextKey",
+            true
+          )),
+          yaml(
+            """
+              items:
+                - item1
+                - item2
+              nextKey: value
+              """,
+            """
+              items:
+                - item1
+                - item2
+              newKey: newValue
+              nextKey: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeAfterPlainScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              newKey: newValue
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "nextKey",
+            true
+          )),
+          yaml(
+            """
+              description: Plain scalar value
+              nextKey: value
+              """,
+            """
+              description: Plain scalar value
+              newKey: newValue
+              nextKey: value
+              """
+          )
+        );
+    }
 }
