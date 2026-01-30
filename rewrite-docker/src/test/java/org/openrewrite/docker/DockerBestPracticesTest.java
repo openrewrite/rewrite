@@ -56,7 +56,7 @@ class DockerBestPracticesTest implements RewriteTest {
               ENTRYPOINT /app/start.sh
               """,
             """
-              FROM ubuntu:22.04
+              ~~(EOL: ubuntu:22.04 (ended 2024-09-30, suggest noble (24.04)))~~>FROM ubuntu:22.04
               COPY app.jar /app/
               RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
               ENTRYPOINT ["/app/start.sh"]
