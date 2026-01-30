@@ -15,22 +15,22 @@
  */
 package org.openrewrite.docker.search;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
+import org.yaml.snakeyaml.Yaml;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Represents a known end-of-life Docker base image.
  * <p>
- * Data is loaded from the classpath resource {@code eol-images.json}.
+ * Data is loaded from the classpath resource {@code eol-images.yaml}.
  * <p>
  * Data sources:
  * <ul>
@@ -50,15 +50,24 @@ public class EolImage {
     LocalDate eolDate;
     String suggestedReplacement;
 
+    @SuppressWarnings("unchecked")
     private static List<EolImage> loadEolImages() {
-        try (InputStream is = EolImage.class.getResourceAsStream("/eol-images.json")) {
+        try (InputStream is = EolImage.class.getResourceAsStream("/eol-images.yaml")) {
             if (is == null) {
                 return Collections.emptyList();
             }
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.findAndRegisterModules();
-            return mapper.readValue(is, new TypeReference<List<EolImage>>() {});
-        } catch (IOException e) {
+            Yaml yaml = new Yaml();
+            List<Map<String, Object>> data = yaml.load(is);
+            List<EolImage> images = new ArrayList<>();
+            for (Map<String, Object> entry : data) {
+                String imageName = (String) entry.get("imageName");
+                List<String> tagPatterns = (List<String>) entry.get("tagPatterns");
+                LocalDate eolDate = LocalDate.parse((String) entry.get("eolDate"));
+                String suggestedReplacement = (String) entry.get("suggestedReplacement");
+                images.add(new EolImage(imageName, tagPatterns, eolDate, suggestedReplacement));
+            }
+            return images;
+        } catch (Exception e) {
             return Collections.emptyList();
         }
     }
