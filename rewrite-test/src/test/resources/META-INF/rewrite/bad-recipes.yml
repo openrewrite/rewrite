@@ -21,6 +21,8 @@ type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.test.internal.InvalidTagType
 displayName: A recipe with a bad tag
 description: 1.0 cannot be coerced into a string, and must be surrounded in quotes.
+preconditions:
+  - org.openrewrite.Singleton
 recipeList:
   - org.openrewrite.text.ChangeText:
       toText: Hello Jon!

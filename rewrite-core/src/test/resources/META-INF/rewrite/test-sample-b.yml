@@ -19,6 +19,8 @@ type: specs.openrewrite.org/v1beta/recipe
 name: test.declarative.sample.b
 displayName: Test Recipe
 description: Test Recipe.
+preconditions:
+  - org.openrewrite.Singleton
 recipeList:
   - org.openrewrite.text.ChangeText:
       toText: after

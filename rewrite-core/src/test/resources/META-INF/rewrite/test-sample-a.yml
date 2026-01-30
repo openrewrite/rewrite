@@ -19,5 +19,7 @@ type: specs.openrewrite.org/v1beta/recipe
 name: test.declarative.sample.a
 displayName: Test Recipe
 description: Test Recipe.
+preconditions:
+  - org.openrewrite.Singleton
 recipeList:
   - test.declarative.sample.b
