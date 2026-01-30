@@ -19,71 +19,98 @@
 # - Alpine: https://alpinelinux.org/releases/
 # - Python: https://devguide.python.org/versions/
 # - Node.js: https://nodejs.org/en/about/releases/
+# - General: https://endoflife.date/
 #
 - imageName: debian
   tagPatterns: [jessie, "jessie-*", "8", "8.*"]
   eolDate: "2020-06-30"
-  suggestedReplacement: bookworm (12) or bullseye (11)
+  suggestedReplacement: trixie (13) or bookworm (12)
 
 - imageName: debian
   tagPatterns: [stretch, "stretch-*", "9", "9.*"]
   eolDate: "2022-07-01"
-  suggestedReplacement: bookworm (12) or bullseye (11)
+  suggestedReplacement: trixie (13) or bookworm (12)
 
 - imageName: debian
   tagPatterns: [buster, "buster-*", "10", "10.*"]
   eolDate: "2024-06-30"
-  suggestedReplacement: bookworm (12) or bullseye (11)
+  suggestedReplacement: trixie (13) or bookworm (12)
+
+- imageName: debian
+  tagPatterns: [bullseye, "bullseye-*", "11", "11.*"]
+  eolDate: "2024-08-14"
+  suggestedReplacement: trixie (13) or bookworm (12)
 
 - imageName: ubuntu
   tagPatterns: [trusty, "trusty-*", "14.04", "14.04.*"]
   eolDate: "2019-04-25"
-  suggestedReplacement: noble (24.04) or jammy (22.04)
+  suggestedReplacement: noble (24.04)
 
 - imageName: ubuntu
   tagPatterns: [xenial, "xenial-*", "16.04", "16.04.*"]
   eolDate: "2021-04-30"
-  suggestedReplacement: noble (24.04) or jammy (22.04)
+  suggestedReplacement: noble (24.04)
 
 - imageName: ubuntu
   tagPatterns: [bionic, "bionic-*", "18.04", "18.04.*"]
   eolDate: "2023-05-31"
-  suggestedReplacement: noble (24.04) or jammy (22.04)
+  suggestedReplacement: noble (24.04)
 
 - imageName: ubuntu
   tagPatterns: [focal, "focal-*", "20.04", "20.04.*"]
   eolDate: "2025-04-30"
-  suggestedReplacement: noble (24.04) or jammy (22.04)
+  suggestedReplacement: noble (24.04)
+
+- imageName: ubuntu
+  tagPatterns: [jammy, "jammy-*", "22.04", "22.04.*"]
+  eolDate: "2024-09-30"
+  suggestedReplacement: noble (24.04)
+
 
 - imageName: alpine
   tagPatterns: ["3.14", "3.14.*"]
   eolDate: "2023-05-01"
-  suggestedReplacement: 3.21 or 3.20
+  suggestedReplacement: 3.23 or 3.22
 
 - imageName: alpine
   tagPatterns: ["3.15", "3.15.*"]
   eolDate: "2023-11-01"
-  suggestedReplacement: 3.21 or 3.20
+  suggestedReplacement: 3.23 or 3.22
 
 - imageName: alpine
   tagPatterns: ["3.16", "3.16.*"]
   eolDate: "2024-05-23"
-  suggestedReplacement: 3.21 or 3.20
+  suggestedReplacement: 3.23 or 3.22
 
 - imageName: alpine
   tagPatterns: ["3.17", "3.17.*"]
   eolDate: "2024-11-22"
-  suggestedReplacement: 3.21 or 3.20
+  suggestedReplacement: 3.23 or 3.22
+
+- imageName: alpine
+  tagPatterns: ["3.18", "3.18.*"]
+  eolDate: "2025-05-09"
+  suggestedReplacement: 3.23 or 3.22
+
+- imageName: alpine
+  tagPatterns: ["3.19", "3.19.*"]
+  eolDate: "2025-11-01"
+  suggestedReplacement: 3.23 or 3.22
 
 - imageName: python
   tagPatterns: ["3.7", "3.7.*", "3.7-*"]
   eolDate: "2023-06-27"
-  suggestedReplacement: 3.12 or 3.11
+  suggestedReplacement: 3.14 or 3.13
 
 - imageName: python
   tagPatterns: ["3.8", "3.8.*", "3.8-*"]
   eolDate: "2024-10-31"
-  suggestedReplacement: 3.12 or 3.11
+  suggestedReplacement: 3.14 or 3.13
+
+- imageName: python
+  tagPatterns: ["3.9", "3.9.*", "3.9-*"]
+  eolDate: "2025-10-31"
+  suggestedReplacement: 3.14 or 3.13
 
 - imageName: node
   tagPatterns: ["14", "14.*", "14-*"]
@@ -93,9 +120,14 @@
 - imageName: node
   tagPatterns: ["16", "16.*", "16-*"]
   eolDate: "2024-04-30"
-  suggestedReplacement: 22 or 20
+  suggestedReplacement: 24 or 22
 
 - imageName: node
   tagPatterns: ["18", "18.*", "18-*"]
   eolDate: "2025-04-30"
-  suggestedReplacement: 22 or 20
+  suggestedReplacement: 24 or 22
+
+- imageName: node
+  tagPatterns: ["20", "20.*", "20-*"]
+  eolDate: "2026-04-30"
+  suggestedReplacement: 24 or 22
