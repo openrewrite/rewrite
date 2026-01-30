@@ -278,4 +278,134 @@ class DeletePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void globPatternSingleWildcard() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("management.metrics.binders.*.enabled", null, null, null)),
+          yaml(
+            """
+              management.metrics.binders.files.enabled: true
+              management.metrics.binders.jvm.enabled: true
+              management.metrics.export.enabled: true
+              """,
+            """
+              management.metrics.export.enabled: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternSingleWildcardAtEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("management.metrics.binders.files.*", null, null, null)),
+          yaml(
+            """
+              management:
+                metrics:
+                  binders:
+                    files:
+                      enabled: true
+                      disabled: false
+              xyz.export.enabled: true
+              """,
+            """
+              xyz.export.enabled: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternDoubleWildcard() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("management.**.enabled", null, null, null)),
+          yaml(
+            """
+              management.metrics.binders.files.enabled: true
+              management.metrics.enabled: true
+              management.health.enabled: false
+              server.port: 8080
+              """,
+            """
+              server.port: 8080
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternNestedYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("spring.datasource.*.password", null, null, null)),
+          yaml(
+            """
+              spring:
+                datasource:
+                  primary:
+                    url: jdbc:mysql://localhost/db1
+                    password: secret1
+                  secondary:
+                    url: jdbc:mysql://localhost/db2
+                    password: secret2
+              """,
+            """
+              spring:
+                datasource:
+                  primary:
+                    url: jdbc:mysql://localhost/db1
+                  secondary:
+                    url: jdbc:mysql://localhost/db2
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternWithRelaxedBinding() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.*.first-name", null, true, null)),
+          yaml(
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: John
+                    last-name: Doe
+                  employee:
+                    firstName: Jane
+                    lastName: Smith
+              """,
+            """
+              acme:
+                my-project:
+                  person:
+                    last-name: Doe
+                  employee:
+                    lastName: Smith
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternWithExactMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.*.first-name", null, false, null)),
+          yaml(
+            """
+              acme:
+                person:
+                  first-name: John
+                  firstName: Jane
+              """,
+            """
+              acme:
+                person:
+                  firstName: Jane
+              """
+          )
+        );
+    }
 }
