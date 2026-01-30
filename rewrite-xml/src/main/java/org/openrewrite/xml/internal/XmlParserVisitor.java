@@ -354,12 +354,12 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         advanceCursor(codePointCursor + 2);
 
                         // Handle malformed XML where closing tag name might be null
-                        String closeTagName = ctx.Name(1) != null
-                                ? convert(ctx.Name(1), (n, p) -> n.getText())
-                                : name;  // Fall back to opening tag name
-                        String beforeCloseTagDelimiter = ctx.CLOSE(1) != null
-                                ? prefix(ctx.CLOSE(1))
-                                : "";
+                        String closeTagName = ctx.Name(1) != null ?
+                                convert(ctx.Name(1), (n, p) -> n.getText()) :
+                                name;  // Fall back to opening tag name
+                        String beforeCloseTagDelimiter = ctx.CLOSE(1) != null ?
+                                prefix(ctx.CLOSE(1)) :
+                                "";
 
                         closeTag = new Xml.Tag.Closing(
                                 randomId(),
