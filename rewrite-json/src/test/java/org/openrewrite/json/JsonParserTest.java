@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Parser;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.json.tree.Json;
@@ -27,6 +28,8 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 
+import java.nio.charset.Charset;
+import java.nio.file.Paths;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -232,6 +235,19 @@ class JsonParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void windows1252EncodedAccentedCharacters() {
+        Charset windows1252 = Charset.forName("Windows-1252");
+        String jsonContent = "{\"keyword\": \"Mot-cl\u00e9\", \"period\": \"P\u00e9riode\"}";
+        ExecutionContext ctx = new InMemoryExecutionContext(e -> {});
+        Parser.Input input = Parser.Input.fromString(Paths.get("test.json"), jsonContent, windows1252);
+        List<SourceFile> results = new JsonParser()
+          .parseInputs(List.of(input), null, ctx)
+          .toList();
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0)).isNotInstanceOf(ParseError.class);
     }
 
     @Test
