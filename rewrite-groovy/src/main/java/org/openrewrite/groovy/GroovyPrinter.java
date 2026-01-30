@@ -199,6 +199,14 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitTupleExpression(G.TupleExpression tuple, PrintOutputCapture<P> p) {
+        beforeSyntax(tuple, GSpace.Location.TUPLE_PREFIX, p);
+        visitContainer("(", tuple.getPadding().getVariables(), GContainer.Location.TUPLE_ELEMENTS, ",", ")", p);
+        afterSyntax(tuple, p);
+        return tuple;
+    }
+
+    @Override
     public J visitRange(G.Range range, PrintOutputCapture<P> p) {
         beforeSyntax(range, GSpace.Location.RANGE_PREFIX, p);
         visit(range.getFrom(), p);
@@ -297,6 +305,18 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
 
         @Override
+        public J visitVariable(J.VariableDeclarations.NamedVariable variable, PrintOutputCapture<P> p) {
+            if (variable.getDeclarator() instanceof G.TupleExpression) {
+                beforeSyntax(variable, Space.Location.VARIABLE_PREFIX, p);
+                visit(variable.getDeclarator(), p);
+                visitLeftPadded("=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+                afterSyntax(variable, p);
+                return variable;
+            }
+            return super.visitVariable(variable, p);
+        }
+
+        @Override
         public J visitVariableDeclarations(J.VariableDeclarations multiVariable, PrintOutputCapture<P> p) {
             beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
@@ -317,7 +337,9 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                 visitSpace(multiVariable.getVarargs(), Space.Location.VARARGS, p);
                 p.append("...");
             }
+
             visitRightPadded(multiVariable.getPadding().getVariables(), JRightPadded.Location.NAMED_VARIABLE, ",", p);
+
             afterSyntax(multiVariable, p);
             return multiVariable;
         }
