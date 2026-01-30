@@ -18,22 +18,22 @@ package org.openrewrite.docker.search;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.docker.Assertions;
-import org.openrewrite.docker.table.DockerBaseImages;
+import org.openrewrite.docker.table.BaseImages;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-class FindDockerBaseImagesTest implements RewriteTest {
+class FindBaseImagesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindDockerBaseImages(null));
+        spec.recipe(new FindBaseImages(null, null, null, null));
     }
 
     @DocumentExample
     @Test
     void findAllBaseImages() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -56,8 +56,8 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void findBaseImageWithPattern() {
         rewriteRun(
-          spec -> spec.recipe(new FindDockerBaseImages("ubuntu*"))
-            .dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.recipe(new FindBaseImages("ubuntu*", null, null, null))
+            .dataTableAsCsv(BaseImages.class.getName(),
               //language=csv
               """
                 sourceFile,stageName,imageName,tag,digest,platform
@@ -80,7 +80,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void noMatchWithPattern() {
         rewriteRun(
-          spec -> spec.recipe(new FindDockerBaseImages("alpine*")),
+          spec -> spec.recipe(new FindBaseImages("alpine*", null, null, null)),
           Assertions.docker(
             """
               FROM ubuntu:22.04
@@ -93,7 +93,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void findBaseImageWithDigest() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -116,7 +116,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void findBaseImageWithPlatform() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -139,7 +139,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void findBaseImageWithStageName() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -162,7 +162,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void findMultipleBaseImages() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -192,8 +192,8 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void filterByPatternInMultiStage() {
         rewriteRun(
-          spec -> spec.recipe(new FindDockerBaseImages("alpine*"))
-            .dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.recipe(new FindBaseImages("alpine*", null, null, null))
+            .dataTableAsCsv(BaseImages.class.getName(),
               //language=csv
               """
                 sourceFile,stageName,imageName,tag,digest,platform
@@ -222,7 +222,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void findBaseImageWithAllDetails() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -245,7 +245,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void findBaseImageWithoutTag() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -268,7 +268,7 @@ class FindDockerBaseImagesTest implements RewriteTest {
     @Test
     void findBaseImageWithGlobalArg() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerBaseImages.class.getName(),
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
               sourceFile,stageName,imageName,tag,digest,platform
@@ -287,6 +287,121 @@ class FindDockerBaseImagesTest implements RewriteTest {
               ARG BASE_TAG=22.04
               ~~(${BASE_IMAGE}:${BASE_TAG})~~>FROM ${BASE_IMAGE}:${BASE_TAG}
               RUN apt-get update
+              """
+          )
+        );
+    }
+
+    @Test
+    void filterByTagPattern() {
+        rewriteRun(
+          spec -> spec.recipe(new FindBaseImages(null, "22.*", null, null))
+            .dataTableAsCsv(BaseImages.class.getName(),
+              //language=csv
+              """
+                sourceFile,stageName,imageName,tag,digest,platform
+                Dockerfile,,ubuntu,22.04,,
+                """
+            ),
+          Assertions.docker(
+            """
+              FROM ubuntu:22.04
+              FROM ubuntu:20.04
+              FROM alpine:latest
+              """,
+            """
+              ~~(ubuntu:22.04)~~>FROM ubuntu:22.04
+              FROM ubuntu:20.04
+              FROM alpine:latest
+              """
+          )
+        );
+    }
+
+    @Test
+    void filterByDigestPattern() {
+        rewriteRun(
+          spec -> spec.recipe(new FindBaseImages(null, null, "sha256:abc*", null))
+            .dataTableAsCsv(BaseImages.class.getName(),
+              //language=csv
+              """
+                sourceFile,stageName,imageName,tag,digest,platform
+                Dockerfile,,ubuntu,,sha256:abc123,
+                """
+            ),
+          Assertions.docker(
+            """
+              FROM ubuntu@sha256:abc123
+              FROM alpine@sha256:def456
+              """,
+            """
+              ~~(ubuntu@sha256:abc123)~~>FROM ubuntu@sha256:abc123
+              FROM alpine@sha256:def456
+              """
+          )
+        );
+    }
+
+    @Test
+    void filterByPlatformPattern() {
+        rewriteRun(
+          spec -> spec.recipe(new FindBaseImages(null, null, null, "linux/arm*"))
+            .dataTableAsCsv(BaseImages.class.getName(),
+              //language=csv
+              """
+                sourceFile,stageName,imageName,tag,digest,platform
+                Dockerfile,,ubuntu,22.04,,linux/arm64
+                """
+            ),
+          Assertions.docker(
+            """
+              FROM --platform=linux/arm64 ubuntu:22.04
+              FROM --platform=linux/amd64 alpine:latest
+              """,
+            """
+              ~~(ubuntu:22.04)~~>FROM --platform=linux/arm64 ubuntu:22.04
+              FROM --platform=linux/amd64 alpine:latest
+              """
+          )
+        );
+    }
+
+    @Test
+    void filterByMultiplePatterns() {
+        rewriteRun(
+          spec -> spec.recipe(new FindBaseImages("ubuntu*", "22.*", null, "linux/amd64"))
+            .dataTableAsCsv(BaseImages.class.getName(),
+              //language=csv
+              """
+                sourceFile,stageName,imageName,tag,digest,platform
+                Dockerfile,,ubuntu,22.04,,linux/amd64
+                """
+            ),
+          Assertions.docker(
+            """
+              FROM --platform=linux/amd64 ubuntu:22.04
+              FROM --platform=linux/arm64 ubuntu:22.04
+              FROM --platform=linux/amd64 ubuntu:20.04
+              FROM --platform=linux/amd64 alpine:latest
+              """,
+            """
+              ~~(ubuntu:22.04)~~>FROM --platform=linux/amd64 ubuntu:22.04
+              FROM --platform=linux/arm64 ubuntu:22.04
+              FROM --platform=linux/amd64 ubuntu:20.04
+              FROM --platform=linux/amd64 alpine:latest
+              """
+          )
+        );
+    }
+
+    @Test
+    void noMatchWithTagPattern() {
+        rewriteRun(
+          spec -> spec.recipe(new FindBaseImages(null, "18.*", null, null)),
+          Assertions.docker(
+            """
+              FROM ubuntu:22.04
+              FROM ubuntu:20.04
               """
           )
         );

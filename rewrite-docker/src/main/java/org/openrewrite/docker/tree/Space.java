@@ -61,14 +61,14 @@ public class Space {
     @JsonCreator
     public static Space build(@Nullable String whitespace, List<Comment> comments) {
         if (comments.isEmpty()) {
-			if (whitespace == null || whitespace.isEmpty()) {
-				return Space.EMPTY;
-			}
-			if (whitespace.length() <= 100) {
-				//noinspection StringOperationCanBeSimplified
-				return flyweights.computeIfAbsent(whitespace, k -> new Space(new String(whitespace), comments));
-			}
-		}
+            if (whitespace == null || whitespace.isEmpty()) {
+                return Space.EMPTY;
+            }
+            if (whitespace.length() <= 100) {
+                //noinspection StringOperationCanBeSimplified
+                return flyweights.computeIfAbsent(whitespace, k -> new Space(new String(whitespace), comments));
+            }
+        }
         return new Space(whitespace, comments);
     }
 
@@ -87,18 +87,18 @@ public class Space {
     }
 
     private String getWhitespaceIndent(@Nullable String whitespace) {
-		if (whitespace == null) {
-			return "";
-		}
-		int lastNewline = whitespace.lastIndexOf('\n');
-		if (lastNewline >= 0) {
-			return whitespace.substring(lastNewline + 1);
-		}
-		if (lastNewline == whitespace.length() - 1) {
-			return "";
-		}
-		return whitespace;
-	}
+        if (whitespace == null) {
+            return "";
+        }
+        int lastNewline = whitespace.lastIndexOf('\n');
+        if (lastNewline >= 0) {
+            return whitespace.substring(lastNewline + 1);
+        }
+        if (lastNewline == whitespace.length() - 1) {
+            return "";
+        }
+        return whitespace;
+    }
 
     public String getWhitespace() {
         return whitespace == null ? "" : whitespace;
@@ -146,63 +146,60 @@ public class Space {
     }
 
     public static Space format(String formatting, int beginIndex, int toIndex) {
-		if (beginIndex == toIndex) {
-			return Space.EMPTY;
-		}
-		if (toIndex == beginIndex + 1 && ' ' == formatting.charAt(beginIndex)) {
-			return Space.SINGLE_SPACE;
-		}
-		rangeCheck(formatting.length(), beginIndex, toIndex);
+        if (beginIndex == toIndex) {
+            return Space.EMPTY;
+        }
+        if (toIndex == beginIndex + 1 && ' ' == formatting.charAt(beginIndex)) {
+            return Space.SINGLE_SPACE;
+        }
+        rangeCheck(formatting.length(), beginIndex, toIndex);
 
-		StringBuilder prefix = new StringBuilder();
-		StringBuilder comment = new StringBuilder();
-		List<Comment> comments = new ArrayList<>(1);
+        StringBuilder prefix = new StringBuilder();
+        StringBuilder comment = new StringBuilder();
+        List<Comment> comments = new ArrayList<>(1);
 
-		boolean inComment = false;
+        boolean inComment = false;
 
-		for (int i = beginIndex; i < toIndex; i++) {
-			char c = formatting.charAt(i);
-			switch (c) {
-				case '#':
-					if (inComment) {
-						comment.append(c);
-					}
-					else {
-						inComment = true;
-						comment.setLength(0);
-						comment.append(c);
-					}
-					break;
-				case '\r':
-				case '\n':
-					if (inComment) {
-						inComment = false;
-						comments.add(new Comment(comment.toString(), prefix.toString(), Markers.EMPTY));
-						prefix.setLength(0);
-						comment.setLength(0);
-						prefix.append(c);
-					}
-					else {
-						prefix.append(c);
-					}
-					break;
-				default:
-					if (inComment) {
-						comment.append(c);
-					}
-					else {
-						prefix.append(c);
-					}
-			}
-		}
-		// If a file ends with a comment there may be no terminating newline
-		if (comment.length() > 0 || inComment) {
-			comments.add(new Comment(comment.toString(), prefix.toString(), Markers.EMPTY));
-			prefix.setLength(0);
-		}
+        for (int i = beginIndex; i < toIndex; i++) {
+            char c = formatting.charAt(i);
+            switch (c) {
+                case '#':
+                    if (inComment) {
+                        comment.append(c);
+                    } else {
+                        inComment = true;
+                        comment.setLength(0);
+                        comment.append(c);
+                    }
+                    break;
+                case '\r':
+                case '\n':
+                    if (inComment) {
+                        inComment = false;
+                        comments.add(new Comment(comment.toString(), prefix.toString(), Markers.EMPTY));
+                        prefix.setLength(0);
+                        comment.setLength(0);
+                        prefix.append(c);
+                    } else {
+                        prefix.append(c);
+                    }
+                    break;
+                default:
+                    if (inComment) {
+                        comment.append(c);
+                    } else {
+                        prefix.append(c);
+                    }
+            }
+        }
+        // If a file ends with a comment there may be no terminating newline
+        if (comment.length() > 0 || inComment) {
+            comments.add(new Comment(comment.toString(), prefix.toString(), Markers.EMPTY));
+            prefix.setLength(0);
+        }
 
-		return build(prefix.toString(), comments);
-	}
+        return build(prefix.toString(), comments);
+    }
 
     private static void rangeCheck(int arrayLength, int fromIndex, int toIndex) {
         if (fromIndex > toIndex) {

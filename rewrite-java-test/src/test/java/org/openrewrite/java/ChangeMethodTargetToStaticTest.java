@@ -185,6 +185,125 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
         );
     }
 
+    @Test
+    void memberReferenceTargetToStatic() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A of(..)", "b.B", null, null, false)),
+          java(
+            """
+              package a;
+              public class A {
+                 public static String of(String s) { return s; }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class B {
+                 public static String of(String s) { return s; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+              import java.util.stream.Stream;
+
+              class Test {
+                 public void test() {
+                     Stream.of("a", "b").map(A::of);
+                 }
+              }
+              """,
+            """
+              import b.B;
+
+              import java.util.stream.Stream;
+
+              class Test {
+                 public void test() {
+                     Stream.of("a", "b").map(B::of);
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void memberReferenceAlreadyOnTargetType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A of(..)", "a.A", null, null, false)),
+          java(
+            """
+              package a;
+              public class A {
+                 public static String of(String s) { return s; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+              import java.util.stream.Stream;
+
+              class Test {
+                 public void test() {
+                     Stream.of("a", "b").map(A::of);
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void memberReferenceWithReturnTypeChange() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A of(..)", "b.B", "java.lang.CharSequence", null, false)),
+          java(
+            """
+              package a;
+              public class A {
+                 public static String of(String s) { return s; }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class B {
+                 public static CharSequence of(String s) { return s; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+              import java.util.stream.Stream;
+
+              class Test {
+                 public void test() {
+                     Stream.of("a", "b").map(A::of);
+                 }
+              }
+              """,
+            """
+              import b.B;
+
+              import java.util.stream.Stream;
+
+              class Test {
+                 public void test() {
+                     Stream.of("a", "b").map(B::of);
+                 }
+              }
+              """
+          )
+        );
+    }
+
     @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/3085")
     @SuppressWarnings("ResultOfMethodCallIgnored")
