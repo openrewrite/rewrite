@@ -50,6 +50,15 @@ _PYTHON_PRIMITIVES: Dict[str, JavaType.Primitive] = {
     'bytes': JavaType.Primitive.String,  # Close enough for matching
 }
 
+# Reverse mapping from JavaType.Primitive to Python type name
+_PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
+    JavaType.Primitive.String: 'str',
+    JavaType.Primitive.Int: 'int',
+    JavaType.Primitive.Double: 'float',
+    JavaType.Primitive.Boolean: 'bool',
+    JavaType.Primitive.None_: 'None',
+}
+
 
 class PythonTypeMapping:
     """Maps Python types to JavaType for recipe matching.
@@ -502,7 +511,7 @@ class PythonTypeMapping:
             if isinstance(java_type, JavaType.Class):
                 return java_type
             if isinstance(java_type, JavaType.Primitive):
-                return self._create_class_type(java_type.keyword)
+                return self._create_class_type(_PRIMITIVE_TO_PYTHON.get(java_type, java_type.name.lower()))
 
         return None
 
@@ -633,7 +642,7 @@ class PythonTypeMapping:
                 return java_type
             # For primitives like str, create a class wrapper
             if isinstance(java_type, JavaType.Primitive):
-                return self._create_class_type(java_type.keyword)
+                return self._create_class_type(_PRIMITIVE_TO_PYTHON.get(java_type, java_type.name.lower()))
         return None
 
     def _strip_markdown(self, hover: str) -> str:
@@ -757,12 +766,9 @@ class PythonTypeMapping:
         self._type_cache[fqn] = class_type
         return class_type
 
-    def _get_node_text(self, node: ast.AST) -> str:
+    def _get_node_text(self, node: ast.expr) -> str:
         """Get the source text for an AST node."""
-        if not hasattr(node, 'lineno') or not hasattr(node, 'col_offset'):
-            return ""
-
-        if hasattr(node, 'end_lineno') and hasattr(node, 'end_col_offset'):
+        if node.end_lineno is not None and node.end_col_offset is not None:
             if node.lineno == node.end_lineno:
                 line = self._source_lines[node.lineno - 1] if node.lineno <= len(self._source_lines) else ""
                 return line[node.col_offset:node.end_col_offset]
