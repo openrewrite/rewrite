@@ -29,11 +29,17 @@ import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.style.NamedStyles;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
-import java.nio.file.Path;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
+import static java.nio.file.Files.*;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
@@ -97,24 +103,89 @@ public class ClasspathScanningLoader implements ResourceLoader {
     /**
      * Construct a ClasspathScanningLoader as used from `Environment.scanJar` for
      * `MavenRecipeBundleReader.marketplaceFromClasspathScan`.
+     * Supports both jar files and directories containing class files.
      */
     public ClasspathScanningLoader(Path jar, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
         this.classLoader = classLoader;
         this.recipeLoader = new RecipeLoader(classLoader);
-        String jarName = jar.toFile().getName();
 
         this.performScan = () -> {
-            scanClasses(new ClassGraph()
-                    .acceptJars(jarName)
-                    .ignoreParentClassLoaders()
-                    .overrideClassLoaders(classLoader), classLoader);
+            ClassGraph classGraph;
+            ClassGraph yamlGraph;
 
-            scanYaml(new ClassGraph()
-                    .acceptJars(jarName)
-                    .ignoreParentClassLoaders()
-                    .overrideClassLoaders(classLoader)
-                    .acceptPaths("META-INF/rewrite"), properties, dependencyResourceLoaders, classLoader);
+            if (isDirectory(jar)) {
+                // For directories, create a temporary jar to scan
+                // ClassGraph will find classes in the temp jar, but we use the original
+                // classloader (which has the directory URL) for class loading.
+                // This works because the classes are identical in both locations.
+                Path tempJar;
+                try {
+                    tempJar = createTempJarFromDirectory(jar);
+                } catch (IOException e) {
+                    throw new UncheckedIOException("Failed to create temporary jar from directory: " + jar, e);
+                }
+
+                String tempJarName = tempJar.toFile().getName();
+                classGraph = new ClassGraph()
+                        .overrideClasspath(tempJar.toString())
+                        .acceptJars(tempJarName)
+                        .overrideClassLoaders(classLoader);
+
+                yamlGraph = new ClassGraph()
+                        .overrideClasspath(tempJar.toString())
+                        .acceptJars(tempJarName)
+                        .overrideClassLoaders(classLoader)
+                        .acceptPaths("META-INF/rewrite");
+            } else {
+                // For jar files, use acceptJars with the jar name
+                String jarName = jar.toFile().getName();
+                classGraph = new ClassGraph()
+                        .acceptJars(jarName)
+                        .ignoreParentClassLoaders()
+                        .overrideClassLoaders(classLoader);
+
+                yamlGraph = new ClassGraph()
+                        .acceptJars(jarName)
+                        .ignoreParentClassLoaders()
+                        .overrideClassLoaders(classLoader)
+                        .acceptPaths("META-INF/rewrite");
+            }
+
+            scanClasses(classGraph, classLoader);
+            scanYaml(yamlGraph, properties, dependencyResourceLoaders, classLoader);
         };
+    }
+
+    /**
+     * Creates a temporary jar file containing all files from the given directory.
+     */
+    private static Path createTempJarFromDirectory(Path directory) throws IOException {
+        Path tempJar = createTempFile("recipe-scan-", ".jar");
+        tempJar.toFile().deleteOnExit();
+
+        try (JarOutputStream jos = new JarOutputStream(newOutputStream(tempJar))) {
+            walkFileTree(directory, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    String entryName = directory.relativize(file).toString().replace('\\', '/');
+                    jos.putNextEntry(new JarEntry(entryName));
+                    copy(file, jos);
+                    jos.closeEntry();
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                    if (!dir.equals(directory)) {
+                        String entryName = directory.relativize(dir).toString().replace('\\', '/') + "/";
+                        jos.putNextEntry(new JarEntry(entryName));
+                        jos.closeEntry();
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
+        return tempJar;
     }
 
     /**
