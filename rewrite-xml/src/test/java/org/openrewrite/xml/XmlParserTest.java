@@ -212,10 +212,14 @@ class XmlParserTest implements RewriteTest {
             //language=html
             """
               <%@ page language="java" %>
-              <%	String logNr = null;
-              	logNr = "test";
-              %>
-              <html><body>test</body></html>
+              <html>
+                <body>
+                  <%	String logNr = null;
+                  	logNr = "test";
+                  %>
+                  <p>test</p>
+                </body>
+              </html>
               """,
             spec -> spec.path("test.jsp")
           )
@@ -224,7 +228,7 @@ class XmlParserTest implements RewriteTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/856")
     @Test
-    void jspCommentAtFileStart() {
+    void jspCommentInProlog() {
         rewriteRun(
           xml(
             //language=html
@@ -246,11 +250,15 @@ class XmlParserTest implements RewriteTest {
             //language=html
             """
               <%@ page language="java" %>
-              <%
-                String s = "test%>notend";
-                out.println(s);
-              %>
-              <html><body>test</body></html>
+              <html>
+                <body>
+                  <%
+                    String s = "test%>notend";
+                    out.println(s);
+                  %>
+                  <p>output</p>
+                </body>
+              </html>
               """,
             spec -> spec.path("test.jsp")
           )
