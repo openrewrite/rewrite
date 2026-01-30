@@ -433,4 +433,44 @@ class UpgradePluginVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doesNotPinPropertyManagedVersions() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradePluginVersion("org.springframework.boot", "2.5.x", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '2.5.14'
+                  id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  runtimeOnly 'mysql:mysql-connector-java'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '2.5.15'
+                  id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  runtimeOnly 'mysql:mysql-connector-java'
+              }
+              """
+          )
+        );
+    }
 }

@@ -278,7 +278,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                                             .collect(toList());
 
                                     List<GroupArtifact> noLongerManaged = new ArrayList<>(oldPlatformManaged);
-                                    noLongerManaged.removeAll(newPlatformManaged);
+                                    noLongerManaged.removeIf(oldPlatform -> newPlatformManaged.stream().anyMatch(newPlatform -> oldPlatform.equals(newPlatform.asGroupArtifact())));
 
                                     List<GroupArtifact> newlyManaged = newPlatformManaged.stream().map(GroupArtifactVersion::asGroupArtifact).collect(toList());
                                     newlyManaged.removeAll(oldPlatformManaged);
