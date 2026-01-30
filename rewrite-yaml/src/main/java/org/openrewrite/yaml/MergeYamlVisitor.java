@@ -199,7 +199,13 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     String partOne = substringOfBeforeFirstLineBreak(afterInsertEntry.getPrefix());
                     String partTwo = substringOfAfterFirstLineBreak(afterInsertEntry.getPrefix());
 
-                    mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, firstNewlyAddedEntry.withPrefix(partOne + firstNewlyAddedEntry.getPrefix()));
+                    String newFirstPrefix = partOne + firstNewlyAddedEntry.getPrefix();
+                    if (afterInsertEntry.getPrefix().isEmpty() && partOne.isEmpty() && newFirstPrefix.startsWith("\n")) {
+                        // Remove leading newline since the previous element already provides line separation
+                        newFirstPrefix = newFirstPrefix.substring(1);
+                    }
+
+                    mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, firstNewlyAddedEntry.withPrefix(newFirstPrefix));
                     mutatedEntries.ls.set(mutatedEntries.lastNewlyAddedItemIndex + 1, afterInsertEntry.withPrefix(linebreak() + partTwo));
                 }
             } else {
