@@ -16,12 +16,7 @@
 package org.openrewrite.json;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Issue;
-import org.openrewrite.Parser;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.test.RecipeSpec;
@@ -31,6 +26,7 @@ import org.openrewrite.tree.ParseError;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.json.Assertions.json;
@@ -49,18 +45,18 @@ class JsonParserTest implements RewriteTest {
         rewriteRun(
           json(
             """
-            {
-              // comments
-              unquoted: 'and you can quote me on that',
-              singleQuotes: 'I can use "double quotes" here',
-              hexadecimal: 0xdecaf,
-              leadingDecimalPoint: .8675309, andTrailing: 8675309.,
-              positiveSign: +1,
-              trailingComma: 'in objects', andIn: ['arrays',],
-              "backwardsCompatible": "with JSON",
-            }
-            //
-            """
+              {
+                // comments
+                unquoted: 'and you can quote me on that',
+                singleQuotes: 'I can use "double quotes" here',
+                hexadecimal: 0xdecaf,
+                leadingDecimalPoint: .8675309, andTrailing: 8675309.,
+                positiveSign: +1,
+                trailingComma: 'in objects', andIn: ['arrays'],
+                "backwardsCompatible": "with JSON"
+              }
+              //
+              """
           )
         );
     }
@@ -103,7 +99,7 @@ class JsonParserTest implements RewriteTest {
     @Test
     void array() {
         rewriteRun(
-          json("[ 1 , 2 , 3 , ]")
+          json("[ 1 , 2 , 3  ]")
         );
     }
 
@@ -112,11 +108,11 @@ class JsonParserTest implements RewriteTest {
         rewriteRun(
           json(
             """
-            {
-                key: "value",
-                "key": 1,
-            }
-            """
+              {
+                  key: "value",
+                  "key": 1
+              }
+              """
           )
         );
     }
@@ -126,14 +122,14 @@ class JsonParserTest implements RewriteTest {
         rewriteRun(
           json(
             """
-            // test
-            {
-                /* test */
-                key: "value",
-                // test
-                "key": 1,
-            }
-            """
+              // test
+              {
+                  /* test */
+                  key: "value",
+                  // test
+                  "key": 1
+              }
+              """
           )
         );
     }
@@ -143,10 +139,10 @@ class JsonParserTest implements RewriteTest {
         rewriteRun(
           json(
             """
-            {
-              /* https://foo.bar */
-            }
-            """
+              {
+                /* https://foo.bar */
+              }
+              """
           )
         );
     }
@@ -157,10 +153,10 @@ class JsonParserTest implements RewriteTest {
         rewriteRun(
           json(
             """
-            {
-                "timestamp": 1577000812973
-            }
-            """
+              {
+                  "timestamp": 1577000812973
+              }
+              """
           )
         );
     }
@@ -170,8 +166,8 @@ class JsonParserTest implements RewriteTest {
         rewriteRun(
           json(
             """
-            null
-            """,
+              null
+              """,
             spec -> spec.afterRecipe(doc -> {
                 JsonValue value = doc.getValue();
                 assertThat(value).isInstanceOf(Json.Literal.class);
@@ -214,7 +210,7 @@ class JsonParserTest implements RewriteTest {
             """
               {
                 "nul": "\\u0000",
-                "reverse-solidus": "\\u005c",
+                "reverse-solidus": "\\u005c"
               }
               """
           )
@@ -241,13 +237,11 @@ class JsonParserTest implements RewriteTest {
     void windows1252EncodedAccentedCharacters() {
         Charset windows1252 = Charset.forName("Windows-1252");
         String jsonContent = "{\"keyword\": \"Mot-cl\u00e9\", \"period\": \"P\u00e9riode\"}";
-        ExecutionContext ctx = new InMemoryExecutionContext(e -> {});
         Parser.Input input = Parser.Input.fromString(Paths.get("test.json"), jsonContent, windows1252);
-        List<SourceFile> results = new JsonParser()
-          .parseInputs(List.of(input), null, ctx)
-          .toList();
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0)).isNotInstanceOf(ParseError.class);
+        Stream<SourceFile> parsed = new JsonParser().parseInputs(List.of(input), null, new InMemoryExecutionContext());
+        assertThat(parsed)
+          .singleElement()
+          .isNotInstanceOf(ParseError.class);
     }
 
     @Test
@@ -273,12 +267,10 @@ class JsonParserTest implements RewriteTest {
 
     @Test
     void invalidJsonProducesParseError() {
-        ExecutionContext ctx = new InMemoryExecutionContext(e -> {});
-        List<SourceFile> results = JsonParser.builder().build()
-          .parse(ctx, "{\"offset\": %s, \"limit\": %s}")
-          .toList();
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0)).isInstanceOf(ParseError.class);
+        Stream<SourceFile> results = new JsonParser().parse(new InMemoryExecutionContext(), "{\"offset\": %s, \"limit\": %s}");
+        assertThat(results)
+          .singleElement()
+          .isInstanceOf(ParseError.class);
     }
 
     @Issue("https://github.com/openrewrite/rewrite/pull/6631")
