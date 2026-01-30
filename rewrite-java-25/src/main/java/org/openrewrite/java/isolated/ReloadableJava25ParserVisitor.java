@@ -848,6 +848,8 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         return new J.Import(randomId(), fmt, Markers.EMPTY,
                 new JLeftPadded<>(node.isStatic() ? sourceBefore("static") : EMPTY,
                         node.isStatic(), Markers.EMPTY),
+                new JLeftPadded<>(node.isModule() ? sourceBefore("module") : EMPTY,
+                        node.isModule(), Markers.EMPTY),
                 convert(node.getQualifiedIdentifier()), null);
     }
 

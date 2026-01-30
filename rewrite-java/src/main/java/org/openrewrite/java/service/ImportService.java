@@ -31,7 +31,16 @@ public class ImportService {
                                                @Nullable String member,
                                                @Nullable String alias,
                                                boolean onlyIfReferenced) {
-        return new AddImport<>(packageName, typeName, member,  alias, onlyIfReferenced);
+        return new AddImport<>(packageName, typeName, member, alias, onlyIfReferenced);
+    }
+
+    public <P> JavaVisitor<P> addImportVisitor(@Nullable String packageName,
+                                               String typeName,
+                                               @Nullable String member,
+                                               boolean module,
+                                               @Nullable String alias,
+                                               boolean onlyIfReferenced) {
+        return new AddImport<>(packageName, typeName, member, module,  alias, onlyIfReferenced);
     }
 
     public <J2 extends J> JavaVisitor<ExecutionContext> shortenAllFullyQualifiedTypeReferences() {

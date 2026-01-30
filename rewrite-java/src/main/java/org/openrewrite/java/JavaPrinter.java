@@ -727,6 +727,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         if (import_.isStatic()) {
             visitSpace(import_.getPadding().getStatic().getBefore(), Space.Location.STATIC_IMPORT, p);
             p.append("static");
+        } else if (import_.isModule()) {
+            visitSpace(import_.getPadding().getModule().getBefore(), Space.Location.MODULE_IMPORT, p);
+            p.append("module");
         }
         visit(import_.getQualid(), p);
         afterSyntax(import_, p);
