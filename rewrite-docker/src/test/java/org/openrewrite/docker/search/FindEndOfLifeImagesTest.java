@@ -37,7 +37,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
             //language=csv
             """
               sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
-              Dockerfile,,debian,buster,2024-06-30,"bookworm (12) or bullseye (11)"
+              Dockerfile,,debian,buster,2024-06-30,"trixie (13) or bookworm (12)"
               """
           ),
           Assertions.docker(
@@ -46,7 +46,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: debian:buster (ended 2024-06-30, suggest bookworm (12) or bullseye (11)))~~>FROM debian:buster
+              ~~(EOL: debian:buster (ended 2024-06-30, suggest trixie (13) or bookworm (12)))~~>FROM debian:buster
               RUN apt-get update
               """
           )
@@ -60,7 +60,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
             //language=csv
             """
               sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
-              Dockerfile,,debian,buster-slim,2024-06-30,"bookworm (12) or bullseye (11)"
+              Dockerfile,,debian,buster-slim,2024-06-30,"trixie (13) or bookworm (12)"
               """
           ),
           Assertions.docker(
@@ -69,7 +69,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: debian:buster-slim (ended 2024-06-30, suggest bookworm (12) or bullseye (11)))~~>FROM debian:buster-slim
+              ~~(EOL: debian:buster-slim (ended 2024-06-30, suggest trixie (13) or bookworm (12)))~~>FROM debian:buster-slim
               RUN apt-get update
               """
           )
@@ -85,7 +85,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: debian:stretch (ended 2022-07-01, suggest bookworm (12) or bullseye (11)))~~>FROM debian:stretch
+              ~~(EOL: debian:stretch (ended 2022-07-01, suggest trixie (13) or bookworm (12)))~~>FROM debian:stretch
               RUN apt-get update
               """
           )
@@ -101,7 +101,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: ubuntu:16.04 (ended 2021-04-30, suggest noble (24.04) or jammy (22.04)))~~>FROM ubuntu:16.04
+              ~~(EOL: ubuntu:16.04 (ended 2021-04-30, suggest noble (24.04)))~~>FROM ubuntu:16.04
               RUN apt-get update
               """
           )
@@ -117,7 +117,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: ubuntu:bionic (ended 2023-05-31, suggest noble (24.04) or jammy (22.04)))~~>FROM ubuntu:bionic
+              ~~(EOL: ubuntu:bionic (ended 2023-05-31, suggest noble (24.04)))~~>FROM ubuntu:bionic
               RUN apt-get update
               """
           )
@@ -133,7 +133,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apk update
               """,
             """
-              ~~(EOL: alpine:3.14 (ended 2023-05-01, suggest 3.21 or 3.20))~~>FROM alpine:3.14
+              ~~(EOL: alpine:3.14 (ended 2023-05-01, suggest 3.23 or 3.22))~~>FROM alpine:3.14
               RUN apk update
               """
           )
@@ -149,7 +149,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN pip install flask
               """,
             """
-              ~~(EOL: python:3.7 (ended 2023-06-27, suggest 3.12 or 3.11))~~>FROM python:3.7
+              ~~(EOL: python:3.7 (ended 2023-06-27, suggest 3.14 or 3.13))~~>FROM python:3.7
               RUN pip install flask
               """
           )
@@ -165,7 +165,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN pip install flask
               """,
             """
-              ~~(EOL: python:3.7-alpine (ended 2023-06-27, suggest 3.12 or 3.11))~~>FROM python:3.7-alpine
+              ~~(EOL: python:3.7-alpine (ended 2023-06-27, suggest 3.14 or 3.13))~~>FROM python:3.7-alpine
               RUN pip install flask
               """
           )
@@ -197,7 +197,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN npm install
               """,
             """
-              ~~(EOL: node:16 (ended 2024-04-30, suggest 22 or 20))~~>FROM node:16
+              ~~(EOL: node:16 (ended 2024-04-30, suggest 24 or 22))~~>FROM node:16
               RUN npm install
               """
           )
@@ -221,7 +221,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
         rewriteRun(
           Assertions.docker(
             """
-              FROM ubuntu:22.04
+              FROM ubuntu:24.04
               RUN apt-get update
               """
           )
@@ -296,7 +296,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
             """
               sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
               Dockerfile,builder,node,14,2023-04-30,"22 or 20"
-              Dockerfile,,debian,buster,2024-06-30,"bookworm (12) or bullseye (11)"
+              Dockerfile,,debian,buster,2024-06-30,"trixie (13) or bookworm (12)"
               """
           ),
           Assertions.docker(
@@ -311,7 +311,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               ~~(EOL: node:14 (ended 2023-04-30, suggest 22 or 20))~~>FROM node:14 AS builder
               RUN npm run build
 
-              ~~(EOL: debian:buster (ended 2024-06-30, suggest bookworm (12) or bullseye (11)))~~>FROM debian:buster
+              ~~(EOL: debian:buster (ended 2024-06-30, suggest trixie (13) or bookworm (12)))~~>FROM debian:buster
               COPY --from=builder /app /app
               """
           )
@@ -325,7 +325,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
             //language=csv
             """
               sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
-              Dockerfile,,debian,buster,2024-06-30,"bookworm (12) or bullseye (11)"
+              Dockerfile,,debian,buster,2024-06-30,"trixie (13) or bookworm (12)"
               """
           ),
           Assertions.docker(
@@ -340,7 +340,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               FROM golang:1.21 AS builder
               RUN go build -o app .
 
-              ~~(EOL: debian:buster (ended 2024-06-30, suggest bookworm (12) or bullseye (11)))~~>FROM debian:buster
+              ~~(EOL: debian:buster (ended 2024-06-30, suggest trixie (13) or bookworm (12)))~~>FROM debian:buster
               COPY --from=builder /app /app
               """
           )
@@ -368,7 +368,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: debian:10 (ended 2024-06-30, suggest bookworm (12) or bullseye (11)))~~>FROM debian:10
+              ~~(EOL: debian:10 (ended 2024-06-30, suggest trixie (13) or bookworm (12)))~~>FROM debian:10
               RUN apt-get update
               """
           )
