@@ -513,7 +513,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             private <J2 extends J> @Nullable J2 unsubstitute(J2 j) {
                 try {
-                    return substitutions.unsubstitute(j);
+                    J2 result = substitutions.unsubstitute(j);
+                    if (!substitutions.getTypeVariables().isEmpty()) {
+                        result = substitutions.resolveTypeVariables(result);
+                    }
+                    return result;
                 } finally {
                     substituted = true;
                 }
@@ -521,7 +525,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             private <J2 extends J> List<J2> unsubstitute(List<J2> js) {
                 try {
-                    return substitutions.unsubstitute(js);
+                    List<J2> result = substitutions.unsubstitute(js);
+                    if (!substitutions.getTypeVariables().isEmpty()) {
+                        result = ListUtils.map(result, substitutions::resolveTypeVariables);
+                    }
+                    return result;
                 } finally {
                     substituted = true;
                 }
