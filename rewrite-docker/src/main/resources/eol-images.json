@@ -1,0 +1,98 @@
+[
+  {
+    "imageName": "debian",
+    "tagPatterns": ["jessie", "jessie-*", "8", "8.*"],
+    "eolDate": "2020-06-30",
+    "suggestedReplacement": "bookworm (12) or bullseye (11)"
+  },
+  {
+    "imageName": "debian",
+    "tagPatterns": ["stretch", "stretch-*", "9", "9.*"],
+    "eolDate": "2022-07-01",
+    "suggestedReplacement": "bookworm (12) or bullseye (11)"
+  },
+  {
+    "imageName": "debian",
+    "tagPatterns": ["buster", "buster-*", "10", "10.*"],
+    "eolDate": "2024-06-30",
+    "suggestedReplacement": "bookworm (12) or bullseye (11)"
+  },
+  {
+    "imageName": "ubuntu",
+    "tagPatterns": ["trusty", "trusty-*", "14.04", "14.04.*"],
+    "eolDate": "2019-04-25",
+    "suggestedReplacement": "noble (24.04) or jammy (22.04)"
+  },
+  {
+    "imageName": "ubuntu",
+    "tagPatterns": ["xenial", "xenial-*", "16.04", "16.04.*"],
+    "eolDate": "2021-04-30",
+    "suggestedReplacement": "noble (24.04) or jammy (22.04)"
+  },
+  {
+    "imageName": "ubuntu",
+    "tagPatterns": ["bionic", "bionic-*", "18.04", "18.04.*"],
+    "eolDate": "2023-05-31",
+    "suggestedReplacement": "noble (24.04) or jammy (22.04)"
+  },
+  {
+    "imageName": "ubuntu",
+    "tagPatterns": ["focal", "focal-*", "20.04", "20.04.*"],
+    "eolDate": "2025-04-30",
+    "suggestedReplacement": "noble (24.04) or jammy (22.04)"
+  },
+  {
+    "imageName": "alpine",
+    "tagPatterns": ["3.14", "3.14.*"],
+    "eolDate": "2023-05-01",
+    "suggestedReplacement": "3.21 or 3.20"
+  },
+  {
+    "imageName": "alpine",
+    "tagPatterns": ["3.15", "3.15.*"],
+    "eolDate": "2023-11-01",
+    "suggestedReplacement": "3.21 or 3.20"
+  },
+  {
+    "imageName": "alpine",
+    "tagPatterns": ["3.16", "3.16.*"],
+    "eolDate": "2024-05-23",
+    "suggestedReplacement": "3.21 or 3.20"
+  },
+  {
+    "imageName": "alpine",
+    "tagPatterns": ["3.17", "3.17.*"],
+    "eolDate": "2024-11-22",
+    "suggestedReplacement": "3.21 or 3.20"
+  },
+  {
+    "imageName": "python",
+    "tagPatterns": ["3.7", "3.7.*", "3.7-*"],
+    "eolDate": "2023-06-27",
+    "suggestedReplacement": "3.12 or 3.11"
+  },
+  {
+    "imageName": "python",
+    "tagPatterns": ["3.8", "3.8.*", "3.8-*"],
+    "eolDate": "2024-10-31",
+    "suggestedReplacement": "3.12 or 3.11"
+  },
+  {
+    "imageName": "node",
+    "tagPatterns": ["14", "14.*", "14-*"],
+    "eolDate": "2023-04-30",
+    "suggestedReplacement": "22 or 20"
+  },
+  {
+    "imageName": "node",
+    "tagPatterns": ["16", "16.*", "16-*"],
+    "eolDate": "2024-04-30",
+    "suggestedReplacement": "22 or 20"
+  },
+  {
+    "imageName": "node",
+    "tagPatterns": ["18", "18.*", "18-*"],
+    "eolDate": "2025-04-30",
+    "suggestedReplacement": "22 or 20"
+  }
+]

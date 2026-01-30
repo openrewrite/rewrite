@@ -15,15 +15,22 @@
  */
 package org.openrewrite.docker.search;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
 
 /**
- * Enumeration of known end-of-life Docker base images.
+ * Represents a known end-of-life Docker base image.
+ * <p>
+ * Data is loaded from the classpath resource {@code eol-images.json}.
  * <p>
  * Data sources:
  * <ul>
@@ -34,55 +41,27 @@ import java.time.LocalDate;
  *   <li>Node.js: <a href="https://nodejs.org/en/about/releases/">Node.js Releases</a></li>
  * </ul>
  */
-@RequiredArgsConstructor
-@Getter
-public enum EolImage {
-    // Debian releases - https://wiki.debian.org/DebianReleases
-    DEBIAN_JESSIE("debian", new String[]{"jessie", "jessie-*", "8", "8.*"},
-            LocalDate.of(2020, 6, 30), "bookworm (12) or bullseye (11)"),
-    DEBIAN_STRETCH("debian", new String[]{"stretch", "stretch-*", "9", "9.*"},
-            LocalDate.of(2022, 7, 1), "bookworm (12) or bullseye (11)"),
-    DEBIAN_BUSTER("debian", new String[]{"buster", "buster-*", "10", "10.*"},
-            LocalDate.of(2024, 6, 30), "bookworm (12) or bullseye (11)"),
+@Value
+public class EolImage {
+    private static final List<EolImage> EOL_IMAGES = loadEolImages();
 
-    // Ubuntu releases - https://wiki.ubuntu.com/Releases
-    UBUNTU_TRUSTY("ubuntu", new String[]{"trusty", "trusty-*", "14.04", "14.04.*"},
-            LocalDate.of(2019, 4, 25), "noble (24.04) or jammy (22.04)"),
-    UBUNTU_XENIAL("ubuntu", new String[]{"xenial", "xenial-*", "16.04", "16.04.*"},
-            LocalDate.of(2021, 4, 30), "noble (24.04) or jammy (22.04)"),
-    UBUNTU_BIONIC("ubuntu", new String[]{"bionic", "bionic-*", "18.04", "18.04.*"},
-            LocalDate.of(2023, 5, 31), "noble (24.04) or jammy (22.04)"),
-    UBUNTU_FOCAL("ubuntu", new String[]{"focal", "focal-*", "20.04", "20.04.*"},
-            LocalDate.of(2025, 4, 30), "noble (24.04) or jammy (22.04)"),
+    String imageName;
+    List<String> tagPatterns;
+    LocalDate eolDate;
+    String suggestedReplacement;
 
-    // Alpine releases - https://alpinelinux.org/releases/
-    ALPINE_3_14("alpine", new String[]{"3.14", "3.14.*"},
-            LocalDate.of(2023, 5, 1), "3.21 or 3.20"),
-    ALPINE_3_15("alpine", new String[]{"3.15", "3.15.*"},
-            LocalDate.of(2023, 11, 1), "3.21 or 3.20"),
-    ALPINE_3_16("alpine", new String[]{"3.16", "3.16.*"},
-            LocalDate.of(2024, 5, 23), "3.21 or 3.20"),
-    ALPINE_3_17("alpine", new String[]{"3.17", "3.17.*"},
-            LocalDate.of(2024, 11, 22), "3.21 or 3.20"),
-
-    // Python releases - https://devguide.python.org/versions/
-    PYTHON_3_7("python", new String[]{"3.7", "3.7.*", "3.7-*"},
-            LocalDate.of(2023, 6, 27), "3.12 or 3.11"),
-    PYTHON_3_8("python", new String[]{"3.8", "3.8.*", "3.8-*"},
-            LocalDate.of(2024, 10, 31), "3.12 or 3.11"),
-
-    // Node.js releases - https://nodejs.org/en/about/releases/
-    NODE_14("node", new String[]{"14", "14.*", "14-*"},
-            LocalDate.of(2023, 4, 30), "22 or 20"),
-    NODE_16("node", new String[]{"16", "16.*", "16-*"},
-            LocalDate.of(2024, 4, 30), "22 or 20"),
-    NODE_18("node", new String[]{"18", "18.*", "18-*"},
-            LocalDate.of(2025, 4, 30), "22 or 20");
-
-    private final String imageName;
-    private final String[] tagPatterns;
-    private final LocalDate eolDate;
-    private final String suggestedReplacement;
+    private static List<EolImage> loadEolImages() {
+        try (InputStream is = EolImage.class.getResourceAsStream("/eol-images.json")) {
+            if (is == null) {
+                return Collections.emptyList();
+            }
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.findAndRegisterModules();
+            return mapper.readValue(is, new TypeReference<List<EolImage>>() {});
+        } catch (IOException e) {
+            return Collections.emptyList();
+        }
+    }
 
     /**
      * Find the EOL entry matching the given image name and tag.
@@ -95,7 +74,7 @@ public enum EolImage {
         if (tag == null) {
             return null; // Cannot determine EOL without a tag
         }
-        for (EolImage eol : values()) {
+        for (EolImage eol : EOL_IMAGES) {
             if (matchesImageName(imageName, eol.imageName) && matchesTag(tag, eol.tagPatterns)) {
                 return eol;
             }
@@ -110,7 +89,7 @@ public enum EolImage {
         return normalizedActual.equals(pattern);
     }
 
-    private static boolean matchesTag(String tag, String[] patterns) {
+    private static boolean matchesTag(String tag, List<String> patterns) {
         for (String pattern : patterns) {
             if (StringUtils.matchesGlob(tag, pattern)) {
                 return true;
