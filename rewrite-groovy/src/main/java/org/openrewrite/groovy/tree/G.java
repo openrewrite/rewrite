@@ -384,7 +384,7 @@ public interface G extends J {
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
             J j = v.visit(getExpression(), p);
-            if(j instanceof ExpressionStatement) {
+            if (j instanceof ExpressionStatement) {
                 return j;
             } else if (j instanceof Expression) {
                 return withExpression((Expression) j);
@@ -419,7 +419,7 @@ public interface G extends J {
 
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
-            if(expression instanceof J.MethodInvocation) {
+            if (expression instanceof J.MethodInvocation) {
                 if (!(type instanceof JavaType.Method)) {
                     return (T) this;
                 }
@@ -1022,6 +1022,106 @@ public interface G extends J {
 
             public G.Unary withOperator(JLeftPadded<G.Unary.Type> operator) {
                 return t.operator == operator ? t : new G.Unary(t.id, t.prefix, t.markers, operator, t.expression, t.type);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class DestructuringDeclaration implements G, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        List<Modifier> modifiers;
+
+        @With
+        @Nullable
+        @Getter
+        TypeTree typeExpression;
+
+        JLeftPadded<Expression> initializer;
+
+        JContainer<VariableDeclarations> variables;
+
+        public Expression getInitializer() {
+            return initializer.getElement();
+        }
+
+        public DestructuringDeclaration withInitializer(Expression initializer) {
+            return getPadding().withInitializer(this.initializer.withElement(initializer));
+        }
+
+        public List<VariableDeclarations> getVariables() {
+            return variables.getElements();
+        }
+
+        public DestructuringDeclaration withVariables(List<VariableDeclarations> elements) {
+            return getPadding().withVariables(JContainer.withElements(this.variables, elements));
+        }
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return v.visitDestructuringDeclaration(this, p);
+        }
+
+        public Padding getPadding() {
+            DestructuringDeclaration.Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DestructuringDeclaration t;
+
+            public JContainer<VariableDeclarations> getVariables() {
+                return t.variables;
+            }
+
+            public DestructuringDeclaration withVariables(JContainer<VariableDeclarations> variables) {
+                return t.variables == variables ? t : new DestructuringDeclaration(
+                        t.id, t.prefix, t.markers, t.modifiers, t.typeExpression, t.initializer, variables);
+            }
+
+            public DestructuringDeclaration withInitializer(JLeftPadded<Expression> initializer) {
+                return t.initializer == initializer ? t : new DestructuringDeclaration(
+                        t.id, t.prefix, t.markers, t.modifiers, t.typeExpression, initializer, t.variables);
+            }
+
+            public JLeftPadded<Expression> getInitializer() {
+                return t.initializer;
             }
         }
     }
