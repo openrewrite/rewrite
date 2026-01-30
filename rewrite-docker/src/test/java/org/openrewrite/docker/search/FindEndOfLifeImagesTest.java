@@ -22,11 +22,11 @@ import org.openrewrite.docker.table.EolDockerImages;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-class FindEndOfLifeDockerImagesTest implements RewriteTest {
+class FindEndOfLifeImagesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindEndOfLifeDockerImages(null));
+        spec.recipe(new FindEndOfLifeImages(null));
     }
 
     @DocumentExample

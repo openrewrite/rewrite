@@ -45,7 +45,7 @@ recipeList:
   - org.openrewrite.docker.ReplaceAddWithCopy
   - org.openrewrite.docker.search.FindRootUser
   - org.openrewrite.docker.search.FindUnpinnedBaseImages
-  - org.openrewrite.docker.search.FindEndOfLifeDockerImages
+  - org.openrewrite.docker.search.FindEndOfLifeImages
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.docker.DockerBuildOptimization

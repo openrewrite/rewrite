@@ -38,7 +38,7 @@ import java.time.LocalDate;
  */
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class FindEndOfLifeDockerImages extends Recipe {
+public class FindEndOfLifeImages extends Recipe {
 
     transient EolDockerImages eolImages = new EolDockerImages(this);
 
