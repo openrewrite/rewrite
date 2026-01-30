@@ -2320,6 +2320,101 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1374")
+    @Test
+    void changeVersionPropertyInParentPomSimple() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "io.swagger",
+            "swagger-annotations",
+            "io.swagger.core.v3",
+            null,
+            "2.2.x",
+            null,
+            null,
+            null
+          )),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1</version>
+                  <properties>
+                    <version.swagger>1.5.16</version.swagger>
+                  </properties>
+                  <modules>
+                    <module>sub-project</module>
+                  </modules>
+                </project>
+                """,
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1</version>
+                  <properties>
+                    <version.swagger>2.2.42</version.swagger>
+                  </properties>
+                  <modules>
+                    <module>sub-project</module>
+                  </modules>
+                </project>
+                """,
+              spec -> spec.path("pom.xml")
+            ),
+            mavenProject("sub-project",
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>sub-project</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent-project</artifactId>
+                      <version>1</version>
+                      <relativePath>../pom.xml</relativePath>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>io.swagger</groupId>
+                        <artifactId>swagger-annotations</artifactId>
+                        <version>${version.swagger}</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>sub-project</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent-project</artifactId>
+                      <version>1</version>
+                      <relativePath>../pom.xml</relativePath>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>io.swagger.core.v3</groupId>
+                        <artifactId>swagger-annotations</artifactId>
+                        <version>${version.swagger}</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.path("sub-project/pom.xml")
+              )
+            )
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5965")
     @Test
     void changeDependencyGroupIdAndArtifactIdForEjbType() {
