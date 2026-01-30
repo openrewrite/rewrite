@@ -15,16 +15,16 @@
  */
 package org.openrewrite.docker.search;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.yaml.snakeyaml.Yaml;
 
 import java.io.InputStream;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import static java.util.Collections.emptyList;
 
@@ -51,23 +51,14 @@ public class EolImage {
     LocalDate eolDate;
     String suggestedReplacement;
 
-    @SuppressWarnings("unchecked")
     private static List<EolImage> loadEolImages() {
         try (InputStream is = EolImage.class.getResourceAsStream("/eol-images.yaml")) {
             if (is == null) {
                 return emptyList();
             }
-            Yaml yaml = new Yaml();
-            List<Map<String, Object>> data = yaml.load(is);
-            List<EolImage> images = new ArrayList<>();
-            for (Map<String, Object> entry : data) {
-                String imageName = (String) entry.get("imageName");
-                List<String> tagPatterns = (List<String>) entry.get("tagPatterns");
-                LocalDate eolDate = LocalDate.parse((String) entry.get("eolDate"));
-                String suggestedReplacement = (String) entry.get("suggestedReplacement");
-                images.add(new EolImage(imageName, tagPatterns, eolDate, suggestedReplacement));
-            }
-            return images;
+            ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+            mapper.findAndRegisterModules();
+            return mapper.readValue(is, new TypeReference<List<EolImage>>() {});
         } catch (Exception e) {
             return emptyList();
         }
