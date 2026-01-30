@@ -23,9 +23,10 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Represents a known end-of-life Docker base image.
@@ -54,7 +55,7 @@ public class EolImage {
     private static List<EolImage> loadEolImages() {
         try (InputStream is = EolImage.class.getResourceAsStream("/eol-images.yaml")) {
             if (is == null) {
-                return Collections.emptyList();
+                return emptyList();
             }
             Yaml yaml = new Yaml();
             List<Map<String, Object>> data = yaml.load(is);
@@ -68,7 +69,7 @@ public class EolImage {
             }
             return images;
         } catch (Exception e) {
-            return Collections.emptyList();
+            return emptyList();
         }
     }
 
