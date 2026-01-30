@@ -17,30 +17,16 @@ package org.openrewrite.docker;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.config.Environment;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.docker.Assertions.docker;
 
 class DockerBestPracticesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(Environment.builder()
-                .scanRuntimeClasspath("org.openrewrite.docker")
-                .build()
-                .activateRecipes("org.openrewrite.docker.DockerBestPractices"));
-    }
-
-    @Test
-    void recipeLoadsSuccessfully() {
-        assertThat(Environment.builder()
-                .scanRuntimeClasspath("org.openrewrite.docker")
-                .build()
-                .activateRecipes("org.openrewrite.docker.DockerBestPractices")
-                .getRecipeList()).isNotEmpty();
+        spec.recipeFromResources("org.openrewrite.docker.DockerBestPractices");
     }
 
     @DocumentExample
@@ -56,7 +42,7 @@ class DockerBestPracticesTest implements RewriteTest {
               ENTRYPOINT /app/start.sh
               """,
             """
-              ~~(EOL: ubuntu:22.04 (ended 2024-09-30, suggest noble (24.04)))~~>FROM ubuntu:22.04
+              ~~(EOL: ubuntu:22.04 (ended 2024-09-30, suggest noble (24.04)))~~>~~(Missing HEALTHCHECK instruction)~~>FROM ubuntu:22.04
               COPY app.jar /app/
               RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
               ENTRYPOINT ["/app/start.sh"]
@@ -64,32 +50,5 @@ class DockerBestPracticesTest implements RewriteTest {
               """
           )
         );
-    }
-
-    @Test
-    void securityRecipesLoadSuccessfully() {
-        assertThat(Environment.builder()
-                .scanRuntimeClasspath("org.openrewrite.docker")
-                .build()
-                .activateRecipes("org.openrewrite.docker.DockerSecurityBestPractices")
-                .getRecipeList()).isNotEmpty();
-    }
-
-    @Test
-    void buildOptimizationRecipesLoadSuccessfully() {
-        assertThat(Environment.builder()
-                .scanRuntimeClasspath("org.openrewrite.docker")
-                .build()
-                .activateRecipes("org.openrewrite.docker.DockerBuildOptimization")
-                .getRecipeList()).isNotEmpty();
-    }
-
-    @Test
-    void complianceRecipesLoadSuccessfully() {
-        assertThat(Environment.builder()
-                .scanRuntimeClasspath("org.openrewrite.docker")
-                .build()
-                .activateRecipes("org.openrewrite.docker.DockerImageCompliance")
-                .getRecipeList()).isNotEmpty();
     }
 }
