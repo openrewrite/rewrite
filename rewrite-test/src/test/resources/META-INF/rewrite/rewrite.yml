@@ -18,6 +18,8 @@ type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.text.ChangeTextToJon
 displayName: Change Text To Jon
 description: Changes Text to "Hello Jon!".
+preconditions:
+  - org.openrewrite.Singleton
 tags:
   - testing
   - plain text
@@ -29,6 +31,8 @@ type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.text.HelloKotlin
 displayName: Hello Kotlin
 description: Changes Text to "Hello Kotlin."
+preconditions:
+  - org.openrewrite.Singleton
 tags:
   - testing
   - plain text
@@ -40,6 +44,8 @@ type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.HelloJon
 displayName: Hello Jon
 description: Also Changes Text to "Hello Jon!."
+preconditions:
+  - org.openrewrite.Singleton
 recipeList:
   - org.openrewrite.text.ChangeTextToJon
 ---

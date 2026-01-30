@@ -21,5 +21,7 @@ type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.HelloJon2
 displayName: Hello Jon 2 - Electric Boogaloo
 description: Also Changes Text to "Hello Jon!", but with extra indirection
+preconditions:
+  - org.openrewrite.Singleton
 recipeList:
   - org.openrewrite.HelloJon

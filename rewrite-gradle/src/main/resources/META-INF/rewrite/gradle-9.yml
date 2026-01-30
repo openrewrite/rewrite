@@ -18,6 +18,8 @@ type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.MigrateToGradle9
 displayName: Migrate to Gradle 9 from Gradle 8
 description: Migrate to version 9.x. See the Gradle upgrade guide from [version 8.x to 9.0](https://docs.gradle.org/9.0.0/userguide/upgrading_major_version_9.html) for more information.
+preconditions:
+  - org.openrewrite.Singleton
 recipeList:
   - org.openrewrite.gradle.MigrateToGradle8
   - org.openrewrite.gradle.UpdateGradleWrapper:

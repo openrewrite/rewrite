@@ -18,6 +18,8 @@ type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.GradleBestPractices
 displayName: Apply Gradle best practices
 description: Apply a set of [Gradle best practices](https://docs.gradle.org/current/userguide/best_practices_general.html) to the build files, for more efficient and ideomatic builds.
+preconditions:
+  - org.openrewrite.Singleton
 recipeList:
   - org.openrewrite.gradle.MigrateToGradle9
   - org.openrewrite.gradle.EnableGradleBuildCache
@@ -27,6 +29,8 @@ type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.EnableGradleBuildCache
 displayName: Enable Gradle build cache
 description: Enable the Gradle build cache. By enabling build cache the build outputs are stored externally and fetched from the cache when it is determined that those inputs have no changed, avoiding the expensive work of regenerating them. See the [Gradle Build Cache](https://docs.gradle.org/current/userguide/build_cache.html) for more information.
+preconditions:
+  - org.openrewrite.Singleton
 recipeList:
   - org.openrewrite.gradle.AddProperty:
       key: org.gradle.caching
@@ -37,6 +41,8 @@ type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.EnableGradleParallelExecution
 displayName: Enable Gradle parallel execution
 description: Most builds consist of more than one project and some of those projects are usually independent of one another. Yet Gradle will only run one task at a time by default, regardless of the project structure. By using the `--parallel` switch, you can force Gradle to execute tasks in parallel as long as those tasks are in different projects. See the [Gradle performance documentation](https://docs.gradle.org/current/userguide/performance.html#parallel_execution) for more information.
+preconditions:
+  - org.openrewrite.Singleton
 recipeList:
   - org.openrewrite.gradle.AddProperty:
       key: org.gradle.parallel
@@ -47,6 +53,8 @@ type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.plugins.RemoveDevelocity
 displayName: Remove Develocity
 description: Remove the Develocity plugin and configuration from the Gradle build and settings files.
+preconditions:
+  - org.openrewrite.Singleton
 recipeList:
   - org.openrewrite.gradle.plugins.RemoveBuildPlugin:
       pluginId: com.gradle.develocity
