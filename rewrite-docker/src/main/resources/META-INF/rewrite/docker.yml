@@ -28,7 +28,9 @@ tags:
 recipeList:
   - org.openrewrite.docker.DockerSecurityBestPractices
   - org.openrewrite.docker.DockerBuildOptimization
+  - org.openrewrite.docker.NormalizeDockerHubImageName
   - org.openrewrite.docker.UseExecFormEntrypoint
+
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.docker.DockerSecurityBestPractices
@@ -45,6 +47,9 @@ recipeList:
   - org.openrewrite.docker.ReplaceAddWithCopy
   - org.openrewrite.docker.search.FindRootUser
   - org.openrewrite.docker.search.FindUnpinnedBaseImages
+  - org.openrewrite.docker.search.FindEndOfLifeImages
+  - org.openrewrite.docker.search.FindMissingHealthcheck
+
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.docker.DockerBuildOptimization
@@ -58,15 +63,3 @@ tags:
 recipeList:
   - org.openrewrite.docker.CombineRunInstructions
   - org.openrewrite.docker.AddAptGetCleanup
----
-type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.docker.DockerImageCompliance
-displayName: Docker image compliance
-description: >-
-  Apply compliance-focused improvements to Dockerfiles, including adding standard OCI
-  labels and finding missing health checks.
-tags:
-  - docker
-  - compliance
-recipeList:
-  - org.openrewrite.docker.search.FindMissingHealthcheck
