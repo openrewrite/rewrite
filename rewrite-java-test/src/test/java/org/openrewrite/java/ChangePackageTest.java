@@ -1912,4 +1912,59 @@ class ChangePackageTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1733")
+    @Test
+    void starImportExpandedWhenOtherStarImportsExist() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("javax.validation.constraints", "jakarta.validation.constraints", false))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package javax.validation.constraints;
+                public @interface NotNull {}
+                """,
+              """
+                package jakarta.validation.constraints;
+                public @interface NotNull {}
+                """,
+              """
+                package org.hibernate.validator.constraints;
+                public @interface NotBlank {}
+                """
+            )),
+          // When there are multiple star imports and one is from a renamed package,
+          // the renamed star import should be expanded to explicit imports to avoid
+          // potential ambiguity
+          java(
+            """
+              package com.example;
+
+              import javax.validation.constraints.*;
+              import org.hibernate.validator.constraints.*;
+
+              public class MyDTO {
+                  @NotNull
+                  private String id;
+
+                  @NotBlank
+                  private String name;
+              }
+              """,
+            """
+              package com.example;
+
+              import jakarta.validation.constraints.NotNull;
+              import org.hibernate.validator.constraints.*;
+
+              public class MyDTO {
+                  @NotNull
+                  private String id;
+
+                  @NotBlank
+                  private String name;
+              }
+              """
+          )
+        );
+    }
 }
