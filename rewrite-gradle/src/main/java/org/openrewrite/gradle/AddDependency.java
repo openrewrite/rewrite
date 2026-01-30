@@ -190,6 +190,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return (J) tree;
                         }
                         JavaSourceFile s = (JavaSourceFile) tree;
+
+                        String filename = s.getSourcePath().getFileName().toString();
+                        if (!"build.gradle".equals(filename) && !"build.gradle.kts".equals(filename)) {
+                            return s;
+                        }
                         Optional<JavaProject> maybeJp = s.getMarkers().findFirst(JavaProject.class);
                         Optional<GradleProject> maybeGp = s.getMarkers().findFirst(GradleProject.class);
                         if (!maybeJp.isPresent() ||

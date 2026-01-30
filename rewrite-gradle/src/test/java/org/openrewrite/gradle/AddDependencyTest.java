@@ -1761,6 +1761,54 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doNotAddDependencyToAppliedScripts() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, "implementation")),
+          mavenProject("project",
+            buildGradle(
+              //language=groovy
+              """
+                plugins {
+                    id "java-library"
+                }
+    
+                repositories {
+                    mavenCentral()
+                }
+    
+                apply from: "dependencies.gradle"
+                """,
+              //language=groovy
+              """
+                plugins {
+                    id "java-library"
+                }
+    
+                repositories {
+                    mavenCentral()
+                }
+    
+                apply from: "dependencies.gradle"
+    
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            ),
+            buildGradle(
+              //language=groovy
+              """
+                dependencies {
+                }
+                """,
+              s -> s.path("dependencies.gradle")
+            )
+          )
+        );
+    }
+
+
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null);
     }
