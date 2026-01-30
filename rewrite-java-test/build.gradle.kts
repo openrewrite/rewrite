@@ -7,7 +7,6 @@ recipeDependencies {
 }
 
 dependencies {
-    implementation("org.assertj:assertj-core:latest.release")
     implementation(project(":rewrite-java"))
     implementation(project(":rewrite-kotlin"))
     implementation(project(":rewrite-groovy"))

@@ -22,3 +22,11 @@ allprojects {
     group = "org.openrewrite"
     description = "Eliminate tech-debt. Automatically."
 }
+
+// Use this task locally between different dependency check runs to have updated analysis:
+// OSSINDEX_PASSWORD=... OSSINDEX_USERNAME=... gradle cleanReports dCAg --no-parallel
+tasks.register<Delete>("cleanReports") {
+    description = "Removes build/reports folder from all modules"
+    group = "owasp dependency-check"
+    delete(allprojects.map { it.layout.buildDirectory.dir("reports") })
+}
