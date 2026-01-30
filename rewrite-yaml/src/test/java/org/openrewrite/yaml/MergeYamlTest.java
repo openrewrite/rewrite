@@ -3063,7 +3063,7 @@ class MergeYamlTest implements RewriteTest {
           spec -> spec
             .recipe(new MergeYaml(
               "$.some.object",
-              // language=yaml
+              //language=text
               """
                 script: |-ParseError
                 """,
@@ -3141,6 +3141,7 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("DataFlowIssue")
     @Test
     void sourceNull() {
         assertThrows(AssertionError.class, () ->
