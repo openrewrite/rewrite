@@ -290,7 +290,15 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             String existingEntryPrefix = s1.getEntries().get(0).getPrefix();
             String currentIndent = existingEntryPrefix.substring(existingEntryPrefix.lastIndexOf('\n'));
             List<Yaml.Sequence.Entry> newEntries = ListUtils.map(incomingEntries, it -> it.withPrefix(currentIndent));
-            List<Yaml.Sequence.Entry> mutatedEntries = concatAll(s1.getEntries(), newEntries, it -> ((Yaml.Scalar) it.getBlock()).getValue()).ls;
+            List<Yaml.Sequence.Entry> mutatedEntries = concatAll(s1.getEntries(), newEntries, it -> {
+                if (it.getBlock() instanceof Yaml.Scalar) {
+                    return ((Yaml.Scalar) it.getBlock()).getValue();
+                } else if (it.getBlock() instanceof Yaml.Mapping) {
+                    Yaml.Mapping.Entry entry = ((Yaml.Mapping) it.getBlock()).getEntries().get(0);
+                    return entry.getKey().getValue();
+                }
+                return "";
+            }).ls;
 
             return s1.withEntries(mutatedEntries);
         }

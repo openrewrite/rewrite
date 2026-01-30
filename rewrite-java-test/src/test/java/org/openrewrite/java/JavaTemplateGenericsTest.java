@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
@@ -348,7 +347,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void replaceLambdaToMemberReference() {
         //noinspection Convert2MethodRef
@@ -398,6 +396,121 @@ class JavaTemplateGenericsTest implements RewriteTest {
                   }
 
                   void test(Function<Object, String> fn) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceLambdaToMemberReferenceWithSpecificType() {
+        // Even when the context has Function<String, String>, the template's T is unbounded,
+        // so its erasure is Object. Object::toString is valid in any Function<X, String> context.
+        //noinspection Convert2MethodRef
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.toString()")
+                  .bindType("java.util.function.Function<T, String>")
+                  .genericTypes("T")
+                  .build();
+                final JavaTemplate refTemplate = JavaTemplate.builder("T::toString")
+                  .bindType("java.util.function.Function<T, String>")
+                  .genericTypes("T")
+                  .build();
+
+                @Override
+                public J visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                    JavaTemplate.Matcher matcher = lambdaTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return refTemplate.apply(getCursor(), lambda.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return super.visitLambda(lambda, ctx);
+                    }
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.function.Function;
+
+              class Foo {
+                  void test() {
+                      test(e -> e.toString());
+                  }
+
+                  void test(Function<String, String> fn) {
+                  }
+              }
+              """,
+            """
+              import java.util.function.Function;
+
+              class Foo {
+                  void test() {
+                      test(Object::toString);
+                  }
+
+                  void test(Function<String, String> fn) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceLambdaToMemberReferenceWithBoundedTypeVariable() {
+        // When T has a bound (T extends Number), the erasure is Number.
+        //noinspection Convert2MethodRef
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.intValue()")
+                  .bindType("java.util.function.ToIntFunction<T>")
+                  .genericTypes("T extends java.lang.Number")
+                  .build();
+                final JavaTemplate refTemplate = JavaTemplate.builder("T::intValue")
+                  .bindType("java.util.function.ToIntFunction<T>")
+                  .genericTypes("T extends java.lang.Number")
+                  .build();
+
+                @Override
+                public J visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                    JavaTemplate.Matcher matcher = lambdaTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return refTemplate.apply(getCursor(), lambda.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return super.visitLambda(lambda, ctx);
+                    }
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.function.ToIntFunction;
+
+              class Foo {
+                  void test() {
+                      test(e -> e.intValue());
+                  }
+
+                  void test(ToIntFunction<Integer> fn) {
+                  }
+              }
+              """,
+            """
+              import java.util.function.ToIntFunction;
+
+              class Foo {
+                  void test() {
+                      test(Number::intValue);
+                  }
+
+                  void test(ToIntFunction<Integer> fn) {
                   }
               }
               """

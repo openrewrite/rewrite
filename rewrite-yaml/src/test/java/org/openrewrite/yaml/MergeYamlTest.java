@@ -3063,7 +3063,7 @@ class MergeYamlTest implements RewriteTest {
           spec -> spec
             .recipe(new MergeYaml(
               "$.some.object",
-              // language=yaml
+              //language=text
               """
                 script: |-ParseError
                 """,
@@ -3141,6 +3141,7 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("DataFlowIssue")
     @Test
     void sourceNull() {
         assertThrows(AssertionError.class, () ->
@@ -3281,6 +3282,53 @@ class MergeYamlTest implements RewriteTest {
                 new-key: 123
                d2:
                 e2: text
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeRecipePreconditionsInsertBefore() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              preconditions:
+                - org.openrewrite.Singleton
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "recipeList",
+            true
+          )),
+          yaml(
+            """
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.MyRecipe
+              displayName: My Recipe
+              description: Does something useful
+              preconditions:
+                - org.openrewrite.java.search.FindTypes:
+                    fullyQualifiedTypeName: org.openrewrite.Recipe
+              recipeList:
+                - org.openrewrite.java.OrderImports
+              """,
+            """
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.MyRecipe
+              displayName: My Recipe
+              description: Does something useful
+              preconditions:
+                - org.openrewrite.java.search.FindTypes:
+                    fullyQualifiedTypeName: org.openrewrite.Recipe
+                - org.openrewrite.Singleton
+              recipeList:
+                - org.openrewrite.java.OrderImports
               """
           )
         );
