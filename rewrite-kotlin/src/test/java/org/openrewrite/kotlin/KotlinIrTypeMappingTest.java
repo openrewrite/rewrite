@@ -48,7 +48,7 @@ public class KotlinIrTypeMappingTest {
             .logCompilationWarningsAndErrors(true)
             .moduleName("test")
             .build()
-            .parse(singletonList(new Parser.Input(Path.of("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))), disposable,
+            .parse(singletonList(new Parser.Input(Path.of("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)), true)), disposable,
                     new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)));
 
     @AfterAll
