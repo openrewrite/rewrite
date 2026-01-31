@@ -1872,6 +1872,121 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Nested
+    class ManagedDependencies {
+        @Test
+        void omitVersionWhenManagedBySpringDependencyManagementPlugin() {
+            rewriteRun(
+              spec -> spec.recipe(addDependency("org.springframework.boot:spring-boot-starter-web:latest.release", null, "implementation")),
+              mavenProject("project",
+                buildGradle(
+                  """
+                    plugins {
+                        id 'java'
+                        id 'org.springframework.boot' version '3.2.0'
+                        id 'io.spring.dependency-management' version '1.1.5'
+                    }
+
+                    repositories {
+                        mavenCentral()
+                    }
+                    """,
+                  """
+                    plugins {
+                        id 'java'
+                        id 'org.springframework.boot' version '3.2.0'
+                        id 'io.spring.dependency-management' version '1.1.5'
+                    }
+
+                    repositories {
+                        mavenCentral()
+                    }
+
+                    dependencies {
+                        implementation "org.springframework.boot:spring-boot-starter-web"
+                    }
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void omitVersionWhenManagedByPlatform() {
+            rewriteRun(
+              spec -> spec.recipe(addDependency("org.springframework.boot:spring-boot-starter-web:latest.release", null, "implementation")),
+              mavenProject("project",
+                buildGradle(
+                  """
+                    plugins {
+                        id 'java'
+                    }
+
+                    repositories {
+                        mavenCentral()
+                    }
+
+                    dependencies {
+                        implementation platform('org.springframework.boot:spring-boot-dependencies:3.2.0')
+                    }
+                    """,
+                  """
+                    plugins {
+                        id 'java'
+                    }
+
+                    repositories {
+                        mavenCentral()
+                    }
+
+                    dependencies {
+                        implementation platform('org.springframework.boot:spring-boot-dependencies:3.2.0')
+                        implementation "org.springframework.boot:spring-boot-starter-web"
+                    }
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void addVersionWhenNotManaged() {
+            rewriteRun(
+              spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, "implementation")),
+              mavenProject("project",
+                buildGradle(
+                  """
+                    plugins {
+                        id 'java'
+                        id 'org.springframework.boot' version '3.2.0'
+                        id 'io.spring.dependency-management' version '1.1.5'
+                    }
+
+                    repositories {
+                        mavenCentral()
+                    }
+                    """,
+                  """
+                    plugins {
+                        id 'java'
+                        id 'org.springframework.boot' version '3.2.0'
+                        id 'io.spring.dependency-management' version '1.1.5'
+                    }
+
+                    repositories {
+                        mavenCentral()
+                    }
+
+                    dependencies {
+                        implementation "com.google.guava:guava:29.0-jre"
+                    }
+                    """
+                )
+              )
+            );
+        }
+    }
+
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null);
     }
