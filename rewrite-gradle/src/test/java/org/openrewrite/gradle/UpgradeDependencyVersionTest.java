@@ -2347,4 +2347,81 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void upgradeMultipleArtifactsWithSharedVariableSelectsMinimumVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "*", "4.2.x", null)),
+          buildGradle(
+            //language=groovy
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  springCloudVersion = '4.1.0'
+              }
+
+              dependencies {
+                  // commons has max 4.2.4, consul-config has max 4.2.3
+                  // Both use the same variable, so the minimum (4.2.3) should be selected
+                  implementation "org.springframework.cloud:spring-cloud-commons:${springCloudVersion}"
+                  implementation "org.springframework.cloud:spring-cloud-starter-consul-config:${springCloudVersion}"
+              }
+              """,
+            spec -> spec.after(actual -> {
+                // Verify the version is exactly 4.2.3 (the minimum compatible version)
+                // NOT 4.2.4 which would break spring-cloud-starter-consul-config
+                assertThat(actual)
+                  .as("Should select 4.2.3 (minimum compatible), not 4.2.4 (max of spring-cloud-commons)")
+                  .contains("springCloudVersion = '4.2.3'")
+                  .doesNotContain("springCloudVersion = '4.2.4'");
+                return actual;
+            })
+          )
+        );
+    }
+
+    @Test
+    void upgradeMultipleArtifactsWithSharedPropertyInGradlePropertiesSelectsMinimumVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "*", "4.2.x", null)),
+          properties(
+            """
+              springCloudVersion=4.1.0
+              """,
+            spec -> spec.path("gradle.properties").after(actual -> {
+                // Verify the version is exactly 4.2.3 (the minimum compatible version)
+                assertThat(actual)
+                  .as("Should select 4.2.3 (minimum compatible), not 4.2.4")
+                  .contains("springCloudVersion=4.2.3")
+                  .doesNotContain("springCloudVersion=4.2.4");
+                return actual;
+            })
+          ),
+          buildGradle(
+            //language=groovy
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  // commons has max 4.2.4, consul-config has max 4.2.3
+                  implementation "org.springframework.cloud:spring-cloud-commons:${springCloudVersion}"
+                  implementation "org.springframework.cloud:spring-cloud-starter-consul-config:${springCloudVersion}"
+              }
+              """
+          )
+        );
+    }
 }

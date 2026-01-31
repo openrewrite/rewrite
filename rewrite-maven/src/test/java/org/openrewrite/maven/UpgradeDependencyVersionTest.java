@@ -2537,4 +2537,62 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+
+    @Test
+    void upgradeMultipleArtifactsWithSharedPropertySelectsMinimumVersion() {
+        // Using real Spring Cloud artifacts where:
+        // - spring-cloud-commons has 4.2.4 available
+        // - spring-cloud-starter-consul-config only has up to 4.2.3
+        // we can only upgrade to the minimum (4.2.3)
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "*", "4.2.x", null, false, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <spring-cloud.version>4.1.0</spring-cloud.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-commons</artifactId>
+                          <version>${spring-cloud.version}</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-starter-consul-config</artifactId>
+                          <version>${spring-cloud.version}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <spring-cloud.version>4.2.3</spring-cloud.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-commons</artifactId>
+                          <version>${spring-cloud.version}</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-starter-consul-config</artifactId>
+                          <version>${spring-cloud.version}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
 }
