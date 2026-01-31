@@ -46,15 +46,24 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             Markers.EMPTY, new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY),
             emptyList(), Space.format(" "));
 
+    private final boolean autoFormat;
+
     public JavaTemplateJavaExtension(JavaTemplateParser templateParser, Substitutions substitutions,
-                                     String substitutedTemplate, JavaCoordinates coordinates) {
+                                     String substitutedTemplate, JavaCoordinates coordinates,
+                                     boolean autoFormat) {
         super(templateParser, substitutions, substitutedTemplate, coordinates);
+        this.autoFormat = autoFormat;
     }
 
     @Override
     public TreeVisitor<? extends J, Integer> getMixin() {
         return new JavaVisitor<Integer>() {
             private boolean substituted;
+
+            @Override
+            public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, Integer p, Cursor parent) {
+                return autoFormat ? super.autoFormat(j, stopAfter, p, parent) : j;
+            }
 
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer p) {
