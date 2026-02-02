@@ -518,7 +518,7 @@ empty-value=
             expect(marker).toBeDefined();
             expect(marker!.name).toBe("subproject");
             // Path should be relative to relativeTo
-            expect(marker!.path).toBe("subproject/package.json");
+            expect(marker!.path).toBe(path.normalize("subproject/package.json"));
             // Should have found the lock file in the subdirectory
             expect(marker!.resolvedDependencies.length).toBeGreaterThan(0);
             // Check that dependency is resolved

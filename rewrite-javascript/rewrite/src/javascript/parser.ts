@@ -210,8 +210,9 @@ export class JavaScriptParser extends Parser {
 
         // Override getSourceFile
         host.getSourceFile = (fileName, languageVersion, onError) => {
+            const normalizedFileName = path.normalize(fileName);
             // Check if the SourceFile is in the cache
-            let sourceFile = this.sourceFileCache && this.sourceFileCache.get(fileName);
+            let sourceFile = this.sourceFileCache && this.sourceFileCache.get(normalizedFileName);
             if (sourceFile) {
                 return sourceFile;
             }
@@ -220,17 +221,17 @@ export class JavaScriptParser extends Parser {
             let sourceText: string | undefined;
 
             // For input files
-            const input = inputFiles.get(fileName);
+            const input = inputFiles.get(normalizedFileName);
             if (input) {
                 sourceText = parserInputRead(input);
             } else {
                 // For dependency files
-                sourceText = ts.sys.readFile(fileName);
+                sourceText = ts.sys.readFile(normalizedFileName);
             }
 
             if (sourceText !== undefined) {
                 // Determine script kind based on file extension
-                const scriptKind = getScriptKindFromFileName(fileName);
+                const scriptKind = getScriptKindFromFileName(normalizedFileName);
 
                 // Build CreateSourceFileOptions with jsDocParsingMode
                 const sourceFileOptions: ts.CreateSourceFileOptions = typeof languageVersion === 'number'
@@ -243,27 +244,29 @@ export class JavaScriptParser extends Parser {
                         jsDocParsingMode: ts.JSDocParsingMode.ParseNone // We override this as otherwise invalid JSDoc causes parse errors
                     };
 
-                sourceFile = ts.createSourceFile(fileName, sourceText, sourceFileOptions, true, scriptKind);
+                sourceFile = ts.createSourceFile(normalizedFileName, sourceText, sourceFileOptions, true, scriptKind);
                 // Cache the SourceFile if it's a dependency
                 if (!input && this.sourceFileCache) {
-                    this.sourceFileCache.set(fileName, sourceFile);
+                    this.sourceFileCache.set(normalizedFileName, sourceFile);
                 }
                 return sourceFile;
             }
 
-            if (onError) onError(`File not found: ${fileName}`);
+            if (onError) onError(`File not found: ${normalizedFileName}`);
             return undefined;
         };
 
         // Override fileExists
         host.fileExists = (fileName) => {
-            return inputFiles.has(fileName) || ts.sys.fileExists(fileName);
+            const normalizedFileName = path.normalize(fileName);
+            return inputFiles.has(normalizedFileName) || ts.sys.fileExists(normalizedFileName);
         };
 
         // Override readFile
         host.readFile = (fileName) => {
-            const input = inputFiles.get(fileName);
-            return input ? parserInputRead(input) : ts.sys.readFile(fileName);
+            const normalizedFileName = path.normalize(fileName);
+            const input = inputFiles.get(normalizedFileName);
+            return input ? parserInputRead(input) : ts.sys.readFile(normalizedFileName);
         };
 
         // Custom module resolution to handle in-memory imports
@@ -271,7 +274,8 @@ export class JavaScriptParser extends Parser {
         // but our source files only exist in memory (in the inputFiles map)
         host.resolveModuleNameLiterals = (moduleLiterals, containingFile) => {
             const resolvedModules: ts.ResolvedModuleWithFailedLookupLocations[] = [];
-            const containingDir = path.dirname(containingFile);
+            const normalizedFileName = path.normalize(containingFile);
+            const containingDir = path.dirname(normalizedFileName);
 
             for (const moduleLiteral of moduleLiterals) {
                 const moduleName = moduleLiteral.text;
@@ -311,7 +315,7 @@ export class JavaScriptParser extends Parser {
                 // Fall back to TypeScript's default resolution for node_modules and absolute paths
                 const result = ts.resolveModuleName(
                     moduleName,
-                    containingFile,
+                    normalizedFileName,
                     this.compilerOptions,
                     host
                 );
