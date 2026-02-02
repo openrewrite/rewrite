@@ -140,6 +140,6 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     @Override
     protected RecipeDescriptor createRecipeDescriptor() {
-        return this.descriptor;
+        return this.descriptor != null ? this.descriptor : super.createRecipeDescriptor();
     }
 }
