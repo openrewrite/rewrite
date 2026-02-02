@@ -163,6 +163,7 @@ Since `version` is optional, marketplaces can represent version-independent reci
     - Implementations:
       - `MavenRecipeBundleResolver` in `rewrite-maven`
       - `NpmRecipeBundleResolver` in `rewrite-javascript`
+      - `PythonRecipeBundleResolver` in `rewrite-python`
       - `YamlRecipeBundleResolver` in `rewrite-core`
   - `RecipeBundleReader`: Interface returned by resolvers with methods:
     - `getBundle()`: Returns the associated `RecipeBundle`
@@ -172,6 +173,7 @@ Since `version` is optional, marketplaces can represent version-independent reci
   - Implementations:
     - `MavenRecipeBundleReader`: Downloads Maven artifacts, reads `META-INF/rewrite/recipes.csv` from JAR, falls back to classpath scanning
     - `NpmRecipeBundleReader`: Uses `JavaScriptRewriteRpc` for remote communication with npm packages
+    - `PythonRecipeBundleReader`: Uses `PythonRewriteRpc` for remote communication with Python packages
     - `YamlRecipeBundleReader`: Reads recipes from YAML files by path or URI
   - `RecipeListing.resolve()`: Convenience method that finds the appropriate resolver and returns a `RecipeBundleReader`
 
