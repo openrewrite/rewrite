@@ -1140,6 +1140,54 @@ class UnnecessaryParenthesesTest implements RewriteTest {
               )
             );
         }
+
+        @Issue("https://github.com/moderneinc/customer-requests/issues/1790")
+        @Test
+        void methodInvocationSelectUnary() {
+            //language=java
+            rewriteRun(
+              java(
+                """
+                  class A {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (++i).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class B {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (i++).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class C {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (--i).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class D {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (i--).toString();
+                    }
+                  }
+                  """
+              )
+            );
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/534")
