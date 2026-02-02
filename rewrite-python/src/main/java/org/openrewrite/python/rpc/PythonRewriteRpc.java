@@ -82,6 +82,15 @@ public class PythonRewriteRpc extends RewriteRpc {
         MANAGER.shutdown();
     }
 
+    public InstallRecipesResponse installRecipes(String packageName, @Nullable String version) {
+        return send(
+                "InstallRecipes",
+                new InstallRecipesByPackage(
+                        new InstallRecipesByPackage.Package(packageName, version)),
+                InstallRecipesResponse.class
+        );
+    }
+
     /**
      * Resets the cached state of the current Python RPC instance.
      * This clears all parsed objects and references on both the Java and Python sides,

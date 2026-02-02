@@ -814,6 +814,69 @@ def handle_generate(params: dict) -> dict:
     return {'ids': [], 'sourceFileTypes': []}
 
 
+def handle_install_recipes(params: dict) -> dict:
+    """Handle an InstallRecipes RPC request.
+
+    Installs a Python recipe package via pip and activates it into the marketplace.
+
+    The request contains a 'recipes' field which is an object with:
+    - packageName: the pip package name
+    - version: optional version constraint
+
+    Returns:
+        dict with 'recipesInstalled' count and optional 'version'
+    """
+    import subprocess
+    import importlib
+
+    recipes = params.get('recipes', {})
+    package_name = recipes.get('packageName')
+    version = recipes.get('version')
+
+    if package_name is None:
+        raise ValueError("'recipes.packageName' is required")
+
+    logger.info(f"InstallRecipes: package={package_name}, version={version}")
+
+    marketplace = _get_marketplace()
+    before_count = len(marketplace.all_recipes())
+
+    package_spec = package_name if version is None else f"{package_name}=={version}"
+
+    # Install the package via pip
+    result = subprocess.run(
+        [sys.executable, "-m", "pip", "install", package_spec, "--quiet"],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"pip install {package_spec} failed: {result.stderr}")
+
+    # Resolve the installed version
+    installed_version = None
+    try:
+        from importlib.metadata import version as get_version
+        installed_version = get_version(package_name)
+    except Exception:
+        pass
+
+    # Discover and activate recipes from the newly installed package
+    from importlib.metadata import entry_points
+    eps = entry_points(group="openrewrite.recipes")
+    for ep in eps:
+        try:
+            module = ep.load()
+            if hasattr(module, "activate") and callable(module.activate):
+                module.activate(marketplace)
+        except Exception as e:
+            logger.warning(f"Failed to activate entry point {ep.name}: {e}")
+
+    after_count = len(marketplace.all_recipes())
+    recipes_installed = after_count - before_count
+
+    logger.info(f"InstallRecipes: installed {recipes_installed} recipes, version={installed_version}")
+    return {'recipesInstalled': recipes_installed, 'version': installed_version}
+
+
 def handle_request(method: str, params: dict) -> Any:
     """Handle an RPC request."""
     handlers = {
@@ -823,6 +886,7 @@ def handle_request(method: str, params: dict) -> Any:
         'GetLanguages': handle_get_languages,
         'Print': handle_print,
         'Reset': handle_reset,
+        'InstallRecipes': handle_install_recipes,
         'GetMarketplace': handle_get_marketplace,
         'PrepareRecipe': handle_prepare_recipe,
         'Visit': handle_visit,

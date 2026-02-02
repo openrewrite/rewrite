@@ -16,6 +16,7 @@
 package org.openrewrite.python.marketplace;
 
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.python.rpc.InstallRecipesResponse;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleReader;
@@ -32,8 +33,10 @@ public class PythonRecipeBundleResolver implements RecipeBundleResolver {
 
     @Override
     public RecipeBundleReader resolve(RecipeBundle bundle) {
-        // TODO installRecipes is not yet implemented for Python RPC
-        rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
+        InstallRecipesResponse response = rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
+        if (response.getVersion() != null) {
+            bundle.setVersion(response.getVersion());
+        }
         return new PythonRecipeBundleReader(bundle, rpc);
     }
 }
