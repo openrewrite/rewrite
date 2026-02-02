@@ -932,6 +932,63 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void unwrapUnaryInAssignment() {
+        rewriteRun(
+          unnecessaryParentheses(style -> style.withAssign(true)),
+          java(
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      int a = (++i);
+                      int b = (i++);
+                      int c = (--i);
+                      int d = (i--);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      int a = ++i;
+                      int b = i++;
+                      int c = --i;
+                      int d = i--;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unwrapUnaryInMethodArgument() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      System.out.println((++i));
+                      System.out.println((i++));
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      System.out.println(++i);
+                      System.out.println(i++);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @ExpectedToFail("Not implemented yet")
     @Test
     void unwrapBinaryInIf() {
