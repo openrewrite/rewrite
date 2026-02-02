@@ -137,4 +137,9 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
             rpc.getObject(id, null);
         }
     }
+
+    @Override
+    protected RecipeDescriptor createRecipeDescriptor() {
+        return this.descriptor;
+    }
 }
