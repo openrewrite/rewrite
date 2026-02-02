@@ -16,6 +16,7 @@
 package org.openrewrite.maven.graph;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
@@ -33,6 +34,25 @@ import java.util.*;
  * non-matching dependencies, reducing GC pressure on large dependency graphs.
  */
 public class DependencyTreeWalker {
+    /**
+     * Controls how traversal continues after a callback is invoked.
+     */
+    public enum TraversalControl {
+        /**
+         * Continue traversal normally.
+         */
+        CONTINUE,
+        /**
+         * Stop all traversal immediately.
+         */
+        HALT,
+        /**
+         * Skip future visits to dependencies with the same group:artifact coordinates.
+         * Useful for presence detection where path counting is not needed.
+         */
+        SKIP_SAME_COORDINATES
+    }
+
     /**
      * Callback interface for handling dependencies during tree traversal.
      */
@@ -52,63 +72,140 @@ public class DependencyTreeWalker {
     }
 
     /**
+     * Callback interface that can control traversal behavior.
+     * Use this when you need to halt traversal early or skip duplicate coordinates.
+     */
+    @FunctionalInterface
+    public interface ControlledCallback {
+        /**
+         * Called when a dependency is visited or matches a pattern.
+         * <p>
+         * The path is in <b>leaf-to-root order</b>: {@code path.getFirst()} returns the current
+         * dependency, {@code path.getLast()} returns the direct (root) dependency.
+         *
+         * @param dependency the current dependency being visited/matched
+         * @param path       the path from this dependency to direct dependency (leaf-to-root order);
+         *                   use {@code getLast()} for the direct dependency, iterate normally for leaf-to-root
+         * @return control instruction for how to continue traversal
+         */
+        TraversalControl accept(ResolvedDependency dependency, Deque<ResolvedDependency> path);
+    }
+
+    /**
      * Walks the dependency tree starting from the given roots, calling the callback
      * for each dependency that matches the matcher (or all dependencies if matcher is null).
-     * Uses caching to avoid re-traversing duplicate dependencies.
+     * Visits every path to matching dependencies.
+     * Uses O(1) cycle detection to avoid infinite loops.
      *
      * @param roots    the direct dependencies to start traversal from
      * @param matcher  the matcher to test dependencies against, or null to visit all
      * @param callback called for each matching dependency with its path
      */
     public static void walk(List<ResolvedDependency> roots, @Nullable DependencyMatcher matcher, Callback callback) {
+        walk(roots, matcher, (dep, path) -> {
+            callback.accept(dep, path);
+            return TraversalControl.CONTINUE;
+        });
+    }
+
+    /**
+     * Walks the dependency tree starting from the given roots, calling the callback
+     * for each dependency that matches the matcher (or all dependencies if matcher is null).
+     * The callback can control traversal behavior by returning a {@link TraversalControl} value.
+     * Uses O(1) cycle detection to avoid infinite loops.
+     *
+     * @param roots    the direct dependencies to start traversal from
+     * @param matcher  the matcher to test dependencies against, or null to visit all
+     * @param callback called for each matching dependency with its path; returns traversal control
+     */
+    public static void walk(List<ResolvedDependency> roots, @Nullable DependencyMatcher matcher, ControlledCallback callback) {
         Deque<ResolvedDependency> path = new ArrayDeque<>();
+        Set<GroupArtifact> inPath = new HashSet<>();
+        Set<GroupArtifact> skipCoordinates = new HashSet<>();
         for (ResolvedDependency root : roots) {
-            walkRecursive(root, matcher, path, callback);
+            if (walkRecursive(root, matcher, path, inPath, skipCoordinates, callback) == TraversalControl.HALT) {
+                return;
+            }
         }
     }
 
     /**
      * Walks a single dependency tree, calling the callback for each match.
+     * Visits every path to matching dependencies.
      *
      * @param root     the direct dependency to start traversal from
      * @param matcher  the matcher to test dependencies against, or null to visit all
      * @param callback called for each matching dependency with its path
      */
     public static void walk(ResolvedDependency root, @Nullable DependencyMatcher matcher, Callback callback) {
-        Deque<ResolvedDependency> path = new ArrayDeque<>();
-        walkRecursive(root, matcher, path,  callback);
+        walk(root, matcher, (dep, path) -> {
+            callback.accept(dep, path);
+            return TraversalControl.CONTINUE;
+        });
     }
 
-    private static void walkRecursive(
+    /**
+     * Walks a single dependency tree, calling the callback for each match.
+     * The callback can control traversal behavior by returning a {@link TraversalControl} value.
+     *
+     * @param root     the direct dependency to start traversal from
+     * @param matcher  the matcher to test dependencies against, or null to visit all
+     * @param callback called for each matching dependency with its path; returns traversal control
+     */
+    public static void walk(ResolvedDependency root, @Nullable DependencyMatcher matcher, ControlledCallback callback) {
+        Deque<ResolvedDependency> path = new ArrayDeque<>();
+        Set<GroupArtifact> inPath = new HashSet<>();
+        Set<GroupArtifact> skipCoordinates = new HashSet<>();
+        walkRecursive(root, matcher, path, inPath, skipCoordinates, callback);
+    }
+
+    private static TraversalControl walkRecursive(
             ResolvedDependency dependency,
             @Nullable DependencyMatcher matcher,
             Deque<ResolvedDependency> path,
-            Callback callback
+            Set<GroupArtifact> inPath,
+            Set<GroupArtifact> skipCoordinates,
+            ControlledCallback callback
     ) {
-        // Cycle detection - check if we've already visited this dependency in the current path
-        if (containsDependency(path, dependency)) {
-            return;
+        GroupArtifact ga = new GroupArtifact(dependency.getGroupId(), dependency.getArtifactId());
+
+        // Cycle detection - O(1) check if this dependency is already in the current path
+        if (!inPath.add(ga)) {
+            return TraversalControl.CONTINUE;
+        }
+
+        // Skip coordinates that the callback requested to skip
+        if (skipCoordinates.contains(ga)) {
+            inPath.remove(ga);
+            return TraversalControl.CONTINUE;
         }
 
         path.addFirst(dependency);
+
+        TraversalControl control;
         if (matcher == null || matcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())) {
-            callback.accept(dependency, new ArrayDeque<>(path));
+            control = callback.accept(dependency, new ArrayDeque<>(path));
+            if (control == TraversalControl.HALT) {
+                path.removeFirst();
+                inPath.remove(ga);
+                return TraversalControl.HALT;
+            }
+            if (control == TraversalControl.SKIP_SAME_COORDINATES) {
+                skipCoordinates.add(ga);
+            }
         }
 
         for (ResolvedDependency child : dependency.getDependencies()) {
-            walkRecursive(child, matcher, path, callback);
-        }
-        path.removeFirst();
-    }
-
-    private static boolean containsDependency(Deque<ResolvedDependency> path, ResolvedDependency dependency) {
-        for (ResolvedDependency dep : path) {
-            if (dep.getGroupId().equals(dependency.getGroupId()) &&
-                dep.getArtifactId().equals(dependency.getArtifactId())) {
-                return true;
+            if (walkRecursive(child, matcher, path, inPath, skipCoordinates, callback) == TraversalControl.HALT) {
+                path.removeFirst();
+                inPath.remove(ga);
+                return TraversalControl.HALT;
             }
         }
-        return false;
+
+        path.removeFirst();
+        inPath.remove(ga);
+        return TraversalControl.CONTINUE;
     }
 
     /**
