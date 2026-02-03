@@ -75,12 +75,12 @@ class GradleProjectBuilderTest {
 
             @Override
             public Set<ResolvedDependency> getParents() {
-                return Collections.emptySet();
-            }
-
-            @Override
-            public Set<ResolvedArtifact> getModuleArtifacts() {
-                return Collections.emptySet();
+                return emptySet();
+                return emptySet();
+                return emptySet();
+                return emptySet();
+                return emptySet();
+                return emptySet();
             }
 
             @Override
