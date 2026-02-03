@@ -388,6 +388,38 @@ class TyLspClient:
 
         return None
 
+    def get_type_definition(self, uri: str, line: int, character: int) -> Optional[str]:
+        """Get the file URI where the type at a position is defined.
+
+        This uses LSP's textDocument/typeDefinition to find where a type
+        is defined, which can be used to derive the module FQN.
+
+        Args:
+            uri: The document URI.
+            line: Zero-based line number.
+            character: Zero-based character offset.
+
+        Returns:
+            The file URI where the type is defined, or None if unavailable.
+        """
+        response = self._send_request("textDocument/typeDefinition", {
+            "textDocument": {"uri": uri},
+            "position": {"line": line, "character": character}
+        })
+
+        if response is None:
+            return None
+
+        # Response can be a Location, Location[], or LocationLink[]
+        if isinstance(response, list) and len(response) > 0:
+            # Take the first location
+            loc = response[0]
+            return loc.get("uri") or loc.get("targetUri")
+        elif isinstance(response, dict):
+            return response.get("uri") or response.get("targetUri")
+
+        return None
+
     def get_diagnostics(self, uri: str) -> List[Dict[str, Any]]:
         """Get diagnostics (type errors) for a document.
 
