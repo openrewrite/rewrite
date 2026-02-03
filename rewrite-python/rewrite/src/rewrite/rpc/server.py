@@ -488,6 +488,176 @@ def _get_marketplace():
     return _marketplace
 
 
+def handle_install_recipes(params: dict) -> dict:
+    """Handle an InstallRecipes RPC request.
+
+    Activates a recipe package in the marketplace. The package should already be
+    installed by the caller (e.g., via pip install --target). This handler discovers
+    and activates the package's recipes.
+
+    Args:
+        params: Dict containing either:
+            - 'recipes': str - A local file path (package already installed to target)
+            - 'recipes': {'packageName': str, 'version': str|None} - A package spec
+
+    Returns:
+        Dict with 'recipesInstalled' count and 'version' (if resolved)
+    """
+    import importlib
+    import importlib.util
+
+    marketplace = _get_marketplace()
+    before_count = len(list(marketplace.all_recipes()))
+
+    recipes = params.get('recipes')
+    installed_version = None
+
+    if isinstance(recipes, str):
+        # Local file path - package should already be installed by caller
+        local_path = Path(recipes)
+        logger.info(f"Activating recipes from local path: {recipes}")
+
+        # Find and import the package
+        # For local paths, we look for the package name from setup.py/pyproject.toml
+        package_name = _find_package_name(local_path)
+        if package_name:
+            _import_and_activate_package(package_name, marketplace)
+
+    elif isinstance(recipes, dict):
+        # Package spec with name and optional version - package should already be installed
+        package_name = recipes.get('packageName')
+        version = recipes.get('version')
+
+        if not package_name:
+            raise ValueError("Package name is required")
+
+        logger.info(f"Activating recipes package: {package_name}")
+
+        # Get the installed version
+        try:
+            import importlib.metadata
+            installed_version = importlib.metadata.version(package_name)
+        except Exception:
+            pass
+
+        _import_and_activate_package(package_name, marketplace)
+    else:
+        raise ValueError(f"Invalid recipes parameter: {recipes}")
+
+    after_count = len(list(marketplace.all_recipes()))
+    recipes_installed = after_count - before_count
+
+    logger.info(f"InstallRecipes: installed {recipes_installed} recipes")
+    return {
+        'recipesInstalled': recipes_installed,
+        'version': installed_version
+    }
+
+
+def _find_package_name(local_path: Path) -> Optional[str]:
+    """Find the package name from a local path."""
+    import tomllib
+
+    # Try pyproject.toml first
+    pyproject_path = local_path / 'pyproject.toml'
+    if pyproject_path.exists():
+        try:
+            with open(pyproject_path, 'rb') as f:
+                data = tomllib.load(f)
+                # Try [project] section first (PEP 621)
+                if 'project' in data and 'name' in data['project']:
+                    return data['project']['name']
+                # Try [tool.poetry] section
+                if 'tool' in data and 'poetry' in data['tool'] and 'name' in data['tool']['poetry']:
+                    return data['tool']['poetry']['name']
+        except Exception as e:
+            logger.warning(f"Failed to parse pyproject.toml: {e}")
+
+    # Try setup.py
+    setup_py = local_path / 'setup.py'
+    if setup_py.exists():
+        # Simple heuristic: look for name= in setup.py
+        try:
+            content = setup_py.read_text()
+            import re
+            match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', content)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            logger.warning(f"Failed to parse setup.py: {e}")
+
+    return None
+
+
+def _import_and_activate_package(package_name: str, marketplace):
+    """Import a package and call its activate function using entry points.
+
+    Uses importlib.metadata to discover entry points registered under
+    the 'openrewrite.recipes' group and calls their activate functions.
+    Since matching package names to entry points is unreliable (hyphens vs
+    underscores, different naming conventions), we activate ALL entry points
+    but the marketplace handles deduplication.
+    """
+    from importlib.metadata import entry_points
+
+    # Normalize package name for comparison
+    def normalize(name: str) -> str:
+        return name.replace('-', '_').replace('.', '_').lower()
+
+    normalized_name = normalize(package_name)
+
+    # Find all entry points in the openrewrite.recipes group
+    eps = entry_points(group='openrewrite.recipes')
+    activated = False
+
+    for ep in eps:
+        try:
+            # Try to match this entry point to our package using the dist attribute
+            dist_name = None
+            if hasattr(ep, 'dist') and ep.dist is not None:
+                dist_name = ep.dist.name if hasattr(ep.dist, 'name') else str(ep.dist)
+
+            # Check if this entry point belongs to our package
+            matches_package = False
+            if dist_name and normalize(dist_name) == normalized_name:
+                matches_package = True
+            elif ep.name and normalize(ep.name) == normalized_name:
+                matches_package = True
+            elif ':' in ep.value:
+                # Check module name in value (e.g., "sample_recipe:activate")
+                module_name = ep.value.split(':')[0]
+                if normalize(module_name) == normalized_name:
+                    matches_package = True
+
+            if matches_package:
+                logger.info(f"Loading entry point: {ep.name} -> {ep.value} (dist: {dist_name})")
+                activate_fn = ep.load()
+                activate_fn(marketplace)
+                activated = True
+                logger.info(f"Successfully activated {ep.name}")
+        except Exception as e:
+            logger.warning(f"Failed to process entry point {ep.name}: {e}")
+
+    if not activated:
+        # Fallback: try direct module import (for packages without entry points)
+        import importlib
+        module_name = package_name.replace('-', '_')
+        try:
+            if module_name in sys.modules:
+                importlib.reload(sys.modules[module_name])
+            else:
+                importlib.import_module(module_name)
+
+            module = sys.modules.get(module_name)
+            if module and hasattr(module, 'activate'):
+                logger.info(f"Calling activate() on {module_name}")
+                module.activate(marketplace)
+            else:
+                logger.warning(f"Package {package_name} does not have an activate() function")
+        except ImportError as e:
+            logger.warning(f"Could not import {module_name}: {e}")
+
+
 def handle_get_marketplace(params: dict) -> List[dict]:
     """Handle a GetMarketplace RPC request.
 
@@ -560,6 +730,7 @@ def _recipe_descriptor_to_dict(descriptor) -> dict:
             }
             for name, value, opt in descriptor.options
         ],
+        'dataTables': [],  # Python recipes don't have data tables yet
         'recipeList': [_recipe_descriptor_to_dict(r) for r in descriptor.recipe_list],
     }
 
@@ -859,6 +1030,7 @@ def handle_request(method: str, params: dict) -> Any:
         'GetLanguages': handle_get_languages,
         'Print': handle_print,
         'Reset': handle_reset,
+        'InstallRecipes': handle_install_recipes,
         'GetMarketplace': handle_get_marketplace,
         'PrepareRecipe': handle_prepare_recipe,
         'Visit': handle_visit,
