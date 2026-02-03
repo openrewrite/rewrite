@@ -157,9 +157,6 @@ public class DeleteProperty extends Recipe {
                             // This is the first kept entry and there were deleted entries before it
                             entry = entry.withPrefix(firstDeletedPrefix);
                         } else if (previousWasDeleted && !entries.isEmpty() && !startsWithNewline(entry.getPrefix())) {
-                            // Previous entry was deleted and current prefix doesn't have a newline -
-                            // this can happen when the deleted entry had a block scalar value whose
-                            // content included the newline before this entry
                             entry = entry.withPrefix("\n" + entry.getPrefix());
                         }
                         entries.add(entry);
@@ -181,11 +178,6 @@ public class DeleteProperty extends Recipe {
                     }
                 }
 
-                // When child mappings were modified, ensure all entries in this block-style mapping
-                // have proper newline prefixes. This handles the case where a block scalar's content
-                // included the newline that separated entries in the parent mapping.
-                // Only add newline if the previous kept entry doesn't have a block scalar value
-                // (since block scalars include trailing newlines in their content).
                 if ((changed || childModified) && m.getOpeningBracePrefix() == null) {
                     List<Yaml.Mapping.Entry> currentEntries = m.getEntries();
                     List<Yaml.Mapping.Entry> fixedEntries = null;
