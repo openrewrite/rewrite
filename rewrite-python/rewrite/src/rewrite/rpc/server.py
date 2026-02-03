@@ -146,6 +146,11 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         This is called by RpcReceiveQueue when it needs more data.
         We send GetObject requests repeatedly until END_OF_OBJECT is received.
         For large objects (>1000 items), Java sends data in multiple batches.
+
+        IMPORTANT: We filter out END_OF_OBJECT from the returned batch to prevent
+        it from being accidentally consumed during nested operations (like receive_list
+        expecting positions). Java's RewriteRpc.java explicitly consumes END_OF_OBJECT
+        after receive() completes (line 474), and we do the same by tracking received_end.
         """
         nonlocal received_end
 
@@ -164,8 +169,10 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
 
         # Check if this batch contains END_OF_OBJECT (last item has state='END_OF_OBJECT')
         # The END_OF_OBJECT marker is always at the end of the final batch
+        # We filter it out to prevent it from being consumed during nested operations
         if batch[-1].get('state') == 'END_OF_OBJECT':
             received_end = True
+            batch = batch[:-1]  # Remove END_OF_OBJECT from the batch
 
         return batch
 
@@ -178,6 +185,11 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
 
     # Receive and deserialize the object (applies diffs to before state)
     obj = receiver.receive(before, q)
+
+    # Verify we received the complete object (END_OF_OBJECT was in the final batch)
+    # This matches Java's RewriteRpc.java line 474-475 which explicitly checks for END_OF_OBJECT
+    if not received_end:
+        raise RuntimeError(f"Did not receive END_OF_OBJECT marker for object {obj_id}")
 
     if obj is not None:
         # Update our understanding of what Java has
@@ -228,26 +240,50 @@ def parse_python_source(source: str, path: str = "<unknown>") -> dict:
     except ImportError as e:
         logger.error(f"Failed to import parser: {e}")
         traceback.print_exc()
-        return _create_parse_error(path, str(e))
+        return _create_parse_error(path, str(e), source)
     except SyntaxError as e:
         logger.error(f"Syntax error parsing {path}: {e}")
-        return _create_parse_error(path, str(e))
+        return _create_parse_error(path, str(e), source)
     except Exception as e:
         logger.error(f"Error parsing {path}: {e}")
         traceback.print_exc()
-        return _create_parse_error(path, str(e))
+        return _create_parse_error(path, str(e), source)
 
 
-def _create_parse_error(path: str, message: str) -> dict:
-    """Create a parse error result."""
-    obj_id = generate_id()
-    error = {
-        'id': obj_id,
-        'type': 'org.openrewrite.tree.ParseError',
-        'sourcePath': path,
-        'message': message,
-    }
-    local_objects[obj_id] = error
+def _create_parse_error(path: str, message: str, source: str = '') -> dict:
+    """Create a parse error result using the proper ParseError class.
+
+    This creates a real ParseError SourceFile that can be properly serialized
+    via the RPC protocol, rather than a dict that can't be handled.
+    """
+    from rewrite.parser import ParseError
+    from rewrite.markers import Markers, ParseExceptionResult
+    from rewrite import random_id
+
+    # Create a ParseExceptionResult marker with the error info
+    # We use 'PythonParser' as the parser type since we don't have a parser instance
+    exception_marker = ParseExceptionResult(
+        _id=random_id(),
+        _parser_type='PythonParser',
+        _exception_type='SyntaxError',
+        _message=message
+    )
+
+    # Create the ParseError with the marker
+    parse_error = ParseError(
+        _id=random_id(),
+        _markers=Markers(random_id(), [exception_marker]),
+        _source_path=Path(path),
+        _file_attributes=None,
+        _charset_name='utf-8',
+        _charset_bom_marked=False,
+        _checksum=None,
+        _text=source,
+        _erroneous=None
+    )
+
+    obj_id = str(parse_error.id)
+    local_objects[obj_id] = parse_error
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError'}
 
 
