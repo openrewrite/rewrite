@@ -94,9 +94,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         String methodName = methodInvocation.getSimpleName();
         if ("classpath".equals(methodName)) {
             return gradleProject.getBuildscript().getConfiguration(methodName);
-        } else {
-            return gradleProject.getConfiguration(methodName);
         }
+        return gradleProject.getConfiguration(methodName);
     }
 
     public static boolean isDependencyDeclaration(Cursor cursor) {
@@ -486,11 +485,14 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         if (v instanceof J.Literal) {
             Object literalValue = ((J.Literal) v).getValue();
             return literalValue instanceof String ? (String) literalValue : null;
-        } else if (v instanceof J.Identifier) {
+        }
+        if (v instanceof J.Identifier) {
             return ((J.Identifier) v).getSimpleName();
-        } else if (v instanceof J.FieldAccess) {
+        }
+        if (v instanceof J.FieldAccess) {
             return v.printTrimmed(cursor);
-        } else if (v instanceof J.MethodInvocation) {
+        }
+        if (v instanceof J.MethodInvocation) {
             // Handle property('name') or findProperty('name') patterns
             J.MethodInvocation mi = (J.MethodInvocation) v;
             String methodName = mi.getSimpleName();
@@ -549,12 +551,15 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 Tree tree = gStringValue.getTree();
                 if (tree instanceof J.Identifier) {
                     return ((J.Identifier) tree).getSimpleName();
-                } else if (tree instanceof J.FieldAccess) {
+                }
+                if (tree instanceof J.FieldAccess) {
                     return tree.printTrimmed(cursor);
-                } else if (tree instanceof J.MethodInvocation) {
+                }
+                if (tree instanceof J.MethodInvocation) {
                     // Recursively handle method invocations within GString
                     return extractValueAsString((J.MethodInvocation) tree);
-                } else if (tree instanceof G.Binary) {
+                }
+                if (tree instanceof G.Binary) {
                     // Recursively handle binary expressions within GString
                     return extractValueAsString((G.Binary) tree);
                 }
@@ -668,9 +673,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 Object versionTree = ((G.GString.Value) strings.get(1)).getTree();
                 if (versionTree instanceof J.Identifier) {
                     return ((J.Identifier) versionTree).getSimpleName();
-                } else if (versionTree instanceof J.FieldAccess) {
+                }
+                if (versionTree instanceof J.FieldAccess) {
                     return ((J.FieldAccess) versionTree).printTrimmed(cursor);
-                } else if (versionTree instanceof J.MethodInvocation) {
+                }
+                if (versionTree instanceof J.MethodInvocation) {
                     // Handle property('version') or findProperty('version')
                     String propName = extractPropertyNameFromMethodInvocation((J.MethodInvocation) versionTree);
                     if (propName != null) {
@@ -709,12 +716,15 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
             if (versionExp instanceof J.Identifier) {
                 return ((J.Identifier) versionExp).getSimpleName();
-            } else if (versionExp instanceof J.FieldAccess) {
+            }
+            if (versionExp instanceof J.FieldAccess) {
                 return versionExp.printTrimmed(cursor);
-            } else if (versionExp instanceof J.MethodInvocation) {
+            }
+            if (versionExp instanceof J.MethodInvocation) {
                 // Handle property('version') or findProperty('version')
                 return extractPropertyNameFromMethodInvocation((J.MethodInvocation) versionExp);
-            } else if (versionExp instanceof G.Binary) {
+            }
+            if (versionExp instanceof G.Binary) {
                 // Handle properties['version']
                 return extractPropertyNameFromGBinary((G.Binary) versionExp);
             } else if (versionExp instanceof G.GString) {
@@ -726,9 +736,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     Object tree = versionGStringValue.getTree();
                     if (tree instanceof J.Identifier) {
                         return ((J.Identifier) tree).getSimpleName();
-                    } else if (tree instanceof J.FieldAccess) {
+                    }
+                    if (tree instanceof J.FieldAccess) {
                         return ((J.FieldAccess) tree).printTrimmed(cursor);
-                    } else if (tree instanceof J.MethodInvocation) {
+                    }
+                    if (tree instanceof J.MethodInvocation) {
                         String propName = extractPropertyNameFromMethodInvocation((J.MethodInvocation) tree);
                         if (propName != null) {
                             return propName;
@@ -749,7 +761,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     Object tree = versionTemplateExpr.getTree();
                     if (tree instanceof J.Identifier) {
                         return ((J.Identifier) tree).getSimpleName();
-                    } else if (tree instanceof J.FieldAccess) {
+                    }
+                    if (tree instanceof J.FieldAccess) {
                         return ((J.FieldAccess) tree).printTrimmed(cursor);
                     }
                 }
@@ -1531,7 +1544,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     return parseMultiComponentLiterals(arguments);
                 }
                 return null;
-            } else if (argument instanceof G.GString) {
+            }
+            if (argument instanceof G.GString) {
                 G.GString gstring = (G.GString) argument;
                 List<J> strings = gstring.getStrings();
                 if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
