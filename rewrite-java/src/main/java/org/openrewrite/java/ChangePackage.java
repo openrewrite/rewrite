@@ -438,7 +438,7 @@ public class ChangePackage extends Recipe {
                     continue;
                 }
 
-                Set<String> typesUsedFromThisPackage = typesUsedByPackage.getOrDefault(importPkg, Collections.emptySet());
+                Set<String> typesUsedFromThisPackage = typesUsedByPackage.getOrDefault(importPkg, emptySet());
                 if (typesUsedFromThisPackage.isEmpty()) {
                     continue;
                 }
