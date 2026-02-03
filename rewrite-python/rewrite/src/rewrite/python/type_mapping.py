@@ -110,6 +110,87 @@ class PythonTypeMapping:
                 # ty not installed
                 self._ty_client = None
 
+    def _get_module_from_type_definition(self, line: int, col: int) -> Optional[str]:
+        """Get the module path where a type at the given position is defined.
+
+        Uses ty's textDocument/typeDefinition to find the file where a type
+        is defined, then extracts the module path from that file path.
+
+        Args:
+            line: Zero-based line number.
+            col: Zero-based column offset.
+
+        Returns:
+            The module path (e.g., 'httpx' or 'httpx._models'), or None.
+        """
+        if self._ty_client is None:
+            return None
+
+        type_def_uri = self._ty_client.get_type_definition(self._uri, line, col)
+        if not type_def_uri:
+            return None
+
+        return self._extract_module_from_uri(type_def_uri)
+
+    def _extract_module_from_uri(self, uri: str) -> Optional[str]:
+        """Extract a Python module path from a file URI.
+
+        Converts a file URI like 'file:///path/to/httpx/httpx/_models.py'
+        to a module path like 'httpx._models'. Uses package structure
+        (presence of __init__.py) to determine the module hierarchy.
+
+        Args:
+            uri: A file URI pointing to a Python file.
+
+        Returns:
+            The module path, or None if it cannot be determined.
+        """
+        from urllib.parse import urlparse, unquote
+
+        parsed = urlparse(uri)
+        if parsed.scheme != 'file':
+            return None
+
+        file_path = Path(unquote(parsed.path))
+        if not file_path.suffix == '.py':
+            return None
+
+        # Build module path by walking up and looking for __init__.py
+        module_parts = []
+        current = file_path
+
+        # Add the filename (without .py) unless it's __init__
+        if current.stem != '__init__':
+            module_parts.insert(0, current.stem)
+
+        current = current.parent
+
+        # Walk up looking for __init__.py to find package boundaries
+        for _ in range(20):  # Limit depth
+            init_file = current / '__init__.py'
+            if init_file.exists():
+                module_parts.insert(0, current.name)
+                current = current.parent
+            else:
+                # No __init__.py means we've left the package
+                break
+
+        if module_parts:
+            # Clean up internal module names: httpx._models -> httpx
+            # If the module has an underscore prefix, use the parent
+            fqn = '.'.join(module_parts)
+            # For patterns like 'httpx._models', just use 'httpx' as the public API
+            parts = fqn.split('.')
+            public_parts = []
+            for part in parts:
+                if part.startswith('_') and public_parts:
+                    # Stop at private modules, use only public path
+                    break
+                public_parts.append(part)
+            return '.'.join(public_parts) if public_parts else None
+
+        return None
+
     def _discover_venv(self, file_path: str) -> Optional[Path]:
         """Discover the virtual environment for a file.
 
@@ -451,15 +532,36 @@ class PythonTypeMapping:
             if hasattr(receiver, 'end_col_offset') and receiver.end_col_offset:
                 # Hover at the end of the expression (within the last attribute)
                 hover_col = receiver.end_col_offset - 1
+
+            # Get the type name from hover
             hover = self._ty_client.get_hover(
                 self._uri,
                 receiver.lineno - 1,
                 hover_col
             )
             if hover:
-                result = self._parse_hover_as_class_type(hover)
-                if result:
-                    return result
+                # Check if this is a module (e.g., httpx.get() where httpx is a module)
+                hover_clean = self._strip_markdown(hover)
+                module_match = re.match(r"<module\s+'([^']+)'", hover_clean)
+                if module_match:
+                    # The receiver is a module, so the FQN is just the module name
+                    module_name = module_match.group(1)
+                    return self._create_class_type(module_name)
+
+                type_name = self._extract_type_name_from_hover(hover)
+                if type_name and type_name != 'Unknown':
+                    # Get the module FQN from typeDefinition
+                    module = self._get_module_from_type_definition(
+                        receiver.lineno - 1,
+                        hover_col
+                    )
+                    if module:
+                        # Create FQN: module.TypeName (e.g., httpx.Client)
+                        fqn = f"{module}.{type_name}"
+                        return self._create_class_type(fqn)
+                    else:
+                        # Fall back to just the type name
+                        return self._create_class_type(type_name)
 
         elif isinstance(node.func, ast.Name):
             # For function calls, try to get the module
@@ -472,6 +574,48 @@ class PythonTypeMapping:
                 return self._extract_declaring_type_from_function_hover(hover)
 
         return self._infer_declaring_type_from_ast(node)
+
+    def _extract_type_name_from_hover(self, hover: str) -> Optional[str]:
+        """Extract just the type name from a hover response.
+
+        Args:
+            hover: The raw hover response from ty.
+
+        Returns:
+            The type name (e.g., 'Client', 'Response'), or None.
+        """
+        hover = self._strip_markdown(hover)
+
+        # Handle module type format: <module 'httpx'>
+        # Return None so we use module-based FQN lookup instead
+        module_match = re.match(r"<module\s+'([^']+)'", hover)
+        if module_match:
+            # Return the module name as the type - the FQN IS the module
+            return None  # Signal that this is a module, not a class type
+
+        # Handle "variable: Type" format
+        if ': ' in hover and not hover.startswith('def '):
+            type_str = hover.split(': ', 1)[1].strip()
+            # Handle union types by taking the first non-None type
+            if ' | ' in type_str:
+                for part in type_str.split(' | '):
+                    part = part.strip()
+                    if part not in ('None', 'NoneType', 'Unknown'):
+                        type_str = part
+                        break
+            # Handle generics - extract base type
+            if '[' in type_str:
+                type_str = type_str.split('[')[0]
+            return type_str
+
+        # Just a type name
+        if hover and not hover.startswith('def '):
+            type_str = hover.strip()
+            if '[' in type_str:
+                type_str = type_str.split('[')[0]
+            return type_str
+
+        return None
 
     def _get_call_return_type(self, call_node: ast.Call) -> Optional[JavaType.FullyQualified]:
         """Get the return type of a function/method call.
@@ -544,6 +688,7 @@ class PythonTypeMapping:
                 pass
 
             # Try to build a fully qualified name from the attribute chain
+            # Only do this for actual attribute chains (like os.path), not simple names
             parts = []
             current = receiver
             while isinstance(current, ast.Attribute):
@@ -552,7 +697,10 @@ class PythonTypeMapping:
             if isinstance(current, ast.Name):
                 parts.insert(0, current.id)
 
-            if parts:
+            # Only create a class type if we have an attribute chain (len > 1)
+            # For simple variable names like 'client', return None (Unknown)
+            # since we can't determine the actual type without ty
+            if len(parts) > 1:
                 fqn = '.'.join(parts)
                 return self._create_class_type(fqn)
         return None
@@ -750,7 +898,14 @@ class PythonTypeMapping:
         return self._create_class_type(type_str)
 
     def _create_class_type(self, fqn: str) -> JavaType.Class:
-        """Create a JavaType.Class from a fully qualified name."""
+        """Create a JavaType.Class from a fully qualified name.
+
+        Args:
+            fqn: The fully qualified type name (e.g., 'httpx.Client' or 'str').
+
+        Returns:
+            A JavaType.Class with the fully qualified name.
+        """
         # Check cache
         if fqn in self._type_cache:
             cached = self._type_cache[fqn]

@@ -962,6 +962,13 @@ class FormattedString(Py, Expression, TypedTree):
         return self._parts
 
 
+    _type: Optional[JavaType]
+
+    @property
+    def type(self) -> Optional[JavaType]:
+        return self._type
+
+
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
     @dataclass(frozen=True, eq=False)
     class Value(Py, Expression, TypedTree):

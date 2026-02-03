@@ -154,3 +154,9 @@ class ParseExceptionResult(Marker):
     @property
     def message(self) -> str:
         return self._message
+
+    _tree_type: Optional[str] = None
+
+    @property
+    def tree_type(self) -> Optional[str]:
+        return self._tree_type
