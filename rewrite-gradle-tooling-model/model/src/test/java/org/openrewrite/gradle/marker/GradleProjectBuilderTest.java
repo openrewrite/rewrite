@@ -24,6 +24,7 @@ import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
 import java.util.*;
 
+import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class GradleProjectBuilderTest {
@@ -76,31 +77,31 @@ class GradleProjectBuilderTest {
             @Override
             public Set<ResolvedDependency> getParents() {
                 return emptySet();
-                return emptySet();
-                return emptySet();
-                return emptySet();
-                return emptySet();
-                return emptySet();
+            }
+
+            @Override
+            public Set<ResolvedArtifact> getModuleArtifacts() {
+                return Set.of();
             }
 
             @Override
             public Set<ResolvedArtifact> getAllModuleArtifacts() {
-                return Collections.emptySet();
+                return emptySet();
             }
 
             @Override
             public Set<ResolvedArtifact> getParentArtifacts(ResolvedDependency parent) {
-                return Collections.emptySet();
+                return emptySet();
             }
 
             @Override
             public Set<ResolvedArtifact> getArtifacts(ResolvedDependency parent) {
-                return Collections.emptySet();
+                return emptySet();
             }
 
             @Override
             public Set<ResolvedArtifact> getAllArtifacts(ResolvedDependency parent) {
-                return Collections.emptySet();
+                return emptySet();
             }
         };
     }
