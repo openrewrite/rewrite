@@ -395,6 +395,100 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void positionalLiteralNotation() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                `java-library`
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation("com.google.guava", "guava", "29.0-jre")
+              }
+              """,
+            """
+              plugins {
+                `java-library`
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation("com.google.guava", "guava", "30.1.1-jre")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void positionalLiteralNotationWithVariableVersion() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                `java-library`
+              }
+
+              val guavaVersion = "29.0-jre"
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """,
+            """
+              plugins {
+                `java-library`
+              }
+
+              val guavaVersion = "30.1.1-jre"
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void positionalLiteralNotationWithoutVersion() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                `java-library`
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation("com.google.guava", "guava")
+              }
+              """
+            // No change expected - no version to upgrade
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"$guavaVersion", "${guavaVersion}"})
     void mapNotationGStringInterpolation(String stringInterpolationReference) {

@@ -48,9 +48,11 @@ public class DependencyUseStringNotation extends Recipe {
 
     @Getter
     final String description = "In Gradle, dependencies can be expressed as a `String` like `\"groupId:artifactId:version\"`, " +
-        "or equivalently as a `Map` like `group: 'groupId', name: 'artifactId', version: 'version'`. " +
-        "This recipe replaces dependencies represented as `Maps` with an equivalent dependency represented as a `String`, " +
-        "as recommended per the [Gradle best practices for dependencies to use a single GAV](https://docs.gradle.org/8.14.2/userguide/best_practices_dependencies.html#single-gav-string).";
+        "or equivalently as a `Map` like `group: 'groupId', name: 'artifactId', version: 'version'`, " +
+        "or as positional arguments like `(\"groupId\", \"artifactId\", \"version\")`. " +
+        "This recipe replaces dependencies represented as `Maps` or positional arguments with an equivalent dependency represented as a `String`, " +
+        "as recommended per the [Gradle best practices for dependencies to use a single GAV](https://docs.gradle.org/8.14.2/userguide/best_practices_dependencies.html#single-gav-string). " +
+        "The positional argument notation is deprecated in Gradle 9.1 and will fail in Gradle 10.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -147,6 +149,17 @@ public class DependencyUseStringNotation extends Recipe {
                     } else {
                         m = m.withArguments(singletonList(stringNotation));
                     }
+                } else {
+                    // Positional literal notation: ("group", "artifact", "version") or ("group", "artifact")
+                    J.Literal stringNotation = positionalToLiteral(m.getArguments());
+                    if (stringNotation != null) {
+                        Expression lastArg = m.getArguments().get(m.getArguments().size() - 1);
+                        if (lastArg instanceof J.Lambda) {
+                            m = m.withArguments(Arrays.asList(stringNotation, lastArg));
+                        } else {
+                            m = m.withArguments(singletonList(stringNotation));
+                        }
+                    }
                 }
 
                 return m;
@@ -196,6 +209,61 @@ public class DependencyUseStringNotation extends Recipe {
                     return sb.toString();
                 }
                 return null;
+            }
+
+            /**
+             * Converts positional literal notation like ("group", "artifact", "version") to a single string literal.
+             * Returns null if the arguments don't match the positional literal pattern.
+             */
+            private J.@Nullable Literal positionalToLiteral(List<Expression> args) {
+                if (args.size() < 2) {
+                    return null;
+                }
+
+                // First two args must be string literals
+                if (!(args.get(0) instanceof J.Literal) || !(args.get(1) instanceof J.Literal)) {
+                    return null;
+                }
+                J.Literal groupLiteral = (J.Literal) args.get(0);
+                J.Literal artifactLiteral = (J.Literal) args.get(1);
+
+                Object groupValue = groupLiteral.getValue();
+                Object artifactValue = artifactLiteral.getValue();
+                if (!(groupValue instanceof String) || !(artifactValue instanceof String)) {
+                    return null;
+                }
+
+                String group = (String) groupValue;
+                String artifact = (String) artifactValue;
+
+                // Positional notation doesn't use colons in group/artifact
+                if (group.contains(":") || artifact.contains(":")) {
+                    return null;
+                }
+
+                String version = null;
+                // Check for third argument (version)
+                if (args.size() >= 3) {
+                    Expression versionArg = args.get(2);
+                    // Skip lambda arguments
+                    if (versionArg instanceof J.Lambda) {
+                        // No version, just lambda
+                    } else {
+                        version = coerceToStringNotation(versionArg);
+                        if (version == null) {
+                            // Version argument exists but couldn't be converted
+                            return null;
+                        }
+                    }
+                }
+
+                Dependency dependency = Dependency.builder()
+                        .gav(new GroupArtifactVersion(group, artifact, version))
+                        .build();
+                String stringNotation = DependencyNotation.toStringNotation(dependency);
+
+                return new J.Literal(randomId(), groupLiteral.getPrefix(), groupLiteral.getMarkers(),
+                        stringNotation, "\"" + stringNotation + "\"", emptyList(), JavaType.Primitive.String);
             }
         });
     }

@@ -99,6 +99,31 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         }
     }
 
+    /**
+     * Checks if the arguments represent positional literal notation for dependencies.
+     * Returns true when the first two arguments are string literals without colons.
+     * Examples: implementation("group", "artifact", "version"), implementation("group", "artifact"),
+     * or implementation("group", "artifact", versionVariable).
+     * This form is deprecated in Gradle 9.1 and will fail in Gradle 10.
+     */
+    private static boolean isPositionalLiteralNotation(List<Expression> args) {
+        if (args.size() < 2) {
+            return false;
+        }
+        if (!(args.get(0) instanceof J.Literal) || !(args.get(1) instanceof J.Literal)) {
+            return false;
+        }
+        Object firstValue = ((J.Literal) args.get(0)).getValue();
+        Object secondValue = ((J.Literal) args.get(1)).getValue();
+        if (!(firstValue instanceof String) || !(secondValue instanceof String)) {
+            return false;
+        }
+        String first = (String) firstValue;
+        String second = (String) secondValue;
+        // Single-string notation contains colons; positional does not
+        return !first.contains(":") && !second.contains(":");
+    }
+
     public static boolean isDependencyDeclaration(Cursor cursor) {
         Object object = cursor.getValue();
         if (!(object instanceof J.MethodInvocation)) {
@@ -208,6 +233,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
         Expression arg = depArgs.get(0);
 
+        // Positional literal notation: ("group", "artifact", "version") or ("group", "artifact")
+        if (isPositionalLiteralNotation(depArgs)) {
+            return (String) ((J.Literal) arg).getValue();
+        }
+
         // Binary concatenation: "group:artifact:" + version
         if (arg instanceof J.Binary) {
             J.Binary binary = (J.Binary) arg;
@@ -307,6 +337,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         }
 
         Expression arg = depArgs.get(0);
+
+        // Positional literal notation: ("group", "artifact", "version") or ("group", "artifact")
+        if (isPositionalLiteralNotation(depArgs)) {
+            return (String) ((J.Literal) depArgs.get(1)).getValue();
+        }
 
         // Binary concatenation: "group:artifact:" + version
         if (arg instanceof J.Binary) {
@@ -416,6 +451,12 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         }
 
         Expression arg = depArgs.get(0);
+
+        // Positional literal notation: ("group", "artifact", "version")
+        if (isPositionalLiteralNotation(depArgs) && depArgs.size() >= 3 && depArgs.get(2) instanceof J.Literal) {
+            Object versionValue = ((J.Literal) depArgs.get(2)).getValue();
+            return versionValue instanceof String ? (String) versionValue : null;
+        }
 
         // String literal notation: "group:artifact:version"
         if (arg instanceof J.Literal && ((J.Literal) arg).getValue() instanceof String) {
@@ -622,6 +663,21 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         }
 
         Expression arg = depArgs.get(0);
+
+        // Handle positional literal notation with variable version: ("group", "artifact", version)
+        if (isPositionalLiteralNotation(depArgs) && depArgs.size() >= 3) {
+            Expression versionArg = depArgs.get(2);
+            if (versionArg instanceof J.Identifier) {
+                return ((J.Identifier) versionArg).getSimpleName();
+            } else if (versionArg instanceof J.FieldAccess) {
+                return versionArg.printTrimmed(cursor);
+            } else if (versionArg instanceof J.MethodInvocation) {
+                String propName = extractPropertyNameFromMethodInvocation((J.MethodInvocation) versionArg);
+                if (propName != null) {
+                    return propName;
+                }
+            }
+        }
 
         // Handle binary concatenation: "group:artifact:" + version
         if (arg instanceof J.Binary) {
@@ -1156,7 +1212,25 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         }
 
         J.MethodInvocation updated = m;
-        Expression firstArg = m.getArguments().get(0);
+        List<Expression> args = m.getArguments();
+        Expression firstArg = args.get(0);
+
+        // Positional literal notation: ("group", "artifact", "version")
+        // When the version is a variable (not a literal), getVersionVariableName() is used instead
+        // and the variable declaration is updated directly by the recipe
+        if (isPositionalLiteralNotation(args) && args.size() >= 3 && args.get(2) instanceof J.Literal) {
+            J.Literal versionLiteral = (J.Literal) args.get(2);
+            Object versionValue = versionLiteral.getValue();
+            if (!(versionValue instanceof String)) {
+                return this;
+            }
+            String currentVersion = (String) versionValue;
+            if (!newVersion.equals(currentVersion)) {
+                updated = m.withArguments(ListUtils.map(args, (i, arg) ->
+                        i == 2 ? ChangeStringLiteral.withStringValue(versionLiteral, newVersion) : arg));
+            }
+            return updated == m ? this : new GradleDependency(new Cursor(cursor.getParent(), updated), resolvedDependency);
+        }
 
         if (firstArg instanceof J.Literal) {
             String gav = (String) ((J.Literal) firstArg).getValue();
@@ -1468,6 +1542,21 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
         private @Nullable Dependency parseDependency(List<Expression> arguments) {
             Expression argument = arguments.get(0);
+
+            // Positional literal notation: ("group", "artifact", "version") or ("group", "artifact")
+            if (isPositionalLiteralNotation(arguments)) {
+                String group = (String) ((J.Literal) argument).getValue();
+                String artifact = (String) ((J.Literal) arguments.get(1)).getValue();
+                String version = null;
+                if (arguments.size() >= 3 && arguments.get(2) instanceof J.Literal) {
+                    Object versionValue = ((J.Literal) arguments.get(2)).getValue();
+                    version = versionValue instanceof String ? (String) versionValue : null;
+                }
+                return Dependency.builder()
+                        .gav(new GroupArtifactVersion(group, artifact, version))
+                        .build();
+            }
+
             if (argument instanceof J.Literal) {
                 return DependencyNotation.parse((String) ((J.Literal) argument).getValue());
             } else if (argument instanceof G.GString) {
