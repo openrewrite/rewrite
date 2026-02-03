@@ -842,4 +842,58 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removesUnusedPropertiesInSinglePomWithResourceFilteringEnabled() {
+        rewriteRun(
+          pomXml(
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.sample</groupId>
+              <artifactId>test.application</artifactId>
+              <version>1.0.0</version>
+              <name>test-application</name>
+              <packaging>jar</packaging>
+            
+              <properties>
+                <junk>junk</junk>
+              </properties>
+            
+              <build>
+                <resources>
+                  <resource>
+                    <directory>src/main/resources</directory>
+                    <filtering>true</filtering>
+                  </resource>
+                </resources>
+              </build>
+            </project>
+            """,
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.sample</groupId>
+              <artifactId>test.application</artifactId>
+              <version>1.0.0</version>
+              <name>test-application</name>
+              <packaging>jar</packaging>
+            
+              <build>
+                <resources>
+                  <resource>
+                    <directory>src/main/resources</directory>
+                    <filtering>true</filtering>
+                  </resource>
+                </resources>
+              </build>
+            </project>
+            """
+          )
+        );
+    }
 }
