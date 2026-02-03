@@ -408,4 +408,32 @@ class DeletePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void globPatternWithFoldedBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.*.last-name", null, null, null)),
+          yaml(
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: John
+                    last-name: >-
+                      Doe
+                  employee:
+                    firstName: Jane
+                    lastName: Smith
+              """,
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: John
+                  employee:
+                    firstName: Jane
+              """
+          )
+        );
+    }
 }

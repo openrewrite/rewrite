@@ -136,10 +136,12 @@ public class DeleteProperty extends Recipe {
             @Override
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
                 Yaml.Mapping m = super.visitMapping(mapping, ctx);
+                boolean childModified = (m != mapping);
 
                 boolean changed = false;
                 List<Yaml.Mapping.Entry> entries = new ArrayList<>();
                 String firstDeletedPrefix = null;
+                boolean previousWasDeleted = false;
                 for (Yaml.Mapping.Entry entry : m.getEntries()) {
                     if (ToBeRemoved.hasMarker(entry.getValue()) ||
                         ToBeRemoved.hasMarker(entry) ||
@@ -149,12 +151,19 @@ public class DeleteProperty extends Recipe {
                             firstDeletedPrefix = entry.getPrefix();
                         }
                         changed = true;
+                        previousWasDeleted = true;
                     } else {
                         if (entries.isEmpty() && firstDeletedPrefix != null && containsOnlyWhitespace(entry.getPrefix())) {
                             // This is the first kept entry and there were deleted entries before it
                             entry = entry.withPrefix(firstDeletedPrefix);
+                        } else if (previousWasDeleted && !entries.isEmpty() && !startsWithNewline(entry.getPrefix())) {
+                            // Previous entry was deleted and current prefix doesn't have a newline -
+                            // this can happen when the deleted entry had a block scalar value whose
+                            // content included the newline before this entry
+                            entry = entry.withPrefix("\n" + entry.getPrefix());
                         }
                         entries.add(entry);
+                        previousWasDeleted = false;
                     }
                 }
 
@@ -171,6 +180,30 @@ public class DeleteProperty extends Recipe {
                         }
                     }
                 }
+
+                // When child mappings were modified, ensure all entries in this block-style mapping
+                // have proper newline prefixes. This handles the case where a block scalar's content
+                // included the newline that separated entries in the parent mapping.
+                // Only add newline if the previous kept entry doesn't have a block scalar value
+                // (since block scalars include trailing newlines in their content).
+                if ((changed || childModified) && m.getOpeningBracePrefix() == null) {
+                    List<Yaml.Mapping.Entry> currentEntries = m.getEntries();
+                    List<Yaml.Mapping.Entry> fixedEntries = null;
+                    for (int i = 1; i < currentEntries.size(); i++) {
+                        Yaml.Mapping.Entry entry = currentEntries.get(i);
+                        Yaml.Mapping.Entry prevEntry = currentEntries.get(i - 1);
+                        if (!startsWithNewline(entry.getPrefix()) && !endsWithBlockScalar(prevEntry)) {
+                            if (fixedEntries == null) {
+                                fixedEntries = new ArrayList<>(currentEntries);
+                            }
+                            fixedEntries.set(i, entry.withPrefix("\n" + entry.getPrefix()));
+                        }
+                    }
+                    if (fixedEntries != null) {
+                        m = m.withEntries(fixedEntries);
+                    }
+                }
+
                 return m;
             }
         });
@@ -189,6 +222,32 @@ public class DeleteProperty extends Recipe {
         }
 
         return true;
+    }
+
+    private static boolean startsWithNewline(@Nullable String str) {
+        return str != null && !str.isEmpty() && str.charAt(0) == '\n';
+    }
+
+    private static boolean endsWithBlockScalar(Yaml.Mapping.Entry entry) {
+        return endsWithBlockScalar(entry.getValue());
+    }
+
+    private static boolean endsWithBlockScalar(Yaml.Block block) {
+        if (block instanceof Yaml.Scalar) {
+            Yaml.Scalar.Style style = ((Yaml.Scalar) block).getStyle();
+            return style == Yaml.Scalar.Style.FOLDED || style == Yaml.Scalar.Style.LITERAL;
+        } else if (block instanceof Yaml.Mapping) {
+            List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) block).getEntries();
+            if (!entries.isEmpty()) {
+                return endsWithBlockScalar(entries.get(entries.size() - 1));
+            }
+        } else if (block instanceof Yaml.Sequence) {
+            List<Yaml.Sequence.Entry> entries = ((Yaml.Sequence) block).getEntries();
+            if (!entries.isEmpty()) {
+                return endsWithBlockScalar(entries.get(entries.size() - 1).getBlock());
+            }
+        }
+        return false;
     }
 
     @Value
