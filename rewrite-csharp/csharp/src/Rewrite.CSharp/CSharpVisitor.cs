@@ -32,6 +32,8 @@ public class CSharpVisitor<P>
             Annotation ann => VisitAnnotation(ann, p),
             Block blk => VisitBlock(blk, p),
             ClassDeclaration cd => VisitClassDeclaration(cd, p),
+            EnumValueSet evs => VisitEnumValueSet(evs, p),
+            EnumValue ev => VisitEnumValue(ev, p),
             MethodDeclaration md => VisitMethodDeclaration(md, p),
             Return ret => VisitReturn(ret, p),
             If iff => VisitIf(iff, p),
@@ -59,6 +61,8 @@ public class CSharpVisitor<P>
             Primitive prim => VisitPrimitive(prim, p),
             MethodInvocation mi => VisitMethodInvocation(mi, p),
             NewClass nc => VisitNewClass(nc, p),
+            NewArray na => VisitNewArray(na, p),
+            ArrayType at => VisitArrayType(at, p),
             NamedExpression ne => VisitNamedExpression(ne, p),
             RefExpression re => VisitRefExpression(re, p),
             DeclarationExpression de => VisitDeclarationExpression(de, p),
@@ -70,6 +74,19 @@ public class CSharpVisitor<P>
             Case cs => VisitCase(cs, p),
             RelationalPattern rp => VisitRelationalPattern(rp, p),
             PropertyPattern pp => VisitPropertyPattern(pp, p),
+            DeconstructionPattern dp => VisitDeconstructionPattern(dp, p),
+            TypeParameterBound tpb => VisitTypeParameterBound(tpb, p),
+            SwitchExpression se => VisitSwitchExpression(se, p),
+            InterpolatedString istr => VisitInterpolatedString(istr, p),
+            Interpolation interp => VisitInterpolation(interp, p),
+            AwaitExpression ae => VisitAwaitExpression(ae, p),
+            Synchronized sync => VisitSynchronized(sync, p),
+            TypeCast tc => VisitTypeCast(tc, p),
+            YieldStatement ys => VisitYieldStatement(ys, p),
+            Package pkg => VisitPackage(pkg, p),
+            NamespaceDeclaration ns => VisitNamespaceDeclaration(ns, p),
+            TupleType tt => VisitTupleType(tt, p),
+            TupleExpression te => VisitTupleExpression(te, p),
             _ => throw new InvalidOperationException($"Unknown tree type: {tree.GetType().Name}")
         };
 
@@ -135,6 +152,51 @@ public class CSharpVisitor<P>
         }
 
         return pp;
+    }
+
+    public virtual J VisitDeconstructionPattern(DeconstructionPattern dp, P p)
+    {
+        // Visit deconstructor (may be J.Empty for tuple patterns)
+        Expression deconstructor = dp.Deconstructor;
+        var visitedDeconstructor = Visit(deconstructor, p);
+        if (visitedDeconstructor is Expression d && !ReferenceEquals(d, deconstructor))
+        {
+            deconstructor = d;
+        }
+
+        // Visit nested patterns
+        var newElements = new List<JRightPadded<J>>();
+        bool changed = false;
+
+        foreach (var nested in dp.Nested.Elements)
+        {
+            var visited = Visit(nested.Element, p);
+            if (visited is J v && !ReferenceEquals(v, nested.Element))
+            {
+                changed = true;
+                newElements.Add(nested with { Element = v });
+            }
+            else
+            {
+                newElements.Add(nested);
+            }
+        }
+
+        var nestedPatterns = changed
+            ? dp.Nested with { Elements = newElements }
+            : dp.Nested;
+
+        if (!ReferenceEquals(deconstructor, dp.Deconstructor) ||
+            !ReferenceEquals(nestedPatterns, dp.Nested))
+        {
+            return dp with
+            {
+                Deconstructor = deconstructor,
+                Nested = nestedPatterns
+            };
+        }
+
+        return dp;
     }
 
     public virtual J VisitCompilationUnit(CompilationUnit compilationUnit, P p)
@@ -261,6 +323,47 @@ public class CSharpVisitor<P>
             return classDecl with { Body = b };
         }
         return classDecl;
+    }
+
+    public virtual J VisitEnumValueSet(EnumValueSet enumValueSet, P p)
+    {
+        var changed = false;
+        var newEnums = new List<JRightPadded<EnumValue>>();
+        foreach (var paddedValue in enumValueSet.Enums)
+        {
+            var visited = Visit(paddedValue.Element, p);
+            if (visited is EnumValue ev)
+            {
+                if (!ReferenceEquals(ev, paddedValue.Element))
+                {
+                    changed = true;
+                }
+                newEnums.Add(paddedValue with { Element = ev });
+            }
+            else
+            {
+                newEnums.Add(paddedValue);
+            }
+        }
+        return changed ? enumValueSet with { Enums = newEnums } : enumValueSet;
+    }
+
+    public virtual J VisitEnumValue(EnumValue enumValue, P p)
+    {
+        var name = Visit(enumValue.Name, p);
+        if (enumValue.Initializer != null)
+        {
+            var init = Visit(enumValue.Initializer.Element, p);
+            if (init is Expression e && !ReferenceEquals(e, enumValue.Initializer.Element))
+            {
+                return enumValue with { Initializer = enumValue.Initializer with { Element = e } };
+            }
+        }
+        if (name is Identifier id && !ReferenceEquals(id, enumValue.Name))
+        {
+            return enumValue with { Name = id };
+        }
+        return enumValue;
     }
 
     public virtual J VisitMethodDeclaration(MethodDeclaration method, P p)
@@ -676,6 +779,49 @@ public class CSharpVisitor<P>
         return nc;
     }
 
+    public virtual J VisitNewArray(NewArray na, P p)
+    {
+        // Visit type expression if present
+        if (na.TypeExpression != null)
+        {
+            Visit(na.TypeExpression, p);
+        }
+
+        // Visit dimensions
+        foreach (var dim in na.Dimensions)
+        {
+            Visit(dim, p);
+        }
+
+        // Visit initializer elements if present
+        if (na.Initializer != null)
+        {
+            foreach (var paddedElem in na.Initializer.Elements)
+            {
+                Visit(paddedElem.Element, p);
+            }
+        }
+
+        return na;
+    }
+
+    public virtual J VisitArrayType(ArrayType at, P p)
+    {
+        // Visit element type
+        Visit(at.ElementType, p);
+
+        // Visit annotations if present
+        if (at.Annotations != null)
+        {
+            foreach (var ann in at.Annotations)
+            {
+                Visit(ann, p);
+            }
+        }
+
+        return at;
+    }
+
     public virtual J VisitNamedExpression(NamedExpression ne, P p)
     {
         var expr = Visit(ne.Expression, p);
@@ -700,6 +846,125 @@ public class CSharpVisitor<P>
     {
         Visit(de.Type, p);
         return de;
+    }
+
+    public virtual J VisitTypeParameterBound(TypeParameterBound tpb, P p)
+    {
+        // Visit the type parameter name if present (first bound only)
+        TypeTree? name = tpb.Name;
+        if (name != null)
+        {
+            var visitedName = Visit(name, p);
+            if (visitedName is TypeTree n && !ReferenceEquals(n, name))
+            {
+                name = n;
+            }
+        }
+
+        // Visit the bound type
+        var bound = Visit(tpb.Bound, p);
+
+        if (!ReferenceEquals(name, tpb.Name) ||
+            (bound is TypeTree b && !ReferenceEquals(b, tpb.Bound)))
+        {
+            return tpb with
+            {
+                Name = name,
+                Bound = bound is TypeTree newBound ? newBound : tpb.Bound
+            };
+        }
+
+        return tpb;
+    }
+
+    public virtual J VisitSwitchExpression(SwitchExpression se, P p)
+    {
+        // Visit the selector (inside ControlParentheses)
+        var selector = Visit(se.Selector.Tree.Element, p);
+
+        // Visit the cases block
+        var cases = Visit(se.Cases, p);
+
+        if ((selector is Expression s && !ReferenceEquals(s, se.Selector.Tree.Element)) ||
+            (cases is Block b && !ReferenceEquals(b, se.Cases)))
+        {
+            return se with
+            {
+                Selector = selector is Expression sel
+                    ? se.Selector with { Tree = se.Selector.Tree with { Element = sel } }
+                    : se.Selector,
+                Cases = cases is Block newCases ? newCases : se.Cases
+            };
+        }
+
+        return se;
+    }
+
+    public virtual J VisitInterpolatedString(InterpolatedString istr, P p)
+    {
+        var newParts = new List<J>();
+        bool changed = false;
+
+        foreach (var part in istr.Parts)
+        {
+            var visited = Visit(part, p);
+            if (visited is J v)
+            {
+                if (!ReferenceEquals(v, part))
+                {
+                    changed = true;
+                }
+                newParts.Add(v);
+            }
+        }
+
+        if (changed)
+        {
+            return istr with { Parts = newParts };
+        }
+        return istr;
+    }
+
+    public virtual J VisitInterpolation(Interpolation interp, P p)
+    {
+        var expr = Visit(interp.Expression, p);
+
+        Expression? newAlignment = null;
+        if (interp.Alignment != null)
+        {
+            var visited = Visit(interp.Alignment.Element, p);
+            if (visited is Expression ae && !ReferenceEquals(ae, interp.Alignment.Element))
+            {
+                newAlignment = ae;
+            }
+        }
+
+        Identifier? newFormat = null;
+        if (interp.Format != null)
+        {
+            var visited = Visit(interp.Format.Element, p);
+            if (visited is Identifier f && !ReferenceEquals(f, interp.Format.Element))
+            {
+                newFormat = f;
+            }
+        }
+
+        if ((expr is Expression e && !ReferenceEquals(e, interp.Expression)) ||
+            newAlignment != null || newFormat != null)
+        {
+            return interp with
+            {
+                Expression = expr is Expression newExpr ? newExpr : interp.Expression,
+                Alignment = newAlignment != null && interp.Alignment != null
+                    ? interp.Alignment with { Element = newAlignment }
+                    : interp.Alignment,
+                Format = newFormat != null && interp.Format != null
+                    ? interp.Format with { Element = newFormat }
+                    : interp.Format
+            };
+        }
+
+        return interp;
     }
 
     public virtual J VisitUnary(Unary unary, P p)
@@ -756,5 +1021,199 @@ public class CSharpVisitor<P>
     public virtual J VisitPrimitive(Primitive primitive, P p)
     {
         return primitive;
+    }
+
+    public virtual J VisitAwaitExpression(AwaitExpression ae, P p)
+    {
+        var expr = Visit(ae.Expression, p);
+        if (expr is Expression e && !ReferenceEquals(e, ae.Expression))
+        {
+            return ae with { Expression = e };
+        }
+        return ae;
+    }
+
+    public virtual J VisitSynchronized(Synchronized sync, P p)
+    {
+        var lockExpr = Visit(sync.Lock, p);
+        var body = Visit(sync.Body, p);
+
+        if ((lockExpr is ControlParentheses<Expression> cp && !ReferenceEquals(cp, sync.Lock)) ||
+            (body is Block b && !ReferenceEquals(b, sync.Body)))
+        {
+            return sync with
+            {
+                Lock = lockExpr as ControlParentheses<Expression> ?? sync.Lock,
+                Body = body as Block ?? sync.Body
+            };
+        }
+
+        return sync;
+    }
+
+    public virtual J VisitTypeCast(TypeCast cast, P p)
+    {
+        var clazz = Visit(cast.Clazz, p);
+        var expr = Visit(cast.Expression, p);
+
+        if ((clazz is ControlParentheses<TypeTree> cp && !ReferenceEquals(cp, cast.Clazz)) ||
+            (expr is Expression e && !ReferenceEquals(e, cast.Expression)))
+        {
+            return cast with
+            {
+                Clazz = clazz as ControlParentheses<TypeTree> ?? cast.Clazz,
+                Expression = expr as Expression ?? cast.Expression
+            };
+        }
+
+        return cast;
+    }
+
+    public virtual J VisitYieldStatement(YieldStatement yield, P p)
+    {
+        if (yield.Value != null)
+        {
+            var value = Visit(yield.Value, p);
+            if (value is Expression v && !ReferenceEquals(v, yield.Value))
+            {
+                return yield with { Value = v };
+            }
+        }
+        return yield;
+    }
+
+    public virtual J VisitPackage(Package pkg, P p)
+    {
+        // Visit annotations
+        var annotations = pkg.Annotations;
+        bool annotationsChanged = false;
+        var newAnnotations = new List<Annotation>();
+        foreach (var ann in annotations)
+        {
+            var visited = Visit(ann, p);
+            if (visited is Annotation a)
+            {
+                if (!ReferenceEquals(a, ann))
+                {
+                    annotationsChanged = true;
+                }
+                newAnnotations.Add(a);
+            }
+        }
+
+        // Visit expression (namespace name)
+        var expr = Visit(pkg.Expression.Element, p);
+
+        if (annotationsChanged ||
+            (expr is Expression e && !ReferenceEquals(e, pkg.Expression.Element)))
+        {
+            return pkg with
+            {
+                Annotations = annotationsChanged ? newAnnotations : pkg.Annotations,
+                Expression = expr is Expression newExpr
+                    ? pkg.Expression with { Element = newExpr }
+                    : pkg.Expression
+            };
+        }
+
+        return pkg;
+    }
+
+    public virtual J VisitNamespaceDeclaration(NamespaceDeclaration ns, P p)
+    {
+        // Visit name expression
+        var name = Visit(ns.Name.Element, p);
+
+        // Visit members
+        var members = ns.Members;
+        var newMembers = new List<JRightPadded<Statement>>();
+        bool membersChanged = false;
+
+        foreach (var member in members)
+        {
+            var visited = Visit(member.Element, p);
+            if (visited is Statement stmt)
+            {
+                if (!ReferenceEquals(stmt, member.Element))
+                {
+                    membersChanged = true;
+                }
+                newMembers.Add(member with { Element = stmt });
+            }
+        }
+
+        if ((name is Expression e && !ReferenceEquals(e, ns.Name.Element)) ||
+            membersChanged)
+        {
+            return ns with
+            {
+                Name = name is Expression newName
+                    ? ns.Name with { Element = newName }
+                    : ns.Name,
+                Members = membersChanged ? newMembers : ns.Members
+            };
+        }
+
+        return ns;
+    }
+
+    public virtual J VisitTupleType(TupleType tupleType, P p)
+    {
+        var elements = tupleType.Elements.Elements;
+        var newElements = new List<JRightPadded<VariableDeclarations>>();
+        bool elementsChanged = false;
+
+        foreach (var element in elements)
+        {
+            var visited = Visit(element.Element, p);
+            if (visited is VariableDeclarations vd)
+            {
+                if (!ReferenceEquals(vd, element.Element))
+                {
+                    elementsChanged = true;
+                }
+                newElements.Add(element with { Element = vd });
+            }
+        }
+
+        if (elementsChanged)
+        {
+            return tupleType with
+            {
+                Elements = new JContainer<VariableDeclarations>(tupleType.Elements.Before, newElements, tupleType.Elements.Markers)
+            };
+        }
+
+        return tupleType;
+    }
+
+    public virtual J VisitTupleExpression(TupleExpression tupleExpr, P p)
+    {
+        var args = tupleExpr.Arguments.Elements;
+        var newArgs = new List<JRightPadded<Expression>>();
+        bool argsChanged = false;
+
+        foreach (var arg in args)
+        {
+            var visited = Visit(arg.Element, p);
+            if (visited is Expression expr)
+            {
+                if (!ReferenceEquals(expr, arg.Element))
+                {
+                    argsChanged = true;
+                }
+                newArgs.Add(arg with { Element = expr });
+            }
+        }
+
+        if (argsChanged)
+        {
+            return tupleExpr with
+            {
+                Arguments = new JContainer<Expression>(tupleExpr.Arguments.Before, newArgs, tupleExpr.Arguments.Markers)
+            };
+        }
+
+        return tupleExpr;
     }
 }
