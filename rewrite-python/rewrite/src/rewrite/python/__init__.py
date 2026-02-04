@@ -58,6 +58,25 @@ from rewrite.python.add_import import AddImport, AddImportOptions, maybe_add_imp
 from rewrite.python.remove_import import RemoveImport, RemoveImportOptions, maybe_remove_import
 from rewrite.python.method_matcher import MethodMatcher
 
+# Precondition helpers (delegate to Java via RPC)
+from rewrite.python.preconditions import (
+    has_source_path,
+    uses_method,
+    uses_type,
+    find_methods,
+    find_types,
+)
+
+# Recipe wrappers (delegate to Java via RPC)
+from rewrite.python.recipes import (
+    ChangeType,
+    ChangeMethodName,
+    ChangePackage,
+    DeleteMethodArgument,
+    ReorderMethodArguments,
+    AddLiteralMethodArgument,
+)
+
 __all__ = [
     # Marker class
     "Py",
@@ -104,4 +123,17 @@ __all__ = [
     "maybe_remove_import",
     # Method matching
     "MethodMatcher",
+    # Precondition helpers
+    "has_source_path",
+    "uses_method",
+    "uses_type",
+    "find_methods",
+    "find_types",
+    # Recipe wrappers (Java delegation)
+    "ChangeType",
+    "ChangeMethodName",
+    "ChangePackage",
+    "DeleteMethodArgument",
+    "ReorderMethodArguments",
+    "AddLiteralMethodArgument",
 ]

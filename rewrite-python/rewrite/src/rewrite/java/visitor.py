@@ -94,15 +94,21 @@ class JavaVisitor(TreeVisitor[J, P]):
         if container is None:
             return None
         before = self.visit_space(container.before, p)
+        original_elements = container.padding.elements
         elements = list_map(
             lambda e: self.visit_right_padded(e, p),
-            container.padding.elements
+            original_elements
         )
+        # Track if list_map detected any changes (returns same list if unchanged)
+        elements_changed = elements is not original_elements
         # Filter out None elements (deleted by visitor)
-        elements = [e for e in elements if e is not None]
-        if before is container.before and elements == list(container.padding.elements):
+        filtered_elements = [e for e in elements if e is not None]
+        # Check if filtering removed any elements
+        if len(filtered_elements) != len(elements):
+            elements_changed = True
+        if before is container.before and not elements_changed:
             return container
-        return container.replace(before=before).padding.replace(elements=elements)
+        return container.replace(before=before).padding.replace(elements=filtered_elements)
 
     # -------------------------------------------------------------------------
     # Java tree visitor methods

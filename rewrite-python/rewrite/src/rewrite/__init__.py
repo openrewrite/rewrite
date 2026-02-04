@@ -74,6 +74,11 @@ __all__ = [
     'Marker',
     'Markers',
     'SearchResult',
+    'Markup',
+    'MarkupWarn',
+    'MarkupError',
+    'MarkupInfo',
+    'MarkupDebug',
     'UnknownJavaMarker',
     'ParseExceptionResult',
 
