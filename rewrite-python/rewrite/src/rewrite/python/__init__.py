@@ -19,6 +19,20 @@ This module provides the Python-specific LST types, visitor, parser,
 and printer for transforming Python source code.
 """
 
+# Template system
+from rewrite.python.template import (
+    template,
+    pattern,
+    capture,
+    raw,
+    Template,
+    Pattern,
+    MatchResult,
+    Capture,
+    RawCode,
+    PythonCoordinates,
+)
+
 from rewrite.python.tree import (
     Py,
     Async,
@@ -78,6 +92,17 @@ from rewrite.python.recipes import (
 )
 
 __all__ = [
+    # Template system
+    "template",
+    "pattern",
+    "capture",
+    "raw",
+    "Template",
+    "Pattern",
+    "MatchResult",
+    "Capture",
+    "RawCode",
+    "PythonCoordinates",
     # Marker class
     "Py",
     # Python-specific types
