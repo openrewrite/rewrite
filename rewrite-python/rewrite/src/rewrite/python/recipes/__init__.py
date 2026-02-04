@@ -20,6 +20,14 @@ from rewrite.marketplace import Python
 from .remove_pass import RemovePass
 from .change_import import ChangeImport
 
+# Java recipe wrappers (delegate to Java via RPC)
+from .change_type import ChangeType
+from .change_method_name import ChangeMethodName
+from .change_package import ChangePackage
+from .delete_method_argument import DeleteMethodArgument
+from .reorder_method_arguments import ReorderMethodArguments
+from .add_literal_method_argument import AddLiteralMethodArgument
+
 # Category constants for Python recipes
 # Use these when decorating recipes with @recipe(category=...)
 # Note: Also defined in remove_pass.py to avoid circular imports
@@ -27,8 +35,16 @@ Cleanup = [*Python, CategoryDescriptor(display_name="Cleanup")]
 Imports = [*Python, CategoryDescriptor(display_name="Imports")]
 
 __all__ = [
+    # Native Python recipes
     "RemovePass",
     "ChangeImport",
+    # Java recipe wrappers
+    "ChangeType",
+    "ChangeMethodName",
+    "ChangePackage",
+    "DeleteMethodArgument",
+    "ReorderMethodArguments",
+    "AddLiteralMethodArgument",
     # Category constants
     "Python",
     "Cleanup",
