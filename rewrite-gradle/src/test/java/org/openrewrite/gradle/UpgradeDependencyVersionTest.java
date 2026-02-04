@@ -133,10 +133,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Test
     void mockitoTestImplementation() {
-        rewriteRun(recipeSpec -> {
+        rewriteRun(recipeSpec ->
               recipeSpec.beforeRecipe(withToolingApi())
-                .recipe(new UpgradeDependencyVersion("org.mockito", "*", "4.11.0", null));
-          },
+                .recipe(new UpgradeDependencyVersion("org.mockito", "*", "4.11.0", null)),
           buildGradle(
             """
               plugins {
@@ -389,6 +388,40 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
               dependencies {
                 implementation (group: "com.google.guava", name: "guava", version: '30.1.1-jre')
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiComponentLiteralNotation() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("com.google.guava", "guava", "29.0-jre")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("com.google.guava", "guava", "30.1.1-jre")
               }
               """
           )
