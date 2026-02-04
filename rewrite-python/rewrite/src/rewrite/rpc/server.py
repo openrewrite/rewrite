@@ -730,7 +730,7 @@ def _recipe_descriptor_to_dict(descriptor) -> dict:
             }
             for name, value, opt in descriptor.options
         ],
-        'dataTables': [],  # Python recipes don't have data tables yet
+        'dataTables': descriptor.data_tables,
         'recipeList': [_recipe_descriptor_to_dict(r) for r in descriptor.recipe_list],
     }
 
@@ -754,6 +754,8 @@ _execution_contexts: Dict[str, Any] = {}
 _recipe_accumulators: Dict[str, Any] = {}
 # Phase tracking for recipes - maps recipe IDs to 'scan' or 'edit'
 _recipe_phases: Dict[str, str] = {}
+# Data table output directory - if set, data tables will be written to CSV files
+_data_table_output_dir: Optional[str] = None
 
 
 def handle_prepare_recipe(params: dict) -> dict:
@@ -766,15 +768,22 @@ def handle_prepare_recipe(params: dict) -> dict:
     4. Returning the descriptor and visitor info
 
     Args:
-        params: dict with 'id' (recipe name) and optional 'options'
+        params: dict with 'id' (recipe name), optional 'options', and optional 'dataTableOutputDir'
 
     Returns:
         dict with 'id', 'descriptor', 'editVisitor', and precondition info
     """
+    global _data_table_output_dir
+
     recipe_name = params.get('id')
     if recipe_name is None:
         raise ValueError("Recipe 'id' is required")
     options = params.get('options', {})
+
+    # Set up data table output directory if specified
+    if 'dataTableOutputDir' in params:
+        _data_table_output_dir = params['dataTableOutputDir']
+        logger.info(f"Data table output directory set to: {_data_table_output_dir}")
 
     logger.info(f"PrepareRecipe: id={recipe_name}, options={options}")
 
@@ -861,6 +870,12 @@ def handle_visit(params: dict) -> dict:
     else:
         from rewrite import InMemoryExecutionContext
         ctx = InMemoryExecutionContext()
+        # Set up data table store if output directory is configured
+        if _data_table_output_dir:
+            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
+            store = CsvDataTableStore(_data_table_output_dir)
+            store.accept_rows(True)
+            ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
 
@@ -992,6 +1007,12 @@ def handle_generate(params: dict) -> dict:
     else:
         from rewrite import InMemoryExecutionContext
         ctx = InMemoryExecutionContext()
+        # Set up data table store if output directory is configured
+        if _data_table_output_dir:
+            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
+            store = CsvDataTableStore(_data_table_output_dir)
+            store.accept_rows(True)
+            ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
 
