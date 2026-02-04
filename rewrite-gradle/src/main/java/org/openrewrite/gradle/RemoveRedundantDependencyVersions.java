@@ -155,9 +155,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                                         new SpringDependencyManagementPluginEntry.Matcher().get(getCursor()).ifPresent(entry -> entry.getArtifacts().forEach(artifact -> {
                                             if ("mavenBom".equals(method.getSimpleName())) {
+                                                String version = entry.getVersion();
+                                                if (version == null || version.contains("${")) {
+                                                    return;
+                                                }
                                                 MavenPomDownloader mpd = new MavenPomDownloader(ctx);
                                                 try {
-                                                    ResolvedPom platformPom = mpd.download(new GroupArtifactVersion(entry.getGroup(), artifact, entry.getVersion()), null, null, gp.getMavenRepositories())
+                                                    ResolvedPom platformPom = mpd.download(new GroupArtifactVersion(entry.getGroup(), artifact, version), null, null, gp.getMavenRepositories())
                                                             .resolve(emptyList(), mpd, ctx);
                                                     platformPom.getDependencyManagement().stream()
                                                             .filter(managedVersion -> managedVersion.getVersion() != null)
