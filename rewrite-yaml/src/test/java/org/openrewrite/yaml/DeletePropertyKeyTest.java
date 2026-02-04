@@ -408,4 +408,140 @@ class DeletePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void globPatternWithFoldedBlockScalarDeleteLeading() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.*.first-name", null, null, null)),
+          yaml(
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: John
+                    last-name: >-
+                      Doe
+                  employee:
+                    firstName: Jane
+                    lastName: Smith
+              """,
+            """
+              acme:
+                my-project:
+                  person:
+                    last-name: >-
+                      Doe
+                  employee:
+                    lastName: Smith
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternWithFoldedBlockScalarDeleteLeadingScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.*.first-name", null, null, null)),
+          yaml(
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: >-
+                      John
+                    last-name: Doe
+                  employee:
+                    firstName: Jane
+                    lastName: Smith
+              """,
+            """
+              acme:
+                my-project:
+                  person:
+                    last-name: Doe
+                  employee:
+                    lastName: Smith
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternWithFoldedBlockScalarDeleteTrailing() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.*.last-name", null, null, null)),
+          yaml(
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: John
+                    last-name: >-
+                      Doe
+                  employee:
+                    firstName: Jane
+                    lastName: Smith
+              """,
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: John
+                  employee:
+                    firstName: Jane
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternWithFoldedBlockScalarInSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.items.last-name", null, null, null)),
+          yaml(
+            """
+              acme:
+                items:
+                  - first-name: John
+                    last-name: >-
+                      Doe
+                  - first-name: Jane
+                    last-name: Smith
+              """,
+            """
+              acme:
+                items:
+                  - first-name: John
+                  - first-name: Jane
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternWithFoldedBlockScalarHigherParent() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.*.last-name", null, null, null)),
+          yaml(
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: John
+                    last-name: >-
+                      Doe
+                other:
+                  key: value
+              """,
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: John
+                other:
+                  key: value
+              """
+          )
+        );
+    }
 }
