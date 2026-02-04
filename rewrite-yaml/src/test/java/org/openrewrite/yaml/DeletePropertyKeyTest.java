@@ -469,7 +469,7 @@ class DeletePropertyKeyTest implements RewriteTest {
     @Test
     void globPatternWithFoldedBlockScalarHigherParent() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("acme.my-project.person.last-name", null, null, null)),
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.*.last-name", null, null, null)),
           yaml(
             """
               acme:
@@ -478,16 +478,16 @@ class DeletePropertyKeyTest implements RewriteTest {
                     first-name: John
                     last-name: >-
                       Doe
-              other:
-                key: value
+                other:
+                  key: value
               """,
             """
               acme:
                 my-project:
                   person:
                     first-name: John
-              other:
-                key: value
+                other:
+                  key: value
               """
           )
         );
