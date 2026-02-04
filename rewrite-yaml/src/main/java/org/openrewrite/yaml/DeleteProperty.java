@@ -154,7 +154,6 @@ public class DeleteProperty extends Recipe {
                         previousWasDeleted = true;
                     } else {
                         if (entries.isEmpty() && firstDeletedPrefix != null && containsOnlyWhitespace(entry.getPrefix())) {
-                            // This is the first kept entry and there were deleted entries before it
                             entry = entry.withPrefix(firstDeletedPrefix);
                         } else if (previousWasDeleted && !entries.isEmpty() && !startsWithNewline(entry.getPrefix())) {
                             entry = entry.withPrefix("\n" + entry.getPrefix());
