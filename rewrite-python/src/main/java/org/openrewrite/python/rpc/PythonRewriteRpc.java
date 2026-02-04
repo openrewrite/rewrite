@@ -37,6 +37,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -226,6 +227,7 @@ public class PythonRewriteRpc extends RewriteRpc {
         // Default to looking for a venv python, falling back to system python
         private Path pythonPath = findDefaultPythonPath();
         private @Nullable Path log;
+        private @Nullable Path pipPackagesPath;
 
         private static Path findDefaultPythonPath() {
             // Try to find a venv in the project structure
@@ -324,8 +326,26 @@ public class PythonRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        /**
+         * Set the pip packages directory for recipe installations.
+         * When set, this directory will be added to PYTHONPATH and the openrewrite
+         * package will be automatically installed if not present.
+         *
+         * @param pipPackagesPath The directory where pip packages are installed
+         * @return This builder
+         */
+        public Builder pipPackagesPath(@Nullable Path pipPackagesPath) {
+            this.pipPackagesPath = pipPackagesPath;
+            return this;
+        }
+
         @Override
         public PythonRewriteRpc get() {
+            // Bootstrap openrewrite package if pip packages path is set
+            if (pipPackagesPath != null) {
+                bootstrapOpenrewrite(pipPackagesPath);
+            }
+
             Stream<@Nullable String> cmd;
 
             // Use python -m rewrite.rpc.server to start the RPC server
@@ -347,12 +367,18 @@ public class PythonRewriteRpc extends RewriteRpc {
             process.environment().putAll(environment);
 
             // Set up PYTHONPATH for the rewrite package
-            String pythonPathEnv = null;
+            List<String> pythonPathParts = new ArrayList<>();
+
+            // Add pip packages path first if set (takes priority)
+            if (pipPackagesPath != null) {
+                pythonPathParts.add(pipPackagesPath.toAbsolutePath().normalize().toString());
+            }
 
             // If debug source path is set, use it
             if (debugRewriteSourcePath != null) {
-                pythonPathEnv = debugRewriteSourcePath.toAbsolutePath().normalize().toString();
-            } else {
+                pythonPathParts.add(debugRewriteSourcePath.toAbsolutePath().normalize().toString());
+            } else if (pipPackagesPath == null) {
+                // Only search for development source if pip packages path is not set
                 // Try to find the Python source in the project structure
                 // Look for rewrite-python/rewrite/src relative to the working directory
                 Path basePath = workingDirectory != null ? workingDirectory : Paths.get(System.getProperty("user.dir"));
@@ -366,18 +392,20 @@ public class PythonRewriteRpc extends RewriteRpc {
 
                 for (Path searchPath : searchPaths) {
                     if (searchPath != null && Files.exists(searchPath.resolve("rewrite"))) {
-                        pythonPathEnv = searchPath.toAbsolutePath().normalize().toString();
+                        pythonPathParts.add(searchPath.toAbsolutePath().normalize().toString());
                         break;
                     }
                 }
             }
 
-            if (pythonPathEnv != null) {
-                String existingPath = System.getenv("PYTHONPATH");
-                if (existingPath != null && !existingPath.isEmpty()) {
-                    pythonPathEnv = pythonPathEnv + File.pathSeparator + existingPath;
-                }
-                process.environment().put("PYTHONPATH", pythonPathEnv);
+            // Add existing PYTHONPATH
+            String existingPath = System.getenv("PYTHONPATH");
+            if (existingPath != null && !existingPath.isEmpty()) {
+                pythonPathParts.add(existingPath);
+            }
+
+            if (!pythonPathParts.isEmpty()) {
+                process.environment().put("PYTHONPATH", String.join(File.pathSeparator, pythonPathParts));
             }
 
             process.start();
@@ -390,6 +418,46 @@ public class PythonRewriteRpc extends RewriteRpc {
                         .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
+            }
+        }
+
+        /**
+         * Ensures the openrewrite Python package is installed in the pip packages directory.
+         * This is required for the RPC server to start.
+         */
+        private void bootstrapOpenrewrite(Path pipPackagesPath) {
+            Path rewriteModule = pipPackagesPath.resolve("rewrite");
+            if (Files.exists(rewriteModule)) {
+                return; // Already installed
+            }
+
+            try {
+                Files.createDirectories(pipPackagesPath);
+
+                ProcessBuilder pb = new ProcessBuilder(
+                        pythonPath.toString(),
+                        "-m", "pip", "install",
+                        "--target=" + pipPackagesPath.toAbsolutePath().normalize(),
+                        "openrewrite"
+                );
+                pb.inheritIO();
+                Process process = pb.start();
+                boolean completed = process.waitFor(2, TimeUnit.MINUTES);
+
+                if (!completed) {
+                    process.destroyForcibly();
+                    throw new RuntimeException("Timed out bootstrapping openrewrite package");
+                }
+
+                int exitCode = process.exitValue();
+                if (exitCode != 0) {
+                    throw new RuntimeException("Failed to bootstrap openrewrite package, pip install exited with code " + exitCode);
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to bootstrap openrewrite package", e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted while bootstrapping openrewrite package", e);
             }
         }
     }
