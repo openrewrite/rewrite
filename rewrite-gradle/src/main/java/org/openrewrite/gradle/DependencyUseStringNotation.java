@@ -148,14 +148,19 @@ public class DependencyUseStringNotation extends Recipe {
                     } else {
                         m = m.withArguments(singletonList(stringNotation));
                     }
-                } else if (GradleDependency.isMultiComponentLiterals(m.getArguments())) {
-                    Dependency dep = GradleDependency.parseMultiComponentLiterals(m.getArguments());
-                    if (dep != null) {
-                        String notation = DependencyNotation.toStringNotation(dep);
-                        J.Literal firstArg = (J.Literal) m.getArguments().get(0);
-                        J.Literal stringNotation = new J.Literal(
-                                randomId(), firstArg.getPrefix(), firstArg.getMarkers(),
-                                notation, "\"" + notation + "\"", emptyList(), JavaType.Primitive.String);
+                } else if (isMultiComponentLiterals(m.getArguments())) {
+                    J.Literal firstArg = (J.Literal) m.getArguments().get(0);
+                    mapNotation.put("group", firstArg);
+                    mapNotation.put("name", m.getArguments().get(1));
+                    if (m.getArguments().size() >= 3) {
+                        mapNotation.put("version", m.getArguments().get(2));
+                    }
+                    if (m.getArguments().size() >= 4) {
+                        mapNotation.put("classifier", m.getArguments().get(3));
+                    }
+
+                    J.Literal stringNotation = toLiteral(firstArg.getPrefix(), firstArg.getMarkers(), mapNotation);
+                    if (stringNotation != null) {
                         m = m.withArguments(singletonList(stringNotation));
                     }
                 }
@@ -183,6 +188,19 @@ public class DependencyUseStringNotation extends Recipe {
                 }
 
                 return null;
+            }
+
+            private boolean isMultiComponentLiterals(List<Expression> arguments) {
+                if (arguments.size() < 2 || arguments.size() > 4) {
+                    return false;
+                }
+                for (Expression arg : arguments) {
+                    if (!(arg instanceof J.Literal) || !(((J.Literal) arg).getValue() instanceof String)) {
+                        return false;
+                    }
+                }
+                String first = (String) ((J.Literal) arguments.get(0)).getValue();
+                return first != null && !first.contains(":");
             }
 
             private @Nullable String coerceToStringNotation(Expression expression) {

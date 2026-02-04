@@ -16,27 +16,14 @@
 package org.openrewrite.gradle.trait;
 
 import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
@@ -430,123 +417,4 @@ class GradleDependencyTest implements RewriteTest {
         );
     }
 
-    @Nested
-    class IsMultiComponentLiteralsTest {
-
-        private J.Literal stringLiteral(String value) {
-            return new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, "\"" + value + "\"", null, JavaType.Primitive.String);
-        }
-
-        private J.Literal intLiteral(int value) {
-            return new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, String.valueOf(value), null, JavaType.Primitive.Int);
-        }
-
-        @Test
-        void twoStringLiterals() {
-            List<Expression> args = Arrays.asList(stringLiteral("com.example"), stringLiteral("mylib"));
-            assertThat(GradleDependency.isMultiComponentLiterals(args)).isTrue();
-        }
-
-        @Test
-        void threeStringLiterals() {
-            List<Expression> args = Arrays.asList(stringLiteral("com.example"), stringLiteral("mylib"), stringLiteral("1.0"));
-            assertThat(GradleDependency.isMultiComponentLiterals(args)).isTrue();
-        }
-
-        @Test
-        void fourStringLiterals() {
-            List<Expression> args = Arrays.asList(stringLiteral("com.example"), stringLiteral("mylib"), stringLiteral("1.0"), stringLiteral("sources"));
-            assertThat(GradleDependency.isMultiComponentLiterals(args)).isTrue();
-        }
-
-        @Test
-        void singleArgIsNotMultiComponent() {
-            List<Expression> args = Collections.singletonList(stringLiteral("com.example"));
-            assertThat(GradleDependency.isMultiComponentLiterals(args)).isFalse();
-        }
-
-        @Test
-        void fiveArgsIsNotMultiComponent() {
-            List<Expression> args = Arrays.asList(
-              stringLiteral("a"), stringLiteral("b"), stringLiteral("c"), stringLiteral("d"), stringLiteral("e"));
-            assertThat(GradleDependency.isMultiComponentLiterals(args)).isFalse();
-        }
-
-        @Test
-        void colonSeparatedIsNotMultiComponent() {
-            List<Expression> args = Arrays.asList(stringLiteral("com.example:mylib:1.0"), stringLiteral("extra"));
-            assertThat(GradleDependency.isMultiComponentLiterals(args)).isFalse();
-        }
-
-        @Test
-        void nonLiteralArgIsNotMultiComponent() {
-            J.Identifier variable = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, Collections.emptyList(), "version", null, null);
-            List<Expression> args = Arrays.asList(stringLiteral("com.example"), stringLiteral("mylib"), variable);
-            assertThat(GradleDependency.isMultiComponentLiterals(args)).isFalse();
-        }
-
-        @Test
-        void nonStringLiteralIsNotMultiComponent() {
-            List<Expression> args = Arrays.asList(stringLiteral("com.example"), intLiteral(42));
-            assertThat(GradleDependency.isMultiComponentLiterals(args)).isFalse();
-        }
-
-        @Test
-        void emptyListIsNotMultiComponent() {
-            assertThat(GradleDependency.isMultiComponentLiterals(Collections.emptyList())).isFalse();
-        }
-    }
-
-    @Nested
-    class ParseMultiComponentLiteralsTest {
-
-        private J.Literal stringLiteral(String value) {
-            return new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, "\"" + value + "\"", null, JavaType.Primitive.String);
-        }
-
-        @Test
-        void twoArgs() {
-            List<Expression> args = Arrays.asList(stringLiteral("com.example"), stringLiteral("mylib"));
-            Dependency dep = GradleDependency.parseMultiComponentLiterals(args);
-            assertThat(dep).isNotNull();
-            assertThat(dep.getGroupId()).isEqualTo("com.example");
-            assertThat(dep.getArtifactId()).isEqualTo("mylib");
-            assertThat(dep.getVersion()).isNull();
-            assertThat(dep.getClassifier()).isNull();
-        }
-
-        @Test
-        void threeArgs() {
-            List<Expression> args = Arrays.asList(stringLiteral("com.example"), stringLiteral("mylib"), stringLiteral("1.0"));
-            Dependency dep = GradleDependency.parseMultiComponentLiterals(args);
-            assertThat(dep).isNotNull();
-            assertThat(dep.getGroupId()).isEqualTo("com.example");
-            assertThat(dep.getArtifactId()).isEqualTo("mylib");
-            assertThat(dep.getVersion()).isEqualTo("1.0");
-            assertThat(dep.getClassifier()).isNull();
-        }
-
-        @Test
-        void fourArgs() {
-            List<Expression> args = Arrays.asList(stringLiteral("com.example"), stringLiteral("mylib"), stringLiteral("1.0"), stringLiteral("sources"));
-            Dependency dep = GradleDependency.parseMultiComponentLiterals(args);
-            assertThat(dep).isNotNull();
-            assertThat(dep.getGroupId()).isEqualTo("com.example");
-            assertThat(dep.getArtifactId()).isEqualTo("mylib");
-            assertThat(dep.getVersion()).isEqualTo("1.0");
-            assertThat(dep.getClassifier()).isEqualTo("sources");
-        }
-
-        @Test
-        void emptyGroupReturnsNull() {
-            List<Expression> args = Arrays.asList(stringLiteral(""), stringLiteral("mylib"));
-            assertThat(GradleDependency.parseMultiComponentLiterals(args)).isNull();
-        }
-
-        @Test
-        void emptyArtifactReturnsNull() {
-            List<Expression> args = Arrays.asList(stringLiteral("com.example"), stringLiteral(""));
-            assertThat(GradleDependency.parseMultiComponentLiterals(args)).isNull();
-        }
-    }
 }
