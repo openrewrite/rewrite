@@ -37,17 +37,6 @@ public sealed record NullSafe(Guid Id) : Marker
 }
 
 /// <summary>
-/// Marker indicating multi-dimensional array access (matrix[i, j] vs matrix[i][j]).
-/// When present on an ArrayAccess whose Indexed is also an ArrayAccess,
-/// the printer outputs comma-separated indices in a single bracket pair
-/// instead of nested bracket pairs.
-/// </summary>
-public sealed record MultiDimensionalArray(Guid Id) : Marker
-{
-    public static MultiDimensionalArray Instance { get; } = new(Guid.Empty);
-}
-
-/// <summary>
 /// Marker indicating parentheses should be omitted in NewClass.
 /// Used for object initializers without constructor arguments: new Foo { X = 1 }
 /// </summary>
@@ -57,13 +46,32 @@ public sealed record OmitParentheses(Guid Id) : Marker
 }
 
 /// <summary>
-/// Marker indicating null-coalescing operator (?? in C#, ?: in Groovy/Kotlin).
-/// When present on a Ternary, the expression represents "a ?? b" rather than "a ? b : c".
-/// The TruePart is empty and the printer outputs "condition ?? falsePart".
+/// Marker indicating a semicolon-terminated element.
+/// Used for positional records (record Person(string Name);) and other contexts
+/// where a semicolon replaces the expected body/braces.
 /// </summary>
-public sealed record NullCoalescing(Guid Id) : Marker
+public sealed record Semicolon(Guid Id) : Marker;
+
+/// <summary>
+/// A package/namespace declaration.
+/// Java: package com.example;
+/// C#: namespace MyApp.Services; (file-scoped)
+/// </summary>
+public sealed record Package(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    JRightPadded<Expression> Expression,  // The package/namespace name with trailing space before ;
+    IList<Annotation> Annotations         // Annotations before the package keyword
+) : J, Statement
 {
-    public static NullCoalescing Instance { get; } = new(Guid.Empty);
+    public Package WithId(Guid id) => this with { Id = id };
+    public Package WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public Package WithMarkers(Markers markers) => this with { Markers = markers };
+    public Package WithExpression(JRightPadded<Expression> expression) => this with { Expression = expression };
+    public Package WithAnnotations(IList<Annotation> annotations) => this with { Annotations = annotations };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
 }
 
 /// <summary>
@@ -308,6 +316,28 @@ public sealed record DoWhileLoop(
 }
 
 /// <summary>
+/// A synchronized/lock block statement.
+/// In Java: synchronized (lock) { body }
+/// In C#: lock (lock) { body }
+/// </summary>
+public sealed record Synchronized(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    ControlParentheses<Expression> Lock,
+    Block Body
+) : J, Statement
+{
+    public Synchronized WithId(Guid id) => this with { Id = id };
+    public Synchronized WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public Synchronized WithMarkers(Markers markers) => this with { Markers = markers };
+    public Synchronized WithLock(ControlParentheses<Expression> @lock) => this with { Lock = @lock };
+    public Synchronized WithBody(Block body) => this with { Body = body };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
 /// A try statement (e.g., try { } catch { } finally { }).
 /// </summary>
 public sealed record Try(
@@ -433,7 +463,7 @@ public sealed record ClassDeclaration(
     JavaType.FullyQualified? Type
 ) : J, Statement
 {
-    public enum KindType { Class, Enum, Interface, Annotation, Record, Struct }
+    public enum KindType { Class, Enum, Interface, Annotation, Record, Value }
 
     public sealed record Kind(
         Guid Id,
@@ -455,6 +485,54 @@ public sealed record ClassDeclaration(
     public ClassDeclaration WithMarkers(Markers markers) => this with { Markers = markers };
     public ClassDeclaration WithName(Identifier name) => this with { Name = name };
     public ClassDeclaration WithBody(Block body) => this with { Body = body };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A single enum constant/value.
+/// Examples:
+///   Red
+///   Green = 1
+///   Blue = 2
+/// </summary>
+public sealed record EnumValue(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    IList<Annotation> Annotations,
+    Identifier Name,
+    JLeftPadded<Expression>? Initializer  // For = value
+) : J
+{
+    public EnumValue WithId(Guid id) => this with { Id = id };
+    public EnumValue WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public EnumValue WithMarkers(Markers markers) => this with { Markers = markers };
+    public EnumValue WithAnnotations(IList<Annotation> annotations) => this with { Annotations = annotations };
+    public EnumValue WithName(Identifier name) => this with { Name = name };
+    public EnumValue WithInitializer(JLeftPadded<Expression>? initializer) => this with { Initializer = initializer };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// The set of enum values in an enum declaration.
+/// Example:
+///   Red, Green = 1, Blue
+/// </summary>
+public sealed record EnumValueSet(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    IList<JRightPadded<EnumValue>> Enums,
+    bool TerminatedWithSemicolon
+) : J, Statement
+{
+    public EnumValueSet WithId(Guid id) => this with { Id = id };
+    public EnumValueSet WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public EnumValueSet WithMarkers(Markers markers) => this with { Markers = markers };
+    public EnumValueSet WithEnums(IList<JRightPadded<EnumValue>> enums) => this with { Enums = enums };
+    public EnumValueSet WithTerminatedWithSemicolon(bool terminated) => this with { TerminatedWithSemicolon = terminated };
 
     Tree Tree.WithId(Guid id) => WithId(id);
 }
@@ -672,7 +750,9 @@ public sealed record Binary(
         RightShift,
         UnsignedRightShift,
         Or,
-        And
+        And,
+        PatternOr,    // C# pattern 'or' keyword (distinct from expression '||')
+        PatternAnd    // C# pattern 'and' keyword (distinct from expression '&&')
     }
 
     public Binary WithId(Guid id) => this with { Id = id };
@@ -707,7 +787,8 @@ public sealed record Unary(
         Positive,
         Negative,
         Complement,
-        Not
+        Not,
+        PatternNot    // C# pattern 'not' keyword (distinct from expression '!')
     }
 
     public Unary WithId(Guid id) => this with { Id = id };
@@ -716,6 +797,26 @@ public sealed record Unary(
     public Unary WithOperator(JLeftPadded<OperatorType> op) => this with { Operator = op };
     public Unary WithExpression(Expression expression) => this with { Expression = expression };
     public Unary WithType(JavaType? type) => this with { Type = type };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A type cast expression (e.g., (int)x, (string)obj).
+/// </summary>
+public sealed record TypeCast(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    ControlParentheses<TypeTree> Clazz,  // The (type) part
+    Expression Expression                 // The expression being cast
+) : J, Expression
+{
+    public TypeCast WithId(Guid id) => this with { Id = id };
+    public TypeCast WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public TypeCast WithMarkers(Markers markers) => this with { Markers = markers };
+    public TypeCast WithClazz(ControlParentheses<TypeTree> clazz) => this with { Clazz = clazz };
+    public TypeCast WithExpression(Expression expression) => this with { Expression = expression };
 
     Tree Tree.WithId(Guid id) => WithId(id);
 }
@@ -922,6 +1023,60 @@ public sealed record ArrayDimension(
 }
 
 /// <summary>
+/// An array type expression (e.g., int[], string[,]).
+/// For multi-dimensional arrays like int[,], each dimension is nested.
+/// </summary>
+public sealed record ArrayType(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    TypeTree ElementType,                  // The element type (int, string, etc.)
+    IList<Annotation>? Annotations,        // Type annotations (rare in C#)
+    JLeftPadded<Space>? Dimension,         // The [] part: Before = space before [, Element = space before ]
+    JavaType? Type
+) : J, TypeTree, Expression
+{
+    public ArrayType WithId(Guid id) => this with { Id = id };
+    public ArrayType WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public ArrayType WithMarkers(Markers markers) => this with { Markers = markers };
+    public ArrayType WithElementType(TypeTree elementType) => this with { ElementType = elementType };
+    public ArrayType WithAnnotations(IList<Annotation>? annotations) => this with { Annotations = annotations };
+    public ArrayType WithDimension(JLeftPadded<Space>? dimension) => this with { Dimension = dimension };
+    public ArrayType WithType(JavaType? type) => this with { Type = type };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// An array creation expression.
+/// Examples:
+///   new int[10]
+///   new int[] { 1, 2, 3 }
+///   new[] { 1, 2, 3 }
+///   new int[2, 3]
+/// </summary>
+public sealed record NewArray(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    TypeTree? TypeExpression,              // The element type (null for implicitly typed new[])
+    IList<ArrayDimension> Dimensions,      // The [size] parts
+    JContainer<Expression>? Initializer,   // The { elements } part
+    JavaType? Type
+) : J, Expression
+{
+    public NewArray WithId(Guid id) => this with { Id = id };
+    public NewArray WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public NewArray WithMarkers(Markers markers) => this with { Markers = markers };
+    public NewArray WithTypeExpression(TypeTree? typeExpression) => this with { TypeExpression = typeExpression };
+    public NewArray WithDimensions(IList<ArrayDimension> dimensions) => this with { Dimensions = dimensions };
+    public NewArray WithInitializer(JContainer<Expression>? initializer) => this with { Initializer = initializer };
+    public NewArray WithType(JavaType? type) => this with { Type = type };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
 /// A constructor invocation (new expression).
 /// Examples:
 ///   new Foo()
@@ -1006,6 +1161,32 @@ public sealed record Switch(
     public Switch WithMarkers(Markers markers) => this with { Markers = markers };
     public Switch WithSelector(ControlParentheses<Expression> selector) => this with { Selector = selector };
     public Switch WithCases(Block cases) => this with { Cases = cases };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A switch expression (Java 14+ / C# 8+).
+/// Java: switch (x) { case 1 -> "one"; default -> "other"; }
+/// C#: x switch { 1 => "one", _ => "other" }
+/// For C#, the Selector stores the expression and space before 'switch' keyword
+/// (Selector.Prefix = space before selector for C#, Selector.Tree.After = space before 'switch').
+/// </summary>
+public sealed record SwitchExpression(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    ControlParentheses<Expression> Selector,  // For C#: no parens, just selector + space before 'switch'
+    Block Cases,                               // Block containing Case elements
+    JavaType? Type
+) : J, Expression
+{
+    public SwitchExpression WithId(Guid id) => this with { Id = id };
+    public SwitchExpression WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public SwitchExpression WithMarkers(Markers markers) => this with { Markers = markers };
+    public SwitchExpression WithSelector(ControlParentheses<Expression> selector) => this with { Selector = selector };
+    public SwitchExpression WithCases(Block cases) => this with { Cases = cases };
+    public SwitchExpression WithType(JavaType? type) => this with { Type = type };
 
     Tree Tree.WithId(Guid id) => WithId(id);
 }
@@ -1106,6 +1287,33 @@ public sealed record Lambda(
 
         Tree Tree.WithId(Guid id) => WithId(id);
     }
+}
+
+/// <summary>
+/// A deconstruction pattern for positional pattern matching.
+/// Used for record patterns in Java and positional/tuple patterns in C#.
+/// Examples:
+///   case Point(int x, int y):     // Named type deconstruction
+///   case (int x, int y):          // C# tuple deconstruction (Deconstructor = Empty)
+///   case (> 0, > 0):              // Nested patterns
+/// </summary>
+public sealed record DeconstructionPattern(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    Expression Deconstructor,     // The type being deconstructed; J.Empty for tuple patterns without type
+    JContainer<J> Nested,         // The ( pattern, pattern, ... )
+    JavaType? Type
+) : J, Expression
+{
+    public DeconstructionPattern WithId(Guid id) => this with { Id = id };
+    public DeconstructionPattern WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public DeconstructionPattern WithMarkers(Markers markers) => this with { Markers = markers };
+    public DeconstructionPattern WithDeconstructor(Expression deconstructor) => this with { Deconstructor = deconstructor };
+    public DeconstructionPattern WithNested(JContainer<J> nested) => this with { Nested = nested };
+    public DeconstructionPattern WithType(JavaType? type) => this with { Type = type };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
 }
 
 /// <summary>

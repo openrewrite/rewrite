@@ -532,4 +532,293 @@ public class SwitchTests : RewriteTest
             )
         );
     }
+
+    [Fact]
+    public void SwitchWithPositionalPattern()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    void Bar((int, int) point) {
+                        switch (point) {
+                            case (0, 0):
+                                break;
+                        }
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SwitchWithPositionalPatternTypeBinding()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    void Bar((int, int) point) {
+                        switch (point) {
+                            case (int x, int y):
+                                break;
+                        }
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SwitchWithPositionalPatternNested()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    void Bar((int, int) point) {
+                        switch (point) {
+                            case (> 0, > 0):
+                                break;
+                        }
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SwitchWithNamedDeconstructionPattern()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                record Point(int X, int Y);
+                class Foo {
+                    void Bar(Point point) {
+                        switch (point) {
+                            case Point(0, 0):
+                                break;
+                        }
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SwitchWithNamedDeconstructionPatternVarBinding()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                record Point(int X, int Y);
+                class Foo {
+                    void Bar(Point point) {
+                        switch (point) {
+                            case Point(var x, var y):
+                                break;
+                        }
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SwitchWithTypePatternAndGuard()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    void Bar(object o) {
+                        switch (o) {
+                            case int i when i > 0:
+                                break;
+                        }
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SwitchWithPatternAndComplexGuard()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    void Bar(object o, int min, int max) {
+                        switch (o) {
+                            case int n when n > min && n < max:
+                                break;
+                        }
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SwitchWithRelationalPatternAndGuard()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    int x = 10;
+                    void Bar(int n) {
+                        switch (n) {
+                            case > 0 when x != 50:
+                                break;
+                        }
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SwitchWithGuardExtraSpaces()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    void Bar(object o) {
+                        switch (o) {
+                            case int i  when  i > 0:
+                                break;
+                        }
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    // Switch Expression Tests
+
+    [Fact]
+    public void SimpleSwitchExpression()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    string Bar(int x) {
+                        return x switch {
+                            1 => "one",
+                            2 => "two",
+                            _ => "other"
+                        };
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SwitchExpressionWithTypePattern()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    int Bar(object o) {
+                        return o switch {
+                            int i => i * 2,
+                            _ => 0
+                        };
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SwitchExpressionWithWhenClause()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    string Bar(int x) {
+                        return x switch {
+                            int n when n > 0 => "positive",
+                            int n when n < 0 => "negative",
+                            _ => "zero"
+                        };
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SwitchExpressionSingleLine()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    string Bar(int x) { return x switch { 1 => "one", _ => "other" }; }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SwitchExpressionWithRelationalPattern()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    string Bar(int x) {
+                        return x switch {
+                            > 100 => "large",
+                            > 10 => "medium",
+                            _ => "small"
+                        };
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SwitchExpressionWithPropertyPattern()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    string Bar(string s) {
+                        return s switch {
+                            { Length: > 10 } => "long",
+                            { Length: > 5 } => "medium",
+                            _ => "short"
+                        };
+                    }
+                }
+                """
+            )
+        );
+    }
 }
