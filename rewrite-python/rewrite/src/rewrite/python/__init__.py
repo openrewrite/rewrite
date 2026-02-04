@@ -56,6 +56,7 @@ from rewrite.python.tree import (
 from rewrite.python.visitor import PythonVisitor
 from rewrite.python.add_import import AddImport, AddImportOptions, maybe_add_import
 from rewrite.python.remove_import import RemoveImport, RemoveImportOptions, maybe_remove_import
+from rewrite.python.method_matcher import MethodMatcher
 
 __all__ = [
     # Marker class
@@ -101,4 +102,6 @@ __all__ = [
     "RemoveImport",
     "RemoveImportOptions",
     "maybe_remove_import",
+    # Method matching
+    "MethodMatcher",
 ]

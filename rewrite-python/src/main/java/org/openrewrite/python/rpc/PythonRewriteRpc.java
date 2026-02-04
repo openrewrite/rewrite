@@ -97,6 +97,46 @@ public class PythonRewriteRpc extends RewriteRpc {
     }
 
     /**
+     * Install recipes from a local file path (e.g., a local pip package).
+     *
+     * @param recipes Path to the local package directory
+     * @return Response with installation details
+     */
+    public InstallRecipesResponse installRecipes(File recipes) {
+        return send(
+                "InstallRecipes",
+                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath()),
+                InstallRecipesResponse.class
+        );
+    }
+
+    /**
+     * Install recipes from a package name.
+     *
+     * @param packageName The package name to install
+     * @return Response with installation details
+     */
+    public InstallRecipesResponse installRecipes(String packageName) {
+        return installRecipes(packageName, null);
+    }
+
+    /**
+     * Install recipes from a package name with a specific version.
+     *
+     * @param packageName The package name to install
+     * @param version     Optional version specification
+     * @return Response with installation details
+     */
+    public InstallRecipesResponse installRecipes(String packageName, @Nullable String version) {
+        return send(
+                "InstallRecipes",
+                new InstallRecipesByPackage(
+                        new InstallRecipesByPackage.Package(packageName, version)),
+                InstallRecipesResponse.class
+        );
+    }
+
+    /**
      * Parses an entire Python project directory.
      * Discovers and parses all relevant source files.
      *
