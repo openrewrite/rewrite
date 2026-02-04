@@ -48,8 +48,9 @@ public class DependencyUseStringNotation extends Recipe {
 
     @Getter
     final String description = "In Gradle, dependencies can be expressed as a `String` like `\"groupId:artifactId:version\"`, " +
-        "or equivalently as a `Map` like `group: 'groupId', name: 'artifactId', version: 'version'`. " +
-        "This recipe replaces dependencies represented as `Maps` with an equivalent dependency represented as a `String`, " +
+        "or equivalently as a `Map` like `group: 'groupId', name: 'artifactId', version: 'version'`, " +
+        "or as positional parameters like `(\"groupId\", \"artifactId\", \"version\")`. " +
+        "This recipe replaces dependencies represented as `Maps` or positional parameters with an equivalent dependency represented as a `String`, " +
         "as recommended per the [Gradle best practices for dependencies to use a single GAV](https://docs.gradle.org/8.14.2/userguide/best_practices_dependencies.html#single-gav-string).";
 
     @Override
@@ -145,6 +146,16 @@ public class DependencyUseStringNotation extends Recipe {
                     if (lastArg instanceof J.Lambda) {
                         m = m.withArguments(Arrays.asList(stringNotation, lastArg));
                     } else {
+                        m = m.withArguments(singletonList(stringNotation));
+                    }
+                } else if (GradleDependency.isMultiComponentLiterals(m.getArguments())) {
+                    Dependency dep = GradleDependency.parseMultiComponentLiterals(m.getArguments());
+                    if (dep != null) {
+                        String notation = DependencyNotation.toStringNotation(dep);
+                        J.Literal firstArg = (J.Literal) m.getArguments().get(0);
+                        J.Literal stringNotation = new J.Literal(
+                                randomId(), firstArg.getPrefix(), firstArg.getMarkers(),
+                                notation, "\"" + notation + "\"", emptyList(), JavaType.Primitive.String);
                         m = m.withArguments(singletonList(stringNotation));
                     }
                 }

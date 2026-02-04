@@ -1649,7 +1649,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
      * All arguments must be string literals and the first must not contain a colon
      * (to distinguish from colon-separated notation).
      */
-    static boolean isMultiComponentLiterals(List<Expression> arguments) {
+    public static boolean isMultiComponentLiterals(List<Expression> arguments) {
         if (arguments.size() < 2 || arguments.size() > 4) {
             return false;
         }
@@ -1666,7 +1666,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
      * Parses a multi-component literal dependency declaration into a Dependency.
      * Expects 2-4 string literal arguments: group, artifact, [version], [classifier].
      */
-    static @Nullable Dependency parseMultiComponentLiterals(List<Expression> arguments) {
+    public static @Nullable Dependency parseMultiComponentLiterals(List<Expression> arguments) {
         String group = (String) ((J.Literal) arguments.get(0)).getValue();
         String artifact = (String) ((J.Literal) arguments.get(1)).getValue();
         String version = arguments.size() >= 3 ? (String) ((J.Literal) arguments.get(2)).getValue() : null;
