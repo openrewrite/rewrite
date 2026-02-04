@@ -112,12 +112,35 @@ public class DeleteProperty extends Recipe {
             @Override
             public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
                 Yaml.Sequence s = super.visitSequence(sequence, ctx);
+                boolean childModified = (s != sequence);
                 List<Yaml.Sequence.Entry> entries = s.getEntries();
                 if (entries.isEmpty()) {
                     return s;
                 }
 
+                boolean changed = false;
                 entries = ListUtils.map(entries, entry -> ToBeRemoved.hasMarker(entry) ? null : entry);
+                if (entries.size() != s.getEntries().size()) {
+                    changed = true;
+                }
+
+                if ((changed || childModified) && s.getOpeningBracketPrefix() == null) {
+                    List<Yaml.Sequence.Entry> fixedEntries = null;
+                    for (int i = 1; i < entries.size(); i++) {
+                        Yaml.Sequence.Entry entry = entries.get(i);
+                        Yaml.Sequence.Entry prevEntry = entries.get(i - 1);
+                        if (!startsWithNewline(entry.getPrefix()) && !endsWithBlockScalar(prevEntry.getBlock())) {
+                            if (fixedEntries == null) {
+                                fixedEntries = new ArrayList<>(entries);
+                            }
+                            fixedEntries.set(i, entry.withPrefix("\n" + entry.getPrefix()));
+                        }
+                    }
+                    if (fixedEntries != null) {
+                        entries = fixedEntries;
+                    }
+                }
+
                 return entries.isEmpty() ? ToBeRemoved.withMarker(s) : s.withEntries(entries);
             }
 
