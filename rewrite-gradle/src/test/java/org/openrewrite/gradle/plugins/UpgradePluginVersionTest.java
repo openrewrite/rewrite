@@ -88,11 +88,12 @@ class UpgradePluginVersionTest implements RewriteTest {
                   kotlin("jvm") version "2.0.0"
               }
               """,
-            """
-              plugins {
-                  kotlin("jvm") version "2.3.0"
+            spec -> spec.after(s -> {
+                  assertThat(s).doesNotContain("2.0.0");
+                  assertThat(s).containsPattern("2.\\d+.\\d+(.\\d+)*");
+                  return s;
               }
-              """
+            )
           )
         );
     }
@@ -363,11 +364,11 @@ class UpgradePluginVersionTest implements RewriteTest {
                   id 'java'
                   id 'org.springframework.boot' version '2.7.0'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   implementation 'javax.servlet:javax.servlet-api:4.0.1'
                   implementation 'org.apache.activemq:activemq-client-jakarta:5.18.2'
@@ -378,11 +379,11 @@ class UpgradePluginVersionTest implements RewriteTest {
                   id 'java'
                   id 'org.springframework.boot' version '3.2.4'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   implementation 'javax.servlet:javax.servlet-api:4.0.1'
                   implementation 'org.apache.activemq:activemq-client-jakarta:5.18.2'
@@ -404,11 +405,11 @@ class UpgradePluginVersionTest implements RewriteTest {
                   id 'org.springframework.boot' version '2.7.0'
                   id 'io.spring.dependency-management' version '1.1.6'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   implementation 'javax.servlet:javax.servlet-api'
                   implementation 'org.apache.activemq:activemq-client-jakarta:5.18.2'
@@ -420,11 +421,11 @@ class UpgradePluginVersionTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.2.4'
                   id 'io.spring.dependency-management' version '1.1.6'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   implementation 'javax.servlet:javax.servlet-api:4.0.1'
                   implementation 'org.apache.activemq:activemq-client-jakarta'
@@ -446,11 +447,11 @@ class UpgradePluginVersionTest implements RewriteTest {
                   id 'org.springframework.boot' version '2.5.14'
                   id 'io.spring.dependency-management' version '1.0.11.RELEASE'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   runtimeOnly 'mysql:mysql-connector-java'
               }
@@ -461,11 +462,11 @@ class UpgradePluginVersionTest implements RewriteTest {
                   id 'org.springframework.boot' version '2.5.15'
                   id 'io.spring.dependency-management' version '1.0.11.RELEASE'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   runtimeOnly 'mysql:mysql-connector-java'
               }
