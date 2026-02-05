@@ -24,6 +24,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.maven.Assertions.withLocalRepository;
 
 class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @DocumentExample
@@ -3123,6 +3124,93 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void noVersionAddedWhenManagedByNewExternalCorporateParentAfterUpgrade() {
+        withLocalRepository(new String[]{
+            //language=xml
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example.test</groupId>
+                <artifactId>corp-parent</artifactId>
+                <version>1</version>
+                <packaging>pom</packaging>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.4.4</version>
+                </parent>
+              </project>
+              """,
+            //language=xml
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example.test</groupId>
+                <artifactId>corp-parent</artifactId>
+                <version>2</version>
+                <packaging>pom</packaging>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>4.0.2</version>
+                </parent>
+              </project>
+              """},
+          () -> rewriteRun(
+            spec -> spec.recipes(
+              new ChangeParentPom("com.example.test", null, "corp-parent", null, "2", null, null, null, null),
+              new ChangeDependencyGroupIdAndArtifactId(
+                "org.springframework.boot", "spring-boot-starter-web",
+                "org.springframework.boot", "spring-boot-starter-webmvc",
+                "4.0.x", null, false, null)
+            ),
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <parent>
+                    <groupId>com.example.test</groupId>
+                    <artifactId>corp-parent</artifactId>
+                    <version>1</version>
+                    <relativePath/>
+                  </parent>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-web</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <parent>
+                    <groupId>com.example.test</groupId>
+                    <artifactId>corp-parent</artifactId>
+                    <version>2</version>
+                    <relativePath/>
+                  </parent>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-webmvc</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            )
           )
         );
     }

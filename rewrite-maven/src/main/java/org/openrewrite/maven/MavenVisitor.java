@@ -27,6 +27,7 @@ import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Predicate;
 
@@ -65,9 +66,21 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     @Nullable
     private transient MavenResolutionResult resolutionResult;
 
+    @Nullable
+    private transient ExecutionContext executionContext;
+
     @Override
     public String getLanguage() {
         return "maven";
+    }
+
+    @Override
+    public Xml visitDocument(Xml.Document document, P p) {
+        // Store ExecutionContext for use in getResolutionResult()
+        if (p instanceof ExecutionContext && executionContext == null) {
+            executionContext = (ExecutionContext) p;
+        }
+        return super.visitDocument(document, p);
     }
 
     @Override
@@ -89,10 +102,23 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             document = newDocument;
         }
         if (resolutionResult == null) {
-            resolutionResult = Optional.ofNullable(document)
+            MavenResolutionResult documentMarker = Optional.ofNullable(document)
                     .map(Xml.Document::getMarkers)
                     .flatMap(markers -> markers.findFirst(MavenResolutionResult.class))
                     .orElseThrow(() -> new IllegalStateException("Maven visitors should not be visiting XML documents without a Maven marker"));
+
+            // Check if there's a fresh marker in ExecutionContext (from a modified parent)
+            if (executionContext != null) {
+                Path sourcePath = documentMarker.getPom().getRequested().getSourcePath();
+                if (sourcePath != null) {
+                    MavenResolutionResult freshMarker = UpdateMavenModel.getFreshMarker(sourcePath, executionContext);
+                    if (freshMarker != null) {
+                        resolutionResult = freshMarker;
+                        return resolutionResult;
+                    }
+                }
+            }
+            resolutionResult = documentMarker;
         }
         return resolutionResult;
     }
