@@ -169,9 +169,9 @@ public class KotlinParser implements Parser {
         List<Input> acceptedInputs = ListUtils.concatAll(dependsOn, acceptedInputs(sources).collect(toList()));
         try {
             compilerCus = parse(acceptedInputs, disposable, pctx);
-        } catch (Exception e) {
+        } catch (Throwable t) {
             disposable.dispose();
-            return acceptedInputs.stream().map(input -> ParseError.build(this, input, relativeTo, ctx, e));
+            return acceptedInputs.stream().map(input -> ParseError.build(this, input, relativeTo, ctx, t));
         }
 
         FirSession firSession = compilerCus.getFirSession();
