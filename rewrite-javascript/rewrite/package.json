@@ -50,10 +50,10 @@
     "postbuild": "bun -e \"require('fs').chmodSync('dist/rpc/server.js', '+x')\" && npm link",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "dev": "tsc --watch -p tsconfig.json",
-    "test": "npm run typecheck && npm run build && NODE_OPTIONS='--max-old-space-size=4096 --experimental-vm-modules' jest",
+    "test": "npm run typecheck && npm run build && bun run testhelper",
+    "testhelper": "NODE_OPTIONS='--max-old-space-size=4096 --experimental-vm-modules' jest",
     "build:fixtures": "tsc --build fixtures/tsconfig.json",
-    "ci:test": "bun run ci:testhelper",
-    "ci:testhelper": "NODE_OPTIONS='--max-old-space-size=4096 --experimental-vm-modules' jest",
+    "ci:test": "bun run testhelper",
     "start": "npm run build && node ./dist/rpc/server.js"
   },
   "dependencies": {

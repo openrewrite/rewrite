@@ -238,6 +238,7 @@ function runInstall(pm: PackageManager, options: InstallOptions): PackageManager
             stdio: ['pipe', 'pipe', 'pipe'],
             timeout: options.timeout ?? 120000,
             env: options.env ? {...process.env, ...options.env} : process.env,
+            shell: os.platform() === 'win32',
         });
 
         if (result.error) {
