@@ -45,7 +45,7 @@
     }
   },
   "scripts": {
-    "prebuild": "bun -e \"const fs=require('fs'); fs.rmSync('dist',{recursive:true,force:true}) && fs.rmSync('tsconfig.build.tsbuildinfo',{force:true})\"",
+    "prebuild": "bun -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && bun -e \"require('fs').rmSync('tsconfig.build.tsbuildinfo',{force:true})\"",
     "build": "tsc --build tsconfig.build.json",
     "postbuild": "bun -e \"require('fs').chmodSync('dist/rpc/server.js', '+x')\" && npm link",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
