@@ -2369,4 +2369,5 @@ class ChangeParentPomTest implements RewriteTest {
           )
         );
     }
+
 }

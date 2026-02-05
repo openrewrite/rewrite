@@ -179,6 +179,49 @@ public class Assertions {
                 publishedFiles.add(pomFile);
             }
 
+            // Generate maven-metadata.xml for each groupId:artifactId
+            java.util.Map<String, java.util.List<String>> gavVersions = new java.util.LinkedHashMap<>();
+            java.util.Map<String, Path> gavArtifactDirs = new java.util.LinkedHashMap<>();
+            for (String pomXml : pomXmls) {
+                RawPom rawPom = RawPom.parse(new ByteArrayInputStream(pomXml.getBytes(UTF_8)), null);
+                Pom pom = rawPom.toPom(Paths.get("pom.xml"), null);
+                String ga = pom.getGroupId() + ":" + pom.getArtifactId();
+                gavVersions.computeIfAbsent(ga, k -> new java.util.ArrayList<>()).add(pom.getVersion());
+
+                String[] groupParts = pom.getGroupId().split("\\.");
+                Path artifactDir = localRepo;
+                for (String part : groupParts) {
+                    artifactDir = artifactDir.resolve(part);
+                }
+                artifactDir = artifactDir.resolve(pom.getArtifactId());
+                gavArtifactDirs.put(ga, artifactDir);
+            }
+            for (java.util.Map.Entry<String, java.util.List<String>> entry : gavVersions.entrySet()) {
+                String ga = entry.getKey();
+                java.util.List<String> versions = entry.getValue();
+                Path artifactDir = gavArtifactDirs.get(ga);
+                String[] gaParts = ga.split(":");
+                StringBuilder metadata = new StringBuilder();
+                metadata.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+                metadata.append("<metadata>\n");
+                metadata.append("  <groupId>").append(gaParts[0]).append("</groupId>\n");
+                metadata.append("  <artifactId>").append(gaParts[1]).append("</artifactId>\n");
+                metadata.append("  <versioning>\n");
+                metadata.append("    <latest>").append(versions.get(versions.size() - 1)).append("</latest>\n");
+                metadata.append("    <release>").append(versions.get(versions.size() - 1)).append("</release>\n");
+                metadata.append("    <versions>\n");
+                for (String v : versions) {
+                    metadata.append("      <version>").append(v).append("</version>\n");
+                }
+                metadata.append("    </versions>\n");
+                metadata.append("  </versioning>\n");
+                metadata.append("</metadata>\n");
+                Path metadataFile = artifactDir.resolve("maven-metadata-local.xml");
+                Files.createDirectories(artifactDir);
+                Files.write(metadataFile, metadata.toString().getBytes(UTF_8));
+                publishedFiles.add(metadataFile);
+            }
+
             testCode.run();
 
         } catch (IOException e) {

@@ -29,6 +29,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.maven.Assertions.withLocalRepository;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("NewClassNamingConvention")
@@ -767,6 +768,325 @@ class AddDependencyTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1788")
+    @Test
+    void omitVersionWhenManagedByUpgradedGrandparentThroughProjectCorporateParent() {
+        // This test has a multi-module project where:
+        // - corp-parent extends spring-boot-starter-parent:3.4.4
+        // - demo extends corp-parent
+        //
+        // ChangeParentPom upgrades spring-boot-starter-parent from 3.4.4 to 4.0.2.
+        // AddDependency adds spring-boot-starter-validation which is managed in SB4.
+        // Expected: AddDependency should omit the version.
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "4.0.x", null, null, null, null),
+            new AddDependency("org.springframework.boot", "spring-boot-starter-validation", "4.x", null, null, true, "com.google.common.math.IntMath", null, null, null, null, true)
+          ),
+          mavenProject("aggregate",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>aggregate</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                    <module>corp-parent</module>
+                    <module>demo</module>
+                  </modules>
+                </project>
+                """
+            )
+          ),
+          mavenProject("corp-parent",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>corp-parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.4.4</version>
+                  </parent>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>corp-parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>4.0.2</version>
+                  </parent>
+                </project>
+                """
+            )
+          ),
+          mavenProject("demo",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.mycompany</groupId>
+                    <artifactId>corp-parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.mycompany</groupId>
+                    <artifactId>corp-parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-validation</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1788")
+    @Test
+    void omitVersionWhenManagedByUpgradedProjectCorporateParentWithBomImport() {
+        // This test reproduces the stale projectPoms cache issue.
+        //
+        // Scenario: corp-parent imports spring-boot-dependencies BOM in dependencyManagement.
+        // When corp-parent's BOM version is upgraded (via UpgradeDependencyVersion), the child
+        // demo should see the new dependency management. But due to stale projectPoms cache,
+        // AddDependency still sees the OLD BOM version and adds an explicit version.
+        //
+        // corp-parent (before): imports spring-boot-dependencies:3.4.4 BOM
+        // corp-parent (after):  imports spring-boot-dependencies:4.0.2 BOM
+        // demo: extends corp-parent
+        //
+        // spring-boot-starter-validation is only managed in SB4, not SB3.
+        rewriteRun(
+          spec -> spec.recipes(
+            // Upgrade the BOM version in corp-parent
+            new UpgradeDependencyVersion("org.springframework.boot", "spring-boot-dependencies", "4.0.x", null, false, null),
+            // Then try to add a dependency that's managed by the new BOM
+            new AddDependency("org.springframework.boot", "spring-boot-starter-validation", "4.x", null, null, true, "com.google.common.math.IntMath", null, null, null, null, true)
+          ),
+          mavenProject("aggregate",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>aggregate</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                    <module>corp-parent</module>
+                    <module>demo</module>
+                  </modules>
+                </project>
+                """
+            )
+          ),
+          mavenProject("corp-parent",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>corp-parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-dependencies</artifactId>
+                        <version>3.4.4</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>corp-parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-dependencies</artifactId>
+                        <version>4.0.2</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """
+            )
+          ),
+          mavenProject("demo",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.mycompany</groupId>
+                    <artifactId>corp-parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.mycompany</groupId>
+                    <artifactId>corp-parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-validation</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1788")
+    @Test
+    void omitVersionWhenManagedByUpgradedExternalCorporateParent() {
+        // This test uses external (local maven repo) corporate parents that wrap Spring Boot.
+        // corp-parent:1.0.0 extends spring-boot-starter-parent:3.4.4 (which does NOT manage spring-boot-starter-validation)
+        // corp-parent:2.0.0 extends spring-boot-starter-parent:4.0.2 (which DOES manage spring-boot-starter-validation)
+        //
+        // The bug: When UpgradeParentVersion upgrades corp-parent from 1.0.0 to 2.0.0, and then AddDependency
+        // tries to add spring-boot-starter-validation, it should recognize that the NEW parent (via its grandparent
+        // spring-boot-starter-parent:4.0.2) manages this dependency. But due to stale markers/projectPoms cache,
+        // AddDependency still sees the OLD dependency management and adds an explicit version.
+        withLocalRepository(
+          """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.example.corp</groupId>
+              <artifactId>corp-parent</artifactId>
+              <version>1.0.0</version>
+              <packaging>pom</packaging>
+              <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>3.4.4</version>
+              </parent>
+            </project>
+            """,
+          """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.example.corp</groupId>
+              <artifactId>corp-parent</artifactId>
+              <version>2.0.0</version>
+              <packaging>pom</packaging>
+              <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>4.0.2</version>
+              </parent>
+            </project>
+            """,
+          () -> rewriteRun(
+            spec -> spec.recipes(
+              new UpgradeParentVersion("com.example.corp", "corp-parent", "2.x", null, null),
+              new AddDependency("org.springframework.boot", "spring-boot-starter-validation", "4.x", null, null, true, "com.google.common.math.IntMath", null, null, null, null, true)
+            ),
+            mavenProject("demo",
+              srcMainJava(
+                java(usingGuavaIntMath)
+              ),
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany</groupId>
+                    <artifactId>demo</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.example.corp</groupId>
+                      <artifactId>corp-parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany</groupId>
+                    <artifactId>demo</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.example.corp</groupId>
+                      <artifactId>corp-parent</artifactId>
+                      <version>2.0.0</version>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-validation</artifactId>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """
+              )
             )
           )
         );

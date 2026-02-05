@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Validated;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.ExactVersion;
@@ -37,6 +38,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 
 @RequiredArgsConstructor
@@ -113,7 +115,8 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                     getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "doNotAlterDependency", true);
                 } else {
                     String versionToUse = null;
-                    String managedVersion = getResolutionResult().getPom().getManagedVersion(groupId, artifactId, type, classifier);
+                    // Use fresh managed version check to handle stale markers from earlier recipe modifications
+                    String managedVersion = getFreshManagedVersion(groupId, artifactId, type, classifier, executionContext);
                     if (managedVersion == null || (versionComparator != null && !versionComparator.isValid(version, managedVersion))) {
                         versionToUse = tryGetFamilyVersion();
                         if (versionToUse == null) {
@@ -227,7 +230,8 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (DEPENDENCIES_MATCHER.matches(getCursor())) {
                 String versionToUse = null;
-                String managedVersion = getResolutionResult().getPom().getManagedVersion(groupId, artifactId, type, classifier);
+                // Use fresh managed version check to handle stale markers from earlier recipe modifications
+                String managedVersion = getFreshManagedVersion(groupId, artifactId, type, classifier, ctx);
                 boolean scheduleVersionUpgrade = false;
                 if (managedVersion == null) {
                     versionToUse = tryGetFamilyVersion();
@@ -311,5 +315,101 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
         }
 
         return resolvedVersion;
+    }
+
+    /**
+     * Check if a dependency is managed by the parent chain, re-resolving the parent if needed
+     * to account for modifications made by earlier recipes in the same run.
+     * <p>
+     * This addresses the stale marker issue where the MavenResolutionResult marker on a POM
+     * contains dependency management data from parse time, which may be outdated if a parent
+     * POM was modified by an earlier recipe (e.g., UpgradeDependencyVersion upgrading a BOM).
+     *
+     * @param groupId    The dependency groupId to check
+     * @param artifactId The dependency artifactId to check
+     * @param type       The dependency type (may be null)
+     * @param classifier The dependency classifier (may be null)
+     * @param ctx        The execution context
+     * @return The managed version if found, or null if not managed
+     */
+    private @Nullable String getFreshManagedVersion(String groupId, String artifactId,
+                                                    @Nullable String type, @Nullable String classifier,
+                                                    ExecutionContext ctx) {
+        MavenResolutionResult mrr = getResolutionResult();
+        ResolvedPom pom = mrr.getPom();
+
+        // First check the marker's cached data (fast path)
+        String cachedVersion = pom.getManagedVersion(groupId, artifactId, type, classifier);
+        if (cachedVersion != null) {
+            return cachedVersion;
+        }
+
+        // If not found in cache, check if any parent in the chain has fresh dependency management
+        // that manages this dependency. This handles the case where a parent POM was modified
+        // by an earlier recipe (e.g., UpgradeDependencyVersion upgrading a BOM).
+        return getFreshManagedVersionFromParentChain(mrr, groupId, artifactId, type, classifier, ctx);
+    }
+
+    /**
+     * Walk up the parent chain via markers and check if any parent manages this dependency.
+     * For project POMs that were modified during this recipe run, we check the fresh resolved
+     * data stored in execution context by UpdateMavenModel.
+     * For external POMs, we download fresh copies.
+     */
+    private @Nullable String getFreshManagedVersionFromParentChain(
+            MavenResolutionResult current,
+            String groupId, String artifactId,
+            @Nullable String type, @Nullable String classifier,
+            ExecutionContext ctx) {
+
+        MavenResolutionResult parent = current.getParent();
+        if (parent == null) {
+            return null;
+        }
+
+        ResolvedPom parentPom = parent.getPom();
+        ResolvedGroupArtifactVersion parentGav = parentPom.getGav();
+
+        // Check if parent is a project POM (has a source path, meaning it could have been modified)
+        if (parentPom.getRequested().getSourcePath() != null) {
+            // First check if there's a fresh version in execution context
+            // (set by UpdateMavenModel when the parent POM was modified)
+            String gavKey = parentGav.getGroupId() + ":" + parentGav.getArtifactId() + ":" + parentGav.getVersion();
+            Map<String, ResolvedPom> freshPoms = UpdateMavenModel.getFreshResolvedPoms(ctx);
+            ResolvedPom freshParentPom = freshPoms.get(gavKey);
+            if (freshParentPom != null) {
+                String managedVersion = freshParentPom.getManagedVersion(groupId, artifactId, type, classifier);
+                if (managedVersion != null) {
+                    return managedVersion;
+                }
+            } else {
+                // No fresh version, use the marker's cached data
+                String managedVersion = parentPom.getManagedVersion(groupId, artifactId, type, classifier);
+                if (managedVersion != null) {
+                    return managedVersion;
+                }
+            }
+        } else {
+            // For external POMs, try to download fresh copy
+            try {
+                MavenPomDownloader downloader = new MavenPomDownloader(emptyMap(), ctx,
+                        getResolutionResult().getMavenSettings(), getResolutionResult().getActiveProfiles());
+                GroupArtifactVersion gav = new GroupArtifactVersion(
+                        parentGav.getGroupId(), parentGav.getArtifactId(), parentGav.getVersion());
+                Pom freshParentPom = downloader.download(gav, null,
+                        current.getPom(), current.getPom().getRepositories());
+                ResolvedPom resolvedParent = freshParentPom.resolve(
+                        getResolutionResult().getActiveProfiles(), downloader, ctx);
+                String managedVersion = resolvedParent.getManagedVersion(groupId, artifactId, type, classifier);
+                if (managedVersion != null) {
+                    return managedVersion;
+                }
+            } catch (MavenDownloadingException e) {
+                // Fall through to continue up the chain
+            }
+        }
+
+        // Continue up the parent chain
+        return getFreshManagedVersionFromParentChain(parent, groupId, artifactId, type, classifier, ctx);
     }
 }

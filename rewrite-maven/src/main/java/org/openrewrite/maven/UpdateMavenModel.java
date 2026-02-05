@@ -27,12 +27,34 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 public class UpdateMavenModel<P> extends MavenVisitor<P> {
+
+    /**
+     * Key for storing fresh resolved POMs in the execution context.
+     * When a project POM is updated, its fresh ResolvedPom is stored here
+     * so that downstream recipes processing child POMs can access the
+     * up-to-date dependency management.
+     */
+    private static final String FRESH_RESOLVED_POMS_KEY = "org.openrewrite.maven.UpdateMavenModel.freshResolvedPoms";
+
+    /**
+     * Get the map of fresh resolved POMs from the execution context.
+     * This allows recipes to access up-to-date resolved data for project POMs
+     * that were modified earlier in the same recipe run.
+     *
+     * @param ctx The execution context
+     * @return A map of GAV (as string "groupId:artifactId:version") to fresh ResolvedPom
+     */
+    @SuppressWarnings("unchecked")
+    public static Map<String, ResolvedPom> getFreshResolvedPoms(ExecutionContext ctx) {
+        return ctx.computeMessageIfAbsent(FRESH_RESOLVED_POMS_KEY, k -> new ConcurrentHashMap<>());
+    }
 
     @Override
     public Xml visitDocument(Xml.Document document, P p) {
@@ -141,6 +163,13 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         try {
             MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
                     resolutionResult.getProjectPoms());
+
+            // Store the fresh resolved POM in execution context so child POMs can access it
+            ResolvedPom freshPom = updated.getPom();
+            ResolvedGroupArtifactVersion gav = freshPom.getGav();
+            String gavKey = gav.getGroupId() + ":" + gav.getArtifactId() + ":" + gav.getVersion();
+            getFreshResolvedPoms(ctx).put(gavKey, freshPom);
+
             return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
                     (original, ignored) -> updated));
         } catch (MavenDownloadingExceptions e) {
@@ -165,7 +194,18 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
     }
 
     private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) throws MavenDownloadingExceptions {
-        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx, getResolutionResult().getMavenSettings(),
+        // Create fresh projectPoms by overlaying any fresh resolved POMs from execution context
+        // This handles the case where parent POMs were modified earlier in the same recipe run
+        Map<Path, Pom> freshProjectPoms = new java.util.HashMap<>(projectPoms);
+        Map<String, ResolvedPom> freshResolvedPoms = getFreshResolvedPoms(ctx);
+        for (ResolvedPom freshPom : freshResolvedPoms.values()) {
+            Path sourcePath = freshPom.getRequested().getSourcePath();
+            if (sourcePath != null) {
+                freshProjectPoms.put(sourcePath, freshPom.getRequested());
+            }
+        }
+
+        MavenPomDownloader downloader = new MavenPomDownloader(freshProjectPoms, ctx, getResolutionResult().getMavenSettings(),
                 getResolutionResult().getActiveProfiles());
 
         AtomicReference<MavenDownloadingExceptions> exceptions = new AtomicReference<>();
