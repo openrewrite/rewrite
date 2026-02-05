@@ -434,6 +434,30 @@ class LombokTest implements RewriteTest {
         );
     }
 
+    @MinimumJava11
+    @Issue("https://github.com/openrewrite/rewrite/issues/5490")
+    @Test
+    void generatedAnnotationOnMethodWithDollarBraceInJavadoc() {
+        rewriteRun(
+          java(
+            """
+              import lombok.Generated;
+
+              class Test {
+                  /**
+                   * @param relPath path from the ${user.home}/.symphony directory
+                   * @return Configuration
+                   */
+                  @Generated
+                  Object loadFromSymphonyDir(String relPath) {
+                      return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void data() {
         rewriteRun(

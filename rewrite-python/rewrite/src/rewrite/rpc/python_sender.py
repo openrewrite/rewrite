@@ -450,7 +450,9 @@ class PythonRpcSender:
     def _visit_literal(self, lit, q: 'RpcSendQueue') -> None:
         q.get_and_send(lit, lambda x: x.value)
         q.get_and_send(lit, lambda x: x.value_source)
-        q.get_and_send(lit, lambda x: x.unicode_escapes)
+        q.get_and_send_list(lit, lambda x: x.unicode_escapes,
+                            lambda s: str(s.value_source_index) + s.code_point,
+                            None)
         q.get_and_send(lit, lambda x: x.type, lambda t: self._visit_type(t, q))
 
     def _visit_import(self, imp, q: 'RpcSendQueue') -> None:

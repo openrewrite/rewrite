@@ -498,7 +498,7 @@ class PythonRpcReceiver:
     def _visit_literal(self, lit, q: RpcReceiveQueue):
         value = q.receive(lit.value)
         value_source = q.receive(lit.value_source)
-        unicode_escapes = q.receive(lit.unicode_escapes)
+        unicode_escapes = q.receive_list(lit.unicode_escapes)
         type_ = q.receive(lit.type)
         return replace_if_changed(lit, value=value, value_source=value_source, unicode_escapes=unicode_escapes, type=type_)
 
@@ -1150,25 +1150,42 @@ def _receive_search_result(marker, q: RpcReceiveQueue):
 
 
 def _receive_parse_exception_result(marker, q: RpcReceiveQueue):
-    """Codec for receiving ParseExceptionResult marker."""
+    """Codec for receiving ParseExceptionResult marker.
+
+    Fields are received in the order sent by Java's ParseExceptionResult.rpcSend():
+    id, parserType, exceptionType, message, treeType
+    """
     from rewrite.markers import ParseExceptionResult
 
-    # ParseExceptionResult sends: id, parserType, message, exceptionType, treeType
+    # Receive in Java's send order: id, parserType, exceptionType, message, treeType
     id_str = q.receive(str(marker.id) if marker else None)
     parser_type = q.receive(marker.parser_type if marker else None)
-    message = q.receive(marker.message if marker else None)
     exception_type = q.receive(marker.exception_type if marker else None)
+    message = q.receive(marker.message if marker else None)
     tree_type = q.receive(marker.tree_type if marker else None)
 
     from uuid import UUID
     new_id = UUID(id_str) if id_str else (marker.id if marker else None)
     return ParseExceptionResult(
-        id=new_id,
-        parser_type=parser_type,
-        message=message,
-        exception_type=exception_type,
-        tree_type=tree_type
+        _id=new_id,
+        _parser_type=parser_type,
+        _exception_type=exception_type,
+        _message=message,
+        _tree_type=tree_type
     )
+
+
+def _send_parse_exception_result(marker, q):
+    """Codec for sending ParseExceptionResult marker.
+
+    Fields are sent in the order expected by Java's ParseExceptionResult.rpcReceive():
+    id, parserType, exceptionType, message, treeType
+    """
+    q.get_and_send(marker, lambda x: str(x.id))
+    q.get_and_send(marker, lambda x: x.parser_type)
+    q.get_and_send(marker, lambda x: x.exception_type)
+    q.get_and_send(marker, lambda x: x.message)
+    q.get_and_send(marker, lambda x: x.tree_type)
 
 
 def _receive_style(style, q: RpcReceiveQueue):
@@ -1299,17 +1316,12 @@ def _register_java_type_codecs():
     )
 
     # JavaType.Unknown - no additional fields
-    # Note: JavaType.Unknown is a nested class inside JavaType, not a standalone type
-    # in Python's support_types.py, so we register by Java type name and Python name separately
-    register_receive_codec(
+    # Use register_codec_with_both_names so that Python's sender can find the Java type name
+    register_codec_with_both_names(
         'org.openrewrite.java.tree.JavaType$Unknown',
+        JT.Unknown,
         _receive_java_type_unknown,
         lambda: JT.Unknown()  # Factory creates a new Unknown instance
-    )
-    register_receive_codec(
-        'Unknown',  # Python class name for _get_codec lookup
-        _receive_java_type_unknown,
-        lambda: JT.Unknown()
     )
 
     # JavaType.Method - full serialization of method type info
@@ -1418,12 +1430,13 @@ def _register_core_marker_codecs():
         _receive_search_result,
         make_dataclass_factory(SearchResult)
     )
-    # ParseExceptionResult - has specific fields to receive
+    # ParseExceptionResult - has specific fields to receive/send
     register_codec_with_both_names(
         'org.openrewrite.marker.ParseExceptionResult',
         ParseExceptionResult,
         _receive_parse_exception_result,
-        make_dataclass_factory(ParseExceptionResult)
+        make_dataclass_factory(ParseExceptionResult),
+        sender=_send_parse_exception_result
     )
 
 
@@ -1439,6 +1452,73 @@ def _register_style_codecs():
         register_codec_with_both_names(java_name, cls, _receive_style, make_dataclass_factory(cls))
 
 
+def _receive_parse_error(parse_error, q: RpcReceiveQueue):
+    """Codec for receiving ParseError.
+
+    Fields are received in the order sent by Java's ParseError.rpcSend():
+    id, markers, sourcePath, charset.name(), charsetBomMarked, checksum, fileAttributes, text
+    Note: erroneous is NOT sent over RPC.
+    """
+    from rewrite.parser import ParseError
+    from pathlib import Path
+
+    # Receive all fields in order (matching Java's ParseError.rpcSend)
+    id_str = q.receive(str(parse_error.id) if parse_error else None)
+    markers = q.receive_markers(parse_error.markers if parse_error else None)
+    source_path = q.receive(str(parse_error.source_path) if parse_error else None)
+    charset_name = q.receive(parse_error.charset_name if parse_error else None)
+    charset_bom_marked = q.receive(parse_error.charset_bom_marked if parse_error else False)
+    checksum = q.receive(parse_error.checksum if parse_error else None)
+    file_attributes = q.receive(parse_error.file_attributes if parse_error else None)
+    text = q.receive(parse_error.text if parse_error else '')
+
+    from uuid import UUID
+    new_id = UUID(id_str) if id_str else (parse_error.id if parse_error else None)
+
+    return ParseError(
+        _id=new_id,
+        _markers=markers,
+        _source_path=Path(source_path) if source_path else Path('.'),
+        _file_attributes=file_attributes,
+        _charset_name=charset_name,
+        _charset_bom_marked=charset_bom_marked,
+        _checksum=checksum,
+        _text=text,
+        _erroneous=None  # Not sent over RPC
+    )
+
+
+def _send_parse_error(parse_error, q):
+    """Codec for sending ParseError.
+
+    Fields are sent in the order expected by Java's ParseError.rpcReceive():
+    id, markers, sourcePath, charset.name(), charsetBomMarked, checksum, fileAttributes, text
+    """
+    # Send all fields in order (matching Java's ParseError.rpcSend)
+    q.get_and_send(parse_error, lambda x: str(x.id))
+    q.get_and_send(parse_error, lambda x: x.markers)
+    q.get_and_send(parse_error, lambda x: str(x.source_path))
+    q.get_and_send(parse_error, lambda x: x.charset_name)
+    q.get_and_send(parse_error, lambda x: x.charset_bom_marked)
+    q.get_and_send(parse_error, lambda x: x.checksum)
+    q.get_and_send(parse_error, lambda x: x.file_attributes)
+    q.get_and_send(parse_error, lambda x: x.text)
+
+
+def _register_parse_error_codec():
+    """Register codec for ParseError."""
+    from rewrite.parser import ParseError
+    from rewrite.rpc.receive_queue import register_codec_with_both_names, make_dataclass_factory
+
+    register_codec_with_both_names(
+        'org.openrewrite.tree.ParseError',
+        ParseError,
+        _receive_parse_error,
+        make_dataclass_factory(ParseError),
+        sender=_send_parse_error
+    )
+
+
 # Register all codecs on module import
 _register_marker_codecs()  # Existing marker codecs with full deserialization
 _register_tree_codecs()
@@ -1446,3 +1526,4 @@ _register_support_type_codecs()
 _register_java_type_codecs()  # JavaType.Primitive handling
 _register_core_marker_codecs()
 _register_style_codecs()
+_register_parse_error_codec()  # ParseError handling

@@ -1919,15 +1919,76 @@ class ParserVisitor(ast.NodeVisitor):
         prefix = self.__whitespace()
         next_tok = self._advance_token()
 
+        # Extract surrogate characters that would cause serialization issues
+        value_source = tok.string
+        unicode_escapes = None
+
+        if isinstance(node.value, (str, bytes)):
+            value_source, unicode_escapes = self.__extract_surrogate_escapes(tok.string)
+
+        # When there are unicode escapes (surrogates), set value to None since
+        # the actual value contains unserializable characters. The printer will
+        # reconstruct the value from valueSource + unicodeEscapes.
+        literal_value = None if unicode_escapes else self.__map_literal_value(node, tok)
+
         return (j.Literal(
             random_id(),
             prefix,
             Markers.EMPTY,
-            self.__map_literal_value(node, tok),
-            tok.string,  # Use token string directly instead of extracting from source
-            None,
+            literal_value,
+            value_source,
+            unicode_escapes,
             self._type_mapping.type(node),
         ), next_tok)
+
+    def __extract_surrogate_escapes(self, value_source: str) -> Tuple[str, Optional[List[j.Literal.UnicodeEscape]]]:
+        """Extract invalid UTF-16 surrogate characters from a string literal.
+
+        Unmatched UTF-16 surrogate pairs are unserializable by technologies like Jackson.
+        We extract them, store the code point separately, and reconstruct the escape
+        sequence when printing later.
+
+        Returns:
+            A tuple of (cleaned_source, unicode_escapes) where unicode_escapes is None
+            if no surrogates were found.
+        """
+        SURR_FIRST = 0xD800
+        SURR_LAST = 0xDFFF
+
+        unicode_escapes: List[j.Literal.UnicodeEscape] = []
+        cleaned_source = ''
+        cleaned_index = 0
+
+        i = 0
+        while i < len(value_source):
+            c = value_source[i]
+            char_code = ord(c)
+
+            # Check for unicode escape sequence: \uXXXX
+            if c == '\\' and i < len(value_source) - 1 and (i == 0 or value_source[i - 1] != '\\'):
+                if i < len(value_source) - 5 and value_source[i + 1] == 'u':
+                    code_point = value_source[i + 2:i + 6]
+                    try:
+                        code_point_numeric = int(code_point, 16)
+                        if SURR_FIRST <= code_point_numeric <= SURR_LAST:
+                            unicode_escapes.append(j.Literal.UnicodeEscape(cleaned_index, code_point))
+                            i += 6  # Skip the \uXXXX sequence
+                            continue
+                    except ValueError:
+                        pass
+
+            # Check for raw surrogate characters in the source
+            if SURR_FIRST <= char_code <= SURR_LAST:
+                code_point = format(char_code, '04X')
+                unicode_escapes.append(j.Literal.UnicodeEscape(cleaned_index, code_point))
+                i += 1
+                continue
+
+            cleaned_source += c
+            cleaned_index += 1
+            i += 1
+
+        return (cleaned_source, unicode_escapes if unicode_escapes else None)
 
     def __map_literal_value(self, node, tok):
         if node.value is Ellipsis:
@@ -3076,14 +3137,17 @@ class ParserVisitor(ast.NodeVisitor):
                 # format specifiers are stored as f-strings in the AST; e.g. `f'{1:n}'`
                 format_val = node.values[0].value
                 format_str = str(format_val) if format_val is not None else None
+                value_source, unicode_escapes = self.__extract_surrogate_escapes(format_str) if format_str else (None, None)
+                # Set value to None when there are unicode escapes (surrogates)
+                literal_value = None if unicode_escapes else format_val
                 self._token_idx += 1  # consume the format token
                 return (j.Literal(
                     random_id(),
                     self.__whitespace(),
                     Markers.EMPTY,
-                    format_val,
-                    format_str,
-                    None,
+                    literal_value,
+                    value_source,
+                    unicode_escapes,
                     JavaType.Primitive.String
                 ), self._tokens[self._token_idx], 0)
             else:
@@ -3137,13 +3201,16 @@ class ParserVisitor(ast.NodeVisitor):
                 # For value_source, escape braces so the printer outputs them correctly
                 # In f-strings, {{ becomes { and }} becomes }, so we reverse that
                 value_source = s.replace('{', '{{').replace('}', '}}')
+                value_source, unicode_escapes = self.__extract_surrogate_escapes(value_source)
+                # Set value to None when there are unicode escapes (surrogates)
+                literal_value = None if unicode_escapes else s
                 parts.append(j.Literal(
                     random_id(),
                     Space.EMPTY,
                     Markers.EMPTY,
-                    s,
+                    literal_value,
                     value_source,
-                    None,
+                    unicode_escapes,
                     JavaType.Primitive.String
                 ))
                 if cast(ast.Constant, value).value == s:
@@ -3242,7 +3309,8 @@ class ParserVisitor(ast.NodeVisitor):
             prefix,
             Markers.EMPTY,
             delimiter,
-            parts
+            parts,
+            JavaType.Primitive.String
         ), tok, value_idx)
 
     def __at_token(self, s: str) -> bool:

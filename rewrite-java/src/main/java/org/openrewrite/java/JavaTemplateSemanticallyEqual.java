@@ -52,7 +52,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
 
         J[] parameters = createTemplateParameters(template.getCode(), template.getGenericTypes());
         try {
-            J templateTree = template.apply(input, coordinates, (Object[]) parameters);
+            J templateTree = template.applyWithoutFormatting(input, coordinates, (Object[]) parameters);
             return matchTemplate(templateTree, input);
         } catch (RuntimeException e) {
             // FIXME this is just a workaround, as template matching finds many new corner cases in `JavaTemplate` which we need to fix

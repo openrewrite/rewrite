@@ -146,6 +146,11 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         This is called by RpcReceiveQueue when it needs more data.
         We send GetObject requests repeatedly until END_OF_OBJECT is received.
         For large objects (>1000 items), Java sends data in multiple batches.
+
+        IMPORTANT: We filter out END_OF_OBJECT from the returned batch to prevent
+        it from being accidentally consumed during nested operations (like receive_list
+        expecting positions). Java's RewriteRpc.java explicitly consumes END_OF_OBJECT
+        after receive() completes (line 474), and we do the same by tracking received_end.
         """
         nonlocal received_end
 
@@ -164,8 +169,10 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
 
         # Check if this batch contains END_OF_OBJECT (last item has state='END_OF_OBJECT')
         # The END_OF_OBJECT marker is always at the end of the final batch
+        # We filter it out to prevent it from being consumed during nested operations
         if batch[-1].get('state') == 'END_OF_OBJECT':
             received_end = True
+            batch = batch[:-1]  # Remove END_OF_OBJECT from the batch
 
         return batch
 
@@ -178,6 +185,11 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
 
     # Receive and deserialize the object (applies diffs to before state)
     obj = receiver.receive(before, q)
+
+    # Verify we received the complete object (END_OF_OBJECT was in the final batch)
+    # This matches Java's RewriteRpc.java line 474-475 which explicitly checks for END_OF_OBJECT
+    if not received_end:
+        raise RuntimeError(f"Did not receive END_OF_OBJECT marker for object {obj_id}")
 
     if obj is not None:
         # Update our understanding of what Java has
@@ -228,26 +240,50 @@ def parse_python_source(source: str, path: str = "<unknown>") -> dict:
     except ImportError as e:
         logger.error(f"Failed to import parser: {e}")
         traceback.print_exc()
-        return _create_parse_error(path, str(e))
+        return _create_parse_error(path, str(e), source)
     except SyntaxError as e:
         logger.error(f"Syntax error parsing {path}: {e}")
-        return _create_parse_error(path, str(e))
+        return _create_parse_error(path, str(e), source)
     except Exception as e:
         logger.error(f"Error parsing {path}: {e}")
         traceback.print_exc()
-        return _create_parse_error(path, str(e))
+        return _create_parse_error(path, str(e), source)
 
 
-def _create_parse_error(path: str, message: str) -> dict:
-    """Create a parse error result."""
-    obj_id = generate_id()
-    error = {
-        'id': obj_id,
-        'type': 'org.openrewrite.tree.ParseError',
-        'sourcePath': path,
-        'message': message,
-    }
-    local_objects[obj_id] = error
+def _create_parse_error(path: str, message: str, source: str = '') -> dict:
+    """Create a parse error result using the proper ParseError class.
+
+    This creates a real ParseError SourceFile that can be properly serialized
+    via the RPC protocol, rather than a dict that can't be handled.
+    """
+    from rewrite.parser import ParseError
+    from rewrite.markers import Markers, ParseExceptionResult
+    from rewrite import random_id
+
+    # Create a ParseExceptionResult marker with the error info
+    # We use 'PythonParser' as the parser type since we don't have a parser instance
+    exception_marker = ParseExceptionResult(
+        _id=random_id(),
+        _parser_type='PythonParser',
+        _exception_type='SyntaxError',
+        _message=message
+    )
+
+    # Create the ParseError with the marker
+    parse_error = ParseError(
+        _id=random_id(),
+        _markers=Markers(random_id(), [exception_marker]),
+        _source_path=Path(path),
+        _file_attributes=None,
+        _charset_name='utf-8',
+        _charset_bom_marked=False,
+        _checksum=None,
+        _text=source,
+        _erroneous=None
+    )
+
+    obj_id = str(parse_error.id)
+    local_objects[obj_id] = parse_error
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError'}
 
 
@@ -452,6 +488,176 @@ def _get_marketplace():
     return _marketplace
 
 
+def handle_install_recipes(params: dict) -> dict:
+    """Handle an InstallRecipes RPC request.
+
+    Activates a recipe package in the marketplace. The package should already be
+    installed by the caller (e.g., via pip install --target). This handler discovers
+    and activates the package's recipes.
+
+    Args:
+        params: Dict containing either:
+            - 'recipes': str - A local file path (package already installed to target)
+            - 'recipes': {'packageName': str, 'version': str|None} - A package spec
+
+    Returns:
+        Dict with 'recipesInstalled' count and 'version' (if resolved)
+    """
+    import importlib
+    import importlib.util
+
+    marketplace = _get_marketplace()
+    before_count = len(list(marketplace.all_recipes()))
+
+    recipes = params.get('recipes')
+    installed_version = None
+
+    if isinstance(recipes, str):
+        # Local file path - package should already be installed by caller
+        local_path = Path(recipes)
+        logger.info(f"Activating recipes from local path: {recipes}")
+
+        # Find and import the package
+        # For local paths, we look for the package name from setup.py/pyproject.toml
+        package_name = _find_package_name(local_path)
+        if package_name:
+            _import_and_activate_package(package_name, marketplace)
+
+    elif isinstance(recipes, dict):
+        # Package spec with name and optional version - package should already be installed
+        package_name = recipes.get('packageName')
+        version = recipes.get('version')
+
+        if not package_name:
+            raise ValueError("Package name is required")
+
+        logger.info(f"Activating recipes package: {package_name}")
+
+        # Get the installed version
+        try:
+            import importlib.metadata
+            installed_version = importlib.metadata.version(package_name)
+        except Exception:
+            pass
+
+        _import_and_activate_package(package_name, marketplace)
+    else:
+        raise ValueError(f"Invalid recipes parameter: {recipes}")
+
+    after_count = len(list(marketplace.all_recipes()))
+    recipes_installed = after_count - before_count
+
+    logger.info(f"InstallRecipes: installed {recipes_installed} recipes")
+    return {
+        'recipesInstalled': recipes_installed,
+        'version': installed_version
+    }
+
+
+def _find_package_name(local_path: Path) -> Optional[str]:
+    """Find the package name from a local path."""
+    import tomllib
+
+    # Try pyproject.toml first
+    pyproject_path = local_path / 'pyproject.toml'
+    if pyproject_path.exists():
+        try:
+            with open(pyproject_path, 'rb') as f:
+                data = tomllib.load(f)
+                # Try [project] section first (PEP 621)
+                if 'project' in data and 'name' in data['project']:
+                    return data['project']['name']
+                # Try [tool.poetry] section
+                if 'tool' in data and 'poetry' in data['tool'] and 'name' in data['tool']['poetry']:
+                    return data['tool']['poetry']['name']
+        except Exception as e:
+            logger.warning(f"Failed to parse pyproject.toml: {e}")
+
+    # Try setup.py
+    setup_py = local_path / 'setup.py'
+    if setup_py.exists():
+        # Simple heuristic: look for name= in setup.py
+        try:
+            content = setup_py.read_text()
+            import re
+            match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', content)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            logger.warning(f"Failed to parse setup.py: {e}")
+
+    return None
+
+
+def _import_and_activate_package(package_name: str, marketplace):
+    """Import a package and call its activate function using entry points.
+
+    Uses importlib.metadata to discover entry points registered under
+    the 'openrewrite.recipes' group and calls their activate functions.
+    Since matching package names to entry points is unreliable (hyphens vs
+    underscores, different naming conventions), we activate ALL entry points
+    but the marketplace handles deduplication.
+    """
+    from importlib.metadata import entry_points
+
+    # Normalize package name for comparison
+    def normalize(name: str) -> str:
+        return name.replace('-', '_').replace('.', '_').lower()
+
+    normalized_name = normalize(package_name)
+
+    # Find all entry points in the openrewrite.recipes group
+    eps = entry_points(group='openrewrite.recipes')
+    activated = False
+
+    for ep in eps:
+        try:
+            # Try to match this entry point to our package using the dist attribute
+            dist_name = None
+            if hasattr(ep, 'dist') and ep.dist is not None:
+                dist_name = ep.dist.name if hasattr(ep.dist, 'name') else str(ep.dist)
+
+            # Check if this entry point belongs to our package
+            matches_package = False
+            if dist_name and normalize(dist_name) == normalized_name:
+                matches_package = True
+            elif ep.name and normalize(ep.name) == normalized_name:
+                matches_package = True
+            elif ':' in ep.value:
+                # Check module name in value (e.g., "sample_recipe:activate")
+                module_name = ep.value.split(':')[0]
+                if normalize(module_name) == normalized_name:
+                    matches_package = True
+
+            if matches_package:
+                logger.info(f"Loading entry point: {ep.name} -> {ep.value} (dist: {dist_name})")
+                activate_fn = ep.load()
+                activate_fn(marketplace)
+                activated = True
+                logger.info(f"Successfully activated {ep.name}")
+        except Exception as e:
+            logger.warning(f"Failed to process entry point {ep.name}: {e}")
+
+    if not activated:
+        # Fallback: try direct module import (for packages without entry points)
+        import importlib
+        module_name = package_name.replace('-', '_')
+        try:
+            if module_name in sys.modules:
+                importlib.reload(sys.modules[module_name])
+            else:
+                importlib.import_module(module_name)
+
+            module = sys.modules.get(module_name)
+            if module and hasattr(module, 'activate'):
+                logger.info(f"Calling activate() on {module_name}")
+                module.activate(marketplace)
+            else:
+                logger.warning(f"Package {package_name} does not have an activate() function")
+        except ImportError as e:
+            logger.warning(f"Could not import {module_name}: {e}")
+
+
 def handle_get_marketplace(params: dict) -> List[dict]:
     """Handle a GetMarketplace RPC request.
 
@@ -524,6 +730,7 @@ def _recipe_descriptor_to_dict(descriptor) -> dict:
             }
             for name, value, opt in descriptor.options
         ],
+        'dataTables': descriptor.data_tables,
         'recipeList': [_recipe_descriptor_to_dict(r) for r in descriptor.recipe_list],
     }
 
@@ -547,6 +754,8 @@ _execution_contexts: Dict[str, Any] = {}
 _recipe_accumulators: Dict[str, Any] = {}
 # Phase tracking for recipes - maps recipe IDs to 'scan' or 'edit'
 _recipe_phases: Dict[str, str] = {}
+# Data table output directory - if set, data tables will be written to CSV files
+_data_table_output_dir: Optional[str] = None
 
 
 def handle_prepare_recipe(params: dict) -> dict:
@@ -559,15 +768,22 @@ def handle_prepare_recipe(params: dict) -> dict:
     4. Returning the descriptor and visitor info
 
     Args:
-        params: dict with 'id' (recipe name) and optional 'options'
+        params: dict with 'id' (recipe name), optional 'options', and optional 'dataTableOutputDir'
 
     Returns:
         dict with 'id', 'descriptor', 'editVisitor', and precondition info
     """
+    global _data_table_output_dir
+
     recipe_name = params.get('id')
     if recipe_name is None:
         raise ValueError("Recipe 'id' is required")
     options = params.get('options', {})
+
+    # Set up data table output directory if specified
+    if 'dataTableOutputDir' in params:
+        _data_table_output_dir = params['dataTableOutputDir']
+        logger.info(f"Data table output directory set to: {_data_table_output_dir}")
 
     logger.info(f"PrepareRecipe: id={recipe_name}, options={options}")
 
@@ -654,6 +870,12 @@ def handle_visit(params: dict) -> dict:
     else:
         from rewrite import InMemoryExecutionContext
         ctx = InMemoryExecutionContext()
+        # Set up data table store if output directory is configured
+        if _data_table_output_dir:
+            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
+            store = CsvDataTableStore(_data_table_output_dir)
+            store.accept_rows(True)
+            ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
 
@@ -785,6 +1007,12 @@ def handle_generate(params: dict) -> dict:
     else:
         from rewrite import InMemoryExecutionContext
         ctx = InMemoryExecutionContext()
+        # Set up data table store if output directory is configured
+        if _data_table_output_dir:
+            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
+            store = CsvDataTableStore(_data_table_output_dir)
+            store.accept_rows(True)
+            ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
 
@@ -823,6 +1051,7 @@ def handle_request(method: str, params: dict) -> Any:
         'GetLanguages': handle_get_languages,
         'Print': handle_print,
         'Reset': handle_reset,
+        'InstallRecipes': handle_install_recipes,
         'GetMarketplace': handle_get_marketplace,
         'PrepareRecipe': handle_prepare_recipe,
         'Visit': handle_visit,
