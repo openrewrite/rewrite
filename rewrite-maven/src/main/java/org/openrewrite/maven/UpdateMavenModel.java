@@ -23,64 +23,16 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 public class UpdateMavenModel<P> extends MavenVisitor<P> {
-
-    /**
-     * Key for storing fresh Pom objects in the execution context.
-     * When a project POM is updated, its fresh Pom is stored here
-     * so that downstream POMs can resolve against up-to-date data.
-     */
-    private static final String FRESH_POMS_KEY = "org.openrewrite.maven.UpdateMavenModel.freshPoms";
-
-    /**
-     * Key for storing fresh MavenResolutionResult objects in the execution context.
-     * When a project POM is updated, fresh resolution results for the entire module
-     * hierarchy are stored here so child POMs can use up-to-date dependency management.
-     */
-    private static final String FRESH_MARKERS_KEY = "org.openrewrite.maven.UpdateMavenModel.freshMarkers";
-
-    /**
-     * Get the map of fresh Pom objects from the execution context.
-     * This allows re-resolution to see updated project POMs that were
-     * modified earlier in the same recipe run.
-     *
-     * @param ctx The execution context
-     * @return A map of source path to fresh Pom
-     */
-    @SuppressWarnings("unchecked")
-    public static Map<Path, Pom> getFreshPoms(ExecutionContext ctx) {
-        return ctx.computeMessageIfAbsent(FRESH_POMS_KEY, k -> new HashMap<>());
-    }
-
-    /**
-     * Get the map of fresh MavenResolutionResult objects from the execution context.
-     * When a parent POM is modified, the fresh resolution result (with updated dependency
-     * management) is stored here so child POMs can use it.
-     *
-     * @param ctx The execution context
-     * @return A map of source path to fresh MavenResolutionResult
-     */
-    @SuppressWarnings("unchecked")
-    public static Map<Path, MavenResolutionResult> getFreshMarkers(ExecutionContext ctx) {
-        return ctx.computeMessageIfAbsent(FRESH_MARKERS_KEY, k -> new HashMap<>());
-    }
-
-    /**
-     * Get the fresh MavenResolutionResult for the given source path, if available.
-     *
-     * @param sourcePath The source path of the POM
-     * @param ctx The execution context
-     * @return The fresh MavenResolutionResult, or null if not available
-     */
-    public static @Nullable MavenResolutionResult getFreshMarker(Path sourcePath, ExecutionContext ctx) {
-        return getFreshMarkers(ctx).get(sourcePath);
-    }
 
     @Override
     public Xml visitDocument(Xml.Document document, P p) {
@@ -189,10 +141,6 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         try {
             MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
                     resolutionResult.getProjectPoms());
-
-            // Store fresh data in execution context so downstream POMs see updated data
-            storeFreshData(updated, ctx);
-
             return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
                     (original, ignored) -> updated));
         } catch (MavenDownloadingExceptions e) {
@@ -216,31 +164,8 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                 .orElse(null);
     }
 
-    /**
-     * Store fresh Pom and MavenResolutionResult data for this POM and all its modules.
-     * This enables downstream POMs to see the updated dependency management when they
-     * are re-resolved.
-     */
-    private void storeFreshData(MavenResolutionResult mrr, ExecutionContext ctx) {
-        Pom freshPom = mrr.getPom().getRequested();
-        Path sourcePath = freshPom.getSourcePath();
-        if (sourcePath != null) {
-            getFreshPoms(ctx).put(sourcePath, freshPom);
-            getFreshMarkers(ctx).put(sourcePath, mrr);
-        }
-        // Also store fresh data for all modules
-        for (MavenResolutionResult module : mrr.getModules()) {
-            storeFreshData(module, ctx);
-        }
-    }
-
     private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) throws MavenDownloadingExceptions {
-        // Overlay fresh Poms from ExecutionContext onto projectPoms
-        // This ensures we see updated parent data from earlier recipe modifications
-        Map<Path, Pom> effectiveProjectPoms = new HashMap<>(projectPoms);
-        effectiveProjectPoms.putAll(getFreshPoms(ctx));
-
-        MavenPomDownloader downloader = new MavenPomDownloader(effectiveProjectPoms, ctx, getResolutionResult().getMavenSettings(),
+        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx, getResolutionResult().getMavenSettings(),
                 getResolutionResult().getActiveProfiles());
 
         AtomicReference<MavenDownloadingExceptions> exceptions = new AtomicReference<>();
