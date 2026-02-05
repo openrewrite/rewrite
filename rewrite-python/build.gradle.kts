@@ -18,6 +18,7 @@ dependencies {
     api("com.fasterxml.jackson.core:jackson-annotations")
 
     implementation("io.moderne:jsonrpc:latest.integration")
+    implementation(project(":rewrite-maven"))
 
     compileOnly(project(":rewrite-test"))
 
@@ -262,3 +263,53 @@ val pythonPublish by tasks.registering(Exec::class) {
 tasks.named("publish") {
     dependsOn(pythonPublish)
 }
+
+// ============================================
+// Python Test Support Tasks
+// ============================================
+
+// Task to generate classpath file for Java RPC server testing
+val generateTestClasspath by tasks.registering {
+    group = "python"
+    description = "Generate classpath file for Java RPC server (used by Python tests)"
+
+    val outputFile = pythonDir.resolve("test-classpath.txt")
+    outputs.file(outputFile)
+
+    // Depend on jar tasks to ensure jars exist
+    dependsOn(tasks.named("testClasses"))
+    dependsOn(tasks.named("jar"))
+
+    doLast {
+        // Combine compile and test runtime classpaths to get all dependencies
+        val classpath = (
+            configurations.getByName("runtimeClasspath").files +
+            configurations.getByName("testRuntimeClasspath").files +
+            tasks.named("compileJava").get().outputs.files +
+            tasks.named("processResources").get().outputs.files
+        ).distinctBy { it.absolutePath }
+         .joinToString(File.pathSeparator) { it.absolutePath }
+        outputFile.writeText(classpath)
+        logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
+    }
+}
+
+// Task to print test classpath to stdout (useful for setting env vars)
+val printTestClasspath by tasks.registering {
+    group = "python"
+    description = "Print the test classpath (for use with REWRITE_PYTHON_CLASSPATH env var)"
+
+    dependsOn(tasks.named("testClasses"))
+
+    doLast {
+        val classpath = (
+            configurations.getByName("runtimeClasspath").files +
+            configurations.getByName("testRuntimeClasspath").files +
+            tasks.named("compileJava").get().outputs.files +
+            tasks.named("processResources").get().outputs.files
+        ).distinctBy { it.absolutePath }
+         .joinToString(File.pathSeparator) { it.absolutePath }
+        println(classpath)
+    }
+}
+

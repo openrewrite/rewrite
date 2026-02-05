@@ -111,7 +111,7 @@ export class InstallRecipes {
 
                         // Rather than using npm on PATH, use `node_cli.js`.
                         // https://stackoverflow.com/questions/15957529/can-i-install-a-npm-package-from-javascript-running-in-node-js
-                        const packageSpec = recipePackage.packageName + (recipePackage.version ? `@${recipePackage.version}` : "");
+                        const packageSpec = recipePackage.packageName + (recipePackage.version ? `@${recipePackage.version}` : "@latest");
                         await spawnNpmCommand("npm", ["install", packageSpec, "--no-fund"], absoluteInstallDir, logger);
                         resolvedPath = require.resolve(path.join(absoluteInstallDir, "node_modules", recipePackage.packageName));
                         recipesName = request.recipes.packageName;
