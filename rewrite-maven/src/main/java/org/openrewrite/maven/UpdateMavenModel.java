@@ -172,7 +172,12 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         try {
             ResolvedPom resolved = resolutionResult.getPom().resolve(ctx, downloader);
 
-            // Update projectPoms with the resolved Pom so child modules see changes made to parents
+            // Update projectPoms with the resolved Pom so child modules see changes made to parents.
+            // This updates the Map that was passed in, making the change visible to:
+            // 1. The MavenPomDownloader created above (which holds a reference to this Map)
+            // 2. Recursive updateResult calls for child modules (which receive this Map as a parameter)
+            // Note: The returned MavenResolutionResult doesn't store this Map directly; it will
+            // compute projectPoms dynamically from its updated tree structure when getProjectPoms() is called.
             Path sourcePath = resolved.getRequested().getSourcePath();
             if (sourcePath != null) {
                 projectPoms.put(sourcePath, resolved.getRequested());
