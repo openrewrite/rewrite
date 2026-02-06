@@ -315,8 +315,6 @@ class DependencyInsightTest implements RewriteTest {
     @Issue("https://github.com/moderneinc/customer-requests/issues/1803")
     @Test
     void findDependencyDeclaredInProjectParent() {
-        // When the parent (in the same project) declares a dependency and the child
-        // inherits it without redeclaring, the <parent> tag in the child should be marked.
         rewriteRun(
           spec -> spec.recipe(new DependencyInsight("com.google.guava", "guava", null, null, null)),
           mavenProject("parent",
@@ -392,8 +390,6 @@ class DependencyInsightTest implements RewriteTest {
     @Issue("https://github.com/moderneinc/customer-requests/issues/1803")
     @Test
     void doNotMarkParentTagWhenDependencyDeclaredInChild() {
-        // When the child POM declares its own dependency that brings the target,
-        // only the <dependency> tag should be marked, NOT the <parent> tag.
         rewriteRun(
           spec -> spec.recipe(new DependencyInsight("com.google.guava", "guava", null, null, null)),
           mavenProject("parent",
@@ -465,9 +461,6 @@ class DependencyInsightTest implements RewriteTest {
     @Issue("https://github.com/moderneinc/customer-requests/issues/1803")
     @Test
     void doNotMarkParentTagWhenTransitiveDependencyComesFromChildDeclaredDependency() {
-        // When the child POM declares a dependency that transitively brings the target,
-        // only the <dependency> tag should be marked, NOT the <parent> tag.
-        // Here we search for spring-core, which comes transitively from spring-boot-starter-web.
         rewriteRun(
           spec -> spec.recipe(new DependencyInsight("org.springframework", "spring-core", null, null, null)),
           mavenProject("parent",
