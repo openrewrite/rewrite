@@ -318,6 +318,11 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         }
 
         @Override
+        protected RecipeDescriptor createRecipeDescriptor() {
+            return delegate.getDescriptor();
+        }
+
+        @Override
         public void onComplete(ExecutionContext ctx) {
             delegate.onComplete(ctx);
         }
@@ -433,6 +438,11 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         @Override
         public List<DataTableDescriptor> getDataTableDescriptors() {
             return delegate.getDataTableDescriptors();
+        }
+
+        @Override
+        protected RecipeDescriptor createRecipeDescriptor() {
+            return delegate.getDescriptor();
         }
 
         @Override

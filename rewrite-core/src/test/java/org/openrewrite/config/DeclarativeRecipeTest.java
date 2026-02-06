@@ -539,4 +539,36 @@ class DeclarativeRecipeTest implements RewriteTest {
             .hasMessageContaining("RecipeB")
             .hasMessageContaining("RecipeC");
     }
+
+
+    @Test
+    void bellwetherDecoratedRecipeReturnsDelegateDescriptorInstance() {
+        // given
+        DeclarativeRecipe inner = new DeclarativeRecipe("inner", "Inner Recipe", "Inner description", emptySet(),
+          null, URI.create("dummy"), true, emptyList());
+        inner.addUninitialized(new ChangeText("changed"));
+        inner.initialize(List.of());
+
+        DeclarativeRecipe outer = new DeclarativeRecipe("outer", "Outer Recipe", "Outer description", emptySet(),
+          null, URI.create("dummy"), true, emptyList());
+        outer.addPrecondition(
+          toRecipe(() -> new PlainTextVisitor<>() {
+              @Override
+              public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                  return SearchResult.found(text);
+              }
+          })
+        );
+        outer.addUninitialized(inner);
+        outer.initialize(List.of());
+
+        // when
+        Recipe wrappedInner = outer.getRecipeList().stream()
+          .filter(r -> r.getName().equals("inner"))
+          .findFirst()
+          .orElseThrow();
+
+        // then - the wrapper should return the delegate's cached descriptor, not create a new one
+        assertThat(wrappedInner.getDescriptor()).isSameAs(inner.getDescriptor());
+    }
 }
