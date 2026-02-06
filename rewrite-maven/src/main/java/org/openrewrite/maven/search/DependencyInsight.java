@@ -244,25 +244,33 @@ public class DependencyInsight extends Recipe {
         }
 
         private Xml.Tag markParentTag(Xml.Tag t, ExecutionContext ctx) {
-            // Collect target dependencies from direct dependencies that don't have
-            // a corresponding <dependency> tag in this POM (inherited from parent)
-            Set<String> inheritedTargets = new TreeSet<>();
+            // Collect all target dependencies and track which are covered by declared dependencies.
+            // A target is "covered" if it's reachable through ANY declared dependency.
+            // Only mark parent with targets that aren't covered by any declared dependency.
+            Set<String> coveredTargets = new HashSet<>();
+            Set<String> allTargets = new HashSet<>();
 
             for (Map.Entry<Scope, Set<GroupArtifactVersion>> entry : scopeToDirectDependency.entrySet()) {
                 for (GroupArtifactVersion directGav : entry.getValue()) {
-                    // Check if this direct dependency is declared in the current POM
-                    if (!isDeclaredInCurrentPom(directGav)) {
-                        Set<GroupArtifactVersion> targets = directDependencyToTargetDependency.get(directGav);
-                        if (targets != null) {
-                            for (GroupArtifactVersion target : targets) {
-                                if (!Boolean.TRUE.equals(onlyDirect) || directGav.equals(target)) {
-                                    inheritedTargets.add(target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion());
+                    Set<GroupArtifactVersion> targets = directDependencyToTargetDependency.get(directGav);
+                    if (targets != null) {
+                        boolean isDeclared = isDeclaredInCurrentPom(directGav);
+                        for (GroupArtifactVersion target : targets) {
+                            if (!Boolean.TRUE.equals(onlyDirect) || directGav.equals(target)) {
+                                String targetStr = target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion();
+                                allTargets.add(targetStr);
+                                if (isDeclared) {
+                                    coveredTargets.add(targetStr);
                                 }
                             }
                         }
                     }
                 }
             }
+
+            // Only mark with targets that aren't covered by declared dependencies
+            Set<String> inheritedTargets = new TreeSet<>(allTargets);
+            inheritedTargets.removeAll(coveredTargets);
 
             if (!inheritedTargets.isEmpty()) {
                 return SearchResult.found(t, String.join(",", inheritedTargets));

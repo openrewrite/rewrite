@@ -462,6 +462,73 @@ class DependencyInsightTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1803")
+    @Test
+    void doNotMarkParentTagWhenTransitiveDependencyComesFromChildDeclaredDependency() {
+        // When the child POM declares a dependency that transitively brings the target,
+        // only the <dependency> tag should be marked, NOT the <parent> tag.
+        // Here we search for spring-core, which comes transitively from spring-boot-starter-web.
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("org.springframework", "spring-core", null, null, null)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <groupId>org.sample</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>../</relativePath>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-web</artifactId>
+                        <version>2.7.18</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>../</relativePath>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <dependencies>
+                      <!--~~(org.springframework:spring-core:5.3.31)~~>--><dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-web</artifactId>
+                        <version>2.7.18</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.path("child/pom.xml")
+              )
+            )
+          )
+        );
+    }
+
     @Test
     @Disabled("Test is logically correct, but the MavenResolutionResult's dependency graph is not")
     void jacksonIsFoundInternally() {
