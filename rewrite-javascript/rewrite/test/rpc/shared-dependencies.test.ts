@@ -37,30 +37,23 @@ describe('Shared dependencies setup', () => {
         // In a real scenario, dynamically loaded recipes would benefit from this
 
         // Simulate what happens when modules are cached
-        var mockCache: Record<string, any> = {
+        const mockCache: Record<string, any> = {
             '/some/path/node_modules/@openrewrite/rewrite/tree.js': {exports: {}},
             '/some/path/node_modules/@openrewrite/rewrite/recipe.js': {exports: {}},
             '/some/path/node_modules/@openrewrite/rewrite/visitor.js': {exports: {}},
         };
-        if (path.sep == "\\") {
-            mockCache = {
-                '\\some\\path\\node_modules\\@openrewrite\\rewrite\\tree.js': {exports: {}},
-                '\\some\\path\\node_modules\\@openrewrite\\rewrite\\recipe.js': {exports: {}},
-                '\\some\\path\\node_modules\\@openrewrite\\rewrite\\visitor.js': {exports: {}},
-            }
-        }
 
         // Count modules from our mock that match the pattern
-        const depPattern = path.sep + 'node_modules' + path.sep + '@openrewrite/rewrite'.replace('/', path.sep);
-        const rewriteModules = Object.keys(mockCache).filter(p => p.includes(depPattern));
+        const depPattern = path.normalize('/node_modules/@openrewrite/rewrite');
+        const rewriteModules = Object.keys(mockCache).filter(p => path.normalize(p).includes(depPattern));
 
         // Should find all three mocked modules
         expect(rewriteModules.length).toBe(3);
 
         // Verify different subpaths exist
-        const hasTreeModule = rewriteModules.some(p => p.includes(path.sep + 'tree'));
-        const hasRecipeModule = rewriteModules.some(p => p.includes(path.sep + 'recipe'));
-        const hasVisitorModule = rewriteModules.some(p => p.includes(path.sep + 'visitor'));
+        const hasTreeModule = rewriteModules.some(p => path.normalize(p).includes(path.normalize('/tree')));
+        const hasRecipeModule = rewriteModules.some(p => path.normalize(p).includes(path.normalize('/recipe')));
+        const hasVisitorModule = rewriteModules.some(p => path.normalize(p).includes(path.normalize('/visitor')));
 
         expect(hasTreeModule).toBe(true);
         expect(hasRecipeModule).toBe(true);
@@ -68,34 +61,35 @@ describe('Shared dependencies setup', () => {
     });
 
     it('should handle package names with slashes correctly', () => {
-        const depPattern = path.sep + 'node_modules' + path.sep + '@openrewrite/rewrite'.replace('/', path.sep);
+        const depPattern = path.normalize('/node_modules/@openrewrite/rewrite');
 
         // Pattern should work correctly with scoped packages
-        expect(depPattern).toContain('@openrewrite' + path.sep + 'rewrite');
+        expect(depPattern).toContain(path.normalize('@openrewrite/rewrite'));
     });
 
     it('should extract subpaths correctly', () => {
         const testCases = [
             {
-                path: '/path/to/node_modules/@openrewrite/rewrite/tree.js'.replace(/\//g, path.sep),
-                expected: '/tree.js'.replace(/\//g, path.sep)
+                path: '/path/to/node_modules/@openrewrite/rewrite/tree.js',
+                expected: '/tree.js'
             },
             {
-                path: '/path/to/node_modules/@openrewrite/rewrite/index.js'.replace(/\//g, path.sep),
-                expected: '/index.js'.replace(/\//g, path.sep)
+                path: '/path/to/node_modules/@openrewrite/rewrite/index.js',
+                expected: '/index.js'
             },
             {
-                path: '/path/to/node_modules/@openrewrite/rewrite/rpc/recipe.js'.replace(/\//g, path.sep),
-                expected: '/rpc/recipe.js'.replace(/\//g, path.sep)
+                path: '/path/to/node_modules/@openrewrite/rewrite/rpc/recipe.js',
+                expected: '/rpc/recipe.js'
             }
         ];
 
         testCases.forEach(tc => {
-            const depPattern = path.sep + 'node_modules' + path.sep + '@openrewrite/rewrite'.replace('/', path.sep);
-            const packageIndex = tc.path.indexOf(depPattern);
-            const afterPackage = tc.path.substring(packageIndex + depPattern.length);
+            const depPattern = path.normalize('/node_modules/@openrewrite/rewrite');
+            const normalizedPath = path.normalize(tc.path);
+            const packageIndex = normalizedPath.indexOf(depPattern);
+            const afterPackage = normalizedPath.substring(packageIndex + depPattern.length);
 
-            expect(afterPackage).toBe(tc.expected);
+            expect(afterPackage).toBe(path.normalize(tc.expected));
         });
     });
 
@@ -108,10 +102,10 @@ describe('Shared dependencies setup', () => {
         // 2. Recipe package tries to load Check but doesn't have './preconditions' in exports
         // 3. setupSharedDependencies() needs to map it anyway using fallback strategies
 
-        const mockPreconditionsPath = '/host/node_modules/@openrewrite/rewrite/dist/preconditions.js'.replace(/\//g, path.sep);
+        const mockPreconditionsPath = path.normalize('/host/node_modules/@openrewrite/rewrite/dist/preconditions.js');
 
         // The subpath extraction should work
-        const depPattern = path.sep + 'node_modules' + path.sep + '@openrewrite/rewrite'.replace('/', path.sep);
+        const depPattern = path.normalize('/node_modules/@openrewrite/rewrite');
         const pkgIndex = mockPreconditionsPath.indexOf(depPattern);
         let subpath = mockPreconditionsPath.substring(pkgIndex + depPattern.length)
             .replace(/^[/\\]/, '')
@@ -123,7 +117,7 @@ describe('Shared dependencies setup', () => {
 
         // Even if '@openrewrite/rewrite/preconditions' can't be resolved via exports,
         // the fallback strategy should construct the direct file path
-        const targetDir = '/target/node_modules/@openrewrite/recipes-nodejs'.replace(/\//g, path.sep);
+        const targetDir = path.normalize('/target/node_modules/@openrewrite/recipes-nodejs');
         const expectedFallbackPath = path.join(targetDir, 'node_modules', '@openrewrite', 'rewrite', 'dist', 'preconditions.js');
 
         // This documents that the fallback strategy exists for such cases
