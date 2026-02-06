@@ -630,4 +630,50 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void shouldPreserveProjectVersionPropertyInManagedDependencyVersion() {
+        // When the managed dependency version is ${project.version}, it should be preserved
+        // even when changing groupId/artifactId with a newVersion specified
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "org.junit.jupiter", "junit-jupiter-api",
+            "org.junit.jupiter", "junit-jupiter-engine",
+            "5.x", null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>5.7.2</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                              <version>${project.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>5.7.2</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-engine</artifactId>
+                              <version>${project.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
 }
