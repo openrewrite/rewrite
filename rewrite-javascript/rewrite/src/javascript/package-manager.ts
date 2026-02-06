@@ -238,7 +238,7 @@ function runInstall(pm: PackageManager, options: InstallOptions): PackageManager
             stdio: ['pipe', 'pipe', 'pipe'],
             timeout: options.timeout ?? 120000,
             env: options.env ? {...process.env, ...options.env} : process.env,
-            shell: os.platform() === 'win32',
+            ...(os.platform() === 'win32' ? { shell: true } : {})
         });
 
         if (result.error) {
@@ -292,6 +292,7 @@ export function runList(pm: PackageManager, cwd: string, timeout: number = 30000
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout,
+        ...(os.platform() === 'win32' ? { shell: true } : {})
     });
 
     if (result.error || result.status !== 0) {
