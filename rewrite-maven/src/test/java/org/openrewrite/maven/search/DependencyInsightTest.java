@@ -389,6 +389,79 @@ class DependencyInsightTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1803")
+    @Test
+    void doNotMarkParentTagWhenDependencyDeclaredInChild() {
+        // When the child POM declares its own dependency that brings the target,
+        // only the <dependency> tag should be marked, NOT the <parent> tag.
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("com.google.guava", "guava", null, null, null)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <groupId>org.sample</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>29.0-jre</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>../</relativePath>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>../</relativePath>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <dependencies>
+                      <!--~~(com.google.guava:guava:29.0-jre)~~>--><dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.path("child/pom.xml")
+              )
+            )
+          )
+        );
+    }
+
     @Test
     @Disabled("Test is logically correct, but the MavenResolutionResult's dependency graph is not")
     void jacksonIsFoundInternally() {
