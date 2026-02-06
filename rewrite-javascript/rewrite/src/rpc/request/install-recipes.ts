@@ -16,6 +16,7 @@
 import * as rpc from "vscode-jsonrpc/node";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 import {spawn} from "child_process";
 import {withMetrics} from "./metrics";
 import {RecipeMarketplace} from "../../marketplace";
@@ -36,7 +37,7 @@ async function spawnNpmCommand(
     logger?: rpc.Logger,
     logPrefix?: string
 ): Promise<void> {
-    const child = spawn(getPlatformCommand(command), args, {cwd});
+    const child = spawn(getPlatformCommand(command), args, {cwd, ...(os.platform() === 'win32' ? { shell: true } : {})});
 
     if (logger) {
         const prefix = logPrefix ? `${logPrefix}: ` : '';
