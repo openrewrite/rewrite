@@ -194,9 +194,10 @@ export class JavaScriptParser extends Parser {
             if (this.relativeTo && !path.isAbsolute(sourcePath)) {
                 sourcePath = path.join(this.relativeTo, sourcePath);
             }
-            inputFiles.set(sourcePath, input);
+            const normalizedSourcePath = path.normalize(sourcePath);
+            inputFiles.set(normalizedSourcePath, input);
             // Remove from cache if previously cached
-            this.sourceFileCache && this.sourceFileCache.delete(sourcePath);
+            this.sourceFileCache && this.sourceFileCache.delete(normalizedSourcePath);
         }
 
         // Create a new CompilerHost within parseInputs
