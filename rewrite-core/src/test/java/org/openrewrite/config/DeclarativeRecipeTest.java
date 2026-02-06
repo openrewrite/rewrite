@@ -539,4 +539,41 @@ class DeclarativeRecipeTest implements RewriteTest {
             .hasMessageContaining("RecipeB")
             .hasMessageContaining("RecipeC");
     }
+
+    @Test
+    void bellwetherDecoratedRecipeReturnsUnderlyingDescriptor() {
+        // given
+        DeclarativeRecipe inner = new DeclarativeRecipe("inner", "Inner Recipe", "Inner description", emptySet(),
+          null, URI.create("dummy"), true, emptyList());
+        inner.addUninitialized(new ChangeText("changed"));
+        inner.initialize(List.of());
+        RecipeDescriptor innerDescriptor = inner.getDescriptor();
+
+        DeclarativeRecipe outer = new DeclarativeRecipe("outer", "Outer Recipe", "Outer description", emptySet(),
+          null, URI.create("dummy"), true, emptyList());
+        outer.addPrecondition(
+          toRecipe(() -> new PlainTextVisitor<>() {
+              @Override
+              public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                  return SearchResult.found(text);
+              }
+          })
+        );
+        outer.addUninitialized(inner);
+        outer.initialize(List.of());
+
+        // when - get the wrapped recipe from outer's recipe list
+        List<Recipe> outerRecipeList = outer.getRecipeList();
+        Recipe wrappedInner = outerRecipeList.stream()
+          .filter(r -> r.getName().equals("inner"))
+          .findFirst()
+          .orElseThrow();
+
+        // then - the wrapped recipe's descriptor should match the underlying recipe's descriptor
+        RecipeDescriptor wrappedDescriptor = wrappedInner.getDescriptor();
+        assertThat(wrappedDescriptor.getName()).isEqualTo(innerDescriptor.getName());
+        assertThat(wrappedDescriptor.getDisplayName()).isEqualTo(innerDescriptor.getDisplayName());
+        assertThat(wrappedDescriptor.getDescription()).isEqualTo(innerDescriptor.getDescription());
+        assertThat(wrappedDescriptor.getRecipeList()).hasSameSizeAs(innerDescriptor.getRecipeList());
+    }
 }
