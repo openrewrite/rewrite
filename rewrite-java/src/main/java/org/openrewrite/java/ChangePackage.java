@@ -27,7 +27,8 @@ import org.openrewrite.trait.Reference;
 
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Collectors;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
 import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
@@ -412,7 +413,7 @@ public class ChangePackage extends Recipe {
 
             Set<String> starImportPackages = starImports.stream()
                     .map(J.Import::getPackageName)
-                    .collect(Collectors.toSet());
+                    .collect(toSet());
 
             // Get the JavaSourceSet from markers to access classpath information
             org.openrewrite.java.marker.JavaSourceSet sourceSet = sf.getMarkers()
@@ -443,9 +444,9 @@ public class ChangePackage extends Recipe {
                     .filter(starImport -> {
                         String importPkg = starImport.getPackageName();
                         return (importPkg.equals(newPackageName) ||
-                                (Boolean.TRUE.equals(recursive) && importPkg.startsWith(newPackageName + ".")))
-                               && !typesUsedByPackage.getOrDefault(importPkg, emptySet()).isEmpty();
-                    })
+                                (Boolean.TRUE.equals(recursive) && importPkg.startsWith(newPackageName + "."))) &&
+                               !typesUsedByPackage.getOrDefault(importPkg, emptySet()).isEmpty();
+                    .collect(toList());
                     .collect(Collectors.toList());
 
             for (J.Import starImport : toExpand) {
