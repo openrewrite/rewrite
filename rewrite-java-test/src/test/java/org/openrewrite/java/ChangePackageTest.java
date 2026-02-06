@@ -31,7 +31,6 @@ import org.openrewrite.test.SourceSpec;
 import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.xml.Assertions.xml;
@@ -1928,13 +1927,19 @@ class ChangePackageTest implements RewriteTest {
                 public @interface NotNull {}
                 """,
               """
+                package jakarta.validation.constraints;
+                public @interface NotBlank {}
+                """,
+              """
                 package org.hibernate.validator.constraints;
                 public @interface NotBlank {}
                 """
             )),
           // When there are multiple star imports and one is from a renamed package,
           // the renamed star import should be expanded to explicit imports to avoid
-          // potential ambiguity
+          // potential ambiguity. In this case, both jakarta.validation.constraints
+          // and org.hibernate.validator.constraints define @NotBlank, so leaving
+          // jakarta.validation.constraints.* as a star import would create an ambiguity.
           java(
             """
               package com.example;
