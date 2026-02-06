@@ -26,6 +26,7 @@ import org.openrewrite.maven.table.ExplainDependenciesInUse;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class DependencyInsightTest implements RewriteTest {
@@ -313,48 +314,77 @@ class DependencyInsightTest implements RewriteTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1803")
     @Test
-    void markParentTagWhenDependencyInheritedFromExternalParent() {
+    void findDependencyDeclaredInProjectParent() {
+        // When the parent (in the same project) declares a dependency and the child
+        // inherits it without redeclaring, the <parent> tag in the child should be marked.
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("org.springframework", "spring-core", null, null, null)),
-          pomXml(
-            """
-              <project>
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>2.7.18</version>
-                  <relativePath/>
-                </parent>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                  <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-web</artifactId>
-                  </dependency>
-                </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                <!--~~(org.springframework:spring-core:5.3.31)~~>--><parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>2.7.18</version>
-                  <relativePath/>
-                </parent>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                  <!--~~(org.springframework:spring-core:5.3.31)~~>--><dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-web</artifactId>
-                  </dependency>
-                </dependencies>
-              </project>
+          spec -> spec.recipe(new DependencyInsight("com.google.guava", "guava", null, null, null)),
+          mavenProject("parent",
+            pomXml(
               """
+                <project>
+                  <groupId>org.sample</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                  <groupId>org.sample</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                  <dependencies>
+                    <!--~~(com.google.guava:guava:29.0-jre)~~>--><dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>../</relativePath>
+                    </parent>
+                    <artifactId>child</artifactId>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <!--~~(com.google.guava:guava:29.0-jre)~~>--><parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>../</relativePath>
+                    </parent>
+                    <artifactId>child</artifactId>
+                  </project>
+                  """,
+                spec -> spec.path("child/pom.xml")
+              )
+            )
           )
         );
     }
