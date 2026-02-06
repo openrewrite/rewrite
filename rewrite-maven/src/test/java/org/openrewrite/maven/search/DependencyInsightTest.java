@@ -311,6 +311,54 @@ class DependencyInsightTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1803")
+    @Test
+    void markParentTagWhenDependencyInheritedFromExternalParent() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("org.springframework", "spring-core", null, null, null)),
+          pomXml(
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.18</version>
+                  <relativePath/>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <!--~~(org.springframework:spring-core:5.3.31)~~>--><parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.18</version>
+                  <relativePath/>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <!--~~(org.springframework:spring-core:5.3.31)~~>--><dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @Test
     @Disabled("Test is logically correct, but the MavenResolutionResult's dependency graph is not")
     void jacksonIsFoundInternally() {
