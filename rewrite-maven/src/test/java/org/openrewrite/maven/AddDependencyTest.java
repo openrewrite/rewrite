@@ -2143,4 +2143,128 @@ class AddDependencyTest implements RewriteTest {
         return new AddDependency(gavParts[0], gavParts[1], gavParts[2], null, scope, true, onlyIfUsing, null, null,
           false, null, acceptTransitive);
     }
+
+    @Test
+    void testLowerVersionThanBomManaged() {
+        // Test what happens when requested version is LOWER than BOM-managed version
+        // Result: Adds dependency WITH explicit version, causing multi-cycle issue
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency(
+            "org.springframework.boot",
+            "spring-boot-jackson2",
+            "4.0.0", // LOWER than BOM-managed 4.0.2
+            null,
+            null,
+            true,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>4.0.0-RC1</version>
+                  </parent>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>4.0.0-RC1</version>
+                  </parent>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-jackson2</artifactId>
+                          <version>4.0.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/TBD")
+    @Test
+    void shouldNotOverrideBomManagedVersionWithAcceptTransitive() {
+        // Witness test for BOM override bug reported in TNZ-76077
+        //
+        // Real-world scenario from spring-upgrade-recipes UseJackson2Only recipe:
+        // - Spring Boot 4.0.0 parent manages spring-boot-jackson2 at 4.0.2
+        // - YAML recipe omits version (only specifies groupId, artifactId, acceptTransitive=true)
+        // - Test uses version="4.0.0" as minimum version (mimics YAML default behavior)
+        //
+        // Expected: <dependency> added with NO <version> tag (BOM-managed at 4.0.2)
+        // Actual (bug): <dependency> added WITH explicit <version>4.0.0</version> tag
+        //
+        // This demonstrates the regression introduced in commit 5ec28fc76 where
+        // AddDependency with acceptTransitive=true overrides BOM-managed versions.
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency(
+            "org.springframework.boot",
+            "spring-boot-jackson2",
+            "4.0.0", // Minimum version - BOM manages 4.0.2
+            null,
+            null,
+            true,
+            null, // No onlyIfUsing - mimics YAML recipe usage
+            null,
+            null,
+            null,
+            null,
+            true // acceptTransitive=true - this triggers the bug
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>4.0.0</version>
+                  </parent>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>4.0.0</version>
+                  </parent>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-jackson2</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
 }
