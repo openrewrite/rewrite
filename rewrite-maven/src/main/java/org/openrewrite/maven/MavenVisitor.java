@@ -300,7 +300,11 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         if (childTag.isPresent()) {
             String oldValue = childTag.get().getValue().orElse(null);
             if (newValue != null && !newValue.equals(oldValue)) {
-                if (isProperty(oldValue)) {
+                if (isImplicitlyDefinedVersionProperty(oldValue)) {
+                    // Implicitly defined version properties like ${project.parent.version} should never be changed
+                    // as they represent intentional links to parent/project versions
+                    return tag;
+                } else if (isProperty(oldValue)) {
                     MavenResolutionResult resolutionResult = getResolutionResult();
                     String propertyName = oldValue.substring(2, oldValue.length() - 1);
                     ResolvedPom pom = resolutionResult.getPom();
@@ -331,6 +335,11 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             }
         }
         return tag;
+    }
+
+    @Contract("null -> false")
+    protected boolean isImplicitlyDefinedVersionProperty(@Nullable String value) {
+        return IMPLICITLY_DEFINED_VERSION_PROPERTIES.contains(value);
     }
 
     @Contract("null -> false")

@@ -154,7 +154,9 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                 }
                                 String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, resolvedArtifactId, getResolutionResult().getPom().getValue(versionTag.get().getValue().orElse(null)));
                                 String versionTagValue = t.getChildValue("version").orElse(null);
-                                if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
+                                if (isImplicitlyDefinedVersionProperty(versionTagValue)) {
+                                    // Implicitly defined version properties like ${project.parent.version} should not be changed
+                                } else if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
                                     t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
                                 } else {
                                     t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
