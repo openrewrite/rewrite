@@ -76,22 +76,13 @@ public class RemoveRedundantSecurityResolutionRules extends Recipe {
     @Nullable
     String securityPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove redundant security resolution rules";
-    }
+    String displayName = "Remove redundant security resolution rules";
 
-    @Override
-    public String getDescription() {
-        return "Remove `resolutionStrategy.eachDependency` rules that pin dependencies to versions that are already " +
+    String description = "Remove `resolutionStrategy.eachDependency` rules that pin dependencies to versions that are already " +
                "being managed by a platform/BOM to equal or newer versions. Only removes rules that have a security " +
                "advisory identifier (CVE or GHSA) in the `because` clause, unless a custom pattern is specified.";
-    }
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("security");
-    }
+    Set<String> tags = singleton("security");
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

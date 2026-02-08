@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import threading
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, replace as dataclass_replace
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Any, TypeVar, cast, TYPE_CHECKING, Generic, ClassVar, Callable, Type
@@ -11,6 +11,7 @@ from uuid import UUID
 
 from .markers import Markers
 from .style import NamedStyles, Style
+from .utils import replace_if_changed
 
 if TYPE_CHECKING:
     from rewrite import TreeVisitor, ExecutionContext
@@ -49,7 +50,7 @@ class Tree(ABC):
         return cursor.first_enclosing_or_throw(SourceFile).printer(cursor)
 
     def is_scope(self, tree: Optional[Tree]) -> bool:
-        return tree and tree.id == self.id
+        return tree is not None and tree.id == self.id
 
     def __eq__(self, other: object) -> bool:
         if self.__class__ == other.__class__:
@@ -60,25 +61,8 @@ class Tree(ABC):
         return hash(self.id)
 
     def replace(self, **kwargs) -> 'Tree':
-        """Replace fields on this tree node using dataclasses.replace.
-
-        Handles the convention where properties use public names (e.g., 'prefix')
-        but dataclass fields use private names (e.g., '_prefix').
-        """
-        # Map public property names to private field names
-        mapped_kwargs = {}
-        for key, value in kwargs.items():
-            # If the key doesn't start with underscore, try the private version
-            if not key.startswith('_'):
-                private_key = f'_{key}'
-                # Check if the private field exists
-                if hasattr(self, private_key):
-                    mapped_kwargs[private_key] = value
-                else:
-                    mapped_kwargs[key] = value
-            else:
-                mapped_kwargs[key] = value
-        return dataclass_replace(self, **mapped_kwargs)
+        """Replace fields on this tree node, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
 
 class PrinterFactory(ABC):
@@ -167,7 +151,11 @@ class Checksum:
 class PrintOutputCapture(Generic[P]):
     @dataclass
     class MarkerPrinter(ABC):
-        DEFAULT: ClassVar['PrintOutputCapture.MarkerPrinter'] = None  # type: ignore
+        DEFAULT: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
+        SEARCH_MARKERS_ONLY: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
+        VERBOSE: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
+        FENCED: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
+        SANITIZED: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
 
         def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
             return ""
@@ -180,8 +168,8 @@ class PrintOutputCapture(Generic[P]):
 
     def __init__(self, p: P, marker_printer: Optional['PrintOutputCapture.MarkerPrinter'] = None):
         self._context = p
-        self._marker_printer = marker_printer or PrintOutputCapture.MarkerPrinter.DEFAULT
-        self._out = []
+        self._marker_printer: PrintOutputCapture.MarkerPrinter = marker_printer or PrintOutputCapture.MarkerPrinter.DEFAULT
+        self._out: list[str] = []
 
     def get_out(self) -> str:
         return ''.join(self._out)
@@ -214,4 +202,47 @@ class _DefaultMarkerPrinter(PrintOutputCapture.MarkerPrinter):
         return marker.print(cursor, comment_wrapper, False)
 
 
+@dataclass
+class _SearchMarkersOnlyPrinter(PrintOutputCapture.MarkerPrinter):
+    """Only prints SearchResult markers, ignores all others."""
+    def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
+        from .markers import SearchResult
+        if isinstance(marker, SearchResult):
+            return marker.print(cursor, comment_wrapper, False)
+        return ""
+
+
+@dataclass
+class _VerboseMarkerPrinter(PrintOutputCapture.MarkerPrinter):
+    """Prints all markers with verbose=True (shows detail instead of message)."""
+    def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
+        return marker.print(cursor, comment_wrapper, True)
+
+
+@dataclass
+class _FencedMarkerPrinter(PrintOutputCapture.MarkerPrinter):
+    """Prints SearchResult and Markup markers with fenced {{uuid}} format."""
+    def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
+        from .markers import SearchResult, Markup
+        if isinstance(marker, (SearchResult, Markup)):
+            return "{{" + str(marker.id) + "}}"
+        return ""
+
+    def after_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
+        from .markers import SearchResult, Markup
+        if isinstance(marker, (SearchResult, Markup)):
+            return "{{" + str(marker.id) + "}}"
+        return ""
+
+
+@dataclass
+class _SanitizedMarkerPrinter(PrintOutputCapture.MarkerPrinter):
+    """Prints nothing - produces clean output without any marker annotations."""
+    pass
+
+
 PrintOutputCapture.MarkerPrinter.DEFAULT = _DefaultMarkerPrinter()
+PrintOutputCapture.MarkerPrinter.SEARCH_MARKERS_ONLY = _SearchMarkersOnlyPrinter()
+PrintOutputCapture.MarkerPrinter.VERBOSE = _VerboseMarkerPrinter()
+PrintOutputCapture.MarkerPrinter.FENCED = _FencedMarkerPrinter()
+PrintOutputCapture.MarkerPrinter.SANITIZED = _SanitizedMarkerPrinter()

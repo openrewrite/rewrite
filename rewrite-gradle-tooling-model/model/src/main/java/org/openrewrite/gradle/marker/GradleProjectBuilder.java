@@ -100,6 +100,7 @@ public final class GradleProjectBuilder {
                 .collect(toList());
     }
 
+    @SuppressWarnings("ResultOfMethodCallIgnored")
     private static MavenRepository.Builder withAuthentication(MavenArtifactRepository repo, MavenRepository.Builder builder) {
         if (!(repo instanceof AuthenticationSupportedInternal)) {
             return builder;
@@ -227,6 +228,7 @@ public final class GradleProjectBuilder {
                         .collect(toMap(GradleProjectBuilder::groupArtifact, dep -> dep, (a, b) -> a));
                 String exceptionType = null;
                 String exceptionMessage = null;
+                List<String> detectedCycles = new ArrayList<>();
                 // Archives and default are redundant with other configurations
                 // Newer versions of gradle display warnings with long stack traces when attempting to resolve them
                 // Some Scala plugin we don't care about creates configurations that, for some unknown reason, are difficult to resolve
@@ -242,10 +244,24 @@ public final class GradleProjectBuilder {
                     }
                     Map<GroupArtifact, ResolvedDependency> gaToResolved = resolvedConf.getFirstLevelModuleDependencies().stream()
                             .collect(toMap(GradleProjectBuilder::groupArtifact, dep -> dep, (a, b) -> a));
-                    resolved = resolved(gaToRequested, gaToResolved);
+                    resolved = resolved(gaToRequested, gaToResolved, detectedCycles);
                 } else {
                     resolved = emptyList();
                 }
+
+                // If cycles were detected, record them in the exception fields
+                if (!detectedCycles.isEmpty()) {
+                    if (exceptionType == null) {
+                        exceptionType = "org.openrewrite.gradle.marker.CyclicDependencyException";
+                    }
+                    String cycleMessage = "Cyclic dependency detected: " + String.join("; ", detectedCycles);
+                    if (exceptionMessage == null) {
+                        exceptionMessage = cycleMessage;
+                    } else {
+                        exceptionMessage = exceptionMessage + "; " + cycleMessage;
+                    }
+                }
+
                 GradleDependencyConfiguration dc = new GradleDependencyConfiguration(conf.getName(), conf.getDescription(),
                         conf.isTransitive(), conf.isCanBeResolved(), conf.isCanBeConsumed(), isCanBeDeclared(conf), emptyList(), requested, resolved, exceptionType, exceptionMessage, constraints(configurationContainer, conf), attributes(conf));
                 results.put(conf.getName(), dc);
@@ -370,6 +386,7 @@ public final class GradleProjectBuilder {
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
             // ProjectDependency.getDependencyProject() scheduled for removal in Gradle 9.0
             try {
+                //noinspection JavaReflectionMemberAccess
                 Method getDependencyProject = ProjectDependency.class.getMethod("getDependencyProject");
                 return ((Project) getDependencyProject.invoke(pd)).getPath();
             } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException ex) {
@@ -379,9 +396,10 @@ public final class GradleProjectBuilder {
         }
     }
 
-    private static List<org.openrewrite.maven.tree.ResolvedDependency> resolved(
+    static List<org.openrewrite.maven.tree.ResolvedDependency> resolved(
             Map<GroupArtifact, org.openrewrite.maven.tree.Dependency> gaToRequested,
-            Map<GroupArtifact, ResolvedDependency> gaToResolved) {
+            Map<GroupArtifact, ResolvedDependency> gaToResolved,
+            List<String> detectedCycles) {
         Map<org.openrewrite.maven.tree.ResolvedGroupArtifactVersion, org.openrewrite.maven.tree.ResolvedDependency>
                 resolvedCache = new HashMap<>();
         return gaToResolved.entrySet().stream()
@@ -394,13 +412,16 @@ public final class GradleProjectBuilder {
                     org.openrewrite.maven.tree.ResolvedDependency resolvedDependency = resolvedCache.get(resolvedGav);
                     if (resolvedDependency == null) {
                         org.openrewrite.maven.tree.Dependency requested = gaToRequested.getOrDefault(ga, dependency(resolved));
+                        // Track the traversal path to detect cycles at any depth
+                        List<GroupArtifactVersion> ancestorPath = new ArrayList<>();
+                        ancestorPath.add(groupArtifactVersion(resolved));
                         resolvedDependency = org.openrewrite.maven.tree.ResolvedDependency.builder()
                                 .gav(resolvedGav)
                                 // There may not be a requested entry if a dependency substitution rule took effect
                                 // the DependencyHandler has the substitution mapping buried inside it, but not exposed publicly
                                 .requested(requested)
                                 .dependencies(resolved.getChildren().stream()
-                                        .map(child -> resolved(child, 1, resolvedCache))
+                                        .map(child -> resolved(child, 1, resolvedCache, detectedCycles, ancestorPath))
                                         .collect(toList()))
                                 .licenses(emptyList())
                                 .type(requested.getType())
@@ -442,9 +463,11 @@ public final class GradleProjectBuilder {
         });
     }
 
-    private static org.openrewrite.maven.tree.ResolvedDependency resolved(
+    static org.openrewrite.maven.tree.ResolvedDependency resolved(
             ResolvedDependency dep, int depth,
-            Map<org.openrewrite.maven.tree.ResolvedGroupArtifactVersion, org.openrewrite.maven.tree.ResolvedDependency> resolvedCache
+            Map<org.openrewrite.maven.tree.ResolvedGroupArtifactVersion, org.openrewrite.maven.tree.ResolvedDependency> resolvedCache,
+            List<String> detectedCycles,
+            List<GroupArtifactVersion> ancestorPath
     ) {
         ResolvedGroupArtifactVersion resolvedGav = resolvedGroupArtifactVersion(dep);
         org.openrewrite.maven.tree.ResolvedDependency resolvedDependency = resolvedCache.get(resolvedGav);
@@ -461,7 +484,52 @@ public final class GradleProjectBuilder {
                     .build();
             //we add a temporal resolved dependency in the cache to avoid stackoverflow with dependencies that have cycles
             resolvedCache.put(resolvedGav, resolvedDependency);
-            dep.getChildren().forEach(child -> dependencies.add(resolved(child, depth + 1, resolvedCache)));
+
+            // Detect cycles at any depth by checking if a child dependency is already in our traversal path
+            dep.getChildren().forEach(child -> {
+                GroupArtifactVersion childGav = groupArtifactVersion(child);
+                // Check if the child is already in the current traversal path (cycle detection)
+                // Compare by GroupArtifact only since the same artifact may appear with different versions
+                GroupArtifact childGa = new GroupArtifact(childGav.getGroupId(), childGav.getArtifactId());
+                int cycleIndex = -1;
+                for (int i = 0; i < ancestorPath.size(); i++) {
+                    GroupArtifactVersion ancestor = ancestorPath.get(i);
+                    if (childGa.equals(new GroupArtifact(ancestor.getGroupId(), ancestor.getArtifactId()))) {
+                        cycleIndex = i;
+                        break;
+                    }
+                }
+
+                if (cycleIndex >= 0) {
+                    // Build the full cycle chain for the error message
+                    StringBuilder cycleChain = new StringBuilder();
+                    for (int i = cycleIndex; i < ancestorPath.size(); i++) {
+                        GroupArtifactVersion gav = ancestorPath.get(i);
+                        if (i > cycleIndex) {
+                            cycleChain.append(" -> ");
+                        }
+                        cycleChain.append(gav.getGroupId()).append(":").append(gav.getArtifactId());
+                        if (gav.getVersion() != null) {
+                            cycleChain.append(":").append(gav.getVersion());
+                        }
+                    }
+                    cycleChain.append(" -> ");
+                    cycleChain.append(childGav.getGroupId()).append(":").append(childGav.getArtifactId());
+                    if (childGav.getVersion() != null) {
+                        cycleChain.append(":").append(childGav.getVersion());
+                    }
+                    detectedCycles.add(cycleChain.toString());
+                } else {
+                    // Add current child to the path before recursing
+                    ancestorPath.add(childGav);
+                    try {
+                        dependencies.add(resolved(child, depth + 1, resolvedCache, detectedCycles, ancestorPath));
+                    } finally {
+                        // Remove from path after processing (backtrack)
+                        ancestorPath.remove(ancestorPath.size() - 1);
+                    }
+                }
+            });
         }
         return resolvedDependency;
     }

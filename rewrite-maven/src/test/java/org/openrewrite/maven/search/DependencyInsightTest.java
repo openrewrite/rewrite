@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.search;
 
-import org.assertj.core.api.Condition;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -27,6 +26,7 @@ import org.openrewrite.maven.table.ExplainDependenciesInUse;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class DependencyInsightTest implements RewriteTest {
@@ -213,49 +213,49 @@ class DependencyInsightTest implements RewriteTest {
     void versionPatterns(String versionPattern) {
         rewriteRun(
           recipeSpec -> recipeSpec.recipe(new DependencyInsight("org.springframework", "*", null, versionPattern, null)),
-            //language=xml
-            pomXml(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>foo</artifactId>
+                <version>1.0.0</version>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-core</artifactId>
+                    <version>6.1.5</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-aop</artifactId>
+                    <version>6.2.2</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>foo</artifactId>
+                <version>1.0.0</version>
+              
+                <dependencies>
+                  <!--~~(org.springframework:spring-core:6.1.5,org.springframework:spring-jcl:6.1.5)~~>--><dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-core</artifactId>
+                    <version>6.1.5</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-aop</artifactId>
+                    <version>6.2.2</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """
-                <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>foo</artifactId>
-                  <version>1.0.0</version>
-    
-                  <dependencies>
-                    <dependency>
-                      <groupId>org.springframework</groupId>
-                      <artifactId>spring-core</artifactId>
-                      <version>6.1.5</version>
-                    </dependency>
-                    <dependency>
-                      <groupId>org.springframework</groupId>
-                      <artifactId>spring-aop</artifactId>
-                      <version>6.2.2</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-                """,
-              """
-                <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>foo</artifactId>
-                  <version>1.0.0</version>
-    
-                  <dependencies>
-                    <!--~~(org.springframework:spring-core:6.1.5,org.springframework:spring-jcl:6.1.5)~~>--><dependency>
-                      <groupId>org.springframework</groupId>
-                      <artifactId>spring-core</artifactId>
-                      <version>6.1.5</version>
-                    </dependency>
-                    <dependency>
-                      <groupId>org.springframework</groupId>
-                      <artifactId>spring-aop</artifactId>
-                      <version>6.2.2</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-                """
-            )
+          )
         );
     }
 
@@ -266,9 +266,9 @@ class DependencyInsightTest implements RewriteTest {
           spec -> spec
             .dataTable(DependenciesInUse.Row.class, rows -> assertThat(rows).hasSize(2))
             .recipes(
-            new DependencyInsight("*", "guava", "compile", null, null),
-            new DependencyInsight("*", "lombok", "compile", null, null)
-          ),
+              new DependencyInsight("*", "guava", "compile", null, null),
+              new DependencyInsight("*", "lombok", "compile", null, null)
+            ),
           pomXml(
             """
               <project>
@@ -312,6 +312,216 @@ class DependencyInsightTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1803")
+    @Test
+    void findDependencyDeclaredInProjectParent() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("com.google.guava", "guava", null, null, null)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <groupId>org.sample</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                  <groupId>org.sample</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                  <dependencies>
+                    <!--~~(com.google.guava:guava:29.0-jre)~~>--><dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>../</relativePath>
+                    </parent>
+                    <artifactId>child</artifactId>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <!--~~(com.google.guava:guava:29.0-jre)~~>--><parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>../</relativePath>
+                    </parent>
+                    <artifactId>child</artifactId>
+                  </project>
+                  """,
+                spec -> spec.path("child/pom.xml")
+              )
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1803")
+    @Test
+    void doNotMarkParentTagWhenDependencyDeclaredInChild() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("com.google.guava", "guava", null, null, null)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <groupId>org.sample</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>29.0-jre</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>../</relativePath>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>../</relativePath>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <dependencies>
+                      <!--~~(com.google.guava:guava:29.0-jre)~~>--><dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.path("child/pom.xml")
+              )
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1803")
+    @Test
+    void doNotMarkParentTagWhenTransitiveDependencyComesFromChildDeclaredDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("org.springframework", "spring-core", null, null, null)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <groupId>org.sample</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>../</relativePath>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-web</artifactId>
+                        <version>2.7.18</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>../</relativePath>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <dependencies>
+                      <!--~~(org.springframework:spring-core:5.3.31)~~>--><dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-web</artifactId>
+                        <version>2.7.18</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.path("child/pom.xml")
+              )
+            )
+          )
+        );
+    }
+
     @Test
     @Disabled("Test is logically correct, but the MavenResolutionResult's dependency graph is not")
     void jacksonIsFoundInternally() {
@@ -319,46 +529,49 @@ class DependencyInsightTest implements RewriteTest {
           spec -> spec.recipe(new DependencyInsight("com.fasterxml.jackson.*", "*", null, null, null))
             .dataTable(DependenciesInUse.Row.class, rows -> {
                 assertThat(rows).isNotEmpty();
-                assertThat(rows).anyMatch(row ->
-                  "compileClasspath".equals(row.getScope()) &&
-                    "com.fasterxml.jackson.datatype".equals(row.getGroupId()) &&
-                    "jackson-datatype-jsr310".equals(row.getArtifactId()) &&
-                    row.getCount() == 1);
-                assertThat(rows).anyMatch(row ->
-                  "compileClasspath".equals(row.getScope()) &&
-                    "com.fasterxml.jackson.core".equals(row.getGroupId()) &&
-                    "jackson-core".equals(row.getArtifactId()) &&
-                    row.getCount() == 11);
-            })
-            .dataTable(ExplainDependenciesInUse.Row.class, rows -> {
-                assertThat(rows).isNotEmpty();
-                assertThat(rows).haveExactly(1, new Condition<>(row ->
-                  "com.fasterxml.jackson.core".equals(row.getGroupId()) &&
-                    "jackson-core".equals(row.getArtifactId()) &&
+                assertThat(rows)
+                  .filteredOn(row ->
                     "compile".equals(row.getScope()) &&
-                    """
-                      com.fasterxml.jackson.core:jackson-core:2.13.2
-                      +--- com.fasterxml.jackson.core:jackson-databind:2.13.2.2
-                      |    +--- com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2
-                      |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6
-                      |    |         \\--- org.springframework.boot:spring-boot-starter-web:2.6.6
-                      |    |              \\--- compile
-                      |    +--- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2
-                      |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
-                      |    +--- com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2
-                      |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
-                      |    +--- io.pivotal.cfenv:java-cfenv:2.5.0
-                      |    |    +--- io.pivotal.cfenv:java-cfenv-boot:2.5.0
-                      |    |    |    \\--- compile
-                      |    |    \\--- io.pivotal.cfenv:java-cfenv-jdbc:2.5.0
-                      |    |         \\--- io.pivotal.cfenv:java-cfenv-boot:2.5.0 (*)
-                      |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
-                      +--- com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2 (*)
-                      +--- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2 (*)
-                      +--- com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2 (*)
-                      \\--- io.pivotal.cfenv:java-cfenv:2.5.0 (*)
-                      """.equals(row.getDependencyGraph()), "jackson-core dependency graph"));
-            }),
+                      "com.fasterxml.jackson.datatype".equals(row.getGroupId()) &&
+                      "jackson-datatype-jsr310".equals(row.getArtifactId()))
+                  .anyMatch(row -> row.getCount() == 1);
+                assertThat(rows)
+                  .filteredOn(row ->
+                    "compile".equals(row.getScope()) &&
+                      "com.fasterxml.jackson.core".equals(row.getGroupId()) &&
+                      "jackson-core".equals(row.getArtifactId()))
+                  .anyMatch(row -> row.getCount() == 11);
+            })
+            .dataTable(ExplainDependenciesInUse.Row.class,
+              rows -> assertThat(rows)
+                .filteredOn(row ->
+                  "compile".equals(row.getScope()) &&
+                    "com.fasterxml.jackson.core".equals(row.getGroupId()) &&
+                    "jackson-core".equals(row.getArtifactId()))
+                .singleElement()
+                .extracting(ExplainDependenciesInUse.Row::getDependencyGraph)
+                .isEqualTo("""
+                  com.fasterxml.jackson.core:jackson-core:2.13.2
+                  +--- com.fasterxml.jackson.core:jackson-databind:2.13.2.2
+                  |    +--- com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2
+                  |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6
+                  |    |         \\--- org.springframework.boot:spring-boot-starter-web:2.6.6
+                  |    |              \\--- compile
+                  |    +--- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2
+                  |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
+                  |    +--- com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2
+                  |    |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
+                  |    +--- io.pivotal.cfenv:java-cfenv:2.5.0
+                  |    |    +--- io.pivotal.cfenv:java-cfenv-boot:2.5.0
+                  |    |    |    \\--- compile
+                  |    |    \\--- io.pivotal.cfenv:java-cfenv-jdbc:2.5.0
+                  |    |         \\--- io.pivotal.cfenv:java-cfenv-boot:2.5.0 (*)
+                  |    \\--- org.springframework.boot:spring-boot-starter-json:2.6.6 (*)
+                  +--- com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2 (*)
+                  +--- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2 (*)
+                  +--- com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2 (*)
+                  \\--- io.pivotal.cfenv:java-cfenv:2.5.0 (*)
+                  """)),
           pomXml(
             """
               <project>

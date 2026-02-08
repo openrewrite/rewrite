@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.format;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -46,36 +45,17 @@ public class AutoFormat extends Recipe {
     @Nullable
     String style;
 
-    @Option(displayName = "Remove custom line breaks",
-            description = "Do you want to remove custom line breaks? (default false)",
-            required = false)
-    @Nullable
-    Boolean removeCustomLineBreaks;
-
-    @JsonCreator
-    public AutoFormat(@Nullable String style, @Nullable Boolean removeCustomLineBreaks) {
-        this.style = style;
-        this.removeCustomLineBreaks = removeCustomLineBreaks;
-    }
-
-    @Deprecated
     public AutoFormat(@Nullable String style) {
-        this(style, null);
+        this.style = style;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Format Java code";
-    }
+    String displayName = "Format Java code";
 
-    @Override
-    public String getDescription() {
-        return "Format Java code using a standard comprehensive set of Java formatting recipes.";
-    }
+    String description = "Format Java code using a standard comprehensive set of Java formatting recipes.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new AutoFormatVisitor<>(null, Boolean.TRUE.equals(removeCustomLineBreaks), computeNamedStyles());
+        return new AutoFormatVisitor<>(null, computeNamedStyles());
     }
 
     private NamedStyles[] computeNamedStyles() {

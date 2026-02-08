@@ -19,6 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.table.DistinctGitProvenance;
@@ -129,6 +132,35 @@ class RecipeEstimatedEffortTest implements RewriteTest {
           ));
     }
 
+    @ParameterizedTest
+    @CsvSource({
+      "'foo is here', 'bar is here', 10",           // Only recipe1 applies
+      "'baz is here', 'qux is here', 5",            // Only recipe2 applies
+      "'foo and baz are here', 'bar and qux are here', 15" // Both recipes apply
+    })
+    void estimatedTimeSavingsForMultipleRecipes(String beforeContent, String afterContent, int expectedMinutes) {
+        // Create composite recipe with 2 recipes that have different estimated efforts
+        Recipe recipe1 = new CustomEstimatedEffortFindReplaceRecipe("foo", "bar", Duration.ofMinutes(10));
+        Recipe recipe2 = new CustomEstimatedEffortFindReplaceRecipe("baz", "qux", Duration.ofMinutes(5));
+        Recipe compositeRecipe = new CompositeRecipe(List.of(recipe1, recipe2));
+
+        rewriteRun(
+          spec -> spec.recipe(compositeRecipe)
+            .afterRecipe(run -> {
+                List<Result> results = run.getChangeset().getAllResults();
+                assertThat(results).hasSize(1);
+                assertThat(results.getFirst().getTimeSavings()).isEqualTo(Duration.ofMinutes(expectedMinutes));
+            })
+            .dataTable(SourcesFileResults.Row.class, rows -> {
+                long totalEstimatedTimeSaving = rows.stream()
+                    .mapToLong(SourcesFileResults.Row::getEstimatedTimeSaving)
+                    .sum();
+                assertThat(totalEstimatedTimeSaving).isEqualTo(expectedMinutes * 60L);
+            }),
+          text(beforeContent, afterContent)
+        );
+    }
+
     private static void assertEstimatedEffortInFirstRowOfSourceFileResults(List<SourcesFileResults.Row> rows, Long expectedEstimatedEffort) {
         assertThat(rows)
           .first()
@@ -149,15 +181,9 @@ class RecipeEstimatedEffortTest implements RewriteTest {
           description = "The text to be appended if the search term can found")
         String appendText;
 
-        @Override
-        public String getDisplayName() {
-            return "CustomEstimatedEffortRecipe";
-        }
+        String displayName = "CustomEstimatedEffortRecipe";
 
-        @Override
-        public String getDescription() {
-            return "NoArgRecipe.";
-        }
+        String description = "NoArgRecipe.";
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -166,7 +192,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
                 public PlainText visitText(PlainText text, ExecutionContext ctx) {
                     for (AlreadyReplaced alreadyReplaced : text.getMarkers().findAll(AlreadyReplaced.class)) {
                         if (Objects.equals(searchTerm, alreadyReplaced.getFind()) &&
-                          Objects.equals(appendText, alreadyReplaced.getReplace())) {
+                            Objects.equals(appendText, alreadyReplaced.getReplace())) {
                             return text;
                         }
                     }
@@ -189,6 +215,43 @@ class RecipeEstimatedEffortTest implements RewriteTest {
 
     @EqualsAndHashCode(callSuper = false)
     @Value
+    private static class CustomEstimatedEffortFindReplaceRecipe extends Recipe {
+        String find;
+        String replace;
+        Duration estimatedEffort;
+
+        @Override
+        public String getDisplayName() {
+            return "Simple text replace";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Replaces text in files";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    String newText = text.getText().replace(find, replace);
+                    if (!newText.equals(text.getText())) {
+                        return text.withText(newText);
+                    }
+                    return text;
+                }
+            };
+        }
+
+        @Override
+        public Duration getEstimatedEffortPerOccurrence() {
+            return estimatedEffort;
+        }
+    }
+
+    @EqualsAndHashCode(callSuper = false)
+    @Value
     private static class CustomEstimatedEffortCreateTextFile extends ScanningRecipe<AtomicBoolean> {
         @Option(displayName = "File contents",
           description = "Multiline text content for the file.",
@@ -206,15 +269,9 @@ class RecipeEstimatedEffortTest implements RewriteTest {
         @Nullable
         Boolean overwriteExisting;
 
-        @Override
-        public String getDisplayName() {
-            return "Create text file";
-        }
+        String displayName = "Create text file";
 
-        @Override
-        public String getDescription() {
-            return "Creates a new plain text file.";
-        }
+        String description = "Creates a new plain text file.";
 
         @Override
         public AtomicBoolean getInitialValue(ExecutionContext ctx) {
@@ -242,7 +299,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
             return new TreeVisitor<SourceFile, ExecutionContext>() {
                 @Override
                 public SourceFile visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                    var sourceFile = (SourceFile) requireNonNull(tree);
                     if (Boolean.TRUE.equals(overwriteExisting) && path.equals(sourceFile.getSourcePath())) {
                         if (sourceFile instanceof PlainText text) {
                             return text.withText(fileContents);

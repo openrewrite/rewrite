@@ -27,16 +27,10 @@ import java.util.Set;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class IsInRepository extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Is in repository";
-    }
+    String displayName = "Is in repository";
 
-    @Override
-    public String getDescription() {
-        return "A search recipe which marks files that are in a repository with one of the supplied names. " +
+    String description = "A search recipe which marks files that are in a repository with one of the supplied names. " +
                "Intended for use as a precondition for other recipes being run over many different repositories.";
-    }
 
     @Option(displayName = "Allowed repositories",
             description = "The names of the repositories that are allowed to be searched. " +

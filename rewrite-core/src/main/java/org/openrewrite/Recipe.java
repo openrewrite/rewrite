@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
@@ -90,15 +91,11 @@ public abstract class Recipe implements Cloneable {
     }
 
     static class Noop extends Recipe {
-        @Override
-        public String getDisplayName() {
-            return "Do nothing";
-        }
+        @Getter
+        final String displayName = "Do nothing";
 
-        @Override
-        public String getDescription() {
-            return "Default no-op test, does nothing.";
-        }
+        @Getter
+        final String description = "Default no-op test, does nothing.";
     }
 
     /**
@@ -209,9 +206,8 @@ public abstract class Recipe implements Cloneable {
      *
      * @return The tags.
      */
-    public Set<String> getTags() {
-        return emptySet();
-    }
+    @Getter
+    final Set<String> tags = emptySet();
 
     /**
      * @return An estimated effort were a developer to fix manually instead of using this recipe.
@@ -453,12 +449,7 @@ public abstract class Recipe implements Cloneable {
 
     @SuppressWarnings("unused")
     public Validated<Object> validate(ExecutionContext ctx) {
-        Validated<Object> validated = validate();
-
-        for (Recipe recipe : getRecipeList()) {
-            validated = validated.and(recipe.validate(ctx));
-        }
-        return validated;
+        return validate();
     }
 
     /**
@@ -478,9 +469,6 @@ public abstract class Recipe implements Cloneable {
             } catch (IllegalAccessException e) {
                 validated = Validated.invalid(field.getName(), null, "Unable to access " + clazz.getName() + "." + field.getName(), e);
             }
-        }
-        for (Recipe recipe : getRecipeList()) {
-            validated = validated.and(recipe.validate());
         }
         return validated;
     }

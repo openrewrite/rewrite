@@ -31,15 +31,9 @@ import java.util.List;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddCommentToMethodInvocations extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Add comment to method invocations";
-    }
+    String displayName = "Add comment to method invocations";
 
-    @Override
-    public String getDescription() {
-        return "Add a comment to method invocations in a Java source file.";
-    }
+    String description = "Add a comment to method invocations in a Java source file.";
 
     @Option(displayName = "Comment",
             description = "The comment to add.",

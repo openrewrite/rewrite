@@ -560,6 +560,23 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/6519")
+    @Test
+    void retainPackageInfoAnnotationWithMissingTypeInformation() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion()).typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              @NullMarked
+              package org.openrewrite.java;
+
+              import org.jspecify.annotations.NullMarked;
+              """,
+            spec -> spec.path("src/main/java/org/openrewrite/java/package-info.java")
+          )
+        );
+    }
+
     @Test
     void removePackageInfoStarImports() {
         rewriteRun(

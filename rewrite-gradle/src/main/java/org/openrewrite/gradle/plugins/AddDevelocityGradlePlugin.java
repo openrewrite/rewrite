@@ -109,15 +109,9 @@ public class AddDevelocityGradlePlugin extends Recipe {
         Failure
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Add the Develocity Gradle plugin";
-    }
+    String displayName = "Add the Develocity Gradle plugin";
 
-    @Override
-    public String getDescription() {
-        return "Add the Develocity Gradle plugin to settings.gradle files.";
-    }
+    String description = "Add the Develocity Gradle plugin to settings.gradle files.";
 
     @Override
     public Validated<Object> validate() {

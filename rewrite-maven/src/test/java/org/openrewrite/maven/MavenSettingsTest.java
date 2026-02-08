@@ -20,14 +20,11 @@ import org.assertj.core.api.Condition;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.assertj.core.api.ThrowingConsumer;
 import org.intellij.lang.annotations.Language;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
@@ -49,6 +46,7 @@ import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings({"HttpUrlsUsage", "ConstantConditions", "OptionalGetWithoutIsPresent"})
+@Isolated("Modifies user.home system property")
 @Execution(ExecutionMode.SAME_THREAD)
 class MavenSettingsTest {
 
@@ -80,27 +78,27 @@ class MavenSettingsTest {
         ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                    <activeProfiles>
-                        <activeProfile>
-                            repo
-                        </activeProfile>
-                    </activeProfiles>
-                    <profiles>
-                        <profile>
-                            <id>repo</id>
-                            <repositories>
-                                <repository>
-                                    <id>spring-milestones</id>
-                                    <name>Spring Milestones</name>
-                                    <url>https://repo.spring.io/milestone</url>
-                                </repository>
-                            </repositories>
-                        </profile>
-                    </profiles>
-                </settings>
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <activeProfiles>
+                    <activeProfile>
+                        repo
+                    </activeProfile>
+                </activeProfiles>
+                <profiles>
+                    <profile>
+                        <id>repo</id>
+                        <repositories>
+                            <repository>
+                                <id>spring-milestones</id>
+                                <name>Spring Milestones</name>
+                                <url>https://repo.spring.io/milestone</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                </profiles>
+            </settings>
             """
         ), ctx));
 
@@ -115,17 +113,17 @@ class MavenSettingsTest {
         MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                    <servers>
-                        <server>
-                          <id>server001</id>
-                          <username>my_login</username>
-                          <password>%s</password>
-                        </server>
-                      </servers>
-                </settings>
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <servers>
+                    <server>
+                      <id>server001</id>
+                      <username>my_login</username>
+                      <password>%s</password>
+                    </server>
+                  </servers>
+            </settings>
             """.formatted(ENCRYPTED_PASSWORD)
         ), ctx);
 
@@ -143,17 +141,17 @@ class MavenSettingsTest {
         MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                    <servers>
-                        <server>
-                          <id>server001</id>
-                          <username>my_login</username>
-                          <password>%s</password>
-                        </server>
-                      </servers>
-                </settings>
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <servers>
+                    <server>
+                      <id>server001</id>
+                      <username>my_login</username>
+                      <password>%s</password>
+                    </server>
+                  </servers>
+            </settings>
             """.formatted(plainTextPassword)
         ), ctx);
 
@@ -169,35 +167,35 @@ class MavenSettingsTest {
         ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                    <profiles>
-                        <profile>
-                            <id>default</id>
-                            <activation>
-                                <activeByDefault>true</activeByDefault>
-                            </activation>
-                            <repositories>
-                                <repository>
-                                    <id>spring-milestones-default</id>
-                                    <name>Spring Milestones</name>
-                                    <url>https://activebydefault.com</url>
-                                </repository>
-                            </repositories>
-                        </profile>
-                        <profile>
-                            <id>repo</id>
-                            <repositories>
-                                <repository>
-                                    <id>spring-milestones</id>
-                                    <name>Spring Milestones</name>
-                                    <url>https://actviebyactivationlist.com</url>
-                                </repository>
-                            </repositories>
-                        </profile>
-                    </profiles>
-                </settings>
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <profiles>
+                    <profile>
+                        <id>default</id>
+                        <activation>
+                            <activeByDefault>true</activeByDefault>
+                        </activation>
+                        <repositories>
+                            <repository>
+                                <id>spring-milestones-default</id>
+                                <name>Spring Milestones</name>
+                                <url>https://activebydefault.com</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                    <profile>
+                        <id>repo</id>
+                        <repositories>
+                            <repository>
+                                <id>spring-milestones</id>
+                                <name>Spring Milestones</name>
+                                <url>https://actviebyactivationlist.com</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                </profiles>
+            </settings>
             """
         ), ctx));
 
@@ -209,34 +207,34 @@ class MavenSettingsTest {
         ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                    <activeProfiles>
-                        <activeProfile>
-                            repo
-                        </activeProfile>
-                    </activeProfiles>
-                    <profiles>
-                        <profile>
-                            <id>repo</id>
-                            <repositories>
-                                <repository>
-                                    <id>repo</id>
-                                    <url>https://firstloses.com</url>
-                                </repository>
-                                <repository>
-                                    <id>repo</id>
-                                    <url>https://secondloses.com</url>
-                                </repository>
-                                <repository>
-                                    <id>repo</id>
-                                    <url>https://lastwins.com</url>
-                                </repository>
-                            </repositories>
-                        </profile>
-                    </profiles>
-                </settings>
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <activeProfiles>
+                    <activeProfile>
+                        repo
+                    </activeProfile>
+                </activeProfiles>
+                <profiles>
+                    <profile>
+                        <id>repo</id>
+                        <repositories>
+                            <repository>
+                                <id>repo</id>
+                                <url>https://firstloses.com</url>
+                            </repository>
+                            <repository>
+                                <id>repo</id>
+                                <url>https://secondloses.com</url>
+                            </repository>
+                            <repository>
+                                <id>repo</id>
+                                <url>https://lastwins.com</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                </profiles>
+            </settings>
             """
         ), ctx));
 
@@ -251,40 +249,40 @@ class MavenSettingsTest {
         ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                    <activeProfiles>
-                        <activeProfile>
-                            repo
-                        </activeProfile>
-                    </activeProfiles>
-                    <profiles>
-                        <profile>
-                            <id>default</id>
-                            <activation>
-                                <activeByDefault>true</activeByDefault>
-                            </activation>
-                            <repositories>
-                                <repository>
-                                    <id>spring-milestones-default</id>
-                                    <name>Spring Milestones</name>
-                                    <url>https://activebydefault.com</url>
-                                </repository>
-                            </repositories>
-                        </profile>
-                        <profile>
-                            <id>repo</id>
-                            <repositories>
-                                <repository>
-                                    <id>spring-milestones</id>
-                                    <name>Spring Milestones</name>
-                                    <url>https://activebyactivationlist.com</url>
-                                </repository>
-                            </repositories>
-                        </profile>
-                    </profiles>
-                </settings>
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <activeProfiles>
+                    <activeProfile>
+                        repo
+                    </activeProfile>
+                </activeProfiles>
+                <profiles>
+                    <profile>
+                        <id>default</id>
+                        <activation>
+                            <activeByDefault>true</activeByDefault>
+                        </activation>
+                        <repositories>
+                            <repository>
+                                <id>spring-milestones-default</id>
+                                <name>Spring Milestones</name>
+                                <url>https://activebydefault.com</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                    <profile>
+                        <id>repo</id>
+                        <repositories>
+                            <repository>
+                                <id>spring-milestones</id>
+                                <name>Spring Milestones</name>
+                                <url>https://activebyactivationlist.com</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                </profiles>
+            </settings>
             """
         ), ctx));
 
@@ -301,34 +299,34 @@ class MavenSettingsTest {
         ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                    <activeProfiles>
-                        <activeProfile>
-                            repo
-                        </activeProfile>
-                    </activeProfiles>
-                    <profiles>
-                        <profile>
-                            <id>repo</id>
-                            <repositories>
-                                <repository>
-                                    <id>spring-milestones</id>
-                                    <url>https://externalrepository.com</url>
-                                </repository>
-                            </repositories>
-                        </profile>
-                    </profiles>
-                    <mirrors>
-                        <mirror>
-                            <mirrorOf>*</mirrorOf>
-                            <name>repo</name>
-                            <url>https://internalartifactrepository.yourorg.com</url>
-                            <id>repo</id>
-                        </mirror>
-                    </mirrors>
-                </settings>
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <activeProfiles>
+                    <activeProfile>
+                        repo
+                    </activeProfile>
+                </activeProfiles>
+                <profiles>
+                    <profile>
+                        <id>repo</id>
+                        <repositories>
+                            <repository>
+                                <id>spring-milestones</id>
+                                <url>https://externalrepository.com</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                </profiles>
+                <mirrors>
+                    <mirror>
+                        <mirrorOf>*</mirrorOf>
+                        <name>repo</name>
+                        <url>https://internalartifactrepository.yourorg.com</url>
+                        <id>repo</id>
+                    </mirror>
+                </mirrors>
+            </settings>
             """
         ), ctx));
 
@@ -343,38 +341,38 @@ class MavenSettingsTest {
         ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                    <activeProfiles>
-                        <activeProfile>
-                            repo
-                        </activeProfile>
-                    </activeProfiles>
-                    <profiles>
-                        <profile>
-                            <id>repo</id>
-                            <repositories>
-                                <repository>
-                                    <id>should-be-mirrored</id>
-                                    <url>https://externalrepository.com</url>
-                                </repository>
-                                <repository>
-                                    <id>should-not-be-mirrored</id>
-                                    <url>https://externalrepository.com</url>
-                                </repository>
-                            </repositories>
-                        </profile>
-                    </profiles>
-                    <mirrors>
-                        <mirror>
-                            <mirrorOf>*,!should-not-be-mirrored</mirrorOf>
-                            <name>repo</name>
-                            <url>https://internalartifactrepository.yourorg.com</url>
-                            <id>repo</id>
-                        </mirror>
-                    </mirrors>
-                </settings>
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <activeProfiles>
+                    <activeProfile>
+                        repo
+                    </activeProfile>
+                </activeProfiles>
+                <profiles>
+                    <profile>
+                        <id>repo</id>
+                        <repositories>
+                            <repository>
+                                <id>should-be-mirrored</id>
+                                <url>https://externalrepository.com</url>
+                            </repository>
+                            <repository>
+                                <id>should-not-be-mirrored</id>
+                                <url>https://externalrepository.com</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                </profiles>
+                <mirrors>
+                    <mirror>
+                        <mirrorOf>*,!should-not-be-mirrored</mirrorOf>
+                        <name>repo</name>
+                        <url>https://internalartifactrepository.yourorg.com</url>
+                        <id>repo</id>
+                    </mirror>
+                </mirrors>
+            </settings>
             """
         ), ctx));
 
@@ -387,7 +385,7 @@ class MavenSettingsTest {
             )
           ).haveAtLeastOne(
             new Condition<>(repo -> "https://externalrepository.com".equals(repo.getUri()) &&
-                                    "should-not-be-mirrored".equals(repo.getId()),
+              "should-not-be-mirrored".equals(repo.getId()),
               "Repository should-not-be-mirrored should have had its URL left unchanged"
             )
           );
@@ -398,17 +396,17 @@ class MavenSettingsTest {
         var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                      <servers>
-                        <server>
-                          <id>server001</id>
-                          <username>my_login</username>
-                          <password>my_password</password>
-                        </server>
-                      </servers>
-                </settings>
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                  <servers>
+                    <server>
+                      <id>server001</id>
+                      <username>my_login</username>
+                      <password>my_password</password>
+                    </server>
+                  </servers>
+            </settings>
             """
         ), ctx);
 
@@ -428,17 +426,17 @@ class MavenSettingsTest {
         MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                    <servers>
-                        <server>
-                          <id>server001</id>
-                          <username>my_login</username>
-                          <password>%s</password>
-                        </server>
-                      </servers>
-                </settings>
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <servers>
+                    <server>
+                      <id>server001</id>
+                      <username>my_login</username>
+                      <password>%s</password>
+                    </server>
+                  </servers>
+            </settings>
             """.formatted(ENCRYPTED_PASSWORD)
         ), ctx);
 
@@ -457,17 +455,17 @@ class MavenSettingsTest {
         MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                    <servers>
-                        <server>
-                          <id>server001</id>
-                          <username>my_login</username>
-                          <password>%s</password>
-                        </server>
-                      </servers>
-                </settings>
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <servers>
+                    <server>
+                      <id>server001</id>
+                      <username>my_login</username>
+                      <password>%s</password>
+                    </server>
+                  </servers>
+            </settings>
             """.formatted(plainTextPassword)
         ), ctx);
 
@@ -484,18 +482,18 @@ class MavenSettingsTest {
         var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                      <servers>
-                        <server>
-                          <id>server001</id>
-                          <configuration>
-                            <timeout>40000</timeout>
-                          </configuration>
-                        </server>
-                      </servers>
-                </settings>
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                  <servers>
+                    <server>
+                      <id>server001</id>
+                      <configuration>
+                        <timeout>40000</timeout>
+                      </configuration>
+                    </server>
+                  </servers>
+            </settings>
             """
         ), ctx);
 
@@ -514,11 +512,11 @@ class MavenSettingsTest {
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
-                    <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                        xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                          <localRepository>%s</localRepository>
-                    </settings>
+                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                      <localRepository>%s</localRepository>
+                </settings>
                 """.formatted(localRepoPath)
             ), ctx));
             assertThat(ctx.getLocalRepository().getUri())
@@ -531,11 +529,11 @@ class MavenSettingsTest {
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
-                    <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                        xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                          <localRepository>%s</localRepository>
-                    </settings>
+                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                      <localRepository>%s</localRepository>
+                </settings>
                 """.formatted(localRepoPath)
             ), ctx));
 
@@ -549,10 +547,10 @@ class MavenSettingsTest {
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
-                        <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                            xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                        </settings>
+                    <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                    </settings>
                 """
             ), ctx));
 
@@ -569,35 +567,35 @@ class MavenSettingsTest {
             var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
-                    <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                        xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                        <servers>
-                             <server>
-                                 <id>private-repo</id>
-                                 <username>my_username</username>
-                                 <password>my_pass</password>
-                            </server>
-                        </servers>
-                        <localRepository>${rewrite.test.custom.location}/maven/local/repository/</localRepository>
-                        <activeProfiles>
-                            <activeProfile>
-                                my-profile
-                            </activeProfile>
-                        </activeProfiles>
-                        <profiles>
-                            <profile>
-                                <id>my-profile</id>
-                                <repositories>
-                                    <repository>
-                                        <id>private-repo</id>
-                                        <name>Private Repo</name>
-                                        <url>https://repo.company.net/maven</url>
-                                    </repository>
-                                </repositories>
-                            </profile>
-                        </profiles>
-                    </settings>
+                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                    <servers>
+                         <server>
+                             <id>private-repo</id>
+                             <username>my_username</username>
+                             <password>my_pass</password>
+                        </server>
+                    </servers>
+                    <localRepository>${rewrite.test.custom.location}/maven/local/repository/</localRepository>
+                    <activeProfiles>
+                        <activeProfile>
+                            my-profile
+                        </activeProfile>
+                    </activeProfiles>
+                    <profiles>
+                        <profile>
+                            <id>my-profile</id>
+                            <repositories>
+                                <repository>
+                                    <id>private-repo</id>
+                                    <name>Private Repo</name>
+                                    <url>https://repo.company.net/maven</url>
+                                </repository>
+                            </repositories>
+                        </profile>
+                    </profiles>
+                </settings>
                 """
             ), ctx);
 
@@ -609,35 +607,35 @@ class MavenSettingsTest {
             var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
-                    <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                        xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                        <servers>
-                             <server>
-                                 <id>private-repo</id>
-                                 <username>${env.PRIVATE_REPO_USERNAME_ZZ}</username>
-                                 <password>${env.PRIVATE_REPO_PASSWORD_ZZ}</password>
-                            </server>
-                        </servers>
-                        <localRepository>${custom.location.zz}/maven/local/repository/</localRepository>
-                        <activeProfiles>
-                            <activeProfile>
-                                my-profile
-                            </activeProfile>
-                        </activeProfiles>
-                        <profiles>
-                            <profile>
-                                <id>my-profile</id>
-                                <repositories>
-                                    <repository>
-                                        <id>private-repo</id>
-                                        <name>Private Repo</name>
-                                        <url>https://repo.company.net/maven</url>
-                                    </repository>
-                                </repositories>
-                            </profile>
-                        </profiles>
-                    </settings>
+                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                    <servers>
+                         <server>
+                             <id>private-repo</id>
+                             <username>${env.PRIVATE_REPO_USERNAME_ZZ}</username>
+                             <password>${env.PRIVATE_REPO_PASSWORD_ZZ}</password>
+                        </server>
+                    </servers>
+                    <localRepository>${custom.location.zz}/maven/local/repository/</localRepository>
+                    <activeProfiles>
+                        <activeProfile>
+                            my-profile
+                        </activeProfile>
+                    </activeProfiles>
+                    <profiles>
+                        <profile>
+                            <id>my-profile</id>
+                            <repositories>
+                                <repository>
+                                    <id>private-repo</id>
+                                    <name>Private Repo</name>
+                                    <url>https://repo.company.net/maven</url>
+                                </repository>
+                            </repositories>
+                        </profile>
+                    </profiles>
+                </settings>
                 """
             ), ctx);
 
@@ -655,35 +653,35 @@ class MavenSettingsTest {
             var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
-                    <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                        xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                        <servers>
-                             <server>
-                                 <id>private-repo</id>
-                                 <username>${env.REWRITE_TEST_PRIVATE_REPO_USERNAME}</username>
-                                 <password>${env.REWRITE_TEST_PRIVATE_REPO_PASSWORD}</password>
-                            </server>
-                        </servers>
-                        <localRepository>/tmp/maven/local/repository/</localRepository>
-                        <activeProfiles>
-                            <activeProfile>
-                                my-profile
-                            </activeProfile>
-                        </activeProfiles>
-                        <profiles>
-                            <profile>
-                                <id>my-profile</id>
-                                <repositories>
-                                    <repository>
-                                        <id>private-repo</id>
-                                        <name>Private Repo</name>
-                                        <url>https://repo.company.net/maven</url>
-                                    </repository>
-                                </repositories>
-                            </profile>
-                        </profiles>
-                    </settings>
+                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                    <servers>
+                         <server>
+                             <id>private-repo</id>
+                             <username>${env.REWRITE_TEST_PRIVATE_REPO_USERNAME}</username>
+                             <password>${env.REWRITE_TEST_PRIVATE_REPO_PASSWORD}</password>
+                        </server>
+                    </servers>
+                    <localRepository>/tmp/maven/local/repository/</localRepository>
+                    <activeProfiles>
+                        <activeProfile>
+                            my-profile
+                        </activeProfile>
+                    </activeProfiles>
+                    <profiles>
+                        <profile>
+                            <id>my-profile</id>
+                            <repositories>
+                                <repository>
+                                    <id>private-repo</id>
+                                    <name>Private Repo</name>
+                                    <url>https://repo.company.net/maven</url>
+                                </repository>
+                            </repositories>
+                        </profile>
+                    </profiles>
+                </settings>
                 """
             ), ctx);
 
@@ -715,41 +713,41 @@ class MavenSettingsTest {
     class MergingTest {
         @Language("xml")
         private final String installationSettings = """
-              <settings>
-                  <servers>
-                       <server>
-                           <id>private-repo</id>
-                           <username>user</username>
-                           <password>secret</password>
-                      </server>
-                  </servers>
-                  <localRepository>${user.home}/maven/local/repository/</localRepository>
-                  <activeProfiles>
-                      <activeProfile>
-                          my-profile
-                      </activeProfile>
-                  </activeProfiles>
-                  <profiles>
-                      <profile>
-                          <id>my-profile</id>
-                          <repositories>
-                              <repository>
-                                  <id>private-repo</id>
-                                  <name>Private Repo</name>
-                                  <url>https://repo.company.net/maven</url>
-                              </repository>
-                          </repositories>
-                      </profile>
-                  </profiles>
-                  <mirrors>
-                      <mirror>
-                          <id>planetmirror.com</id>
-                          <name>PlanetMirror Australia</name>
-                          <url>http://downloads.planetmirror.com/pub/maven2</url>
-                          <mirrorOf>central</mirrorOf>
-                      </mirror>
-                  </mirrors>
-              </settings>
+          <settings>
+              <servers>
+                   <server>
+                       <id>private-repo</id>
+                       <username>user</username>
+                       <password>secret</password>
+                  </server>
+              </servers>
+              <localRepository>${user.home}/maven/local/repository/</localRepository>
+              <activeProfiles>
+                  <activeProfile>
+                      my-profile
+                  </activeProfile>
+              </activeProfiles>
+              <profiles>
+                  <profile>
+                      <id>my-profile</id>
+                      <repositories>
+                          <repository>
+                              <id>private-repo</id>
+                              <name>Private Repo</name>
+                              <url>https://repo.company.net/maven</url>
+                          </repository>
+                      </repositories>
+                  </profile>
+              </profiles>
+              <mirrors>
+                  <mirror>
+                      <id>planetmirror.com</id>
+                      <name>PlanetMirror Australia</name>
+                      <url>http://downloads.planetmirror.com/pub/maven2</url>
+                      <mirrorOf>central</mirrorOf>
+                  </mirror>
+              </mirrors>
+          </settings>
           """;
 
         @Test
@@ -759,47 +757,47 @@ class MavenSettingsTest {
             var userSettings = MavenSettings.parse(Parser.Input.fromString(path,
               //language=xml
               """
-                    <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                        xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                        <servers>
-                             <server>
-                                 <id>private-repo-2</id>
-                                 <username>user</username>
-                                 <password>secret</password>
-                            </server>
-                        </servers>
-                        <activeProfiles>
-                            <activeProfile>
-                                my-profile-2
-                            </activeProfile>
-                        </activeProfiles>
-                        <profiles>
-                            <profile>
-                                <id>my-profile-2</id>
-                                <repositories>
-                                    <repository>
-                                        <id>private-repo-2</id>
-                                        <name>Private Repo</name>
-                                        <url>https://repo.company.net/maven</url>
-                                        <snapshots>
-                                            <enabled>true</enabled>
-                                            <updatePolicy>never</updatePolicy>
-                                            <checksumPolicy>fail</checksumPolicy>
-                                        </snapshots>
-                                    </repository>
-                                </repositories>
-                            </profile>
-                        </profiles>
-                        <mirrors>
-                            <mirror>
-                                <id>planetmirror.com-2</id>
-                                <name>PlanetMirror Australia</name>
-                                <url>http://downloads.planetmirror.com/pub/maven2</url>
-                                <mirrorOf>central</mirrorOf>
-                            </mirror>
-                        </mirrors>
-                    </settings>
+                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                    <servers>
+                         <server>
+                             <id>private-repo-2</id>
+                             <username>user</username>
+                             <password>secret</password>
+                        </server>
+                    </servers>
+                    <activeProfiles>
+                        <activeProfile>
+                            my-profile-2
+                        </activeProfile>
+                    </activeProfiles>
+                    <profiles>
+                        <profile>
+                            <id>my-profile-2</id>
+                            <repositories>
+                                <repository>
+                                    <id>private-repo-2</id>
+                                    <name>Private Repo</name>
+                                    <url>https://repo.company.net/maven</url>
+                                    <snapshots>
+                                        <enabled>true</enabled>
+                                        <updatePolicy>never</updatePolicy>
+                                        <checksumPolicy>fail</checksumPolicy>
+                                    </snapshots>
+                                </repository>
+                            </repositories>
+                        </profile>
+                    </profiles>
+                    <mirrors>
+                        <mirror>
+                            <id>planetmirror.com-2</id>
+                            <name>PlanetMirror Australia</name>
+                            <url>http://downloads.planetmirror.com/pub/maven2</url>
+                            <mirrorOf>central</mirrorOf>
+                        </mirror>
+                    </mirrors>
+                </settings>
                 """
             ), ctx);
 
@@ -865,36 +863,36 @@ class MavenSettingsTest {
             var userSettings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
-                    <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                        xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                        <servers>
-                             <server>
-                                 <id>private-repo</id>
-                                 <username>foo</username>
-                            </server>
-                        </servers>
-                        <profiles>
-                            <profile>
-                                <id>my-profile</id>
-                                <repositories>
-                                    <repository>
-                                        <id>private-repo</id>
-                                        <name>Private Repo</name>
-                                        <url>https://repo.company.net/maven</url>
-                                    </repository>
-                                </repositories>
-                            </profile>
-                        </profiles>
-                        <mirrors>
-                            <mirror>
-                                <id>planetmirror.com</id>
-                                <name>PlanetMirror Australia</name>
-                                <url>http://downloads.planetmirror.com/pub/maven3000</url>
-                                <mirrorOf>central</mirrorOf>
-                            </mirror>
-                        </mirrors>
-                    </settings>
+                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                    <servers>
+                         <server>
+                             <id>private-repo</id>
+                             <username>foo</username>
+                        </server>
+                    </servers>
+                    <profiles>
+                        <profile>
+                            <id>my-profile</id>
+                            <repositories>
+                                <repository>
+                                    <id>private-repo</id>
+                                    <name>Private Repo</name>
+                                    <url>https://repo.company.net/maven</url>
+                                </repository>
+                            </repositories>
+                        </profile>
+                    </profiles>
+                    <mirrors>
+                        <mirror>
+                            <id>planetmirror.com</id>
+                            <name>PlanetMirror Australia</name>
+                            <url>http://downloads.planetmirror.com/pub/maven3000</url>
+                            <mirrorOf>central</mirrorOf>
+                        </mirror>
+                    </mirrors>
+                </settings>
                 """
             ), ctx);
 
@@ -966,13 +964,13 @@ class MavenSettingsTest {
               <server>
                 <id>maven-snapshots</id>
                 <configuration>
-                  <timeout>10000</timeout>
                   <httpHeaders>
                     <property>
                       <name>X-JFrog-Art-Api</name>
                       <value>myApiToken</value>
                     </property>
                   </httpHeaders>
+                  <timeout>10000</timeout>
                 </configuration>
               </server>
             </servers>

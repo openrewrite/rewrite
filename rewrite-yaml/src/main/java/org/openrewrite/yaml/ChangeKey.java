@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.yaml.tree.Yaml;
 
 @Value
@@ -36,19 +37,18 @@ public class ChangeKey extends Recipe {
             example = "kind")
     String newKey;
 
-    @Override
-    public String getDisplayName() {
-        return "Change key";
-    }
+    String displayName = "Change key";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s` to `%s`", oldKeyPath, newKey);
     }
 
+    String description = "Change a YAML mapping entry key while leaving the value intact.";
+
     @Override
-    public String getDescription() {
-        return "Change a YAML mapping entry key while leaving the value intact.";
+    public Validated<Object> validate() {
+        return super.validate().and(JsonPathMatcher.validate("oldKeyPath", oldKeyPath));
     }
 
     @Override

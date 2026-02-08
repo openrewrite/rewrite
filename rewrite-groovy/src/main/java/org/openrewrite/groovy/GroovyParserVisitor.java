@@ -16,6 +16,7 @@
 package org.openrewrite.groovy;
 
 import groovy.lang.GroovySystem;
+import groovy.transform.Canonical;
 import groovy.transform.Field;
 import groovy.transform.Generated;
 import groovy.transform.Immutable;
@@ -673,7 +674,11 @@ public class GroovyParserVisitor {
                         body = bodyVisitor.visit(method.getCode());
                     }
                 } else {
-                    body = bodyVisitor.visit(method.getCode());
+                    if (annotations.stream().anyMatch(a -> TypeUtils.isOfClassType(a.getAnnotationType().getType(), "groovy.transform.Synchronized"))) {
+                        body = bodyVisitor.visit(((SynchronizedStatement) method.getCode()).getCode());
+                    } else {
+                        body = bodyVisitor.visit(method.getCode());
+                    }
                 }
             }
 
@@ -950,8 +955,12 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitClassExpression(ClassExpression clazz) {
-            Space prefix = whitespace();
             ClassNode type = clazz.getType();
+            if (type.isArray()) {
+                queue.add(arrayType(type));
+                return;
+            }
+            Space prefix = whitespace();
             String name = type.getNameWithoutPackage().replace('$', '.');
             if (!source.startsWith(name, cursor)) {
                 name = type.getUnresolvedName().replace('$', '.');
@@ -1355,17 +1364,26 @@ public class GroovyParserVisitor {
                 for (int i = 0; i < parameters.length; i++) {
                     Parameter p = parameters[i];
                     JavaType type = typeMapping.type(staticType(p));
-                    J expr = new J.VariableDeclarations(randomId(), whitespace(), Markers.EMPTY,
-                            emptyList(), emptyList(), p.isDynamicTyped() ? null : visitTypeTree(p.getType()),
+                    Space varDeclPrefix = whitespace();
+                    TypeTree paramType = p.isDynamicTyped() ? null : visitTypeTree(p.getType());
+                    JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
+                            new J.VariableDeclarations.NamedVariable(randomId(), sourceBefore(p.getName()), Markers.EMPTY,
+                                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), p.getName(), type, null),
+                                    emptyList(), null,
+                                    typeMapping.variableType(p.getName(), staticType(p)))
+                    );
+                    org.codehaus.groovy.ast.expr.Expression defaultValue = p.getInitialExpression();
+                    if (defaultValue != null) {
+                        paramName = paramName.withElement(paramName.getElement().getPadding()
+                                .withInitializer(new JLeftPadded<>(
+                                        sourceBefore("="),
+                                        visit(defaultValue),
+                                        Markers.EMPTY)));
+                    }
+                    J expr = new J.VariableDeclarations(randomId(), varDeclPrefix, Markers.EMPTY,
+                            emptyList(), emptyList(), paramType,
                             null,
-                            singletonList(
-                                    JRightPadded.build(
-                                            new J.VariableDeclarations.NamedVariable(randomId(), sourceBefore(p.getName()), Markers.EMPTY,
-                                                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), p.getName(), type, null),
-                                                    emptyList(), null,
-                                                    typeMapping.variableType(p.getName(), staticType(p)))
-                                    )
-                            ));
+                            singletonList(paramName));
                     JRightPadded<J> param = JRightPadded.build(expr);
                     if (i != parameters.length - 1) {
                         param = param.withAfter(sourceBefore(","));
@@ -1990,21 +2008,18 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMethodPointerExpression(MethodPointerExpression ref) {
-            String referenceName = null;
-            if (ref.getMethodName() instanceof ConstantExpression) {
-                referenceName = ((ConstantExpression) ref.getMethodName()).getValue().toString();
-            }
-
+            boolean isMethodRef = ref instanceof MethodReferenceExpression;
+            String name = ref.getMethodName().getText();
             queue.add(new J.MemberReference(randomId(),
                     whitespace(),
-                    Markers.EMPTY,
-                    padRight(visit(ref.getExpression()), sourceBefore("::")),
+                    isMethodRef ? Markers.EMPTY : Markers.build(singleton(new MethodPointer(randomId()))),
+                    padRight(visit(ref.getExpression()), sourceBefore(isMethodRef ? "::" : ".&")),
                     null, // not supported by Groovy
                     padLeft(whitespace(), new J.Identifier(randomId(),
-                            sourceBefore(referenceName),
+                            sourceBefore(name),
                             Markers.EMPTY,
                             emptyList(),
-                            referenceName,
+                            name,
                             null, null)),
                     typeMapping.type(ref.getType()),
                     null, // not enough information in the AST
@@ -2429,7 +2444,7 @@ public class GroovyParserVisitor {
             Space space = whitespace();
             J.FieldAccess qualid = TypeTree.build(name()).withPrefix(space);
             JLeftPadded<J.Identifier> alias = null;
-            if (sourceStartsWith("as")) {
+            if (sourceStartsWith("as", "\n", " ")) {
                 alias = padLeft(sourceBefore("as"), new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), name(), null, null));
             }
             return maybeSemicolon(new J.Import(randomId(), importPrefix, Markers.EMPTY, statik, qualid, alias));
@@ -2440,6 +2455,10 @@ public class GroovyParserVisitor {
         return maybeSemicolon(groovyVisitor.pollQueue());
     }
 
+    // The groovy compiler discards these annotations in favour of other transform annotations,
+    // so they must be parsed by hand when found in source.
+    private static final Class<?>[] DISCARDED_TRANSFORM_ANNOTATIONS = {Canonical.class, Immutable.class, groovy.transform.Synchronized.class};
+
     public List<J.Annotation> visitAndGetAnnotations(AnnotatedNode node, RewriteGroovyClassVisitor classVisitor) {
         if (node.getAnnotations().isEmpty()) {
             return emptyList();
@@ -2447,10 +2466,10 @@ public class GroovyParserVisitor {
 
         List<J.Annotation> paramAnnotations = new ArrayList<>(node.getAnnotations().size());
         for (AnnotationNode annotationNode : node.getAnnotations()) {
-            // The groovy compiler can add or remove annotations for AST transformations.
-            // Because @groovy.transform.Immutable is discarded in favour of other transform annotations, the removed annotation must be parsed by hand.
-            if (sourceStartsWith("@" + Immutable.class.getSimpleName()) || sourceStartsWith("@" + Immutable.class.getCanonicalName())) {
-                paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(Immutable.class)), classVisitor));
+            for (Class<?> discarded : DISCARDED_TRANSFORM_ANNOTATIONS) {
+                if (sourceStartsWith("@" + discarded.getSimpleName()) || sourceStartsWith("@" + discarded.getCanonicalName())) {
+                    paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(discarded)), classVisitor));
+                }
             }
 
             if (appearsInSource(annotationNode)) {

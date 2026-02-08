@@ -68,3 +68,160 @@ class TestRemovePass:
                 """
             )
         )
+
+    def test_keeps_pass_when_only_statement_in_function(self):
+        """Test that pass is NOT removed when it's the only statement in a function."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                """
+                def foo():
+                    pass
+                """
+            )
+        )
+
+    def test_keeps_pass_when_only_statement_in_class(self):
+        """Test that pass is NOT removed when it's the only statement in a class body."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                """
+                class Foo:
+                    pass
+                """
+            )
+        )
+
+    def test_removes_pass_from_class_method(self):
+        """Test that pass is removed from a method inside a class when there are other statements."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                """
+                class Foo:
+                    def bar(self):
+                        pass
+                        x = 1
+                """,
+                """
+                class Foo:
+                    def bar(self):
+                        x = 1
+                """,
+            )
+        )
+
+    def test_removes_pass_from_if_block(self):
+        """Test that pass is removed from an if block when there are other statements."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                """
+                if True:
+                    pass
+                    x = 1
+                """,
+                """
+                if True:
+                    x = 1
+                """,
+            )
+        )
+
+    def test_keeps_pass_when_only_statement_in_if(self):
+        """Test that pass is NOT removed when it's the only statement in an if block."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                """
+                if True:
+                    pass
+                """
+            )
+        )
+
+    def test_removes_pass_from_else_block(self):
+        """Test that pass is removed from an else block when there are other statements."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                """
+                if False:
+                    x = 1
+                else:
+                    pass
+                    y = 2
+                """,
+                """
+                if False:
+                    x = 1
+                else:
+                    y = 2
+                """,
+            )
+        )
+
+    def test_keeps_pass_when_only_docstring_in_function(self):
+        """Test that pass is NOT removed when the only other statement is a docstring."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                '''
+                def foo():
+                    """This is a docstring."""
+                    pass
+                '''
+            )
+        )
+
+    def test_keeps_pass_when_only_docstring_in_class(self):
+        """Test that pass is NOT removed when the only other statement is a class docstring."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                '''
+                class Foo:
+                    """This is a class docstring."""
+                    pass
+                '''
+            )
+        )
+
+    def test_removes_pass_when_docstring_plus_other_statement(self):
+        """Test that pass IS removed when there is a docstring AND other statements."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                '''
+                def foo():
+                    """This is a docstring."""
+                    pass
+                    x = 1
+                ''',
+                '''
+                def foo():
+                    """This is a docstring."""
+                    x = 1
+                ''',
+            )
+        )
+
+    def test_removes_pass_when_string_not_first_statement(self):
+        """Test that pass IS removed when the string literal is not the first statement (not a docstring)."""
+        spec = RecipeSpec(recipe=RemovePass())
+        spec.rewrite_run(
+            python(
+                '''
+                def foo():
+                    x = 1
+                    """Not a docstring."""
+                    pass
+                ''',
+                '''
+                def foo():
+                    x = 1
+                    """Not a docstring."""
+                ''',
+            )
+        )

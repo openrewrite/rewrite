@@ -250,8 +250,8 @@ class JavaTemplateTest6Test implements RewriteTest {
                   return super.visitMethodDeclaration(method, p);
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
-              J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+              var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              var testMethodDecl = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
               assertThat(testMethodDecl.getMethodType().getThrownExceptions().stream()
                 .map(JavaType.FullyQualified.class::cast)
                 .map(JavaType.FullyQualified::getFullyQualifiedName))
@@ -289,7 +289,7 @@ class JavaTemplateTest6Test implements RewriteTest {
                   return super.visitMethodDeclaration(method, p);
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
               JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();
               assertThat(type).isNotNull();
               var paramTypes = type.getParameterTypes();
@@ -494,6 +494,56 @@ class JavaTemplateTest6Test implements RewriteTest {
                               new Integer(i);
                           }
                       }.toString();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6520")
+    @Test
+    void annotateMethodInAnonymousClassWithMultipleArgs() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
+                  if (m.getSimpleName().equals("toString") && m.getLeadingAnnotations().stream().noneMatch(
+                    a -> a.getSimpleName().equals("SuppressWarnings"))) {
+                      return JavaTemplate.builder("@SuppressWarnings(\"all\")")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              class A {
+                  A(Object o, String name) {}
+              }
+              class B {
+                  void test() {
+                      new A(new Object() {
+                          @Override
+                          public String toString() { return null; }
+                      }, "Elvar Fridriksson");
+                  }
+              }
+              """,
+            """
+              class A {
+                  A(Object o, String name) {}
+              }
+              class B {
+                  void test() {
+                      new A(new Object() {
+                          @Override
+                          @SuppressWarnings("all")
+                          public String toString() { return null; }
+                      }, "Elvar Fridriksson");
                   }
               }
               """

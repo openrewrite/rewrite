@@ -61,15 +61,9 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
     private static final String CATALOG_PATH = "gradle/libs.versions.toml";
     private static final String GRADLE_PROPERTIES = "gradle.properties";
 
-    @Override
-    public String getDisplayName() {
-        return "Migrate Gradle project dependencies to version catalog";
-    }
+    String displayName = "Migrate Gradle project dependencies to version catalog";
 
-    @Override
-    public String getDescription() {
-        //language=markdown
-        return "Migrates Gradle project dependencies to use the [version catalog](https://docs.gradle.org/current/userguide/platforms.html) feature. " +
+    String description = "Migrates Gradle project dependencies to use the [version catalog](https://docs.gradle.org/current/userguide/platforms.html) feature. " +
                 "Supports migrating dependency declarations of various forms:\n" +
                 " * `String` notation: `\"group:artifact:version\"`\n" +
                 " * `Map` notation: `group: 'group', name: 'artifact', version: 'version'`\n" +
@@ -80,7 +74,6 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                 " * Migrate version properties from `gradle.properties` to the version catalog\n" +
                 " * Preserve project dependencies unchanged\n\n" +
                 "**Note:** If a version catalog already exists, the recipe will not modify it.";
-    }
 
     static class DependencyAccumulator {
         final Map<String, DependencyInfo> dependencies = new LinkedHashMap<>();

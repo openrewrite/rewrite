@@ -434,6 +434,30 @@ class LombokTest implements RewriteTest {
         );
     }
 
+    @MinimumJava11
+    @Issue("https://github.com/openrewrite/rewrite/issues/5490")
+    @Test
+    void generatedAnnotationOnMethodWithDollarBraceInJavadoc() {
+        rewriteRun(
+          java(
+            """
+              import lombok.Generated;
+
+              class Test {
+                  /**
+                   * @param relPath path from the ${user.home}/.symphony directory
+                   * @return Configuration
+                   */
+                  @Generated
+                  Object loadFromSymphonyDir(String relPath) {
+                      return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void data() {
         rewriteRun(
@@ -1141,7 +1165,7 @@ class LombokTest implements RewriteTest {
                 .parser(JavaParser.fromJavaVersion().classpath("jackson-annotations", "lombok"))
                 .typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
                     assert o instanceof FindMissingTypes.MissingTypeResult;
-                    FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
+                    var result = (FindMissingTypes.MissingTypeResult) o;
                     // Using the @Jacksonized annotation in java 8 just breaks it all
                     return result.getPath().startsWith("ClassDeclaration->CompilationUnit") ||
                       result.getPath().startsWith("Identifier->Annotation") ||
@@ -1170,7 +1194,7 @@ class LombokTest implements RewriteTest {
             rewriteRun(
               spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
                   assert o instanceof FindMissingTypes.MissingTypeResult;
-                  FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
+                  var result = (FindMissingTypes.MissingTypeResult) o;
                   // The AllArgsConstructorHandler, GetterHandler and SetterHandler do not run at all for java 8,
                   // so no generated constructors and methods, thus no types.
                   return result.getPath().startsWith("NewClass->") || result.getPath().startsWith("MethodInvocation->");
@@ -1212,7 +1236,7 @@ class LombokTest implements RewriteTest {
             rewriteRun(
               spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
                   assert o instanceof FindMissingTypes.MissingTypeResult;
-                  FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
+                  var result = (FindMissingTypes.MissingTypeResult) o;
                   // The NoArgsConstructor and RequiredArgsConstructor do not run at all for java 8,
                   // so no generated constructors, thus no types.
                   return result.getPath().startsWith("NewClass->");

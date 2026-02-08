@@ -4,14 +4,13 @@ Python RPC Sender that mirrors Java's PythonSender structure.
 This uses the visitor pattern with pre_visit handling common fields (id, prefix, markers)
 and type-specific visit methods handling only additional fields.
 """
-import sys
 from typing import Any
 
 from rewrite import Markers
 from rewrite.java import Space, JRightPadded, JLeftPadded, JContainer, J
 from rewrite.python import CompilationUnit
 from rewrite.python.tree import (
-    Py, Async, Await, Binary, ChainedAssignment, ExceptionType,
+    Async, Await, Binary, ChainedAssignment, ExceptionType,
     LiteralType, TypeHint, ExpressionStatement, ExpressionTypeTree,
     StatementExpression, MultiImport, KeyValue, DictLiteral, CollectionLiteral,
     FormattedString, Pass, TrailingElseWrapper, ComprehensionExpression,
@@ -19,19 +18,14 @@ from rewrite.python.tree import (
     Star, NamedArgument, TypeHintedExpression, ErrorFrom, MatchCase, Slice
 )
 
-_DEBUG_SENDER = False
-
-def _debug(msg: str) -> None:
-    if _DEBUG_SENDER:
-        print(f"[SENDER] {msg}", file=sys.stderr, flush=True)
-
 
 class PythonRpcSender:
     """Sender that mirrors Java's PythonSender for RPC serialization."""
 
     def send(self, after: Any, before: Any, q: 'RpcSendQueue') -> None:
         """Entry point for sending an object."""
-        from rewrite.rpc.send_queue import RpcObjectState, to_java_type_name
+        from rewrite.rpc.send_queue import RpcObjectState
+        from rewrite.rpc.receive_queue import get_java_type_name
 
         if before is after:
             q.put({'state': RpcObjectState.NO_CHANGE})
@@ -43,13 +37,13 @@ class PythonRpcSender:
 
         if before is None:
             # ADD for new object
-            value_type = to_java_type_name(type(after)) if hasattr(after, '__class__') else None
+            value_type = get_java_type_name(type(after)) if hasattr(after, '__class__') else None
             q.put({'state': RpcObjectState.ADD, 'valueType': value_type})
             q._before = None
             self._visit(after, q)
         else:
             # CHANGE for existing object
-            value_type = to_java_type_name(type(after)) if hasattr(after, '__class__') else None
+            value_type = get_java_type_name(type(after)) if hasattr(after, '__class__') else None
             q.put({'state': RpcObjectState.CHANGE, 'valueType': value_type})
             q._before = before
             self._visit(after, q)
@@ -58,8 +52,6 @@ class PythonRpcSender:
         """Visit a tree node, dispatching to appropriate visitor method."""
         if tree is None:
             return
-
-        _debug(f"_visit: {type(tree).__name__}")
 
         # First handle common J fields via pre_visit
         # ExpressionStatement and StatementExpression delegate prefix/markers to their child, so skip them
@@ -326,22 +318,14 @@ class PythonRpcSender:
         q.get_and_send(ef, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
 
     def _visit_match_case(self, mc: MatchCase, q: 'RpcSendQueue') -> None:
-        _debug(f"_visit_match_case: id={mc.id}")
         q.get_and_send(mc, lambda x: x.pattern, lambda el: self._visit(el, q))
-        _debug("_visit_match_case: sent pattern")
         q.get_and_send(mc, lambda x: x.padding.guard, lambda el: self._visit_left_padded(el, q))
-        _debug("_visit_match_case: sent guard")
         q.get_and_send(mc, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
-        _debug("_visit_match_case: done")
 
     def _visit_match_case_pattern(self, p: MatchCase.Pattern, q: 'RpcSendQueue') -> None:
-        _debug(f"_visit_match_case_pattern: kind={p.kind}, children_count={len(p.children) if p.children else 0}")
         q.get_and_send(p, lambda x: x.kind)
-        _debug("_visit_match_case_pattern: sent kind")
         q.get_and_send(p, lambda x: x.padding.children, lambda el: self._visit_container(el, q))
-        _debug("_visit_match_case_pattern: sent children")
         q.get_and_send(p, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
-        _debug("_visit_match_case_pattern: done")
 
     def _visit_slice(self, slice_: Slice, q: 'RpcSendQueue') -> None:
         q.get_and_send(slice_, lambda x: x.padding.start, lambda el: self._visit_right_padded(el, q))
@@ -358,7 +342,8 @@ class PythonRpcSender:
             ClassDeclaration, VariableDeclarations, Return, Assignment,
             AssignmentOperation, Unary, Ternary, Lambda, Empty, Throw,
             Assert, Break, Continue, WhileLoop, ForEachLoop, Switch, Case, Annotation, Import,
-            Binary, Parentheses, ControlParentheses, NewArray, Modifier, Yield
+            Binary, Parentheses, ControlParentheses, NewArray, Modifier, Yield,
+            ParameterizedType, TypeParameter, TypeParameters
         )
 
         # For Java types, we need to handle their specific fields
@@ -446,6 +431,12 @@ class PythonRpcSender:
             self._visit_j_modifier(j, q)
         elif isinstance(j, Yield):
             self._visit_j_yield(j, q)
+        elif isinstance(j, ParameterizedType):
+            self._visit_j_parameterized_type(j, q)
+        elif isinstance(j, TypeParameter):
+            self._visit_j_type_parameter(j, q)
+        elif isinstance(j, TypeParameters):
+            self._visit_j_type_parameters(j, q)
 
     def _visit_identifier(self, ident, q: 'RpcSendQueue') -> None:
         # Java Identifier sends: annotations (list), simpleName, type (ref), fieldType (ref)
@@ -459,7 +450,9 @@ class PythonRpcSender:
     def _visit_literal(self, lit, q: 'RpcSendQueue') -> None:
         q.get_and_send(lit, lambda x: x.value)
         q.get_and_send(lit, lambda x: x.value_source)
-        q.get_and_send(lit, lambda x: x.unicode_escapes)
+        q.get_and_send_list(lit, lambda x: x.unicode_escapes,
+                            lambda s: str(s.value_source_index) + s.code_point,
+                            None)
         q.get_and_send(lit, lambda x: x.type, lambda t: self._visit_type(t, q))
 
     def _visit_import(self, imp, q: 'RpcSendQueue') -> None:
@@ -480,7 +473,8 @@ class PythonRpcSender:
         q.get_and_send(mi, lambda x: x.padding.type_parameters, lambda c: self._visit_container(c, q))
         q.get_and_send(mi, lambda x: x.name, lambda el: self._visit(el, q))
         q.get_and_send(mi, lambda x: x.padding.arguments, lambda c: self._visit_container(c, q))
-        q.get_and_send(mi, lambda x: x.method_type)
+        # method_type: serialize the JavaType.Method with all its fields
+        q.get_and_send(mi, lambda x: x.method_type, lambda t: self._visit_type(t, q) if t else None)
 
     def _visit_block(self, block, q: 'RpcSendQueue') -> None:
         # static is JRightPadded[bool], not just bool
@@ -596,6 +590,13 @@ class PythonRpcSender:
         q.get_and_send(ternary, lambda x: x.padding.false_part, lambda lp: self._visit_left_padded(lp, q))
         q.get_and_send(ternary, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
 
+    def _visit_j_parameterized_type(self, param_type, q: 'RpcSendQueue') -> None:
+        # Java ParameterizedType: clazz, typeParameters (container), type
+        q.get_and_send(param_type, lambda x: x.clazz, lambda el: self._visit(el, q))
+        q.get_and_send(param_type, lambda x: x.padding.type_parameters if hasattr(x.padding, 'type_parameters') else None,
+                      lambda c: self._visit_container(c, q) if c else None)
+        q.get_and_send(param_type, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
+
     def _visit_j_lambda(self, lam, q: 'RpcSendQueue') -> None:
         # Java Lambda: params, arrow, body, type
         q.get_and_send(lam, lambda x: x.parameters, lambda el: self._visit(el, q))
@@ -658,7 +659,8 @@ class PythonRpcSender:
         q.get_and_send(class_decl, lambda x: x.body, lambda el: self._visit(el, q))
 
     def _visit_j_class_declaration_kind(self, kind, q: 'RpcSendQueue') -> None:
-        # Java ClassDeclaration.Kind: annotations (list), type (enum)
+        # Java ClassDeclaration.Kind: preVisit IS automatically called by _visit before this method
+        # Java sends: id, prefix, markers (via preVisit), then annotations (list), type (enum)
         q.get_and_send_list(kind, lambda x: x.annotations,
                            lambda a: a.id,
                            lambda a: self._visit(a, q))
@@ -675,12 +677,11 @@ class PythonRpcSender:
         q.get_and_send(method, lambda x: x.padding.type_parameters if hasattr(x.padding, 'type_parameters') else None,
                       lambda el: self._visit(el, q) if el else None)
         q.get_and_send(method, lambda x: x.return_type_expression, lambda el: self._visit(el, q))
-        # Name annotations from IdentifierWithAnnotations
-        q.get_and_send_list(method, lambda x: x.annotations.name.annotations if hasattr(x.annotations.name, 'annotations') else [],
+        # Simplified model: nameAnnotations and name are separate fields (like TypeScript)
+        q.get_and_send_list(method, lambda x: x.name_annotations if x.name_annotations else [],
                            lambda a: a.id,
                            lambda a: self._visit(a, q))
-        # In Java: getName() returns name.getIdentifier()
-        q.get_and_send(method, lambda x: x.annotations.name.identifier, lambda el: self._visit(el, q))
+        q.get_and_send(method, lambda x: x.name, lambda el: self._visit(el, q) if el else None)
         q.get_and_send(method, lambda x: x.padding.parameters,
                       lambda c: self._visit_container(c, q) if c else None)
         q.get_and_send(method, lambda x: x.padding.throws if hasattr(x.padding, 'throws') else None,
@@ -754,6 +755,33 @@ class PythonRpcSender:
         q.get_and_send(yield_stmt, lambda x: x.implicit)
         q.get_and_send(yield_stmt, lambda x: x.value, lambda el: self._visit(el, q))
 
+    def _visit_j_parameterized_type(self, pt, q: 'RpcSendQueue') -> None:
+        # Java ParameterizedType: clazz (NameTree), typeParameters (JContainer), type (JavaType ref)
+        q.get_and_send(pt, lambda x: x.clazz, lambda el: self._visit(el, q))
+        q.get_and_send(pt, lambda x: x.padding.type_parameters, lambda c: self._visit_container(c, q))
+        q.get_and_send(pt, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
+
+    def _visit_j_type_parameter(self, tp, q: 'RpcSendQueue') -> None:
+        # Java TypeParameter: annotations (list), modifiers (list), name (Expression), bounds (JContainer)
+        q.get_and_send_list(tp, lambda x: x.annotations,
+                           lambda a: a.id,
+                           lambda a: self._visit(a, q))
+        q.get_and_send_list(tp, lambda x: x.modifiers,
+                           lambda m: m.id,
+                           lambda m: self._visit(m, q))
+        q.get_and_send(tp, lambda x: x.name, lambda el: self._visit(el, q))
+        q.get_and_send(tp, lambda x: x.padding.bounds if hasattr(x, 'padding') and hasattr(x.padding, 'bounds') else None,
+                      lambda c: self._visit_container(c, q) if c else None)
+
+    def _visit_j_type_parameters(self, tps, q: 'RpcSendQueue') -> None:
+        # Java TypeParameters: annotations (list), typeParameters (list of JRightPadded)
+        q.get_and_send_list(tps, lambda x: x.annotations,
+                           lambda a: a.id,
+                           lambda a: self._visit(a, q))
+        q.get_and_send_list(tps, lambda x: x.padding.type_parameters,
+                           lambda rp: rp.element.id,
+                           lambda rp: self._visit_right_padded(rp, q))
+
     # Helper methods for Space, JRightPadded, JLeftPadded, JContainer
 
     def _visit_markers(self, markers: Markers, q: 'RpcSendQueue') -> None:
@@ -801,7 +829,54 @@ class PythonRpcSender:
             keyword = keyword_map.get(java_type, str(java_type.name).lower())
             # Send keyword as a primitive value field
             q.get_and_send(java_type, lambda x, kw=keyword: kw)
-        # TODO: Add handling for other JavaType subtypes (Class, Method, Variable, etc.)
+
+        elif isinstance(java_type, JT.Method):
+            # Method: declaringType, name, flagsBitMap, returnType, parameterNames,
+            #         parameterTypes, thrownExceptions, annotations, defaultValue, declaredFormalTypeNames
+            q.get_and_send(java_type, lambda x: x._declaring_type, lambda t: self._visit_type(t, q))
+            q.get_and_send(java_type, lambda x: x._name)
+            q.get_and_send(java_type, lambda x: x._flags_bit_map)
+            q.get_and_send(java_type, lambda x: x._return_type, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: x._parameter_names or [], lambda s: s, None)
+            q.get_and_send_list(java_type, lambda x: x._parameter_types or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: x._thrown_exceptions or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: x._annotations or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: x._default_value or [], lambda s: s, None)
+            q.get_and_send_list(java_type, lambda x: x._declared_formal_type_names or [], lambda s: s, None)
+
+        elif isinstance(java_type, JT.Class):
+            # Class: flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype,
+            #        owningClass, annotations, interfaces, members, methods
+            q.get_and_send(java_type, lambda x: getattr(x, '_flags_bit_map', 0))
+            q.get_and_send(java_type, lambda x: getattr(x, '_kind', JT.FullyQualified.Kind.Class))
+            q.get_and_send(java_type, lambda x: getattr(x, '_fully_qualified_name', ''))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_type_parameters', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send(java_type, lambda x: getattr(x, '_supertype', None), lambda t: self._visit_type(t, q))
+            q.get_and_send(java_type, lambda x: getattr(x, '_owning_class', None), lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_annotations', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_interfaces', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_members', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_methods', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+
+        elif isinstance(java_type, JT.Unknown):
+            # Unknown has no additional fields
+            pass
+
+    def _type_signature(self, java_type) -> str:
+        """Generate a signature string for a JavaType, used as list item identifier."""
+        from rewrite.java.support_types import JavaType as JT
+
+        if java_type is None:
+            return ''
+        if isinstance(java_type, JT.Primitive):
+            return java_type.name
+        if isinstance(java_type, JT.Class):
+            return getattr(java_type, '_fully_qualified_name', str(id(java_type)))
+        if isinstance(java_type, JT.Method):
+            declaring = getattr(java_type, '_declaring_type', None)
+            declaring_name = self._type_signature(declaring) if declaring else ''
+            return f"{declaring_name}#{java_type._name}"
+        return str(id(java_type))
 
     def _visit_space(self, space: Space, q: 'RpcSendQueue') -> None:
         """Visit a Space object.
@@ -817,15 +892,11 @@ class PythonRpcSender:
         q.get_and_send(space, lambda x: x.whitespace)
 
     def _visit_comment(self, comment, q: 'RpcSendQueue') -> None:
-        """Visit a Comment object."""
-        from rewrite.python.support_types import PyComment
+        """Visit a Comment object (TextComment for Python)."""
         q.get_and_send(comment, lambda x: x.multiline)
         q.get_and_send(comment, lambda x: x.text)
         q.get_and_send(comment, lambda x: x.suffix)
         q.get_and_send(comment, lambda x: x.markers)
-        # PyComment has an additional field
-        if isinstance(comment, PyComment):
-            q.get_and_send(comment, lambda x: x.aligned_to_indent)
 
     def _visit_right_padded(self, rp: JRightPadded, q: 'RpcSendQueue') -> None:
         """Visit a JRightPadded wrapper."""
@@ -863,12 +934,9 @@ class PythonRpcSender:
         """Visit a JContainer wrapper."""
         if container is None:
             return
-        elements = container.padding.elements if container else []
-        _debug(f"_visit_container: {len(elements)} elements")
         q.get_and_send(container, lambda x: x.before, lambda space: self._visit_space(space, q))
         # Use padding.elements to get JRightPadded list, not unwrapped elements
         q.get_and_send_list(container, lambda x: x.padding.elements,
                            lambda el: el.element.id,
                            lambda el: self._visit_right_padded(el, q))
         q.get_and_send(container, lambda x: x.markers)
-        _debug("_visit_container: done")

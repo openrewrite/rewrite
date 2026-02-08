@@ -59,15 +59,9 @@ public class AddSettingsPluginRepository extends Recipe {
     @Nullable
     String url;
 
-    @Override
-    public String getDisplayName() {
-        return "Add a Gradle settings repository";
-    }
+    String displayName = "Add a Gradle settings repository";
 
-    @Override
-    public String getDescription() {
-        return "Add a Gradle settings repository to `settings.gradle(.kts)`.";
-    }
+    String description = "Add a Gradle settings repository to `settings.gradle(.kts)`.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

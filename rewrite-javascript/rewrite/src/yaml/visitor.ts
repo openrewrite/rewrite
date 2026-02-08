@@ -34,10 +34,18 @@ export class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     protected async visitDocument(document: Yaml.Document, p: P): Promise<Yaml | undefined> {
         const updates: any = {
             markers: await this.visitMarkers(document.markers, p),
+            directives: await mapAsync(document.directives, d => this.visitDefined(d, p) as Promise<Yaml.Directive>),
             block: await this.visitDefined(document.block, p),
             end: await this.visitDefined(document.end, p)
         };
         return updateIfChanged(document, updates);
+    }
+
+    protected async visitDirective(directive: Yaml.Directive, p: P): Promise<Yaml | undefined> {
+        const updates: any = {
+            markers: await this.visitMarkers(directive.markers, p)
+        };
+        return updateIfChanged(directive, updates);
     }
 
     protected async visitDocumentEnd(end: Yaml.DocumentEnd, p: P): Promise<Yaml | undefined> {
@@ -123,6 +131,8 @@ export class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
                 return this.visitDocument(t as Yaml.Document, p);
             case Yaml.Kind.DocumentEnd:
                 return this.visitDocumentEnd(t as Yaml.DocumentEnd, p);
+            case Yaml.Kind.Directive:
+                return this.visitDirective(t as Yaml.Directive, p);
             case Yaml.Kind.Mapping:
                 return this.visitMapping(t as Yaml.Mapping, p);
             case Yaml.Kind.MappingEntry:

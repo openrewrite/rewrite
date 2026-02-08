@@ -262,6 +262,40 @@ public class Substitutions {
         return ListUtils.map(js, this::unsubstitute);
     }
 
+    /**
+     * Resolve generic type variable identifiers in the template AST to their erasure.
+     * E.g., an identifier "T" with type GenericTypeVariable("T") becomes "Object"
+     * when T is unbounded, or the first bound's simple name when bounded.
+     */
+    public <J2 extends J> @Nullable J2 resolveTypeVariables(J2 j) {
+        if (typeVariables.isEmpty()) {
+            return j;
+        }
+        //noinspection unchecked
+        return (J2) new JavaVisitor<Integer>() {
+            @Override
+            public J visitIdentifier(J.Identifier ident, Integer integer) {
+                if (ident.getType() instanceof JavaType.GenericTypeVariable) {
+                    JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) ident.getType();
+                    for (JavaType.GenericTypeVariable tv : typeVariables) {
+                        // Only resolve when the identifier name matches the type variable name,
+                        // i.e. the identifier IS the type reference (like T in T::toString),
+                        // not a variable that happens to have type T (like e in e -> e.toString())
+                        if (tv.getName().equals(gtv.getName()) && tv.getName().equals(ident.getSimpleName())) {
+                            JavaType erasure = tv.getBounds().isEmpty() ?
+                                    JavaType.ShallowClass.build("java.lang.Object") :
+                                    tv.getBounds().get(0);
+                            String simpleName = erasure instanceof JavaType.FullyQualified ?
+                                    ((JavaType.FullyQualified) erasure).getClassName() : "Object";
+                            return ident.withSimpleName(simpleName).withType(erasure);
+                        }
+                    }
+                }
+                return super.visitIdentifier(ident, integer);
+            }
+        }.visitNonNull(j, 0);
+    }
+
     @SuppressWarnings("SpellCheckingInspection")
     public <J2 extends J> @Nullable J2 unsubstitute(J2 j) {
         if (parameters.length == 0) {
@@ -298,7 +332,22 @@ public class Substitutions {
                 } else if (param != null) {
                     return param;
                 }
-                return super.visitMethodInvocation(method, integer);
+
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, integer);
+                return maybeExpandVarargsNewArray(m);
+            }
+
+            private J.MethodInvocation maybeExpandVarargsNewArray(J.MethodInvocation method) {
+                return method.withArguments(ListUtils.flatMap(method.getArguments(), arg -> {
+                    if (arg instanceof J.NewArray) {
+                        J.NewArray newArray = (J.NewArray) arg;
+                        // Varargs-captured arrays have no type expression and no dimensions
+                        if (newArray.getTypeExpression() == null && newArray.getDimensions().isEmpty()) {
+                            return ListUtils.mapFirst(newArray.getInitializer(), e -> e.withPrefix(newArray.getPrefix()));
+                        }
+                    }
+                    return arg;
+                }));
             }
 
             @Override

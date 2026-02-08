@@ -142,7 +142,7 @@ class SequenceTest implements RewriteTest {
           yaml(
             "[1 ,2  ,0]",
             spec -> spec.afterRecipe(y -> {
-                Yaml.Sequence seq = (Yaml.Sequence) y.getDocuments().getFirst().getBlock();
+                var seq = (Yaml.Sequence) y.getDocuments().getFirst().getBlock();
                 assertThat(seq.getEntries().getFirst().getTrailingCommaPrefix()).isEqualTo(" ");
                 assertThat(seq.getEntries().get(1).getTrailingCommaPrefix()).isEqualTo("  ");
                 assertThat(seq.getEntries().get(2).getTrailingCommaPrefix()).isNull();

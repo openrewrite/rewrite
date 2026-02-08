@@ -41,15 +41,9 @@ public class ChangePackageInStringLiteral extends Recipe {
         return String.format("`%s` to `%s`", oldPackageName, newPackageName);
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Rename package name in String literals";
-    }
+    String displayName = "Rename package name in String literals";
 
-    @Override
-    public String getDescription() {
-        return "A recipe that will rename a package name in String literals.";
-    }
+    String description = "A recipe that will rename a package name in String literals.";
 
     @Override
     public Validated<Object> validate() {

@@ -211,7 +211,7 @@ class PropertiesParserTest implements RewriteTest {
               key4=val\\:ue4
               """,
             spec -> spec.beforeRecipe(props -> {
-                Properties.File p = (Properties.File) new PropertiesVisitor<Integer>() {
+                var p = (Properties.File) new PropertiesVisitor<Integer>() {
                     @Override
                     public Properties visitEntry(Properties.Entry entry, Integer integer) {
                         return entry.withDelimiter(null);

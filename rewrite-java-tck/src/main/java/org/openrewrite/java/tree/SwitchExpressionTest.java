@@ -152,10 +152,10 @@ class SwitchExpressionTest implements RewriteTest {
               }
               """,
               spec -> spec.afterRecipe(cu -> {
-                  J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                  var md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
                   assert md.getBody() != null;
 
-                  J.SwitchExpression s = ((J.SwitchExpression) ((J.Return) md.getBody().getStatements().get(0)).getExpression());
+                  var s = ((J.SwitchExpression) ((J.Return) md.getBody().getStatements().get(0)).getExpression());
                   assert s != null;
 
                   JavaType type = s.getType();

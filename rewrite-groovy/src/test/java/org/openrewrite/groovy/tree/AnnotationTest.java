@@ -192,6 +192,24 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6302")
+    @Test
+    void groovyCanonicalAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Canonical
+
+              @Canonical
+              class Person {
+                  String name
+                  int age
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4853")
     @Test
     void annotationOnVariable() {
@@ -247,6 +265,28 @@ class AnnotationTest implements RewriteTest {
             """
               @groovy.transform.Field def a = callSomething()
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6319")
+    @Test
+    void synchronizedAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+            package org.dummy
+            
+            import groovy.transform.Synchronized
+            
+            class Foo {
+            
+                @Synchronized
+                void bar() {
+                    println('Hello World')
+                }
+            }
+            """
           )
         );
     }

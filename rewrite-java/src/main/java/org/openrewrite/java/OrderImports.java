@@ -81,17 +81,11 @@ public class OrderImports extends Recipe {
     @Nullable
     String style;
 
-    @Override
-    public String getDisplayName() {
-        return "Order imports";
-    }
+    String displayName = "Order imports";
 
-    @Override
-    public String getDescription() {
-        return "Groups and orders import statements. If a [style has been defined](https://docs.openrewrite.org/concepts-and-explanations/styles), this recipe will order the imports " +
+    String description = "Groups and orders import statements. If a [style has been defined](https://docs.openrewrite.org/concepts-and-explanations/styles), this recipe will order the imports " +
                 "according to that style. If no style is detected, this recipe will default to ordering imports in " +
                 "the same way that IntelliJ IDEA does.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

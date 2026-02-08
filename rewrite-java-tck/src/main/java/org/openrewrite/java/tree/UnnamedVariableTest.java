@@ -122,9 +122,9 @@ class UnnamedVariableTest implements RewriteTest {
               }
               """,
             after -> after.afterRecipe(cu -> {
-                J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(1).getBody().getStatements().getFirst();
-                J.VariableDeclarations vd = (J.VariableDeclarations) md.getBody().getStatements().getFirst();
-                J.Lambda lambda = (J.Lambda) vd.getVariables().getFirst().getInitializer();
+                var md = (J.MethodDeclaration) cu.getClasses().get(1).getBody().getStatements().getFirst();
+                var vd = (J.VariableDeclarations) md.getBody().getStatements().getFirst();
+                var lambda = (J.Lambda) vd.getVariables().getFirst().getInitializer();
                 List<J> lambdaParams = lambda.getParameters().getParameters();
                 assertThat(lambdaParams.getFirst()).isNotEqualTo(lambdaParams.get(1));
                 // They are semantically equal but not registered by the compiler as

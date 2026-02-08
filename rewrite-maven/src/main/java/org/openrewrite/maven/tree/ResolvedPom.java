@@ -901,30 +901,6 @@ public class ResolvedPom {
             );
         }
 
-        private ResolvedManagedDependency mergeProperties(ResolvedManagedDependency child, ResolvedManagedDependency parent) {
-            return new ResolvedManagedDependency(
-                    child.getGav().withVersion(child.getVersion() != null ? child.getVersion() : parent.getVersion()),
-                    child.getScope() != null ? child.getScope() : parent.getScope(),
-                    child.getType() != null ? child.getType() : parent.getType(),
-                    child.getClassifier() != null ? child.getClassifier() : parent.getClassifier(),
-                    // For exclusions, merge child and parent lists if both exist, otherwise take non-empty one
-                    mergeExclusions(child.getExclusions(), parent.getExclusions()),
-                    child.getRequested(), // Child's requested info always wins
-                    child.getRequestedBom() != null ? child.getRequestedBom() : parent.getRequestedBom(),
-                    child.getBomGav() != null ? child.getBomGav() : parent.getBomGav()
-            );
-        }
-
-        /**
-         * Merges exclusion lists, preferring child when both are present
-         */
-        private List<GroupArtifact> mergeExclusions(@Nullable List<GroupArtifact> childExclusions, @Nullable List<GroupArtifact> parentExclusions) {
-            if (childExclusions != null && !childExclusions.isEmpty()) {
-                return childExclusions;
-            }
-            return parentExclusions != null ? parentExclusions : emptyList();
-        }
-
         private void mergeDependencyManagement(
                 List<ManagedDependency> incomingDependencyManagement,
                 Map<GroupArtifactClassifierType, ResolvedManagedDependency> managedDependencyMap,
@@ -945,12 +921,7 @@ public class ResolvedPom {
                             .withRequestedBom(d)
                             .withBomGav(bom.getGav()));
                     for (ResolvedManagedDependency managed : bomManaged) {
-                        managedDependencyMap.compute(createDependencyManagementKey(managed), (key, existing) -> {
-                            if (existing == null) {
-                                return managed;
-                            }
-                            return mergeProperties(existing, managed);
-                        });
+                        managedDependencyMap.putIfAbsent(createDependencyManagementKey(managed), managed);
                     }
                 } else if (d instanceof Defined) {
                     Defined defined = (Defined) d;
@@ -958,27 +929,20 @@ public class ResolvedPom {
                             .getResolutionListener()
                             .dependencyManagement(defined.withGav(getValues(defined.getGav())), pom);
 
-                    ResolvedManagedDependency resolvedDefined = new ResolvedManagedDependency(
-                            getValues(defined.getGav()),
-                            defined.getScope() == null ? null : Scope.fromName(getValue(defined.getScope())),
-                            getValue(defined.getType()),
-                            getValue(defined.getClassifier()),
-                            ListUtils.map(defined.getExclusions(), (UnaryOperator<GroupArtifact>) ResolvedPom.this::getValues),
-                            defined,
-                            null,
-                            null
-                    );
-                    managedDependencyMap.compute(createDependencyManagementKey(defined), (key, existing) -> {
-                        if (existing == null) {
-                            return resolvedDefined;
+                    managedDependencyMap.compute(createDependencyManagementKey(defined), (gav, existing) -> {
+                        if (existing != null && existing.getBomGav() == null) {
+                            return existing;
                         }
-                        if (existing.getBomGav() != null) {
-                            if (resolvedDefined.getVersion() != null) {
-                                return resolvedDefined;
-                            }
-                            return mergeProperties(resolvedDefined, existing);
-                        }
-                        return mergeProperties(existing, resolvedDefined);
+                        return new ResolvedManagedDependency(
+                                getValues(defined.getGav()),
+                                defined.getScope() == null ? null : Scope.fromName(getValue(defined.getScope())),
+                                getValue(defined.getType()),
+                                getValue(defined.getClassifier()),
+                                ListUtils.map(defined.getExclusions(), (UnaryOperator<GroupArtifact>) ResolvedPom.this::getValues),
+                                defined,
+                                null,
+                                null
+                        );
                     });
                 }
             }

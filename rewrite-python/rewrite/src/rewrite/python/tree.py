@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import weakref
 from dataclasses import dataclass, replace as dataclass_replace
+from rewrite.utils import replace_if_changed
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional, TYPE_CHECKING
@@ -9,9 +10,14 @@ from uuid import UUID
 
 if TYPE_CHECKING:
     from .visitor import PythonVisitor
-from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Markers, Cursor, PrintOutputCapture, PrinterFactory
-from rewrite.java import *
-from rewrite.python.support_types import Py
+from rewrite import Checksum, FileAttributes, SourceFile, TreeVisitor, Markers, Cursor, PrinterFactory
+# Explicit imports from rewrite.java (excluding Binary, CompilationUnit which are redefined here)
+from rewrite.java import (
+    J, JavaType, JContainer, JLeftPadded, JRightPadded, Space,
+    JavaSourceFile, TypeTree, TypedTree, NameTree, Expression, Statement,
+    Block, Identifier, Import, TypeParameter,
+)
+from rewrite.python.support_types import Py, P
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @dataclass(frozen=True, eq=False)
@@ -166,21 +172,12 @@ class Binary(Py, Expression, TypedTree):
             return self._t._operator
 
         def replace(self, **kwargs) -> Binary:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Binary.PaddingHelper
         if self._padding is None:
             p = Binary.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -249,21 +246,12 @@ class ChainedAssignment(Py, Statement, TypedTree):
             return self._t._variables
 
         def replace(self, **kwargs) -> ChainedAssignment:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: ChainedAssignment.PaddingHelper
         if self._padding is None:
             p = ChainedAssignment.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -501,21 +489,12 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
             return self._t._statements
 
         def replace(self, **kwargs) -> CompilationUnit:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: CompilationUnit.PaddingHelper
         if self._padding is None:
             p = CompilationUnit.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -527,11 +506,12 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
 
-    def printer(self, cursor: Cursor) -> TreeVisitor[Tree, PrintOutputCapture]:
+    def printer(self, cursor: Cursor) -> TreeVisitor:
+        # PythonPrinter has TreeVisitor interface but doesn't extend it
         if factory := PrinterFactory.current():
             return factory.create_printer(cursor)
         from .printer import PythonPrinter
-        return PythonPrinter()
+        return PythonPrinter()  # ty: ignore[invalid-return-type]
 
     def accept_python(self, v: PythonVisitor[P], p: P) -> J:
         return v.visit_compilation_unit(self, p)
@@ -627,7 +607,7 @@ class StatementExpression(Py, Expression, Statement):
         """Replace fields, handling delegated prefix/markers specially."""
         # Handle delegated properties by modifying the inner statement
         if 'prefix' in kwargs:
-            new_statement = self._statement.replace(prefix=kwargs.pop('prefix'))
+            new_statement = self._statement.replace(prefix=kwargs.pop('prefix'))  # ty: ignore[unresolved-attribute]  # Statement base class doesn't have replace
             kwargs['statement'] = new_statement
         if 'markers' in kwargs:
             new_statement = kwargs.get('statement', self._statement).replace(markers=kwargs.pop('markers'))
@@ -704,21 +684,12 @@ class MultiImport(Py, Statement):
             return self._t._names
 
         def replace(self, **kwargs) -> MultiImport:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: MultiImport.PaddingHelper
         if self._padding is None:
             p = MultiImport.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -787,21 +758,12 @@ class KeyValue(Py, Expression, TypedTree):
             return self._t._key
 
         def replace(self, **kwargs) -> KeyValue:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: KeyValue.PaddingHelper
         if self._padding is None:
             p = KeyValue.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -863,21 +825,12 @@ class DictLiteral(Py, Expression, TypedTree):
             return self._t._elements
 
         def replace(self, **kwargs) -> DictLiteral:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: DictLiteral.PaddingHelper
         if self._padding is None:
             p = DictLiteral.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -951,21 +904,12 @@ class CollectionLiteral(Py, Expression, TypedTree):
             return self._t._elements
 
         def replace(self, **kwargs) -> CollectionLiteral:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: CollectionLiteral.PaddingHelper
         if self._padding is None:
             p = CollectionLiteral.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1016,6 +960,13 @@ class FormattedString(Py, Expression, TypedTree):
     @property
     def parts(self) -> List[Expression]:
         return self._parts
+
+
+    _type: Optional[JavaType]
+
+    @property
+    def type(self) -> Optional[JavaType]:
+        return self._type
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
@@ -1102,21 +1053,12 @@ class FormattedString(Py, Expression, TypedTree):
                 return self._t._debug
 
             def replace(self, **kwargs) -> FormattedString.Value:
-                mapped = {}
-                for key, value in kwargs.items():
-                    if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                        mapped[f'_{key}'] = value
-                    else:
-                        mapped[key] = value
-                if not mapped:
-                    return self._t
-                return dataclass_replace(self._t, **mapped)
+                return replace_if_changed(self._t, **kwargs)
 
-        _padding: weakref.ReferenceType[PaddingHelper] = None
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
         @property
         def padding(self) -> PaddingHelper:
-            p: FormattedString.Value.PaddingHelper
             if self._padding is None:
                 p = FormattedString.Value.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1159,7 +1101,7 @@ class Pass(Py, Statement):
 
 
     def accept_python(self, v: PythonVisitor[P], p: P) -> J:
-        return v.visit_pass(self, p)
+        return v.visit_pass(self, p)  # ty: ignore[invalid-return-type]  # visitor returns J|None
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @dataclass(frozen=True, eq=False)
@@ -1208,21 +1150,12 @@ class TrailingElseWrapper(Py, Statement):
             return self._t._else_block
 
         def replace(self, **kwargs) -> TrailingElseWrapper:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: TrailingElseWrapper.PaddingHelper
         if self._padding is None:
             p = TrailingElseWrapper.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1423,21 +1356,12 @@ class ComprehensionExpression(Py, Expression):
                 return self._t._iterated_list
 
             def replace(self, **kwargs) -> ComprehensionExpression.Clause:
-                mapped = {}
-                for key, value in kwargs.items():
-                    if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                        mapped[f'_{key}'] = value
-                    else:
-                        mapped[key] = value
-                if not mapped:
-                    return self._t
-                return dataclass_replace(self._t, **mapped)
+                return replace_if_changed(self._t, **kwargs)
 
-        _padding: weakref.ReferenceType[PaddingHelper] = None
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
         @property
         def padding(self) -> PaddingHelper:
-            p: ComprehensionExpression.Clause.PaddingHelper
             if self._padding is None:
                 p = ComprehensionExpression.Clause.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1486,6 +1410,13 @@ class TypeAlias(Py, Statement, TypedTree):
         return self._name
 
 
+    _type_parameters: Optional[JContainer[TypeParameter]]
+
+    @property
+    def type_parameters(self) -> Optional[List[TypeParameter]]:
+        return self._type_parameters.elements if self._type_parameters else None
+
+
     _value: JLeftPadded[J]
 
     @property
@@ -1505,25 +1436,20 @@ class TypeAlias(Py, Statement, TypedTree):
         _t: TypeAlias
 
         @property
+        def type_parameters(self) -> Optional[JContainer[TypeParameter]]:
+            return self._t._type_parameters
+
+        @property
         def value(self) -> JLeftPadded[J]:
             return self._t._value
 
         def replace(self, **kwargs) -> TypeAlias:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: TypeAlias.PaddingHelper
         if self._padding is None:
             p = TypeAlias.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1626,21 +1552,12 @@ class UnionType(Py, Expression, TypeTree):
             return self._t._types
 
         def replace(self, **kwargs) -> UnionType:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: UnionType.PaddingHelper
         if self._padding is None:
             p = UnionType.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1706,21 +1623,12 @@ class VariableScope(Py, Statement):
             return self._t._names
 
         def replace(self, **kwargs) -> VariableScope:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: VariableScope.PaddingHelper
         if self._padding is None:
             p = VariableScope.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1775,21 +1683,12 @@ class Del(Py, Statement):
             return self._t._targets
 
         def replace(self, **kwargs) -> Del:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Del.PaddingHelper
         if self._padding is None:
             p = Del.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -1962,21 +1861,12 @@ class NamedArgument(Py, Expression):
             return self._t._value
 
         def replace(self, **kwargs) -> NamedArgument:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: NamedArgument.PaddingHelper
         if self._padding is None:
             p = NamedArgument.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -2093,21 +1983,12 @@ class ErrorFrom(Py, Expression):
             return self._t._from
 
         def replace(self, **kwargs) -> ErrorFrom:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: ErrorFrom.PaddingHelper
         if self._padding is None:
             p = ErrorFrom.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -2176,21 +2057,12 @@ class MatchCase(Py, Expression):
             return self._t._guard
 
         def replace(self, **kwargs) -> MatchCase:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: MatchCase.PaddingHelper
         if self._padding is None:
             p = MatchCase.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -2286,21 +2158,12 @@ class MatchCase(Py, Expression):
                 return self._t._children
 
             def replace(self, **kwargs) -> MatchCase.Pattern:
-                mapped = {}
-                for key, value in kwargs.items():
-                    if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                        mapped[f'_{key}'] = value
-                    else:
-                        mapped[key] = value
-                if not mapped:
-                    return self._t
-                return dataclass_replace(self._t, **mapped)
+                return replace_if_changed(self._t, **kwargs)
 
-        _padding: weakref.ReferenceType[PaddingHelper] = None
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
         @property
         def padding(self) -> PaddingHelper:
-            p: MatchCase.Pattern.PaddingHelper
             if self._padding is None:
                 p = MatchCase.Pattern.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
@@ -2380,21 +2243,12 @@ class Slice(Py, Expression, TypedTree):
             return self._t._step
 
         def replace(self, **kwargs) -> Slice:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return dataclass_replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Slice.PaddingHelper
         if self._padding is None:
             p = Slice.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))

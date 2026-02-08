@@ -571,7 +571,7 @@ class TypeTableTest implements RewriteTest {
                     // Verify that the annotation types are properly resolved
                     J.ClassDeclaration clazz = cu.getClasses().getFirst();
                     J.Annotation classAnnotation = clazz.getLeadingAnnotations().getFirst();
-                    JavaType.Class annotationType = (JavaType.Class) classAnnotation.getType();
+                    var annotationType = (JavaType.Class) classAnnotation.getType();
 
                     assertThat(annotationType).isNotNull();
                     assertThat(annotationType.getFullyQualifiedName()).isEqualTo("test.annotations.ValidationRule");
@@ -628,9 +628,9 @@ class TypeTableTest implements RewriteTest {
                       );
 
                     // Verify field-level annotation is also properly typed with same default values
-                    J.VariableDeclarations field = (J.VariableDeclarations) clazz.getBody().getStatements().getFirst();
+                    var field = (J.VariableDeclarations) clazz.getBody().getStatements().getFirst();
                     J.Annotation fieldAnnotation = field.getLeadingAnnotations().getFirst();
-                    JavaType.Class fieldAnnotationType = (JavaType.Class) fieldAnnotation.getType();
+                    var fieldAnnotationType = (JavaType.Class) fieldAnnotation.getType();
 
                     assertThat(fieldAnnotationType).isNotNull();
                     assertThat(fieldAnnotationType.getFullyQualifiedName()).isEqualTo("test.annotations.ValidationRule");
@@ -817,7 +817,7 @@ class TypeTableTest implements RewriteTest {
                     assertThat(transactionalAnn.getSimpleName()).isEqualTo("Transactional");
 
                     // Verify the annotation type is resolved
-                    JavaType.Class annotationType = (JavaType.Class) transactionalAnn.getType();
+                    var annotationType = (JavaType.Class) transactionalAnn.getType();
                     assertThat(annotationType).isNotNull();
                     assertThat(annotationType.getFullyQualifiedName()).isEqualTo("test.annotations.Transactional");
 
@@ -854,7 +854,7 @@ class TypeTableTest implements RewriteTest {
         if (bytes < unit || Double.isNaN(bytes)) {
             return decimalOrNan(bytes) + " B";
         }
-        int exp = (int) (Math.log(bytes) / Math.log(unit));
+        var exp = (int) (Math.log(bytes) / Math.log(unit));
         String pre = "KMGTPE".charAt(exp - 1) + "i";
         return decimalOrNan(bytes / Math.pow(unit, exp)) + " " + pre + "B";
     }

@@ -66,15 +66,9 @@ public class ChangePackage extends Recipe {
         return String.format("`%s` to `%s`", oldPackageName, newPackageName);
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Rename package name";
-    }
+    String displayName = "Rename package name";
 
-    @Override
-    public String getDescription() {
-        return "A recipe that will rename a package name in package statements, imports, and fully-qualified types.";
-    }
+    String description = "A recipe that will rename a package name in package statements, imports, and fully-qualified types.";
 
     @Override
     public Validated<Object> validate() {
@@ -320,6 +314,13 @@ public class ChangePackage extends Recipe {
                     oldNameToChangedType.put(oldType, fq);
                     oldNameToChangedType.put(fq, fq);
                     return fq;
+                } else if (oldType instanceof JavaType.Class) {
+                    JavaType.Class clazz = ((JavaType.Class) oldType)
+                            .withInterfaces(ListUtils.map(original.getInterfaces(), t -> (JavaType.FullyQualified) updateType(t)))
+                            .withSupertype((JavaType.FullyQualified) updateType(original.getSupertype()));
+                    oldNameToChangedType.put(oldType, clazz);
+                    oldNameToChangedType.put(clazz, clazz);
+                    return clazz;
                 }
             } else if (oldType instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) oldType;

@@ -36,15 +36,9 @@ import static java.lang.System.lineSeparator;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddCommentToImport extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Add comment to import statement";
-    }
+    String displayName = "Add comment to import statement";
 
-    @Override
-    public String getDescription() {
-        return "Add a comment to an import statement in a Java source file.";
-    }
+    String description = "Add a comment to an import statement in a Java source file.";
 
     @Option(displayName = "Comment",
             description = "The comment to add.",
@@ -76,12 +70,13 @@ public class AddCommentToImport extends Recipe {
                     foundImport = true;
                     String prefixWhitespace = anImport.getPrefix().getWhitespace();
                     Matcher newlineMatcher = Pattern.compile("\\R").matcher(comment.trim());
+                    String adjustedPrefixWhitespace = prefixWhitespace.isEmpty() ? lineSeparator() : prefixWhitespace;
                     String newCommentText = comment.trim()
-                            .replaceAll("\\R", prefixWhitespace + " * ")
+                            .replaceAll("\\R", adjustedPrefixWhitespace + " * ")
                             .replace("*/", "*");
                     String formattedCommentText = newlineMatcher.find() ? lineSeparator() + " * " + newCommentText + lineSeparator() + " " : " " + newCommentText + " ";
                     if (doesNotHaveComment(formattedCommentText, anImport.getComments())) {
-                        TextComment textComment = new TextComment(true, formattedCommentText, prefixWhitespace, Markers.EMPTY);
+                        TextComment textComment = new TextComment(true, formattedCommentText, adjustedPrefixWhitespace, Markers.EMPTY);
                         return autoFormat(anImport.withComments(ListUtils.concat(anImport.getComments(), textComment)), ctx);
                     }
                 }
@@ -91,7 +86,8 @@ public class AddCommentToImport extends Recipe {
             private boolean doesNotHaveComment(String lookFor, List<Comment> comments) {
                 for (Comment c : comments) {
                     if (c instanceof TextComment &&
-                            lookFor.trim().equals(((TextComment) c).getText().trim())) {
+                            lookFor.trim().replaceAll("\\R", "\n")
+                                    .equals(((TextComment) c).getText().trim().replaceAll("\\R", "\n"))) {
                         return false;
                     }
                 }

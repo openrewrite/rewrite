@@ -33,10 +33,16 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable
 from uuid import uuid4
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', stream=sys.stderr)
+# Configure logging - log to file by default to avoid filling stderr buffer
+# (which can cause deadlock if parent process doesn't read stderr)
+_default_log_file = '/tmp/python-rpc.log'
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filename=_default_log_file,
+    filemode='a'
+)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 # Local object storage - maps object IDs to parsed trees (objects Python created)
 local_objects: Dict[str, Any] = {}
@@ -124,28 +130,51 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
 
     This is how the RPC protocol works - each side tracks local and remote
     state, and GetObject transmits only the changes (diffs) between states.
+
+    IMPORTANT: GetObject returns data in batches. We must keep calling GetObject
+    until we receive a batch containing END_OF_OBJECT marker.
     """
-    # Request the object from Java - ALWAYS send this, don't short-circuit
-    result = send_request('GetObject', {
-        'id': obj_id,
-        'sourceFileType': source_file_type
-    })
-
-    if not result:
-        return None
-
-    # Deserialize using PythonRpcReceiver
     from rewrite.rpc.receive_queue import RpcReceiveQueue
     from rewrite.rpc.python_receiver import PythonRpcReceiver
 
-    # Create a batch iterator that yields the result data
-    batch = list(result)  # result is already a list of RpcObjectData dicts
+    # Track whether we've received the complete object
+    received_end = False
 
     def pull_batch() -> List[Dict[str, Any]]:
-        nonlocal batch
-        data = batch
-        batch = []  # Clear for next pull (which shouldn't happen for a single object)
-        return data
+        """Pull the next batch of RpcObjectData from Java.
+
+        This is called by RpcReceiveQueue when it needs more data.
+        We send GetObject requests repeatedly until END_OF_OBJECT is received.
+        For large objects (>1000 items), Java sends data in multiple batches.
+
+        IMPORTANT: We filter out END_OF_OBJECT from the returned batch to prevent
+        it from being accidentally consumed during nested operations (like receive_list
+        expecting positions). Java's RewriteRpc.java explicitly consumes END_OF_OBJECT
+        after receive() completes (line 474), and we do the same by tracking received_end.
+        """
+        nonlocal received_end
+
+        if received_end:
+            return []
+
+        # Request the next batch from Java
+        batch = send_request('GetObject', {
+            'id': obj_id,
+            'sourceFileType': source_file_type
+        })
+
+        if not batch:
+            received_end = True
+            return []
+
+        # Check if this batch contains END_OF_OBJECT (last item has state='END_OF_OBJECT')
+        # The END_OF_OBJECT marker is always at the end of the final batch
+        # We filter it out to prevent it from being consumed during nested operations
+        if batch[-1].get('state') == 'END_OF_OBJECT':
+            received_end = True
+            batch = batch[:-1]  # Remove END_OF_OBJECT from the batch
+
+        return batch
 
     q = RpcReceiveQueue(remote_refs, source_file_type, pull_batch, trace=_trace_rpc)
     receiver = PythonRpcReceiver()
@@ -156,6 +185,11 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
 
     # Receive and deserialize the object (applies diffs to before state)
     obj = receiver.receive(before, q)
+
+    # Verify we received the complete object (END_OF_OBJECT was in the final batch)
+    # This matches Java's RewriteRpc.java line 474-475 which explicitly checks for END_OF_OBJECT
+    if not received_end:
+        raise RuntimeError(f"Did not receive END_OF_OBJECT marker for object {obj_id}")
 
     if obj is not None:
         # Update our understanding of what Java has
@@ -185,11 +219,14 @@ def parse_python_source(source: str, path: str = "<unknown>") -> dict:
         from rewrite.python._parser_visitor import ParserVisitor
         from rewrite import random_id, Markers
 
+        # Strip BOM before parsing (ParserVisitor handles it internally but ast.parse doesn't)
+        source_for_ast = source[1:] if source.startswith('\ufeff') else source
+
         # Parse using Python AST
-        tree = ast.parse(source, path)
+        tree = ast.parse(source_for_ast, path)
 
         # Convert to OpenRewrite LST
-        cu = ParserVisitor(source).visit(tree)
+        cu = ParserVisitor(source, path).visit(tree)
         cu = cu.replace(source_path=Path(path))
         cu = cu.replace(markers=Markers.EMPTY)
 
@@ -203,26 +240,50 @@ def parse_python_source(source: str, path: str = "<unknown>") -> dict:
     except ImportError as e:
         logger.error(f"Failed to import parser: {e}")
         traceback.print_exc()
-        return _create_parse_error(path, str(e))
+        return _create_parse_error(path, str(e), source)
     except SyntaxError as e:
         logger.error(f"Syntax error parsing {path}: {e}")
-        return _create_parse_error(path, str(e))
+        return _create_parse_error(path, str(e), source)
     except Exception as e:
         logger.error(f"Error parsing {path}: {e}")
         traceback.print_exc()
-        return _create_parse_error(path, str(e))
+        return _create_parse_error(path, str(e), source)
 
 
-def _create_parse_error(path: str, message: str) -> dict:
-    """Create a parse error result."""
-    obj_id = generate_id()
-    error = {
-        'id': obj_id,
-        'type': 'org.openrewrite.tree.ParseError',
-        'sourcePath': path,
-        'message': message,
-    }
-    local_objects[obj_id] = error
+def _create_parse_error(path: str, message: str, source: str = '') -> dict:
+    """Create a parse error result using the proper ParseError class.
+
+    This creates a real ParseError SourceFile that can be properly serialized
+    via the RPC protocol, rather than a dict that can't be handled.
+    """
+    from rewrite.parser import ParseError
+    from rewrite.markers import Markers, ParseExceptionResult
+    from rewrite import random_id
+
+    # Create a ParseExceptionResult marker with the error info
+    # We use 'PythonParser' as the parser type since we don't have a parser instance
+    exception_marker = ParseExceptionResult(
+        _id=random_id(),
+        _parser_type='PythonParser',
+        _exception_type='SyntaxError',
+        _message=message
+    )
+
+    # Create the ParseError with the marker
+    parse_error = ParseError(
+        _id=random_id(),
+        _markers=Markers(random_id(), [exception_marker]),
+        _source_path=Path(path),
+        _file_attributes=None,
+        _charset_name='utf-8',
+        _charset_bom_marked=False,
+        _checksum=None,
+        _text=source,
+        _erroneous=None
+    )
+
+    obj_id = str(parse_error.id)
+    local_objects[obj_id] = parse_error
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError'}
 
 
@@ -285,6 +346,8 @@ def handle_get_object(params: dict) -> List[dict]:
     """
     obj_id = params.get('id')
     source_file_type = params.get('sourceFileType')
+    if obj_id is None:
+        return [{'state': 'DELETE'}, {'state': 'END_OF_OBJECT'}]
     obj = local_objects.get(obj_id)
     logger.info(f"handle_get_object: id={obj_id}, type={type(obj).__name__ if obj else 'None'}")
 
@@ -351,6 +414,10 @@ def handle_print(params: dict) -> str:
 
     logger.info(f"handle_print: treeId={obj_id}, sourceFileType={source_file_type}")
 
+    if obj_id is None:
+        logger.warning("No treeId or id provided")
+        return ""
+
     # Fetch the object from Java to get the latest version (including recipe modifications)
     obj = get_object_from_java(obj_id, source_file_type)
 
@@ -367,8 +434,7 @@ def handle_print(params: dict) -> str:
         logger.error(f"Failed to import PythonPrinter: {e}")
         pass
     except Exception as e:
-        logger.error(f"Error printing object: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error printing object: {e}")
 
     # Fallback: return stored source if available
     if hasattr(obj, 'source'):
@@ -384,6 +450,18 @@ def handle_reset(params: dict) -> bool:
     local_objects.clear()
     remote_objects.clear()
     remote_refs.clear()
+    _prepared_recipes.clear()
+    _execution_contexts.clear()
+    _recipe_accumulators.clear()
+    _recipe_phases.clear()
+
+    # Reset TyLspClient if it was initialized
+    try:
+        from rewrite.python.ty_client import TyLspClient
+        TyLspClient.reset()
+    except ImportError:
+        pass  # ty not available
+
     logger.info("Reset: cleared all cached state")
     return True
 
@@ -408,6 +486,176 @@ def _get_marketplace():
         activate(_marketplace)
 
     return _marketplace
+
+
+def handle_install_recipes(params: dict) -> dict:
+    """Handle an InstallRecipes RPC request.
+
+    Activates a recipe package in the marketplace. The package should already be
+    installed by the caller (e.g., via pip install --target). This handler discovers
+    and activates the package's recipes.
+
+    Args:
+        params: Dict containing either:
+            - 'recipes': str - A local file path (package already installed to target)
+            - 'recipes': {'packageName': str, 'version': str|None} - A package spec
+
+    Returns:
+        Dict with 'recipesInstalled' count and 'version' (if resolved)
+    """
+    import importlib
+    import importlib.util
+
+    marketplace = _get_marketplace()
+    before_count = len(list(marketplace.all_recipes()))
+
+    recipes = params.get('recipes')
+    installed_version = None
+
+    if isinstance(recipes, str):
+        # Local file path - package should already be installed by caller
+        local_path = Path(recipes)
+        logger.info(f"Activating recipes from local path: {recipes}")
+
+        # Find and import the package
+        # For local paths, we look for the package name from setup.py/pyproject.toml
+        package_name = _find_package_name(local_path)
+        if package_name:
+            _import_and_activate_package(package_name, marketplace)
+
+    elif isinstance(recipes, dict):
+        # Package spec with name and optional version - package should already be installed
+        package_name = recipes.get('packageName')
+        version = recipes.get('version')
+
+        if not package_name:
+            raise ValueError("Package name is required")
+
+        logger.info(f"Activating recipes package: {package_name}")
+
+        # Get the installed version
+        try:
+            import importlib.metadata
+            installed_version = importlib.metadata.version(package_name)
+        except Exception:
+            pass
+
+        _import_and_activate_package(package_name, marketplace)
+    else:
+        raise ValueError(f"Invalid recipes parameter: {recipes}")
+
+    after_count = len(list(marketplace.all_recipes()))
+    recipes_installed = after_count - before_count
+
+    logger.info(f"InstallRecipes: installed {recipes_installed} recipes")
+    return {
+        'recipesInstalled': recipes_installed,
+        'version': installed_version
+    }
+
+
+def _find_package_name(local_path: Path) -> Optional[str]:
+    """Find the package name from a local path."""
+    import tomllib
+
+    # Try pyproject.toml first
+    pyproject_path = local_path / 'pyproject.toml'
+    if pyproject_path.exists():
+        try:
+            with open(pyproject_path, 'rb') as f:
+                data = tomllib.load(f)
+                # Try [project] section first (PEP 621)
+                if 'project' in data and 'name' in data['project']:
+                    return data['project']['name']
+                # Try [tool.poetry] section
+                if 'tool' in data and 'poetry' in data['tool'] and 'name' in data['tool']['poetry']:
+                    return data['tool']['poetry']['name']
+        except Exception as e:
+            logger.warning(f"Failed to parse pyproject.toml: {e}")
+
+    # Try setup.py
+    setup_py = local_path / 'setup.py'
+    if setup_py.exists():
+        # Simple heuristic: look for name= in setup.py
+        try:
+            content = setup_py.read_text()
+            import re
+            match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', content)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            logger.warning(f"Failed to parse setup.py: {e}")
+
+    return None
+
+
+def _import_and_activate_package(package_name: str, marketplace):
+    """Import a package and call its activate function using entry points.
+
+    Uses importlib.metadata to discover entry points registered under
+    the 'openrewrite.recipes' group and calls their activate functions.
+    Since matching package names to entry points is unreliable (hyphens vs
+    underscores, different naming conventions), we activate ALL entry points
+    but the marketplace handles deduplication.
+    """
+    from importlib.metadata import entry_points
+
+    # Normalize package name for comparison
+    def normalize(name: str) -> str:
+        return name.replace('-', '_').replace('.', '_').lower()
+
+    normalized_name = normalize(package_name)
+
+    # Find all entry points in the openrewrite.recipes group
+    eps = entry_points(group='openrewrite.recipes')
+    activated = False
+
+    for ep in eps:
+        try:
+            # Try to match this entry point to our package using the dist attribute
+            dist_name = None
+            if hasattr(ep, 'dist') and ep.dist is not None:
+                dist_name = ep.dist.name if hasattr(ep.dist, 'name') else str(ep.dist)
+
+            # Check if this entry point belongs to our package
+            matches_package = False
+            if dist_name and normalize(dist_name) == normalized_name:
+                matches_package = True
+            elif ep.name and normalize(ep.name) == normalized_name:
+                matches_package = True
+            elif ':' in ep.value:
+                # Check module name in value (e.g., "sample_recipe:activate")
+                module_name = ep.value.split(':')[0]
+                if normalize(module_name) == normalized_name:
+                    matches_package = True
+
+            if matches_package:
+                logger.info(f"Loading entry point: {ep.name} -> {ep.value} (dist: {dist_name})")
+                activate_fn = ep.load()
+                activate_fn(marketplace)
+                activated = True
+                logger.info(f"Successfully activated {ep.name}")
+        except Exception as e:
+            logger.warning(f"Failed to process entry point {ep.name}: {e}")
+
+    if not activated:
+        # Fallback: try direct module import (for packages without entry points)
+        import importlib
+        module_name = package_name.replace('-', '_')
+        try:
+            if module_name in sys.modules:
+                importlib.reload(sys.modules[module_name])
+            else:
+                importlib.import_module(module_name)
+
+            module = sys.modules.get(module_name)
+            if module and hasattr(module, 'activate'):
+                logger.info(f"Calling activate() on {module_name}")
+                module.activate(marketplace)
+            else:
+                logger.warning(f"Package {package_name} does not have an activate() function")
+        except ImportError as e:
+            logger.warning(f"Could not import {module_name}: {e}")
 
 
 def handle_get_marketplace(params: dict) -> List[dict]:
@@ -482,6 +730,7 @@ def _recipe_descriptor_to_dict(descriptor) -> dict:
             }
             for name, value, opt in descriptor.options
         ],
+        'dataTables': descriptor.data_tables,
         'recipeList': [_recipe_descriptor_to_dict(r) for r in descriptor.recipe_list],
     }
 
@@ -497,6 +746,302 @@ def _serialize_value(value) -> Any:
     return str(value)
 
 
+# Prepared recipes storage - maps recipe IDs to recipe instances
+_prepared_recipes: Dict[str, Any] = {}
+# Execution contexts storage - maps context IDs to ExecutionContext instances
+_execution_contexts: Dict[str, Any] = {}
+# Accumulator storage for ScanningRecipes - maps recipe IDs to accumulators
+_recipe_accumulators: Dict[str, Any] = {}
+# Phase tracking for recipes - maps recipe IDs to 'scan' or 'edit'
+_recipe_phases: Dict[str, str] = {}
+# Data table output directory - if set, data tables will be written to CSV files
+_data_table_output_dir: Optional[str] = None
+
+
+def handle_prepare_recipe(params: dict) -> dict:
+    """Handle a PrepareRecipe RPC request.
+
+    Prepares a recipe for execution by:
+    1. Looking up the recipe in the marketplace
+    2. Instantiating it with the provided options
+    3. Storing it with a unique ID
+    4. Returning the descriptor and visitor info
+
+    Args:
+        params: dict with 'id' (recipe name), optional 'options', and optional 'dataTableOutputDir'
+
+    Returns:
+        dict with 'id', 'descriptor', 'editVisitor', and precondition info
+    """
+    global _data_table_output_dir
+
+    recipe_name = params.get('id')
+    if recipe_name is None:
+        raise ValueError("Recipe 'id' is required")
+    options = params.get('options', {})
+
+    # Set up data table output directory if specified
+    if 'dataTableOutputDir' in params:
+        _data_table_output_dir = params['dataTableOutputDir']
+        logger.info(f"Data table output directory set to: {_data_table_output_dir}")
+
+    logger.info(f"PrepareRecipe: id={recipe_name}, options={options}")
+
+    marketplace = _get_marketplace()
+
+    # Look up the recipe - returns (RecipeDescriptor, Type[Recipe]) tuple
+    recipe_info = marketplace.find_recipe(recipe_name)
+    if recipe_info is None:
+        raise ValueError(f"Recipe not found: {recipe_name}")
+
+    _descriptor, recipe_class = recipe_info
+    if recipe_class is None:
+        raise ValueError(f"Recipe class not found for: {recipe_name}")
+
+    # Instantiate the recipe with options
+    if options:
+        recipe = recipe_class(**options)
+    else:
+        recipe = recipe_class()
+
+    # Generate a unique ID for this prepared recipe
+    prepared_id = generate_id()
+    _prepared_recipes[prepared_id] = recipe
+
+    # Build the response
+    descriptor = recipe.descriptor()
+
+    # Determine if this is a scanning recipe
+    from rewrite.recipe import ScanningRecipe
+    is_scanning = isinstance(recipe, ScanningRecipe)
+
+    response = {
+        'id': prepared_id,
+        'descriptor': _recipe_descriptor_to_dict(descriptor),
+        'editVisitor': f'edit:{prepared_id}',
+        'editPreconditions': _get_preconditions(recipe, 'edit'),
+        'scanVisitor': f'scan:{prepared_id}' if is_scanning else None,
+        'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
+    }
+
+    logger.info(f"PrepareRecipe response: {response}")
+    return response
+
+
+def _get_preconditions(recipe, phase: str) -> List[dict]:
+    """Get preconditions for a recipe phase.
+
+    For now, we add a type precondition to ensure only Python files are visited.
+    """
+    # Add precondition to only visit Python source files
+    return [{
+        'visitorName': 'org.openrewrite.rpc.internal.FindTreesOfType',
+        'visitorOptions': {'type': 'org.openrewrite.python.tree.Py'}
+    }]
+
+
+def handle_visit(params: dict) -> dict:
+    """Handle a Visit RPC request.
+
+    Applies a visitor to a tree and returns whether it was modified.
+
+    Args:
+        params: dict with 'visitor', 'sourceFileType', 'treeId', 'p' (context id), 'cursor'
+
+    Returns:
+        dict with 'modified' boolean
+    """
+    visitor_name = params.get('visitor')
+    source_file_type = params.get('sourceFileType')
+    tree_id = params.get('treeId')
+    p_id = params.get('p')
+    cursor_ids = params.get('cursor')
+
+    if visitor_name is None:
+        raise ValueError("'visitor' is required")
+    if tree_id is None:
+        raise ValueError("'treeId' is required")
+
+    logger.info(f"Visit: visitor={visitor_name}, treeId={tree_id}, p={p_id}")
+
+    # Get or create execution context
+    if p_id and p_id in _execution_contexts:
+        ctx = _execution_contexts[p_id]
+    else:
+        from rewrite import InMemoryExecutionContext
+        ctx = InMemoryExecutionContext()
+        # Set up data table store if output directory is configured
+        if _data_table_output_dir:
+            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
+            store = CsvDataTableStore(_data_table_output_dir)
+            store.accept_rows(True)
+            ctx.put_message(DATA_TABLE_STORE, store)
+        if p_id:
+            _execution_contexts[p_id] = ctx
+
+    # Get the tree - fetch from Java if we don't have it locally
+    tree = local_objects.get(tree_id)
+    if tree is None:
+        tree = get_object_from_java(tree_id, source_file_type)
+
+    if tree is None:
+        raise ValueError(f"Tree not found: {tree_id}")
+
+    # Instantiate the visitor
+    visitor = _instantiate_visitor(visitor_name, ctx)
+
+    # Apply the visitor
+    from rewrite.visitor import Cursor
+    cursor = Cursor(None, Cursor.ROOT_VALUE)
+
+    before = tree
+    after = visitor.visit(tree, ctx, cursor)
+
+    # Update local objects with the result and determine if modified
+    # Use referential equality (identity comparison) to detect modifications
+    if after is None:
+        # Tree was deleted
+        if tree_id in local_objects:
+            del local_objects[tree_id]
+        modified = True
+    elif after is not before:
+        # Tree object changed - update both the tree_id entry and the new id entry
+        local_objects[tree_id] = after
+        if str(after.id) != tree_id:
+            local_objects[str(after.id)] = after
+        modified = True
+    else:
+        modified = False
+
+    logger.info(f"Visit result: modified={modified}, tree_id={tree_id}, before.id={before.id}, after.id={after.id if after else None}")
+    return {'modified': modified}
+
+
+def _instantiate_visitor(visitor_name: str, ctx):
+    """Instantiate a visitor from its name.
+
+    Visitor names can be:
+    - 'edit:<recipe_id>' - get the editor from a prepared recipe
+    - 'scan:<recipe_id>' - get the scanner from a prepared scanning recipe
+
+    For ScanningRecipes, the accumulator is persisted across calls so that
+    data collected during the scan phase is available during the edit and
+    generate phases.
+    """
+    if visitor_name.startswith('edit:'):
+        recipe_id = visitor_name[5:]
+        recipe = _prepared_recipes.get(recipe_id)
+        if recipe is None:
+            raise ValueError(f"Prepared recipe not found: {recipe_id}")
+
+        # Track phase transition
+        _recipe_phases[recipe_id] = 'edit'
+
+        # For ScanningRecipe, use the accumulated data from scan phase
+        from rewrite.recipe import ScanningRecipe
+        if isinstance(recipe, ScanningRecipe):
+            # Get existing accumulator or create new one
+            if recipe_id not in _recipe_accumulators:
+                _recipe_accumulators[recipe_id] = recipe.initial_value(ctx)
+            acc = _recipe_accumulators[recipe_id]
+            return recipe.editor_with_data(acc)
+
+        return recipe.editor()
+
+    elif visitor_name.startswith('scan:'):
+        recipe_id = visitor_name[5:]
+        recipe = _prepared_recipes.get(recipe_id)
+        if recipe is None:
+            raise ValueError(f"Prepared recipe not found: {recipe_id}")
+        from rewrite.recipe import ScanningRecipe
+        if not isinstance(recipe, ScanningRecipe):
+            raise ValueError(f"Recipe is not a scanning recipe: {recipe_id}")
+
+        # Check for phase transition (edit -> scan = new cycle)
+        # If we're transitioning from edit back to scan, clear the accumulator
+        if _recipe_phases.get(recipe_id) == 'edit':
+            _recipe_accumulators.pop(recipe_id, None)
+        _recipe_phases[recipe_id] = 'scan'
+
+        # Get existing accumulator or create new one
+        if recipe_id not in _recipe_accumulators:
+            _recipe_accumulators[recipe_id] = recipe.initial_value(ctx)
+        acc = _recipe_accumulators[recipe_id]
+
+        return recipe.scanner(acc)
+
+    else:
+        raise ValueError(f"Unknown visitor name format: {visitor_name}")
+
+
+def handle_generate(params: dict) -> dict:
+    """Handle a Generate RPC request.
+
+    Called by the recipe run cycle to generate new source files from scanning recipes.
+    For non-scanning recipes, returns an empty list.
+
+    The accumulator used here is the same one that was populated during the scan phase,
+    allowing recipes to generate files based on data collected across all source files.
+
+    Args:
+        params: dict with 'id' (prepared recipe id) and 'p' (context id)
+
+    Returns:
+        dict with 'ids' list and 'sourceFileTypes' list
+    """
+    recipe_id = params.get('id')
+    p_id = params.get('p')
+
+    if recipe_id is None:
+        raise ValueError("'id' is required")
+
+    logger.info(f"Generate: id={recipe_id}, p={p_id}")
+
+    recipe = _prepared_recipes.get(recipe_id)
+    if recipe is None:
+        raise ValueError(f"Prepared recipe not found: {recipe_id}")
+
+    # Get or create execution context
+    if p_id and p_id in _execution_contexts:
+        ctx = _execution_contexts[p_id]
+    else:
+        from rewrite import InMemoryExecutionContext
+        ctx = InMemoryExecutionContext()
+        # Set up data table store if output directory is configured
+        if _data_table_output_dir:
+            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
+            store = CsvDataTableStore(_data_table_output_dir)
+            store.accept_rows(True)
+            ctx.put_message(DATA_TABLE_STORE, store)
+        if p_id:
+            _execution_contexts[p_id] = ctx
+
+    # Only scanning recipes can generate files
+    from rewrite.recipe import ScanningRecipe
+    if isinstance(recipe, ScanningRecipe):
+        # Use the persisted accumulator from the scan phase, or create new one if not available
+        if recipe_id in _recipe_accumulators:
+            acc = _recipe_accumulators[recipe_id]
+        else:
+            acc = recipe.initial_value(ctx)
+            _recipe_accumulators[recipe_id] = acc
+
+        generated = recipe.generate(acc, ctx)
+
+        ids = []
+        source_file_types = []
+        for sf in generated:
+            sf_id = str(sf.id)
+            local_objects[sf_id] = sf
+            ids.append(sf_id)
+            source_file_types.append(sf.__class__.__module__ + '.' + sf.__class__.__name__)
+
+        return {'ids': ids, 'sourceFileTypes': source_file_types}
+
+    # Non-scanning recipes don't generate files
+    return {'ids': [], 'sourceFileTypes': []}
+
+
 def handle_request(method: str, params: dict) -> Any:
     """Handle an RPC request."""
     handlers = {
@@ -506,7 +1051,11 @@ def handle_request(method: str, params: dict) -> Any:
         'GetLanguages': handle_get_languages,
         'Print': handle_print,
         'Reset': handle_reset,
+        'InstallRecipes': handle_install_recipes,
         'GetMarketplace': handle_get_marketplace,
+        'PrepareRecipe': handle_prepare_recipe,
+        'Visit': handle_visit,
+        'Generate': handle_generate,
     }
 
     handler = handlers.get(method)
@@ -519,65 +1068,146 @@ def handle_request(method: str, params: dict) -> Any:
 def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
     """Read a JSON-RPC message from stdin with timeout.
 
-    Uses select() to wait for data with a timeout, preventing indefinite blocking.
+    Uses select() on the raw file descriptor and unbuffered binary I/O
+    to avoid issues with Python's buffered TextIOWrapper.
 
     Args:
-        timeout_seconds: Maximum time to wait for data
+        timeout_seconds: Maximum time to wait for complete message
 
     Returns:
         Parsed JSON message, or None on timeout/error
     """
+    import time
+    import os
+    start_time = time.time()
+    fd = sys.stdin.fileno()
+
+    def remaining_timeout() -> float:
+        elapsed = time.time() - start_time
+        return max(0, timeout_seconds - elapsed)
+
+    def read_bytes_with_timeout(n: int) -> Optional[bytes]:
+        """Read exactly n bytes from stdin fd with timeout."""
+        result = []
+        remaining = n
+        while remaining > 0:
+            timeout = remaining_timeout()
+            if timeout <= 0:
+                return None
+            readable, _, _ = select.select([fd], [], [], timeout)
+            if not readable:
+                return None
+            chunk = os.read(fd, remaining)
+            if not chunk:
+                return None  # EOF
+            result.append(chunk)
+            remaining -= len(chunk)
+        return b''.join(result)
+
+    def read_line_with_timeout() -> Optional[bytes]:
+        """Read a line (up to \n) from stdin fd with timeout."""
+        result = []
+        while True:
+            timeout = remaining_timeout()
+            if timeout <= 0:
+                return None
+            readable, _, _ = select.select([fd], [], [], timeout)
+            if not readable:
+                return None
+            byte = os.read(fd, 1)
+            if not byte:
+                return None  # EOF
+            result.append(byte)
+            if byte == b'\n':
+                break
+        return b''.join(result)
+
     try:
-        # Wait for stdin to be readable with timeout
-        # Note: select works on file descriptors, stdin.fileno() gives us that
-        readable, _, _ = select.select([sys.stdin], [], [], timeout_seconds)
-
-        if not readable:
-            logger.warning(f"Timeout waiting for RPC response after {timeout_seconds}s")
-            return None
-
         # Read Content-Length header
-        header_line = sys.stdin.readline()
+        header_line = read_line_with_timeout()
         if not header_line:
+            logger.warning(f"Timeout waiting for RPC response header after {timeout_seconds}s")
             return None
 
-        if not header_line.startswith('Content-Length:'):
-            logger.error(f"Invalid header: {header_line}")
+        header_str = header_line.decode('utf-8').strip()
+        if not header_str.startswith('Content-Length:'):
+            logger.error(f"Invalid header: {header_str}")
             return None
 
-        content_length = int(header_line.split(':')[1].strip())
+        content_length = int(header_str.split(':')[1].strip())
 
-        # Read empty line
-        sys.stdin.readline()
+        # Read empty line (separator)
+        separator = read_line_with_timeout()
+        if separator is None:
+            logger.warning(f"Timeout waiting for header separator")
+            return None
 
         # Read content
-        content = sys.stdin.read(content_length)
-        return json.loads(content)
+        content_bytes = read_bytes_with_timeout(content_length)
+        if content_bytes is None:
+            logger.warning(f"Timeout waiting for message content")
+            return None
+
+        return json.loads(content_bytes.decode('utf-8'))
     except Exception as e:
         logger.error(f"Error reading message with timeout: {e}")
         return None
 
 
 def read_message() -> Optional[dict]:
-    """Read a JSON-RPC message from stdin (blocking, no timeout)."""
+    """Read a JSON-RPC message from stdin (blocking, no timeout).
+
+    Uses unbuffered binary I/O (os.read) to be consistent with
+    read_message_with_timeout() and avoid buffering conflicts.
+    """
+    import os
+    fd = sys.stdin.fileno()
+
+    def read_line() -> Optional[bytes]:
+        """Read a line (up to \n) from stdin fd."""
+        result = []
+        while True:
+            byte = os.read(fd, 1)
+            if not byte:
+                return None  # EOF
+            result.append(byte)
+            if byte == b'\n':
+                break
+        return b''.join(result)
+
+    def read_bytes(n: int) -> Optional[bytes]:
+        """Read exactly n bytes from stdin fd."""
+        result = []
+        remaining = n
+        while remaining > 0:
+            chunk = os.read(fd, remaining)
+            if not chunk:
+                return None  # EOF
+            result.append(chunk)
+            remaining -= len(chunk)
+        return b''.join(result)
+
     try:
         # Read Content-Length header
-        header_line = sys.stdin.readline()
+        header_line = read_line()
         if not header_line:
             return None
 
-        if not header_line.startswith('Content-Length:'):
-            logger.error(f"Invalid header: {header_line}")
+        header_str = header_line.decode('utf-8').strip()
+        if not header_str.startswith('Content-Length:'):
+            logger.error(f"Invalid header: {header_str}")
             return None
 
-        content_length = int(header_line.split(':')[1].strip())
+        content_length = int(header_str.split(':')[1].strip())
 
-        # Read empty line
-        sys.stdin.readline()
+        # Read empty line (separator)
+        read_line()
 
         # Read content
-        content = sys.stdin.read(content_length)
-        return json.loads(content)
+        content_bytes = read_bytes(content_length)
+        if not content_bytes:
+            return None
+        return json.loads(content_bytes.decode('utf-8'))
     except Exception as e:
         logger.error(f"Error reading message: {e}")
         return None
@@ -628,6 +1258,10 @@ def main():
             method = message.get('method')
             params = message.get('params', {})
 
+            if method is None:
+                logger.error("Missing 'method' in request")
+                continue
+
             try:
                 result = handle_request(method, params)
                 response = {
@@ -638,12 +1272,15 @@ def main():
             except Exception as e:
                 logger.error(f"Error handling request: {e}")
                 traceback.print_exc()
+                # Include full stack trace in error response for debugging
+                tb_str = traceback.format_exc()
                 response = {
                     'jsonrpc': '2.0',
                     'id': request_id,
                     'error': {
                         'code': -32603,
-                        'message': str(e)
+                        'message': str(e),
+                        'data': tb_str
                     }
                 }
 
@@ -656,6 +1293,13 @@ def main():
             logger.error(f"Fatal error: {e}")
             traceback.print_exc()
             break
+
+    # Shutdown TyLspClient if it was initialized
+    try:
+        from rewrite.python.ty_client import TyLspClient
+        TyLspClient.reset()
+    except ImportError:
+        pass  # ty not available
 
     logger.info("Python RPC server shutting down...")
 

@@ -20,6 +20,7 @@ import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.AnnotationService;
@@ -48,11 +49,7 @@ public class AnnotationTemplateGenerator {
         } else if (j instanceof J.VariableDeclarations) {
             after.insert(0, " int $variable;");
         } else if (j instanceof J.ClassDeclaration) {
-            if (cursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
-                after.insert(0, "class $Clazz {}");
-            } else {
-                after.insert(0, "static class $Clazz {}");
-            }
+            addDummyClass(cursor, after);
         }
 
         if (cursor.getParentOrThrow().getValue() instanceof J.ClassDeclaration &&
@@ -92,14 +89,24 @@ public class AnnotationTemplateGenerator {
                     } else if (j instanceof J.ClassDeclaration || annotationParent instanceof J.ClassDeclaration) {
                         // Check if this is a top-level class or nested class
                         Cursor classCursor = j instanceof J.ClassDeclaration ? cursor : cursor.getParent(level);
-                        if (classCursor != null && classCursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
-                            after.insert(0, "class $Clazz {}");
-                        } else {
-                            after.insert(0, "static class $Clazz {}");
+                        if (classCursor != null) {
+                            addDummyClass(classCursor, after);
                         }
                     }
                     return before + "/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
                 });
+    }
+
+    protected void addDummyClass(Cursor cursor, StringBuilder after) {
+        if (cursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
+            after.insert(0, "class $Clazz {}");
+        } else {
+            after.insert(0, "static class $Clazz {}");
+        }
+    }
+
+    protected void addDummyAnnotationType(StringBuilder after) {
+        after.append("\n@interface $Placeholder {}");
     }
 
     public List<J.Annotation> listAnnotations(JavaSourceFile cu) {
@@ -145,7 +152,7 @@ public class AnnotationTemplateGenerator {
             }
             List<J.ClassDeclaration> classes = cu.getClasses();
             if (!"$Placeholder".equals(classes.get(classes.size() - 1).getName().getSimpleName())) {
-                after.append("\n@interface $Placeholder {}");
+                addDummyAnnotationType(after);
             }
             return;
         } else if (j instanceof J.ClassDeclaration) {
@@ -178,6 +185,10 @@ public class AnnotationTemplateGenerator {
                         .withPrefix(Space.EMPTY)
                         .printTrimmed(cursor).trim() + '{');
                 after.append('}');
+            } else if (parent instanceof J.NewClass) {
+                // Anonymous class body
+                J.NewClass nc = (J.NewClass) parent;
+                anonymousClassDeclaration(before, after, nc, cursor, prior);
             } else if (parent instanceof J.Block) {
                 J.Block b = (J.Block) j;
 
@@ -200,11 +211,60 @@ public class AnnotationTemplateGenerator {
                 after.append('}');
             }
         } else if (j instanceof J.NewClass) {
-            J.NewClass n = (J.NewClass) j;
-            n = n.withBody(null).withPrefix(Space.EMPTY);
-            before.insert(0, '{');
-            before.insert(0, n.printTrimmed(cursor.getParentOrThrow()).trim());
-            after.append("};");
+            final J.NewClass n = (J.NewClass) j;
+            if (n.getBody() != null && referToSameElement(n.getBody(), prior)) {
+                // prior is the body of this anonymous class - already handled by J.Block case
+                // Check if this J.NewClass is an argument to another constructor - if so, don't add semicolon
+                // The parent will handle closing the statement
+                J parent = next(cursor).getValue();
+                if (!(parent instanceof J.NewClass) ||
+                        ((J.NewClass) parent).getArguments().stream().noneMatch(arg -> referToSameElement(arg, n))) {
+                    // Only add semicolon if this is not an argument to another NewClass
+                    after.append(";");
+                }
+            } else if (n.getArguments().stream().anyMatch(arg -> referToSameElement(arg, prior))) {
+                // prior is one of the arguments - wrap in argument list
+                String newClassString;
+                JavaType.Class constructorTypeClass = n.getConstructorType() != null ? TypeUtils.asClass(n.getConstructorType().getReturnType()) : null;
+                if (n.getClazz() != null) {
+                    newClassString = "new " + n.getClazz().printTrimmed(cursor);
+                } else if (constructorTypeClass != null) {
+                    newClassString = "new " + constructorTypeClass.getFullyQualifiedName();
+                } else {
+                    throw new IllegalStateException("Unable to template a J.NewClass instance having a null clazz and constructor type.");
+                }
+
+                // Build stub arguments before and after the prior
+                StringBuilder beforeArgs = new StringBuilder(newClassString + "(");
+                StringBuilder afterArgs = new StringBuilder();
+                List<Expression> arguments = n.getArguments();
+                boolean priorFound = false;
+                for (int i = 0; i < arguments.size(); i++) {
+                    Expression arg = arguments.get(i);
+                    if (!priorFound) {
+                        if (referToSameElement(arg, prior)) {
+                            priorFound = true;
+                            continue;
+                        }
+                        if (i > 0) {
+                            beforeArgs.append(", ");
+                        }
+                        beforeArgs.append(valueOfType(arg.getType()));
+                    } else {
+                        afterArgs.append(", ").append(valueOfType(arg.getType()));
+                    }
+                }
+                afterArgs.append(")");
+
+                before.insert(0, beforeArgs);
+                after.append(afterArgs);
+                after.append(";");
+            } else {
+                J.NewClass stripped = n.withBody(null).withPrefix(Space.EMPTY);
+                before.insert(0, '{');
+                before.insert(0, stripped.printTrimmed(cursor.getParentOrThrow()).trim());
+                after.append("};");
+            }
         }
 
         template(next(cursor), j, before, after, templated);
@@ -233,7 +293,7 @@ public class AnnotationTemplateGenerator {
             }
         }
         c = c.withBody(J.Block.createEmptyBlock())
-                .withLeadingAnnotations(null)
+                .withLeadingAnnotations(emptyList())
                 .withPrefix(Space.EMPTY)
                 .withKind(J.ClassDeclaration.Kind.Type.Class)
                 .withPrimaryConstructor(null);
@@ -245,6 +305,49 @@ public class AnnotationTemplateGenerator {
             before.insert(0, braceIndex == -1 ? printed + '{' : printed.substring(0, braceIndex + 1));
         }
         after.append('}');
+    }
+
+    private void anonymousClassDeclaration(StringBuilder before, StringBuilder after, J.NewClass nc, Cursor cursor, J prior) {
+        // Generate the anonymous class instantiation stub
+        String newClassString;
+        JavaType.Class constructorTypeClass = nc.getConstructorType() != null ? TypeUtils.asClass(nc.getConstructorType().getReturnType()) : null;
+        if (nc.getClazz() != null) {
+            newClassString = "new " + nc.getClazz().printTrimmed(cursor);
+        } else if (constructorTypeClass != null) {
+            newClassString = "new " + constructorTypeClass.getFullyQualifiedName();
+        } else {
+            throw new IllegalStateException("Unable to template inside a J.NewClass instance having a null clazz and constructor type.");
+        }
+
+        // Build stub arguments to make it parseable
+        StringBuilder stubArgs = new StringBuilder("(");
+        List<Expression> arguments = nc.getArguments();
+        for (int i = 0; i < arguments.size(); i++) {
+            if (i > 0) {
+                stubArgs.append(", ");
+            }
+            stubArgs.append(valueOfType(arguments.get(i).getType()));
+        }
+        stubArgs.append(")");
+
+        before.insert(0, newClassString + stubArgs + '{');
+
+        J.Block body = nc.getBody();
+        if (body != null) {
+            for (Statement statement : body.getStatements()) {
+                if (referToSameElement(statement, prior)) {
+                    break;
+                } else if (statement instanceof J.VariableDeclarations) {
+                    J.VariableDeclarations v = (J.VariableDeclarations) statement;
+                    before.insert(0, variable(v, cursor) + ";\n");
+                }
+            }
+        }
+        after.append('}');
+    }
+
+    private static boolean referToSameElement(@Nullable Tree t1, @Nullable Tree t2) {
+        return t1 == t2 || (t1 != null && t2 != null && t1.getId().equals(t2.getId()));
     }
 
     private static boolean isAnnotated(Cursor cursor, J maybeAnnotation) {

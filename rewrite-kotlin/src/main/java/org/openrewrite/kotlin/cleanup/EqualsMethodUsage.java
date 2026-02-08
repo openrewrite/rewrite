@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.KotlinVisitor;
+import org.openrewrite.kotlin.marker.IsNullSafe;
 import org.openrewrite.kotlin.tree.K;
 
 import java.time.Duration;
@@ -41,30 +42,18 @@ public class EqualsMethodUsage extends Recipe {
     @SuppressWarnings("ALL")
     private static J.@Nullable Binary equalsBinaryTemplate;
 
-    @Override
-    public String getDisplayName() {
-        return "Structural equality tests should use `==` or `!=`";
-    }
+    String displayName = "Structural equality tests should use `==` or `!=`";
 
-    @Override
-    public String getDescription() {
-        return "In Kotlin, `==` means structural equality and `!=` structural inequality and both map to the left-side " +
+    String description = "In Kotlin, `==` means structural equality and `!=` structural inequality and both map to the left-side " +
                "term’s `equals()` function. It is, therefore, redundant to call `equals()` as a function. Also, `==` and `!=` " +
                "are more general than `equals()` and `!equals()` because it allows either of both operands to be `null`.\n" +
                "Developers using `equals()` instead of `==` or `!=` is often the result of adapting styles from other " +
                "languages like Java, where `==` means reference equality and `!=` means reference inequality.\n" +
                "The `==` and `!=` operators are a more concise and elegant way to test structural equality than calling a function.";
-    }
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("RSPEC-S6519");
-    }
+    Set<String> tags = singleton("RSPEC-S6519");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(3);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(3);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -96,11 +85,16 @@ public class EqualsMethodUsage extends Recipe {
             public J visitMethodInvocation(J.MethodInvocation method,
                                            ExecutionContext ctx) {
                 method = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                // Don't transform safe-call method invocations (obj?.equals(other)) because
+                // they have different null semantics than obj == other:
+                // - obj?.equals(other) returns Boolean? (null if obj is null)
+                // - obj == other returns Boolean (false if obj is null)
                 if ("equals".equals(method.getSimpleName()) &&
                     method.getMethodType() != null &&
                     method.getArguments().size() == 1 &&
                     TypeUtils.isOfClassType(method.getMethodType().getReturnType(), "kotlin.Boolean") &&
-                    method.getSelect() != null
+                    method.getSelect() != null &&
+                    !method.getMarkers().findFirst(IsNullSafe.class).isPresent()
                 ) {
                     Expression lhs = method.getSelect();
                     Expression rhs = method.getArguments().get(0);

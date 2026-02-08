@@ -49,9 +49,17 @@ public class YamlReceiver extends YamlVisitor<RpcReceiveQueue> {
     @Override
     public Yaml visitDocument(Yaml.Document document, RpcReceiveQueue q) {
         return document
+                .withDirectives(q.receiveList(document.getDirectives(), dir -> (Yaml.Directive) visitNonNull(dir, q)))
                 .withExplicit(q.receive(document.isExplicit()))
                 .withBlock(q.receive(document.getBlock(), b -> (Yaml.Block) visitNonNull(b, q)))
                 .withEnd(q.receive(document.getEnd(), e -> (Yaml.Document.End) visitNonNull(e, q)));
+    }
+
+    @Override
+    public Yaml visitDirective(Yaml.Directive directive, RpcReceiveQueue q) {
+        return directive
+                .withValue(q.receive(directive.getValue()))
+                .withSuffix(q.receive(directive.getSuffix()));
     }
 
     @Override
