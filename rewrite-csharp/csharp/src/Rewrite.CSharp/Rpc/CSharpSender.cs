@@ -73,6 +73,19 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             NamespaceDeclaration ns => VisitNamespaceDeclaration(ns, q),
             TupleType tt => VisitTupleType(tt, q),
             TupleExpression te => VisitTupleExpression(te, q),
+            ConditionalBlock cb => VisitConditionalBlock(cb, q),
+            IfDirective ifd => VisitIfDirective(ifd, q),
+            ElifDirective elif => VisitElifDirective(elif, q),
+            ElseDirective elsed => VisitElseDirective(elsed, q),
+            PragmaWarningDirective pwd => VisitPragmaWarningDirective(pwd, q),
+            NullableDirective nd => VisitNullableDirective(nd, q),
+            RegionDirective rd => VisitRegionDirective(rd, q),
+            EndRegionDirective erd => VisitEndRegionDirective(erd, q),
+            DefineDirective dd => VisitDefineDirective(dd, q),
+            UndefDirective ud2 => VisitUndefDirective(ud2, q),
+            ErrorDirective ed => VisitErrorDirective(ed, q),
+            WarningDirective wd => VisitWarningDirective(wd, q),
+            LineDirective ld => VisitLineDirective(ld, q),
             _ => throw new InvalidOperationException($"Unknown Cs tree type: {tree.GetType().Name}")
         };
 
@@ -336,6 +349,113 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     {
         q.GetAndSend(te, t => t.Arguments, c => VisitContainer(c, q));
         return te;
+    }
+
+    // ---- ConditionalBlock ----
+    public override J VisitConditionalBlock(ConditionalBlock cb, RpcSendQueue q)
+    {
+        q.GetAndSend(cb, c => (J)c.IfBranch, el => Visit(el, q));
+        q.GetAndSendList(cb, c => (IList<ElifDirective>)c.ElifBranches,
+            e => (object)e.Id, e => Visit(e, q));
+        q.GetAndSend(cb, c => (J?)c.ElseBranch, el => Visit(el!, q));
+        q.GetAndSend(cb, c => c.BeforeEndif, space => VisitSpace(space, q));
+        return cb;
+    }
+
+    // ---- IfDirective ----
+    public override J VisitIfDirective(IfDirective ifd, RpcSendQueue q)
+    {
+        q.GetAndSend(ifd, i => (J)i.Condition, el => Visit(el, q));
+        q.GetAndSend(ifd, i => (object)i.BranchTaken);
+        q.GetAndSendList(ifd, i => i.Body,
+            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
+        return ifd;
+    }
+
+    // ---- ElifDirective ----
+    public override J VisitElifDirective(ElifDirective elif, RpcSendQueue q)
+    {
+        q.GetAndSend(elif, e => (J)e.Condition, el => Visit(el, q));
+        q.GetAndSend(elif, e => (object)e.BranchTaken);
+        q.GetAndSendList(elif, e => e.Body,
+            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
+        return elif;
+    }
+
+    // ---- ElseDirective ----
+    public override J VisitElseDirective(ElseDirective elsed, RpcSendQueue q)
+    {
+        q.GetAndSend(elsed, e => (object)e.BranchTaken);
+        q.GetAndSendList(elsed, e => e.Body,
+            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
+        return elsed;
+    }
+
+    // ---- PragmaWarningDirective ----
+    public override J VisitPragmaWarningDirective(PragmaWarningDirective pwd, RpcSendQueue q)
+    {
+        q.GetAndSend(pwd, p => (object)p.Action);
+        q.GetAndSendList(pwd, p => p.WarningCodes,
+            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
+        return pwd;
+    }
+
+    // ---- NullableDirective ----
+    public override J VisitNullableDirective(NullableDirective nd, RpcSendQueue q)
+    {
+        q.GetAndSend(nd, n => (object)n.Setting);
+        q.GetAndSend(nd, n => (object?)n.Target);
+        return nd;
+    }
+
+    // ---- RegionDirective ----
+    public override J VisitRegionDirective(RegionDirective rd, RpcSendQueue q)
+    {
+        q.GetAndSend(rd, r => (object?)r.Name);
+        return rd;
+    }
+
+    // ---- EndRegionDirective ----
+    public override J VisitEndRegionDirective(EndRegionDirective erd, RpcSendQueue q)
+    {
+        return erd;
+    }
+
+    // ---- DefineDirective ----
+    public override J VisitDefineDirective(DefineDirective dd, RpcSendQueue q)
+    {
+        q.GetAndSend(dd, d => (J)d.Symbol, el => Visit(el, q));
+        return dd;
+    }
+
+    // ---- UndefDirective ----
+    public override J VisitUndefDirective(UndefDirective ud, RpcSendQueue q)
+    {
+        q.GetAndSend(ud, u => (J)u.Symbol, el => Visit(el, q));
+        return ud;
+    }
+
+    // ---- ErrorDirective ----
+    public override J VisitErrorDirective(ErrorDirective ed, RpcSendQueue q)
+    {
+        q.GetAndSend(ed, e => (object)e.Message);
+        return ed;
+    }
+
+    // ---- WarningDirective ----
+    public override J VisitWarningDirective(WarningDirective wd, RpcSendQueue q)
+    {
+        q.GetAndSend(wd, w => (object)w.Message);
+        return wd;
+    }
+
+    // ---- LineDirective ----
+    public override J VisitLineDirective(LineDirective ld, RpcSendQueue q)
+    {
+        q.GetAndSend(ld, l => (object)l.Kind);
+        q.GetAndSend(ld, l => (J?)l.Line, el => Visit(el!, q));
+        q.GetAndSend(ld, l => (J?)l.File, el => Visit(el!, q));
+        return ld;
     }
 
     // ---- Helper delegation to JavaSender ----

@@ -880,6 +880,95 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withType(q.receive(pointerFieldAccess.getType(), type -> visitType(type, q)));
     }
 
+    @Override
+    public J visitConditionalBlock(Cs.ConditionalBlock conditionalBlock, RpcReceiveQueue q) {
+        return conditionalBlock
+                .withIfBranch(q.receive(conditionalBlock.getIfBranch(), el -> (Cs.IfDirective) visitNonNull(el, q)))
+                .withElifBranches(q.receiveList(conditionalBlock.getElifBranches(), el -> (Cs.ElifDirective) visitNonNull(el, q)))
+                .withElseBranch(q.receive(conditionalBlock.getElseBranch(), el -> (Cs.ElseDirective) visitNonNull(el, q)))
+                .withBeforeEndif(q.receive(conditionalBlock.getBeforeEndif(), space -> visitSpace(space, q)));
+    }
+
+    @Override
+    public J visitIfDirective(Cs.IfDirective ifDirective, RpcReceiveQueue q) {
+        return ifDirective
+                .withCondition(q.receive(ifDirective.getCondition(), el -> (Expression) visitNonNull(el, q)))
+                .withBranchTaken(q.receive(ifDirective.isBranchTaken()))
+                .getPadding().withBody(q.receiveList(ifDirective.getPadding().getBody(), el -> visitRightPadded(el, q)));
+    }
+
+    @Override
+    public J visitElifDirective(Cs.ElifDirective elifDirective, RpcReceiveQueue q) {
+        return elifDirective
+                .withCondition(q.receive(elifDirective.getCondition(), el -> (Expression) visitNonNull(el, q)))
+                .withBranchTaken(q.receive(elifDirective.isBranchTaken()))
+                .getPadding().withBody(q.receiveList(elifDirective.getPadding().getBody(), el -> visitRightPadded(el, q)));
+    }
+
+    @Override
+    public J visitElseDirective(Cs.ElseDirective elseDirective, RpcReceiveQueue q) {
+        return elseDirective
+                .withBranchTaken(q.receive(elseDirective.isBranchTaken()))
+                .getPadding().withBody(q.receiveList(elseDirective.getPadding().getBody(), el -> visitRightPadded(el, q)));
+    }
+
+    @Override
+    public J visitPragmaWarningDirective(Cs.PragmaWarningDirective pragmaWarningDirective, RpcReceiveQueue q) {
+        return pragmaWarningDirective
+                .withAction(q.receiveAndGet(pragmaWarningDirective.getAction(), toEnum(Cs.PragmaWarningDirective.PragmaWarningAction.class)))
+                .getPadding().withWarningCodes(q.receiveList(pragmaWarningDirective.getPadding().getWarningCodes(), el -> visitRightPadded(el, q)));
+    }
+
+    @Override
+    public J visitNullableDirective(Cs.NullableDirective nullableDirective, RpcReceiveQueue q) {
+        return nullableDirective
+                .withSetting(q.receiveAndGet(nullableDirective.getSetting(), toEnum(Cs.NullableDirective.NullableSetting.class)))
+                .withTarget(q.receiveAndGet(nullableDirective.getTarget(), toEnum(Cs.NullableDirective.NullableTarget.class)));
+    }
+
+    @Override
+    public J visitRegionDirective(Cs.RegionDirective regionDirective, RpcReceiveQueue q) {
+        return regionDirective
+                .withName(q.receive(regionDirective.getName()));
+    }
+
+    @Override
+    public J visitEndRegionDirective(Cs.EndRegionDirective endRegionDirective, RpcReceiveQueue q) {
+        return endRegionDirective;
+    }
+
+    @Override
+    public J visitDefineDirective(Cs.DefineDirective defineDirective, RpcReceiveQueue q) {
+        return defineDirective
+                .withSymbol(q.receive(defineDirective.getSymbol(), el -> (J.Identifier) visitNonNull(el, q)));
+    }
+
+    @Override
+    public J visitUndefDirective(Cs.UndefDirective undefDirective, RpcReceiveQueue q) {
+        return undefDirective
+                .withSymbol(q.receive(undefDirective.getSymbol(), el -> (J.Identifier) visitNonNull(el, q)));
+    }
+
+    @Override
+    public J visitErrorDirective(Cs.ErrorDirective errorDirective, RpcReceiveQueue q) {
+        return errorDirective
+                .withMessage(q.receive(errorDirective.getMessage()));
+    }
+
+    @Override
+    public J visitWarningDirective(Cs.WarningDirective warningDirective, RpcReceiveQueue q) {
+        return warningDirective
+                .withMessage(q.receive(warningDirective.getMessage()));
+    }
+
+    @Override
+    public J visitLineDirective(Cs.LineDirective lineDirective, RpcReceiveQueue q) {
+        return lineDirective
+                .withKind(q.receiveAndGet(lineDirective.getKind(), toEnum(Cs.LineDirective.LineKind.class)))
+                .withLine(q.receive(lineDirective.getLine(), el -> (Expression) visitNonNull(el, q)))
+                .withFile(q.receive(lineDirective.getFile(), el -> (Expression) visitNonNull(el, q)));
+    }
+
     // Delegate methods to JavaReceiver
     public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q) {
         return delegate.visitLeftPadded(left, q);
