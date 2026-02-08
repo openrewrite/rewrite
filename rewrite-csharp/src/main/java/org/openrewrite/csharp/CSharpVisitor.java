@@ -1352,6 +1352,149 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         return pointerFieldAccess.getPadding().withName(visitLeftPadded(pointerFieldAccess.getPadding().getName(), CsLeftPadded.Location.POINTER_FIELD_ACCESS_NAME, p));
     }
 
+    // =====================
+    // Preprocessor Directives
+    // =====================
+
+    public J visitConditionalBlock(Cs.ConditionalBlock conditionalBlock, P p) {
+        conditionalBlock = conditionalBlock.withPrefix(visitSpace(conditionalBlock.getPrefix(), CsSpace.Location.CONDITIONAL_BLOCK_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(conditionalBlock, p);
+        if (!(tempStatement instanceof Cs.ConditionalBlock))
+        {
+            return tempStatement;
+        }
+        conditionalBlock = (Cs.ConditionalBlock) tempStatement;
+        conditionalBlock = conditionalBlock.withMarkers(visitMarkers(conditionalBlock.getMarkers(), p));
+        conditionalBlock = conditionalBlock.withIfBranch((Cs.IfDirective) visit(conditionalBlock.getIfBranch(), p));
+        conditionalBlock = conditionalBlock.withElifBranches(ListUtils.map(conditionalBlock.getElifBranches(), el -> (Cs.ElifDirective) visit(el, p)));
+        conditionalBlock = conditionalBlock.withElseBranch(visitAndCast(conditionalBlock.getElseBranch(), p));
+        return conditionalBlock.withBeforeEndif(visitSpace(conditionalBlock.getBeforeEndif(), CsSpace.Location.CONDITIONAL_BLOCK_BEFORE_ENDIF, p));
+    }
+
+    public J visitIfDirective(Cs.IfDirective ifDirective, P p) {
+        ifDirective = ifDirective.withPrefix(visitSpace(ifDirective.getPrefix(), CsSpace.Location.IF_DIRECTIVE_PREFIX, p));
+        ifDirective = ifDirective.withMarkers(visitMarkers(ifDirective.getMarkers(), p));
+        ifDirective = ifDirective.withCondition(visitAndCast(ifDirective.getCondition(), p));
+        return ifDirective.getPadding().withBody(ListUtils.map(ifDirective.getPadding().getBody(), el -> visitRightPadded(el, CsRightPadded.Location.IF_DIRECTIVE_BODY, p)));
+    }
+
+    public J visitElifDirective(Cs.ElifDirective elifDirective, P p) {
+        elifDirective = elifDirective.withPrefix(visitSpace(elifDirective.getPrefix(), CsSpace.Location.ELIF_DIRECTIVE_PREFIX, p));
+        elifDirective = elifDirective.withMarkers(visitMarkers(elifDirective.getMarkers(), p));
+        elifDirective = elifDirective.withCondition(visitAndCast(elifDirective.getCondition(), p));
+        return elifDirective.getPadding().withBody(ListUtils.map(elifDirective.getPadding().getBody(), el -> visitRightPadded(el, CsRightPadded.Location.ELIF_DIRECTIVE_BODY, p)));
+    }
+
+    public J visitElseDirective(Cs.ElseDirective elseDirective, P p) {
+        elseDirective = elseDirective.withPrefix(visitSpace(elseDirective.getPrefix(), CsSpace.Location.ELSE_DIRECTIVE_PREFIX, p));
+        elseDirective = elseDirective.withMarkers(visitMarkers(elseDirective.getMarkers(), p));
+        return elseDirective.getPadding().withBody(ListUtils.map(elseDirective.getPadding().getBody(), el -> visitRightPadded(el, CsRightPadded.Location.ELSE_DIRECTIVE_BODY, p)));
+    }
+
+    public J visitPragmaWarningDirective(Cs.PragmaWarningDirective pragmaWarningDirective, P p) {
+        pragmaWarningDirective = pragmaWarningDirective.withPrefix(visitSpace(pragmaWarningDirective.getPrefix(), CsSpace.Location.PRAGMA_WARNING_DIRECTIVE_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(pragmaWarningDirective, p);
+        if (!(tempStatement instanceof Cs.PragmaWarningDirective))
+        {
+            return tempStatement;
+        }
+        pragmaWarningDirective = (Cs.PragmaWarningDirective) tempStatement;
+        pragmaWarningDirective = pragmaWarningDirective.withMarkers(visitMarkers(pragmaWarningDirective.getMarkers(), p));
+        return pragmaWarningDirective.getPadding().withWarningCodes(ListUtils.map(pragmaWarningDirective.getPadding().getWarningCodes(), el -> visitRightPadded(el, CsRightPadded.Location.PRAGMA_WARNING_DIRECTIVE_WARNING_CODES, p)));
+    }
+
+    public J visitNullableDirective(Cs.NullableDirective nullableDirective, P p) {
+        nullableDirective = nullableDirective.withPrefix(visitSpace(nullableDirective.getPrefix(), CsSpace.Location.NULLABLE_DIRECTIVE_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(nullableDirective, p);
+        if (!(tempStatement instanceof Cs.NullableDirective))
+        {
+            return tempStatement;
+        }
+        nullableDirective = (Cs.NullableDirective) tempStatement;
+        return nullableDirective.withMarkers(visitMarkers(nullableDirective.getMarkers(), p));
+    }
+
+    public J visitRegionDirective(Cs.RegionDirective regionDirective, P p) {
+        regionDirective = regionDirective.withPrefix(visitSpace(regionDirective.getPrefix(), CsSpace.Location.REGION_DIRECTIVE_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(regionDirective, p);
+        if (!(tempStatement instanceof Cs.RegionDirective))
+        {
+            return tempStatement;
+        }
+        regionDirective = (Cs.RegionDirective) tempStatement;
+        return regionDirective.withMarkers(visitMarkers(regionDirective.getMarkers(), p));
+    }
+
+    public J visitEndRegionDirective(Cs.EndRegionDirective endRegionDirective, P p) {
+        endRegionDirective = endRegionDirective.withPrefix(visitSpace(endRegionDirective.getPrefix(), CsSpace.Location.END_REGION_DIRECTIVE_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(endRegionDirective, p);
+        if (!(tempStatement instanceof Cs.EndRegionDirective))
+        {
+            return tempStatement;
+        }
+        endRegionDirective = (Cs.EndRegionDirective) tempStatement;
+        return endRegionDirective.withMarkers(visitMarkers(endRegionDirective.getMarkers(), p));
+    }
+
+    public J visitDefineDirective(Cs.DefineDirective defineDirective, P p) {
+        defineDirective = defineDirective.withPrefix(visitSpace(defineDirective.getPrefix(), CsSpace.Location.DEFINE_DIRECTIVE_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(defineDirective, p);
+        if (!(tempStatement instanceof Cs.DefineDirective))
+        {
+            return tempStatement;
+        }
+        defineDirective = (Cs.DefineDirective) tempStatement;
+        defineDirective = defineDirective.withMarkers(visitMarkers(defineDirective.getMarkers(), p));
+        return defineDirective.withSymbol(visitAndCast(defineDirective.getSymbol(), p));
+    }
+
+    public J visitUndefDirective(Cs.UndefDirective undefDirective, P p) {
+        undefDirective = undefDirective.withPrefix(visitSpace(undefDirective.getPrefix(), CsSpace.Location.UNDEF_DIRECTIVE_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(undefDirective, p);
+        if (!(tempStatement instanceof Cs.UndefDirective))
+        {
+            return tempStatement;
+        }
+        undefDirective = (Cs.UndefDirective) tempStatement;
+        undefDirective = undefDirective.withMarkers(visitMarkers(undefDirective.getMarkers(), p));
+        return undefDirective.withSymbol(visitAndCast(undefDirective.getSymbol(), p));
+    }
+
+    public J visitErrorDirective(Cs.ErrorDirective errorDirective, P p) {
+        errorDirective = errorDirective.withPrefix(visitSpace(errorDirective.getPrefix(), CsSpace.Location.ERROR_DIRECTIVE_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(errorDirective, p);
+        if (!(tempStatement instanceof Cs.ErrorDirective))
+        {
+            return tempStatement;
+        }
+        errorDirective = (Cs.ErrorDirective) tempStatement;
+        return errorDirective.withMarkers(visitMarkers(errorDirective.getMarkers(), p));
+    }
+
+    public J visitWarningDirective(Cs.WarningDirective warningDirective, P p) {
+        warningDirective = warningDirective.withPrefix(visitSpace(warningDirective.getPrefix(), CsSpace.Location.WARNING_DIRECTIVE_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(warningDirective, p);
+        if (!(tempStatement instanceof Cs.WarningDirective))
+        {
+            return tempStatement;
+        }
+        warningDirective = (Cs.WarningDirective) tempStatement;
+        return warningDirective.withMarkers(visitMarkers(warningDirective.getMarkers(), p));
+    }
+
+    public J visitLineDirective(Cs.LineDirective lineDirective, P p) {
+        lineDirective = lineDirective.withPrefix(visitSpace(lineDirective.getPrefix(), CsSpace.Location.LINE_DIRECTIVE_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(lineDirective, p);
+        if (!(tempStatement instanceof Cs.LineDirective))
+        {
+            return tempStatement;
+        }
+        lineDirective = (Cs.LineDirective) tempStatement;
+        lineDirective = lineDirective.withMarkers(visitMarkers(lineDirective.getMarkers(), p));
+        lineDirective = lineDirective.withLine(visitAndCast(lineDirective.getLine(), p));
+        return lineDirective.withFile(visitAndCast(lineDirective.getFile(), p));
+    }
+
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
                                                         CsContainer.Location loc, P p) {
         if (container == null) {

@@ -43,6 +43,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Handle using directives
         foreach (var usingDirective in node.Usings)
         {
+            members.AddRange(ProcessGapDirectives(usingDirective.SpanStart));
             var visited = VisitUsingDirective(usingDirective);
             members.Add(visited);
         }
@@ -50,12 +51,16 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Handle top-level statements and type declarations
         foreach (var member in node.Members)
         {
+            members.AddRange(ProcessGapDirectives(member.SpanStart));
             var visited = Visit(member);
             if (visited is Statement stmt)
             {
                 members.Add(stmt);
             }
         }
+
+        // Process trailing directives before EOF
+        members.AddRange(ProcessGapDirectives(_source.Length));
 
         var eof = ExtractRemaining();
 
@@ -186,6 +191,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // First, handle using directives within the namespace
         foreach (var usingDirective in node.Usings)
         {
+            foreach (var d in ProcessGapDirectives(usingDirective.SpanStart))
+                members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
             var visited = VisitUsingDirective(usingDirective);
             members.Add(new JRightPadded<Statement>(visited, Space.Empty, Markers.Empty));
         }
@@ -193,12 +200,18 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Then handle member declarations (types, nested namespaces)
         foreach (var member in node.Members)
         {
+            foreach (var d in ProcessGapDirectives(member.SpanStart))
+                members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
             var visited = Visit(member);
             if (visited is Statement stmt)
             {
                 members.Add(new JRightPadded<Statement>(stmt, Space.Empty, Markers.Empty));
             }
         }
+
+        // Process trailing directives before close brace
+        foreach (var d in ProcessGapDirectives(node.CloseBraceToken.SpanStart))
+            members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
 
         // Get space before close brace
         var end = ExtractSpaceBefore(node.CloseBraceToken);
@@ -224,12 +237,18 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var statements = new List<JRightPadded<Statement>>();
         foreach (var stmt in node.Statements)
         {
+            foreach (var d in ProcessGapDirectives(stmt.SpanStart))
+                statements.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
             var visited = Visit(stmt);
             if (visited is Statement s)
             {
                 statements.Add(new JRightPadded<Statement>(s, Space.Empty, Markers.Empty));
             }
         }
+
+        // Process trailing directives before close brace
+        foreach (var d in ProcessGapDirectives(node.CloseBraceToken.SpanStart))
+            statements.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
 
         // Extract space before close brace
         var end = ExtractSpaceBefore(node.CloseBraceToken);
@@ -646,12 +665,18 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var statements = new List<JRightPadded<Statement>>();
         foreach (var member in node.Members)
         {
+            foreach (var d in ProcessGapDirectives(member.SpanStart))
+                statements.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
             var visited = Visit(member);
             if (visited is Statement s)
             {
                 statements.Add(new JRightPadded<Statement>(s, Space.Empty, Markers.Empty));
             }
         }
+
+        // Process trailing directives before close brace
+        foreach (var d in ProcessGapDirectives(node.CloseBraceToken.SpanStart))
+            statements.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
 
         var end = ExtractSpaceBefore(node.CloseBraceToken);
         _cursor = node.CloseBraceToken.Span.End;
@@ -5369,6 +5394,265 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             _ => Modifier.ModifierType.LanguageExtension
         };
     }
+
+    #region Preprocessor Directive Processing
+
+    /// <summary>
+    /// Scans the source text between _cursor and targetPosition for preprocessor directive lines.
+    /// Creates LST nodes for simple (non-conditional) directives.
+    /// Stops processing when encountering conditional directives (#if, #elif, #else, #endif).
+    /// </summary>
+    private List<Statement> ProcessGapDirectives(int targetPosition)
+    {
+        var directives = new List<Statement>();
+
+        while (_cursor < targetPosition)
+        {
+            var hashPos = FindDirectiveStart(_cursor, targetPosition);
+            if (hashPos < 0) break;
+
+            // Extract the keyword after '#'
+            var kwStart = hashPos + 1;
+            while (kwStart < targetPosition && _source[kwStart] == ' ') kwStart++;
+            var keyword = GetDirectiveKeyword(kwStart, targetPosition);
+
+            // Stop at conditional directives — let them be consumed by ExtractPrefix
+            if (keyword is "if" or "elif" or "else" or "endif")
+                break;
+
+            // Capture prefix (whitespace before '#')
+            var prefix = _cursor < hashPos ? Space.Format(_source[_cursor..hashPos]) : Space.Empty;
+
+            // Find end of directive content (before line ending)
+            var contentEnd = hashPos;
+            while (contentEnd < targetPosition && _source[contentEnd] != '\r' && _source[contentEnd] != '\n')
+                contentEnd++;
+
+            var directiveText = _source[hashPos..contentEnd];
+            var directive = ParseDirectiveText(prefix, directiveText);
+            if (directive != null)
+                directives.Add(directive);
+
+            _cursor = contentEnd;
+        }
+
+        return directives;
+    }
+
+    /// <summary>
+    /// Finds the next '#' that starts a preprocessor directive (first non-whitespace on its line).
+    /// </summary>
+    private int FindDirectiveStart(int from, int to)
+    {
+        for (int i = from; i < to; i++)
+        {
+            if (_source[i] == '#')
+            {
+                // Check if only whitespace precedes it on this line
+                var lineStart = i;
+                while (lineStart > from && _source[lineStart - 1] != '\n')
+                    lineStart--;
+                var onlyWhitespace = true;
+                for (int j = lineStart; j < i; j++)
+                {
+                    if (_source[j] != ' ' && _source[j] != '\t' && _source[j] != '\r')
+                    {
+                        onlyWhitespace = false;
+                        break;
+                    }
+                }
+                if (onlyWhitespace) return i;
+            }
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Extracts the directive keyword starting at the given position.
+    /// </summary>
+    private string GetDirectiveKeyword(int pos, int maxPos)
+    {
+        var start = pos;
+        while (pos < maxPos && char.IsLetter(_source[pos])) pos++;
+        return pos > start ? _source[start..pos] : "";
+    }
+
+    /// <summary>
+    /// Parses a directive line (starting with '#') into an LST node.
+    /// </summary>
+    private Statement? ParseDirectiveText(Space prefix, string text)
+    {
+        // Remove '#' and any whitespace between '#' and keyword
+        var afterHash = text[1..].TrimStart();
+
+        // Extract the first keyword
+        var spaceIdx = afterHash.IndexOfAny([' ', '\t']);
+        var keyword = spaceIdx >= 0 ? afterHash[..spaceIdx] : afterHash;
+        var afterKeyword = spaceIdx >= 0 ? afterHash[spaceIdx..] : "";
+
+        return keyword switch
+        {
+            "region" => ParseRegionDirective(prefix, afterKeyword),
+            "endregion" => new EndRegionDirective(Guid.NewGuid(), prefix, Markers.Empty),
+            "pragma" => ParsePragmaDirective(prefix, afterKeyword),
+            "nullable" => ParseNullableDirective(prefix, afterKeyword),
+            "define" => ParseDefineDirective(prefix, afterKeyword),
+            "undef" => ParseUndefDirective(prefix, afterKeyword),
+            "error" => ParseErrorDirective(prefix, afterKeyword),
+            "warning" => ParseWarningDirective(prefix, afterKeyword),
+            "line" => ParseLineDirective(prefix, afterKeyword),
+            _ => null
+        };
+    }
+
+    private RegionDirective ParseRegionDirective(Space prefix, string afterKeyword)
+    {
+        var name = afterKeyword.TrimStart();
+        return new RegionDirective(Guid.NewGuid(), prefix, Markers.Empty,
+            name.Length > 0 ? name : null);
+    }
+
+    private Statement? ParsePragmaDirective(Space prefix, string afterKeyword)
+    {
+        var rest = afterKeyword.TrimStart();
+        if (!rest.StartsWith("warning")) return null;
+
+        rest = rest[7..].TrimStart(); // skip "warning"
+
+        PragmaWarningAction action;
+        string afterAction;
+        if (rest.StartsWith("disable"))
+        {
+            action = PragmaWarningAction.Disable;
+            afterAction = rest[7..];
+        }
+        else if (rest.StartsWith("restore"))
+        {
+            action = PragmaWarningAction.Restore;
+            afterAction = rest[7..];
+        }
+        else
+        {
+            return null;
+        }
+
+        var codes = new List<JRightPadded<Expression>>();
+        if (afterAction.Length > 0)
+        {
+            var parts = afterAction.Split(',');
+            foreach (var part in parts)
+            {
+                var trimmed = part.TrimStart();
+                if (trimmed.Length == 0) continue;
+                var spaceLen = part.Length - trimmed.Length;
+                var codePrefix = spaceLen > 0 ? Space.Format(part[..spaceLen]) : Space.Empty;
+                var code = new Identifier(Guid.NewGuid(), codePrefix, Markers.Empty, trimmed, null);
+                codes.Add(new JRightPadded<Expression>(code, Space.Empty, Markers.Empty));
+            }
+        }
+
+        return new PragmaWarningDirective(Guid.NewGuid(), prefix, Markers.Empty, action, codes);
+    }
+
+    private NullableDirective ParseNullableDirective(Space prefix, string afterKeyword)
+    {
+        var parts = afterKeyword.TrimStart().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        var setting = parts.Length > 0 ? parts[0] switch
+        {
+            "enable" => NullableSetting.Enable,
+            "disable" => NullableSetting.Disable,
+            "restore" => NullableSetting.Restore,
+            _ => NullableSetting.Enable
+        } : NullableSetting.Enable;
+
+        NullableTarget? target = null;
+        if (parts.Length > 1)
+        {
+            target = parts[1] switch
+            {
+                "annotations" => NullableTarget.Annotations,
+                "warnings" => NullableTarget.Warnings,
+                _ => null
+            };
+        }
+
+        return new NullableDirective(Guid.NewGuid(), prefix, Markers.Empty, setting, target);
+    }
+
+    private DefineDirective ParseDefineDirective(Space prefix, string afterKeyword)
+    {
+        var spaceLen = afterKeyword.Length - afterKeyword.TrimStart().Length;
+        var symbolPrefix = spaceLen > 0 ? Space.Format(afterKeyword[..spaceLen]) : Space.Empty;
+        var symbolName = afterKeyword.TrimStart();
+        return new DefineDirective(Guid.NewGuid(), prefix, Markers.Empty,
+            new Identifier(Guid.NewGuid(), symbolPrefix, Markers.Empty, symbolName, null));
+    }
+
+    private UndefDirective ParseUndefDirective(Space prefix, string afterKeyword)
+    {
+        var spaceLen = afterKeyword.Length - afterKeyword.TrimStart().Length;
+        var symbolPrefix = spaceLen > 0 ? Space.Format(afterKeyword[..spaceLen]) : Space.Empty;
+        var symbolName = afterKeyword.TrimStart();
+        return new UndefDirective(Guid.NewGuid(), prefix, Markers.Empty,
+            new Identifier(Guid.NewGuid(), symbolPrefix, Markers.Empty, symbolName, null));
+    }
+
+    private ErrorDirective ParseErrorDirective(Space prefix, string afterKeyword)
+    {
+        return new ErrorDirective(Guid.NewGuid(), prefix, Markers.Empty, afterKeyword.TrimStart());
+    }
+
+    private WarningDirective ParseWarningDirective(Space prefix, string afterKeyword)
+    {
+        return new WarningDirective(Guid.NewGuid(), prefix, Markers.Empty, afterKeyword.TrimStart());
+    }
+
+    private LineDirective ParseLineDirective(Space prefix, string afterKeyword)
+    {
+        var rest = afterKeyword.TrimStart();
+
+        if (rest.StartsWith("hidden"))
+            return new LineDirective(Guid.NewGuid(), prefix, Markers.Empty, LineKind.Hidden, null, null);
+        if (rest.StartsWith("default"))
+            return new LineDirective(Guid.NewGuid(), prefix, Markers.Empty, LineKind.Default, null, null);
+
+        // Numeric: " 200" or " 200 \"file.cs\""
+        var spaceLen = afterKeyword.Length - afterKeyword.TrimStart().Length;
+        var linePrefix = spaceLen > 0 ? Space.Format(afterKeyword[..spaceLen]) : Space.Empty;
+
+        // Parse line number
+        var numEnd = 0;
+        while (numEnd < rest.Length && char.IsDigit(rest[numEnd])) numEnd++;
+        var lineNum = rest[..numEnd];
+        var line = new Literal(
+            Guid.NewGuid(), linePrefix, Markers.Empty,
+            int.Parse(lineNum), lineNum, null,
+            new JavaType.Primitive(JavaType.PrimitiveKind.Int)
+        );
+
+        // Optional file
+        Expression? file = null;
+        if (numEnd < rest.Length)
+        {
+            var fileRest = rest[numEnd..];
+            var fileSpaceLen = fileRest.Length - fileRest.TrimStart().Length;
+            var fileTrimmed = fileRest.TrimStart();
+            if (fileTrimmed.StartsWith('"'))
+            {
+                var filePrefix = fileSpaceLen > 0 ? Space.Format(fileRest[..fileSpaceLen]) : Space.Empty;
+                file = new Literal(
+                    Guid.NewGuid(), filePrefix, Markers.Empty,
+                    fileTrimmed.Trim('"'), fileTrimmed, null,
+                    new JavaType.Primitive(JavaType.PrimitiveKind.String)
+                );
+            }
+        }
+
+        return new LineDirective(Guid.NewGuid(), prefix, Markers.Empty, LineKind.Numeric, line, file);
+    }
+
+    #endregion
 
     private Space ExtractSpaceBefore(SyntaxToken token)
     {

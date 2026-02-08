@@ -1416,6 +1416,151 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
         return node;
     }
 
+    @Override
+    public J visitConditionalBlock(Cs.ConditionalBlock conditionalBlock, PrintOutputCapture<P> p) {
+        beforeSyntax(conditionalBlock, CsSpace.Location.CONDITIONAL_BLOCK_PREFIX, p);
+        visit(conditionalBlock.getIfBranch(), p);
+        visit(conditionalBlock.getElifBranches(), p);
+        visit(conditionalBlock.getElseBranch(), p);
+        visitSpace(conditionalBlock.getBeforeEndif(), CsSpace.Location.CONDITIONAL_BLOCK_BEFORE_ENDIF, p);
+        p.append("#endif");
+        afterSyntax(conditionalBlock, p);
+        return conditionalBlock;
+    }
+
+    @Override
+    public J visitIfDirective(Cs.IfDirective ifDirective, PrintOutputCapture<P> p) {
+        beforeSyntax(ifDirective, CsSpace.Location.IF_DIRECTIVE_PREFIX, p);
+        p.append("#if");
+        visit(ifDirective.getCondition(), p);
+        visitStatements(ifDirective.getPadding().getBody(), CsRightPadded.Location.IF_DIRECTIVE_BODY, p);
+        afterSyntax(ifDirective, p);
+        return ifDirective;
+    }
+
+    @Override
+    public J visitElifDirective(Cs.ElifDirective elifDirective, PrintOutputCapture<P> p) {
+        beforeSyntax(elifDirective, CsSpace.Location.ELIF_DIRECTIVE_PREFIX, p);
+        p.append("#elif");
+        visit(elifDirective.getCondition(), p);
+        visitStatements(elifDirective.getPadding().getBody(), CsRightPadded.Location.ELIF_DIRECTIVE_BODY, p);
+        afterSyntax(elifDirective, p);
+        return elifDirective;
+    }
+
+    @Override
+    public J visitElseDirective(Cs.ElseDirective elseDirective, PrintOutputCapture<P> p) {
+        beforeSyntax(elseDirective, CsSpace.Location.ELSE_DIRECTIVE_PREFIX, p);
+        p.append("#else");
+        visitStatements(elseDirective.getPadding().getBody(), CsRightPadded.Location.ELSE_DIRECTIVE_BODY, p);
+        afterSyntax(elseDirective, p);
+        return elseDirective;
+    }
+
+    @Override
+    public J visitPragmaWarningDirective(Cs.PragmaWarningDirective pragmaWarningDirective, PrintOutputCapture<P> p) {
+        beforeSyntax(pragmaWarningDirective, CsSpace.Location.PRAGMA_WARNING_DIRECTIVE_PREFIX, p);
+        p.append("#pragma warning");
+        p.append(pragmaWarningDirective.getAction() == Cs.PragmaWarningDirective.PragmaWarningAction.Disable ? " disable" : " restore");
+        visitRightPadded(pragmaWarningDirective.getPadding().getWarningCodes(), CsRightPadded.Location.PRAGMA_WARNING_DIRECTIVE_WARNING_CODES, ",", p);
+        afterSyntax(pragmaWarningDirective, p);
+        return pragmaWarningDirective;
+    }
+
+    @Override
+    public J visitNullableDirective(Cs.NullableDirective nullableDirective, PrintOutputCapture<P> p) {
+        beforeSyntax(nullableDirective, CsSpace.Location.NULLABLE_DIRECTIVE_PREFIX, p);
+        p.append("#nullable");
+        p.append(' ');
+        p.append(nullableDirective.getSetting().name().toLowerCase());
+        if (nullableDirective.getTarget() != null) {
+            p.append(' ');
+            p.append(nullableDirective.getTarget().name().toLowerCase());
+        }
+        afterSyntax(nullableDirective, p);
+        return nullableDirective;
+    }
+
+    @Override
+    public J visitRegionDirective(Cs.RegionDirective regionDirective, PrintOutputCapture<P> p) {
+        beforeSyntax(regionDirective, CsSpace.Location.REGION_DIRECTIVE_PREFIX, p);
+        p.append("#region");
+        if (regionDirective.getName() != null) {
+            p.append(' ');
+            p.append(regionDirective.getName());
+        }
+        afterSyntax(regionDirective, p);
+        return regionDirective;
+    }
+
+    @Override
+    public J visitEndRegionDirective(Cs.EndRegionDirective endRegionDirective, PrintOutputCapture<P> p) {
+        beforeSyntax(endRegionDirective, CsSpace.Location.END_REGION_DIRECTIVE_PREFIX, p);
+        p.append("#endregion");
+        afterSyntax(endRegionDirective, p);
+        return endRegionDirective;
+    }
+
+    @Override
+    public J visitDefineDirective(Cs.DefineDirective defineDirective, PrintOutputCapture<P> p) {
+        beforeSyntax(defineDirective, CsSpace.Location.DEFINE_DIRECTIVE_PREFIX, p);
+        p.append("#define");
+        visit(defineDirective.getSymbol(), p);
+        afterSyntax(defineDirective, p);
+        return defineDirective;
+    }
+
+    @Override
+    public J visitUndefDirective(Cs.UndefDirective undefDirective, PrintOutputCapture<P> p) {
+        beforeSyntax(undefDirective, CsSpace.Location.UNDEF_DIRECTIVE_PREFIX, p);
+        p.append("#undef");
+        visit(undefDirective.getSymbol(), p);
+        afterSyntax(undefDirective, p);
+        return undefDirective;
+    }
+
+    @Override
+    public J visitErrorDirective(Cs.ErrorDirective errorDirective, PrintOutputCapture<P> p) {
+        beforeSyntax(errorDirective, CsSpace.Location.ERROR_DIRECTIVE_PREFIX, p);
+        p.append("#error");
+        p.append(' ');
+        p.append(errorDirective.getMessage());
+        afterSyntax(errorDirective, p);
+        return errorDirective;
+    }
+
+    @Override
+    public J visitWarningDirective(Cs.WarningDirective warningDirective, PrintOutputCapture<P> p) {
+        beforeSyntax(warningDirective, CsSpace.Location.WARNING_DIRECTIVE_PREFIX, p);
+        p.append("#warning");
+        p.append(' ');
+        p.append(warningDirective.getMessage());
+        afterSyntax(warningDirective, p);
+        return warningDirective;
+    }
+
+    @Override
+    public J visitLineDirective(Cs.LineDirective lineDirective, PrintOutputCapture<P> p) {
+        beforeSyntax(lineDirective, CsSpace.Location.LINE_DIRECTIVE_PREFIX, p);
+        p.append("#line");
+        switch (lineDirective.getKind()) {
+            case Hidden:
+                p.append(" hidden");
+                break;
+            case Default:
+                p.append(" default");
+                break;
+            case Numeric:
+                visit(lineDirective.getLine(), p);
+                break;
+        }
+        if (lineDirective.getFile() != null) {
+            visit(lineDirective.getFile(), p);
+        }
+        afterSyntax(lineDirective, p);
+        return lineDirective;
+    }
+
     private class CSharpJavaPrinter extends JavaPrinter<P> {
 
         @Override
@@ -1800,6 +1945,19 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
                 {
                     usingStatementRequiresSemicolon = true;
                 }
+            }
+
+            if (s instanceof Cs.ConditionalBlock ||
+                    s instanceof Cs.PragmaWarningDirective ||
+                    s instanceof Cs.NullableDirective ||
+                    s instanceof Cs.RegionDirective ||
+                    s instanceof Cs.EndRegionDirective ||
+                    s instanceof Cs.DefineDirective ||
+                    s instanceof Cs.UndefDirective ||
+                    s instanceof Cs.ErrorDirective ||
+                    s instanceof Cs.WarningDirective ||
+                    s instanceof Cs.LineDirective) {
+                return;
             }
 
             if (s instanceof Cs.AssignmentOperation ||

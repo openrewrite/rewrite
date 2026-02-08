@@ -400,4 +400,199 @@ class CSharpRpcTest {
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
     }
+
+    @Test
+    void parseRegionDirective(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Test
+                {
+                    public class Foo
+                    {
+                        #region Methods
+                        public void A()
+                        {
+                        }
+                        #endregion
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Region.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+        assertThat(parsed).isInstanceOf(Cs.CompilationUnit.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parsePragmaWarningDirective(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Test
+                {
+                    public class Foo
+                    {
+                        #pragma warning disable CS0168
+                        public void A()
+                        {
+                            int x;
+                        }
+                        #pragma warning restore CS0168
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Pragma.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseNullableDirective(@TempDir Path tempDir) throws IOException {
+        String source = """
+                #nullable enable
+                namespace Test
+                {
+                    public class Foo
+                    {
+                        public string? Name { get; set; }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Nullable.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseErrorAndWarningDirectives(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Test
+                {
+                    public class Foo
+                    {
+                        public void A()
+                        {
+                            #warning This method is not implemented
+                            throw new System.NotImplementedException();
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("ErrorWarning.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseLineDirective(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Test
+                {
+                    public class Foo
+                    {
+                        public void A()
+                        {
+                            #line 200
+                            int x = 1;
+                            #line default
+                            int y = 2;
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Line.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parsePragmaWarningMultipleCodes(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Test
+                {
+                    public class Foo
+                    {
+                        #pragma warning disable CS0168, CS0219
+                        public void A()
+                        {
+                            int x;
+                            int y;
+                        }
+                        #pragma warning restore CS0168, CS0219
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("PragmaMulti.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
 }

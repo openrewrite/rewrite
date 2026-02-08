@@ -1881,6 +1881,177 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         p.Append(space.Whitespace);
     }
 
+    #region Preprocessor Directives
+
+    public override J VisitConditionalBlock(ConditionalBlock conditionalBlock, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(conditionalBlock, p);
+        Visit(conditionalBlock.IfBranch, p);
+        foreach (var elif in conditionalBlock.ElifBranches)
+        {
+            Visit(elif, p);
+        }
+        if (conditionalBlock.ElseBranch != null)
+        {
+            Visit(conditionalBlock.ElseBranch, p);
+        }
+        VisitSpace(conditionalBlock.BeforeEndif, p);
+        p.Append("#endif");
+        AfterSyntax(conditionalBlock, p);
+        return conditionalBlock;
+    }
+
+    public override J VisitIfDirective(IfDirective ifDirective, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(ifDirective, p);
+        p.Append("#if");
+        Visit(ifDirective.Condition, p);
+        foreach (var stmt in ifDirective.Body)
+        {
+            Visit(stmt.Element, p);
+            VisitSpace(stmt.After, p);
+        }
+        AfterSyntax(ifDirective, p);
+        return ifDirective;
+    }
+
+    public override J VisitElifDirective(ElifDirective elifDirective, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(elifDirective, p);
+        p.Append("#elif");
+        Visit(elifDirective.Condition, p);
+        foreach (var stmt in elifDirective.Body)
+        {
+            Visit(stmt.Element, p);
+            VisitSpace(stmt.After, p);
+        }
+        AfterSyntax(elifDirective, p);
+        return elifDirective;
+    }
+
+    public override J VisitElseDirective(ElseDirective elseDirective, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(elseDirective, p);
+        p.Append("#else");
+        foreach (var stmt in elseDirective.Body)
+        {
+            Visit(stmt.Element, p);
+            VisitSpace(stmt.After, p);
+        }
+        AfterSyntax(elseDirective, p);
+        return elseDirective;
+    }
+
+    public override J VisitPragmaWarningDirective(PragmaWarningDirective pragmaWarningDirective, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(pragmaWarningDirective, p);
+        p.Append("#pragma warning");
+        p.Append(pragmaWarningDirective.Action == PragmaWarningAction.Disable ? " disable" : " restore");
+        VisitRightPadded(pragmaWarningDirective.WarningCodes, ",", p);
+        AfterSyntax(pragmaWarningDirective, p);
+        return pragmaWarningDirective;
+    }
+
+    public override J VisitNullableDirective(NullableDirective nullableDirective, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(nullableDirective, p);
+        p.Append("#nullable");
+        p.Append(' ');
+        p.Append(nullableDirective.Setting.ToString().ToLower());
+        if (nullableDirective.Target != null)
+        {
+            p.Append(' ');
+            p.Append(nullableDirective.Target.Value.ToString().ToLower());
+        }
+        AfterSyntax(nullableDirective, p);
+        return nullableDirective;
+    }
+
+    public override J VisitRegionDirective(RegionDirective regionDirective, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(regionDirective, p);
+        p.Append("#region");
+        if (regionDirective.Name != null)
+        {
+            p.Append(' ');
+            p.Append(regionDirective.Name);
+        }
+        AfterSyntax(regionDirective, p);
+        return regionDirective;
+    }
+
+    public override J VisitEndRegionDirective(EndRegionDirective endRegionDirective, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(endRegionDirective, p);
+        p.Append("#endregion");
+        AfterSyntax(endRegionDirective, p);
+        return endRegionDirective;
+    }
+
+    public override J VisitDefineDirective(DefineDirective defineDirective, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(defineDirective, p);
+        p.Append("#define");
+        Visit(defineDirective.Symbol, p);
+        AfterSyntax(defineDirective, p);
+        return defineDirective;
+    }
+
+    public override J VisitUndefDirective(UndefDirective undefDirective, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(undefDirective, p);
+        p.Append("#undef");
+        Visit(undefDirective.Symbol, p);
+        AfterSyntax(undefDirective, p);
+        return undefDirective;
+    }
+
+    public override J VisitErrorDirective(ErrorDirective errorDirective, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(errorDirective, p);
+        p.Append("#error");
+        p.Append(' ');
+        p.Append(errorDirective.Message);
+        AfterSyntax(errorDirective, p);
+        return errorDirective;
+    }
+
+    public override J VisitWarningDirective(WarningDirective warningDirective, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(warningDirective, p);
+        p.Append("#warning");
+        p.Append(' ');
+        p.Append(warningDirective.Message);
+        AfterSyntax(warningDirective, p);
+        return warningDirective;
+    }
+
+    public override J VisitLineDirective(LineDirective lineDirective, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(lineDirective, p);
+        p.Append("#line");
+        switch (lineDirective.Kind)
+        {
+            case LineKind.Hidden:
+                p.Append(" hidden");
+                break;
+            case LineKind.Default:
+                p.Append(" default");
+                break;
+            case LineKind.Numeric:
+                Visit(lineDirective.Line, p);
+                break;
+        }
+        if (lineDirective.File != null)
+        {
+            Visit(lineDirective.File, p);
+        }
+        AfterSyntax(lineDirective, p);
+        return lineDirective;
+    }
+
+    #endregion
+
     #region BeforeSyntax/AfterSyntax Pattern
 
     /// <summary>
