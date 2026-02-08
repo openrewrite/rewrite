@@ -10789,4 +10789,767 @@ public interface Cs extends J {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
     }
+
+    // =====================
+    // Preprocessor Directives
+    // =====================
+
+    /**
+     * Represents a conditional compilation block: {@code #if ... #elif ... #else ... #endif}.
+     * Can appear anywhere a Statement can appear (compilation unit members, class members, method bodies).
+     * <p>
+     * Example:
+     * <pre>
+     *     #if DEBUG
+     *     using System.Diagnostics;
+     *     #elif TRACE
+     *     using System.Tracing;
+     *     #else
+     *     using System.Logging;
+     *     #endif
+     * </pre>
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor
+    final class ConditionalBlock implements Cs, Statement {
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        IfDirective ifBranch;
+
+        @With
+        @Getter
+        List<ElifDirective> elifBranches;
+
+        @With
+        @Getter
+        @Nullable
+        ElseDirective elseBranch;
+
+        @With
+        @Getter
+        Space beforeEndif;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitConditionalBlock(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
+     * An {@code #if CONDITION} branch within a {@link ConditionalBlock}.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class IfDirective implements Cs {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        /**
+         * The condition expression, e.g. {@code DEBUG}, {@code DEBUG && !RELEASE}.
+         * Composed of {@link J.Identifier}, {@link J.Binary}, {@link J.Unary}, {@link J.Literal}, {@link J.Parentheses}.
+         */
+        @With
+        @Getter
+        Expression condition;
+
+        @With
+        @Getter
+        boolean branchTaken;
+
+        List<JRightPadded<Statement>> body;
+
+        public List<Statement> getBody() {
+            return JRightPadded.getElements(body);
+        }
+
+        public IfDirective withBody(List<Statement> body) {
+            return getPadding().withBody(JRightPadded.withElements(this.body, body));
+        }
+
+        @Override
+        public <P> @Nullable J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitIfDirective(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final IfDirective t;
+
+            public List<JRightPadded<Statement>> getBody() {
+                return t.body;
+            }
+
+            public IfDirective withBody(List<JRightPadded<Statement>> body) {
+                return t.body == body ? t : new IfDirective(t.id, t.prefix, t.markers, t.condition, t.branchTaken, body);
+            }
+        }
+    }
+
+    /**
+     * An {@code #elif CONDITION} branch within a {@link ConditionalBlock}.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class ElifDirective implements Cs {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression condition;
+
+        @With
+        @Getter
+        boolean branchTaken;
+
+        List<JRightPadded<Statement>> body;
+
+        public List<Statement> getBody() {
+            return JRightPadded.getElements(body);
+        }
+
+        public ElifDirective withBody(List<Statement> body) {
+            return getPadding().withBody(JRightPadded.withElements(this.body, body));
+        }
+
+        @Override
+        public <P> @Nullable J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitElifDirective(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ElifDirective t;
+
+            public List<JRightPadded<Statement>> getBody() {
+                return t.body;
+            }
+
+            public ElifDirective withBody(List<JRightPadded<Statement>> body) {
+                return t.body == body ? t : new ElifDirective(t.id, t.prefix, t.markers, t.condition, t.branchTaken, body);
+            }
+        }
+    }
+
+    /**
+     * An {@code #else} branch within a {@link ConditionalBlock}.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class ElseDirective implements Cs {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        boolean branchTaken;
+
+        List<JRightPadded<Statement>> body;
+
+        public List<Statement> getBody() {
+            return JRightPadded.getElements(body);
+        }
+
+        public ElseDirective withBody(List<Statement> body) {
+            return getPadding().withBody(JRightPadded.withElements(this.body, body));
+        }
+
+        @Override
+        public <P> @Nullable J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitElseDirective(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ElseDirective t;
+
+            public List<JRightPadded<Statement>> getBody() {
+                return t.body;
+            }
+
+            public ElseDirective withBody(List<JRightPadded<Statement>> body) {
+                return t.body == body ? t : new ElseDirective(t.id, t.prefix, t.markers, t.branchTaken, body);
+            }
+        }
+    }
+
+    /**
+     * Represents {@code #pragma warning disable/restore [codes]}.
+     * <p>
+     * Example:
+     * <pre>
+     *     #pragma warning disable CS0168, CS0219
+     *     #pragma warning restore CS0168
+     *     #pragma warning disable    // disables all warnings
+     * </pre>
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class PragmaWarningDirective implements Cs, Statement {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        PragmaWarningAction action;
+
+        List<JRightPadded<Expression>> warningCodes;
+
+        public List<Expression> getWarningCodes() {
+            return JRightPadded.getElements(warningCodes);
+        }
+
+        public PragmaWarningDirective withWarningCodes(List<Expression> warningCodes) {
+            return getPadding().withWarningCodes(JRightPadded.withElements(this.warningCodes, warningCodes));
+        }
+
+        public enum PragmaWarningAction {
+            Disable,
+            Restore
+        }
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitPragmaWarningDirective(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final PragmaWarningDirective t;
+
+            public List<JRightPadded<Expression>> getWarningCodes() {
+                return t.warningCodes;
+            }
+
+            public PragmaWarningDirective withWarningCodes(List<JRightPadded<Expression>> warningCodes) {
+                return t.warningCodes == warningCodes ? t : new PragmaWarningDirective(t.id, t.prefix, t.markers, t.action, warningCodes);
+            }
+        }
+    }
+
+    /**
+     * Represents {@code #nullable enable|disable|restore [annotations|warnings]}.
+     * <p>
+     * Example:
+     * <pre>
+     *     #nullable enable
+     *     #nullable disable annotations
+     *     #nullable restore warnings
+     * </pre>
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class NullableDirective implements Cs, Statement {
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        NullableSetting setting;
+
+        @With
+        @Getter
+        @Nullable
+        NullableTarget target;
+
+        public enum NullableSetting {
+            Enable,
+            Disable,
+            Restore
+        }
+
+        public enum NullableTarget {
+            Annotations,
+            Warnings
+        }
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitNullableDirective(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
+     * Represents {@code #region [name]}.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class RegionDirective implements Cs, Statement {
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        /**
+         * Optional text after {@code #region}, e.g. "Public Methods".
+         */
+        @With
+        @Getter
+        @Nullable
+        String name;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitRegionDirective(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
+     * Represents {@code #endregion}.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class EndRegionDirective implements Cs, Statement {
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitEndRegionDirective(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
+     * Represents {@code #define SYMBOL}.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class DefineDirective implements Cs, Statement {
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        /**
+         * The symbol being defined. The prefix of the identifier captures the
+         * space between {@code #define} and the symbol name.
+         */
+        @With
+        @Getter
+        Identifier symbol;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitDefineDirective(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
+     * Represents {@code #undef SYMBOL}.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class UndefDirective implements Cs, Statement {
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Identifier symbol;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitUndefDirective(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
+     * Represents {@code #error message}.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class ErrorDirective implements Cs, Statement {
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        /**
+         * The error message text (everything after {@code #error}).
+         */
+        @With
+        @Getter
+        String message;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitErrorDirective(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
+     * Represents {@code #warning message}.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class WarningDirective implements Cs, Statement {
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        String message;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitWarningDirective(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
+     * Represents {@code #line} directives.
+     * <p>
+     * Examples:
+     * <pre>
+     *     #line 200 "other.cs"
+     *     #line hidden
+     *     #line default
+     * </pre>
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class LineDirective implements Cs, Statement {
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        LineKind kind;
+
+        /**
+         * For {@link LineKind#Numeric}: the line number literal.
+         * Its prefix captures the space between {@code #line} and the number.
+         * Null for {@link LineKind#Hidden} and {@link LineKind#Default}.
+         */
+        @With
+        @Getter
+        @Nullable
+        Expression line;
+
+        /**
+         * Optional file name string literal, e.g. {@code "other.cs"}.
+         * Its prefix captures the space before the string.
+         */
+        @With
+        @Getter
+        @Nullable
+        Expression file;
+
+        public enum LineKind {
+            Numeric,
+            Hidden,
+            Default
+        }
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitLineDirective(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
 }

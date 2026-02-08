@@ -381,6 +381,276 @@ public sealed record PropertyPattern(
 }
 
 /// <summary>
+/// The action for a #pragma warning directive.
+/// </summary>
+public enum PragmaWarningAction
+{
+    Disable,
+    Restore
+}
+
+/// <summary>
+/// The setting for a #nullable directive.
+/// </summary>
+public enum NullableSetting
+{
+    Enable,
+    Disable,
+    Restore
+}
+
+/// <summary>
+/// The optional target for a #nullable directive.
+/// </summary>
+public enum NullableTarget
+{
+    Annotations,
+    Warnings
+}
+
+/// <summary>
+/// The kind of #line directive.
+/// </summary>
+public enum LineKind
+{
+    Numeric,
+    Hidden,
+    Default
+}
+
+/// <summary>
+/// A conditional compilation block containing #if, optional #elif/#else, and #endif.
+/// </summary>
+public sealed record ConditionalBlock(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    IfDirective IfBranch,
+    IList<ElifDirective> ElifBranches,
+    ElseDirective? ElseBranch,
+    Space BeforeEndif
+) : Cs, Statement
+{
+    public ConditionalBlock WithId(Guid id) => this with { Id = id };
+    public ConditionalBlock WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public ConditionalBlock WithMarkers(Markers markers) => this with { Markers = markers };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// An #if directive branch within a ConditionalBlock.
+/// </summary>
+public sealed record IfDirective(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    Expression Condition,
+    bool BranchTaken,
+    IList<JRightPadded<Statement>> Body
+) : Cs
+{
+    public IfDirective WithId(Guid id) => this with { Id = id };
+    public IfDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public IfDirective WithMarkers(Markers markers) => this with { Markers = markers };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// An #elif directive branch within a ConditionalBlock.
+/// </summary>
+public sealed record ElifDirective(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    Expression Condition,
+    bool BranchTaken,
+    IList<JRightPadded<Statement>> Body
+) : Cs
+{
+    public ElifDirective WithId(Guid id) => this with { Id = id };
+    public ElifDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public ElifDirective WithMarkers(Markers markers) => this with { Markers = markers };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// An #else directive branch within a ConditionalBlock.
+/// </summary>
+public sealed record ElseDirective(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    bool BranchTaken,
+    IList<JRightPadded<Statement>> Body
+) : Cs
+{
+    public ElseDirective WithId(Guid id) => this with { Id = id };
+    public ElseDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public ElseDirective WithMarkers(Markers markers) => this with { Markers = markers };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A #pragma warning disable/restore directive.
+/// </summary>
+public sealed record PragmaWarningDirective(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    PragmaWarningAction Action,
+    IList<JRightPadded<Expression>> WarningCodes
+) : Cs, Statement
+{
+    public PragmaWarningDirective WithId(Guid id) => this with { Id = id };
+    public PragmaWarningDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public PragmaWarningDirective WithMarkers(Markers markers) => this with { Markers = markers };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A #nullable directive.
+/// </summary>
+public sealed record NullableDirective(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    NullableSetting Setting,
+    NullableTarget? Target
+) : Cs, Statement
+{
+    public NullableDirective WithId(Guid id) => this with { Id = id };
+    public NullableDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public NullableDirective WithMarkers(Markers markers) => this with { Markers = markers };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A #region directive.
+/// </summary>
+public sealed record RegionDirective(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    string? Name
+) : Cs, Statement
+{
+    public RegionDirective WithId(Guid id) => this with { Id = id };
+    public RegionDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public RegionDirective WithMarkers(Markers markers) => this with { Markers = markers };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A #endregion directive.
+/// </summary>
+public sealed record EndRegionDirective(
+    Guid Id,
+    Space Prefix,
+    Markers Markers
+) : Cs, Statement
+{
+    public EndRegionDirective WithId(Guid id) => this with { Id = id };
+    public EndRegionDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public EndRegionDirective WithMarkers(Markers markers) => this with { Markers = markers };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A #define directive.
+/// </summary>
+public sealed record DefineDirective(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    Identifier Symbol
+) : Cs, Statement
+{
+    public DefineDirective WithId(Guid id) => this with { Id = id };
+    public DefineDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public DefineDirective WithMarkers(Markers markers) => this with { Markers = markers };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A #undef directive.
+/// </summary>
+public sealed record UndefDirective(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    Identifier Symbol
+) : Cs, Statement
+{
+    public UndefDirective WithId(Guid id) => this with { Id = id };
+    public UndefDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public UndefDirective WithMarkers(Markers markers) => this with { Markers = markers };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A #error directive.
+/// </summary>
+public sealed record ErrorDirective(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    string Message
+) : Cs, Statement
+{
+    public ErrorDirective WithId(Guid id) => this with { Id = id };
+    public ErrorDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public ErrorDirective WithMarkers(Markers markers) => this with { Markers = markers };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A #warning directive.
+/// </summary>
+public sealed record WarningDirective(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    string Message
+) : Cs, Statement
+{
+    public WarningDirective WithId(Guid id) => this with { Id = id };
+    public WarningDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public WarningDirective WithMarkers(Markers markers) => this with { Markers = markers };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A #line directive.
+/// </summary>
+public sealed record LineDirective(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    LineKind Kind,
+    Expression? Line,
+    Expression? File
+) : Cs, Statement
+{
+    public LineDirective WithId(Guid id) => this with { Id = id };
+    public LineDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public LineDirective WithMarkers(Markers markers) => this with { Markers = markers };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
 /// A C# compilation unit (source file).
 /// </summary>
 public sealed record CompilationUnit(
