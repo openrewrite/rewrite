@@ -455,7 +455,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitPrimitive(J.Primitive primitive, RpcReceiveQueue q) {
         return primitive
-                .withType(q.receive(primitive.getType()));
+                .withType(q.receive(primitive.getType(), t -> (JavaType.Primitive) visitType(t, q)));
     }
 
     @Override
