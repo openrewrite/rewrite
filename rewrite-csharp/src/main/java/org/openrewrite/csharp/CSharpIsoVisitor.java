@@ -23,7 +23,6 @@
 package org.openrewrite.csharp;
 
 import org.openrewrite.csharp.tree.Cs;
-import org.openrewrite.csharp.tree.Linq;
 import org.openrewrite.java.tree.J;
 
 public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
@@ -69,23 +68,8 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
-    public Cs.NamedExpression visitNamedExpression(Cs.NamedExpression namedExpression, P p) {
-        return (Cs.NamedExpression) super.visitNamedExpression(namedExpression, p);
-    }
-
-    @Override
-    public Cs.PropertyPattern visitPropertyPattern(Cs.PropertyPattern propertyPattern, P p) {
-        return (Cs.PropertyPattern) super.visitPropertyPattern(propertyPattern, p);
-    }
-
-    @Override
-    public Cs.PragmaChecksumDirective visitPragmaChecksumDirective(Cs.PragmaChecksumDirective pragmaChecksumDirective, P p) {
-        return (Cs.PragmaChecksumDirective) super.visitPragmaChecksumDirective(pragmaChecksumDirective, p);
-    }
-
-    @Override
-    public Cs.Keyword visitKeyword(Cs.Keyword keyword, P p) {
-        return (Cs.Keyword) super.visitKeyword(keyword, p);
+    public Cs.Argument visitArgument(Cs.Argument argument, P p) {
+        return (Cs.Argument) super.visitArgument(argument, p);
     }
 
     @Override
@@ -189,8 +173,18 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
+    public Cs.Keyword visitKeyword(Cs.Keyword keyword, P p) {
+        return (Cs.Keyword) super.visitKeyword(keyword, p);
+    }
+
+    @Override
     public Cs.Lambda visitLambda(Cs.Lambda lambda, P p) {
         return (Cs.Lambda) super.visitLambda(lambda, p);
+    }
+
+    @Override
+    public Cs.ClassDeclaration visitClassDeclaration(Cs.ClassDeclaration classDeclaration, P p) {
+        return (Cs.ClassDeclaration) super.visitClassDeclaration(classDeclaration, p);
     }
 
     @Override
@@ -204,8 +198,13 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
-    public Cs.ConstrainedTypeParameter visitConstrainedTypeParameter(Cs.ConstrainedTypeParameter constrainedTypeParameter, P p) {
-        return (Cs.ConstrainedTypeParameter) super.visitConstrainedTypeParameter(constrainedTypeParameter, p);
+    public Cs.TypeParameterConstraintClause visitTypeParameterConstraintClause(Cs.TypeParameterConstraintClause typeParameterConstraintClause, P p) {
+        return (Cs.TypeParameterConstraintClause) super.visitTypeParameterConstraintClause(typeParameterConstraintClause, p);
+    }
+
+    @Override
+    public Cs.TypeConstraint visitTypeConstraint(Cs.TypeConstraint typeConstraint, P p) {
+        return (Cs.TypeConstraint) super.visitTypeConstraint(typeConstraint, p);
     }
 
     @Override
@@ -259,6 +258,11 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
+    public Cs.Constructor visitConstructor(Cs.Constructor constructor, P p) {
+        return (Cs.Constructor) super.visitConstructor(constructor, p);
+    }
+
+    @Override
     public Cs.DestructorDeclaration visitDestructorDeclaration(Cs.DestructorDeclaration destructorDeclaration, P p) {
         return (Cs.DestructorDeclaration) super.visitDestructorDeclaration(destructorDeclaration, p);
     }
@@ -266,6 +270,11 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     @Override
     public Cs.Unary visitUnary(Cs.Unary unary, P p) {
         return (Cs.Unary) super.visitUnary(unary, p);
+    }
+
+    @Override
+    public Cs.ConstructorInitializer visitConstructorInitializer(Cs.ConstructorInitializer constructorInitializer, P p) {
+        return (Cs.ConstructorInitializer) super.visitConstructorInitializer(constructorInitializer, p);
     }
 
     @Override
@@ -299,11 +308,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
-    public Cs.SizeOf visitSizeOf(Cs.SizeOf sizeOf, P p) {
-        return (Cs.SizeOf) super.visitSizeOf(sizeOf, p);
-    }
-
-    @Override
     public Cs.DefaultExpression visitDefaultExpression(Cs.DefaultExpression defaultExpression, P p) {
         return (Cs.DefaultExpression) super.visitDefaultExpression(defaultExpression, p);
     }
@@ -311,6 +315,21 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     @Override
     public Cs.IsPattern visitIsPattern(Cs.IsPattern isPattern, P p) {
         return (Cs.IsPattern) super.visitIsPattern(isPattern, p);
+    }
+
+    @Override
+    public Cs.UnaryPattern visitUnaryPattern(Cs.UnaryPattern unaryPattern, P p) {
+        return (Cs.UnaryPattern) super.visitUnaryPattern(unaryPattern, p);
+    }
+
+    @Override
+    public Cs.TypePattern visitTypePattern(Cs.TypePattern typePattern, P p) {
+        return (Cs.TypePattern) super.visitTypePattern(typePattern, p);
+    }
+
+    @Override
+    public Cs.BinaryPattern visitBinaryPattern(Cs.BinaryPattern binaryPattern, P p) {
+        return (Cs.BinaryPattern) super.visitBinaryPattern(binaryPattern, p);
     }
 
     @Override
@@ -329,6 +348,26 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
+    public Cs.ParenthesizedPattern visitParenthesizedPattern(Cs.ParenthesizedPattern parenthesizedPattern, P p) {
+        return (Cs.ParenthesizedPattern) super.visitParenthesizedPattern(parenthesizedPattern, p);
+    }
+
+    @Override
+    public Cs.RecursivePattern visitRecursivePattern(Cs.RecursivePattern recursivePattern, P p) {
+        return (Cs.RecursivePattern) super.visitRecursivePattern(recursivePattern, p);
+    }
+
+    @Override
+    public Cs.VarPattern visitVarPattern(Cs.VarPattern varPattern, P p) {
+        return (Cs.VarPattern) super.visitVarPattern(varPattern, p);
+    }
+
+    @Override
+    public Cs.PositionalPatternClause visitPositionalPatternClause(Cs.PositionalPatternClause positionalPatternClause, P p) {
+        return (Cs.PositionalPatternClause) super.visitPositionalPatternClause(positionalPatternClause, p);
+    }
+
+    @Override
     public Cs.RelationalPattern visitRelationalPattern(Cs.RelationalPattern relationalPattern, P p) {
         return (Cs.RelationalPattern) super.visitRelationalPattern(relationalPattern, p);
     }
@@ -339,6 +378,16 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
+    public Cs.PropertyPatternClause visitPropertyPatternClause(Cs.PropertyPatternClause propertyPatternClause, P p) {
+        return (Cs.PropertyPatternClause) super.visitPropertyPatternClause(propertyPatternClause, p);
+    }
+
+    @Override
+    public Cs.Subpattern visitSubpattern(Cs.Subpattern subpattern, P p) {
+        return (Cs.Subpattern) super.visitSubpattern(subpattern, p);
+    }
+
+    @Override
     public Cs.SwitchExpression visitSwitchExpression(Cs.SwitchExpression switchExpression, P p) {
         return (Cs.SwitchExpression) super.visitSwitchExpression(switchExpression, p);
     }
@@ -346,6 +395,31 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     @Override
     public Cs.SwitchExpressionArm visitSwitchExpressionArm(Cs.SwitchExpressionArm switchExpressionArm, P p) {
         return (Cs.SwitchExpressionArm) super.visitSwitchExpressionArm(switchExpressionArm, p);
+    }
+
+    @Override
+    public Cs.SwitchSection visitSwitchSection(Cs.SwitchSection switchSection, P p) {
+        return (Cs.SwitchSection) super.visitSwitchSection(switchSection, p);
+    }
+
+    @Override
+    public Cs.DefaultSwitchLabel visitDefaultSwitchLabel(Cs.DefaultSwitchLabel defaultSwitchLabel, P p) {
+        return (Cs.DefaultSwitchLabel) super.visitDefaultSwitchLabel(defaultSwitchLabel, p);
+    }
+
+    @Override
+    public Cs.CasePatternSwitchLabel visitCasePatternSwitchLabel(Cs.CasePatternSwitchLabel casePatternSwitchLabel, P p) {
+        return (Cs.CasePatternSwitchLabel) super.visitCasePatternSwitchLabel(casePatternSwitchLabel, p);
+    }
+
+    @Override
+    public Cs.SwitchStatement visitSwitchStatement(Cs.SwitchStatement switchStatement, P p) {
+        return (Cs.SwitchStatement) super.visitSwitchStatement(switchStatement, p);
+    }
+
+    @Override
+    public Cs.LockStatement visitLockStatement(Cs.LockStatement lockStatement, P p) {
+        return (Cs.LockStatement) super.visitLockStatement(lockStatement, p);
     }
 
     @Override
@@ -374,63 +448,63 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
-    public Linq.QueryExpression visitQueryExpression(Linq.QueryExpression queryExpression, P p) {
-        return (Linq.QueryExpression) super.visitQueryExpression(queryExpression, p);
+    public Cs.QueryExpression visitQueryExpression(Cs.QueryExpression queryExpression, P p) {
+        return (Cs.QueryExpression) super.visitQueryExpression(queryExpression, p);
     }
 
     @Override
-    public Linq.QueryBody visitQueryBody(Linq.QueryBody queryBody, P p) {
-        return (Linq.QueryBody) super.visitQueryBody(queryBody, p);
+    public Cs.QueryBody visitQueryBody(Cs.QueryBody queryBody, P p) {
+        return (Cs.QueryBody) super.visitQueryBody(queryBody, p);
     }
 
     @Override
-    public Linq.FromClause visitFromClause(Linq.FromClause fromClause, P p) {
-        return (Linq.FromClause) super.visitFromClause(fromClause, p);
+    public Cs.FromClause visitFromClause(Cs.FromClause fromClause, P p) {
+        return (Cs.FromClause) super.visitFromClause(fromClause, p);
     }
 
     @Override
-    public Linq.LetClause visitLetClause(Linq.LetClause letClause, P p) {
-        return (Linq.LetClause) super.visitLetClause(letClause, p);
+    public Cs.LetClause visitLetClause(Cs.LetClause letClause, P p) {
+        return (Cs.LetClause) super.visitLetClause(letClause, p);
     }
 
     @Override
-    public Linq.JoinClause visitJoinClause(Linq.JoinClause joinClause, P p) {
-        return (Linq.JoinClause) super.visitJoinClause(joinClause, p);
+    public Cs.JoinClause visitJoinClause(Cs.JoinClause joinClause, P p) {
+        return (Cs.JoinClause) super.visitJoinClause(joinClause, p);
     }
 
     @Override
-    public Linq.JoinIntoClause visitJoinIntoClause(Linq.JoinIntoClause joinIntoClause, P p) {
-        return (Linq.JoinIntoClause) super.visitJoinIntoClause(joinIntoClause, p);
+    public Cs.JoinIntoClause visitJoinIntoClause(Cs.JoinIntoClause joinIntoClause, P p) {
+        return (Cs.JoinIntoClause) super.visitJoinIntoClause(joinIntoClause, p);
     }
 
     @Override
-    public Linq.WhereClause visitWhereClause(Linq.WhereClause whereClause, P p) {
-        return (Linq.WhereClause) super.visitWhereClause(whereClause, p);
+    public Cs.WhereClause visitWhereClause(Cs.WhereClause whereClause, P p) {
+        return (Cs.WhereClause) super.visitWhereClause(whereClause, p);
     }
 
     @Override
-    public Linq.OrderByClause visitOrderByClause(Linq.OrderByClause orderByClause, P p) {
-        return (Linq.OrderByClause) super.visitOrderByClause(orderByClause, p);
+    public Cs.OrderByClause visitOrderByClause(Cs.OrderByClause orderByClause, P p) {
+        return (Cs.OrderByClause) super.visitOrderByClause(orderByClause, p);
     }
 
     @Override
-    public Linq.QueryContinuation visitQueryContinuation(Linq.QueryContinuation queryContinuation, P p) {
-        return (Linq.QueryContinuation) super.visitQueryContinuation(queryContinuation, p);
+    public Cs.QueryContinuation visitQueryContinuation(Cs.QueryContinuation queryContinuation, P p) {
+        return (Cs.QueryContinuation) super.visitQueryContinuation(queryContinuation, p);
     }
 
     @Override
-    public Linq.Ordering visitOrdering(Linq.Ordering ordering, P p) {
-        return (Linq.Ordering) super.visitOrdering(ordering, p);
+    public Cs.Ordering visitOrdering(Cs.Ordering ordering, P p) {
+        return (Cs.Ordering) super.visitOrdering(ordering, p);
     }
 
     @Override
-    public Linq.SelectClause visitSelectClause(Linq.SelectClause selectClause, P p) {
-        return (Linq.SelectClause) super.visitSelectClause(selectClause, p);
+    public Cs.SelectClause visitSelectClause(Cs.SelectClause selectClause, P p) {
+        return (Cs.SelectClause) super.visitSelectClause(selectClause, p);
     }
 
     @Override
-    public Linq.GroupClause visitGroupClause(Linq.GroupClause groupClause, P p) {
-        return (Linq.GroupClause) super.visitGroupClause(groupClause, p);
+    public Cs.GroupClause visitGroupClause(Cs.GroupClause groupClause, P p) {
+        return (Cs.GroupClause) super.visitGroupClause(groupClause, p);
     }
 
     @Override
@@ -448,7 +522,10 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
         return (Cs.ConversionOperatorDeclaration) super.visitConversionOperatorDeclaration(conversionOperatorDeclaration, p);
     }
 
-    // Cs.TypeParameter visitTypeParameter DELETED — replaced by visitConstrainedTypeParameter
+    @Override
+    public Cs.TypeParameter visitTypeParameter(Cs.TypeParameter typeParameter, P p) {
+        return (Cs.TypeParameter) super.visitTypeParameter(typeParameter, p);
+    }
 
     @Override
     public Cs.EnumDeclaration visitEnumDeclaration(Cs.EnumDeclaration enumDeclaration, P p) {
@@ -478,6 +555,11 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     @Override
     public Cs.Try.Catch visitTryCatch(Cs.Try.Catch catch_, P p) {
         return (Cs.Try.Catch) super.visitTryCatch(catch_, p);
+    }
+
+    @Override
+    public Cs.ArrowExpressionClause visitArrowExpressionClause(Cs.ArrowExpressionClause arrowExpressionClause, P p) {
+        return (Cs.ArrowExpressionClause) super.visitArrowExpressionClause(arrowExpressionClause, p);
     }
 
     @Override
