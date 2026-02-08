@@ -1,3 +1,5 @@
+using Rewrite.Core.Rpc;
+
 namespace Rewrite.Core;
 
 /// <summary>
@@ -12,8 +14,21 @@ public interface Marker
 /// A collection of markers attached to an LST element.
 /// Markers allow attaching metadata without modifying the tree structure.
 /// </summary>
-public sealed record Markers(Guid Id, IList<Marker> MarkerList)
+public sealed record Markers(Guid Id, IList<Marker> MarkerList) : IRpcCodec<Markers>
 {
+    public void RpcSend(Markers after, RpcSendQueue q)
+    {
+        q.GetAndSend(after, m => m.Id);
+        q.GetAndSendList(after, m => m.MarkerList,
+            m => (object)m.Id, null);
+    }
+
+    public Markers RpcReceive(Markers before, RpcReceiveQueue q)
+    {
+        // Receive-side not yet implemented
+        throw new NotImplementedException("Markers.RpcReceive");
+    }
+
     public static readonly Markers Empty = new(Guid.Empty, []);
 
     public static Markers Build(IEnumerable<Marker> markers)
