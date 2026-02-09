@@ -506,10 +506,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     if (!literal.getPrefix().getLastWhitespace().contains("\n")) {
                         ColSpan colSpan = positionService.columnsOf(getCursor(), literal);
                         indent += colSpan.getStartColumn() - colSpan.getIndent() - 1; // since position is index-1-based
-                    } else {
-                        // Take the indent of the whole literal to align the rest of it.
-                        // Terminate the indent with a char that would signal start of the content.
-                        indent = StringUtils.minCommonIndentLevel(literal.getPrefix().getIndent() + "a", style.getTabSize());
                     }
                 } else {
                     indent += style.getContinuationIndent();
