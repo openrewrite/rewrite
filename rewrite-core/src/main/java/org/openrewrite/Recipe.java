@@ -449,12 +449,7 @@ public abstract class Recipe implements Cloneable {
 
     @SuppressWarnings("unused")
     public Validated<Object> validate(ExecutionContext ctx) {
-        Validated<Object> validated = validate();
-
-        for (Recipe recipe : getRecipeList()) {
-            validated = validated.and(recipe.validate(ctx));
-        }
-        return validated;
+        return validate();
     }
 
     /**
@@ -474,9 +469,6 @@ public abstract class Recipe implements Cloneable {
             } catch (IllegalAccessException e) {
                 validated = Validated.invalid(field.getName(), null, "Unable to access " + clazz.getName() + "." + field.getName(), e);
             }
-        }
-        for (Recipe recipe : getRecipeList()) {
-            validated = validated.and(recipe.validate());
         }
         return validated;
     }
