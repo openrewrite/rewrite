@@ -447,7 +447,6 @@ public class ChangePackage extends Recipe {
                                 (Boolean.TRUE.equals(recursive) && importPkg.startsWith(newPackageName + "."))) &&
                                !typesUsedByPackage.getOrDefault(importPkg, emptySet()).isEmpty();
                     .collect(toList());
-                    .collect(Collectors.toList());
 
             for (J.Import starImport : toExpand) {
                 String importPkg = starImport.getPackageName();
