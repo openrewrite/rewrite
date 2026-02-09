@@ -240,7 +240,19 @@ class AddImport(PythonVisitor):
 
             # Found an existing import from the same module - add our name
             new_import = self._create_import_element(self.name, self.alias)
-            new_names = list(stmt.names) + [new_import]
+            # Give the new import a space prefix (space after comma)
+            new_import = new_import.replace(prefix=Space.SINGLE_SPACE)
+
+            # Preserve existing padded elements; append new one with proper padding
+            existing_padded = list(stmt.padding.names.padding.elements)
+            # Move last element's .after (typically '\n') to the new element
+            if existing_padded:
+                last = existing_padded[-1]
+                existing_padded[-1] = last.replace(_after=Space.EMPTY)
+                new_padded_import = JRightPadded(new_import, last.after, Markers.EMPTY)
+            else:
+                new_padded_import = JRightPadded(new_import, Space.EMPTY, Markers.EMPTY)
+            existing_padded.append(new_padded_import)
 
             # Recreate the MultiImport with the new names
             new_multi = MultiImport(
@@ -251,15 +263,16 @@ class AddImport(PythonVisitor):
                 stmt.parenthesized,
                 JContainer(
                     stmt.padding.names.before,
-                    [self._pad_right(n) for n in new_names],
+                    existing_padded,
                     stmt.padding.names.markers
                 )
             )
 
-            # Replace the statement
-            new_statements = list(cu.statements)
-            new_statements[i] = new_multi
-            return cu.replace(statements=new_statements)
+            # Replace the statement at the padding level
+            padded_stmts = list(cu.padding.statements)
+            old_padded = padded_stmts[i]
+            padded_stmts[i] = JRightPadded(new_multi, old_padded.after, old_padded.markers)
+            return cu.padding.replace(_statements=padded_stmts)
 
         return cu
 
@@ -269,26 +282,30 @@ class AddImport(PythonVisitor):
 
         # Find insertion point (after existing imports)
         insert_idx = 0
-        for i, stmt in enumerate(cu.statements):
-            if isinstance(stmt, MultiImport):
+        padded_stmts = list(cu.padding.statements)
+        for i, padded in enumerate(padded_stmts):
+            if isinstance(padded.element, MultiImport):
                 insert_idx = i + 1
             elif insert_idx > 0:
                 break  # Stop after we've passed the import section
 
-        # Insert the new import
-        new_statements = list(cu.statements)
-        new_statements.insert(insert_idx, new_import)
+        # Insert the new import at the padding level
+        if insert_idx == 0 and padded_stmts:
+            # Inserting before the first statement: the new import takes the
+            # first statement's prefix, and the first statement gets '\n'
+            first = padded_stmts[0]
+            new_import_with_prefix = new_import.replace(prefix=first.element.prefix)
+            new_padded = JRightPadded(new_import_with_prefix, Space.EMPTY, Markers.EMPTY)
+            padded_stmts[0] = JRightPadded(
+                first.element.replace(prefix=Space([], '\n')),
+                first.after, first.markers
+            )
+            padded_stmts.insert(insert_idx, new_padded)
+        else:
+            new_padded = JRightPadded(new_import, Space.EMPTY, Markers.EMPTY)
+            padded_stmts.insert(insert_idx, new_padded)
 
-        # Adjust spacing
-        if insert_idx > 0 and insert_idx < len(new_statements):
-            # Add newline before next statement if needed
-            next_stmt = new_statements[insert_idx + 1] if insert_idx + 1 < len(new_statements) else None
-            if next_stmt and not next_stmt.prefix.whitespace.startswith('\n'):
-                new_statements[insert_idx + 1] = next_stmt.replace(  # ty: ignore[unresolved-attribute]
-                    prefix=Space([], '\n' + next_stmt.prefix.whitespace)
-                )
-
-        return cu.replace(statements=new_statements)
+        return cu.padding.replace(_statements=padded_stmts)
 
     def _create_multi_import(self) -> MultiImport:
         """Create a new MultiImport statement."""
@@ -310,6 +327,8 @@ class AddImport(PythonVisitor):
         else:
             # From import: from module import name [as alias]
             from_name = self._create_qualified_name(self.module)
+            # Add space prefix (the space between 'from' and module name)
+            from_name = from_name.replace(prefix=Space.SINGLE_SPACE)
             import_elem = self._create_import_element(self.name, self.alias)
             return MultiImport(
                 random_id(),
@@ -370,21 +389,26 @@ class AddImport(PythonVisitor):
                 None
             )
 
-        # Build nested FieldAccess for qualified names
-        result = Empty(random_id(), Space.EMPTY, Markers.EMPTY)
-        for part in parts:
+        # Build nested FieldAccess for qualified names like "os.path"
+        # Start with the first part as an Identifier target
+        result: J = Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], parts[0], None, None)
+        # Wrap remaining parts as FieldAccess nodes
+        for part in parts[1:]:
             result = FieldAccess(
                 random_id(),
                 Space.EMPTY,
                 Markers.EMPTY,
                 result,
                 JLeftPadded(
-                    Space.EMPTY if isinstance(result, Empty) else Space.EMPTY,
+                    Space.EMPTY,
                     Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], part, None, None),
                     Markers.EMPTY
                 ),
                 None
             )
+        # For multi-part names, result is already a FieldAccess.
+        # Wrap single-part Identifier in FieldAccess(Empty, name) for consistency
+        # (but single-part is handled above, so this shouldn't happen)
         assert isinstance(result, FieldAccess)
         return result
 
