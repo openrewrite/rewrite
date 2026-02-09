@@ -304,7 +304,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                     // Implicitly defined version properties like ${project.parent.version} should never be changed
                     // as they represent intentional links to parent/project versions
                     return tag;
-                } else if (isProperty(oldValue)) {
+                }
+                if (isProperty(oldValue)) {
                     MavenResolutionResult resolutionResult = getResolutionResult();
                     String propertyName = oldValue.substring(2, oldValue.length() - 1);
                     ResolvedPom pom = resolutionResult.getPom();
