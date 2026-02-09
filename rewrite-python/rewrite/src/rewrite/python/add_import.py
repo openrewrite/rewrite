@@ -291,18 +291,35 @@ class AddImport(PythonVisitor):
 
         # Insert the new import at the padding level
         if insert_idx == 0 and padded_stmts:
-            # Inserting before the first statement: the new import takes the
-            # first statement's prefix, and the first statement gets '\n'
             first = padded_stmts[0]
-            new_import_with_prefix = new_import.replace(prefix=first.element.prefix)
-            new_padded = JRightPadded(new_import_with_prefix, Space.EMPTY, Markers.EMPTY)
-            padded_stmts[0] = JRightPadded(
-                first.element.replace(prefix=Space([], '\n')),
-                first.after, first.markers
-            )
+            first_prefix = first.element.prefix
+            if first_prefix.whitespace and first_prefix.whitespace.startswith('\n'):
+                # First statement has a leading newline (e.g., a prior import was
+                # removed). The new import becomes the true first statement with
+                # empty prefix; the existing statement keeps its '\n'.
+                new_padded = JRightPadded(new_import.replace(prefix=Space.EMPTY), Space.EMPTY, Markers.EMPTY)
+            else:
+                # Normal case: new import takes the first statement's prefix,
+                # and the first statement gets '\n' as separator.
+                new_padded = JRightPadded(new_import.replace(prefix=first_prefix), Space.EMPTY, Markers.EMPTY)
+                padded_stmts[0] = JRightPadded(
+                    first.element.replace(prefix=Space([], '\n')),
+                    first.after, first.markers
+                )
             padded_stmts.insert(insert_idx, new_padded)
         else:
-            new_padded = JRightPadded(new_import, Space.EMPTY, Markers.EMPTY)
+            # Inserting after existing imports. The preceding import's last
+            # name typically has '\n' in its after-padding, so the new import
+            # doesn't need its own '\n' prefix.
+            new_padded = JRightPadded(new_import.replace(prefix=Space.EMPTY), Space.EMPTY, Markers.EMPTY)
+            # Ensure the following statement has a '\n' prefix as separator
+            if insert_idx < len(padded_stmts):
+                next_stmt = padded_stmts[insert_idx]
+                if not next_stmt.element.prefix.whitespace:
+                    padded_stmts[insert_idx] = JRightPadded(
+                        next_stmt.element.replace(prefix=Space([], '\n')),
+                        next_stmt.after, next_stmt.markers
+                    )
             padded_stmts.insert(insert_idx, new_padded)
 
         return cu.padding.replace(_statements=padded_stmts)
@@ -326,7 +343,7 @@ class AddImport(PythonVisitor):
             )
         else:
             # From import: from module import name [as alias]
-            from_name = self._create_qualified_name(self.module)
+            from_name = self._create_module_name(self.module)
             # Add space prefix (the space between 'from' and module name)
             from_name = from_name.replace(prefix=Space.SINGLE_SPACE)
             import_elem = self._create_import_element(self.name, self.alias)
@@ -410,6 +427,31 @@ class AddImport(PythonVisitor):
         # Wrap single-part Identifier in FieldAccess(Empty, name) for consistency
         # (but single-part is handled above, so this shouldn't happen)
         assert isinstance(result, FieldAccess)
+        return result
+
+    def _create_module_name(self, name: str) -> J:
+        """Create a name tree for use as a 'from' module name.
+
+        Single-part names become Identifier; multi-part become FieldAccess.
+        Unlike _create_qualified_name, this does NOT wrap single parts in
+        FieldAccess(Empty, name) since the 'from' printer has no special
+        handling for Empty targets.
+        """
+        parts = name.split('.')
+        result: J = Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], parts[0], None, None)
+        for part in parts[1:]:
+            result = FieldAccess(
+                random_id(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                result,
+                JLeftPadded(
+                    Space.EMPTY,
+                    Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], part, None, None),
+                    Markers.EMPTY
+                ),
+                None
+            )
         return result
 
     def _pad_right(self, elem) -> JRightPadded:
