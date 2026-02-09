@@ -2668,12 +2668,46 @@ class TabsAndIndentsTest implements RewriteTest {
             """
               class Test {
                   private final String foo = ""\"
-                    YES
-                    ""\";
+                          YES
+                          ""\";
                   private final String bar =
                           ""\"
-                            NO
-                            ""\";
+                          NO
+                          ""\";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void textBlocksNotAlignedTabs() {
+        rewriteRun(
+          autoFormat(
+            spaces -> spaces.withUseTabCharacter(true),
+            wrap -> wrap
+          ),
+          java(
+            """
+              class Test {
+                  private final String foo = ""\"
+              YES
+              ""\";
+                  private final String bar =
+              ""\"
+              NO
+              ""\";
+              }
+              """,
+            """
+              class Test { 
+                  private final String foo = ""\"
+              \t\t\tYES
+              \t\t\t""\";
+                  private final String bar =
+              \t\t\t""\"
+              \t\t\tNO
+              \t\t\t""\";
               }
               """
           )

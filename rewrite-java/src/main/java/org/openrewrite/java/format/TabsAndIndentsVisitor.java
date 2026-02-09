@@ -498,24 +498,26 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                 SourcePositionService positionService = sourceFile.service(SourcePositionService.class);
                 String content = literal.getValueSource().substring(4);
-                int currentIndent = StringUtils.minCommonIndentLevel(content);
+                int currentIndent = StringUtils.minCommonIndentLevel(content, style.getTabSize());
                 content = StringUtils.trimIndent(content);
                 String[] lines = content.split("\n", -1);
-                int indent = getCursor().getNearestMessage("lastIndent", 0);
+                // get tree parent cursor rather than itself top get the indent, i.e. from the variable declaration node.
+                int indent = getCursor().getParentTreeCursor().getNearestMessage("lastIndent", 0);
                 if (evaluate(() -> wrappingStyle.getTextBlocks().getAlignWhenMultiline(), false)) {
                     if (!literal.getPrefix().getLastWhitespace().contains("\n")) {
                         ColSpan colSpan = positionService.columnsOf(getCursor(), literal);
                         indent += colSpan.getStartColumn() - colSpan.getIndent() - 1; // since position is index-1-based
                     }
                 } else {
-                    indent += style.getIndentSize() + style.getIndentSize();
+                    indent += (style.getIndentSize() + style.getIndentSize());
                 }
                 if (currentIndent != indent) {
                     StringBuilder builder = new StringBuilder().append("\"\"\"");
                     for (String line : lines) {
-                        builder.append("\n").append(line);
+                        builder.append('\n');
+                        shift(builder, indent);
+                        builder.append(line);
                     }
-                    shift(builder, indent);
                     literal = literal.withValueSource(builder.toString()).withValue(content);
                 }
             }
