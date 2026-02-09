@@ -223,14 +223,11 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                                 if (!configuredToOverrideManagedVersion && newDependencyManaged || (oldDependencyDefinedManaged && configuredToChangeManagedDependency)) {
                                     t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false, true).visit(t, ctx);
                                 } else {
-                                    // Otherwise, change the version to the new value, unless it's an implicitly defined property
                                     String versionTagValue = t.getChildValue("version").orElse(null);
-                                    if (!isImplicitlyDefinedVersionProperty(versionTagValue)) {
-                                        if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
-                                            t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
-                                        } else {
-                                            t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
-                                        }
+                                    if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
+                                        t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
+                                    } else {
+                                        t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
                                     }
                                 }
                             } else if (configuredToOverrideManagedVersion || (!newDependencyManaged && !(oldDependencyDefinedManaged && configuredToChangeManagedDependency))) {
