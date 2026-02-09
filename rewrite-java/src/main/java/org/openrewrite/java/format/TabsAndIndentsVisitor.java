@@ -498,7 +498,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                 SourcePositionService positionService = sourceFile.service(SourcePositionService.class);
                 String content = literal.getValueSource().substring(4);
-                int currentIndent = StringUtils.minCommonIndentLevel(content, style.getTabSize());
+                String finalContent = content; //TODO remove this assignment together with the next evaluate invocation as it is no longer needed.
+                int currentIndent = evaluate(() -> StringUtils.minCommonIndentLevel(finalContent, style.getTabSize()), StringUtils.minCommonIndentLevel(content));
                 content = StringUtils.trimIndent(content);
                 String[] lines = content.split("\n", -1);
                 int indent = getCursor().getNearestMessage("lastIndent", 0);
