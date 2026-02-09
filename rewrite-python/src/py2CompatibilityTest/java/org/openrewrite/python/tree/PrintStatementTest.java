@@ -16,14 +16,12 @@
 package org.openrewrite.python.tree;
 
 import org.intellij.lang.annotations.Language;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.python.Assertions.python;
 
-@Disabled("Requires Py2ParserVisitor implementation")
 class PrintStatementTest implements RewriteTest {
 
     @ParameterizedTest
