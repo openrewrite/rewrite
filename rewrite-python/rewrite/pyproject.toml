@@ -33,7 +33,9 @@ dev = [
     "ruff>=0.1.0",
 ]
 typing = [
-    "ty>=0.0.14",  # Required for type attribution with Java recipes
+    # Type attribution requires the ty-types binary on PATH.
+    # Build from https://github.com/moderneinc/ty-types:
+    #   cargo build --release && cp target/release/ty-types ~/.local/bin/
 ]
 publish = [
     "build>=1.0.0",

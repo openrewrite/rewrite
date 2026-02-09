@@ -13,67 +13,51 @@
 # limitations under the License.
 
 """
-LSP client for the ty type checker.
+Client for the ty-types CLI.
 
-This module provides a long-lived LSP client that communicates with ty's
-language server for Python type attribution. The client is lazily initialized
-on first use and persists for the lifetime of the RPC session.
+This module provides a long-lived client that communicates with the ty-types
+binary via line-delimited JSON-RPC over stdin/stdout. The ty-types CLI returns
+all node types in a single batch call per file, with structured type
+descriptors and cross-file deduplication.
 """
 
 from __future__ import annotations
 
 import atexit
 import json
-import os
 import subprocess
 import threading
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 
-class TyLspClient:
-    """Long-lived LSP client for ty type checker.
+class TyTypesClient:
+    """Client for the ty-types CLI.
 
-    This client starts `ty server` as a subprocess and communicates via the
-    Language Server Protocol over stdin/stdout. The client is a lazy singleton
+    This client starts `ty-types` as a subprocess and communicates via
+    line-delimited JSON-RPC over stdin/stdout. It is a lazy singleton
     that initializes on first access and shuts down when the process exits.
 
     Usage:
-        client = TyLspClient.get()
-        client.open_document("file:///path/to/file.py", source_code)
-        hover_info = client.get_hover("file:///path/to/file.py", line=10, character=5)
+        client = TyTypesClient.get()
+        client.initialize("/path/to/project")
+        result = client.get_types("/path/to/file.py")
+        # result = {"nodes": [...], "types": {...}}
     """
 
-    _instance: Optional[TyLspClient] = None
+    _instance: Optional[TyTypesClient] = None
     _lock: threading.Lock = threading.Lock()
 
     @classmethod
-    def get(cls, venv_path: Optional[Path] = None) -> TyLspClient:
-        """Get or create the singleton TyLspClient instance.
-
-        Args:
-            venv_path: Optional path to a virtual environment. If provided,
-                      ty will be configured to use this environment for
-                      type resolution.
+    def get(cls) -> TyTypesClient:
+        """Get or create the singleton TyTypesClient instance.
 
         Returns:
-            The singleton TyLspClient instance.
-
-        Note:
-            If the requested venv_path differs from the current instance's venv,
-            the instance will be reset and recreated with the new venv.
+            The singleton TyTypesClient instance.
         """
         with cls._lock:
-            # Check if we need to reset due to venv change
-            if cls._instance is not None and venv_path is not None:
-                current_venv = cls._instance._venv_path
-                if current_venv != venv_path:
-                    # Venv changed, reset the instance
-                    cls._instance.shutdown()
-                    cls._instance = None
-
             if cls._instance is None:
-                cls._instance = cls(venv_path)
+                cls._instance = cls()
                 atexit.register(cls._instance.shutdown)
             return cls._instance
 
@@ -85,123 +69,55 @@ class TyLspClient:
                 cls._instance.shutdown()
                 cls._instance = None
 
-    def __init__(self, venv_path: Optional[Path] = None):
-        """Initialize the ty LSP client.
-
-        Args:
-            venv_path: Optional path to a virtual environment.
-        """
+    def __init__(self):
+        """Initialize the ty-types client."""
         self._process: Optional[subprocess.Popen] = None
         self._request_id: int = 0
-        self._venv_path = venv_path
         self._initialized = False
+        self._project_root: Optional[str] = None
         self._read_lock = threading.Lock()
         self._write_lock = threading.Lock()
 
-        self._start_server()
+        self._start_process()
 
-    def _start_server(self) -> None:
-        """Start the ty language server subprocess."""
-        env = os.environ.copy()
-
-        # Find the ty executable
-        ty_path = self._find_ty_executable()
-        if ty_path is None:
+    def _start_process(self) -> None:
+        """Start the ty-types subprocess."""
+        binary = self._find_binary()
+        if binary is None:
             self._process = None
             raise RuntimeError(
-                "ty is not installed. Install it with: pip install ty"
+                "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
-
-        cmd = [str(ty_path), 'server']
-
-        if self._venv_path:
-            # Configure environment to use the virtual environment
-            env['VIRTUAL_ENV'] = str(self._venv_path)
-            bin_path = self._venv_path / 'bin'
-            env['PATH'] = f"{bin_path}:{env.get('PATH', '')}"
 
         try:
             self._process = subprocess.Popen(
-                cmd,
+                [str(binary)],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env=env,
             )
-            self._initialize_lsp()
         except FileNotFoundError:
-            # ty is not installed
             self._process = None
             raise RuntimeError(
-                "ty is not installed. Install it with: pip install ty"
+                "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
 
-    def _find_ty_executable(self) -> Optional[Path]:
-        """Find the ty executable.
-
-        Searches in order:
-        1. The specified venv_path's bin directory
-        2. The current Python interpreter's venv bin directory
-        3. The system PATH
-        """
+    @staticmethod
+    def _find_binary() -> Optional[Path]:
+        """Find the ty-types binary on PATH."""
         import shutil
-        import sys
 
-        # Check the specified venv first
-        if self._venv_path:
-            ty_in_venv = self._venv_path / 'bin' / 'ty'
-            if ty_in_venv.exists():
-                return ty_in_venv
-
-        # Check the current Python's venv
-        venv = os.environ.get('VIRTUAL_ENV')
-        if venv:
-            ty_in_venv = Path(venv) / 'bin' / 'ty'
-            if ty_in_venv.exists():
-                return ty_in_venv
-
-        # Check adjacent to the Python interpreter
-        python_dir = Path(sys.executable).parent
-        ty_next_to_python = python_dir / 'ty'
-        if ty_next_to_python.exists():
-            return ty_next_to_python
-
-        # Fall back to PATH lookup
-        ty_in_path = shutil.which('ty')
-        if ty_in_path:
-            return Path(ty_in_path)
-
+        ty_types = shutil.which('ty-types')
+        if ty_types:
+            return Path(ty_types)
         return None
 
-    def _initialize_lsp(self) -> None:
-        """Send LSP initialize request and wait for response."""
-        if self._process is None:
-            return
-
-        response = self._send_request("initialize", {
-            "processId": os.getpid(),
-            "capabilities": {
-                "textDocument": {
-                    "hover": {
-                        "contentFormat": ["plaintext", "markdown"]
-                    }
-                }
-            },
-            "rootUri": None,
-            "initializationOptions": {}
-        })
-
-        if response is not None:
-            self._initialized = True
-            # Send initialized notification
-            self._send_notification("initialized", {})
-
-    def _send_request(self, method: str, params: Dict[str, Any]) -> Optional[Any]:
-        """Send an LSP request and wait for the response.
+    def _send_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Optional[Any]:
+        """Send a JSON-RPC request and read the response.
 
         Args:
-            method: The LSP method name (e.g., "textDocument/hover").
-            params: The request parameters.
+            method: The JSON-RPC method name.
+            params: Optional request parameters.
 
         Returns:
             The result from the response, or None if the request failed.
@@ -209,251 +125,103 @@ class TyLspClient:
         if self._process is None or self._process.stdin is None:
             return None
 
-        with self._write_lock:
-            self._request_id += 1
-            request = {
-                "jsonrpc": "2.0",
-                "id": self._request_id,
-                "method": method,
-                "params": params
-            }
+        self._request_id += 1
+        request: Dict[str, Any] = {
+            "jsonrpc": "2.0",
+            "method": method,
+            "id": self._request_id,
+        }
+        if params is not None:
+            request["params"] = params
 
-            content = json.dumps(request)
-            message = f"Content-Length: {len(content)}\r\n\r\n{content}"
+        line = json.dumps(request) + "\n"
 
-            try:
-                self._process.stdin.write(message.encode('utf-8'))
+        try:
+            with self._write_lock:
+                self._process.stdin.write(line.encode('utf-8'))
                 self._process.stdin.flush()
-            except (BrokenPipeError, OSError):
-                return None
 
-        return self._read_response(self._request_id)
-
-    def _send_notification(self, method: str, params: Dict[str, Any]) -> None:
-        """Send an LSP notification (no response expected).
-
-        Args:
-            method: The LSP method name.
-            params: The notification parameters.
-        """
-        if self._process is None or self._process.stdin is None:
-            return
-
-        with self._write_lock:
-            notification = {
-                "jsonrpc": "2.0",
-                "method": method,
-                "params": params
-            }
-
-            content = json.dumps(notification)
-            message = f"Content-Length: {len(content)}\r\n\r\n{content}"
-
-            try:
-                self._process.stdin.write(message.encode('utf-8'))
-                self._process.stdin.flush()
-            except (BrokenPipeError, OSError):
-                pass
-
-    def _read_response(self, request_id: int) -> Optional[Any]:
-        """Read and parse an LSP response.
-
-        Args:
-            request_id: The ID of the request we're waiting for.
-
-        Returns:
-            The result from the response, or None if reading failed.
-        """
-        if self._process is None or self._process.stdout is None:
-            return None
-
-        with self._read_lock:
-            try:
-                # Read headers until we get an empty line
-                headers: Dict[str, str] = {}
-                while True:
-                    line = self._process.stdout.readline().decode('utf-8')
-                    if line == '\r\n' or line == '\n' or line == '':
-                        break
-                    if ':' in line:
-                        key, value = line.split(':', 1)
-                        headers[key.strip().lower()] = value.strip()
-
-                # Read content based on Content-Length
-                content_length = int(headers.get('content-length', 0))
-                if content_length == 0:
+            with self._read_lock:
+                if self._process.stdout is None:
                     return None
+                response_line = self._process.stdout.readline().decode('utf-8')
+                if not response_line:
+                    return None
+                response = json.loads(response_line)
 
-                content = self._process.stdout.read(content_length).decode('utf-8')
-                response = json.loads(content)
-
-                # Handle notifications and other messages
-                while response.get('id') != request_id:
-                    if 'id' not in response:
-                        # This is a notification, skip it
-                        # Read next message
-                        headers = {}
-                        while True:
-                            line = self._process.stdout.readline().decode('utf-8')
-                            if line == '\r\n' or line == '\n' or line == '':
-                                break
-                            if ':' in line:
-                                key, value = line.split(':', 1)
-                                headers[key.strip().lower()] = value.strip()
-
-                        content_length = int(headers.get('content-length', 0))
-                        if content_length == 0:
-                            return None
-                        content = self._process.stdout.read(content_length).decode('utf-8')
-                        response = json.loads(content)
-                    else:
-                        break
-
-                if 'error' in response:
+                if response.get('error') is not None:
                     return None
 
                 return response.get('result')
-
-            except (json.JSONDecodeError, OSError, ValueError):
-                return None
-
-    def open_document(self, uri: str, content: str) -> None:
-        """Notify ty that a document has been opened.
-
-        This allows ty to analyze the document content without requiring
-        the file to exist on disk.
-
-        Args:
-            uri: The document URI (e.g., "file:///path/to/file.py").
-            content: The document content.
-        """
-        self._send_notification("textDocument/didOpen", {
-            "textDocument": {
-                "uri": uri,
-                "languageId": "python",
-                "version": 1,
-                "text": content
-            }
-        })
-
-    def close_document(self, uri: str) -> None:
-        """Notify ty that a document has been closed.
-
-        Args:
-            uri: The document URI.
-        """
-        self._send_notification("textDocument/didClose", {
-            "textDocument": {"uri": uri}
-        })
-
-    def get_hover(self, uri: str, line: int, character: int) -> Optional[str]:
-        """Get type information at a specific position.
-
-        Args:
-            uri: The document URI.
-            line: Zero-based line number.
-            character: Zero-based character offset.
-
-        Returns:
-            The hover content (type information) as a string, or None if
-            no type information is available at that position.
-        """
-        response = self._send_request("textDocument/hover", {
-            "textDocument": {"uri": uri},
-            "position": {"line": line, "character": character}
-        })
-
-        if response is None:
+        except (BrokenPipeError, OSError, json.JSONDecodeError):
             return None
 
-        contents = response.get("contents")
-        if contents is None:
-            return None
+    def initialize(self, project_root: str) -> bool:
+        """Initialize the ty-types session with a project root.
 
-        # Handle different content formats
-        if isinstance(contents, str):
-            return contents
-        elif isinstance(contents, dict):
-            # MarkupContent format
-            return contents.get("value", "")
-        elif isinstance(contents, list):
-            # MarkedString[] format
-            values = []
-            for item in contents:
-                if isinstance(item, str):
-                    values.append(item)
-                elif isinstance(item, dict):
-                    values.append(item.get("value", ""))
-            return "\n".join(values)
-
-        return None
-
-    def get_type_definition(self, uri: str, line: int, character: int) -> Optional[str]:
-        """Get the file URI where the type at a position is defined.
-
-        This uses LSP's textDocument/typeDefinition to find where a type
-        is defined, which can be used to derive the module FQN.
+        If already initialized with the same project root, this is a no-op.
+        If initialized with a different root, shuts down and reinitializes.
 
         Args:
-            uri: The document URI.
-            line: Zero-based line number.
-            character: Zero-based character offset.
+            project_root: Absolute path to the project root directory.
 
         Returns:
-            The file URI where the type is defined, or None if unavailable.
+            True if initialization succeeded.
         """
-        response = self._send_request("textDocument/typeDefinition", {
-            "textDocument": {"uri": uri},
-            "position": {"line": line, "character": character}
-        })
+        if self._initialized and self._project_root == project_root:
+            return True
 
-        if response is None:
-            return None
+        if self._initialized:
+            # Need to shutdown and reinitialize with new project root
+            self._send_request("shutdown")
+            self._initialized = False
+            self._project_root = None
+            # Restart the process
+            if self._process is not None:
+                try:
+                    self._process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self._process.kill()
+            self._start_process()
 
-        # Response can be a Location, Location[], or LocationLink[]
-        if isinstance(response, list) and len(response) > 0:
-            # Take the first location
-            loc = response[0]
-            return loc.get("uri") or loc.get("targetUri")
-        elif isinstance(response, dict):
-            return response.get("uri") or response.get("targetUri")
+        result = self._send_request("initialize", {"projectRoot": project_root})
+        if result and result.get("ok"):
+            self._initialized = True
+            self._project_root = project_root
+            return True
+        return False
 
-        return None
-
-    def get_diagnostics(self, uri: str) -> List[Dict[str, Any]]:
-        """Get diagnostics (type errors) for a document.
+    def get_types(self, file_path: str) -> Optional[Dict[str, Any]]:
+        """Get all node types for a Python file.
 
         Args:
-            uri: The document URI.
+            file_path: Path to the Python file (absolute or relative to project root).
 
         Returns:
-            A list of diagnostic objects.
+            A dict with 'nodes' (list of NodeAttribution) and 'types' (dict of
+            TypeId -> TypeDescriptor), or None if the request failed.
         """
-        # Diagnostics are typically pushed via notifications, not pulled.
-        # This is a placeholder for future implementation if needed.
-        return []
+        if not self._initialized:
+            return None
+        return self._send_request("getTypes", {"file": file_path})
 
     @property
     def is_available(self) -> bool:
-        """Check if the ty server is available and initialized."""
+        """Check if the ty-types process is available and initialized."""
         return self._process is not None and self._initialized
 
     def shutdown(self) -> None:
-        """Gracefully shut down the ty server."""
+        """Gracefully shut down the ty-types process."""
         if self._process is None:
             return
 
         try:
-            # Send shutdown request
-            self._send_request("shutdown", {})
-            # Send exit notification
-            self._send_notification("exit", {})
-            # Wait for process to terminate
+            self._send_request("shutdown")
             self._process.wait(timeout=5)
         except (subprocess.TimeoutExpired, OSError):
-            # Force kill if graceful shutdown fails
             if self._process is not None:
                 self._process.kill()
         finally:
             self._process = None
             self._initialized = False
+            self._project_root = None

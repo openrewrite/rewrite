@@ -13,30 +13,33 @@
 # limitations under the License.
 
 """
-Python to JavaType mapping using ty for type inference.
+Python to JavaType mapping using ty-types for type inference.
 
-This module provides type attribution for Python code by querying the ty
-type checker via LSP. The type information is mapped to OpenRewrite's
-JavaType model to enable Java recipes like FindMethods to work on Python.
+This module provides type attribution for Python code by querying the ty-types
+CLI for structured type descriptors. All node types for a file are fetched in
+a single batch call, then looked up by byte offset. The type information is
+mapped to OpenRewrite's JavaType model to enable Java recipes like FindMethods
+to work on Python.
 """
 
 from __future__ import annotations
 
 import ast
+import os
 import re
+import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-from uuid import uuid4
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..java import JavaType
 
-# Try to import TyLspClient, but make it optional for parsing to work without ty
+# Try to import TyTypesClient, but make it optional for parsing to work without ty-types
 _TY_AVAILABLE = False
 try:
-    from .ty_client import TyLspClient
+    from .ty_client import TyTypesClient
     _TY_AVAILABLE = True
 except ImportError:
-    TyLspClient = None  # type: ignore
+    TyTypesClient = None  # type: ignore
 
 
 # Mapping of Python builtin types to JavaType.Primitive
@@ -63,16 +66,19 @@ _PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
 class PythonTypeMapping:
     """Maps Python types to JavaType for recipe matching.
 
-    This class uses ty's LSP server to infer types for Python code and
+    This class uses the ty-types CLI to infer types for Python code and
     converts them to JavaType objects that can be used by Java recipes
     like FindMethods, ChangeMethodName, etc.
+
+    All types for a file are fetched in a single batch call during __init__,
+    then individual nodes are looked up by byte offset.
 
     Usage:
         mapping = PythonTypeMapping(source, file_path="/path/to/file.py")
         method_type = mapping.method_invocation_type(call_node)
     """
 
-    # Cache for type mappings to avoid repeated LSP queries
+    # Cache for type mappings to avoid repeated class type creation
     _type_cache: Dict[str, JavaType] = {}
 
     def __init__(self, source: str, file_path: Optional[str] = None):
@@ -81,156 +87,235 @@ class PythonTypeMapping:
         Args:
             source: The Python source code.
             file_path: Optional file path for the source. If provided,
-                      it will be used as the document URI for ty.
+                      it will be used for ty-types queries.
         """
         self._source = source
         self._file_path = file_path
         self._source_lines = source.splitlines()
+        self._temp_file: Optional[Path] = None
 
-        # Create a URI for this document
+        # Compute line byte offsets for position conversion
+        self._line_byte_offsets = self._compute_line_byte_offsets(source)
+
+        # ty-types data: populated by _build_index
+        self._node_index: Dict[Tuple[int, int], Tuple[int, str]] = {}  # (start, end) -> (type_id, node_kind)
+        self._node_index_by_start: Dict[int, List[Tuple[int, int, str]]] = {}  # start -> [(end, type_id, node_kind)]
+        self._type_registry: Dict[int, Dict[str, Any]] = {}  # type_id -> TypeDescriptor
+        self._call_signature_index: Dict[Tuple[int, int], Dict[str, Any]] = {}  # (start, end) -> callSignature
+
+        # Fetch all types in one batch call
+        if _TY_AVAILABLE:
+            try:
+                self._fetch_types(source, file_path)
+            except RuntimeError:
+                # ty-types not installed
+                pass
+
+    def _fetch_types(self, source: str, file_path: Optional[str]) -> None:
+        """Fetch all types for this file from ty-types."""
+        client = TyTypesClient.get()
+
+        # Determine the actual file path on disk
+        actual_file = self._ensure_file_on_disk(source, file_path)
+        if actual_file is None:
+            return
+
+        # Discover and initialize project root
+        project_root = self._discover_project_root(actual_file)
+        if not client.initialize(project_root):
+            return
+
+        # Fetch all types in one call
+        result = client.get_types(actual_file)
+        if result:
+            self._build_index(result)
+
+    def _ensure_file_on_disk(self, source: str, file_path: Optional[str]) -> Optional[str]:
+        """Ensure the source is available as a file on disk for ty-types.
+
+        Returns the absolute file path, or None if unavailable.
+        """
         if file_path:
-            # Ensure we have an absolute path for the file URI
             path = Path(file_path)
             if not path.is_absolute():
                 path = path.resolve()
-            self._uri = path.as_uri()
-        else:
-            self._uri = f"untitled:{uuid4()}"
-
-        # Discover venv from file path
-        venv_path = self._discover_venv(file_path) if file_path else None
-
-        # Open the document in ty if available
-        self._ty_client: Optional[TyLspClient] = None
-        if _TY_AVAILABLE:
+            if path.exists():
+                return str(path)
+            # File path given but doesn't exist — write source there
             try:
-                self._ty_client = TyLspClient.get(venv_path)
-                self._ty_client.open_document(self._uri, source)
-            except RuntimeError:
-                # ty not installed
-                self._ty_client = None
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(source, encoding='utf-8')
+                self._temp_file = path
+                return str(path)
+            except OSError:
+                return None
+        else:
+            # No file path — create temp file
+            try:
+                fd, tmp_path = tempfile.mkstemp(suffix='.py')
+                os.close(fd)
+                Path(tmp_path).write_text(source, encoding='utf-8')
+                self._temp_file = Path(tmp_path)
+                return tmp_path
+            except OSError:
+                return None
 
-    def _get_module_from_type_definition(self, line: int, col: int) -> Optional[str]:
-        """Get the module path where a type at the given position is defined.
+    @staticmethod
+    def _discover_project_root(file_path: str) -> str:
+        """Discover the project root by walking up from file_path.
 
-        Uses ty's textDocument/typeDefinition to find the file where a type
-        is defined, then extracts the module path from that file path.
-
-        Args:
-            line: Zero-based line number.
-            col: Zero-based column offset.
-
-        Returns:
-            The module path (e.g., 'httpx' or 'httpx._models'), or None.
-        """
-        if self._ty_client is None:
-            return None
-
-        type_def_uri = self._ty_client.get_type_definition(self._uri, line, col)
-        if not type_def_uri:
-            return None
-
-        return self._extract_module_from_uri(type_def_uri)
-
-    def _extract_module_from_uri(self, uri: str) -> Optional[str]:
-        """Extract a Python module path from a file URI.
-
-        Converts a file URI like 'file:///path/to/httpx/httpx/_models.py'
-        to a module path like 'httpx._models'. Uses package structure
-        (presence of __init__.py) to determine the module hierarchy.
-
-        Args:
-            uri: A file URI pointing to a Python file.
-
-        Returns:
-            The module path, or None if it cannot be determined.
-        """
-        from urllib.parse import urlparse, unquote
-
-        parsed = urlparse(uri)
-        if parsed.scheme != 'file':
-            return None
-
-        file_path = Path(unquote(parsed.path))
-        if not file_path.suffix == '.py':
-            return None
-
-        # Build module path by walking up and looking for __init__.py
-        module_parts = []
-        current = file_path
-
-        # Add the filename (without .py) unless it's __init__
-        if current.stem != '__init__':
-            module_parts.insert(0, current.stem)
-
-        current = current.parent
-
-        # Walk up looking for __init__.py to find package boundaries
-        for _ in range(20):  # Limit depth
-            init_file = current / '__init__.py'
-            if init_file.exists():
-                module_parts.insert(0, current.name)
-                current = current.parent
-            else:
-                # No __init__.py means we've left the package
-                break
-
-        if module_parts:
-            # Clean up internal module names: httpx._models -> httpx
-            # If the module has an underscore prefix, use the parent
-            fqn = '.'.join(module_parts)
-            # For patterns like 'httpx._models', just use 'httpx' as the public API
-            parts = fqn.split('.')
-            public_parts = []
-            for part in parts:
-                if part.startswith('_') and public_parts:
-                    # Stop at private modules, use only public path
-                    break
-                public_parts.append(part)
-            return '.'.join(public_parts) if public_parts else None
-
-        return None
-
-    def _discover_venv(self, file_path: str) -> Optional[Path]:
-        """Discover the virtual environment for a file.
-
-        Walks up from the file's directory looking for a .venv directory
-        or a pyproject.toml with an associated .venv.
-
-        Args:
-            file_path: Path to the Python source file.
-
-        Returns:
-            Path to the .venv directory if found, None otherwise.
+        Looks for pyproject.toml, setup.py, setup.cfg, or .git.
         """
         path = Path(file_path)
         if not path.is_absolute():
             path = path.resolve()
 
-        # Walk up the directory tree looking for .venv
         current = path.parent
-        for _ in range(20):  # Limit depth to avoid infinite loops
-            venv = current / '.venv'
-            if venv.is_dir():
-                return venv
-
-            # Also check for pyproject.toml as a project root indicator
-            pyproject = current / 'pyproject.toml'
-            if pyproject.exists():
-                # If there's a pyproject.toml but no .venv, stop looking
-                break
-
+        for _ in range(20):
+            for marker in ('pyproject.toml', 'setup.py', 'setup.cfg', '.git'):
+                if (current / marker).exists():
+                    return str(current)
             parent = current.parent
             if parent == current:
                 break
             current = parent
 
+        return str(path.parent)
+
+    @staticmethod
+    def _compute_line_byte_offsets(source: str) -> List[int]:
+        """Compute the byte offset of the start of each line.
+
+        Returns a list where index i is the byte offset of line i+1 (1-based).
+        """
+        offsets = [0]
+        for line in source.splitlines(True):
+            offsets.append(offsets[-1] + len(line.encode('utf-8')))
+        return offsets
+
+    def _pos_to_byte_offset(self, lineno: int, col_offset: int) -> int:
+        """Convert AST (lineno, col_offset) to an absolute byte offset.
+
+        Python's ast uses 1-based lineno and character-based col_offset.
+        ty-types uses absolute byte offsets (ruff convention).
+        """
+        line_start = self._line_byte_offsets[lineno - 1]
+        line_text = self._source_lines[lineno - 1] if lineno <= len(self._source_lines) else ""
+        byte_col = len(line_text[:col_offset].encode('utf-8'))
+        return line_start + byte_col
+
+    def _build_index(self, result: Dict[str, Any]) -> None:
+        """Build the byte-offset lookup index from a getTypes response."""
+        for node in result.get('nodes', []):
+            type_id = node.get('typeId')
+            if type_id is not None:
+                start = node['start']
+                end = node['end']
+                kind = node['nodeKind']
+                self._node_index[(start, end)] = (type_id, kind)
+                if start not in self._node_index_by_start:
+                    self._node_index_by_start[start] = []
+                self._node_index_by_start[start].append((end, type_id, kind))
+
+            # Index call signature data for ExprCall nodes
+            call_sig = node.get('callSignature')
+            if call_sig is not None:
+                self._call_signature_index[(node['start'], node['end'])] = call_sig
+
+        # Merge types into registry (keys are strings in JSON)
+        for type_id_str, descriptor in result.get('types', {}).items():
+            self._type_registry[int(type_id_str)] = descriptor
+
+    def _lookup_type_id(self, node: ast.AST) -> Optional[int]:
+        """Look up a node's type ID by converting AST position to byte offset."""
+        if not hasattr(node, 'lineno') or node.lineno is None:
+            return None
+
+        start = self._pos_to_byte_offset(node.lineno, node.col_offset)
+
+        if hasattr(node, 'end_lineno') and node.end_lineno is not None:
+            end = self._pos_to_byte_offset(node.end_lineno, node.end_col_offset)
+            # Try exact match first
+            result = self._node_index.get((start, end))
+            if result:
+                return result[0]  # type_id
+
+        # Fuzzy match by start offset
+        entries = self._node_index_by_start.get(start, [])
+        if entries:
+            return entries[0][1]  # type_id of first match
+
         return None
 
+    def _descriptor_to_java_type(self, descriptor: Dict[str, Any]) -> Optional[JavaType]:
+        """Convert a ty-types TypeDescriptor to a JavaType."""
+        kind = descriptor.get('kind')
+
+        if kind == 'instance':
+            class_name = descriptor.get('className', '')
+            if class_name in _PYTHON_PRIMITIVES:
+                return _PYTHON_PRIMITIVES[class_name]
+            module_name = descriptor.get('moduleName')
+            if module_name and module_name != 'builtins':
+                return self._create_class_type(f"{module_name}.{class_name}")
+            return self._create_class_type(class_name)
+
+        elif kind == 'intLiteral':
+            return JavaType.Primitive.Int
+
+        elif kind == 'boolLiteral':
+            return JavaType.Primitive.Boolean
+
+        elif kind in ('stringLiteral', 'literalString'):
+            return JavaType.Primitive.String
+
+        elif kind == 'bytesLiteral':
+            return JavaType.Primitive.String
+
+        elif kind == 'union':
+            # Unwrap union: take first non-None type
+            for member_id in descriptor.get('members', []):
+                member = self._type_registry.get(member_id)
+                if member:
+                    member_kind = member.get('kind')
+                    # Skip None/NoneType members
+                    if member_kind == 'instance' and member.get('className') in ('None', 'NoneType'):
+                        continue
+                    return self._descriptor_to_java_type(member)
+            return JavaType.Unknown()
+
+        elif kind == 'module':
+            module_name = descriptor.get('moduleName', '')
+            return self._create_class_type(module_name)
+
+        elif kind in ('function', 'boundMethod'):
+            # Return type based on display string
+            display = descriptor.get('display', '')
+            if display:
+                return self._type_string_to_java_type(display)
+            return JavaType.Unknown()
+
+        elif kind == 'classLiteral':
+            class_name = descriptor.get('className', '')
+            return self._create_class_type(class_name)
+
+        elif kind in ('dynamic', 'never'):
+            return JavaType.Unknown()
+
+        else:
+            # Try display string as fallback
+            display = descriptor.get('display', '')
+            if display:
+                return self._type_string_to_java_type(display)
+            return JavaType.Unknown()
+
     def close(self) -> None:
-        """Close the document in ty."""
-        if self._ty_client is not None:
-            self._ty_client.close_document(self._uri)
+        """Clean up temporary files."""
+        if self._temp_file and self._temp_file.exists():
+            try:
+                self._temp_file.unlink()
+            except OSError:
+                pass
 
     def type(self, node: ast.AST) -> Optional[JavaType]:
         """Get the JavaType for an AST node.
@@ -245,10 +330,13 @@ class PythonTypeMapping:
             return self._constant_type(node)
         elif isinstance(node, ast.Call):
             return self.method_invocation_type(node)
-        elif isinstance(node, ast.Name):
-            return self._name_type(node)
-        elif isinstance(node, ast.Attribute):
-            return self._attribute_type(node)
+
+        # Try to look up in ty-types index
+        type_id = self._lookup_type_id(node)
+        if type_id is not None:
+            descriptor = self._type_registry.get(type_id)
+            if descriptor:
+                return self._descriptor_to_java_type(descriptor)
 
         return None
 
@@ -264,36 +352,6 @@ class PythonTypeMapping:
             return JavaType.Primitive.Double
         elif node.value is None:
             return JavaType.Primitive.None_
-        return None
-
-    def _name_type(self, node: ast.Name) -> Optional[JavaType]:
-        """Get the type for a name reference."""
-        if self._ty_client is None:
-            return None
-
-        hover = self._ty_client.get_hover(
-            self._uri,
-            node.lineno - 1,  # LSP uses 0-based lines
-            node.col_offset
-        )
-
-        if hover:
-            return self._parse_hover_type(hover)
-        return None
-
-    def _attribute_type(self, node: ast.Attribute) -> Optional[JavaType]:
-        """Get the type for an attribute access."""
-        if self._ty_client is None:
-            return None
-
-        hover = self._ty_client.get_hover(
-            self._uri,
-            node.lineno - 1,
-            node.col_offset + len(self._get_node_text(node.value)) + 1  # After the dot
-        )
-
-        if hover:
-            return self._parse_hover_type(hover)
         return None
 
     def method_invocation_type(self, node: ast.Call) -> Optional[JavaType.Method]:
@@ -317,7 +375,7 @@ class PythonTypeMapping:
         if not method_name:
             return None
 
-        # Get declaring type from ty
+        # Get declaring type
         declaring_type = self._get_declaring_type(node)
 
         # Get parameter names and types from method signature
@@ -343,324 +401,144 @@ class PythonTypeMapping:
             return node.func.attr
         return None
 
+    def _lookup_call_signature(self, node: ast.Call) -> Optional[Dict[str, Any]]:
+        """Look up structured call signature data for a Call node."""
+        if not hasattr(node, 'lineno') or node.lineno is None:
+            return None
+
+        start = self._pos_to_byte_offset(node.lineno, node.col_offset)
+        if hasattr(node, 'end_lineno') and node.end_lineno is not None:
+            end = self._pos_to_byte_offset(node.end_lineno, node.end_col_offset)
+            return self._call_signature_index.get((start, end))
+        return None
+
+    def _resolve_param_type(self, param: Dict[str, Any]) -> JavaType:
+        """Resolve a ParameterInfo's typeId to a JavaType."""
+        type_id = param.get('typeId')
+        if type_id is not None:
+            descriptor = self._type_registry.get(type_id)
+            if descriptor:
+                java_type = self._descriptor_to_java_type(descriptor)
+                if java_type is not None:
+                    return java_type
+        return JavaType.Unknown()
+
     def _get_method_signature(self, node: ast.Call) -> Tuple[List[str], List[JavaType]]:
         """Get parameter names and types from the method signature.
 
-        This method queries ty for the method signature and parses it to extract
-        parameter names and types. If ty is unavailable or parsing fails, it
-        falls back to generating placeholder names.
-
-        Args:
-            node: The ast.Call node representing the method invocation.
-
-        Returns:
-            A tuple of (parameter_names, parameter_types).
+        Uses structured call signature from ty-types when available,
+        otherwise falls back to placeholder names.
         """
-        if self._ty_client is None:
-            return self._generate_placeholder_names(node)
-
-        # Get hover on the method name to get its signature
-        hover = self._get_method_hover(node)
-        if not hover:
-            return self._generate_placeholder_names(node)
-
-        # Parse the signature from hover
-        names, types = self._parse_signature_from_hover(hover)
-        if names:
-            return names, types
+        # Try structured call signature from ty-types
+        sig = self._lookup_call_signature(node)
+        if sig:
+            params = sig.get('parameters', [])
+            if params:
+                names = [p['name'] for p in params]
+                types = [self._resolve_param_type(p) for p in params]
+                return names, types
 
         # Fall back to placeholder names
         return self._generate_placeholder_names(node)
 
-    def _get_method_hover(self, node: ast.Call) -> Optional[str]:
-        """Get the hover information for the method being called.
-
-        Args:
-            node: The ast.Call node.
-
-        Returns:
-            The hover string containing the method signature, or None.
-        """
-        if self._ty_client is None:
-            return None
-
-        if isinstance(node.func, ast.Attribute):
-            # For method calls like obj.method(), hover on the method name
-            # The method name starts after the receiver and the dot
-            receiver_text = self._get_node_text(node.func.value)
-            hover_col = node.func.col_offset + len(receiver_text) + 1  # +1 for the dot
-            return self._ty_client.get_hover(
-                self._uri,
-                node.func.lineno - 1,
-                hover_col
-            )
-        elif isinstance(node.func, ast.Name):
-            # For function calls, hover on the function name
-            return self._ty_client.get_hover(
-                self._uri,
-                node.func.lineno - 1,
-                node.func.col_offset
-            )
-
-        return None
-
-    def _parse_signature_from_hover(self, hover: str) -> Tuple[List[str], List[JavaType]]:
-        """Parse parameter names and types from a method signature hover.
-
-        Handles formats like:
-        - def split(sep: str | None = ..., maxsplit: SupportsIndex = ...) -> list[str]
-        - def upper() -> LiteralString
-
-        Args:
-            hover: The hover response containing a method signature.
-
-        Returns:
-            A tuple of (parameter_names, parameter_types).
-        """
-        hover = self._strip_markdown(hover)
-
-        # Match: def method_name(params) -> return_type
-        # Use DOTALL to handle multi-line signatures
-        match = re.search(r'def \w+\s*\((.*?)\)\s*(?:->|$)', hover, re.DOTALL)
-        if not match:
-            return [], []
-
-        params_str = match.group(1).strip()
-        if not params_str:
-            return [], []
-
-        names: List[str] = []
-        types: List[JavaType] = []
-
-        # Parse each parameter, handling defaults and type annotations
-        for param in self._split_params(params_str):
-            param = param.strip()
-            if not param or param in ('self', 'cls', '/', '*'):
-                continue  # Skip self, cls, positional-only marker, and keyword-only marker
-
-            # Handle *args and **kwargs
-            if param.startswith('**'):
-                param = param[2:]
-            elif param.startswith('*'):
-                param = param[1:]
-
-            # Extract name (before : or =)
-            name_match = re.match(r'(\w+)', param)
-            if name_match:
-                name = name_match.group(1)
-                names.append(name)
-
-                # Extract type (between : and = or end of param)
-                type_match = re.search(r':\s*([^=]+?)(?:\s*=|$)', param)
-                if type_match:
-                    type_str = type_match.group(1).strip()
-                    java_type = self._type_string_to_java_type(type_str)
-                    types.append(java_type if java_type else JavaType.Unknown())
-                else:
-                    types.append(JavaType.Unknown())
-
-        return names, types
-
-    def _split_params(self, params_str: str) -> List[str]:
-        """Split a parameter string handling nested brackets.
-
-        Handles cases like:
-        - "a, b, c"
-        - "a: list[str], b: dict[str, int]"
-        - "a: Callable[[int], str], b: int"
-
-        Args:
-            params_str: The parameter string from a function signature.
-
-        Returns:
-            A list of individual parameter strings.
-        """
-        params: List[str] = []
-        current = []
-        depth = 0
-
-        for char in params_str:
-            if char in '([{':
-                depth += 1
-                current.append(char)
-            elif char in ')]}':
-                depth -= 1
-                current.append(char)
-            elif char == ',' and depth == 0:
-                params.append(''.join(current).strip())
-                current = []
-            else:
-                current.append(char)
-
-        # Don't forget the last parameter
-        if current:
-            params.append(''.join(current).strip())
-
-        return params
-
     def _generate_placeholder_names(self, node: ast.Call) -> Tuple[List[str], List[JavaType]]:
-        """Generate placeholder parameter names when signature parsing fails.
-
-        Args:
-            node: The ast.Call node.
-
-        Returns:
-            A tuple of (placeholder_names, parameter_types).
-        """
+        """Generate placeholder parameter names when signature parsing fails."""
         param_types = self._get_parameter_types(node) or []
         names = [f"arg{i}" for i in range(len(param_types))]
         return names, param_types
 
     def _get_declaring_type(self, node: ast.Call) -> Optional[JavaType.FullyQualified]:
         """Get the declaring type (class/module) for a method call."""
-        if self._ty_client is None:
-            return self._infer_declaring_type_from_ast(node)
-
-        # Query ty for the type of the callee
         if isinstance(node.func, ast.Attribute):
             receiver = node.func.value
 
             # For chained calls like "hello".upper().split(), the receiver is a Call
-            # We need to get the return type of the inner call
             if isinstance(receiver, ast.Call):
                 return self._get_call_return_type(receiver)
 
-            # For method calls like obj.method(), get the type of obj
-            # For chained attributes like os.path, we need to hover at the end
-            # of the chain (on 'path') rather than the start (on 'os')
-            hover_col = receiver.col_offset
-            if hasattr(receiver, 'end_col_offset') and receiver.end_col_offset:
-                # Hover at the end of the expression (within the last attribute)
-                hover_col = receiver.end_col_offset - 1
-
-            # Get the type name from hover
-            hover = self._ty_client.get_hover(
-                self._uri,
-                receiver.lineno - 1,
-                hover_col
-            )
-            if hover:
-                # Check if this is a module (e.g., httpx.get() where httpx is a module)
-                hover_clean = self._strip_markdown(hover)
-                module_match = re.match(r"<module\s+'([^']+)'", hover_clean)
-                if module_match:
-                    # The receiver is a module, so the FQN is just the module name
-                    module_name = module_match.group(1)
-                    return self._create_class_type(module_name)
-
-                type_name = self._extract_type_name_from_hover(hover)
-                if type_name and type_name != 'Unknown':
-                    # Get the module FQN from typeDefinition
-                    module = self._get_module_from_type_definition(
-                        receiver.lineno - 1,
-                        hover_col
-                    )
-                    if module:
-                        # Create FQN: module.TypeName (e.g., httpx.Client)
-                        fqn = f"{module}.{type_name}"
-                        return self._create_class_type(fqn)
-                    else:
-                        # Fall back to just the type name
-                        return self._create_class_type(type_name)
+            # Try to look up receiver type in ty-types index
+            type_id = self._lookup_type_id(receiver)
+            if type_id is not None:
+                descriptor = self._type_registry.get(type_id)
+                if descriptor:
+                    return self._declaring_type_from_descriptor(descriptor)
 
         elif isinstance(node.func, ast.Name):
-            # For function calls, try to get the module
-            hover = self._ty_client.get_hover(
-                self._uri,
-                node.func.lineno - 1,
-                node.func.col_offset
-            )
-            if hover:
-                return self._extract_declaring_type_from_function_hover(hover)
+            # For function calls, look up the function name
+            type_id = self._lookup_type_id(node.func)
+            if type_id is not None:
+                descriptor = self._type_registry.get(type_id)
+                if descriptor:
+                    kind = descriptor.get('kind')
+                    if kind == 'module':
+                        return self._create_class_type(descriptor.get('moduleName', ''))
 
         return self._infer_declaring_type_from_ast(node)
 
-    def _extract_type_name_from_hover(self, hover: str) -> Optional[str]:
-        """Extract just the type name from a hover response.
+    def _declaring_type_from_descriptor(self, descriptor: Dict[str, Any]) -> Optional[JavaType.FullyQualified]:
+        """Extract a declaring type (class/module) from a TypeDescriptor."""
+        kind = descriptor.get('kind')
 
-        Args:
-            hover: The raw hover response from ty.
+        if kind == 'module':
+            module_name = descriptor.get('moduleName', '')
+            return self._create_class_type(module_name)
 
-        Returns:
-            The type name (e.g., 'Client', 'Response'), or None.
-        """
-        hover = self._strip_markdown(hover)
+        elif kind == 'instance':
+            class_name = descriptor.get('className', '')
+            module_name = descriptor.get('moduleName')
+            if module_name and module_name != 'builtins':
+                return self._create_class_type(f"{module_name}.{class_name}")
+            return self._create_class_type(class_name)
 
-        # Handle module type format: <module 'httpx'>
-        # Return None so we use module-based FQN lookup instead
-        module_match = re.match(r"<module\s+'([^']+)'", hover)
-        if module_match:
-            # Return the module name as the type - the FQN IS the module
-            return None  # Signal that this is a module, not a class type
+        elif kind in ('stringLiteral', 'literalString'):
+            return self._create_class_type('str')
 
-        # Handle "variable: Type" format
-        if ': ' in hover and not hover.startswith('def '):
-            type_str = hover.split(': ', 1)[1].strip()
-            # Handle union types by taking the first non-None type
-            if ' | ' in type_str:
-                for part in type_str.split(' | '):
-                    part = part.strip()
-                    if part not in ('None', 'NoneType', 'Unknown'):
-                        type_str = part
-                        break
-            # Handle generics - extract base type
-            if '[' in type_str:
-                type_str = type_str.split('[')[0]
-            return type_str
+        elif kind == 'intLiteral':
+            return self._create_class_type('int')
 
-        # Just a type name
-        if hover and not hover.startswith('def '):
-            type_str = hover.strip()
-            if '[' in type_str:
-                type_str = type_str.split('[')[0]
-            return type_str
+        elif kind == 'boolLiteral':
+            return self._create_class_type('bool')
+
+        elif kind == 'bytesLiteral':
+            return self._create_class_type('bytes')
+
+        elif kind == 'union':
+            # Unwrap union: use first non-None member as declaring type
+            for member_id in descriptor.get('members', []):
+                member = self._type_registry.get(member_id)
+                if member:
+                    if member.get('kind') == 'instance' and member.get('className') in ('None', 'NoneType'):
+                        continue
+                    return self._declaring_type_from_descriptor(member)
+
+        elif kind == 'classLiteral':
+            class_name = descriptor.get('className', '')
+            return self._create_class_type(class_name)
 
         return None
 
     def _get_call_return_type(self, call_node: ast.Call) -> Optional[JavaType.FullyQualified]:
-        """Get the return type of a function/method call.
+        """Get the return type of a function/method call as a class type.
 
         For chained calls like "hello".upper().split(), this returns the type
         that .upper() returns (str), which is then the declaring type for .split().
         """
-        if self._ty_client is None:
-            return None
-
-        # For method calls like obj.method(), hover on the method name
-        if isinstance(call_node.func, ast.Attribute):
-            # Hover on the method name to get the signature
-            hover = self._ty_client.get_hover(
-                self._uri,
-                call_node.func.lineno - 1,
-                call_node.func.col_offset + len(self._get_node_text(call_node.func.value)) + 1
-            )
-            if hover:
-                return self._extract_return_type_as_class(hover)
-
-        return None
-
-    def _extract_return_type_as_class(self, hover: str) -> Optional[JavaType.FullyQualified]:
-        """Extract the return type from a method signature hover and convert to class type.
-
-        Handles formats like:
-        - def upper() -> LiteralString
-        - def split(...) -> list[str]
-        """
-        hover = self._strip_markdown(hover)
-
-        # Extract return type from "def func(...) -> ReturnType"
-        if ' -> ' in hover:
-            return_type_str = hover.split(' -> ')[-1].strip()
-            java_type = self._type_string_to_java_type(return_type_str)
-            if isinstance(java_type, JavaType.Class):
-                return java_type
-            if isinstance(java_type, JavaType.Primitive):
-                return self._create_class_type(_PRIMITIVE_TO_PYTHON.get(java_type, java_type.name.lower()))
-
+        # The type of an ExprCall IS the return type
+        type_id = self._lookup_type_id(call_node)
+        if type_id is not None:
+            descriptor = self._type_registry.get(type_id)
+            if descriptor:
+                java_type = self._descriptor_to_java_type(descriptor)
+                if isinstance(java_type, JavaType.Class):
+                    return java_type
+                if isinstance(java_type, JavaType.Primitive):
+                    return self._create_class_type(
+                        _PRIMITIVE_TO_PYTHON.get(java_type, java_type.name.lower())
+                    )
         return None
 
     def _infer_declaring_type_from_ast(self, node: ast.Call) -> Optional[JavaType.FullyQualified]:
-        """Infer declaring type from AST when ty is unavailable."""
+        """Infer declaring type from AST when ty-types data is unavailable."""
         if isinstance(node.func, ast.Attribute):
             receiver = node.func.value
 
@@ -671,7 +549,6 @@ class PythonTypeMapping:
                 elif isinstance(receiver.value, bytes):
                     return self._create_class_type('bytes')
                 elif isinstance(receiver.value, (int, float, bool)):
-                    # Numbers and bools don't have many methods but handle them
                     type_name = type(receiver.value).__name__
                     return self._create_class_type(type_name)
             elif isinstance(receiver, ast.List):
@@ -682,13 +559,8 @@ class PythonTypeMapping:
                 return self._create_class_type('set')
             elif isinstance(receiver, ast.Tuple):
                 return self._create_class_type('tuple')
-            elif isinstance(receiver, ast.Call):
-                # For chained calls like "hello".upper().split(), infer from inner call
-                # This is a simplification - full type inference would require ty
-                pass
 
             # Try to build a fully qualified name from the attribute chain
-            # Only do this for actual attribute chains (like os.path), not simple names
             parts = []
             current = receiver
             while isinstance(current, ast.Attribute):
@@ -698,8 +570,6 @@ class PythonTypeMapping:
                 parts.insert(0, current.id)
 
             # Only create a class type if we have an attribute chain (len > 1)
-            # For simple variable names like 'client', return None (Unknown)
-            # since we can't determine the actual type without ty
             if len(parts) > 1:
                 fqn = '.'.join(parts)
                 return self._create_class_type(fqn)
@@ -730,99 +600,15 @@ class PythonTypeMapping:
         return param_types if param_types else None
 
     def _get_return_type(self, node: ast.Call) -> Optional[JavaType]:
-        """Get the return type of a method call."""
-        if self._ty_client is None:
-            return None
+        """Get the return type of a method call.
 
-        # Query ty for the type at the call expression
-        hover = self._ty_client.get_hover(
-            self._uri,
-            node.lineno - 1,
-            node.col_offset
-        )
-
-        if hover:
-            return self._parse_hover_type(hover)
-        return None
-
-    def _parse_hover_type(self, hover: str) -> Optional[JavaType]:
-        """Parse ty's hover response into a JavaType."""
-        if not hover:
-            return None
-
-        hover = self._strip_markdown(hover)
-
-        # Check for primitive types
-        for py_type, java_type in _PYTHON_PRIMITIVES.items():
-            if hover == py_type or hover.endswith(f': {py_type}'):
-                return java_type
-
-        # Try to extract a type from various hover formats
-        type_str = self._extract_type_from_hover(hover)
-        if type_str:
-            return self._type_string_to_java_type(type_str)
-
-        return None
-
-    def _extract_type_from_hover(self, hover: str) -> Optional[str]:
-        """Extract the type string from a hover response."""
-        # Pattern: "variable: Type"
-        if ': ' in hover and not hover.startswith('def '):
-            return hover.split(': ', 1)[1].strip()
-
-        # Pattern: "def func(...) -> ReturnType"
-        if ' -> ' in hover:
-            return hover.split(' -> ')[-1].strip()
-
-        # Pattern: just "Type"
-        if hover and not hover.startswith('def '):
-            return hover
-
-        return None
-
-    def _parse_hover_as_class_type(self, hover: str) -> Optional[JavaType.FullyQualified]:
-        """Parse ty's hover response as a class type."""
-        hover = self._strip_markdown(hover)
-        type_str = self._extract_type_from_hover(hover)
-        if type_str:
-            java_type = self._type_string_to_java_type(type_str)
-            if isinstance(java_type, JavaType.Class):
-                return java_type
-            # For primitives like str, create a class wrapper
-            if isinstance(java_type, JavaType.Primitive):
-                return self._create_class_type(_PRIMITIVE_TO_PYTHON.get(java_type, java_type.name.lower()))
-        return None
-
-    def _strip_markdown(self, hover: str) -> str:
-        """Strip markdown code block formatting from ty hover response."""
-        if not hover:
-            return ''
-
-        hover = hover.strip()
-        if hover.startswith('```'):
-            lines = hover.split('\n')
-            # Remove first line (```python) and last line (```)
-            content_lines = []
-            for line in lines[1:]:
-                if line.strip() == '```':
-                    break
-                content_lines.append(line)
-            hover = '\n'.join(content_lines).strip()
-
-        # If there's documentation (after ---), only use the type part
-        if '\n---\n' in hover:
-            hover = hover.split('\n---\n')[0].strip()
-
-        return hover
-
-    def _extract_declaring_type_from_function_hover(self, hover: str) -> Optional[JavaType.FullyQualified]:
-        """Extract the declaring type from a function hover.
-
-        For imported functions like 'requests.get', ty might show:
-        "def get(...) -> Response" with module info
+        The type of an ExprCall node in ty-types IS the return type.
         """
-        # This is a simplified implementation
-        # In practice, we'd need to analyze the import context
+        type_id = self._lookup_type_id(node)
+        if type_id is not None:
+            descriptor = self._type_registry.get(type_id)
+            if descriptor:
+                return self._descriptor_to_java_type(descriptor)
         return None
 
     def _type_string_to_java_type(self, type_str: str) -> Optional[JavaType]:
@@ -851,7 +637,6 @@ class PythonTypeMapping:
         literal_match = re.match(r'Literal\[(.+)\]', type_str)
         if literal_match:
             literal_value = literal_match.group(1).strip()
-            # Determine type from the literal value
             if (literal_value.startswith('"') and literal_value.endswith('"')) or \
                (literal_value.startswith("'") and literal_value.endswith("'")):
                 return self._create_class_type('str')
@@ -859,14 +644,12 @@ class PythonTypeMapping:
                 return JavaType.Primitive.Boolean
             elif literal_value.isdigit() or (literal_value.startswith('-') and literal_value[1:].isdigit()):
                 return JavaType.Primitive.Int
-            # Default to treating literal as str
             return self._create_class_type('str')
 
         # Handle Optional[T], List[T], etc.
         generic_match = re.match(r'(\w+)\[(.+)\]', type_str)
         if generic_match:
             base = generic_match.group(1).lower()
-            # Normalize common type names
             type_mapping = {
                 'list': 'list',
                 'dict': 'dict',
@@ -877,42 +660,29 @@ class PythonTypeMapping:
             }
             if base in type_mapping:
                 if type_mapping[base] is None:
-                    # For Optional[T], recurse on T
                     inner = generic_match.group(2)
                     return self._type_string_to_java_type(inner)
                 return self._create_class_type(type_mapping[base])
-            # Keep original casing for other types
             return self._create_class_type(generic_match.group(1))
 
         # Handle union types: T | None, Union[T, None]
         if ' | ' in type_str:
-            # Take the first non-None, non-Unknown type
             parts = [p.strip() for p in type_str.split(' | ')]
             for part in parts:
                 if part not in ('None', 'NoneType', 'Unknown'):
                     return self._type_string_to_java_type(part)
-            # If all parts are None/Unknown, return Unknown
             return JavaType.Unknown()
 
         # Default to class type
         return self._create_class_type(type_str)
 
     def _create_class_type(self, fqn: str) -> JavaType.Class:
-        """Create a JavaType.Class from a fully qualified name.
-
-        Args:
-            fqn: The fully qualified type name (e.g., 'httpx.Client' or 'str').
-
-        Returns:
-            A JavaType.Class with the fully qualified name.
-        """
-        # Check cache
+        """Create a JavaType.Class from a fully qualified name."""
         if fqn in self._type_cache:
             cached = self._type_cache[fqn]
             if isinstance(cached, JavaType.Class):
                 return cached
 
-        # JavaType.Class is not a dataclass, so we create empty and set attrs
         class_type = JavaType.Class()
         class_type._flags_bit_map = 0
         class_type._fully_qualified_name = fqn
@@ -933,15 +703,33 @@ class PythonTypeMapping:
             return self._source_lines[node.lineno - 1][node.col_offset:]
         return ""
 
+    def _discover_venv(self, file_path: str) -> Optional[Path]:
+        """Discover the virtual environment for a file.
+
+        Walks up from the file's directory looking for a .venv directory.
+        """
+        path = Path(file_path)
+        if not path.is_absolute():
+            path = path.resolve()
+
+        current = path.parent
+        for _ in range(20):
+            venv = current / '.venv'
+            if venv.is_dir():
+                return venv
+
+            pyproject = current / 'pyproject.toml'
+            if pyproject.exists():
+                break
+
+            parent = current.parent
+            if parent == current:
+                break
+            current = parent
+
+        return None
+
     @staticmethod
     def module_to_fqn(module_path: str) -> str:
-        """Convert a Python module path to a fully qualified name.
-
-        Args:
-            module_path: The Python module path (e.g., "collections.abc").
-
-        Returns:
-            The fully qualified name suitable for MethodMatcher patterns.
-        """
-        # Python module paths are already in a format suitable for FQN
+        """Convert a Python module path to a fully qualified name."""
         return module_path

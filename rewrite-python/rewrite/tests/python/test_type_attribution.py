@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for Python type attribution using ty.
+"""Tests for Python type attribution using ty-types.
 
 These tests verify that the PythonTypeMapping class correctly:
-1. Starts and communicates with the ty LSP server
+1. Starts and communicates with the ty-types CLI
 2. Maps Python types to JavaType objects
 3. Returns proper JavaType.Method with declaring_type and parameter_types
 
-These tests require ty to be installed: `uv tool install ty`
+These tests require ty-types to be installed and on PATH.
 """
 
 import ast
@@ -32,77 +32,79 @@ from rewrite.java import JavaType
 
 # Import type mapping modules
 from rewrite.python.type_mapping import PythonTypeMapping, _TY_AVAILABLE
-from rewrite.python.ty_client import TyLspClient
+from rewrite.python.ty_client import TyTypesClient
 
 
-def _ty_cli_available() -> bool:
-    """Check if the ty CLI is available on PATH."""
+def _ty_types_cli_available() -> bool:
+    """Check if the ty-types CLI is available on PATH."""
     import shutil
-    return shutil.which('ty') is not None
+    return shutil.which('ty-types') is not None
 
 
-_TY_CLI_INSTALLED = _ty_cli_available()
+_TY_TYPES_CLI_INSTALLED = _ty_types_cli_available()
 
 
-# Mark for tests that require ty CLI to be installed
-requires_ty_cli = pytest.mark.skipif(
-    not _TY_CLI_INSTALLED,
-    reason="ty CLI is not installed (install with: uv tool install ty)"
+# Mark for tests that require ty-types CLI to be installed
+requires_ty_types_cli = pytest.mark.skipif(
+    not _TY_TYPES_CLI_INSTALLED,
+    reason="ty-types CLI is not installed (ensure ty-types binary is on PATH)"
 )
 
 
-@requires_ty_cli
-class TestTyLspClient:
-    """Tests for the TyLspClient singleton.
+@requires_ty_types_cli
+class TestTyTypesClient:
+    """Tests for the TyTypesClient singleton.
 
-    These tests require the ty CLI to be installed.
+    These tests require the ty-types CLI to be installed.
     """
 
     @pytest.fixture(autouse=True)
     def reset_client(self):
-        """Reset the TyLspClient singleton before each test."""
+        """Reset the TyTypesClient singleton before each test."""
         yield
-        TyLspClient.reset()
+        TyTypesClient.reset()
 
     def test_client_initializes(self):
-        """Test that TyLspClient starts the ty server."""
-        client = TyLspClient.get()
+        """Test that TyTypesClient starts the ty-types process."""
+        client = TyTypesClient.get()
         assert client is not None
-        assert client.is_available
+
+        # Create a temp dir as project root
+        with tempfile.TemporaryDirectory() as tmpdir:
+            assert client.initialize(tmpdir)
+            assert client.is_available
 
     def test_client_is_singleton(self):
-        """Test that TyLspClient returns the same instance."""
-        client1 = TyLspClient.get()
-        client2 = TyLspClient.get()
+        """Test that TyTypesClient returns the same instance."""
+        client1 = TyTypesClient.get()
+        client2 = TyTypesClient.get()
         assert client1 is client2
 
     def test_client_reset(self):
         """Test that reset creates a new instance."""
-        client1 = TyLspClient.get()
-        TyLspClient.reset()
-        client2 = TyLspClient.get()
+        client1 = TyTypesClient.get()
+        TyTypesClient.reset()
+        client2 = TyTypesClient.get()
         assert client1 is not client2
 
-    def test_hover_on_simple_variable(self):
-        """Test hover returns type for a simple variable."""
-        client = TyLspClient.get()
+    def test_get_types_on_simple_file(self):
+        """Test that get_types returns node types for a file."""
+        client = TyTypesClient.get()
 
-        # Create a temp file to get a valid URI
-        with tempfile.NamedTemporaryFile(suffix='.py', delete=False) as f:
-            f.write(b'x: int = 42\n')
-            uri = Path(f.name).as_uri()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Write a simple Python file
+            file_path = os.path.join(tmpdir, 'test.py')
+            with open(file_path, 'w') as f:
+                f.write('x: int = 42\n')
 
-        try:
-            client.open_document(uri, 'x: int = 42\n')
-            hover = client.get_hover(uri, 0, 0)  # Line 0, char 0 = start of 'x'
-            client.close_document(uri)
+            client.initialize(tmpdir)
+            result = client.get_types(file_path)
 
-            # ty should return type information for 'x'
-            assert hover is not None
-            # ty may return 'int' or 'Literal[42]' depending on version
-            assert 'int' in hover or 'Literal[42]' in hover
-        finally:
-            os.unlink(f.name)
+            assert result is not None
+            assert 'nodes' in result
+            assert 'types' in result
+            assert len(result['nodes']) > 0
+            assert len(result['types']) > 0
 
 
 class TestPythonTypeMappingPrimitives:
@@ -110,9 +112,9 @@ class TestPythonTypeMappingPrimitives:
 
     @pytest.fixture(autouse=True)
     def reset_client(self):
-        """Reset the TyLspClient singleton after each test."""
+        """Reset the TyTypesClient singleton after each test."""
         yield
-        TyLspClient.reset()
+        TyTypesClient.reset()
 
     def test_string_constant(self):
         """Test that string constants map to JavaType.Primitive.String."""
@@ -181,9 +183,9 @@ class TestMethodInvocationType:
 
     @pytest.fixture(autouse=True)
     def reset_client(self):
-        """Reset the TyLspClient singleton after each test."""
+        """Reset the TyTypesClient singleton after each test."""
         yield
-        TyLspClient.reset()
+        TyTypesClient.reset()
 
     def test_method_invocation_returns_method_type(self):
         """Test that a method call returns a JavaType.Method."""
@@ -241,7 +243,7 @@ class TestMethodInvocationType:
 
         assert result is not None
         assert result._parameter_types is not None
-        # ty returns all signature params (sep, maxsplit), not just the called args
+        # ty-types returns all signature params (sep, maxsplit), not just the called args
         assert len(result._parameter_types) >= 1
 
     def test_builtin_function_call(self):
@@ -290,7 +292,7 @@ class TestMethodInvocationType:
         assert result is not None
         assert result._name == 'replace'
         assert result._parameter_types is not None
-        # ty returns all signature params (old, new, count), not just the called args
+        # ty-types returns all signature params (old, new, count), not just the called args
         assert len(result._parameter_types) >= 2
 
     def test_method_with_mixed_arg_types(self):
@@ -315,9 +317,9 @@ class TestTypeAttributionWithImports:
 
     @pytest.fixture(autouse=True)
     def reset_client(self):
-        """Reset the TyLspClient singleton after each test."""
+        """Reset the TyTypesClient singleton after each test."""
         yield
-        TyLspClient.reset()
+        TyTypesClient.reset()
 
     def test_stdlib_function_call(self):
         """Test type attribution for stdlib function calls."""
@@ -374,9 +376,9 @@ class TestTypeAttributionEdgeCases:
 
     @pytest.fixture(autouse=True)
     def reset_client(self):
-        """Reset the TyLspClient singleton after each test."""
+        """Reset the TyTypesClient singleton after each test."""
         yield
-        TyLspClient.reset()
+        TyTypesClient.reset()
 
     def test_no_args(self):
         """Test method with no arguments."""
@@ -408,7 +410,7 @@ class TestTypeAttributionEdgeCases:
         assert result is not None
         assert result._name == 'print'
         assert result._parameter_types is not None
-        # ty returns all signature params for print (values, sep, end, file, flush)
+        # ty-types returns all signature params for print (values, sep, end, file, flush)
         assert len(result._parameter_types) >= 2
 
     def test_lambda_call(self):
@@ -456,3 +458,117 @@ class TestTypeAttributionEdgeCases:
         assert result._name == 'append'
         assert result._parameter_types is not None
         assert result._parameter_types[0] == JavaType.Primitive.Int
+
+
+class TestByteOffsetConversion:
+    """Tests for byte offset conversion utilities."""
+
+    def test_simple_ascii(self):
+        """Test byte offset conversion for simple ASCII source."""
+        source = 'x = 42\ny = 10\n'
+        mapping = PythonTypeMapping(source)
+
+        # Line 1, col 0 -> byte 0
+        assert mapping._pos_to_byte_offset(1, 0) == 0
+        # Line 1, col 4 -> byte 4
+        assert mapping._pos_to_byte_offset(1, 4) == 4
+        # Line 2, col 0 -> byte 7 (after 'x = 42\n')
+        assert mapping._pos_to_byte_offset(2, 0) == 7
+
+        mapping.close()
+
+    def test_multibyte_chars(self):
+        """Test byte offset conversion with UTF-8 multi-byte characters."""
+        source = 'x = "héllo"\n'  # é is 2 bytes in UTF-8
+        mapping = PythonTypeMapping(source)
+
+        # Line 1, col 0 -> byte 0
+        assert mapping._pos_to_byte_offset(1, 0) == 0
+        # Line 1, col 5 -> byte 5 (x, space, =, space, ")
+        assert mapping._pos_to_byte_offset(1, 5) == 5
+        # Line 1, col 6 -> byte 7 (h, é takes 2 bytes)
+        assert mapping._pos_to_byte_offset(1, 6) == 6
+        # After é: col 7 is the character after é, byte is 8
+        assert mapping._pos_to_byte_offset(1, 7) == 8
+
+        mapping.close()
+
+    def test_line_byte_offsets(self):
+        """Test line start byte offset computation."""
+        source = 'abc\ndef\n'
+        offsets = PythonTypeMapping._compute_line_byte_offsets(source)
+        # Line 1 starts at byte 0, line 2 at byte 4 (after 'abc\n')
+        assert offsets[0] == 0
+        assert offsets[1] == 4
+
+        mapping = PythonTypeMapping(source)
+        mapping.close()
+
+
+@requires_ty_types_cli
+class TestStructuredCallSignatures:
+    """Tests for structured call signature data from ty-types."""
+
+    def test_split_has_structured_signature(self):
+        """Test that str.split() returns structured parameter data."""
+        source = '"hello".split(",")'
+        tree = ast.parse(source)
+        mapping = PythonTypeMapping(source)
+
+        call = tree.body[0].value
+        result = mapping.method_invocation_type(call)
+
+        mapping.close()
+
+        assert result is not None
+        assert result._parameter_names is not None
+        assert 'sep' in result._parameter_names
+        assert result._parameter_types is not None
+        assert len(result._parameter_types) == len(result._parameter_names)
+
+    def test_structured_signature_has_correct_types(self):
+        """Test that structured signature resolves parameter types."""
+        source = '"hello".split(",")'
+        tree = ast.parse(source)
+        mapping = PythonTypeMapping(source)
+
+        call = tree.body[0].value
+
+        # Directly check the call signature index
+        sig = mapping._lookup_call_signature(call)
+
+        mapping.close()
+
+        assert sig is not None, "Expected structured callSignature data"
+        params = sig['parameters']
+        assert len(params) >= 1
+        assert params[0]['name'] == 'sep'
+        assert params[0]['typeId'] is not None
+        # sep has a default value
+        assert params[0]['hasDefault'] is True
+
+    def test_builtin_len_structured_signature(self):
+        """Test structured signature for builtin len()."""
+        source = 'len("hello")'
+        tree = ast.parse(source)
+        mapping = PythonTypeMapping(source)
+
+        call = tree.body[0].value
+        sig = mapping._lookup_call_signature(call)
+
+        mapping.close()
+
+        assert sig is not None, "Expected structured callSignature for len()"
+        params = sig['parameters']
+        assert len(params) >= 1
+
+    def test_no_signature_for_non_call(self):
+        """Test that non-call nodes don't have call signature data."""
+        source = 'x = 42'
+        tree = ast.parse(source)
+        mapping = PythonTypeMapping(source)
+
+        # There's no call node, so we shouldn't find any signatures
+        assert len(mapping._call_signature_index) == 0
+
+        mapping.close()
