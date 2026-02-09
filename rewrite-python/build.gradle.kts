@@ -13,6 +13,7 @@ plugins {
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
+    api(project(":rewrite-toml"))
 
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
