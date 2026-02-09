@@ -513,7 +513,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         indent = StringUtils.minCommonIndentLevel(literal.getPrefix().getIndent() + "a", style.getTabSize());
                     }
                 } else {
-                    indent += (style.getIndentSize() + style.getIndentSize());
+                    indent += style.getContinuationIndent();
                 }
                 if (currentIndent != indent) {
                     StringBuilder builder = new StringBuilder().append("\"\"\"");
