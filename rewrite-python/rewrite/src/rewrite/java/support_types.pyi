@@ -25,6 +25,58 @@ class J(Tree):
     def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]: ...
     def accept_java(self, v: 'JavaVisitor[P]', p: P) -> Optional['J']: ...
 
+@dataclass(frozen=True)
+class Comment(ABC):
+    _text: str
+    _suffix: str
+    _markers: Markers
+
+    def replace(self, **kwargs: Any) -> 'Comment': ...
+
+    @property
+    def multiline(self) -> bool: ...
+    @property
+    def text(self) -> str: ...
+    @property
+    def suffix(self) -> str: ...
+    @property
+    def markers(self) -> Markers: ...
+
+@dataclass(frozen=True)
+class TextComment(Comment):
+    _multiline: bool
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def multiline(self) -> bool: ...
+
+@dataclass(frozen=True)
+class Space:
+    EMPTY: ClassVar[Space]
+    SINGLE_SPACE: ClassVar[Space]
+
+    _comments: List[Comment]
+    _whitespace: Optional[str]
+
+    def replace(self, **kwargs: Any) -> 'Space': ...
+
+    @classmethod
+    def first_prefix(cls, trees: Optional[Iterable[J]]) -> Space: ...
+    @classmethod
+    def format_first_prefix(cls, trees: List[J2], prefix: Space) -> List[J2]: ...
+
+    @property
+    def comments(self) -> List[Comment]: ...
+    @property
+    def whitespace(self) -> str: ...
+    @property
+    def indent(self) -> str: ...
+    @property
+    def last_whitespace(self) -> str: ...
+
+    def is_empty(self) -> bool: ...
+
 class JavaSourceFile(J, SourceFile):
     pass
 
@@ -150,58 +202,6 @@ class JavaType(ABC):
     class Array:
         pass
 
-
-@dataclass(frozen=True)
-class Comment(ABC):
-    _text: str
-    _suffix: str
-    _markers: Markers
-
-    def replace(self, **kwargs: Any) -> 'Comment': ...
-
-    @property
-    def multiline(self) -> bool: ...
-    @property
-    def text(self) -> str: ...
-    @property
-    def suffix(self) -> str: ...
-    @property
-    def markers(self) -> Markers: ...
-
-@dataclass(frozen=True)
-class TextComment(Comment):
-    _multiline: bool
-
-    def replace(self, **kwargs: Any) -> Self: ...
-
-    @property
-    def multiline(self) -> bool: ...
-
-@dataclass(frozen=True)
-class Space:
-    EMPTY: ClassVar[Space]
-    SINGLE_SPACE: ClassVar[Space]
-
-    _comments: List[Comment]
-    _whitespace: Optional[str]
-
-    def replace(self, **kwargs: Any) -> 'Space': ...
-
-    @classmethod
-    def first_prefix(cls, trees: Optional[Iterable[J]]) -> Space: ...
-    @classmethod
-    def format_first_prefix(cls, trees: List[J2], prefix: Space) -> List[J2]: ...
-
-    @property
-    def comments(self) -> List[Comment]: ...
-    @property
-    def whitespace(self) -> str: ...
-    @property
-    def indent(self) -> str: ...
-    @property
-    def last_whitespace(self) -> str: ...
-
-    def is_empty(self) -> bool: ...
 
 @dataclass(frozen=True)
 class JRightPadded(Generic[T]):

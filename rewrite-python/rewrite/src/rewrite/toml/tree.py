@@ -16,13 +16,11 @@ if TYPE_CHECKING:
 P = TypeVar('P')
 
 
+@dataclass(frozen=True)
 class TomlComment:
-    __slots__ = ('_text', '_suffix', '_markers')
-
-    def __init__(self, text: str, suffix: str, markers: Markers):
-        self._text = text
-        self._suffix = suffix
-        self._markers = markers
+    _text: str
+    _suffix: str
+    _markers: Markers
 
     @property
     def text(self) -> str:
@@ -36,31 +34,17 @@ class TomlComment:
     def markers(self) -> Markers:
         return self._markers
 
-    def with_text(self, text: str) -> TomlComment:
-        if text is self._text:
-            return self
-        return TomlComment(text, self._suffix, self._markers)
-
-    def with_suffix(self, suffix: str) -> TomlComment:
-        if suffix is self._suffix:
-            return self
-        return TomlComment(self._text, suffix, self._markers)
-
-    def with_markers(self, markers: Markers) -> TomlComment:
-        if markers is self._markers:
-            return self
-        return TomlComment(self._text, self._suffix, markers)
+    def replace(self, **kwargs) -> TomlComment:
+        return replace_if_changed(self, **kwargs)
 
 
+@dataclass(frozen=True)
 class TomlSpace:
-    __slots__ = ('_comments', '_whitespace')
+    _comments: List[TomlComment]
+    _whitespace: Optional[str]
 
     EMPTY: ClassVar[TomlSpace]
     SINGLE_SPACE: ClassVar[TomlSpace]
-
-    def __init__(self, comments: List[TomlComment], whitespace: Optional[str]):
-        self._comments = comments
-        self._whitespace = whitespace
 
     @property
     def comments(self) -> List[TomlComment]:
@@ -70,35 +54,19 @@ class TomlSpace:
     def whitespace(self) -> str:
         return self._whitespace if self._whitespace is not None else ''
 
-    def with_comments(self, comments: List[TomlComment]) -> TomlSpace:
-        if comments is self._comments:
-            return self
-        return TomlSpace(comments, self._whitespace)
-
-    def with_whitespace(self, whitespace: str) -> TomlSpace:
-        if whitespace == self.whitespace:
-            return self
-        return TomlSpace(self._comments, whitespace if whitespace else None)
-
     def replace(self, **kwargs) -> TomlSpace:
-        comments = kwargs.get('comments', kwargs.get('_comments', self._comments))
-        whitespace = kwargs.get('whitespace', kwargs.get('_whitespace', self._whitespace))
-        if comments is self._comments and whitespace is self._whitespace:
-            return self
-        return TomlSpace(comments, whitespace)
+        return replace_if_changed(self, **kwargs)
 
 
 TomlSpace.EMPTY = TomlSpace([], None)
 TomlSpace.SINGLE_SPACE = TomlSpace([], ' ')
 
 
+@dataclass(frozen=True)
 class TomlRightPadded:
-    __slots__ = ('_element', '_after', '_markers')
-
-    def __init__(self, element: Any, after: TomlSpace, markers: Markers):
-        self._element = element
-        self._after = after
-        self._markers = markers
+    _element: Any
+    _after: TomlSpace
+    _markers: Markers
 
     @property
     def element(self) -> Any:
@@ -112,28 +80,8 @@ class TomlRightPadded:
     def markers(self) -> Markers:
         return self._markers
 
-    def with_element(self, element: Any) -> TomlRightPadded:
-        if element is self._element:
-            return self
-        return TomlRightPadded(element, self._after, self._markers)
-
-    def with_after(self, after: TomlSpace) -> TomlRightPadded:
-        if after is self._after:
-            return self
-        return TomlRightPadded(self._element, after, self._markers)
-
-    def with_markers(self, markers: Markers) -> TomlRightPadded:
-        if markers is self._markers:
-            return self
-        return TomlRightPadded(self._element, self._after, markers)
-
     def replace(self, **kwargs) -> TomlRightPadded:
-        element = kwargs.get('element', kwargs.get('_element', self._element))
-        after = kwargs.get('after', kwargs.get('_after', self._after))
-        markers = kwargs.get('markers', kwargs.get('_markers', self._markers))
-        if element is self._element and after is self._after and markers is self._markers:
-            return self
-        return TomlRightPadded(element, after, markers)
+        return replace_if_changed(self, **kwargs)
 
 
 class TomlPrimitive(Enum):

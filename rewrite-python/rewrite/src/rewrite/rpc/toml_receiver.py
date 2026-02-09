@@ -6,7 +6,6 @@ and type-specific visit methods handling only additional fields.
 """
 from pathlib import Path
 from typing import Any, Optional
-from uuid import UUID
 
 from rewrite import Markers
 from rewrite.utils import replace_if_changed
@@ -117,24 +116,24 @@ class TomlRpcReceiver:
         if space is None:
             return TomlSpace.EMPTY
 
-        comments = q.receive_list(space.comments)
+        comments = q.receive_list_defined(space.comments)
         whitespace = q.receive(space.whitespace)
 
-        if comments is space.comments and whitespace == space.whitespace:
+        if comments is space.comments and whitespace is space.whitespace:
             return space
 
-        return TomlSpace(comments if comments is not None else [], whitespace)
+        return space.replace(comments=comments, whitespace=whitespace)
 
     def _receive_comment(self, comment: TomlComment, q: RpcReceiveQueue) -> TomlComment:
         """Receive a TOML Comment object."""
         if comment is None:
-            text = q.receive(None)
-            suffix = q.receive(None)
+            text = q.receive_defined(None)
+            suffix = q.receive_defined(None)
             markers = q.receive_markers(None)
             return TomlComment(text or '', suffix or '', markers or Markers.EMPTY)
 
-        text = q.receive(comment.text)
-        suffix = q.receive(comment.suffix)
+        text = q.receive_defined(comment.text)
+        suffix = q.receive_defined(comment.suffix)
         markers = q.receive_markers(comment.markers)
         return TomlComment(text, suffix, markers)
 
@@ -144,13 +143,13 @@ class TomlRpcReceiver:
             return None
 
         element = q.receive(rp.element)
-        after = q.receive(rp.after)
+        after = q.receive_defined(rp.after)
         markers = q.receive_markers(rp.markers)
 
         if element is rp.element and after is rp.after and markers is rp.markers:
             return rp
 
-        return TomlRightPadded(element, after, markers)
+        return rp.replace(element=element, after=after, markers=markers)
 
 
 # ============================================================================
@@ -196,18 +195,20 @@ def _receive_toml_comment(comment, q: RpcReceiveQueue):
     return _get_receiver()._receive_comment(comment, q)
 
 
-def _receive_array_table(marker, q: RpcReceiveQueue):
+def _receive_array_table(marker: ArrayTable, q: RpcReceiveQueue) -> ArrayTable:
     """Codec for receiving ArrayTable marker."""
-    id_str = q.receive(str(marker.id) if marker else None)
-    new_id = UUID(id_str) if id_str else (marker.id if marker else None)
-    return ArrayTable(_id=new_id)
+    new_id = q.receive_defined(marker.id)
+    if new_id is marker.id:
+        return marker
+    return marker.replace(id=new_id)
 
 
-def _receive_inline_table(marker, q: RpcReceiveQueue):
+def _receive_inline_table(marker: InlineTable, q: RpcReceiveQueue) -> InlineTable:
     """Codec for receiving InlineTable marker."""
-    id_str = q.receive(str(marker.id) if marker else None)
-    new_id = UUID(id_str) if id_str else (marker.id if marker else None)
-    return InlineTable(_id=new_id)
+    new_id = q.receive_defined(marker.id)
+    if new_id is marker.id:
+        return marker
+    return marker.replace(id=new_id)
 
 
 def _send_array_table(marker, q):
