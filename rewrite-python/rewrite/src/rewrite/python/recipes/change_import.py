@@ -164,7 +164,7 @@ class ChangeImport(Recipe):
 
                 return result
 
-            def visit_multi_import(self, multi: MultiImport, p: ExecutionContext) -> J:
+            def visit_multi_import(self, multi: MultiImport, p: ExecutionContext) -> Optional[J]:  # ty: ignore[invalid-method-override]
                 if not self.has_old_import:
                     return multi
 
@@ -209,7 +209,7 @@ class ChangeImport(Recipe):
                             return self._get_alias_name(imp) or ""
                 return None
 
-            def _remove_name_from_import(self, multi: MultiImport, name_to_remove: str) -> J:
+            def _remove_name_from_import(self, multi: MultiImport, name_to_remove: str) -> Optional[J]:
                 """Remove a specific name from a 'from X import a, b, c' statement."""
                 from rewrite.java.support_types import JContainer, JRightPadded
                 from rewrite.java.tree import Space
@@ -234,7 +234,7 @@ class ChangeImport(Recipe):
                     )
                 return multi
 
-            def _remove_module_from_import(self, multi: MultiImport, module_to_remove: str) -> J:
+            def _remove_module_from_import(self, multi: MultiImport, module_to_remove: str) -> Optional[J]:
                 """Remove a module from an import statement."""
                 from rewrite.java.support_types import JContainer, JRightPadded
                 from rewrite.java.tree import Space

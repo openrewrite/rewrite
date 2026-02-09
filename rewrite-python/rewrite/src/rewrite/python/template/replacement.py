@@ -16,13 +16,12 @@
 
 from __future__ import annotations
 
-from typing import Dict, Optional, List, TYPE_CHECKING
+from typing import Dict, List, TYPE_CHECKING
 
-from rewrite.java import J, Space
+from rewrite.java import J
 from rewrite.java import tree as j
 from rewrite.java.support_types import JContainer
 from rewrite.python.visitor import PythonVisitor
-
 from .placeholder import from_placeholder
 
 if TYPE_CHECKING:
@@ -48,7 +47,7 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
         super().__init__()
         self._values = values
 
-    def visit_identifier(self, identifier: j.Identifier, p: None) -> J:
+    def visit_identifier(self, identifier: j.Identifier, p: None) -> J:  # ty: ignore[invalid-method-override]
         """
         Visit an identifier and replace if it's a placeholder.
 

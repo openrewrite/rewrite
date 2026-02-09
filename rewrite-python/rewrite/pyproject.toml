@@ -33,7 +33,7 @@ dev = [
     "ruff>=0.1.0",
 ]
 typing = [
-    "ty>=0.0.14",  # Required for type attribution with Java recipes
+    "ty>=0.0.15",  # Required for type attribution with Java recipes
 ]
 publish = [
     "build>=1.0.0",

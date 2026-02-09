@@ -59,15 +59,15 @@ def maybe_remove_import(visitor: PythonVisitor, options: RemoveImportOptions) ->
         # Remove: from os.path import join
         maybe_remove_import(visitor, RemoveImportOptions(module='os.path', name='join'))
     """
-    if not hasattr(visitor, 'after_visit') or visitor.after_visit is None:
-        visitor.after_visit = []
+    if visitor._after_visit is None:
+        visitor._after_visit = []
 
-    for v in visitor.after_visit:
+    for v in visitor._after_visit:
         if isinstance(v, RemoveImport):
             if v.module == options.module and v.name == options.name:
                 return  # Already registered
 
-    visitor.after_visit.append(RemoveImport(options))
+    visitor._after_visit.append(RemoveImport(options))
 
 
 class RemoveImport(PythonVisitor):
@@ -266,7 +266,7 @@ class RemoveImport(PythonVisitor):
         """Get the alias name from an Import, or None if no alias."""
         if imp.alias is None:
             return None
-        alias = imp.alias.element
+        alias = imp.alias.element  # ty: ignore[unresolved-attribute]
         if isinstance(alias, Identifier):
             return alias.simple_name
         return None

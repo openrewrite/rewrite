@@ -80,17 +80,17 @@ def maybe_add_import(visitor: PythonVisitor, options: AddImportOptions) -> None:
         maybe_add_import(visitor, AddImportOptions(module='typing', name='*'))
     """
     # Check for duplicate registrations
-    if not hasattr(visitor, 'after_visit') or visitor.after_visit is None:
-        visitor.after_visit = []
+    if visitor._after_visit is None:
+        visitor._after_visit = []
 
-    for v in visitor.after_visit:
+    for v in visitor._after_visit:
         if isinstance(v, AddImport):
             if (v.module == options.module and
                 v.name == options.name and
                 v.alias == options.alias):
                 return  # Already registered
 
-    visitor.after_visit.append(AddImport(options))
+    visitor._after_visit.append(AddImport(options))
 
 
 class AddImport(PythonVisitor):
@@ -199,7 +199,7 @@ class AddImport(PythonVisitor):
         """Get the alias name from an Import, or None if no alias."""
         if imp.alias is None:
             return None
-        alias = imp.alias.element
+        alias = imp.alias.element  # ty: ignore[unresolved-attribute]
         if isinstance(alias, Identifier):
             return alias.simple_name
         return None
@@ -284,8 +284,8 @@ class AddImport(PythonVisitor):
             # Add newline before next statement if needed
             next_stmt = new_statements[insert_idx + 1] if insert_idx + 1 < len(new_statements) else None
             if next_stmt and not next_stmt.prefix.whitespace.startswith('\n'):
-                new_statements[insert_idx + 1] = next_stmt.replace(
-                    prefix=Space.format('\n' + next_stmt.prefix.whitespace)
+                new_statements[insert_idx + 1] = next_stmt.replace(  # ty: ignore[unresolved-attribute]
+                    prefix=Space.format('\n' + next_stmt.prefix.whitespace)  # ty: ignore[unresolved-attribute]
                 )
 
         return cu.replace(statements=new_statements)
@@ -297,12 +297,12 @@ class AddImport(PythonVisitor):
             import_elem = self._create_import_element(self.module, self.alias)
             return MultiImport(
                 uuid4(),
-                Space.format('\n'),
+                Space.format('\n'),  # ty: ignore[unresolved-attribute]
                 Markers.EMPTY,
                 None,  # No 'from'
                 False,  # Not parenthesized
                 JContainer(
-                    Space.format(' '),
+                    Space.format(' '),  # ty: ignore[unresolved-attribute]
                     [self._pad_right(import_elem)],
                     Markers.EMPTY
                 )
@@ -313,12 +313,12 @@ class AddImport(PythonVisitor):
             import_elem = self._create_import_element(self.name, self.alias)
             return MultiImport(
                 uuid4(),
-                Space.format('\n'),
+                Space.format('\n'),  # ty: ignore[unresolved-attribute]
                 Markers.EMPTY,
-                JRightPadded(from_name, Space.format(' '), Markers.EMPTY),
+                JRightPadded(from_name, Space.format(' '), Markers.EMPTY),  # ty: ignore[unresolved-attribute]
                 False,  # Not parenthesized
                 JContainer(
-                    Space.format(' '),
+                    Space.format(' '),  # ty: ignore[unresolved-attribute]
                     [self._pad_right(import_elem)],
                     Markers.EMPTY
                 )
@@ -331,7 +331,7 @@ class AddImport(PythonVisitor):
         if alias:
             alias_ident = Identifier(
                 uuid4(),
-                Space.format(' '),
+                Space.format(' '),  # ty: ignore[unresolved-attribute]
                 Markers.EMPTY,
                 [],
                 alias,
@@ -339,7 +339,7 @@ class AddImport(PythonVisitor):
                 None
             )
             alias_left_padded = JLeftPadded(
-                Space.format(' '),
+                Space.format(' '),  # ty: ignore[unresolved-attribute]
                 alias_ident,
                 Markers.EMPTY
             )
@@ -385,6 +385,7 @@ class AddImport(PythonVisitor):
                 ),
                 None
             )
+        assert isinstance(result, FieldAccess)
         return result
 
     def _pad_right(self, elem) -> JRightPadded:

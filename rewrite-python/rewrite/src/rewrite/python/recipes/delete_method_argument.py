@@ -17,7 +17,7 @@ DeleteMethodArgument recipe for Python that delegates to Java's DeleteMethodArgu
 
 This recipe removes an argument from method invocations matching a pattern.
 """
-
+from dataclasses import field
 from typing import Any, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor, option
@@ -37,17 +37,17 @@ class DeleteMethodArgument(Recipe):
         )
     """
 
-    method_pattern: str = option(
+    method_pattern: str = field(metadata=option(
         display_name="Method pattern",
         description="A method pattern that matches method invocations to modify.",
         example="datetime.datetime fromtimestamp(..)"
-    )
+    ))
 
-    argument_index: int = option(
+    argument_index: int = field(metadata=option(
         display_name="Argument index",
         description="The zero-based index of the argument to remove.",
         example="1"
-    )
+    ))
 
     def __init__(
         self,
