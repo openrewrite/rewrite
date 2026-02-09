@@ -21,9 +21,9 @@ import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
 
-public class DockerExposedPorts extends DataTable<DockerExposedPorts.Row> {
+public class ExposedPorts extends DataTable<ExposedPorts.Row> {
 
-    public DockerExposedPorts(Recipe recipe) {
+    public ExposedPorts(Recipe recipe) {
         super(recipe,
                 "Docker exposed ports",
                 "Records all ports exposed in EXPOSE instructions in Dockerfiles.");

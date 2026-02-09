@@ -134,7 +134,7 @@ public class RewriteRpcProcess extends Thread {
                 // Ignore errors reading final stdout
             }
 
-            String message = "JavaScript RPC process shut down early with exit code " + exitCode;
+            String message = "RPC process shut down early with exit code " + exitCode;
             String errorOutput = accumulatedStderr.toString();
             if (!stdOutput.isEmpty()) {
                 message += "\nStandard output:\n  " + stdOutput.replace("\n", "\n  ");

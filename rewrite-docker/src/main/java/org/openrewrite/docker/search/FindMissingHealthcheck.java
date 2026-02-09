@@ -34,13 +34,13 @@ public class FindMissingHealthcheck extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find missing HEALTHCHECK";
+        return "Find missing `HEALTHCHECK`";
     }
 
     @Override
     public String getDescription() {
-        return "Finds Dockerfiles where the final stage is missing a HEALTHCHECK instruction. " +
-               "Health checks help container orchestrators determine if a container is healthy and ready to receive traffic.";
+        return "Finds Dockerfiles where the final stage is missing a `HEALTHCHECK` instruction (CIS Docker Benchmark 4.6). " +
+                "Health checks help container orchestrators determine if a container is healthy and ready to receive traffic.";
     }
 
     @Override
@@ -63,7 +63,7 @@ public class FindMissingHealthcheck extends Recipe {
 
                 if (!hasHealthcheck) {
                     // Mark the FROM instruction of the final stage
-                    f = f.withStages(ListUtils.mapLast(f.getStages(), stage ->
+                    return f.withStages(ListUtils.mapLast(f.getStages(), stage ->
                             stage.withFrom(SearchResult.found(stage.getFrom(), "Missing HEALTHCHECK instruction"))));
                 }
 
