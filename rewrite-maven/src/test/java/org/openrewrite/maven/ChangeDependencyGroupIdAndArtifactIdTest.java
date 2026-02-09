@@ -2510,6 +2510,117 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/6630#discussion")
+    @Test
+    void sharedPropertyInParentPomUsedByDifferentChildrenLeavesPropertyUnchanged() {
+        // When a property in the parent POM is used by dependencies in two different child modules,
+        // and only one child's dependency matches the change criteria, the property should NOT be updated.
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "io.swagger",
+            "swagger-annotations",
+            "io.swagger.core.v3",
+            null,
+            "2.2.x",
+            null,
+            null,
+            null
+          )),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1</version>
+                  <properties>
+                    <version.swagger>1.5.16</version.swagger>
+                  </properties>
+                  <modules>
+                    <module>child-a</module>
+                    <module>child-b</module>
+                  </modules>
+                </project>
+                """,
+              spec -> spec.path("pom.xml")
+            ),
+            mavenProject("child-a",
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>child-a</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent-project</artifactId>
+                      <version>1</version>
+                      <relativePath>../pom.xml</relativePath>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>io.swagger</groupId>
+                        <artifactId>swagger-annotations</artifactId>
+                        <version>${version.swagger}</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>child-a</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent-project</artifactId>
+                      <version>1</version>
+                      <relativePath>../pom.xml</relativePath>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>io.swagger.core.v3</groupId>
+                        <artifactId>swagger-annotations</artifactId>
+                        <version>2.2.42</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.path("child-a/pom.xml")
+              )
+            ),
+            mavenProject("child-b",
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>child-b</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent-project</artifactId>
+                      <version>1</version>
+                      <relativePath>../pom.xml</relativePath>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>io.swagger</groupId>
+                        <artifactId>swagger-models</artifactId>
+                        <version>${version.swagger}</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.path("child-b/pom.xml")
+              )
+            )
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5965")
     @Test
     void changeDependencyGroupIdAndArtifactIdForEjbType() {

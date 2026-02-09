@@ -33,6 +33,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.max;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Validated.required;
 import static org.openrewrite.Validated.test;
@@ -198,7 +199,14 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                         .collect(toSet());
                 relevantProperties = filterPropertiesWithOverlapInDependencies(relevantProperties, groupId, artifactId, requestedPom, resolvedPom, configuredToChangeManagedDependency);
                 relevantProperties = filterPropertiesWithOverlapInChildren(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency);
-                return filterPropertiesWithOverlapInParents(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency, ctx);
+                relevantProperties = filterPropertiesWithOverlapInParents(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency, ctx);
+                // Also check sibling modules for overlapping property usage
+                MavenResolutionResult current = result;
+                while (current.parentPomIsProjectPom()) {
+                    current = requireNonNull(current.getParent());
+                    relevantProperties = filterPropertiesWithOverlapInChildren(relevantProperties, groupId, artifactId, current, configuredToChangeManagedDependency);
+                }
+                return relevantProperties;
             }
 
             @SuppressWarnings("ConstantConditions")
@@ -407,7 +415,14 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                         .collect(toSet());
                 relevantProperties = filterPropertiesWithOverlapInDependencies(relevantProperties, groupId, artifactId, requestedPom, resolvedPom, configuredToChangeManagedDependency);
                 relevantProperties = filterPropertiesWithOverlapInChildren(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency);
-                return filterPropertiesWithOverlapInParents(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency, ctx);
+                relevantProperties = filterPropertiesWithOverlapInParents(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency, ctx);
+                // Also check sibling modules for overlapping property usage
+                MavenResolutionResult current = result;
+                while (current.parentPomIsProjectPom()) {
+                    current = requireNonNull(current.getParent());
+                    relevantProperties = filterPropertiesWithOverlapInChildren(relevantProperties, groupId, artifactId, current, configuredToChangeManagedDependency);
+                }
+                return relevantProperties;
             }
 
 
