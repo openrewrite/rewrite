@@ -67,7 +67,7 @@ from rewrite.python.tree import (
     VariableScope,
     YieldFrom,
 )
-from rewrite.python.support_types import PySpace, PyComment, PyContainer, PyRightPadded, PyLeftPadded
+from rewrite.python.support_types import PyComment
 from rewrite.python.visitor import PythonVisitor
 from rewrite.python.style import (
     SpacesStyle,
@@ -154,11 +154,7 @@ __all__ = [
     "VariableScope",
     "YieldFrom",
     # Support types
-    "PySpace",
     "PyComment",
-    "PyContainer",
-    "PyRightPadded",
-    "PyLeftPadded",
     # Visitor
     "PythonVisitor",
     # Style
