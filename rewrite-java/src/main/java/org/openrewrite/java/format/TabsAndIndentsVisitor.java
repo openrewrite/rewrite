@@ -498,7 +498,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                 SourcePositionService positionService = sourceFile.service(SourcePositionService.class);
                 String content = literal.getValueSource().substring(4);
-                int currentIndent = StringUtils.minCommonIndentLevel(content);
+                String finalContent = content; //TODO remove this assignment together with the next evaluate invocation as it is no longer needed.
+                int currentIndent = evaluate(() -> StringUtils.minCommonIndentLevel(finalContent, style.getTabSize()), StringUtils.minCommonIndentLevel(content));
                 content = StringUtils.trimIndent(content);
                 String[] lines = content.split("\n", -1);
                 int indent = getCursor().getNearestMessage("lastIndent", 0);
@@ -508,12 +509,14 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         indent += colSpan.getStartColumn() - colSpan.getIndent() - 1; // since position is index-1-based
                     }
                 } else {
-                    indent += 2;
+                    indent += style.getContinuationIndent();
                 }
                 if (currentIndent != indent) {
                     StringBuilder builder = new StringBuilder().append("\"\"\"");
                     for (String line : lines) {
-                        builder.append("\n").append(StringUtils.repeat(" ", indent)).append(line);
+                        builder.append('\n');
+                        shift(builder, indent);
+                        builder.append(line);
                     }
                     literal = literal.withValueSource(builder.toString()).withValue(content);
                 }
