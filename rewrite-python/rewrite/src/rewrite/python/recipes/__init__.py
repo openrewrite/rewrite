@@ -19,7 +19,6 @@ from rewrite.marketplace import Python
 
 from .remove_pass import RemovePass
 from .change_import import ChangeImport
-from .datetime_utc_now import DatetimeUtcNow
 
 # Java recipe wrappers (delegate to Java via RPC)
 from .change_type import ChangeType
