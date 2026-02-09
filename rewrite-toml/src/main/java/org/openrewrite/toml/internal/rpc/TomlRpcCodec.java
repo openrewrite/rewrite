@@ -13,29 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.toml.marker;
+package org.openrewrite.toml.internal.rpc;
 
-import lombok.Value;
-import lombok.With;
-import org.openrewrite.marker.Marker;
-import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.toml.tree.Toml;
+import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
 
-import java.util.UUID;
-
-@Value
-@With
-public class ArrayTable implements Marker, RpcCodec<ArrayTable> {
-    UUID id;
+public class TomlRpcCodec extends DynamicDispatchRpcCodec<Toml> {
+    private final TomlSender sender = new TomlSender();
+    private final TomlReceiver receiver = new TomlReceiver();
 
     @Override
-    public void rpcSend(ArrayTable after, RpcSendQueue q) {
-        q.getAndSend(after, Marker::getId);
+    public String getSourceFileType() {
+        return Toml.Document.class.getName();
     }
 
     @Override
-    public ArrayTable rpcReceive(ArrayTable before, RpcReceiveQueue q) {
-        return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+    public Class<? extends Toml> getType() {
+        return Toml.class;
+    }
+
+    @Override
+    public void rpcSend(Toml after, RpcSendQueue q) {
+        sender.visit(after, q);
+    }
+
+    @Override
+    public Toml rpcReceive(Toml before, RpcReceiveQueue q) {
+        return receiver.visitNonNull(before, q);
     }
 }

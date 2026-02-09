@@ -18,11 +18,24 @@ package org.openrewrite.toml.marker;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
 @Value
 @With
-public class InlineTable implements Marker {
+public class InlineTable implements Marker, RpcCodec<InlineTable> {
     UUID id;
+
+    @Override
+    public void rpcSend(InlineTable after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+    }
+
+    @Override
+    public InlineTable rpcReceive(InlineTable before, RpcReceiveQueue q) {
+        return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+    }
 }
