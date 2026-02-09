@@ -2672,8 +2672,8 @@ class TabsAndIndentsTest implements RewriteTest {
                           ""\";
                   private final String bar =
                           ""\"
-                          NO
-                          ""\";
+                                  NO
+                                  ""\";
               }
               """
           )
