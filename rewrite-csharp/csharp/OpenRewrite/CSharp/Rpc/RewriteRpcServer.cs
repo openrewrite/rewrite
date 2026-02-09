@@ -3,6 +3,7 @@ using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 using Rewrite.Core;
 using Rewrite.Core.Rpc;
+using Rewrite.Java;
 using StreamJsonRpc;
 using static Rewrite.Core.Rpc.RpcObjectData.ObjectState;
 
@@ -29,9 +30,6 @@ public class RewriteRpcServer
 
     public RewriteRpcServer()
     {
-        // Register the C# codec so RpcSendQueue can find it
-        RpcCodec.Register(new CSharpRpcCodec());
-
         // Register type name overrides for nagoya types that don't match Java names
         RpcSendQueue.RegisterJavaTypeName(typeof(NamespaceDeclaration),
             "org.openrewrite.csharp.tree.Cs$BlockScopeNamespaceDeclaration");
@@ -103,7 +101,8 @@ public class RewriteRpcServer
             batch => allData.AddRange(batch),
             _localRefs,
             request.SourceFileType,
-            false
+            false,
+            TreeCodec.Instance
         );
 
         sendQueue.Send(after, before, null);
@@ -150,6 +149,12 @@ public class RewriteRpcServer
         jsonRpc.StartListening();
 
         await jsonRpc.Completion.WaitAsync(cancellationToken);
+    }
+    private class TreeCodec : IRpcCodec
+    {
+        public static readonly TreeCodec Instance = new();
+        public void RpcSend(object after, RpcSendQueue q) => new CSharpSender().Visit((J)after, q);
+        public object RpcReceive(object before, RpcReceiveQueue q) => throw new NotImplementedException();
     }
 }
 

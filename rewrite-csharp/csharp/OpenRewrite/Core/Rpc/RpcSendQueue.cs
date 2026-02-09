@@ -22,11 +22,13 @@ public class RpcSendQueue
     private readonly Dictionary<object, int> _refs;
     private readonly string? _sourceFileType;
     private readonly bool _trace;
+    private readonly IRpcCodec? _treeCodec;
 
     private object? _before;
 
     public RpcSendQueue(int batchSize, Action<List<RpcObjectData>> drain,
-                        Dictionary<object, int> refs, string? sourceFileType, bool trace)
+                        Dictionary<object, int> refs, string? sourceFileType, bool trace,
+                        IRpcCodec? treeCodec = null)
     {
         _batchSize = batchSize;
         _batch = new List<RpcObjectData>(batchSize);
@@ -34,6 +36,18 @@ public class RpcSendQueue
         _refs = refs;
         _sourceFileType = sourceFileType;
         _trace = trace;
+        _treeCodec = treeCodec;
+    }
+
+    /// <summary>
+    /// Finds the codec for a value: self-codecs (like Markers) first,
+    /// then the injected tree codec for tree nodes.
+    /// </summary>
+    private IRpcCodec? GetCodecFor(object val)
+    {
+        if (val is IRpcCodec selfCodec) return selfCodec;
+        if (_treeCodec != null && GetValueType(val) != null) return _treeCodec;
+        return null;
     }
 
     public void Put(RpcObjectData rpcObjectData)
@@ -110,7 +124,7 @@ public class RpcSendQueue
         }
         else
         {
-            var afterCodec = RpcCodec.ForInstance(afterVal, _sourceFileType);
+            var afterCodec = GetCodecFor(afterVal);
             Put(new RpcObjectData
             {
                 State = CHANGE,
@@ -160,7 +174,7 @@ public class RpcSendQueue
                             ValueType = GetValueType(anAfter)
                         });
                         DoChange(anAfter, aBefore, onChangeRun,
-                                 RpcCodec.ForInstance(anAfter!, _sourceFileType));
+                                 GetCodecFor(anAfter!));
                     }
                 }
             }
@@ -211,7 +225,7 @@ public class RpcSendQueue
             _refs[afterVal] = refValue.Value;
         }
 
-        var afterCodec = RpcCodec.ForInstance(afterVal, _sourceFileType);
+        var afterCodec = GetCodecFor(afterVal);
         Put(new RpcObjectData
         {
             State = ADD,
