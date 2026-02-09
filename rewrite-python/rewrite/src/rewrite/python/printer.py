@@ -33,7 +33,7 @@ from rewrite.java import (
 )
 from rewrite.java.markers import Semicolon, TrailingComma, OmitParentheses
 from rewrite.python.support_types import Py
-from rewrite.python.markers import KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline
+from rewrite.python.markers import KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline, PrintSyntax, ExecSyntax
 
 if TYPE_CHECKING:
     from rewrite.python import tree as py
@@ -1556,23 +1556,54 @@ class PythonJavaPrinter:
         """Visit a method invocation (function call)."""
         self._before_syntax(method, p)
 
-        # Visit select with appropriate separator
-        if method.padding.select:
-            suffix = "" if not method.name.simple_name else "."
-            self._visit_right_padded(method.padding.select, p, suffix)
+        print_syntax = method.markers.find_first(PrintSyntax)
+        exec_syntax = method.markers.find_first(ExecSyntax)
 
-        # Visit type parameters
-        self._visit_container("<", method.padding.type_parameters, ",", ">", p)
+        if print_syntax is not None:
+            # Python 2 print statement: print args
+            p.append("print")
+            args = method.padding.arguments
+            if args:
+                padded_elements = args.padding.elements
+                if print_syntax.has_destination and len(padded_elements) >= 1:
+                    # print >> dest, args
+                    p.append(" >>")
+                    for i, elem in enumerate(padded_elements):
+                        self._visit_right_padded(elem, p, "," if i < len(padded_elements) - 1 else ("," if print_syntax.trailing_comma else ""))
+                else:
+                    for i, elem in enumerate(padded_elements):
+                        self._visit_right_padded(elem, p, "," if i < len(padded_elements) - 1 else ("," if print_syntax.trailing_comma else ""))
+        elif exec_syntax is not None:
+            # Python 2 exec statement: exec code [in globals[, locals]]
+            p.append("exec")
+            args = method.padding.arguments
+            if args:
+                padded_elements = args.padding.elements
+                for i, elem in enumerate(padded_elements):
+                    suffix = ""
+                    if i == 0 and len(padded_elements) > 1:
+                        suffix = "in"
+                    elif i > 0 and i < len(padded_elements) - 1:
+                        suffix = ","
+                    self._visit_right_padded(elem, p, suffix)
+        else:
+            # Visit select with appropriate separator
+            if method.padding.select:
+                suffix = "" if not method.name.simple_name else "."
+                self._visit_right_padded(method.padding.select, p, suffix)
 
-        self.visit(method.name, p)
+            # Visit type parameters
+            self._visit_container("<", method.padding.type_parameters, ",", ">", p)
 
-        # Visit arguments
-        before = "("
-        after = ")"
-        if method.markers.find_first(OmitParentheses):
-            before = ""
-            after = ""
-        self._visit_container(before, method.padding.arguments, ",", after, p)
+            self.visit(method.name, p)
+
+            # Visit arguments
+            before = "("
+            after = ")"
+            if method.markers.find_first(OmitParentheses):
+                before = ""
+                after = ""
+            self._visit_container(before, method.padding.arguments, ",", after, p)
 
         self._after_syntax(method, p)
         return method

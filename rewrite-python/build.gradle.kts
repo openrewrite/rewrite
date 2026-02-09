@@ -122,7 +122,41 @@ testing {
                 runtimeOnly("org.junit.platform:junit-platform-suite-engine")
             }
         }
+
+        register<JvmTestSuite>("py2CompatibilityTest") {
+            useJUnitJupiter()
+
+            dependencies {
+                implementation(project())
+                implementation(project(":rewrite-test"))
+                implementation(project(":rewrite-java-21"))
+                implementation("org.assertj:assertj-core:latest.release")
+                implementation("io.moderne:jsonrpc:latest.integration")
+            }
+
+            targets {
+                all {
+                    testTask.configure {
+                        // Include the main test classes so common tests run with the Python 2 parser
+                        testClassesDirs += sourceSets["test"].output.classesDirs
+                        classpath += sourceSets["test"].runtimeClasspath
+
+                        systemProperty("rewrite.python.version", "2")
+
+                        useJUnitPlatform {
+                            excludeTags("python3")
+                        }
+
+                        shouldRunAfter(tasks.named("test"))
+                    }
+                }
+            }
+        }
     }
+}
+
+tasks.named("check") {
+    dependsOn(testing.suites.named("py2CompatibilityTest"))
 }
 
 // Run tests serially to avoid issues with concurrent Python RPC processes
