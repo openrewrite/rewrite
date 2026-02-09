@@ -1,4 +1,5 @@
 using Rewrite.Core;
+using Rewrite.Core.Rpc;
 
 namespace Rewrite.Java;
 
@@ -50,7 +51,11 @@ public sealed record OmitParentheses(Guid Id) : Marker
 /// Used for positional records (record Person(string Name);) and other contexts
 /// where a semicolon replaces the expected body/braces.
 /// </summary>
-public sealed record Semicolon(Guid Id) : Marker;
+public sealed record Semicolon(Guid Id) : Marker, IRpcCodec<Semicolon>
+{
+    public void RpcSend(Semicolon after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public Semicolon RpcReceive(Semicolon before, RpcReceiveQueue q) => throw new NotImplementedException();
+}
 
 /// <summary>
 /// A package/namespace declaration.
@@ -142,13 +147,13 @@ public sealed record Return(
     Guid Id,
     Space Prefix,
     Markers Markers,
-    JLeftPadded<Expression>? Expression
+    Expression? Expression
 ) : J, Statement
 {
     public Return WithId(Guid id) => this with { Id = id };
     public Return WithPrefix(Space prefix) => this with { Prefix = prefix };
     public Return WithMarkers(Markers markers) => this with { Markers = markers };
-    public Return WithExpression(JLeftPadded<Expression>? expression) => this with { Expression = expression };
+    public Return WithExpression(Expression? expression) => this with { Expression = expression };
 
     Tree Tree.WithId(Guid id) => WithId(id);
 }
@@ -750,9 +755,7 @@ public sealed record Binary(
         RightShift,
         UnsignedRightShift,
         Or,
-        And,
-        PatternOr,    // C# pattern 'or' keyword (distinct from expression '||')
-        PatternAnd    // C# pattern 'and' keyword (distinct from expression '&&')
+        And
     }
 
     public Binary WithId(Guid id) => this with { Id = id };
@@ -787,8 +790,7 @@ public sealed record Unary(
         Positive,
         Negative,
         Complement,
-        Not,
-        PatternNot    // C# pattern 'not' keyword (distinct from expression '!')
+        Not
     }
 
     public Unary WithId(Guid id) => this with { Id = id };

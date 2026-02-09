@@ -558,11 +558,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
-    public Cs.ArrowExpressionClause visitArrowExpressionClause(Cs.ArrowExpressionClause arrowExpressionClause, P p) {
-        return (Cs.ArrowExpressionClause) super.visitArrowExpressionClause(arrowExpressionClause, p);
-    }
-
-    @Override
     public Cs.AccessorDeclaration visitAccessorDeclaration(Cs.AccessorDeclaration accessorDeclaration, P p) {
         return (Cs.AccessorDeclaration) super.visitAccessorDeclaration(accessorDeclaration, p);
     }

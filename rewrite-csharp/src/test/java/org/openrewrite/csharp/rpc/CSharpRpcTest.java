@@ -15,8 +15,8 @@
  */
 package org.openrewrite.csharp.rpc;
 
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -42,25 +42,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 class CSharpRpcTest {
 
-    private static CSharpRewriteRpc rpc;
+    private static boolean factoryConfigured = false;
+    private CSharpRewriteRpc rpc;
 
-    @BeforeAll
-    static void setUp() {
-        // Find the C# project path
-        Path csharpProjectPath = findCSharpProjectPath();
-
-        CSharpRewriteRpc.setFactory(
-                CSharpRewriteRpc.builder()
-                        .csharpProjectPath(csharpProjectPath)
-                        .traceRpcMessages(true)
-                        .log(Paths.get("/tmp/csharp-rpc.log"))
-        );
-
+    @BeforeEach
+    void setUp() {
+        if (!factoryConfigured) {
+            Path csharpProjectPath = findCSharpProjectPath();
+            CSharpRewriteRpc.setFactory(
+                    CSharpRewriteRpc.builder()
+                            .csharpProjectPath(csharpProjectPath)
+                            .traceRpcMessages(true)
+                            .log(Paths.get("/tmp/csharp-rpc.log"))
+            );
+            factoryConfigured = true;
+        }
         rpc = CSharpRewriteRpc.getOrStart();
     }
 
-    @AfterAll
-    static void tearDown() {
+    @AfterEach
+    void tearDown() {
         CSharpRewriteRpc.shutdownCurrent();
     }
 

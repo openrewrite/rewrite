@@ -63,6 +63,8 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             RefExpression re => VisitRefExpression(re, q),
             DeclarationExpression de => VisitDeclarationExpression(de, q),
             CsLambda csl => VisitCsLambda(csl, q),
+            IsPattern ip => VisitIsPattern(ip, q),
+            StatementExpression se => VisitStatementExpression(se, q),
             RelationalPattern rp => VisitRelationalPattern(rp, q),
             PropertyPattern pp => VisitPropertyPattern(pp, q),
             TypeParameterBound tpb => VisitTypeParameterBound(tpb, q),
@@ -86,7 +88,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             ErrorDirective ed => VisitErrorDirective(ed, q),
             WarningDirective wd => VisitWarningDirective(wd, q),
             LineDirective ld => VisitLineDirective(ld, q),
-            _ => throw new InvalidOperationException($"Unknown Cs tree type: {tree.GetType().Name}")
+            _ => throw new InvalidOperationException($"Unknown Cs tree type: {tree.GetType().FullName}")
         };
 
         Cursor = Cursor.Parent!;
@@ -168,8 +170,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(pd, _ => (object?)null);
         q.GetAndSend(pd, p => (J)p.Name, el => Visit(el, q));
         q.GetAndSend(pd, p => (J?)p.Accessors, el => Visit(el!, q));
-        // ExpressionBody: Java has ArrowExpressionClause tree, nagoya has LP<Expression>
-        q.GetAndSend(pd, p => (J?)p.ExpressionBody?.Element, el => Visit(el!, q));
+        q.GetAndSend(pd, p => p.ExpressionBody, lp => VisitLeftPadded(lp!, q));
         // Initializer: nagoya doesn't model this
         q.GetAndSend(pd, _ => (object?)null);
         return pd;
@@ -184,8 +185,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSendList(ad, a => a.Modifiers,
             m => (object)m.Id, m => Visit(m, q));
         q.GetAndSend(ad, a => a.Kind, lp => VisitLeftPadded(lp, q));
-        // ExpressionBody: Java has ArrowExpressionClause, nagoya has LP<Expression>
-        q.GetAndSend(ad, a => (J?)a.ExpressionBody?.Element, el => Visit(el!, q));
+        q.GetAndSend(ad, a => a.ExpressionBody, lp => VisitLeftPadded(lp!, q));
         q.GetAndSend(ad, a => (J?)a.Body, el => Visit(el!, q));
         return ad;
     }
@@ -233,6 +233,19 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     }
 
     // ---- RelationalPattern ----
+    public override J VisitIsPattern(IsPattern ip, RpcSendQueue q)
+    {
+        q.GetAndSend(ip, i => (J)i.Expression, el => Visit(el, q));
+        q.GetAndSend(ip, i => i.Pattern, lp => VisitLeftPadded(lp, q));
+        return ip;
+    }
+
+    public override J VisitStatementExpression(StatementExpression se, RpcSendQueue q)
+    {
+        q.GetAndSend(se, s => (J)s.Statement, el => Visit(el, q));
+        return se;
+    }
+
     public override J VisitRelationalPattern(RelationalPattern rp, RpcSendQueue q)
     {
         q.GetAndSend(rp, r => r.Operator, lp => VisitLeftPadded(lp, q));

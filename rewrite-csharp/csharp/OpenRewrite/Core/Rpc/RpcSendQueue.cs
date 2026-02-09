@@ -46,6 +46,7 @@ public class RpcSendQueue
     private IRpcCodec? GetCodecFor(object val)
     {
         if (val is IRpcCodec selfCodec) return selfCodec;
+        if (val is Marker) return null; // Markers without IRpcCodec are serialized as plain values
         if (_treeCodec != null && GetValueType(val) != null) return _treeCodec;
         return null;
     }

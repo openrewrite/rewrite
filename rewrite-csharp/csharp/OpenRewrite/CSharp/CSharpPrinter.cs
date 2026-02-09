@@ -443,6 +443,25 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         return tpb;
     }
 
+    public override J VisitIsPattern(IsPattern ip, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(ip, p);
+        Visit(ip.Expression, p);
+        VisitSpace(ip.Pattern.Before, p);
+        p.Append("is");
+        Visit(ip.Pattern.Element, p);
+        AfterSyntax(ip, p);
+        return ip;
+    }
+
+    public override J VisitStatementExpression(StatementExpression se, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(se, p);
+        Visit(se.Statement, p);
+        AfterSyntax(se, p);
+        return se;
+    }
+
     public override J VisitRelationalPattern(RelationalPattern rp, PrintOutputCapture<P> p)
     {
         BeforeSyntax(rp, p);
@@ -940,7 +959,16 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         p.Append(')');
 
         // Print body or semicolon (for interface methods without body)
-        if (method.Body != null)
+        if (method.Markers.FindFirst<ExpressionBodied>() != null && method.Body != null)
+        {
+            // Expression-bodied: print => expr;
+            VisitSpace(method.Body.Prefix, p);
+            p.Append("=>");
+            var returnStmt = (Return)method.Body.Statements[0].Element;
+            Visit(returnStmt.Expression, p);
+            p.Append(';');
+        }
+        else if (method.Body != null)
         {
             VisitBlock(method.Body, p);
         }
@@ -959,8 +987,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         p.Append("return");
         if (ret.Expression != null)
         {
-            VisitSpace(ret.Expression.Before, p);
-            Visit(ret.Expression.Element, p);
+            Visit(ret.Expression, p);
         }
         p.Append(';');
         AfterSyntax(ret, p);
@@ -1303,14 +1330,10 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         VisitSpace(binary.Operator.Before, p);
 
         var op = binary.Operator.Element;
-        // Pattern operators print as keywords, expression operators print as symbols
-        if (op == Binary.OperatorType.PatternAnd)
+        // In pattern context, And/Or print as keywords instead of &&/||
+        if (IsInPatternContext() && op is Binary.OperatorType.And or Binary.OperatorType.Or)
         {
-            p.Append("and");
-        }
-        else if (op == Binary.OperatorType.PatternOr)
-        {
-            p.Append("or");
+            p.Append(op == Binary.OperatorType.And ? "and" : "or");
         }
         else
         {
@@ -1320,6 +1343,18 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         Visit(binary.Right, p);
         AfterSyntax(binary, p);
         return binary;
+    }
+
+    private bool IsInPatternContext()
+    {
+        var c = Cursor;
+        while (c != null)
+        {
+            if (c.Value is IsPattern)
+                return true;
+            c = c.Parent;
+        }
+        return false;
     }
 
     public override J VisitTernary(Ternary ternary, PrintOutputCapture<P> p)
@@ -1647,8 +1682,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
         var op = unary.Operator.Element;
 
-        // Pattern 'not' operator prints as keyword
-        if (op == Unary.OperatorType.PatternNot)
+        // In pattern context, Not prints as 'not' keyword instead of '!'
+        if (op == Unary.OperatorType.Not && IsInPatternContext())
         {
             VisitSpace(unary.Operator.Before, p);
             p.Append("not");
@@ -1758,7 +1793,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(varDecl, p);
         VisitVariableDeclarationsContent(varDecl, p);
-        p.Append(';');
+        if (!IsInPatternContext())
+            p.Append(';');
         AfterSyntax(varDecl, p);
         return varDecl;
     }
