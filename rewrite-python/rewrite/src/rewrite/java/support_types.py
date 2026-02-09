@@ -3,7 +3,7 @@ from __future__ import annotations
 import weakref
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, Union, cast
 from uuid import UUID
 
@@ -143,36 +143,6 @@ class Space:
             return ""
         last_newline = whitespace.rfind('\n')
         return whitespace if last_newline == -1 else whitespace[last_newline + 1:]
-
-    class Location(Enum):
-        ANNOTATION_ARGUMENT_SUFFIX = auto()
-        ARRAY_INDEX_SUFFIX = auto()
-        BLOCK_END = auto()
-        BLOCK_PREFIX = auto()
-        BLOCK_STATEMENT_SUFFIX = auto()
-        CATCH_PREFIX = auto()
-        CLASS_DECLARATION_PREFIX = auto()
-        COMPILATION_UNIT_PREFIX = auto()
-        ELSE_PREFIX = auto()
-        EXTENDS = auto()
-        FOR_CONDITION_SUFFIX = auto()
-        FOR_UPDATE_SUFFIX = auto()
-        IMPLEMENTS = auto()
-        LANGUAGE_EXTENSION = auto()
-        METHOD_DECLARATION_PARAMETERS = auto()
-        METHOD_DECLARATION_PARAMETER_SUFFIX = auto()
-        METHOD_INVOCATION_ARGUMENTS = auto()
-        METHOD_INVOCATION_ARGUMENT_SUFFIX = auto()
-        METHOD_SELECT_SUFFIX = auto()
-        NEW_ARRAY_INITIALIZER_SUFFIX = auto()
-        NEW_CLASS_ARGUMENTS = auto()
-        NEW_CLASS_ARGUMENTS_SUFFIX = auto()
-        PARENTHESES_SUFFIX = auto()
-        RECORD_STATE_VECTOR_SUFFIX = auto()
-        THROWS = auto()
-        TRY_FINALLY = auto()
-        TYPE_PARAMETERS = auto()
-        TYPE_PARAMETER_SUFFIX = auto()
 
     EMPTY: ClassVar[Space]
     SINGLE_SPACE: ClassVar[Space]
@@ -368,25 +338,6 @@ class JRightPadded(Generic[T]):
     def __hash__(self) -> int:
         return hash(self._element)
 
-    class Location(Enum):
-        ANNOTATION_ARGUMENT = Space.Location.ANNOTATION_ARGUMENT_SUFFIX
-        ARRAY_INDEX = Space.Location.ARRAY_INDEX_SUFFIX
-        BLOCK_STATEMENT = Space.Location.BLOCK_STATEMENT_SUFFIX
-        FOR_CONDITION = Space.Location.FOR_CONDITION_SUFFIX
-        FOR_UPDATE = Space.Location.FOR_UPDATE_SUFFIX
-        LANGUAGE_EXTENSION = Space.Location.LANGUAGE_EXTENSION
-        METHOD_DECLARATION_PARAMETER = Space.Location.METHOD_DECLARATION_PARAMETER_SUFFIX
-        METHOD_INVOCATION_ARGUMENT = Space.Location.METHOD_INVOCATION_ARGUMENT_SUFFIX
-        METHOD_SELECT = Space.Location.METHOD_SELECT_SUFFIX
-        NEW_ARRAY_INITIALIZER = Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX
-        NEW_CLASS_ARGUMENTS = Space.Location.NEW_CLASS_ARGUMENTS_SUFFIX
-        PARENTHESES = Space.Location.PARENTHESES_SUFFIX
-        RECORD_STATE_VECTOR = Space.Location.RECORD_STATE_VECTOR_SUFFIX
-        TYPE_PARAMETER = Space.Location.TYPE_PARAMETER_SUFFIX
-
-        def __init__(self, after_location: Space.Location):
-            self.after_location = after_location
-
     def replace(self, **kwargs) -> 'JRightPadded[T]':
         """Replace fields on this JRightPadded, returning self if nothing changed."""
         return replace_if_changed(self, **kwargs)
@@ -496,19 +447,6 @@ class JContainer(Generic[J2]):
 
     def __hash__(self) -> int:
         return hash(tuple(self._elements))
-
-    class Location(Enum):
-        IMPLEMENTS = (Space.Location.IMPLEMENTS, JRightPadded.Location.LANGUAGE_EXTENSION)
-        LANGUAGE_EXTENSION = (Space.Location.LANGUAGE_EXTENSION, JRightPadded.Location.LANGUAGE_EXTENSION)
-        METHOD_DECLARATION_PARAMETERS = (Space.Location.METHOD_DECLARATION_PARAMETERS, JRightPadded.Location.METHOD_DECLARATION_PARAMETER)
-        METHOD_INVOCATION_ARGUMENTS = (Space.Location.METHOD_INVOCATION_ARGUMENTS, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT)
-        NEW_CLASS_ARGUMENTS = (Space.Location.NEW_CLASS_ARGUMENTS, JRightPadded.Location.NEW_CLASS_ARGUMENTS)
-        THROWS = (Space.Location.THROWS, JRightPadded.Location.LANGUAGE_EXTENSION)
-        TYPE_PARAMETERS = (Space.Location.TYPE_PARAMETERS, JRightPadded.Location.TYPE_PARAMETER)
-
-        def __init__(self, before_location: Space.Location, element_location: JRightPadded.Location):
-            self.before_location = before_location
-            self.element_location = element_location
 
     def replace(self, **kwargs) -> 'JContainer[J2]':
         """Replace fields on this JContainer, returning self if nothing changed."""
