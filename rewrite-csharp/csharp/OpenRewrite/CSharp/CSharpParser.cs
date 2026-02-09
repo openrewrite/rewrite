@@ -889,7 +889,17 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         }
         else if (node.ExpressionBody != null)
         {
-            // Expression-bodied methods not yet supported
+            // Expression-bodied method: syntactic sugar for a single return statement
+            var arrowPrefix = ExtractSpaceBefore(node.ExpressionBody.ArrowToken);
+            _cursor = node.ExpressionBody.ArrowToken.Span.End;
+            var expr = (Expression)Visit(node.ExpressionBody.Expression)!;
+
+            var returnStmt = new Return(Guid.NewGuid(), Space.Empty, Markers.Empty, expr);
+            body = new Block(Guid.NewGuid(), arrowPrefix, Markers.Empty,
+                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+                [new JRightPadded<Statement>(returnStmt, Space.Empty, Markers.Empty)],
+                Space.Empty);
+
             _cursor = node.SemicolonToken.Span.End;
         }
         else if (node.SemicolonToken != default)
@@ -901,7 +911,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         return new MethodDeclaration(
             Guid.NewGuid(),
             prefix,
-            Markers.Empty,
+            node.ExpressionBody != null
+                ? Markers.Build([new ExpressionBodied(Guid.NewGuid())])
+                : Markers.Empty,
             [],
             modifiers,
             null, // TypeParameters
@@ -1161,14 +1173,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var prefix = ExtractPrefix(node);
         _cursor = node.ReturnKeyword.Span.End;
 
-        JLeftPadded<Expression>? expression = null;
+        Expression? expression = null;
         if (node.Expression != null)
         {
-            var exprPrefix = ExtractPrefix(node.Expression);
             var expr = Visit(node.Expression);
             if (expr is Expression e)
             {
-                expression = new JLeftPadded<Expression>(exprPrefix, e);
+                expression = e;
             }
         }
 
@@ -1585,6 +1596,32 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     }
 
     /// <summary>
+    /// Parses an is-pattern expression (e.g., obj is string s, obj is null, obj is int n and > 0).
+    /// </summary>
+    public override J VisitIsPatternExpression(IsPatternExpressionSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+
+        // Visit the left-hand expression
+        var expression = (Expression)Visit(node.Expression)!;
+
+        // Space before "is" keyword
+        var isPrefix = ExtractSpaceBefore(node.IsKeyword);
+        _cursor = node.IsKeyword.Span.End;
+
+        // Visit the right-hand pattern
+        var pattern = Visit(node.Pattern)!;
+
+        return new IsPattern(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            expression,
+            new JLeftPadded<J>(isPrefix, (J)pattern)
+        );
+    }
+
+    /// <summary>
     /// Parses a declaration pattern (e.g., case int i:) as J.VariableDeclarations
     /// following Java's approach for type patterns.
     /// </summary>
@@ -1735,39 +1772,36 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
     public override J VisitBinaryPattern(BinaryPatternSyntax node)
     {
-        // Parse the left pattern
-        var left = Visit(node.Left);
-        if (left is not J leftJ)
-        {
-            throw new InvalidOperationException($"Expected J but got {left?.GetType().Name}");
-        }
+        // Parse the left pattern, wrapping non-Expression results in StatementExpression
+        var leftJ = Visit(node.Left)!;
+        Expression left = leftJ is Expression leftExpr
+            ? leftExpr
+            : new StatementExpression(Guid.NewGuid(), Space.Empty, Markers.Empty, (Statement)leftJ);
 
-        // Parse the operator - use Pattern variants for pattern-specific operators
+        // Parse the operator — reuse J.Binary with And/Or; printer detects pattern context
         var operatorPrefix = ExtractSpaceBefore(node.OperatorToken);
         var operatorType = node.OperatorToken.Kind() switch
         {
-            SyntaxKind.AndKeyword => Binary.OperatorType.PatternAnd,
-            SyntaxKind.OrKeyword => Binary.OperatorType.PatternOr,
+            SyntaxKind.AndKeyword => Binary.OperatorType.And,
+            SyntaxKind.OrKeyword => Binary.OperatorType.Or,
             _ => throw new InvalidOperationException($"Unsupported operator '{node.OperatorToken}' in BinaryPattern")
         };
         _cursor = node.OperatorToken.Span.End;
 
-        // Parse the right pattern
-        var right = Visit(node.Right);
-        if (right is not Expression rightExpr)
-        {
-            throw new InvalidOperationException($"Expected Expression but got {right?.GetType().Name}");
-        }
+        // Parse the right pattern, wrapping non-Expression results in StatementExpression
+        var rightJ = Visit(node.Right)!;
+        Expression right = rightJ is Expression rightExpr
+            ? rightExpr
+            : new StatementExpression(Guid.NewGuid(), Space.Empty, Markers.Empty, (Statement)rightJ);
 
-        // Use J.Binary with And/Or operator - printer will detect pattern context
         return new Binary(
             Guid.NewGuid(),
-            Space.Empty,  // Prefix handled by containing element
+            Space.Empty,
             Markers.Empty,
-            (Expression)leftJ,
+            left,
             new JLeftPadded<Binary.OperatorType>(operatorPrefix, operatorType),
-            rightExpr,
-            null  // type
+            right,
+            null
         );
     }
 
@@ -1787,12 +1821,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             throw new InvalidOperationException($"Expected Expression but got {pattern?.GetType().Name}");
         }
 
-        // Use J.Unary with PatternNot operator - prints as 'not' instead of '!'
+        // Use J.Unary with Not operator — printer detects pattern context for 'not' vs '!'
         return new Unary(
             Guid.NewGuid(),
             prefix,
             Markers.Empty,
-            new JLeftPadded<Unary.OperatorType>(operatorPrefix, Unary.OperatorType.PatternNot),
+            new JLeftPadded<Unary.OperatorType>(operatorPrefix, Unary.OperatorType.Not),
             patternExpr,
             null  // type
         );

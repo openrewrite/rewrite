@@ -24,6 +24,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             RefExpression re => VisitRefExpression(re, p),
             DeclarationExpression de => VisitDeclarationExpression(de, p),
             CsLambda csl => VisitCsLambda(csl, p),
+            IsPattern ip => VisitIsPattern(ip, p),
+            StatementExpression se => VisitStatementExpression(se, p),
             RelationalPattern rp => VisitRelationalPattern(rp, p),
             PropertyPattern pp => VisitPropertyPattern(pp, p),
             TypeParameterBound tpb => VisitTypeParameterBound(tpb, p),
@@ -134,6 +136,36 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     {
         Visit(de.Type, p);
         return de;
+    }
+
+    public virtual J VisitIsPattern(IsPattern isPattern, P p)
+    {
+        var expr = Visit(isPattern.Expression, p);
+        var pattern = Visit(isPattern.Pattern.Element, p);
+
+        if ((expr is Expression e && !ReferenceEquals(e, isPattern.Expression)) ||
+            (pattern is J pat && !ReferenceEquals(pat, isPattern.Pattern.Element)))
+        {
+            return isPattern with
+            {
+                Expression = expr is Expression newExpr ? newExpr : isPattern.Expression,
+                Pattern = pattern is J newPat
+                    ? isPattern.Pattern with { Element = newPat }
+                    : isPattern.Pattern
+            };
+        }
+
+        return isPattern;
+    }
+
+    public virtual J VisitStatementExpression(StatementExpression se, P p)
+    {
+        var stmt = Visit(se.Statement, p);
+        if (stmt is Statement s && !ReferenceEquals(s, se.Statement))
+        {
+            return se with { Statement = s };
+        }
+        return se;
     }
 
     public virtual J VisitCsLambda(CsLambda csLambda, P p)
