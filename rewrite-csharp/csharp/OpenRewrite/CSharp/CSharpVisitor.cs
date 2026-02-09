@@ -9,19 +9,11 @@ namespace Rewrite.CSharp;
 /// </summary>
 public class CSharpVisitor<P> : JavaVisitor<P>
 {
-    public override J? Visit(Tree? tree, P p)
+    protected override J? Accept(J tree, P p)
     {
-        if (tree == null) return null;
+        if (tree is not Cs) return base.Accept(tree, p);
 
-        // J types are handled by the base JavaVisitor
-        if (tree is not Cs)
-        {
-            return base.Visit(tree, p);
-        }
-
-        Cursor = new Cursor(Cursor, tree);
-
-        var result = tree switch
+        return tree switch
         {
             CompilationUnit cu => VisitCompilationUnit(cu, p),
             UsingDirective ud => VisitUsingDirective(ud, p),
@@ -57,25 +49,23 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             LineDirective ld => VisitLineDirective(ld, p),
             _ => throw new InvalidOperationException($"Unknown Cs tree type: {tree.GetType().Name}")
         };
-
-        Cursor = Cursor.Parent!;
-
-        return result;
     }
 
     public virtual J VisitCompilationUnit(CompilationUnit compilationUnit, P p)
     {
         var members = new List<Statement>();
+        bool changed = false;
         foreach (var member in compilationUnit.Members)
         {
             var visited = Visit(member, p);
             if (visited is Statement stmt)
             {
+                if (!ReferenceEquals(stmt, member)) changed = true;
                 members.Add(stmt);
             }
         }
 
-        return compilationUnit with { Members = members };
+        return changed ? compilationUnit with { Members = members } : compilationUnit;
     }
 
     public virtual J VisitUsingDirective(UsingDirective usingDirective, P p)

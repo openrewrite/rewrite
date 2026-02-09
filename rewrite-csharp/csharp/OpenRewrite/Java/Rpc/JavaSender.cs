@@ -82,7 +82,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         return result;
     }
 
-    public virtual J PreVisit(J j, RpcSendQueue q)
+    public new virtual J PreVisit(J j, RpcSendQueue q)
     {
         q.GetAndSend(j, (J t) => t.Id);
         q.GetAndSend(j, (J t) => t.Prefix, space => VisitSpace(GetValueNonNull<Space>(space), q));

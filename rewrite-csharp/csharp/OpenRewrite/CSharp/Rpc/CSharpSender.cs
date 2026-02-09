@@ -93,7 +93,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         return result;
     }
 
-    public J PreVisit(J j, RpcSendQueue q)
+    public new J PreVisit(J j, RpcSendQueue q)
     {
         q.GetAndSend(j, (J t) => t.Id);
         q.GetAndSend(j, (J t) => t.Prefix, space => VisitSpace(GetValueNonNull<Space>(space), q));

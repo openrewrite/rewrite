@@ -4,19 +4,13 @@ namespace Rewrite.Java;
 
 /// <summary>
 /// Base visitor for Java LST elements.
-/// Maintains a cursor for tracking the path from root to current node.
+/// Extends TreeVisitor to provide dispatch for J tree types via switch pattern matching.
 /// </summary>
-public class JavaVisitor<P>
+public class JavaVisitor<P> : TreeVisitor<J, P>
 {
-    public Cursor Cursor { get; set; } = new();
-
-    public virtual J? Visit(Tree? tree, P p)
+    protected override J? Accept(J tree, P p)
     {
-        if (tree == null) return null;
-
-        Cursor = new Cursor(Cursor, tree);
-
-        var result = tree switch
+        return tree switch
         {
             Annotation ann => VisitAnnotation(ann, p),
             Block blk => VisitBlock(blk, p),
@@ -64,10 +58,6 @@ public class JavaVisitor<P>
             Package pkg => VisitPackage(pkg, p),
             _ => throw new InvalidOperationException($"Unknown J tree type: {tree.GetType().Name}")
         };
-
-        Cursor = Cursor.Parent!;
-
-        return result;
     }
 
     public virtual J VisitAnnotation(Annotation annotation, P p)
@@ -86,15 +76,17 @@ public class JavaVisitor<P>
     public virtual J VisitBlock(Block block, P p)
     {
         var statements = new List<JRightPadded<Statement>>();
+        bool changed = false;
         foreach (var stmt in block.Statements)
         {
             var visited = Visit(stmt.Element, p);
             if (visited is Statement s)
             {
+                if (!ReferenceEquals(s, stmt.Element)) changed = true;
                 statements.Add(stmt with { Element = s });
             }
         }
-        return block with { Statements = statements };
+        return changed ? block with { Statements = statements } : block;
     }
 
     public virtual J VisitClassDeclaration(ClassDeclaration classDecl, P p)
