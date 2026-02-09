@@ -232,7 +232,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
             Stream<@Nullable String> cmd = Stream.of(
                     dotnetPath.toString(),
                     "run",
-                    "--project", projectPath.resolve("src/Rewrite.CSharp/Rewrite.CSharp.csproj").toString(),
+                    "--project", projectPath.resolve("OpenRewrite/OpenRewrite.csproj").toString(),
                     "--framework", "net9.0",
                     "--no-build",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
@@ -277,14 +277,14 @@ public class CSharpRewriteRpc extends RewriteRpc {
             };
 
             for (Path searchPath : searchPaths) {
-                if (searchPath != null && Files.exists(searchPath.resolve("src/Rewrite.CSharp/Rewrite.CSharp.csproj"))) {
+                if (searchPath != null && Files.exists(searchPath.resolve("OpenRewrite/OpenRewrite.csproj"))) {
                     return searchPath.toAbsolutePath().normalize();
                 }
             }
 
             throw new IllegalStateException(
                     "Could not find C# Rewrite project. Please set csharpProjectPath() on the builder. " +
-                    "Expected to find src/Rewrite.CSharp/Rewrite.CSharp.csproj in the project directory.");
+                    "Expected to find OpenRewrite/OpenRewrite.csproj in the project directory.");
         }
     }
 }

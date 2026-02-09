@@ -75,7 +75,7 @@ class CSharpRpcTest {
         };
 
         for (Path searchPath : searchPaths) {
-            if (searchPath.resolve("src/Rewrite.CSharp/Rewrite.CSharp.csproj").toFile().exists()) {
+            if (searchPath.resolve("OpenRewrite/OpenRewrite.csproj").toFile().exists()) {
                 return searchPath.toAbsolutePath().normalize();
             }
         }
