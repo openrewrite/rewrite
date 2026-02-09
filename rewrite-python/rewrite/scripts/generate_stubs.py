@@ -476,19 +476,44 @@ def extract_typevars(tree: ast.Module) -> List[str]:
     return typevars
 
 
+def _is_type_checking_guard(node: ast.If) -> bool:
+    """Check if an if-statement is `if TYPE_CHECKING:`."""
+    test = node.test
+    if isinstance(test, ast.Name) and test.id == 'TYPE_CHECKING':
+        return True
+    if isinstance(test, ast.Attribute) and isinstance(test.value, ast.Name):
+        return test.attr == 'TYPE_CHECKING'
+    return False
+
+
 def extract_imports(tree: ast.Module, current_package: str = "") -> List[Tuple[str, bool]]:
     """
     Extract import statements from the module.
 
-    Returns list of (import_statement, should_reexport) tuples.
+    Only considers module-level imports and imports inside `if TYPE_CHECKING:` blocks.
+    Returns list of (import_statement, should_reexport) tuples, deduplicated.
     Sibling module imports (same package) should be re-exported.
     """
     imports = []
-    for node in ast.walk(tree):
+    seen = set()
+
+    # Collect module-level import nodes, including those inside TYPE_CHECKING guards
+    import_nodes = []
+    for node in tree.body:
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            import_nodes.append(node)
+        elif isinstance(node, ast.If) and _is_type_checking_guard(node):
+            for child in node.body:
+                if isinstance(child, (ast.Import, ast.ImportFrom)):
+                    import_nodes.append(child)
+
+    for node in import_nodes:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 imp = f"import {alias.name}" + (f" as {alias.asname}" if alias.asname else "")
-                imports.append((imp, False))
+                if imp not in seen:
+                    seen.add(imp)
+                    imports.append((imp, False))
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
             level = "." * node.level
@@ -515,7 +540,10 @@ def extract_imports(tree: ast.Module, current_package: str = "") -> List[Tuple[s
                 )
 
             if names:  # Skip if only star import
-                imports.append((f"from {level}{module} import {names}", is_sibling))
+                imp = f"from {level}{module} import {names}"
+                if imp not in seen:
+                    seen.add(imp)
+                    imports.append((imp, is_sibling))
     return imports
 
 
@@ -796,17 +824,23 @@ def generate_stub_content(source_path: Path) -> str:
             stub_lines.append(")")
             stub_lines.append("")
 
-    # Find all ABC-like base classes at module level (before dataclasses)
+    # Process all top-level classes in order, handling each type appropriately
     for node in tree.body:
-        if isinstance(node, ast.ClassDef) and is_abc_base_class(node):
+        if not isinstance(node, ast.ClassDef):
+            continue
+
+        if is_abc_base_class(node):
             class_lines = generate_abc_stub_class(node)
             stub_lines.extend(class_lines)
             stub_lines.append("")
-
-    # Find all frozen dataclasses at module level
-    for node in tree.body:
-        if isinstance(node, ast.ClassDef) and is_frozen_dataclass(node):
+        elif is_frozen_dataclass(node):
             class_lines = generate_stub_class(node)
+            stub_lines.extend(class_lines)
+            stub_lines.append("")
+        elif not is_dataclass(node):
+            # Handle Enums, simple mixin classes, and other non-dataclass classes
+            # These are needed in stubs when referenced as base classes
+            class_lines = generate_nested_class_stub(node)
             stub_lines.extend(class_lines)
             stub_lines.append("")
 

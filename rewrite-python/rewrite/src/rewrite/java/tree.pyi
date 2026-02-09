@@ -7,9 +7,9 @@ from typing_extensions import Self
 from uuid import UUID
 import weakref
 
+from rewrite.utils import replace_if_changed
 from enum import Enum
 from pathlib import Path
-from . import extensions as extensions
 from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Markers, Cursor, PrintOutputCapture, PrinterFactory
 
 from .support_types import (

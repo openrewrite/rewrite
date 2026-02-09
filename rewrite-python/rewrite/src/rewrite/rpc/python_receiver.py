@@ -1527,3 +1527,9 @@ _register_java_type_codecs()  # JavaType.Primitive handling
 _register_core_marker_codecs()
 _register_style_codecs()
 _register_parse_error_codec()  # ParseError handling
+
+
+def _register_toml_codecs():
+    from rewrite.rpc import toml_receiver  # noqa: F401 - triggers codec registration
+
+_register_toml_codecs()
