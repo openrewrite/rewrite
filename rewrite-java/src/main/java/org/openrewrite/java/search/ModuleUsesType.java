@@ -98,14 +98,12 @@ public class ModuleUsesType extends ScanningRecipe<ModuleUsesType.Accumulator> {
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-                if (sourceFile.getMarkers().findFirst(SearchResult.class).isPresent()) {
-                    return tree;
-                }
-                return sourceFile.getMarkers().findFirst(JavaProject.class)
+                if (sourceFile.getMarkers().findFirst(JavaProject.class)
                         .filter(acc.modulesUsingType::contains)
-                        .<SourceFile>map(jp -> sourceFile.withMarkers(sourceFile.getMarkers()
-                                .add(new SearchResult(Tree.randomId(), "Module uses type: " + fullyQualifiedTypeName))))
-                        .orElse(sourceFile);
+                        .isPresent()) {
+                    return SearchResult.mergingFound(sourceFile, "Module uses type: " + fullyQualifiedTypeName);
+                }
+                return sourceFile;
             }
         };
     }

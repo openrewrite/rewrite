@@ -95,14 +95,12 @@ public class ModuleContainsFile extends ScanningRecipe<ModuleContainsFile.Accumu
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-                if (sourceFile.getMarkers().findFirst(SearchResult.class).isPresent()) {
-                    return tree;
-                }
-                return sourceFile.getMarkers().findFirst(JavaProject.class)
+                if (sourceFile.getMarkers().findFirst(JavaProject.class)
                         .filter(acc.modulesWithMatchingFile::contains)
-                        .<SourceFile>map(jp -> sourceFile.withMarkers(sourceFile.getMarkers()
-                                .add(new SearchResult(Tree.randomId(), "Module contains file matching pattern: " + filePattern))))
-                        .orElse(sourceFile);
+                        .isPresent()) {
+                    return SearchResult.mergingFound(sourceFile, "Module contains file matching pattern: " + filePattern);
+                }
+                return sourceFile;
             }
         };
     }
