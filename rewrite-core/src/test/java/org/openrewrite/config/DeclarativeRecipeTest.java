@@ -486,6 +486,187 @@ class DeclarativeRecipeTest implements RewriteTest {
     }
 
     @Test
+    void nestedScanningRecipeInOrPrecondition() {
+        // Issue #6698: OR preconditions with nested ScanningRecipes fail with NPE
+        // because getInitialValue() only registers direct preconditions, not nested ones
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.AddJacksonAnnotations
+              description: Test.
+              preconditions:
+                - org.sample.ProjectUsesJackson
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.ProjectUsesJackson
+              description: OR precondition - matches if ANY condition is true
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/jackson-config.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/jackson.properties"
+              """,
+            "org.sample.AddJacksonAnnotations"
+          ),
+          text("config", spec -> spec.path("jackson-config.json")),
+          text("original", "changed")
+        );
+    }
+
+    @Test
+    void nestedScanningRecipeInOrPreconditionNotMet() {
+        // Issue #6698: Verify OR precondition correctly doesn't apply when no condition matches
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.AddJacksonAnnotations
+              description: Test.
+              preconditions:
+                - org.sample.ProjectUsesJackson
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.ProjectUsesJackson
+              description: OR precondition - matches if ANY condition is true
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/jackson-config.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/jackson.properties"
+              """,
+            "org.sample.AddJacksonAnnotations"
+          ),
+          text("config", spec -> spec.path("some-other-file.txt")),
+          text("original")
+        );
+    }
+
+    @Test
+    void sameScanningRecipeWithDifferentParametersInOrPrecondition() {
+        // Issue #6698: Ensure same scanning recipe type with different parameters
+        // is handled correctly (each instance needs its own accumulator)
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.MultiFileCheck
+              description: Test.
+              preconditions:
+                - org.sample.HasAnyConfigFile
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.HasAnyConfigFile
+              description: OR precondition with same recipe type but different params
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/config-a.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/config-b.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/config-c.json"
+              """,
+            "org.sample.MultiFileCheck"
+          ),
+          // Only config-b.json exists, so should still match due to OR logic
+          text("config b", spec -> spec.path("config-b.json")),
+          text("original", "changed")
+        );
+    }
+
+    @Test
+    void deeplyNestedOrPreconditionsWithScanningRecipe() {
+        // Issue #6698: Test deeper nesting of OR preconditions with scanning recipes
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.TopLevel
+              description: Test.
+              preconditions:
+                - org.sample.MiddleLevel
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.MiddleLevel
+              description: Middle level precondition
+              recipeList:
+                - org.sample.BottomLevel
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/middle.json"
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.BottomLevel
+              description: Bottom level with scanning recipes
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/bottom-a.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/bottom-b.json"
+              """,
+            "org.sample.TopLevel"
+          ),
+          // Only bottom-b.json exists, which should match through the nested OR chain
+          text("bottom b config", spec -> spec.path("bottom-b.json")),
+          text("original", "changed")
+        );
+    }
+
+    @Test
+    void multipleNestedOrPreconditionsWithSameScanningRecipe() {
+        // Issue #6698: Multiple nested OR preconditions where the same scanning recipe
+        // appears in different branches - ensure each gets its own accumulator
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.TopLevel
+              description: Test.
+              preconditions:
+                - org.sample.BranchA
+                - org.sample.BranchB
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.BranchA
+              description: First branch
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/branch-a-1.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/shared.json"
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.BranchB
+              description: Second branch
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/branch-b-1.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/shared.json"
+              """,
+            "org.sample.TopLevel"
+          ),
+          // shared.json exists, which should satisfy both branches (AND of two ORs)
+          text("shared config", spec -> spec.path("shared.json")),
+          text("original", "changed")
+        );
+    }
+
+    @Test
     void deeperCyclicReferencesDetectedAsCycle() {
         // Test that deeper cyclic references (A -> B -> C -> A) are detected as a cycle
         DeclarativeRecipe recipeA = new DeclarativeRecipe(
