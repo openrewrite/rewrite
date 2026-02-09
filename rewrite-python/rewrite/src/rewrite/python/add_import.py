@@ -199,7 +199,7 @@ class AddImport(PythonVisitor):
         """Get the alias name from an Import, or None if no alias."""
         if imp.alias is None:
             return None
-        alias = imp.alias.element  # ty: ignore[unresolved-attribute]
+        alias = imp.alias
         if isinstance(alias, Identifier):
             return alias.simple_name
         return None
