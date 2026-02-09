@@ -19,6 +19,7 @@ from rewrite.marketplace import Python
 
 from .remove_pass import RemovePass
 from .change_import import ChangeImport
+from .datetime_utc_now import DatetimeUtcNow
 
 # Java recipe wrappers (delegate to Java via RPC)
 from .change_type import ChangeType
@@ -33,11 +34,13 @@ from .add_literal_method_argument import AddLiteralMethodArgument
 # Note: Also defined in remove_pass.py to avoid circular imports
 Cleanup = [*Python, CategoryDescriptor(display_name="Cleanup")]
 Imports = [*Python, CategoryDescriptor(display_name="Imports")]
+Migration = [*Python, CategoryDescriptor(display_name="Migration")]
 
 __all__ = [
     # Native Python recipes
     "RemovePass",
     "ChangeImport",
+    "DatetimeUtcNow",
     # Java recipe wrappers
     "ChangeType",
     "ChangeMethodName",
@@ -49,4 +52,5 @@ __all__ = [
     "Python",
     "Cleanup",
     "Imports",
+    "Migration",
 ]
