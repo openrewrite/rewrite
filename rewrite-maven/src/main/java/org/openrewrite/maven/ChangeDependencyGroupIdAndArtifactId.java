@@ -186,8 +186,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 boolean isAnnotationProcessorPath = isAnnotationProcessorPathTag(oldGroupId, oldArtifactId);
                 boolean deferUpdate = false;
                 if (isOldDependencyTag || isPluginDependency || isAnnotationProcessorPath) {
-                    // If newVersion is specified but current version uses an implicitly defined property,
-                    // skip the entire change to avoid breaking the intentional version relationship
                     if (newVersion != null) {
                         String currentVersionValue = t.getChildValue("version").orElse(null);
                         if (isImplicitlyDefinedVersionProperty(currentVersionValue)) {
