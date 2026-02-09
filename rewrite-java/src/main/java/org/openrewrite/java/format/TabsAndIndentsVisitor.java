@@ -508,13 +508,14 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         indent += colSpan.getStartColumn() - colSpan.getIndent() - 1; // since position is index-1-based
                     }
                 } else {
-                    indent += 2;
+                    indent += style.getIndentSize() + style.getIndentSize();
                 }
                 if (currentIndent != indent) {
                     StringBuilder builder = new StringBuilder().append("\"\"\"");
                     for (String line : lines) {
-                        builder.append("\n").append(StringUtils.repeat(" ", indent)).append(line);
+                        builder.append("\n").append(line);
                     }
+                    shift(builder, indent);
                     literal = literal.withValueSource(builder.toString()).withValue(content);
                 }
             }
