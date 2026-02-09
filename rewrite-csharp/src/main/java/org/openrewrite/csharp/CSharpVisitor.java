@@ -421,7 +421,7 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         propertyDeclaration = propertyDeclaration.getPadding().withInterfaceSpecifier(visitRightPadded(propertyDeclaration.getPadding().getInterfaceSpecifier(), CsRightPadded.Location.PROPERTY_DECLARATION_INTERFACE_SPECIFIER, p));
         propertyDeclaration = propertyDeclaration.withName(visitAndCast(propertyDeclaration.getName(), p));
         propertyDeclaration = propertyDeclaration.withAccessors(visitAndCast(propertyDeclaration.getAccessors(), p));
-        propertyDeclaration = propertyDeclaration.withExpressionBody(visitAndCast(propertyDeclaration.getExpressionBody(), p));
+        propertyDeclaration = propertyDeclaration.getPadding().withExpressionBody(visitLeftPadded(propertyDeclaration.getPadding().getExpressionBody(), CsLeftPadded.Location.PROPERTY_DECLARATION_EXPRESSION_BODY, p));
         return propertyDeclaration.getPadding().withInitializer(visitLeftPadded(propertyDeclaration.getPadding().getInitializer(), CsLeftPadded.Location.PROPERTY_DECLARATION_INITIALIZER, p));
     }
 
@@ -1305,18 +1305,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         return catch_.withBody(visitAndCast(catch_.getBody(), p));
     }
 
-    public J visitArrowExpressionClause(Cs.ArrowExpressionClause arrowExpressionClause, P p) {
-        arrowExpressionClause = arrowExpressionClause.withPrefix(visitSpace(arrowExpressionClause.getPrefix(), CsSpace.Location.ARROW_EXPRESSION_CLAUSE_PREFIX, p));
-        Statement tempStatement = (Statement) visitStatement(arrowExpressionClause, p);
-        if (!(tempStatement instanceof Cs.ArrowExpressionClause))
-        {
-            return tempStatement;
-        }
-        arrowExpressionClause = (Cs.ArrowExpressionClause) tempStatement;
-        arrowExpressionClause = arrowExpressionClause.withMarkers(visitMarkers(arrowExpressionClause.getMarkers(), p));
-        return arrowExpressionClause.getPadding().withExpression(visitRightPadded(arrowExpressionClause.getPadding().getExpression(), CsRightPadded.Location.ARROW_EXPRESSION_CLAUSE_EXPRESSION, p));
-    }
-
     public J visitAccessorDeclaration(Cs.AccessorDeclaration accessorDeclaration, P p) {
         accessorDeclaration = accessorDeclaration.withPrefix(visitSpace(accessorDeclaration.getPrefix(), CsSpace.Location.ACCESSOR_DECLARATION_PREFIX, p));
         Statement tempStatement = (Statement) visitStatement(accessorDeclaration, p);
@@ -1329,7 +1317,7 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         accessorDeclaration = accessorDeclaration.withAttributes(ListUtils.map(accessorDeclaration.getAttributes(), el -> (Cs.AttributeList)visit(el, p)));
         accessorDeclaration = accessorDeclaration.withModifiers(ListUtils.map(accessorDeclaration.getModifiers(), el -> (J.Modifier)visit(el, p)));
         accessorDeclaration = accessorDeclaration.getPadding().withKind(visitLeftPadded(accessorDeclaration.getPadding().getKind(), CsLeftPadded.Location.ACCESSOR_DECLARATION_KIND, p));
-        accessorDeclaration = accessorDeclaration.withExpressionBody(visitAndCast(accessorDeclaration.getExpressionBody(), p));
+        accessorDeclaration = accessorDeclaration.getPadding().withExpressionBody(visitLeftPadded(accessorDeclaration.getPadding().getExpressionBody(), CsLeftPadded.Location.ACCESSOR_DECLARATION_EXPRESSION_BODY, p));
         return accessorDeclaration.withBody(visitAndCast(accessorDeclaration.getBody(), p));
     }
 

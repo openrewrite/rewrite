@@ -168,7 +168,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     {
         if (ret.Expression != null)
         {
-            Visit(ret.Expression.Element, p);
+            Visit(ret.Expression, p);
         }
         return ret;
     }

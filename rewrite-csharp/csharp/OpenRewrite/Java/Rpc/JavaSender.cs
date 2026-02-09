@@ -411,7 +411,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
     public override J VisitReturn(Return aReturn, RpcSendQueue q)
     {
-        q.GetAndSend(aReturn, r => r.Expression, expr => VisitLeftPadded(expr, q));
+        q.GetAndSend(aReturn, r => (J?)r.Expression, expr => Visit(expr!, q));
         return aReturn;
     }
 

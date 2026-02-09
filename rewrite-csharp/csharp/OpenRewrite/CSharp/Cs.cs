@@ -1,4 +1,5 @@
 using Rewrite.Core;
+using Rewrite.Core.Rpc;
 using Rewrite.Java;
 
 namespace Rewrite.CSharp;
@@ -61,7 +62,7 @@ public sealed record PropertyDeclaration(
     TypeTree TypeExpression,
     Identifier Name,
     Block? Accessors,                        // null when expression body is used
-    JLeftPadded<Expression>? ExpressionBody  // for => expr;
+    JLeftPadded<Expression>? ExpressionBody    // for => expr;
 ) : Cs, Statement
 {
     public PropertyDeclaration WithId(Guid id) => this with { Id = id };
@@ -99,7 +100,7 @@ public sealed record AccessorDeclaration(
     IList<Modifier> Modifiers,
     JLeftPadded<AccessorKind> Kind,          // The get/set/init keyword with space before
     Block? Body,                              // null for auto-implemented or expression body
-    JLeftPadded<Expression>? ExpressionBody  // for => expr
+    JLeftPadded<Expression>? ExpressionBody    // for => expr
 ) : Cs, Statement
 {
     public AccessorDeclaration WithId(Guid id) => this with { Id = id };
@@ -142,7 +143,11 @@ public sealed record DelegateInvocation(Guid Id) : Marker
 /// Applied to both the ClassDeclaration and the synthesized MethodDeclaration in the body.
 /// Following the Kotlin pattern for primary constructor representation.
 /// </summary>
-public sealed record PrimaryConstructor(Guid Id) : Marker;
+public sealed record PrimaryConstructor(Guid Id) : Marker, IRpcCodec<PrimaryConstructor>
+{
+    public void RpcSend(PrimaryConstructor after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public PrimaryConstructor RpcReceive(PrimaryConstructor before, RpcReceiveQueue q) => throw new NotImplementedException();
+}
 
 /// <summary>
 /// Marker indicating a struct declaration.
@@ -150,14 +155,34 @@ public sealed record PrimaryConstructor(Guid Id) : Marker;
 /// The printer checks for this marker and prints "struct" instead of "class".
 /// For record structs, both KindType.Record and Struct marker are used.
 /// </summary>
-public sealed record Struct(Guid Id) : Marker;
+public sealed record Struct(Guid Id) : Marker, IRpcCodec<Struct>
+{
+    public void RpcSend(Struct after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public Struct RpcReceive(Struct before, RpcReceiveQueue q) => throw new NotImplementedException();
+}
 
 /// <summary>
 /// Marker indicating "record class" syntax was used (vs. just "record").
 /// Applied to ClassDeclaration to preserve the explicit "class" keyword.
 /// The printer checks for this marker and prints "record class" instead of "record".
 /// </summary>
-public sealed record RecordClass(Guid Id) : Marker;
+public sealed record RecordClass(Guid Id) : Marker, IRpcCodec<RecordClass>
+{
+    public void RpcSend(RecordClass after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public RecordClass RpcReceive(RecordClass before, RpcReceiveQueue q) => throw new NotImplementedException();
+}
+
+/// <summary>
+/// Marker indicating an expression-bodied method declaration.
+/// Expression-bodied methods are syntactic sugar for a single return statement.
+/// The body Block contains a single J.Return, and the printer prints "=>" instead of "{ return ...; }".
+/// Block.Prefix = space before "=>", Return.Expression.Prefix = space before the expression.
+/// </summary>
+public sealed record ExpressionBodied(Guid Id) : Marker, IRpcCodec<ExpressionBodied>
+{
+    public void RpcSend(ExpressionBodied after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public ExpressionBodied RpcReceive(ExpressionBodied before, RpcReceiveQueue q) => throw new NotImplementedException();
+}
 
 /// <summary>
 /// A C# type parameter constraint. Wraps a single constraint type in TypeParameter.Bounds.
@@ -190,7 +215,11 @@ public sealed record TypeParameterBound(
 /// Marker indicating an implicit/synthesized element that should not be printed directly.
 /// Used on the method name identifier of a primary constructor.
 /// </summary>
-public sealed record Implicit(Guid Id) : Marker;
+public sealed record Implicit(Guid Id) : Marker, IRpcCodec<Implicit>
+{
+    public void RpcSend(Implicit after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public Implicit RpcReceive(Implicit before, RpcReceiveQueue q) => throw new NotImplementedException();
+}
 
 /// <summary>
 /// Marker indicating a null-coalescing expression (??).
@@ -351,6 +380,50 @@ public sealed record RelationalPattern(
     public RelationalPattern WithMarkers(Markers markers) => this with { Markers = markers };
     public RelationalPattern WithOperator(JLeftPadded<Type> op) => this with { Operator = op };
     public RelationalPattern WithValue(Expression value) => this with { Value = value };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A C# is-pattern expression that performs pattern matching.
+/// The expression tests a value against a pattern using the 'is' keyword.
+/// Examples:
+///   obj is string s          // Type pattern with declaration
+///   obj is int n and > 0     // Binary pattern
+///   obj is null              // Constant pattern
+/// </summary>
+public sealed record IsPattern(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    Expression Expression,    // The value being tested (e.g., "obj")
+    JLeftPadded<J> Pattern    // The pattern (left padding = space before "is")
+) : Cs, Expression
+{
+    public IsPattern WithId(Guid id) => this with { Id = id };
+    public IsPattern WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public IsPattern WithMarkers(Markers markers) => this with { Markers = markers };
+    public IsPattern WithExpression(Expression expression) => this with { Expression = expression };
+    public IsPattern WithPattern(JLeftPadded<J> pattern) => this with { Pattern = pattern };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// Wraps a Statement as an Expression, allowing statements to appear
+/// in expression contexts (e.g., VariableDeclarations in pattern matching).
+/// </summary>
+public sealed record StatementExpression(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    Statement Statement
+) : Cs, Expression
+{
+    public StatementExpression WithId(Guid id) => this with { Id = id };
+    public StatementExpression WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public StatementExpression WithMarkers(Markers markers) => this with { Markers = markers };
+    public StatementExpression WithStatement(Statement statement) => this with { Statement = statement };
 
     Tree Tree.WithId(Guid id) => WithId(id);
 }

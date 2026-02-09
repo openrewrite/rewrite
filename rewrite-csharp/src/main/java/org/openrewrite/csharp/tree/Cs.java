@@ -20,13 +20,14 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.csharp.CSharpPrinter;
 import org.openrewrite.csharp.CSharpVisitor;
+import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
 import org.openrewrite.csharp.service.CSharpNamingService;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NamingService;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
+import org.openrewrite.rpc.request.Print;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
@@ -201,7 +202,16 @@ public interface Cs extends J {
 
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-            return new CSharpPrinter<>();
+            return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
+                @Override
+                public Tree preVisit(Tree tree, PrintOutputCapture<P> p) {
+                    CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
+                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
+                    p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
+                    stopAfterPreVisit();
+                    return tree;
+                }
+            };
         }
 
         @Override
@@ -1223,7 +1233,7 @@ public interface Cs extends J {
 
         @Override
         public String toString() {
-            return withPrefix(Space.EMPTY).printTrimmed(new CSharpPrinter<>());
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
         @RequiredArgsConstructor
@@ -1276,7 +1286,7 @@ public interface Cs extends J {
 
         @Override
         public String toString() {
-            return withPrefix(Space.EMPTY).printTrimmed(new CSharpPrinter<>());
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
     }
 
@@ -1445,7 +1455,7 @@ public interface Cs extends J {
 
         @Override
         public String toString() {
-            return withPrefix(Space.EMPTY).printTrimmed(new CSharpPrinter<>());
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
         @RequiredArgsConstructor
@@ -1963,7 +1973,7 @@ public interface Cs extends J {
 
         @Override
         public String toString() {
-            return withPrefix(Space.EMPTY).printTrimmed(new CSharpPrinter<>());
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
         @RequiredArgsConstructor
@@ -2962,10 +2972,8 @@ public interface Cs extends J {
         @Nullable
         Block accessors;
 
-        @With
-        @Getter
         @Nullable
-        ArrowExpressionClause expressionBody;
+        JLeftPadded<Expression> expressionBody;
 
         @Nullable
         JLeftPadded<Expression> initializer;
@@ -2992,6 +3000,14 @@ public interface Cs extends J {
 
         public PropertyDeclaration withInterfaceSpecifier(@Nullable TypeTree interfaceSpecifier) {
             return getPadding().withInterfaceSpecifier(JRightPadded.withElement(this.interfaceSpecifier, interfaceSpecifier));
+        }
+
+        public @Nullable Expression getExpressionBody() {
+            return expressionBody != null ? expressionBody.getElement() : null;
+        }
+
+        public PropertyDeclaration withExpressionBody(@Nullable Expression expressionBody) {
+            return getPadding().withExpressionBody(JLeftPadded.withElement(this.expressionBody, expressionBody));
         }
 
         public @Nullable Expression getInitializer() {
@@ -3059,6 +3075,24 @@ public interface Cs extends J {
                         pd.name,
                         pd.accessors,
                         pd.expressionBody,
+                        pd.initializer);
+            }
+
+            public @Nullable JLeftPadded<Expression> getExpressionBody() {
+                return pd.expressionBody;
+            }
+
+            public PropertyDeclaration withExpressionBody(@Nullable JLeftPadded<Expression> expressionBody) {
+                return pd.expressionBody == expressionBody ? pd : new PropertyDeclaration(pd.id,
+                        pd.prefix,
+                        pd.markers,
+                        pd.attributeLists,
+                        pd.modifiers,
+                        pd.typeExpression,
+                        pd.interfaceSpecifier,
+                        pd.name,
+                        pd.accessors,
+                        expressionBody,
                         pd.initializer);
             }
 
@@ -3186,7 +3220,7 @@ public interface Cs extends J {
 
         @Override
         public String toString() {
-            return withPrefix(Space.EMPTY).printTrimmed(new CSharpPrinter<>());
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
     }
 
@@ -10452,104 +10486,6 @@ public interface Cs extends J {
     }
 
     /**
-     * Represents a C# arrow expression clause (=>).
-     * <p>
-     * For example:
-     * <pre>
-     *     // In property accessors
-     *     public string Name {
-     *         get => _name;
-     *     }
-     *
-     *     // In methods
-     *     public string GetName() => _name;
-     *
-     *     // In properties
-     *     public string FullName => $"{FirstName} {LastName}";
-     *
-     *     // In operators
-     *     public static implicit operator string(Person p) => p.Name;
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ArrowExpressionClause implements Cs, Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * get => value;
-         *     ^^^^^^^^
-         * </pre>
-         */
-        JRightPadded<Expression> expression;
-
-        public Expression getExpression() {
-            return expression.getElement();
-        }
-
-        public ArrowExpressionClause withExpression(Expression expression) {
-            return getPadding().withExpression(this.expression.withElement(expression));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitArrowExpressionClause(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ArrowExpressionClause t;
-
-            public JRightPadded<Expression> getExpression() {
-                return t.expression;
-            }
-
-            public ArrowExpressionClause withExpression(JRightPadded<Expression> expression) {
-                return t.expression == expression ? t : new ArrowExpressionClause(t.id, t.prefix, t.markers, expression);
-            }
-        }
-    }
-
-    /**
      * Represents a C# accessor declaration (get/set/init) within a property or indexer.
      * <p>
      * For example:
@@ -10622,10 +10558,8 @@ public interface Cs extends J {
          *     ^^^^^^^^^
          * </pre>
          */
-        @With
-        @Getter
         @Nullable
-        ArrowExpressionClause expressionBody;
+        JLeftPadded<Expression> expressionBody;
 
         /**
          * <pre>
@@ -10659,6 +10593,14 @@ public interface Cs extends J {
             return getPadding().withKind(this.kind.withElement(kind));
         }
 
+        public @Nullable Expression getExpressionBody() {
+            return expressionBody != null ? expressionBody.getElement() : null;
+        }
+
+        public AccessorDeclaration withExpressionBody(@Nullable Expression expressionBody) {
+            return getPadding().withExpressionBody(JLeftPadded.withElement(this.expressionBody, expressionBody));
+        }
+
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
             return v.visitAccessorDeclaration(this, p);
@@ -10689,6 +10631,14 @@ public interface Cs extends J {
 
             public AccessorDeclaration withKind(JLeftPadded<AccessorKinds> kind) {
                 return t.kind == kind ? t : new AccessorDeclaration(t.id, t.prefix, t.markers, t.attributes, t.modifiers, kind, t.expressionBody, t.body);
+            }
+
+            public @Nullable JLeftPadded<Expression> getExpressionBody() {
+                return t.expressionBody;
+            }
+
+            public AccessorDeclaration withExpressionBody(@Nullable JLeftPadded<Expression> expressionBody) {
+                return t.expressionBody == expressionBody ? t : new AccessorDeclaration(t.id, t.prefix, t.markers, t.attributes, t.modifiers, t.kind, expressionBody, t.body);
             }
         }
     }
