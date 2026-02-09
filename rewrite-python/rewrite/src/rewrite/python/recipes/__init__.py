@@ -40,7 +40,6 @@ __all__ = [
     # Native Python recipes
     "RemovePass",
     "ChangeImport",
-    "DatetimeUtcNow",
     # Java recipe wrappers
     "ChangeType",
     "ChangeMethodName",
