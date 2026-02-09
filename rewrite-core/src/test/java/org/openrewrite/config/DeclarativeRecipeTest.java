@@ -485,11 +485,9 @@ class DeclarativeRecipeTest implements RewriteTest {
             .hasMessageContaining("RecipeB");
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
     @Test
     void nestedScanningRecipeInOrPrecondition() {
-        // Issue #6698: OR preconditions with nested ScanningRecipes fail with NPE
-        // because getInitialValue() only registers direct preconditions, not nested ones
-        // Note: RepositoryContainsFile is a repo-wide precondition - if matched, ALL files are affected
         rewriteRun(
           spec -> spec.recipeFromYaml(
             """
@@ -519,9 +517,9 @@ class DeclarativeRecipeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
     @Test
     void nestedScanningRecipeInOrPreconditionNotMet() {
-        // Issue #6698: Verify OR precondition correctly doesn't apply when no condition matches
         rewriteRun(
           spec -> spec.recipeFromYaml(
             """
@@ -550,11 +548,9 @@ class DeclarativeRecipeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
     @Test
     void sameScanningRecipeWithDifferentParametersInOrPrecondition() {
-        // Issue #6698: Ensure same scanning recipe type with different parameters
-        // is handled correctly (each instance needs its own accumulator)
-        // Note: RepositoryContainsFile is a repo-wide precondition - if matched, ALL files are affected
         rewriteRun(
           spec -> spec.recipeFromYaml(
             """
@@ -587,10 +583,9 @@ class DeclarativeRecipeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
     @Test
     void deeplyNestedOrPreconditionsWithScanningRecipe() {
-        // Issue #6698: Test deeper nesting of OR preconditions with scanning recipes
-        // Note: RepositoryContainsFile is a repo-wide precondition - if matched, ALL files are affected
         rewriteRun(
           spec -> spec.recipeFromYaml(
             """
@@ -629,11 +624,9 @@ class DeclarativeRecipeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
     @Test
     void multipleNestedOrPreconditionsWithSameScanningRecipe() {
-        // Issue #6698: Multiple nested OR preconditions where the same scanning recipe
-        // appears in different branches - ensure each gets its own accumulator
-        // Note: RepositoryContainsFile is a repo-wide precondition - if matched, ALL files are affected
         rewriteRun(
           spec -> spec.recipeFromYaml(
             """
