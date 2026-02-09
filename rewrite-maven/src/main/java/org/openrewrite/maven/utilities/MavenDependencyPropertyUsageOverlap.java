@@ -90,7 +90,7 @@ public class MavenDependencyPropertyUsageOverlap {
         return remainingProperties;
     }
 
-    public static Set<String> filterPropertiesWithOverlapInParents(
+    public static Set<String> filterPropertiesWithOverlapInParentsOrSiblings(
             Set<String> relevantProperties,
             String groupId,
             String artifactId,
@@ -107,6 +107,7 @@ public class MavenDependencyPropertyUsageOverlap {
             current = requireNonNull(current.getParent());
             ResolvedPom currentResolved = current.getPom();
             remainingProperties = filterPropertiesWithOverlapInDependencies(remainingProperties, groupId, artifactId, currentResolved.getRequested(), currentResolved, configuredToChangeManagedDependency);
+            remainingProperties = filterPropertiesWithOverlapInChildren(remainingProperties, groupId, artifactId, current, configuredToChangeManagedDependency);
         }
         MavenPomDownloader downloader = new MavenPomDownloader(current.getProjectPoms(), ctx);
         ResolvedPom currentResolved = current.getPom();

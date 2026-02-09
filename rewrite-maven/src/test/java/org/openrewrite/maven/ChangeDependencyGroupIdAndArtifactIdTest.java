@@ -2335,8 +2335,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             null
           )),
           mavenProject("project",
-            //language=xml
             pomXml(
+              //language=xml
               """
                 <project>
                   <groupId>com.mycompany.app</groupId>
@@ -2350,6 +2350,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </modules>
                 </project>
                 """,
+              //language=xml
               """
                 <project>
                   <groupId>com.mycompany.app</groupId>
@@ -2366,8 +2367,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               spec -> spec.path("pom.xml")
             ),
             mavenProject("sub-project",
-              //language=xml
               pomXml(
+                //language=xml
                 """
                   <project>
                     <groupId>com.mycompany.app</groupId>
@@ -2388,6 +2389,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
+                //language=xml
                 """
                   <project>
                     <groupId>com.mycompany.app</groupId>
@@ -2433,8 +2435,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             null
           )),
           mavenProject("project",
-            //language=xml
             pomXml(
+              //language=xml
               """
                 <project>
                   <groupId>com.mycompany.app</groupId>
@@ -2451,8 +2453,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               spec -> spec.path("pom.xml")
             ),
             mavenProject("sub-project",
-              //language=xml
               pomXml(
+                //language=xml
                 """
                   <project>
                     <groupId>com.mycompany.app</groupId>
@@ -2478,6 +2480,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
+                //language=xml
                 """
                   <project>
                     <groupId>com.mycompany.app</groupId>
@@ -2527,8 +2530,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             null
           )),
           mavenProject("project",
-            //language=xml
             pomXml(
+              //language=xml
               """
                 <project>
                   <groupId>com.mycompany.app</groupId>
@@ -2546,8 +2549,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               spec -> spec.path("pom.xml")
             ),
             mavenProject("child-a",
-              //language=xml
               pomXml(
+                //language=xml
                 """
                   <project>
                     <groupId>com.mycompany.app</groupId>
@@ -2568,6 +2571,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
+                //language=xml
                 """
                   <project>
                     <groupId>com.mycompany.app</groupId>
@@ -2592,8 +2596,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               )
             ),
             mavenProject("child-b",
-              //language=xml
               pomXml(
+                //language=xml
                 """
                   <project>
                     <groupId>com.mycompany.app</groupId>

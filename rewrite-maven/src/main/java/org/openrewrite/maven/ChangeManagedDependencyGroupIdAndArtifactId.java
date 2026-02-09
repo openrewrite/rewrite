@@ -200,7 +200,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                         .collect(toSet());
                 relevantProperties = filterPropertiesWithOverlapInDependencies(relevantProperties, groupId, artifactId, requestedPom, resolvedPom, true);
                 relevantProperties = filterPropertiesWithOverlapInChildren(relevantProperties, groupId, artifactId, result, true);
-                return filterPropertiesWithOverlapInParents(relevantProperties, groupId, artifactId, result, true, ctx);
+                return filterPropertiesWithOverlapInParentsOrSiblings(relevantProperties, groupId, artifactId, result, true, ctx);
             }
 
             private boolean compareVersions(@Nullable String targetVersion, @Nullable String foundVersion) {
