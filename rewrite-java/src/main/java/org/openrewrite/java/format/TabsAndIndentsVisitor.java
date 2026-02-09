@@ -501,8 +501,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 int currentIndent = StringUtils.minCommonIndentLevel(content, style.getTabSize());
                 content = StringUtils.trimIndent(content);
                 String[] lines = content.split("\n", -1);
-                // get tree parent cursor rather than itself top get the indent, i.e. from the variable declaration node.
-                int indent = getCursor().getParentTreeCursor().getNearestMessage("lastIndent", 0);
+                int indent = getCursor().getNearestMessage("lastIndent", 0);
                 if (evaluate(() -> wrappingStyle.getTextBlocks().getAlignWhenMultiline(), false)) {
                     if (!literal.getPrefix().getLastWhitespace().contains("\n")) {
                         ColSpan colSpan = positionService.columnsOf(getCursor(), literal);
