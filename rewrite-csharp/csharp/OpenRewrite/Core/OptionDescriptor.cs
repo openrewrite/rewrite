@@ -1,6 +1,6 @@
 using JetBrains.Annotations;
 
-namespace OpenRewrite.Core;
+namespace Rewrite.Core;
 
 /// <summary>
 /// Describes a single configurable option on a recipe.

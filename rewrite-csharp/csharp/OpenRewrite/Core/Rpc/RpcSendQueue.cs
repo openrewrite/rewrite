@@ -1,8 +1,7 @@
-using Rewrite.Core.Rpc;
-using static OpenRewrite.Core.Rpc.RpcObjectData;
-using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
+using static Rewrite.Core.Rpc.RpcObjectData;
+using static Rewrite.Core.Rpc.RpcObjectData.ObjectState;
 
-namespace OpenRewrite.Core.Rpc;
+namespace Rewrite.Core.Rpc;
 
 public class RpcSendQueue
 {
@@ -47,7 +46,6 @@ public class RpcSendQueue
     private IRpcCodec? GetCodecFor(object val)
     {
         if (val is IRpcCodec selfCodec) return selfCodec;
-        if (val is Marker) return null; // Markers without IRpcCodec are serialized as plain values
         if (_treeCodec != null && GetValueType(val) != null) return _treeCodec;
         return null;
     }
@@ -76,19 +74,8 @@ public class RpcSendQueue
     public void GetAndSend<T, U>(T parent, Func<T, U?> value, Action<U>? onChange)
     {
         var after = value(parent);
-        if (_before != null)
-        {
-            var before = value((T)_before);
-            Send(after, before, onChange == null || after == null ? null : () => onChange(after));
-        }
-        else
-        {
-            // No previous state. Pass null as before to Send so that non-null values
-            // are sent as ADD. Using default(U) when _before is null causes value types
-            // (e.g., bool) to get a non-null default (false), which incorrectly makes
-            // Send emit CHANGE instead of ADD, breaking the Java receiver.
-            Send<object?>(after, null, onChange == null || after == null ? null : () => onChange(after!));
-        }
+        var before = _before == null ? default : value((T)_before);
+        Send(after, before, onChange == null || after == null ? null : () => onChange(after));
     }
 
     public void GetAndSendListAsRef<T, U>(T? parent,
@@ -319,18 +306,16 @@ public class RpcSendQueue
 
         return type.Namespace switch
         {
-            "OpenRewrite.Java" => name switch
+            "Rewrite.Java" => name switch
             {
                 "JRightPadded" or "JLeftPadded" or "JContainer" or "JavaType" =>
                     $"org.openrewrite.java.tree.{name}",
                 _ => $"org.openrewrite.java.tree.J${name}",
             },
-            "OpenRewrite.CSharp" => $"org.openrewrite.csharp.tree.Cs${name}",
-            "OpenRewrite.Core" => name switch
+            "Rewrite.CSharp" => $"org.openrewrite.csharp.tree.Cs${name}",
+            "Rewrite.Core" => name switch
             {
                 "Markers" => "org.openrewrite.marker.Markers",
-                "SearchResult" => "org.openrewrite.marker.SearchResult",
-                "Markup" => "org.openrewrite.marker.Markup",
                 "Space" => "org.openrewrite.java.tree.Space",
                 "TextComment" => "org.openrewrite.java.tree.TextComment",
                 _ => null,

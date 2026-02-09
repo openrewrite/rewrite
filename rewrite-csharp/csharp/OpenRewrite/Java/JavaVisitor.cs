@@ -1,6 +1,6 @@
-using OpenRewrite.Core;
+using Rewrite.Core;
 
-namespace OpenRewrite.Java;
+namespace Rewrite.Java;
 
 /// <summary>
 /// Base visitor for Java LST elements.
@@ -39,17 +39,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             Unary un => VisitUnary(un, p),
             Parentheses<Expression> paren => VisitParentheses(paren, p),
             ControlParentheses<Expression> cp => VisitControlParentheses(cp, p),
-            ControlParentheses<TypeTree> cptt => VisitControlParentheses(cptt, p),
-            ControlParentheses<VariableDeclarations> cpvd => VisitControlParentheses(cpvd, p),
             ExpressionStatement es => VisitExpressionStatement(es, p),
             VariableDeclarations vd => VisitVariableDeclarations(vd, p),
             Primitive prim => VisitPrimitive(prim, p),
             MethodInvocation mi => VisitMethodInvocation(mi, p),
             NewClass nc => VisitNewClass(nc, p),
             NewArray na => VisitNewArray(na, p),
-            InstanceOf io => VisitInstanceOf(io, p),
-            NullableType nt => VisitNullableType(nt, p),
-            ParameterizedType pt => VisitParameterizedType(pt, p),
             ArrayType at => VisitArrayType(at, p),
             ArrayAccess aa => VisitArrayAccess(aa, p),
             ArrayDimension ad => VisitArrayDimension(ad, p),
@@ -58,12 +53,10 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             SwitchExpression se => VisitSwitchExpression(se, p),
             Case cs => VisitCase(cs, p),
             DeconstructionPattern dp => VisitDeconstructionPattern(dp, p),
-            Label lbl => VisitLabel(lbl, p),
             Synchronized sync => VisitSynchronized(sync, p),
             TypeCast tc => VisitTypeCast(tc, p),
-            TypeParameter tp => VisitTypeParameter(tp, p),
             Package pkg => VisitPackage(pkg, p),
-            _ => throw new InvalidOperationException($"Unknown J tree type: {tree.GetType()}")
+            _ => throw new InvalidOperationException($"Unknown J tree type: {tree.GetType().Name}")
         };
     }
 
@@ -90,10 +83,10 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             if (visited is Statement s)
             {
                 if (!ReferenceEquals(s, stmt.Element)) changed = true;
-                statements.Add(stmt.WithElement(s));
+                statements.Add(stmt with { Element = s });
             }
         }
-        return changed ? block.WithStatements(statements) : block;
+        return changed ? block with { Statements = statements } : block;
     }
 
     public virtual J VisitClassDeclaration(ClassDeclaration classDecl, P p)
@@ -101,7 +94,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var body = Visit(classDecl.Body, p);
         if (body is Block b && !ReferenceEquals(b, classDecl.Body))
         {
-            return classDecl.WithBody(b);
+            return classDecl with { Body = b };
         }
         return classDecl;
     }
@@ -119,14 +112,14 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
                 {
                     changed = true;
                 }
-                newEnums.Add(paddedValue.WithElement(ev));
+                newEnums.Add(paddedValue with { Element = ev });
             }
             else
             {
                 newEnums.Add(paddedValue);
             }
         }
-        return changed ? enumValueSet.WithEnums(newEnums) : enumValueSet;
+        return changed ? enumValueSet with { Enums = newEnums } : enumValueSet;
     }
 
     public virtual J VisitEnumValue(EnumValue enumValue, P p)
@@ -137,12 +130,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             var init = Visit(enumValue.Initializer.Element, p);
             if (init is Expression e && !ReferenceEquals(e, enumValue.Initializer.Element))
             {
-                return enumValue.WithInitializer(enumValue.Initializer.WithElement(e));
+                return enumValue with { Initializer = enumValue.Initializer with { Element = e } };
             }
         }
         if (name is Identifier id && !ReferenceEquals(id, enumValue.Name))
         {
-            return enumValue.WithName(id);
+            return enumValue with { Name = id };
         }
         return enumValue;
     }
@@ -164,7 +157,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             var body = Visit(method.Body, p);
             if (body is Block b && !ReferenceEquals(b, method.Body))
             {
-                return method.WithBody(b);
+                return method with { Body = b };
             }
         }
 
@@ -175,7 +168,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     {
         if (ret.Expression != null)
         {
-            Visit(ret.Expression, p);
+            Visit(ret.Expression.Element, p);
         }
         return ret;
     }
@@ -270,18 +263,6 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         return cp;
     }
 
-    public virtual J VisitControlParentheses(ControlParentheses<TypeTree> cp, P p)
-    {
-        Visit(cp.Tree.Element, p);
-        return cp;
-    }
-
-    public virtual J VisitControlParentheses(ControlParentheses<VariableDeclarations> cp, P p)
-    {
-        Visit(cp.Tree.Element, p);
-        return cp;
-    }
-
     public virtual J VisitLiteral(Literal literal, P p)
     {
         return literal;
@@ -297,7 +278,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var target = Visit(fieldAccess.Target, p);
         if (target is Expression t && !ReferenceEquals(t, fieldAccess.Target))
         {
-            return fieldAccess.WithTarget(t);
+            return fieldAccess with { Target = t };
         }
         return fieldAccess;
     }
@@ -310,7 +291,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (left is Expression l && right is Expression r &&
             (!ReferenceEquals(l, binary.Left) || !ReferenceEquals(r, binary.Right)))
         {
-            return binary.WithLeft(l).WithRight(r);
+            return binary with { Left = l, Right = r };
         }
         return binary;
     }
@@ -326,7 +307,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
              !ReferenceEquals(t, ternary.TruePart.Element) ||
              !ReferenceEquals(f, ternary.FalsePart.Element)))
         {
-            return ternary.WithCondition(c).WithTruePart(ternary.TruePart.WithElement(t)).WithFalsePart(ternary.FalsePart.WithElement(f));
+            return ternary with
+            {
+                Condition = c,
+                TruePart = ternary.TruePart with { Element = t },
+                FalsePart = ternary.FalsePart with { Element = f }
+            };
         }
         return ternary;
     }
@@ -339,7 +325,11 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (variable is Expression v && value is Expression val &&
             (!ReferenceEquals(v, assignment.Variable) || !ReferenceEquals(val, assignment.AssignmentValue.Element)))
         {
-            return assignment.WithVariable(v).WithAssignmentValue(assignment.AssignmentValue.WithElement(val));
+            return assignment with
+            {
+                Variable = v,
+                AssignmentValue = assignment.AssignmentValue with { Element = val }
+            };
         }
         return assignment;
     }
@@ -352,7 +342,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (variable is Expression v && value is Expression val &&
             (!ReferenceEquals(v, assignment.Variable) || !ReferenceEquals(val, assignment.AssignmentValue)))
         {
-            return assignment.WithVariable(v).WithAssignmentValue(val);
+            return assignment with { Variable = v, AssignmentValue = val };
         }
         return assignment;
     }
@@ -362,7 +352,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var expr = Visit(unary.Expression, p);
         if (expr is Expression e && !ReferenceEquals(e, unary.Expression))
         {
-            return unary.WithExpression(e);
+            return unary with { Expression = e };
         }
         return unary;
     }
@@ -372,7 +362,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var inner = Visit(parens.Tree.Element, p);
         if (inner is Expression e && !ReferenceEquals(e, parens.Tree.Element))
         {
-            return parens.WithTree(parens.Tree.WithElement(e));
+            return parens with { Tree = parens.Tree with { Element = e } };
         }
         return parens;
     }
@@ -382,7 +372,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var expr = Visit(expressionStatement.Expression, p);
         if (expr is Expression e && !ReferenceEquals(e, expressionStatement.Expression))
         {
-            return expressionStatement.WithExpression(e);
+            return expressionStatement with { Expression = e };
         }
         return expressionStatement;
     }
@@ -482,41 +472,6 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         return na;
     }
 
-    public virtual J VisitLabel(Label label, P p)
-    {
-        Visit(label.LabelName.Element, p);
-        Visit(label.Statement, p);
-        return label;
-    }
-
-    public virtual J VisitInstanceOf(InstanceOf instanceOf, P p)
-    {
-        Visit(instanceOf.Expression.Element, p);
-        Visit(instanceOf.Clazz, p);
-        if (instanceOf.Pattern != null) Visit(instanceOf.Pattern, p);
-        if (instanceOf.InstanceOfModifier != null) Visit(instanceOf.InstanceOfModifier, p);
-        return instanceOf;
-    }
-
-    public virtual J VisitNullableType(NullableType nullableType, P p)
-    {
-        Visit(nullableType.TypeTree, p);
-        return nullableType;
-    }
-
-    public virtual J VisitParameterizedType(ParameterizedType pt, P p)
-    {
-        Visit(pt.Clazz, p);
-        if (pt.TypeParameters != null)
-        {
-            foreach (var paddedParam in pt.TypeParameters.Elements)
-            {
-                Visit(paddedParam.Element, p);
-            }
-        }
-        return pt;
-    }
-
     public virtual J VisitArrayType(ArrayType at, P p)
     {
         Visit(at.ElementType, p);
@@ -539,7 +494,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (indexed is Expression i && dimension is ArrayDimension d &&
             (!ReferenceEquals(i, arrayAccess.Indexed) || !ReferenceEquals(d, arrayAccess.Dimension)))
         {
-            return arrayAccess.WithIndexed(i).WithDimension(d);
+            return arrayAccess with { Indexed = i, Dimension = d };
         }
         return arrayAccess;
     }
@@ -549,7 +504,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var index = Visit(dimension.Index.Element, p);
         if (index is Expression i && !ReferenceEquals(i, dimension.Index.Element))
         {
-            return dimension.WithIndex(dimension.Index.WithElement(i));
+            return dimension with { Index = dimension.Index with { Element = i } };
         }
         return dimension;
     }
@@ -569,18 +524,22 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
                 {
                     changed = true;
                 }
-                elements.Add(paddedParam.WithElement(vp));
+                elements.Add(paddedParam with { Element = vp });
             }
         }
 
-        var newParams = changed ? @params.WithElements(elements) : @params;
+        var newParams = changed ? @params with { Elements = elements } : @params;
 
         var body = Visit(lambda.Body, p);
 
         if (!ReferenceEquals(newParams, @params) ||
             (body is J b && !ReferenceEquals(b, lambda.Body)))
         {
-            return lambda.WithParams(newParams).WithBody(body is J newBody ? newBody : lambda.Body);
+            return lambda with
+            {
+                Params = newParams,
+                Body = body is J newBody ? newBody : lambda.Body
+            };
         }
 
         return lambda;
@@ -596,7 +555,13 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (selectorExpr is Expression se && !ReferenceEquals(se, selector.Tree.Element) ||
             casesBlock is Block cb && !ReferenceEquals(cb, @switch.Cases))
         {
-            return @switch.WithSelector(selectorExpr is Expression newSe ? selector.WithTree(selector.Tree.WithElement(newSe)) : selector).WithCases(casesBlock is Block newCb ? newCb : @switch.Cases);
+            return @switch with
+            {
+                Selector = selectorExpr is Expression newSe
+                    ? selector with { Tree = selector.Tree with { Element = newSe } }
+                    : selector,
+                Cases = casesBlock is Block newCb ? newCb : @switch.Cases
+            };
         }
 
         return @switch;
@@ -617,7 +582,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
                 {
                     labelsChanged = true;
                 }
-                newLabels.Add(labelPadded.WithElement(v));
+                newLabels.Add(labelPadded with { Element = v });
             }
         }
 
@@ -634,7 +599,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
                 {
                     statementsChanged = true;
                 }
-                newStatements.Add(stmtPadded.WithElement(s));
+                newStatements.Add(stmtPadded with { Element = s });
             }
         }
 
@@ -652,7 +617,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         if (labelsChanged || statementsChanged || bodyChanged)
         {
-            return @case.WithCaseLabels(labelsChanged ? @case.CaseLabels.WithElements(newLabels) : @case.CaseLabels).WithStatements(statementsChanged ? @case.Statements.WithElements(newStatements) : @case.Statements).WithBody(bodyChanged && newBody != null ? @case.Body!.WithElement(newBody) : @case.Body);
+            return @case with
+            {
+                CaseLabels = labelsChanged ? @case.CaseLabels with { Elements = newLabels } : @case.CaseLabels,
+                Statements = statementsChanged ? @case.Statements with { Elements = newStatements } : @case.Statements,
+                Body = bodyChanged && newBody != null ? @case.Body with { Element = newBody } : @case.Body
+            };
         }
 
         return @case;
@@ -666,7 +636,13 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if ((selector is Expression s && !ReferenceEquals(s, se.Selector.Tree.Element)) ||
             (cases is Block b && !ReferenceEquals(b, se.Cases)))
         {
-            return se.WithSelector(selector is Expression sel ? se.Selector.WithTree(se.Selector.Tree.WithElement(sel)) : se.Selector).WithCases(cases is Block newCases ? newCases : se.Cases);
+            return se with
+            {
+                Selector = selector is Expression sel
+                    ? se.Selector with { Tree = se.Selector.Tree with { Element = sel } }
+                    : se.Selector,
+                Cases = cases is Block newCases ? newCases : se.Cases
+            };
         }
 
         return se;
@@ -690,7 +666,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             if (visited is J v && !ReferenceEquals(v, nested.Element))
             {
                 changed = true;
-                newElements.Add(nested.WithElement(v));
+                newElements.Add(nested with { Element = v });
             }
             else
             {
@@ -699,13 +675,17 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         var nestedPatterns = changed
-            ? dp.Nested.WithElements(newElements)
+            ? dp.Nested with { Elements = newElements }
             : dp.Nested;
 
         if (!ReferenceEquals(deconstructor, dp.Deconstructor) ||
             !ReferenceEquals(nestedPatterns, dp.Nested))
         {
-            return dp.WithDeconstructor(deconstructor).WithNested(nestedPatterns);
+            return dp with
+            {
+                Deconstructor = deconstructor,
+                Nested = nestedPatterns
+            };
         }
 
         return dp;
@@ -719,7 +699,11 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if ((lockExpr is ControlParentheses<Expression> cp && !ReferenceEquals(cp, sync.Lock)) ||
             (body is Block b && !ReferenceEquals(b, sync.Body)))
         {
-            return sync.WithLock(lockExpr as ControlParentheses<Expression> ?? sync.Lock).WithBody(body as Block ?? sync.Body);
+            return sync with
+            {
+                Lock = lockExpr as ControlParentheses<Expression> ?? sync.Lock,
+                Body = body as Block ?? sync.Body
+            };
         }
 
         return sync;
@@ -733,23 +717,14 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if ((clazz is ControlParentheses<TypeTree> cp && !ReferenceEquals(cp, cast.Clazz)) ||
             (expr is Expression e && !ReferenceEquals(e, cast.Expression)))
         {
-            return cast.WithClazz(clazz as ControlParentheses<TypeTree> ?? cast.Clazz).WithExpression(expr as Expression ?? cast.Expression);
+            return cast with
+            {
+                Clazz = clazz as ControlParentheses<TypeTree> ?? cast.Clazz,
+                Expression = expr as Expression ?? cast.Expression
+            };
         }
 
         return cast;
-    }
-
-    public virtual J VisitTypeParameter(TypeParameter typeParameter, P p)
-    {
-        Visit(typeParameter.Name, p);
-        if (typeParameter.Bounds != null)
-        {
-            foreach (var paddedBound in typeParameter.Bounds.Elements)
-            {
-                Visit(paddedBound.Element, p);
-            }
-        }
-        return typeParameter;
     }
 
     public virtual J VisitPackage(Package pkg, P p)
@@ -775,7 +750,13 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (annotationsChanged ||
             (expr is Expression e && !ReferenceEquals(e, pkg.Expression.Element)))
         {
-            return pkg.WithAnnotations(annotationsChanged ? newAnnotations : pkg.Annotations).WithExpression(expr is Expression newExpr ? pkg.Expression.WithElement(newExpr) : pkg.Expression);
+            return pkg with
+            {
+                Annotations = annotationsChanged ? newAnnotations : pkg.Annotations,
+                Expression = expr is Expression newExpr
+                    ? pkg.Expression with { Element = newExpr }
+                    : pkg.Expression
+            };
         }
 
         return pkg;

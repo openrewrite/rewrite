@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace OpenRewrite.Core;
+namespace Rewrite.Core;
 
 /// <summary>
 /// Captures output during tree printing operations.
@@ -11,16 +11,9 @@ public class PrintOutputCapture<T>
 
     public T Context { get; }
 
-    public IMarkerPrinter MarkerPrinter { get; }
-
-    public PrintOutputCapture(T context) : this(context, Core.MarkerPrinter.Default)
-    {
-    }
-
-    public PrintOutputCapture(T context, IMarkerPrinter markerPrinter)
+    public PrintOutputCapture(T context)
     {
         Context = context;
-        MarkerPrinter = markerPrinter;
     }
 
     public PrintOutputCapture<T> Append(string? text)

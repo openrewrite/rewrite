@@ -1,4 +1,4 @@
-namespace OpenRewrite.Core;
+namespace Rewrite.Core;
 
 /// <summary>
 /// Base visitor for traversing and transforming LST elements.
@@ -11,7 +11,6 @@ public class TreeVisitor<T, P> where T : class, Tree
 {
     public Cursor Cursor { get; set; } = new();
     private int _visitCount;
-    private bool _stopAfterPreVisit;
     private List<TreeVisitor<T, P>>? _afterVisit;
 
     public virtual T? PreVisit(T tree, P p) => tree;
@@ -35,12 +34,8 @@ public class TreeVisitor<T, P> where T : class, Tree
         Cursor = new Cursor(Cursor, tree);
 
         T? t = PreVisit(typed, p);
-        if (!_stopAfterPreVisit)
-        {
-            if (t != null) t = Accept(t, p);
-            if (t != null) t = PostVisit(t, p);
-        }
-        _stopAfterPreVisit = false;
+        if (t != null) t = Accept(t, p);
+        if (t != null) t = PostVisit(t, p);
 
         Cursor = Cursor.Parent!;
 
@@ -72,12 +67,6 @@ public class TreeVisitor<T, P> where T : class, Tree
         => Visit(tree, p) ?? throw new InvalidOperationException("Expected non-null visit result");
 
     public virtual T? DefaultValue(Tree? tree, P p) => tree as T;
-
-    /// <summary>
-    /// Call from <see cref="PreVisit"/> to skip Accept and PostVisit for the current node.
-    /// Used by RpcVisitor to delegate the full tree transformation to a remote peer.
-    /// </summary>
-    protected void StopAfterPreVisit() => _stopAfterPreVisit = true;
 
     /// <summary>
     /// Register a visitor to run once after the whole source file has been visited.

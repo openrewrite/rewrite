@@ -1,9 +1,12 @@
-using OpenRewrite.Core;
-using OpenRewrite.CSharp;
-using OpenRewrite.Java;
-using OpenRewrite.Test;
+using Rewrite.Core;
+using Rewrite.CSharp;
+using Rewrite.Java;
+using Rewrite.Test;
+using static Rewrite.Java.J;
+using ExecutionContext = Rewrite.Core.ExecutionContext;
+using Recipe = Rewrite.Core.Recipe;
 
-namespace OpenRewrite.Tests.Recipe;
+namespace Rewrite.CSharp.Tests.Recipes;
 
 public class RecipeTest : RewriteTest
 {
@@ -69,7 +72,7 @@ public class RecipeTest : RewriteTest
     }
 }
 
-class RenameClassRecipe : Core.Recipe
+class RenameClassRecipe : Recipe
 {
     [Option(DisplayName = "From", Description = "The class name to rename from.", Example = "Foo")]
     public required string From { get; init; }
@@ -80,9 +83,9 @@ class RenameClassRecipe : Core.Recipe
     public override string DisplayName => "Rename class";
     public override string Description => $"Renames class `{From}` to `{To}`.";
 
-    public override JavaVisitor<Core.ExecutionContext> GetVisitor() => new RenameClassVisitor(From, To);
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new RenameClassVisitor(From, To);
 
-    private class RenameClassVisitor : CSharpVisitor<Core.ExecutionContext>
+    private class RenameClassVisitor : CSharpVisitor<ExecutionContext>
     {
         private readonly string _from;
         private readonly string _to;
@@ -93,12 +96,12 @@ class RenameClassRecipe : Core.Recipe
             _to = to;
         }
 
-        public override J VisitClassDeclaration(ClassDeclaration cd, Core.ExecutionContext ctx)
+        public override J VisitClassDeclaration(ClassDeclaration cd, ExecutionContext ctx)
         {
             cd = (ClassDeclaration)base.VisitClassDeclaration(cd, ctx);
             if (cd.Name.SimpleName == _from)
             {
-                return cd.WithName(cd.Name.WithSimpleName(_to));
+                return cd with { Name = cd.Name with { SimpleName = _to } };
             }
 
             return cd;

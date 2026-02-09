@@ -1,8 +1,8 @@
-using OpenRewrite.Core;
-using OpenRewrite.Core.Rpc;
+using Rewrite.Core;
+using Rewrite.Core.Rpc;
 using static Rewrite.Core.Rpc.Reference;
 
-namespace OpenRewrite.Java.Rpc;
+namespace Rewrite.Java.Rpc;
 
 public class JavaSender : JavaVisitor<RpcSendQueue>
 {
@@ -63,9 +63,6 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             MethodInvocation mi => VisitMethodInvocation(mi, q),
             NewClass nc => VisitNewClass(nc, q),
             NewArray na => VisitNewArray(na, q),
-            InstanceOf io => VisitInstanceOf(io, q),
-            NullableType nt => VisitNullableType(nt, q),
-            ParameterizedType pt => VisitParameterizedType(pt, q),
             ArrayType at => VisitArrayType(at, q),
             ArrayAccess aa => VisitArrayAccess(aa, q),
             ArrayDimension ad => VisitArrayDimension(ad, q),
@@ -75,11 +72,10 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             SwitchExpression se => VisitSwitchExpression(se, q),
             Case cs => VisitCase(cs, q),
             DeconstructionPattern dp => VisitDeconstructionPattern(dp, q),
-            Label lbl => VisitLabel(lbl, q),
             Synchronized sync => VisitSynchronized(sync, q),
             TypeCast tc => VisitTypeCast(tc, q),
             Package pkg => VisitPackage(pkg, q),
-            _ => throw new InvalidOperationException($"Unknown J tree type: {tree.GetType()}")
+            _ => throw new InvalidOperationException($"Unknown J tree type: {tree.GetType().Name}")
         };
 
         Cursor = Cursor.Parent!;
@@ -112,38 +108,6 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     {
         q.GetAndSend(arrayDimension, a => a.Index, idx => VisitRightPadded(idx, q));
         return arrayDimension;
-    }
-
-    public override J VisitLabel(Label label, RpcSendQueue q)
-    {
-        q.GetAndSend(label, l => l.LabelName, lbl => VisitRightPadded(lbl, q));
-        q.GetAndSend(label, l => l.Statement, stmt => Visit(stmt, q));
-        return label;
-    }
-
-    public override J VisitInstanceOf(InstanceOf instanceOf, RpcSendQueue q)
-    {
-        q.GetAndSend(instanceOf, i => i.Expression, expr => VisitRightPadded(expr, q));
-        q.GetAndSend(instanceOf, i => i.Clazz, clazz => Visit(clazz, q));
-        q.GetAndSend(instanceOf, i => i.Pattern, pattern => Visit(pattern, q));
-        q.GetAndSend(instanceOf, i => AsRef(i.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
-        q.GetAndSend(instanceOf, i => i.InstanceOfModifier, m => Visit(m, q));
-        return instanceOf;
-    }
-
-    public override J VisitNullableType(NullableType nullableType, RpcSendQueue q)
-    {
-        q.GetAndSendList(nullableType, n => n.Annotations, a => a.Id, a => Visit(a, q));
-        q.GetAndSend(nullableType, n => n.TypeTreePadded, t => VisitRightPadded(t, q));
-        return nullableType;
-    }
-
-    public override J VisitParameterizedType(ParameterizedType type, RpcSendQueue q)
-    {
-        q.GetAndSend(type, t => (J)t.Clazz, clazz => Visit(clazz, q));
-        q.GetAndSend(type, t => t.TypeParameters, p => VisitContainer(p, q));
-        q.GetAndSend(type, t => AsRef(t.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
-        return type;
     }
 
     public override J VisitArrayType(ArrayType arrayType, RpcSendQueue q)
@@ -399,10 +363,9 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
     public J VisitModifier(Modifier modifier, RpcSendQueue q)
     {
-        // Java model has a keyword string field; use stored keyword for LanguageExtension, derive for others
-        q.GetAndSend(modifier, m => m.Keyword ?? GetModifierKeyword(m.Type));
-        // C#-specific modifier types must be mapped to LanguageExtension for Java interop
-        q.GetAndSend(modifier, m => MapModifierTypeForJava(m.Type));
+        // Java model has a keyword string field; derive from ModifierType for protocol compatibility
+        q.GetAndSend(modifier, m => GetModifierKeyword(m.Type));
+        q.GetAndSend(modifier, m => m.Type);
         q.GetAndSendList(modifier, m => m.Annotations, a => a.Id, annot => Visit(annot, q));
         return modifier;
     }
@@ -448,7 +411,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
     public override J VisitReturn(Return aReturn, RpcSendQueue q)
     {
-        q.GetAndSend(aReturn, r => (J?)r.Expression, expr => Visit(expr!, q));
+        q.GetAndSend(aReturn, r => r.Expression, expr => VisitLeftPadded(expr, q));
         return aReturn;
     }
 
@@ -505,7 +468,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         return typeCast;
     }
 
-    public override J VisitTypeParameter(TypeParameter typeParam, RpcSendQueue q)
+    public J VisitTypeParameter(TypeParameter typeParam, RpcSendQueue q)
     {
         q.GetAndSendList(typeParam, t => t.Annotations, a => a.Id, annot => Visit(annot, q));
         q.GetAndSendList(typeParam, t => t.Modifiers, m => m.Id, mod => Visit(mod, q));
@@ -526,7 +489,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     {
         q.GetAndSend(variable, v => (J)v.Name, decl => Visit(decl, q));
         q.GetAndSendList(variable, v => v.DimensionsAfterName,
-            l => l.Element.ToString()!, dim => VisitLeftPadded(dim, q));
+            l => l.Element.ToString(), dim => VisitLeftPadded(dim, q));
         q.GetAndSend(variable, v => v.Initializer, init => VisitLeftPadded(init, q));
         q.GetAndSend(variable, v => AsRef(v.Type), type => VisitType(GetValueNonNull<JavaType>(type), q));
         return variable;
@@ -600,27 +563,8 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     public virtual void VisitContainer<TJ>(JContainer<TJ> container, RpcSendQueue q) where TJ : J
     {
         q.GetAndSend(container, c => c.Before, space => VisitSpace(GetValueNonNull<Space>(space), q));
-        q.GetAndSendList(container, c => c.Elements, e =>
-        {
-            if (e.Element == null)
-                throw new NullReferenceException(
-                    $"Null element in JContainer<{typeof(TJ).Name}>, cursor path: {BuildCursorPath()}");
-            return e.Element.Id;
-        }, e => VisitRightPadded(e, q));
+        q.GetAndSendList(container, c => c.Elements, e => e.Element.Id, e => VisitRightPadded(e, q));
         q.GetAndSend(container, c => c.Markers);
-    }
-
-    private string BuildCursorPath()
-    {
-        var parts = new List<string>();
-        var c = Cursor;
-        while (c != null && !c.IsRoot)
-        {
-            parts.Add(c.Value?.GetType().Name ?? "null");
-            c = c.Parent;
-        }
-        parts.Reverse();
-        return string.Join(" > ", parts);
     }
 
     public virtual void VisitSpace(Space space, RpcSendQueue q)
@@ -658,140 +602,12 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
         switch (javaType)
         {
-            case JavaType.Annotation annotation:
-                q.GetAndSend(annotation, a => AsRef(a.AnnotationType),
-                    t => VisitType(GetValueNonNull<JavaType>(t), q));
-                break;
-
-            case JavaType.MultiCatch multiCatch:
-                q.GetAndSendListAsRef(multiCatch, m => m.ThrowableTypes,
-                    t => TypeSignature(t), t => VisitType(t, q));
-                break;
-
-            case JavaType.Intersection intersection:
-                q.GetAndSendListAsRef(intersection, i => i.Bounds,
-                    t => TypeSignature(t), t => VisitType(t, q));
-                break;
-
-            case JavaType.Class cls:
-                q.GetAndSend(cls, c => c.FlagsBitMap);
-                q.GetAndSend(cls, c => c.ClassKind);
-                q.GetAndSend(cls, c => c.FullyQualifiedName);
-                q.GetAndSendListAsRef(cls, c => c.TypeParameters,
-                    t => TypeSignature(t), t => VisitType(t, q));
-                q.GetAndSend(cls, c => AsRef(c.Supertype),
-                    t => VisitType(GetValueNonNull<JavaType>(t), q));
-                q.GetAndSend(cls, c => AsRef(c.OwningClass),
-                    t => VisitType(GetValueNonNull<JavaType>(t), q));
-                q.GetAndSendListAsRef(cls, c => c.Annotations,
-                    t => TypeSignature(t), t => VisitType(t, q));
-                q.GetAndSendListAsRef(cls, c => c.Interfaces,
-                    t => TypeSignature(t), t => VisitType(t, q));
-                q.GetAndSendListAsRef(cls, c => c.Members,
-                    t => TypeSignature(t), t => VisitType(t, q));
-                q.GetAndSendListAsRef(cls, c => c.Methods,
-                    t => TypeSignature(t), t => VisitType(t, q));
-                break;
-
-            case JavaType.Parameterized parameterized:
-                q.GetAndSend(parameterized, p => AsRef(p.Type),
-                    t => VisitType(GetValueNonNull<JavaType>(t), q));
-                q.GetAndSendListAsRef(parameterized, p => p.TypeParameters,
-                    t => TypeSignature(t), t => VisitType(t, q));
-                break;
-
-            case JavaType.GenericTypeVariable generic:
-                q.GetAndSend(generic, g => g.Name);
-                q.GetAndSend(generic, g => g.Variance.ToString().ToUpper());
-                q.GetAndSendListAsRef(generic, g => g.Bounds,
-                    t => TypeSignature(t), t => VisitType(t, q));
-                break;
-
-            case JavaType.Array array:
-                q.GetAndSend(array, a => AsRef(a.ElemType),
-                    t => VisitType(GetValueNonNull<JavaType>(t), q));
-                q.GetAndSendListAsRef(array, a => a.Annotations,
-                    t => TypeSignature(t), t => VisitType(t, q));
-                break;
-
             case JavaType.Primitive primitive:
                 q.GetAndSend(primitive, p => GetPrimitiveKeyword(p.Kind));
-                break;
-
-            case JavaType.Method method:
-                q.GetAndSend(method, m => AsRef(m.DeclaringType),
-                    t => VisitType(GetValueNonNull<JavaType>(t), q));
-                q.GetAndSend(method, m => m.Name);
-                q.GetAndSend(method, m => m.FlagsBitMap);
-                q.GetAndSend(method, m => AsRef(m.ReturnType),
-                    t => VisitType(GetValueNonNull<JavaType>(t), q));
-                q.GetAndSendList(method, m => m.ParameterNames,
-                    s => s, null);
-                q.GetAndSendListAsRef(method, m => m.ParameterTypes,
-                    t => TypeSignature(t), t => VisitType(t, q));
-                q.GetAndSendListAsRef(method, m => m.ThrownExceptions,
-                    t => TypeSignature(t), t => VisitType(t, q));
-                q.GetAndSendListAsRef(method, m => m.Annotations,
-                    t => TypeSignature(t), t => VisitType(t, q));
-                q.GetAndSendList(method, m => m.DefaultValue,
-                    s => s, null);
-                q.GetAndSendList(method, m => m.DeclaredFormalTypeNames,
-                    s => s, null);
-                break;
-
-            case JavaType.Variable variable:
-                q.GetAndSend(variable, v => v.Name);
-                q.GetAndSend(variable, v => AsRef(v.Owner),
-                    t => VisitType(GetValueNonNull<JavaType>(t), q));
-                q.GetAndSend(variable, v => AsRef(v.Type),
-                    t => VisitType(GetValueNonNull<JavaType>(t), q));
-                q.GetAndSendListAsRef(variable, v => v.Annotations,
-                    t => TypeSignature(t), t => VisitType(t, q));
                 break;
         }
 
         return javaType;
-    }
-
-    /// <summary>
-    /// Produces a signature string for a JavaType, used as the identity function
-    /// for GetAndSendListAsRef. Matches DefaultJavaTypeSignatureBuilder.java.
-    /// </summary>
-    [ThreadStatic] private static HashSet<JavaType>? _typeSignatureStack;
-
-    private static object TypeSignature(JavaType type)
-    {
-        _typeSignatureStack ??= new HashSet<JavaType>(ReferenceEqualityComparer.Instance);
-        if (!_typeSignatureStack.Add(type))
-            return "{circular}";
-        try
-        {
-            return type switch
-            {
-                JavaType.Primitive p => p.Keyword,
-                JavaType.Class c => c.FullyQualifiedName,
-                JavaType.Parameterized p => TypeSignature(p.Type!) + "<" +
-                    string.Join(", ", (p.TypeParameters ?? []).Select(TypeSignature)) + ">",
-                JavaType.GenericTypeVariable g => "Generic{" + g.Name + "}",
-                JavaType.Array a => TypeSignature(a.ElemType!) + "[]",
-                JavaType.Method m => TypeSignature(m.DeclaringType!) +
-                    "{name=" + m.Name + ",return=" + TypeSignature(m.ReturnType!) +
-                    ",parameters=[" + string.Join(",", (m.ParameterTypes ?? []).Select(TypeSignature)) + "]}",
-                JavaType.Variable v => TypeSignature(v.Owner!) +
-                    "{name=" + v.Name + ",type=" + TypeSignature(v.Type!) + "}",
-                JavaType.MultiCatch mc => string.Join("|",
-                    (mc.ThrowableTypes ?? []).Select(TypeSignature)),
-                JavaType.Intersection i => string.Join(" & ",
-                    (i.Bounds ?? []).Select(TypeSignature)),
-                JavaType.Annotation a => "@" + (a.AnnotationType != null ? TypeSignature(a.AnnotationType) : "{undefined}"),
-                JavaType.Unknown => "{undefined}",
-                _ => "{undefined}"
-            };
-        }
-        finally
-        {
-            _typeSignatureStack.Remove(type);
-        }
     }
 
     private static string GetPrimitiveKeyword(JavaType.PrimitiveKind kind) => kind switch
@@ -843,33 +659,5 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         Modifier.ModifierType.In => "in",
         Modifier.ModifierType.LanguageExtension => "",
         _ => type.ToString().ToLowerInvariant()
-    };
-
-    /// <summary>
-    /// Maps C#-specific modifier types to LanguageExtension for Java interop.
-    /// Java's J.Modifier.Type enum only contains modifiers shared across languages.
-    /// C#-only modifiers (partial, internal, virtual, override, etc.) are sent as
-    /// LanguageExtension with the actual keyword preserved in the keyword field.
-    /// </summary>
-    private static Modifier.ModifierType MapModifierTypeForJava(Modifier.ModifierType type) => type switch
-    {
-        // These exist in Java's J.Modifier.Type enum
-        Modifier.ModifierType.Default => type,
-        Modifier.ModifierType.Public => type,
-        Modifier.ModifierType.Protected => type,
-        Modifier.ModifierType.Private => type,
-        Modifier.ModifierType.Abstract => type,
-        Modifier.ModifierType.Static => type,
-        Modifier.ModifierType.Final => type,
-        Modifier.ModifierType.Sealed => type,
-        Modifier.ModifierType.Transient => type,
-        Modifier.ModifierType.Volatile => type,
-        Modifier.ModifierType.Synchronized => type,
-        Modifier.ModifierType.Native => type,
-        Modifier.ModifierType.Strictfp => type,
-        Modifier.ModifierType.Async => type,
-        Modifier.ModifierType.LanguageExtension => type,
-        // C#-specific modifiers map to LanguageExtension
-        _ => Modifier.ModifierType.LanguageExtension
     };
 }

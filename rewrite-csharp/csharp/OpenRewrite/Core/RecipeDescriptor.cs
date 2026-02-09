@@ -1,6 +1,6 @@
 using JetBrains.Annotations;
 
-namespace OpenRewrite.Core;
+namespace Rewrite.Core;
 
 /// <summary>
 /// Complete metadata description of a recipe, including its options

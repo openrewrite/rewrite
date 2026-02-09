@@ -1,6 +1,6 @@
-using OpenRewrite.Test;
+using Rewrite.Test;
 
-namespace OpenRewrite.Tests.Tree;
+namespace Rewrite.CSharp.Tests.Tree;
 
 public class ParenthesesTests : RewriteTest
 {

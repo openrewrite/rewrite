@@ -1,6 +1,6 @@
-using OpenRewrite.Test;
+using Rewrite.Test;
 
-namespace OpenRewrite.Tests.Tree;
+namespace Rewrite.CSharp.Tests.Tree;
 
 public class ArrayAccessTests : RewriteTest
 {
@@ -369,55 +369,6 @@ public class ArrayAccessTests : RewriteTest
                 class Foo {
                     void Bar(string[]? arr) {
                         var x = arr?[0]?.ToUpper();
-                    }
-                }
-                """
-            )
-        );
-    }
-
-    [Fact]
-    public void IndexFromEndOperator()
-    {
-        RewriteRun(
-            CSharp(
-                """
-                class Foo {
-                    void Bar(int[] arr) {
-                        var x = arr[^1];
-                    }
-                }
-                """
-            )
-        );
-    }
-
-    [Fact]
-    public void IndexFromEndWithVariable()
-    {
-        RewriteRun(
-            CSharp(
-                """
-                class Foo {
-                    void Bar(int[] arr) {
-                        var idx = ^3;
-                        var x = arr[idx];
-                    }
-                }
-                """
-            )
-        );
-    }
-
-    [Fact]
-    public void RangeWithIndexFromEnd()
-    {
-        RewriteRun(
-            CSharp(
-                """
-                class Foo {
-                    void Bar(int[] arr) {
-                        var x = arr[1..^1];
                     }
                 }
                 """

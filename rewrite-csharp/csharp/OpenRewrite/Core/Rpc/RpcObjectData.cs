@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace OpenRewrite.Core.Rpc;
+namespace Rewrite.Core.Rpc;
 
 public sealed class RpcObjectData
 {
@@ -15,7 +15,7 @@ public sealed class RpcObjectData
 
     public int? Ref { get; init; }
 
-    public object? Trace { get; init; }
+    public string? Trace { get; init; }
 
     public T? GetValue<T>()
     {

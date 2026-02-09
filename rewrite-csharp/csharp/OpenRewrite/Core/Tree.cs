@@ -1,4 +1,4 @@
-namespace OpenRewrite.Core;
+namespace Rewrite.Core;
 
 /// <summary>
 /// The base interface for all LST (Lossless Semantic Tree) elements.

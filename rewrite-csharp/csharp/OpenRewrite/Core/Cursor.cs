@@ -1,4 +1,4 @@
-namespace OpenRewrite.Core;
+namespace Rewrite.Core;
 
 /// <summary>
 /// Tracks the path from root to the current node during tree traversal.

@@ -1,4 +1,4 @@
-namespace OpenRewrite.Core;
+namespace Rewrite.Core;
 
 /// <summary>
 /// Context for recipe execution, providing message passing between recipes and visitors.
