@@ -1,5 +1,10 @@
+using System.Diagnostics;
+using System.Reflection;
+using System.Runtime.Loader;
+using System.Xml.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 using Rewrite.Core;
 using Rewrite.Core.Rpc;
@@ -12,6 +17,9 @@ namespace Rewrite.CSharp.Rpc;
 public class RewriteRpcServer
 {
     private readonly CSharpParser _parser = new();
+    private readonly RecipeMarketplace _marketplace;
+    private readonly Dictionary<string, Recipe> _preparedRecipes = new();
+    private string? _recipesProjectDir;
 
     /// <summary>
     /// Objects that have been parsed locally and are available for remote access.
@@ -28,8 +36,10 @@ public class RewriteRpcServer
     /// </summary>
     private readonly Dictionary<object, int> _localRefs = new(ReferenceEqualityComparer.Instance);
 
-    public RewriteRpcServer()
+    public RewriteRpcServer(RecipeMarketplace marketplace)
     {
+        _marketplace = marketplace;
+
         // Register type name overrides for nagoya types that don't match Java names
         RpcSendQueue.RegisterJavaTypeName(typeof(NamespaceDeclaration),
             "org.openrewrite.csharp.tree.Cs$BlockScopeNamespaceDeclaration");
@@ -142,8 +152,404 @@ public class RewriteRpcServer
         return Task.FromResult(printed);
     }
 
-    public static async Task RunAsync(CancellationToken cancellationToken = default)
+    [JsonRpcMethod("GetMarketplace")]
+    public Task<List<GetMarketplaceResponseRow>> GetMarketplace()
     {
+        var rowByRecipeId = new Dictionary<string, GetMarketplaceResponseRow>();
+
+        foreach (var category in _marketplace.Categories)
+        {
+            CollectRecipes(rowByRecipeId, category, []);
+        }
+
+        return Task.FromResult(rowByRecipeId.Values.ToList());
+    }
+
+    private static void CollectRecipes(
+        Dictionary<string, GetMarketplaceResponseRow> rowByRecipeId,
+        RecipeMarketplace.Category category,
+        List<CategoryDescriptorDto> parentPath)
+    {
+        var currentPath = new List<CategoryDescriptorDto>(parentPath)
+        {
+            new() { DisplayName = category.Descriptor.DisplayName, Description = category.Descriptor.Description }
+        };
+
+        foreach (var (descriptor, _) in category.Recipes)
+        {
+            if (!rowByRecipeId.TryGetValue(descriptor.Name, out var row))
+            {
+                row = new GetMarketplaceResponseRow
+                {
+                    Descriptor = RecipeDescriptorDto.FromDescriptor(descriptor),
+                    CategoryPaths = []
+                };
+                rowByRecipeId[descriptor.Name] = row;
+            }
+            row.CategoryPaths.Add(new List<CategoryDescriptorDto>(currentPath));
+        }
+
+        foreach (var child in category.SubCategories)
+        {
+            CollectRecipes(rowByRecipeId, child, currentPath);
+        }
+    }
+
+    [JsonRpcMethod("InstallRecipes", UseSingleObjectParameterDeserialization = true)]
+    public Task<InstallRecipesResponse> InstallRecipes(InstallRecipesRequest request)
+    {
+        var beforeCount = _marketplace.AllRecipes().Count;
+        string? version = null;
+
+        if (request.Recipes is string path)
+        {
+            // Local assembly path
+            var absolutePath = Path.GetFullPath(path);
+            var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(absolutePath);
+            ActivateAssembly(assembly);
+        }
+        else if (request.Recipes is JObject packageObj)
+        {
+            var packageName = packageObj["packageName"]?.ToString()
+                              ?? throw new ArgumentException("Missing packageName in recipes object");
+            version = packageObj["version"]?.ToString();
+
+            if (File.Exists(packageName))
+            {
+                var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.GetFullPath(packageName));
+                ActivateAssembly(assembly);
+            }
+            else
+            {
+                // NuGet package download via dotnet CLI
+                var csprojPath = EnsureRecipesProject();
+                var args = $"add \"{csprojPath}\" package {packageName}";
+                if (version != null)
+                    args += $" --version {version}";
+                RunDotnet(args);
+
+                version = ResolveVersionFromCsproj(csprojPath, packageName);
+
+                var assemblies = LoadPackageWithDependencies(csprojPath, packageName, version);
+                foreach (var assembly in assemblies)
+                {
+                    ActivateAssembly(assembly);
+                }
+            }
+        }
+        else
+        {
+            throw new ArgumentException($"Unexpected recipes type: {request.Recipes?.GetType().Name ?? "null"}");
+        }
+
+        var afterCount = _marketplace.AllRecipes().Count;
+        return Task.FromResult(new InstallRecipesResponse
+        {
+            RecipesInstalled = afterCount - beforeCount,
+            Version = version
+        });
+    }
+
+    private void ActivateAssembly(Assembly assembly)
+    {
+        foreach (var type in assembly.GetExportedTypes())
+        {
+            if (typeof(IRecipeActivator).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
+            {
+                var activator = (IRecipeActivator)Activator.CreateInstance(type)!;
+                activator.Activate(_marketplace);
+            }
+        }
+    }
+
+    private string EnsureRecipesProject()
+    {
+        if (_recipesProjectDir != null)
+        {
+            var existing = Path.Combine(_recipesProjectDir, "Recipes.csproj");
+            if (File.Exists(existing))
+                return existing;
+        }
+
+        _recipesProjectDir = Path.Combine(Path.GetTempPath(), "rewrite-recipes", Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(_recipesProjectDir);
+
+        var csprojPath = Path.Combine(_recipesProjectDir, "Recipes.csproj");
+        File.WriteAllText(csprojPath, """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net9.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        return csprojPath;
+    }
+
+    private static void RunDotnet(string arguments)
+    {
+        var psi = new ProcessStartInfo("dotnet", arguments)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = System.Diagnostics.Process.Start(psi)
+                            ?? throw new InvalidOperationException("Failed to start dotnet process");
+
+        var stdout = process.StandardOutput.ReadToEnd();
+        var stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"dotnet {arguments} failed (exit code {process.ExitCode}):\n{stderr}\n{stdout}");
+        }
+    }
+
+    private static string ResolveVersionFromCsproj(string csprojPath, string packageName)
+    {
+        var doc = XDocument.Load(csprojPath);
+        var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
+
+        var packageRef = doc.Descendants(ns + "PackageReference")
+            .FirstOrDefault(e => string.Equals(
+                e.Attribute("Include")?.Value, packageName, StringComparison.OrdinalIgnoreCase));
+
+        return packageRef?.Attribute("Version")?.Value
+               ?? throw new InvalidOperationException(
+                   $"Could not find resolved version for {packageName} in {csprojPath}");
+    }
+
+    private static string GetNuGetPackagesPath()
+    {
+        var envPath = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
+        if (!string.IsNullOrEmpty(envPath))
+            return envPath;
+
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".nuget", "packages");
+    }
+
+    /// <summary>
+    /// Find DLL paths for a package in the NuGet global packages cache.
+    /// </summary>
+    private static List<string> FindPackageAssemblies(string packageName, string version)
+    {
+        var packagesPath = GetNuGetPackagesPath();
+        var packageDir = Path.Combine(packagesPath, packageName.ToLowerInvariant(), version, "lib");
+
+        if (!Directory.Exists(packageDir))
+            return [];
+
+        // Prefer TFMs in order of compatibility
+        string[] tfmPreference = ["net9.0", "net8.0", "net7.0", "net6.0", "netstandard2.1", "netstandard2.0"];
+
+        foreach (var tfm in tfmPreference)
+        {
+            var tfmDir = Path.Combine(packageDir, tfm);
+            if (Directory.Exists(tfmDir))
+            {
+                return Directory.GetFiles(tfmDir, "*.dll").ToList();
+            }
+        }
+
+        // If no preferred TFM found, try any available net* folder
+        var availableTfms = Directory.GetDirectories(packageDir);
+        foreach (var tfmDir in availableTfms)
+        {
+            var dlls = Directory.GetFiles(tfmDir, "*.dll");
+            if (dlls.Length > 0)
+                return dlls.ToList();
+        }
+
+        return [];
+    }
+
+    /// <summary>
+    /// Load a NuGet package and its transitive dependencies from the NuGet cache.
+    /// Parses obj/project.assets.json to discover all packages in the dependency graph.
+    /// Skips assemblies that are already loaded in the current AppDomain.
+    /// </summary>
+    private static List<Assembly> LoadPackageWithDependencies(string csprojPath, string packageName, string version)
+    {
+        var loadedAssemblyNames = new HashSet<string>(
+            AppDomain.CurrentDomain.GetAssemblies()
+                .Select(a => a.GetName().Name!)
+                .Where(n => n != null),
+            StringComparer.OrdinalIgnoreCase);
+
+        var projectDir = Path.GetDirectoryName(csprojPath)!;
+        var assetsPath = Path.Combine(projectDir, "obj", "project.assets.json");
+        var loadedAssemblies = new List<Assembly>();
+
+        if (File.Exists(assetsPath))
+        {
+            // Parse project.assets.json to find all packages and their DLL paths
+            var assetsJson = JObject.Parse(File.ReadAllText(assetsPath));
+            var libraries = assetsJson["libraries"] as JObject;
+
+            if (libraries != null)
+            {
+                foreach (var (key, _) in libraries)
+                {
+                    // key format: "PackageName/Version"
+                    var parts = key.Split('/', 2);
+                    if (parts.Length != 2) continue;
+
+                    var depName = parts[0];
+                    var depVersion = parts[1];
+
+                    var dlls = FindPackageAssemblies(depName, depVersion);
+                    foreach (var dll in dlls)
+                    {
+                        var assemblyName = Path.GetFileNameWithoutExtension(dll);
+                        if (loadedAssemblyNames.Contains(assemblyName))
+                            continue;
+
+                        try
+                        {
+                            var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(dll);
+                            loadedAssemblies.Add(assembly);
+                            loadedAssemblyNames.Add(assemblyName);
+                        }
+                        catch (Exception)
+                        {
+                            // Skip assemblies that can't be loaded (e.g., platform-specific)
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Fallback: just load the requested package directly from cache
+            var dlls = FindPackageAssemblies(packageName, version);
+            foreach (var dll in dlls)
+            {
+                var assemblyName = Path.GetFileNameWithoutExtension(dll);
+                if (loadedAssemblyNames.Contains(assemblyName))
+                    continue;
+
+                try
+                {
+                    var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(dll);
+                    loadedAssemblies.Add(assembly);
+                    loadedAssemblyNames.Add(assemblyName);
+                }
+                catch (Exception)
+                {
+                    // Skip assemblies that can't be loaded
+                }
+            }
+        }
+
+        return loadedAssemblies;
+    }
+
+    [JsonRpcMethod("PrepareRecipe", UseSingleObjectParameterDeserialization = true)]
+    public Task<PrepareRecipeResponse> PrepareRecipe(PrepareRecipeRequest request)
+    {
+        var found = _marketplace.FindRecipe(request.Id);
+        if (found == null)
+        {
+            throw new InvalidOperationException($"Recipe not found: {request.Id}");
+        }
+
+        var (descriptor, recipe) = found.Value;
+        if (recipe == null)
+        {
+            throw new InvalidOperationException($"Recipe {request.Id} has no live instance (installed without constructor)");
+        }
+
+        // If options are provided, create a new instance with options applied
+        if (request.Options is { Count: > 0 })
+        {
+            recipe = InstantiateWithOptions(recipe.GetType(), request.Options);
+        }
+
+        var id = Guid.NewGuid().ToString();
+        _preparedRecipes[id] = recipe;
+
+        return Task.FromResult(new PrepareRecipeResponse
+        {
+            Id = id,
+            Descriptor = RecipeDescriptorDto.FromDescriptor(recipe.GetDescriptor()),
+            EditVisitor = $"edit:{id}",
+            ScanVisitor = recipe is ScanningRecipe<object> ? $"scan:{id}" : null
+        });
+    }
+
+    private static Recipe InstantiateWithOptions(Type recipeType, Dictionary<string, object?> options)
+    {
+        var recipe = (Recipe)Activator.CreateInstance(recipeType)!;
+        foreach (var (key, value) in options)
+        {
+            var prop = recipeType.GetProperty(key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (prop != null && prop.CanWrite)
+            {
+                var convertedValue = Convert.ChangeType(value, prop.PropertyType);
+                prop.SetValue(recipe, convertedValue);
+            }
+        }
+        return recipe;
+    }
+
+    [JsonRpcMethod("Visit", UseSingleObjectParameterDeserialization = true)]
+    public Task<VisitResponse> Visit(VisitRequest request)
+    {
+        // Parse visitor name: "edit:<recipeId>" or "scan:<recipeId>"
+        var parts = request.VisitorName.Split(':', 2);
+        if (parts.Length != 2)
+        {
+            throw new ArgumentException($"Invalid visitor name format: {request.VisitorName}");
+        }
+
+        var phase = parts[0]; // "edit" or "scan"
+        var recipeId = parts[1];
+
+        if (!_preparedRecipes.TryGetValue(recipeId, out var recipe))
+        {
+            throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
+        }
+
+        if (!_localObjects.TryGetValue(request.TreeId, out var obj) || obj is not Tree tree)
+        {
+            throw new InvalidOperationException($"Tree not found: {request.TreeId}");
+        }
+
+        var ctx = new Core.ExecutionContext();
+        var visitor = recipe.GetVisitor();
+        var result = visitor.Visit(tree, ctx);
+
+        var modified = !ReferenceEquals(tree, result);
+        if (modified && result != null)
+        {
+            _localObjects[request.TreeId] = result;
+        }
+
+        return Task.FromResult(new VisitResponse { Modified = modified });
+    }
+
+    public static async Task RunAsync(RecipeMarketplace? marketplace = null,
+        CancellationToken cancellationToken = default)
+    {
+        marketplace ??= new RecipeMarketplace();
+
+        // Scan current assembly for IRecipeActivator implementations
+        foreach (var type in Assembly.GetExecutingAssembly().GetExportedTypes())
+        {
+            if (typeof(IRecipeActivator).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
+            {
+                var activator = (IRecipeActivator)Activator.CreateInstance(type)!;
+                activator.Activate(marketplace);
+            }
+        }
+
         using var inputStream = Console.OpenStandardInput();
         using var outputStream = Console.OpenStandardOutput();
 
@@ -158,12 +564,13 @@ public class RewriteRpcServer
         var handler = new HeaderDelimitedMessageHandler(outputStream, inputStream, formatter);
         using var jsonRpc = new JsonRpc(handler);
 
-        var server = new RewriteRpcServer();
+        var server = new RewriteRpcServer(marketplace);
         jsonRpc.AddLocalRpcTarget(server);
         jsonRpc.StartListening();
 
         await jsonRpc.Completion.WaitAsync(cancellationToken);
     }
+
     private class TreeCodec : IRpcCodec
     {
         public static readonly TreeCodec Instance = new();
@@ -172,7 +579,7 @@ public class RewriteRpcServer
     }
 }
 
-// --- Request DTOs ---
+// --- Request/Response DTOs ---
 
 public class ParseRequest
 {
@@ -196,4 +603,111 @@ public class PrintRequest
     public string TreeId { get; set; } = "";
     public string? SourcePath { get; set; }
     public string? SourceFileType { get; set; }
+}
+
+public class GetMarketplaceResponseRow
+{
+    public RecipeDescriptorDto Descriptor { get; set; } = null!;
+    public List<List<CategoryDescriptorDto>> CategoryPaths { get; set; } = [];
+}
+
+public class CategoryDescriptorDto
+{
+    public string DisplayName { get; set; } = "";
+    public string? Description { get; set; }
+}
+
+public class RecipeDescriptorDto
+{
+    public string Name { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string Description { get; set; } = "";
+    public IReadOnlySet<string>? Tags { get; set; }
+    public string? EstimatedEffortPerOccurrence { get; set; }
+    public List<OptionDescriptorDto>? Options { get; set; }
+    public List<RecipeDescriptorDto>? RecipeList { get; set; }
+
+    public static RecipeDescriptorDto FromDescriptor(RecipeDescriptor d)
+    {
+        return new RecipeDescriptorDto
+        {
+            Name = d.Name,
+            DisplayName = d.DisplayName,
+            Description = d.Description,
+            Tags = d.Tags.Count > 0 ? d.Tags : null,
+            EstimatedEffortPerOccurrence = d.EstimatedEffortPerOccurrence?.ToString(),
+            Options = d.Options.Count > 0
+                ? d.Options.Select(OptionDescriptorDto.FromDescriptor).ToList()
+                : null,
+            RecipeList = d.RecipeList.Count > 0
+                ? d.RecipeList.Select(FromDescriptor).ToList()
+                : null
+        };
+    }
+}
+
+public class OptionDescriptorDto
+{
+    public string Name { get; set; } = "";
+    public string Type { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string? Example { get; set; }
+    public List<string>? Valid { get; set; }
+    public bool Required { get; set; }
+    public object? Value { get; set; }
+
+    public static OptionDescriptorDto FromDescriptor(OptionDescriptor d)
+    {
+        return new OptionDescriptorDto
+        {
+            Name = d.Name,
+            Type = d.Type,
+            DisplayName = d.DisplayName,
+            Description = d.Description,
+            Example = d.Example,
+            Valid = d.Valid?.ToList(),
+            Required = d.Required,
+            Value = d.Value
+        };
+    }
+}
+
+public class InstallRecipesRequest
+{
+    public object? Recipes { get; set; }
+}
+
+public class InstallRecipesResponse
+{
+    public int RecipesInstalled { get; set; }
+    public string? Version { get; set; }
+}
+
+public class PrepareRecipeRequest
+{
+    public string Id { get; set; } = "";
+    public Dictionary<string, object?>? Options { get; set; }
+}
+
+public class PrepareRecipeResponse
+{
+    public string Id { get; set; } = "";
+    public RecipeDescriptorDto Descriptor { get; set; } = null!;
+    public string EditVisitor { get; set; } = "";
+    public string? ScanVisitor { get; set; }
+}
+
+public class VisitRequest
+{
+    public string VisitorName { get; set; } = "";
+    public string? SourceFileType { get; set; }
+    public string TreeId { get; set; } = "";
+    public string? PId { get; set; }
+    public List<string>? CursorIds { get; set; }
+}
+
+public class VisitResponse
+{
+    public bool Modified { get; set; }
 }
