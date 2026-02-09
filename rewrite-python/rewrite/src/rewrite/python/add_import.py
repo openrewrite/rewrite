@@ -16,9 +16,9 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
-from uuid import uuid4
+from typing import Optional
 
+from rewrite import random_id
 from rewrite.java import J
 from rewrite.java.support_types import JContainer, JLeftPadded, JRightPadded
 from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Space
@@ -285,7 +285,7 @@ class AddImport(PythonVisitor):
             next_stmt = new_statements[insert_idx + 1] if insert_idx + 1 < len(new_statements) else None
             if next_stmt and not next_stmt.prefix.whitespace.startswith('\n'):
                 new_statements[insert_idx + 1] = next_stmt.replace(  # ty: ignore[unresolved-attribute]
-                    prefix=Space.format('\n' + next_stmt.prefix.whitespace)  # ty: ignore[unresolved-attribute]
+                    prefix=Space([], '\n' + next_stmt.prefix.whitespace)
                 )
 
         return cu.replace(statements=new_statements)
@@ -296,13 +296,13 @@ class AddImport(PythonVisitor):
             # Direct import: import module [as alias]
             import_elem = self._create_import_element(self.module, self.alias)
             return MultiImport(
-                uuid4(),
-                Space.format('\n'),  # ty: ignore[unresolved-attribute]
+                random_id(),
+                Space([], '\n'),
                 Markers.EMPTY,
                 None,  # No 'from'
                 False,  # Not parenthesized
                 JContainer(
-                    Space.format(' '),  # ty: ignore[unresolved-attribute]
+                    Space.SINGLE_SPACE,
                     [self._pad_right(import_elem)],
                     Markers.EMPTY
                 )
@@ -312,13 +312,13 @@ class AddImport(PythonVisitor):
             from_name = self._create_qualified_name(self.module)
             import_elem = self._create_import_element(self.name, self.alias)
             return MultiImport(
-                uuid4(),
-                Space.format('\n'),  # ty: ignore[unresolved-attribute]
+                random_id(),
+                Space([], '\n'),
                 Markers.EMPTY,
-                JRightPadded(from_name, Space.format(' '), Markers.EMPTY),  # ty: ignore[unresolved-attribute]
+                JRightPadded(from_name, Space.SINGLE_SPACE, Markers.EMPTY),
                 False,  # Not parenthesized
                 JContainer(
-                    Space.format(' '),  # ty: ignore[unresolved-attribute]
+                    Space.SINGLE_SPACE,
                     [self._pad_right(import_elem)],
                     Markers.EMPTY
                 )
@@ -330,8 +330,8 @@ class AddImport(PythonVisitor):
         alias_left_padded = None
         if alias:
             alias_ident = Identifier(
-                uuid4(),
-                Space.format(' '),  # ty: ignore[unresolved-attribute]
+                random_id(),
+                Space.SINGLE_SPACE,
                 Markers.EMPTY,
                 [],
                 alias,
@@ -339,13 +339,13 @@ class AddImport(PythonVisitor):
                 None
             )
             alias_left_padded = JLeftPadded(
-                Space.format(' '),  # ty: ignore[unresolved-attribute]
+                Space.SINGLE_SPACE,
                 alias_ident,
                 Markers.EMPTY
             )
 
         return Import(
-            uuid4(),
+            random_id(),
             Space.EMPTY,
             Markers.EMPTY,
             JLeftPadded(Space.EMPTY, False, Markers.EMPTY),
@@ -358,29 +358,29 @@ class AddImport(PythonVisitor):
         parts = name.split('.')
         if len(parts) == 1:
             return FieldAccess(
-                uuid4(),
+                random_id(),
                 Space.EMPTY,
                 Markers.EMPTY,
-                Empty(uuid4(), Space.EMPTY, Markers.EMPTY),
+                Empty(random_id(), Space.EMPTY, Markers.EMPTY),
                 JLeftPadded(
                     Space.EMPTY,
-                    Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], parts[0], None, None),
+                    Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], parts[0], None, None),
                     Markers.EMPTY
                 ),
                 None
             )
 
         # Build nested FieldAccess for qualified names
-        result = Empty(uuid4(), Space.EMPTY, Markers.EMPTY)
+        result = Empty(random_id(), Space.EMPTY, Markers.EMPTY)
         for part in parts:
             result = FieldAccess(
-                uuid4(),
+                random_id(),
                 Space.EMPTY,
                 Markers.EMPTY,
                 result,
                 JLeftPadded(
                     Space.EMPTY if isinstance(result, Empty) else Space.EMPTY,
-                    Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], part, None, None),
+                    Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], part, None, None),
                     Markers.EMPTY
                 ),
                 None
