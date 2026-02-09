@@ -62,6 +62,10 @@ _pending_lock = threading.Lock()
 # Flag for trace mode
 _trace_rpc = False
 
+# Python version to parse (read from environment, default to "3")
+# Set REWRITE_PYTHON_VERSION to "2" or "2.7" to parse Python 2 code
+_python_version = os.environ.get("REWRITE_PYTHON_VERSION", "3")
+
 
 def _next_request_id() -> int:
     """Generate a unique request ID for outgoing requests."""
@@ -213,20 +217,32 @@ def parse_python_file(path: str) -> dict:
 
 
 def parse_python_source(source: str, path: str = "<unknown>") -> dict:
-    """Parse Python source code and return its LST."""
+    """Parse Python source code and return its LST.
+
+    The parser used depends on the REWRITE_PYTHON_VERSION environment variable:
+    - "2" or "2.7": Use parso-based Py2ParserVisitor for Python 2 code
+    - "3" (default): Use ast-based ParserVisitor for Python 3 code
+    """
     try:
-        # Import parser visitor
-        from rewrite.python._parser_visitor import ParserVisitor
-        from rewrite import random_id, Markers
+        from rewrite import Markers
 
-        # Strip BOM before parsing (ParserVisitor handles it internally but ast.parse doesn't)
-        source_for_ast = source[1:] if source.startswith('\ufeff') else source
+        if _python_version.startswith("2"):
+            # Python 2: Use parso-based parser
+            from rewrite.python._py2_parser_visitor import Py2ParserVisitor
+            cu = Py2ParserVisitor(source, path, _python_version).parse()
+        else:
+            # Python 3: Use standard ast-based parser
+            from rewrite.python._parser_visitor import ParserVisitor
 
-        # Parse using Python AST
-        tree = ast.parse(source_for_ast, path)
+            # Strip BOM before parsing (ParserVisitor handles it internally but ast.parse doesn't)
+            source_for_ast = source[1:] if source.startswith('\ufeff') else source
 
-        # Convert to OpenRewrite LST
-        cu = ParserVisitor(source, path).visit(tree)
+            # Parse using Python AST
+            tree = ast.parse(source_for_ast, path)
+
+            # Convert to OpenRewrite LST
+            cu = ParserVisitor(source, path).visit(tree)
+
         cu = cu.replace(source_path=Path(path))
         cu = cu.replace(markers=Markers.EMPTY)
 

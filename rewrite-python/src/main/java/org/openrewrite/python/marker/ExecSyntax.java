@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,18 +24,33 @@ import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
+/**
+ * Marker indicating that a {@code J.MethodInvocation} represents a Python 2 exec statement
+ * rather than a Python 3 exec function call.
+ * <p>
+ * In Python 2, exec is a statement with optional scope arguments:
+ * <pre>
+ * exec code                    # simple form
+ * exec code in globals         # with globals dict
+ * exec code in globals, locals # with globals and locals dicts
+ * </pre>
+ * <p>
+ * The marker allows the printer to output the correct syntax (using {@code in} keyword
+ * instead of function arguments) and allows recipes to distinguish between exec statements
+ * and exec function calls.
+ */
 @Value
 @With
-public class SuppressNewline implements Marker, RpcCodec<SuppressNewline> {
+public class ExecSyntax implements Marker, RpcCodec<ExecSyntax> {
     UUID id;
 
     @Override
-    public void rpcSend(SuppressNewline after, RpcSendQueue q) {
+    public void rpcSend(ExecSyntax after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
     }
 
     @Override
-    public SuppressNewline rpcReceive(SuppressNewline before, RpcReceiveQueue q) {
+    public ExecSyntax rpcReceive(ExecSyntax before, RpcReceiveQueue q) {
         return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
     }
 }

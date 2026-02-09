@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,21 +18,19 @@ package org.openrewrite.python.tree;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.openrewrite.python.Python3Only;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.python.Assertions.python;
 
-@Python3Only
-class AwaitTest implements RewriteTest {
+class BacktickReprTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "await x",
-            "await  x"
+      "x = `42`",
+      "x = `foo`",
+      "x = `foo + bar`",
     })
-    void await(@Language("py") String arg) {
-        rewriteRun(python(arg));
+    void backtickRepr(@Language("py") String code) {
+        rewriteRun(python(code));
     }
-
 }

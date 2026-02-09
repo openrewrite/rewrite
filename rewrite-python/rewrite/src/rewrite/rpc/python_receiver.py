@@ -1519,6 +1519,145 @@ def _register_parse_error_codec():
     )
 
 
+def _register_python_marker_codecs():
+    """Register codecs for Python-specific marker types."""
+    from rewrite.python.markers import (
+        KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline,
+        PrintSyntax, ExecSyntax
+    )
+    from rewrite.rpc.receive_queue import register_codec_with_both_names
+    from rewrite.rpc.send_queue import RpcSendQueue
+    from uuid import uuid4
+
+    # KeywordArguments - only has id
+    def _receive_keyword_arguments(marker: KeywordArguments, q: RpcReceiveQueue) -> KeywordArguments:
+        new_id = q.receive_defined(marker.id)
+        if new_id is marker.id:
+            return marker
+        return marker.with_id(new_id)
+
+    def _send_keyword_arguments(marker: KeywordArguments, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: x.id)
+
+    register_codec_with_both_names(
+        'org.openrewrite.python.marker.KeywordArguments',
+        KeywordArguments,
+        _receive_keyword_arguments,
+        lambda: KeywordArguments(uuid4()),
+        _send_keyword_arguments
+    )
+
+    # KeywordOnlyArguments - only has id
+    def _receive_keyword_only_arguments(marker: KeywordOnlyArguments, q: RpcReceiveQueue) -> KeywordOnlyArguments:
+        new_id = q.receive_defined(marker.id)
+        if new_id is marker.id:
+            return marker
+        return marker.with_id(new_id)
+
+    def _send_keyword_only_arguments(marker: KeywordOnlyArguments, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: x.id)
+
+    register_codec_with_both_names(
+        'org.openrewrite.python.marker.KeywordOnlyArguments',
+        KeywordOnlyArguments,
+        _receive_keyword_only_arguments,
+        lambda: KeywordOnlyArguments(uuid4()),
+        _send_keyword_only_arguments
+    )
+
+    # Quoted - has id and style (enum)
+    def _receive_quoted(marker: Quoted, q: RpcReceiveQueue) -> Quoted:
+        new_id = q.receive_defined(marker.id)
+        new_style = q.receive_defined(marker.style)
+        if new_id is marker.id and new_style is marker.style:
+            return marker
+        result = marker
+        if new_id is not marker.id:
+            result = result.with_id(new_id)
+        if new_style is not marker.style:
+            result = result.with_style(new_style)
+        return result
+
+    def _send_quoted(marker: Quoted, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: x.style)
+
+    register_codec_with_both_names(
+        'org.openrewrite.python.marker.Quoted',
+        Quoted,
+        _receive_quoted,
+        lambda: Quoted(uuid4(), Quoted.Style.DOUBLE),
+        _send_quoted
+    )
+
+    # SuppressNewline - only has id
+    def _receive_suppress_newline(marker: SuppressNewline, q: RpcReceiveQueue) -> SuppressNewline:
+        new_id = q.receive_defined(marker.id)
+        if new_id is marker.id:
+            return marker
+        return marker.with_id(new_id)
+
+    def _send_suppress_newline(marker: SuppressNewline, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: x.id)
+
+    register_codec_with_both_names(
+        'org.openrewrite.python.marker.SuppressNewline',
+        SuppressNewline,
+        _receive_suppress_newline,
+        lambda: SuppressNewline(uuid4()),
+        _send_suppress_newline
+    )
+
+    # PrintSyntax - has id, hasDestination (bool), trailingComma (bool)
+    def _receive_print_syntax(marker: PrintSyntax, q: RpcReceiveQueue) -> PrintSyntax:
+        new_id = q.receive_defined(marker.id)
+        new_has_destination = q.receive_defined(marker.has_destination)
+        new_trailing_comma = q.receive_defined(marker.trailing_comma)
+        if (new_id is marker.id and
+            new_has_destination is marker.has_destination and
+            new_trailing_comma is marker.trailing_comma):
+            return marker
+        result = marker
+        if new_id is not marker.id:
+            result = result.with_id(new_id)
+        if new_has_destination is not marker.has_destination:
+            result = result.with_has_destination(new_has_destination)
+        if new_trailing_comma is not marker.trailing_comma:
+            result = result.with_trailing_comma(new_trailing_comma)
+        return result
+
+    def _send_print_syntax(marker: PrintSyntax, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: x.has_destination)
+        q.get_and_send(marker, lambda x: x.trailing_comma)
+
+    register_codec_with_both_names(
+        'org.openrewrite.python.marker.PrintSyntax',
+        PrintSyntax,
+        _receive_print_syntax,
+        lambda: PrintSyntax(uuid4(), False, False),
+        _send_print_syntax
+    )
+
+    # ExecSyntax - only has id
+    def _receive_exec_syntax(marker: ExecSyntax, q: RpcReceiveQueue) -> ExecSyntax:
+        new_id = q.receive_defined(marker.id)
+        if new_id is marker.id:
+            return marker
+        return marker.with_id(new_id)
+
+    def _send_exec_syntax(marker: ExecSyntax, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: x.id)
+
+    register_codec_with_both_names(
+        'org.openrewrite.python.marker.ExecSyntax',
+        ExecSyntax,
+        _receive_exec_syntax,
+        lambda: ExecSyntax(uuid4()),
+        _send_exec_syntax
+    )
+
+
 # Register all codecs on module import
 _register_marker_codecs()  # Existing marker codecs with full deserialization
 _register_tree_codecs()
@@ -1527,3 +1666,4 @@ _register_java_type_codecs()  # JavaType.Primitive handling
 _register_core_marker_codecs()
 _register_style_codecs()
 _register_parse_error_codec()  # ParseError handling
+_register_python_marker_codecs()  # Python-specific markers including PrintSyntax, ExecSyntax
