@@ -22,10 +22,11 @@ from rewrite.category import CategoryDescriptor
 from rewrite.decorators import categorize
 from rewrite.java import J
 from rewrite.java.support_types import JContainer, JLeftPadded, JRightPadded, Space
-from rewrite.java.tree import Empty, Expression, FieldAccess, Identifier, Import, MethodInvocation
+from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, MethodInvocation
 from rewrite.markers import Markers
 from rewrite.marketplace import Python
-from rewrite.python.tree import CompilationUnit, MultiImport, NamedArgument
+from rewrite.python.template import template
+from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
 
 _Migration = [*Python, CategoryDescriptor(display_name="Migration")]
@@ -97,21 +98,12 @@ def _make_identifier(name: str, prefix: Space = Space.EMPTY) -> Identifier:
     return Identifier(uuid4(), prefix, Markers.EMPTY, [], name, None, None)
 
 
-def _make_field_access(target: Expression, name: str, prefix: Space = Space.EMPTY) -> FieldAccess:
-    return FieldAccess(
-        uuid4(), prefix, Markers.EMPTY, target,
-        JLeftPadded(Space.EMPTY, _make_identifier(name), Markers.EMPTY),
-        None,
-    )
-
-
-def _build_timezone_utc(import_style: str) -> FieldAccess:
-    """Build the `timezone.utc` or `datetime.timezone.utc` expression."""
-    if import_style == "from":
-        return _make_field_access(_make_identifier("timezone"), "utc")
-    else:
-        dt_tz = _make_field_access(_make_identifier("datetime"), "timezone")
-        return _make_field_access(dt_tz, "utc")
+_TEMPLATES = {
+    ("utcnow", "from"): template("datetime.now(timezone.utc)"),
+    ("utcnow", "direct"): template("datetime.datetime.now(datetime.timezone.utc)"),
+    ("utcfromtimestamp", "from"): template("datetime.fromtimestamp(ts, tz=timezone.utc)"),
+    ("utcfromtimestamp", "direct"): template("datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc)"),
+}
 
 
 def _add_timezone_to_from_import(cu: CompilationUnit) -> CompilationUnit:
@@ -234,46 +226,41 @@ class DatetimeUtcNow(Recipe):
                 if not _is_datetime_receiver(method.select, import_style):
                     return method
 
-                tz_utc = _build_timezone_utc(import_style)
-
                 if import_style == "from":
                     self._needs_timezone_import = True
 
+                tmpl_tree = _TEMPLATES[(method_name, import_style)].get_tree()
+                if not isinstance(tmpl_tree, MethodInvocation):
+                    return method
+
+                new_name = tmpl_tree.name.replace(prefix=method.name.prefix)
+                tmpl_args = tmpl_tree.padding.arguments
+
                 if method_name == "utcnow":
-                    new_name = _make_identifier("now", method.name.prefix)
-                    new_args_container = JContainer(
+                    new_args = JContainer(
                         method.padding.arguments.before,
-                        [JRightPadded(tz_utc, Space.EMPTY, Markers.EMPTY)],
-                        Markers.EMPTY,
-                    )
-                    return method.padding.replace(
-                        _name=new_name,
-                        _arguments=new_args_container,
-                        _method_type=None,
+                        tmpl_args.padding.elements,
+                        tmpl_args.markers,
                     )
                 else:
-                    new_name = _make_identifier("fromtimestamp", method.name.prefix)
-                    existing_padded_args = method.padding.arguments.padding.elements
-                    tz_kwarg = NamedArgument(
-                        uuid4(), Space([], ' '), Markers.EMPTY,
-                        _make_identifier("tz"),
-                        JLeftPadded(Space.EMPTY, tz_utc, Markers.EMPTY),
-                        None,
-                    )
-                    new_padded_args = list(existing_padded_args)
-                    if new_padded_args:
-                        last = new_padded_args[-1]
-                        new_padded_args[-1] = last.replace(after=Space.EMPTY)
-                    new_padded_args.append(JRightPadded(tz_kwarg, Space.EMPTY, Markers.EMPTY))
-                    new_args_container = JContainer(
+                    # Splice original argument(s) into template args,
+                    # replacing the placeholder first arg (ts) with the original
+                    tmpl_padded_args = list(tmpl_args.padding.elements)
+                    orig_padded_args = method.padding.arguments.padding.elements
+                    if orig_padded_args:
+                        tmpl_padded_args[0] = tmpl_padded_args[0].replace(
+                            element=orig_padded_args[0].element
+                        )
+                    new_args = JContainer(
                         method.padding.arguments.before,
-                        new_padded_args,
-                        Markers.EMPTY,
+                        tmpl_padded_args,
+                        tmpl_args.markers,
                     )
-                    return method.padding.replace(
-                        _name=new_name,
-                        _arguments=new_args_container,
-                        _method_type=None,
-                    )
+
+                return method.padding.replace(
+                    _name=new_name,
+                    _arguments=new_args,
+                    _method_type=None,
+                )
 
         return Visitor()
