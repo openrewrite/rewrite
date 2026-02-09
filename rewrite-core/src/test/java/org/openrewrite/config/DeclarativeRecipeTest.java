@@ -489,6 +489,7 @@ class DeclarativeRecipeTest implements RewriteTest {
     void nestedScanningRecipeInOrPrecondition() {
         // Issue #6698: OR preconditions with nested ScanningRecipes fail with NPE
         // because getInitialValue() only registers direct preconditions, not nested ones
+        // Note: RepositoryContainsFile is a repo-wide precondition - if matched, ALL files are affected
         rewriteRun(
           spec -> spec.recipeFromYaml(
             """
@@ -512,7 +513,8 @@ class DeclarativeRecipeTest implements RewriteTest {
               """,
             "org.sample.AddJacksonAnnotations"
           ),
-          text("config", spec -> spec.path("jackson-config.json")),
+          // jackson-config.json triggers the precondition, so all files get changed
+          text("config", "changed", spec -> spec.path("jackson-config.json")),
           text("original", "changed")
         );
     }
@@ -552,6 +554,7 @@ class DeclarativeRecipeTest implements RewriteTest {
     void sameScanningRecipeWithDifferentParametersInOrPrecondition() {
         // Issue #6698: Ensure same scanning recipe type with different parameters
         // is handled correctly (each instance needs its own accumulator)
+        // Note: RepositoryContainsFile is a repo-wide precondition - if matched, ALL files are affected
         rewriteRun(
           spec -> spec.recipeFromYaml(
             """
@@ -578,7 +581,8 @@ class DeclarativeRecipeTest implements RewriteTest {
             "org.sample.MultiFileCheck"
           ),
           // Only config-b.json exists, so should still match due to OR logic
-          text("config b", spec -> spec.path("config-b.json")),
+          // When matched, all files are changed
+          text("config b", "changed", spec -> spec.path("config-b.json")),
           text("original", "changed")
         );
     }
@@ -586,6 +590,7 @@ class DeclarativeRecipeTest implements RewriteTest {
     @Test
     void deeplyNestedOrPreconditionsWithScanningRecipe() {
         // Issue #6698: Test deeper nesting of OR preconditions with scanning recipes
+        // Note: RepositoryContainsFile is a repo-wide precondition - if matched, ALL files are affected
         rewriteRun(
           spec -> spec.recipeFromYaml(
             """
@@ -618,7 +623,8 @@ class DeclarativeRecipeTest implements RewriteTest {
             "org.sample.TopLevel"
           ),
           // Only bottom-b.json exists, which should match through the nested OR chain
-          text("bottom b config", spec -> spec.path("bottom-b.json")),
+          // When matched, all files are changed
+          text("bottom b config", "changed", spec -> spec.path("bottom-b.json")),
           text("original", "changed")
         );
     }
@@ -627,6 +633,7 @@ class DeclarativeRecipeTest implements RewriteTest {
     void multipleNestedOrPreconditionsWithSameScanningRecipe() {
         // Issue #6698: Multiple nested OR preconditions where the same scanning recipe
         // appears in different branches - ensure each gets its own accumulator
+        // Note: RepositoryContainsFile is a repo-wide precondition - if matched, ALL files are affected
         rewriteRun(
           spec -> spec.recipeFromYaml(
             """
@@ -661,7 +668,8 @@ class DeclarativeRecipeTest implements RewriteTest {
             "org.sample.TopLevel"
           ),
           // shared.json exists, which should satisfy both branches (AND of two ORs)
-          text("shared config", spec -> spec.path("shared.json")),
+          // When matched, all files are changed
+          text("shared config", "changed", spec -> spec.path("shared.json")),
           text("original", "changed")
         );
     }
