@@ -153,13 +153,14 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                     resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(newArtifactId, properties::get);
                                 }
                                 String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, resolvedArtifactId, getResolutionResult().getPom().getValue(versionTag.get().getValue().orElse(null)));
+                                // Don't change implicitly defined version properties like ${project.parent.version}
                                 String versionTagValue = t.getChildValue("version").orElse(null);
-                                if (isImplicitlyDefinedVersionProperty(versionTagValue)) {
-                                    // Implicitly defined version properties like ${project.parent.version} should not be changed
-                                } else if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
-                                    t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
-                                } else {
-                                    t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
+                                if (!isImplicitlyDefinedVersionProperty(versionTagValue)) {
+                                    if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
+                                        t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
+                                    } else {
+                                        t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
+                                    }
                                 }
                             }
                         } catch (MavenDownloadingException e) {

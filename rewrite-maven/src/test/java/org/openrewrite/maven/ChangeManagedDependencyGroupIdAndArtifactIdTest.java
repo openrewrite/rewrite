@@ -634,7 +634,11 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @Test
     void shouldPreserveProjectVersionPropertyInManagedDependencyVersion() {
         // When the managed dependency version is ${project.version}, it should be preserved
-        // even when changing groupId/artifactId with a newVersion specified
+        // even when changing groupId/artifactId with a newVersion specified.
+        // This test uses artifacts from the same group (junit-jupiter-*) that share version numbering.
+        // Note: If changing to an unrelated artifact that doesn't share versioning, the preserved
+        // property may cause resolution to fail - but this is better than silently breaking
+        // the intentional version relationship the user established.
         rewriteRun(
           spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
             "org.junit.jupiter", "junit-jupiter-api",
