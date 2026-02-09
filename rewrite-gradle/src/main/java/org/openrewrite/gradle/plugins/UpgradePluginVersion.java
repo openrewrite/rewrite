@@ -188,18 +188,20 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                         String resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
                                 .select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
 
-                        acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
-                        assert resolvedPluginVersion != null;
-                        acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
+                        if (resolvedPluginVersion != null) {
+                            acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
+                            acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
+                        }
                     } else if (versionArgs.get(0) instanceof J.Identifier) {
                         J.Identifier identifier = (J.Identifier) versionArgs.get(0);
                         String versionVariableName = identifier.getSimpleName();
                         String resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
                                 .select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
 
-                        acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
-                        assert resolvedPluginVersion != null;
-                        acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
+                        if (resolvedPluginVersion != null) {
+                            acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
+                            acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
+                        }
                     }
                 } catch (MavenDownloadingException e) {
                     // continue

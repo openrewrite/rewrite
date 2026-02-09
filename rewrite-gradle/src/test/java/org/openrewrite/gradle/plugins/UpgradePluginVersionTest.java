@@ -474,4 +474,59 @@ class UpgradePluginVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dontDowngradeKotlinDslSharedVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.jetbrains.kotlin.*", "1.5.31", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  val kotlinVersion = "1.8.21"
+                  id("org.jetbrains.kotlin.jvm") version kotlinVersion
+                  id("org.jetbrains.kotlin.plugin.allopen") version kotlinVersion
+                  id("org.jetbrains.kotlin.plugin.spring") version kotlinVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dontDowngradeKotlinDslSinglePluginVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.jetbrains.kotlin.*", "1.5.31", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  val kotlinVersion = "1.8.21"
+                  id("org.jetbrains.kotlin.jvm") version kotlinVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradeKotlinDslSharedVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.jetbrains.kotlin.*", "2.0.0", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  val kotlinVersion = "1.9.24"
+                  id("org.jetbrains.kotlin.jvm") version kotlinVersion
+                  id("org.jetbrains.kotlin.plugin.allopen") version kotlinVersion
+              }
+              """,
+            """
+              plugins {
+                  val kotlinVersion = "2.0.0"
+                  id("org.jetbrains.kotlin.jvm") version kotlinVersion
+                  id("org.jetbrains.kotlin.plugin.allopen") version kotlinVersion
+              }
+              """
+          )
+        );
+    }
 }
