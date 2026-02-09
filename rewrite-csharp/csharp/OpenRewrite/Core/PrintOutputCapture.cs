@@ -11,9 +11,16 @@ public class PrintOutputCapture<T>
 
     public T Context { get; }
 
-    public PrintOutputCapture(T context)
+    public IMarkerPrinter MarkerPrinter { get; }
+
+    public PrintOutputCapture(T context) : this(context, Core.MarkerPrinter.Default)
+    {
+    }
+
+    public PrintOutputCapture(T context, IMarkerPrinter markerPrinter)
     {
         Context = context;
+        MarkerPrinter = markerPrinter;
     }
 
     public PrintOutputCapture<T> Append(string? text)

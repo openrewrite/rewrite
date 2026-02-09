@@ -317,6 +317,8 @@ public class RpcSendQueue
             "Rewrite.Core" => name switch
             {
                 "Markers" => "org.openrewrite.marker.Markers",
+                "SearchResult" => "org.openrewrite.marker.SearchResult",
+                "Markup" => "org.openrewrite.marker.Markup",
                 "Space" => "org.openrewrite.java.tree.Space",
                 "TextComment" => "org.openrewrite.java.tree.TextComment",
                 _ => null,
