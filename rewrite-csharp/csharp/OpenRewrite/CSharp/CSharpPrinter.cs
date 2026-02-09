@@ -2090,6 +2090,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
     #region BeforeSyntax/AfterSyntax Pattern
 
+    private static readonly Func<string, string> CSharpMarkerWrapper =
+        content => "/*~~" + content + (content.Length == 0 ? "" : "~~") + ">*/";
+
     /// <summary>
     /// Called at the start of each visit method. Handles prefix space and markers.
     /// </summary>
@@ -2099,12 +2102,23 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     }
 
     /// <summary>
-    /// Called at the start of each visit method. Handles prefix space and markers.
+    /// Called at the start of each visit method. Handles prefix space, markers,
+    /// and MarkerPrinter hooks (beforePrefix and beforeSyntax).
     /// </summary>
     protected void BeforeSyntax(Space prefix, Markers markers, PrintOutputCapture<P> p)
     {
+        foreach (var marker in markers.MarkerList)
+        {
+            p.Append(p.MarkerPrinter.BeforePrefix(marker, new Cursor(Cursor, marker), CSharpMarkerWrapper));
+        }
+
         VisitSpace(prefix, p);
         VisitMarkers(markers, p);
+
+        foreach (var marker in markers.MarkerList)
+        {
+            p.Append(p.MarkerPrinter.BeforeSyntax(marker, new Cursor(Cursor, marker), CSharpMarkerWrapper));
+        }
     }
 
     /// <summary>
@@ -2116,25 +2130,25 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     }
 
     /// <summary>
-    /// Called at the end of each visit method. Handles markers after syntax.
+    /// Called at the end of each visit method. Calls MarkerPrinter.AfterSyntax
+    /// for each marker on the element.
     /// </summary>
     protected void AfterSyntax(Markers markers, PrintOutputCapture<P> p)
     {
-        // No-op for now. C# markers (NullSafe, DelegateInvocation, etc.) are semantic
-        // markers that affect how OTHER elements are printed, rather than markers that
-        // need to be printed themselves like JS's Semicolon/TrailingComma.
+        foreach (var marker in markers.MarkerList)
+        {
+            p.Append(p.MarkerPrinter.AfterSyntax(marker, new Cursor(Cursor, marker), CSharpMarkerWrapper));
+        }
     }
 
     /// <summary>
     /// Visits all markers on an element.
-    /// C# markers are semantic (affect other element printing) rather than syntactic
-    /// (needing their own printed representation). Individual visit methods check for
-    /// markers like NullSafe/DelegateInvocation and adjust their output accordingly.
+    /// C# semantic markers (NullSafe, DelegateInvocation, etc.) affect how other
+    /// elements print rather than being printed themselves. SearchResult and Markup
+    /// markers are handled by the MarkerPrinter hooks in BeforeSyntax/AfterSyntax.
     /// </summary>
     protected void VisitMarkers(Markers markers, PrintOutputCapture<P> p)
     {
-        // C# markers are currently all semantic - they affect how other elements print
-        // rather than being printed themselves. See NullSafe, DelegateInvocation, etc.
     }
 
     #endregion

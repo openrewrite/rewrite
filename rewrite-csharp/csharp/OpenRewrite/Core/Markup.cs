@@ -1,21 +1,13 @@
-using OpenRewrite.Core.Rpc;
+using Rewrite.Core.Rpc;
 
-namespace OpenRewrite.Core;
+namespace Rewrite.Core;
 
 /// <summary>
 /// Markers for annotating LST nodes with error, warning, info, or debug messages.
 /// </summary>
-public abstract class Markup(Guid id, string message, string? detail) : Marker, IEquatable<Markup>
+public abstract record Markup(Guid Id, string Message, string? Detail) : Marker
 {
-    public Guid Id { get; } = id;
-    public string Message { get; } = message;
-    public string? Detail { get; } = detail;
-
-    public bool Equals(Markup? other) => other is not null && Id == other.Id;
-    public override bool Equals(object? obj) => Equals(obj as Markup);
-    public override int GetHashCode() => Id.GetHashCode();
-
-    public sealed class Error(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Error>
+    public sealed record Error(Guid Id, string Message, string? Detail) : Markup(Id, Message, Detail), IRpcCodec<Error>
     {
         public void RpcSend(Error after, RpcSendQueue q)
         {
@@ -26,14 +18,11 @@ public abstract class Markup(Guid id, string message, string? detail) : Marker, 
 
         public Error RpcReceive(Error before, RpcReceiveQueue q)
         {
-            var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
-            var message = q.Receive(before.Message);
-            var detail = q.Receive(before.Detail);
-            return new Error(id, message!, detail);
+            throw new NotImplementedException("Markup.Error.RpcReceive");
         }
     }
 
-    public sealed class Warn(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Warn>
+    public sealed record Warn(Guid Id, string Message, string? Detail) : Markup(Id, Message, Detail), IRpcCodec<Warn>
     {
         public void RpcSend(Warn after, RpcSendQueue q)
         {
@@ -44,14 +33,11 @@ public abstract class Markup(Guid id, string message, string? detail) : Marker, 
 
         public Warn RpcReceive(Warn before, RpcReceiveQueue q)
         {
-            var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
-            var message = q.Receive(before.Message);
-            var detail = q.Receive(before.Detail);
-            return new Warn(id, message!, detail);
+            throw new NotImplementedException("Markup.Warn.RpcReceive");
         }
     }
 
-    public sealed class Info(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Info>
+    public sealed record Info(Guid Id, string Message, string? Detail) : Markup(Id, Message, Detail), IRpcCodec<Info>
     {
         public void RpcSend(Info after, RpcSendQueue q)
         {
@@ -62,14 +48,11 @@ public abstract class Markup(Guid id, string message, string? detail) : Marker, 
 
         public Info RpcReceive(Info before, RpcReceiveQueue q)
         {
-            var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
-            var message = q.Receive(before.Message);
-            var detail = q.Receive(before.Detail);
-            return new Info(id, message!, detail);
+            throw new NotImplementedException("Markup.Info.RpcReceive");
         }
     }
 
-    public sealed class Debug(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Debug>
+    public sealed record Debug(Guid Id, string Message, string? Detail) : Markup(Id, Message, Detail), IRpcCodec<Debug>
     {
         public void RpcSend(Debug after, RpcSendQueue q)
         {
@@ -80,10 +63,7 @@ public abstract class Markup(Guid id, string message, string? detail) : Marker, 
 
         public Debug RpcReceive(Debug before, RpcReceiveQueue q)
         {
-            var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
-            var message = q.Receive(before.Message);
-            var detail = q.Receive(before.Detail);
-            return new Debug(id, message!, detail);
+            throw new NotImplementedException("Markup.Debug.RpcReceive");
         }
     }
 }
