@@ -19,8 +19,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.ParseExceptionResult;
+import org.openrewrite.SourceFile;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
 
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings({"KotlinConstantConditions", "ControlFlowWithEmptyBody"})
@@ -362,5 +369,30 @@ class BinaryTest implements RewriteTest {
               """.formatted(op, op)
           )
         );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1694")
+    @Test
+    void deeplyNestedStringConcatenation() {
+        // Test parsing deeply nested string concatenations (many + operations)
+        // With very deep nesting, the Kotlin compiler's FIR builder causes a StackOverflowError
+        // which should be gracefully caught and converted to a ParseError
+        StringBuilder sb = new StringBuilder();
+        sb.append("val s = ");
+        for (int i = 0; i < 2000; i++) {
+            sb.append("\"line").append(i).append("\\n\" + ");
+        }
+        sb.append("\"end\"");
+
+        Optional<SourceFile> sf = KotlinParser.builder().build()
+                .parse(sb.toString())
+                .findFirst();
+        assertThat(sf).isPresent();
+        assertThat(sf.get()).isInstanceOf(ParseError.class);
+        ParseError parseError = (ParseError) sf.get();
+        ParseExceptionResult ex = parseError.getMarkers()
+                .findFirst(ParseExceptionResult.class)
+                .orElseThrow();
+        assertThat(ex.getExceptionType()).isEqualTo("StackOverflowError");
     }
 }

@@ -1123,6 +1123,22 @@ class PythonJavaPrinter:
         if after:
             p.append(after)
 
+    def _visit_type_parameters(self, type_parameters, p: PrintOutputCapture) -> None:
+        """Visit a TypeParameters AST node (Python 3.12+ type params using [])."""
+        if type_parameters is None:
+            return
+        from rewrite.java.tree import TypeParameters
+        if not isinstance(type_parameters, TypeParameters):
+            return
+        # TypeParameters has annotations, prefix, markers, and right-padded type params
+        for annotation in type_parameters.annotations:
+            self.visit(annotation, p)
+        self._visit_space(type_parameters.prefix, p)
+        self._visit_markers(type_parameters.markers, p)
+        p.append("[")
+        self._visit_right_padded_list(type_parameters.padding.type_parameters, ",", p)
+        p.append("]")
+
     def _visit_statements(self, statements: List[JRightPadded], p: PrintOutputCapture) -> None:
         """Visit a list of statements."""
         for stmt in statements:
@@ -1529,7 +1545,7 @@ class PythonJavaPrinter:
 
         self.visit(method.name, p)
         # Visit type parameters (Python 3.12+)
-        self._visit_container("[", method.padding.type_parameters, ",", "]", p)
+        self._visit_type_parameters(method.padding.type_parameters, p)
         self._visit_container("(", method.padding.parameters, ",", ")", p)
         self.visit(method.return_type_expression, p)
         self.visit(method.body, p)
