@@ -82,6 +82,27 @@ public class CSharpRewriteRpc extends RewriteRpc {
         MANAGER.shutdown();
     }
 
+    public InstallRecipesResponse installRecipes(java.io.File recipes) {
+        return send(
+                "InstallRecipes",
+                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath()),
+                InstallRecipesResponse.class
+        );
+    }
+
+    public InstallRecipesResponse installRecipes(String packageName) {
+        return installRecipes(packageName, null);
+    }
+
+    public InstallRecipesResponse installRecipes(String packageName, @Nullable String version) {
+        return send(
+                "InstallRecipes",
+                new InstallRecipesByPackage(
+                        new InstallRecipesByPackage.Package(packageName, version)),
+                InstallRecipesResponse.class
+        );
+    }
+
     /**
      * Resets the cached state of the current C# RPC instance.
      * This clears all parsed objects and references on both the Java and C# sides,

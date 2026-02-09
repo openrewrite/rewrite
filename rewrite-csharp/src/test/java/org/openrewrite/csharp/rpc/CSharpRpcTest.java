@@ -25,6 +25,8 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.tree.ParseError;
 
 import java.io.IOException;
@@ -595,5 +597,17 @@ class CSharpRpcTest {
 
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void getMarketplace() {
+        RecipeBundle bundle = new RecipeBundle("nuget", "test-recipes",
+                null, null, null);
+        RecipeMarketplace marketplace = rpc.getMarketplace(bundle);
+        assertThat(marketplace).isNotNull();
+        // No IRecipeActivator implementations in the base C# project,
+        // so the marketplace should be empty
+        assertThat(marketplace.getAllRecipes()).isEmpty();
+        assertThat(marketplace.getCategories()).isEmpty();
     }
 }
