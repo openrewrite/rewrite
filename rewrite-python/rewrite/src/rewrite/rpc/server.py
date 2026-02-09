@@ -50,11 +50,6 @@ local_objects: Dict[str, Any] = {}
 remote_objects: Dict[str, Any] = {}
 # Remote refs - maps reference IDs to objects for cyclic graph handling
 remote_refs: Dict[int, Any] = {}
-# Pending data cache - caches serialized diffs for GetObject batching
-# Mirrors rewrite-javascript's pendingData pattern to avoid recomputing
-# diffs when Java requests the same object multiple times during patch writing
-_pending_data: Dict[str, List[dict]] = {}
-_GET_OBJECT_BATCH_SIZE = 1000
 
 # Request ID counter for outgoing requests
 _request_id_counter = 0
@@ -232,9 +227,16 @@ def parse_python_source(source: str, path: str = "<unknown>") -> dict:
         from rewrite import Markers
 
         if _python_version.startswith("2"):
-            # Python 2: Use parso-based parser
-            from rewrite.python._py2_parser_visitor import Py2ParserVisitor
-            cu = Py2ParserVisitor(source, path, _python_version).parse()
+            # Python 2: Try Python 3 ast-based parser first (handles most Python 2 code),
+            # fall back to parso-based parser for Python 2-specific syntax
+            from rewrite.python._parser_visitor import ParserVisitor
+            try:
+                source_for_ast = source[1:] if source.startswith('\ufeff') else source
+                tree = ast.parse(source_for_ast, path)
+                cu = ParserVisitor(source, path).visit(tree)
+            except SyntaxError:
+                from rewrite.python._py2_parser_visitor import Py2ParserVisitor
+                cu = Py2ParserVisitor(source, path, _python_version).parse()
         else:
             # Python 3: Use standard ast-based parser
             from rewrite.python._parser_visitor import ParserVisitor
@@ -359,11 +361,11 @@ def handle_get_object(params: dict) -> List[dict]:
     """Handle a GetObject RPC request.
 
     This serializes an object for RPC transfer as RpcObjectData[].
-    Returns a batch of RpcObjectData objects that Java can deserialize.
+    Returns list of RpcObjectData objects that Java can deserialize.
 
-    Uses a pendingData cache (matching rewrite-javascript's pattern) to avoid
-    recomputing diffs when Java requests the same object multiple times during
-    patch writing. The diff is computed once and streamed in batches.
+    After sending, we update remote_objects to track that the remote (Java)
+    now has this version of the object. This is essential for the diff-based
+    RPC protocol to work correctly.
     """
     obj_id = params.get('id')
     source_file_type = params.get('sourceFileType')
@@ -379,38 +381,26 @@ def handle_get_object(params: dict) -> List[dict]:
         ]
 
     try:
-        all_data = _pending_data.get(obj_id)
-        if all_data is None:
-            from rewrite.rpc.send_queue import RpcSendQueue
+        from rewrite.rpc.send_queue import RpcSendQueue
 
-            # Get the "before" state - what we previously sent to Java
-            before = remote_objects.get(obj_id)
+        # Get the "before" state - what we previously sent to Java
+        before = remote_objects.get(obj_id)
 
-            q = RpcSendQueue(source_file_type)
-            all_data = q.generate(obj, before)
-            _pending_data[obj_id] = all_data
+        q = RpcSendQueue(source_file_type)
+        result = q.generate(obj, before)
+        logger.debug(f"GetObject result: {len(result)} items")
+        for i, item in enumerate(result[:10]):  # Log first 10 items
+            logger.debug(f"  [{i}] {item}")
 
-            # Update remote_objects once so subsequent diffs know the baseline
-            remote_objects[obj_id] = obj
+        # Update remote_objects to track that Java now has this version
+        remote_objects[obj_id] = obj
 
-            logger.debug(f"GetObject computed {len(all_data)} items for {obj_id}")
-
-        # Return next batch
-        batch = all_data[:_GET_OBJECT_BATCH_SIZE]
-        del all_data[:_GET_OBJECT_BATCH_SIZE]
-
-        # If we've sent all data, remove from pending cache
-        if not all_data:
-            del _pending_data[obj_id]
-
-        return batch
+        return result
 
     except Exception as e:
         logger.error(f"Error serializing object: {e}")
         import traceback as tb
         tb.print_exc()
-        # Clean up pending data on error
-        _pending_data.pop(obj_id, None)
         return [{'state': 'END_OF_OBJECT'}]
 
 
@@ -483,7 +473,6 @@ def handle_reset(params: dict) -> bool:
     local_objects.clear()
     remote_objects.clear()
     remote_refs.clear()
-    _pending_data.clear()
     _prepared_recipes.clear()
     _execution_contexts.clear()
     _recipe_accumulators.clear()
@@ -764,7 +753,7 @@ def _recipe_descriptor_to_dict(descriptor) -> dict:
             }
             for name, value, opt in descriptor.options
         ],
-        'dataTables': getattr(descriptor, 'data_tables', []),
+        'dataTables': descriptor.data_tables,
         'recipeList': [_recipe_descriptor_to_dict(r) for r in descriptor.recipe_list],
     }
 

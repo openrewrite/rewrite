@@ -171,7 +171,10 @@ class Py2ParserVisitor:
         """Convert a parso leaf (token) to an LST node."""
         prefix = self._parse_space(leaf.prefix)
 
-        if leaf.type == 'NAME':
+        # parso 0.7.x uses lowercase type names (e.g. 'name', 'number')
+        leaf_type = leaf.type.upper()
+
+        if leaf_type == 'NAME' or leaf_type == 'KEYWORD':
             return j.Identifier(
                 random_id(),
                 prefix,
@@ -181,7 +184,7 @@ class Py2ParserVisitor:
                 None,  # type
                 None   # field_type
             )
-        elif leaf.type == 'NUMBER':
+        elif leaf_type == 'NUMBER':
             return j.Literal(
                 random_id(),
                 prefix,
@@ -191,10 +194,10 @@ class Py2ParserVisitor:
                 None,  # unicode_escapes
                 self._number_type(leaf.value)
             )
-        elif leaf.type == 'STRING':
+        elif leaf_type == 'STRING':
             return self._convert_string_literal(leaf, prefix)
-        elif leaf.type == 'NEWLINE' or leaf.type == 'ENDMARKER':
-            return None  # Skip newlines and end markers
+        elif leaf_type in ('NEWLINE', 'ENDMARKER', 'INDENT', 'DEDENT'):
+            return None  # Skip whitespace tokens
 
         return None
 
@@ -213,7 +216,7 @@ class Py2ParserVisitor:
             value,
             value,
             None,  # unicode_escapes
-            JavaType.Primitive(JavaType.Primitive.PrimitiveType.String)
+            JavaType.Primitive.String
         )
 
     def _detect_quote_style(self, string_value: str) -> Quoted.Style:
@@ -270,6 +273,11 @@ class Py2ParserVisitor:
         while i < len(children):
             child = children[i]
             if hasattr(child, 'value') and child.value == ',':
+                # Capture space before comma as 'after' of the preceding argument
+                comma_prefix = self._parse_space(child.prefix)
+                if arguments:
+                    prev = arguments[-1]
+                    arguments[-1] = JRightPadded(prev.element, comma_prefix, prev.markers)
                 # Check if this is a trailing comma
                 if i == len(children) - 1:
                     trailing_comma = True
@@ -322,7 +330,12 @@ class Py2ParserVisitor:
 
         for child in children:
             if hasattr(child, 'value') and child.value in ('in', ','):
-                continue  # Skip 'in' keyword and commas
+                # Capture space before 'in' or ',' as 'after' of the preceding argument
+                delim_prefix = self._parse_space(child.prefix)
+                if arguments:
+                    prev = arguments[-1]
+                    arguments[-1] = JRightPadded(prev.element, delim_prefix, prev.markers)
+                continue
             expr = self._convert_node(child)
             if expr:
                 arguments.append(JRightPadded(expr, Space.EMPTY, Markers.EMPTY))
@@ -373,7 +386,21 @@ class Py2ParserVisitor:
             expr = self._convert_node(node.children[0])
             if expr:
                 return py.ExpressionStatement(random_id(), expr)
-        # TODO: Handle assignments, augmented assignments
+        elif len(node.children) >= 3 and hasattr(node.children[1], 'value') and node.children[1].value == '=':
+            # Assignment: lhs = rhs
+            lhs = self._convert_node(node.children[0])
+            eq_prefix = self._parse_space(node.children[1].prefix)
+            rhs = self._convert_node(node.children[2])
+            if lhs and rhs:
+                return j.Assignment(
+                    random_id(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    lhs,
+                    JLeftPadded(eq_prefix, rhs, Markers.EMPTY),
+                    None  # type
+                )
+        # TODO: Handle augmented assignments
         return self._convert_generic(node)
 
     def _convert_pass_stmt(self, node) -> j.Empty:
@@ -473,6 +500,26 @@ class Py2ParserVisitor:
         """Convert an atom (basic expression)."""
         if len(node.children) == 1:
             return self._convert_node(node.children[0])
+
+        # Handle backtick repr: `expr` (Python 2 only)
+        if (len(node.children) >= 3 and
+                hasattr(node.children[0], 'value') and node.children[0].value == '`' and
+                hasattr(node.children[-1], 'value') and node.children[-1].value == '`'):
+            prefix = self._parse_space(node.children[0].prefix)
+            # Reconstruct the full backtick expression as a literal
+            inner = ''.join(c.get_code() for c in node.children[1:-1])
+            value_source = '`' + inner + '`'
+            markers = Markers.build(random_id(), [Quoted(random_id(), Quoted.Style.BACKTICK)])
+            return j.Literal(
+                random_id(),
+                prefix,
+                markers,
+                value_source,
+                value_source,
+                None,  # unicode_escapes
+                JavaType.Primitive.String
+            )
+
         # TODO: Handle parenthesized expressions, list/dict literals, etc.
         return self._convert_generic(node)
 
@@ -581,7 +628,7 @@ class Py2ParserVisitor:
 
         # TODO: Parse comments from the whitespace
         # For now, just return the whitespace
-        return Space.build(text, [])
+        return Space([], text)
 
     def _pad_statement(self, stmt: j.J) -> JRightPadded:
         """Wrap a statement in JRightPadded."""
@@ -602,11 +649,11 @@ class Py2ParserVisitor:
         if 'j' in value_lower:
             return None  # Complex number
         elif '.' in value or 'e' in value_lower:
-            return JavaType.Primitive(JavaType.Primitive.PrimitiveType.Double)
+            return JavaType.Primitive.Double
         elif value_lower.endswith('l'):
-            return JavaType.Primitive(JavaType.Primitive.PrimitiveType.Long)
+            return JavaType.Primitive.Long
         else:
-            return JavaType.Primitive(JavaType.Primitive.PrimitiveType.Int)
+            return JavaType.Primitive.Int
 
     # --- Placeholder methods for complex constructs ---
 
@@ -620,10 +667,8 @@ class Py2ParserVisitor:
             [],  # modifiers
             None,  # type_parameters
             None,  # return_type_expression
-            j.MethodDeclaration.IdentifierWithAnnotations(
-                j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], name, None, None),
-                []
-            ),
+            [],  # name_annotations
+            j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], name, None, None),
             JContainer(Space.EMPTY, [], Markers.EMPTY),  # parameters
             None,  # throws
             j.Block(random_id(), Space.EMPTY, Markers.EMPTY,

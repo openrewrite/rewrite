@@ -1432,7 +1432,7 @@ def _register_core_marker_codecs():
     )
     # ParseExceptionResult - has specific fields to receive/send
     register_codec_with_both_names(
-        'org.openrewrite.marker.ParseExceptionResult',
+        'org.openrewrite.ParseExceptionResult',
         ParseExceptionResult,
         _receive_parse_exception_result,
         make_dataclass_factory(ParseExceptionResult),
