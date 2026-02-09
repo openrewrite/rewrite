@@ -282,7 +282,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(propertyDeclaration, p -> p.getPadding().getInterfaceSpecifier(), el -> visitRightPadded(el, q));
         q.getAndSend(propertyDeclaration, Cs.PropertyDeclaration::getName, el -> visit(el, q));
         q.getAndSend(propertyDeclaration, Cs.PropertyDeclaration::getAccessors, el -> visit(el, q));
-        q.getAndSend(propertyDeclaration, Cs.PropertyDeclaration::getExpressionBody, el -> visit(el, q));
+        q.getAndSend(propertyDeclaration, p -> p.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q));
         q.getAndSend(propertyDeclaration, p -> p.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
         return propertyDeclaration;
     }
@@ -859,17 +859,11 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitArrowExpressionClause(Cs.ArrowExpressionClause arrowExpressionClause, RpcSendQueue q) {
-        q.getAndSend(arrowExpressionClause, a -> a.getPadding().getExpression(), el -> visitRightPadded(el, q));
-        return arrowExpressionClause;
-    }
-
-    @Override
     public J visitAccessorDeclaration(Cs.AccessorDeclaration accessorDeclaration, RpcSendQueue q) {
         q.getAndSendList(accessorDeclaration, Cs.AccessorDeclaration::getAttributes, Tree::getId, el -> visit(el, q));
         q.getAndSendList(accessorDeclaration, Cs.AccessorDeclaration::getModifiers, Tree::getId, el -> visit(el, q));
         q.getAndSend(accessorDeclaration, a -> a.getPadding().getKind(), el -> visitLeftPadded(el, q));
-        q.getAndSend(accessorDeclaration, Cs.AccessorDeclaration::getExpressionBody, el -> visit(el, q));
+        q.getAndSend(accessorDeclaration, a -> a.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q));
         q.getAndSend(accessorDeclaration, Cs.AccessorDeclaration::getBody, el -> visit(el, q));
         return accessorDeclaration;
     }

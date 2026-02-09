@@ -19,7 +19,7 @@ public sealed record Markers(Guid Id, IList<Marker> MarkerList) : IRpcCodec<Mark
     public void RpcSend(Markers after, RpcSendQueue q)
     {
         q.GetAndSend(after, m => m.Id);
-        q.GetAndSendList(after, m => m.MarkerList,
+        q.GetAndSendListAsRef(after, m => m.MarkerList,
             m => (object)m.Id, null);
     }
 

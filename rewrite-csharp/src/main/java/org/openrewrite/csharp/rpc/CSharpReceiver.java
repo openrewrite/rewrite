@@ -284,7 +284,7 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .getPadding().withInterfaceSpecifier(q.receive(propertyDeclaration.getPadding().getInterfaceSpecifier(), el -> visitRightPadded(el, q)))
                 .withName(q.receive(propertyDeclaration.getName(), el -> (J.Identifier) visitNonNull(el, q)))
                 .withAccessors(q.receive(propertyDeclaration.getAccessors(), el -> (J.Block) visitNonNull(el, q)))
-                .withExpressionBody(q.receive(propertyDeclaration.getExpressionBody(), el -> (Cs.ArrowExpressionClause) visitNonNull(el, q)))
+                .getPadding().withExpressionBody(q.receive(propertyDeclaration.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q)))
                 .getPadding().withInitializer(q.receive(propertyDeclaration.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
     }
 
@@ -857,18 +857,12 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitArrowExpressionClause(Cs.ArrowExpressionClause arrowExpressionClause, RpcReceiveQueue q) {
-        return arrowExpressionClause
-                .getPadding().withExpression(q.receive(arrowExpressionClause.getPadding().getExpression(), el -> visitRightPadded(el, q)));
-    }
-
-    @Override
     public J visitAccessorDeclaration(Cs.AccessorDeclaration accessorDeclaration, RpcReceiveQueue q) {
         return accessorDeclaration
                 .withAttributes(q.receiveList(accessorDeclaration.getAttributes(), el -> (Cs.AttributeList) visitNonNull(el, q)))
                 .withModifiers(q.receiveList(accessorDeclaration.getModifiers(), el -> (J.Modifier) visitNonNull(el, q)))
                 .getPadding().withKind(q.receive(accessorDeclaration.getPadding().getKind(), el -> visitLeftPadded(el, q, toEnum(Cs.AccessorDeclaration.AccessorKinds.class))))
-                .withExpressionBody(q.receive(accessorDeclaration.getExpressionBody(), el -> (Cs.ArrowExpressionClause) visitNonNull(el, q)))
+                .getPadding().withExpressionBody(q.receive(accessorDeclaration.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q)))
                 .withBody(q.receive(accessorDeclaration.getBody(), el -> (J.Block) visitNonNull(el, q)));
     }
 
