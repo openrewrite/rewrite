@@ -496,9 +496,13 @@ class PythonRpcReceiver:
         return replace_if_changed(ident, annotations=annotations, simple_name=simple_name, type=type_, field_type=field_type)
 
     def _visit_literal(self, lit, q: RpcReceiveQueue):
+        from rewrite.java.tree import Literal
         value = q.receive(lit.value)
         value_source = q.receive(lit.value_source)
-        unicode_escapes = q.receive_list(lit.unicode_escapes)
+        unicode_escapes = q.receive_list(lit.unicode_escapes, lambda s: Literal.UnicodeEscape(
+            q.receive(s.value_source_index if s else 0),
+            q.receive(s.code_point if s else None),
+        ))
         type_ = q.receive(lit.type)
         return replace_if_changed(lit, value=value, value_source=value_source, unicode_escapes=unicode_escapes, type=type_)
 
