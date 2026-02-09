@@ -3129,13 +3129,11 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void shouldPreserveProjectParentVersionPropertyInDependencyVersion() {
-        // When the dependency version is ${project.parent.version}, it should be preserved
-        // even when changing groupId/artifactId with a newVersion specified.
-        // This test uses artifacts from the same group (junit-jupiter-*) that share version numbering.
-        // Note: If changing to an unrelated artifact that doesn't share versioning, the preserved
-        // property may cause resolution to fail - but this is better than silently breaking
-        // the intentional version relationship the user established.
+    void shouldNotChangeDependencyWithImplicitlyDefinedVersionProperty() {
+        // When the dependency version uses an implicitly defined property like ${project.parent.version},
+        // and newVersion is specified, no changes should be made at all. This avoids partially
+        // updating the dependency (groupId/artifactId) while leaving the version property unchanged,
+        // which would break the intentional version relationship the user established.
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "org.junit.jupiter", "junit-jupiter-api",
@@ -3165,23 +3163,6 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                         <dependency>
                             <groupId>org.junit.jupiter</groupId>
                             <artifactId>junit-jupiter-api</artifactId>
-                            <version>${project.parent.version}</version>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """,
-              """
-                <project>
-                    <parent>
-                        <groupId>com.mycompany</groupId>
-                        <artifactId>my-parent</artifactId>
-                        <version>5.7.2</version>
-                    </parent>
-                    <artifactId>my-child</artifactId>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.junit.jupiter</groupId>
-                            <artifactId>junit-jupiter-engine</artifactId>
                             <version>${project.parent.version}</version>
                         </dependency>
                     </dependencies>
