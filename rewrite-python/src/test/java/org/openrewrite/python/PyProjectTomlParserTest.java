@@ -47,20 +47,21 @@ class PyProjectTomlParserTest {
 
     @Test
     void parsesPyprojectTomlWithMarker() {
-        String pyprojectToml = "" +
-                "[project]\n" +
-                "name = \"my-project\"\n" +
-                "version = \"1.0.0\"\n" +
-                "description = \"A test project\"\n" +
-                "requires-python = \">=3.10\"\n" +
-                "dependencies = [\n" +
-                "    \"requests>=2.28.0\",\n" +
-                "    \"click>=8.0\",\n" +
-                "]\n" +
-                "\n" +
-                "[build-system]\n" +
-                "requires = [\"hatchling\"]\n" +
-                "build-backend = \"hatchling.build\"\n";
+        String pyprojectToml = """
+                [project]
+                name = "my-project"
+                version = "1.0.0"
+                description = "A test project"
+                requires-python = ">=3.10"
+                dependencies = [
+                    "requests>=2.28.0",
+                    "click>=8.0",
+                ]
+
+                [build-system]
+                requires = ["hatchling"]
+                build-backend = "hatchling.build"
+                """;
 
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromString(
@@ -96,34 +97,36 @@ class PyProjectTomlParserTest {
 
     @Test
     void parsesWithResolvedDependencies(@TempDir Path tempDir) throws IOException {
-        String pyprojectToml = "" +
-                "[project]\n" +
-                "name = \"my-project\"\n" +
-                "version = \"1.0.0\"\n" +
-                "dependencies = [\n" +
-                "    \"requests>=2.28.0\",\n" +
-                "]\n" +
-                "\n" +
-                "[build-system]\n" +
-                "requires = [\"hatchling\"]\n" +
-                "build-backend = \"hatchling.build\"\n";
+        String pyprojectToml = """
+                [project]
+                name = "my-project"
+                version = "1.0.0"
+                dependencies = [
+                    "requests>=2.28.0",
+                ]
 
-        String uvLock = "" +
-                "version = 1\n" +
-                "requires-python = \">=3.10\"\n" +
-                "\n" +
-                "[[package]]\n" +
-                "name = \"requests\"\n" +
-                "version = \"2.31.0\"\n" +
-                "source = { registry = \"https://pypi.org/simple\" }\n" +
-                "dependencies = [\n" +
-                "    { name = \"certifi\", specifier = \">=2017.4.17\" },\n" +
-                "]\n" +
-                "\n" +
-                "[[package]]\n" +
-                "name = \"certifi\"\n" +
-                "version = \"2024.2.2\"\n" +
-                "source = { registry = \"https://pypi.org/simple\" }\n";
+                [build-system]
+                requires = ["hatchling"]
+                build-backend = "hatchling.build"
+                """;
+
+        String uvLock = """
+                version = 1
+                requires-python = ">=3.10"
+
+                [[package]]
+                name = "requests"
+                version = "2.31.0"
+                source = { registry = "https://pypi.org/simple" }
+                dependencies = [
+                    { name = "certifi", specifier = ">=2017.4.17" },
+                ]
+
+                [[package]]
+                name = "certifi"
+                version = "2024.2.2"
+                source = { registry = "https://pypi.org/simple" }
+                """;
 
         // Write files to temp directory
         Files.write(tempDir.resolve("pyproject.toml"), pyprojectToml.getBytes());
@@ -161,11 +164,12 @@ class PyProjectTomlParserTest {
 
     @Test
     void parsesWithoutLockFile() {
-        String pyprojectToml = "" +
-                "[project]\n" +
-                "name = \"no-lock\"\n" +
-                "version = \"0.1.0\"\n" +
-                "dependencies = [\"requests>=2.28.0\"]\n";
+        String pyprojectToml = """
+                [project]
+                name = "no-lock"
+                version = "0.1.0"
+                dependencies = ["requests>=2.28.0"]
+                """;
 
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromString(
@@ -189,16 +193,17 @@ class PyProjectTomlParserTest {
 
     @Test
     void parsesLicenseAndDependencyGroups() {
-        String pyprojectToml = "" +
-                "[project]\n" +
-                "name = \"licensed-project\"\n" +
-                "version = \"1.0.0\"\n" +
-                "license = \"Apache-2.0\"\n" +
-                "dependencies = [\"requests>=2.28.0\"]\n" +
-                "\n" +
-                "[dependency-groups]\n" +
-                "dev = [\"pytest>=7.0\", \"mypy>=1.0\"]\n" +
-                "test = [\"coverage>=7.0\"]\n";
+        String pyprojectToml = """
+                [project]
+                name = "licensed-project"
+                version = "1.0.0"
+                license = "Apache-2.0"
+                dependencies = ["requests>=2.28.0"]
+
+                [dependency-groups]
+                dev = ["pytest>=7.0", "mypy>=1.0"]
+                test = ["coverage>=7.0"]
+                """;
 
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromString(

@@ -30,28 +30,29 @@ class UvLockParserTest {
 
     @Test
     void parseBasicUvLock() {
-        String uvLock = "" +
-                "version = 1\n" +
-                "requires-python = \">=3.10\"\n" +
-                "\n" +
-                "[[package]]\n" +
-                "name = \"requests\"\n" +
-                "version = \"2.31.0\"\n" +
-                "source = { registry = \"https://pypi.org/simple\" }\n" +
-                "dependencies = [\n" +
-                "    { name = \"certifi\", specifier = \">=2017.4.17\" },\n" +
-                "    { name = \"charset-normalizer\", specifier = \">=2,<4\" },\n" +
-                "]\n" +
-                "\n" +
-                "[[package]]\n" +
-                "name = \"certifi\"\n" +
-                "version = \"2024.2.2\"\n" +
-                "source = { registry = \"https://pypi.org/simple\" }\n" +
-                "\n" +
-                "[[package]]\n" +
-                "name = \"charset-normalizer\"\n" +
-                "version = \"3.3.2\"\n" +
-                "source = { registry = \"https://pypi.org/simple\" }\n";
+        String uvLock = """
+                version = 1
+                requires-python = ">=3.10"
+
+                [[package]]
+                name = "requests"
+                version = "2.31.0"
+                source = { registry = "https://pypi.org/simple" }
+                dependencies = [
+                    { name = "certifi", specifier = ">=2017.4.17" },
+                    { name = "charset-normalizer", specifier = ">=2,<4" },
+                ]
+
+                [[package]]
+                name = "certifi"
+                version = "2024.2.2"
+                source = { registry = "https://pypi.org/simple" }
+
+                [[package]]
+                name = "charset-normalizer"
+                version = "3.3.2"
+                source = { registry = "https://pypi.org/simple" }
+                """;
 
         List<ResolvedDependency> resolved = UvLockParser.parse(uvLock);
 
@@ -79,13 +80,14 @@ class UvLockParserTest {
 
     @Test
     void parseEditableSource() {
-        String uvLock = "" +
-                "version = 1\n" +
-                "\n" +
-                "[[package]]\n" +
-                "name = \"my-project\"\n" +
-                "version = \"0.1.0\"\n" +
-                "source = { editable = \".\" }\n";
+        String uvLock = """
+                version = 1
+
+                [[package]]
+                name = "my-project"
+                version = "0.1.0"
+                source = { editable = "." }
+                """;
 
         List<ResolvedDependency> resolved = UvLockParser.parse(uvLock);
 
@@ -96,13 +98,14 @@ class UvLockParserTest {
 
     @Test
     void parseVirtualSource() {
-        String uvLock = "" +
-                "version = 1\n" +
-                "\n" +
-                "[[package]]\n" +
-                "name = \"workspace-root\"\n" +
-                "version = \"0.1.0\"\n" +
-                "source = { virtual = \".\" }\n";
+        String uvLock = """
+                version = 1
+
+                [[package]]
+                name = "workspace-root"
+                version = "0.1.0"
+                source = { virtual = "." }
+                """;
 
         List<ResolvedDependency> resolved = UvLockParser.parse(uvLock);
 
