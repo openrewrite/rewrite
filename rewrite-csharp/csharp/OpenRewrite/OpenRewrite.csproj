@@ -2,11 +2,23 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <IsPackable>false</IsPackable>
     <GenerateProgramFile>false</GenerateProgramFile>
+
+    <!-- NuGet package metadata (IsPackable overrides Microsoft.NET.Test.Sdk default) -->
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>rewrite-csharp</ToolCommandName>
+    <PackageId>OpenRewrite.CSharp</PackageId>
+    <Version>0.0.0</Version>
+    <Authors>Moderne</Authors>
+    <Description>C# language support for OpenRewrite automated refactoring</Description>
+    <PackageProjectUrl>https://docs.openrewrite.org</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/openrewrite/rewrite</RepositoryUrl>
+    <PackageTags>openrewrite;refactoring;csharp;dotnet</PackageTags>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
   </PropertyGroup>
 
   <ItemGroup>
