@@ -2627,6 +2627,21 @@ class TabsAndIndentsTest implements RewriteTest {
                       ""\";
                   private final String singleLine = ""\"
                     noEndLine""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                        indent me!
+                        ""\", ""\"
+                        indent me too!
+                        ""\");
+                      method(
+                        ""\"
+                        indent me!
+                        ""\",
+                        ""\"
+                        indent me too!
+                        ""\"
+                      );
+                  }
               }
               """,
             """
@@ -2640,6 +2655,21 @@ class TabsAndIndentsTest implements RewriteTest {
                           ""\";
                   private final String singleLine = ""\"
                                                     noEndLine""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                             indent me!
+                             ""\", ""\"
+                                   indent me too!
+                                   ""\");
+                      method(
+                              ""\"
+                              indent me!
+                              ""\",
+                              ""\"
+                              indent me too!
+                              ""\"
+                      );
+                  }
               }
               """
           )
@@ -2663,6 +2693,21 @@ class TabsAndIndentsTest implements RewriteTest {
                     ""\"
                       NO
                       ""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                        indent me!
+                        ""\", ""\"
+                              indent me too!
+                              ""\");
+                      method(
+                        ""\"
+                        indent me!
+                        ""\",
+                        ""\"
+                        indent me too!
+                        ""\"
+                      );
+                  }
               }
               """,
             """
@@ -2674,6 +2719,21 @@ class TabsAndIndentsTest implements RewriteTest {
                           ""\"
                                   NO
                                   ""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                              indent me!
+                              ""\", ""\"
+                              indent me too!
+                              ""\");
+                      method(
+                              ""\"
+                                      indent me!
+                                      ""\",
+                              ""\"
+                                      indent me too!
+                                      ""\"
+                      );
+                  }
               }
               """
           )
