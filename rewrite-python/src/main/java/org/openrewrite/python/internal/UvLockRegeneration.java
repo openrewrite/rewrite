@@ -19,21 +19,17 @@ import lombok.Value;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 
-import java.io.*;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Comparator;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Utility for regenerating uv.lock files by running {@code uv lock} in a temporary directory.
  */
 @UtilityClass
 public class UvLockRegeneration {
-
-    private static final long TIMEOUT_SECONDS = 120;
 
     @Value
     public static class Result {

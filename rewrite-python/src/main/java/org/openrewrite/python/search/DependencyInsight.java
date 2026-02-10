@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
@@ -143,9 +144,8 @@ public class DependencyInsight extends Recipe {
                     return l;
                 }
 
-                // Check if this literal is a PEP 508 dependency string that matches
                 String spec = (String) val;
-                String depName = extractPackageName(spec);
+                String depName = PyProjectHelper.extractPackageName(spec);
                 if (depName != null) {
                     String normalized = PythonResolutionResult.normalizeName(depName);
                     if (matchedPackages.containsKey(normalized)) {
@@ -185,13 +185,11 @@ public class DependencyInsight extends Recipe {
                     String normalized = PythonResolutionResult.normalizeName(dep.getName());
 
                     if (matcher.matcher(normalized).matches()) {
-                        recordMatch(dep, scopeName, true);
+                        recordMatch(dep, scopeName);
                     } else if (!Boolean.TRUE.equals(onlyDirect) && dep.getResolved() != null) {
-                        // Check transitive dependencies
                         Set<String> transitiveMatches = findTransitiveMatches(dep.getResolved(), matcher, new HashSet<>());
                         if (!transitiveMatches.isEmpty()) {
-                            // Record the direct dep as a match (it leads to transitive match)
-                            recordMatch(dep, scopeName, true);
+                            recordMatch(dep, scopeName);
                             for (String transitiveName : transitiveMatches) {
                                 recordTransitiveMatch(transitiveName);
                             }
@@ -224,7 +222,7 @@ public class DependencyInsight extends Recipe {
                 return matches;
             }
 
-            private void recordMatch(Dependency dep, String scopeName, boolean direct) {
+            private void recordMatch(Dependency dep, String scopeName) {
                 String normalized = PythonResolutionResult.normalizeName(dep.getName());
                 MatchInfo existing = matchedPackages.get(normalized);
                 if (existing != null) {
@@ -240,7 +238,7 @@ public class DependencyInsight extends Recipe {
                         resolvedVersion,
                         dep.getVersionConstraint(),
                         scopeName,
-                        direct
+                        true
                 ));
             }
 
@@ -275,25 +273,6 @@ public class DependencyInsight extends Recipe {
                 ));
             }
         };
-    }
-
-    private static @Nullable String extractPackageName(String pep508Spec) {
-        // Extract the package name from a PEP 508 string
-        // The name is the first token before any version specifier, extras, or marker
-        String trimmed = pep508Spec.trim();
-        if (trimmed.isEmpty()) {
-            return null;
-        }
-        int end = 0;
-        while (end < trimmed.length()) {
-            char c = trimmed.charAt(end);
-            if (c == '[' || c == '>' || c == '<' || c == '=' || c == '!' || c == '~' || c == ';' || c == ' ') {
-                break;
-            }
-            end++;
-        }
-        String name = trimmed.substring(0, end).trim();
-        return name.isEmpty() ? null : name;
     }
 
     private static class MatchInfo {

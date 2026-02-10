@@ -17,13 +17,13 @@ package org.openrewrite.python;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
-import org.openrewrite.marker.Markup;
-import org.openrewrite.python.internal.PythonDependencyParser;
-import org.openrewrite.python.internal.UvLockRegeneration;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.ScanningRecipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.toml.TomlIsoVisitor;
-import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlRightPadded;
@@ -62,7 +62,6 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
     static class Accumulator {
         final Set<String> projectsToUpdate = new HashSet<>();
         final Map<String, String> updatedLockFiles = new HashMap<>();
-        final Set<String> failedProjects = new HashSet<>();
     }
 
     @Override
@@ -109,10 +108,10 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 }
 
                 if (sourcePath.endsWith("uv.lock")) {
-                    String pyprojectPath = correspondingPyprojectPath(sourcePath);
+                    String pyprojectPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
                     String newContent = acc.updatedLockFiles.get(pyprojectPath);
                     if (newContent != null) {
-                        return reparseToml(document, newContent);
+                        return PyProjectHelper.reparseToml(document, newContent);
                     }
                 }
 
@@ -123,31 +122,13 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
 
     private Toml.Document removeDependencyFromPyproject(Toml.Document document, ExecutionContext ctx, Accumulator acc) {
         String normalizedName = PythonResolutionResult.normalizeName(packageName);
-        String sourcePath = document.getSourcePath().toString();
 
         Toml.Document updated = (Toml.Document) new TomlIsoVisitor<ExecutionContext>() {
             @Override
             public Toml.Array visitArray(Toml.Array array, ExecutionContext ctx) {
                 Toml.Array a = super.visitArray(array, ctx);
 
-                // Check if this array is the value of a "dependencies" key inside [project]
-                Cursor parent = getCursor().getParentTreeCursor();
-                if (!(parent.getValue() instanceof Toml.KeyValue)) {
-                    return a;
-                }
-                Toml.KeyValue kv = parent.getValue();
-                if (!(kv.getKey() instanceof Toml.Identifier) ||
-                        !"dependencies".equals(((Toml.Identifier) kv.getKey()).getName())) {
-                    return a;
-                }
-
-                // Verify we're inside [project] table
-                Cursor tableParent = parent.getParentTreeCursor();
-                if (!(tableParent.getValue() instanceof Toml.Table)) {
-                    return a;
-                }
-                Toml.Table table = tableParent.getValue();
-                if (table.getName() == null || !"project".equals(table.getName().getName())) {
+                if (!PyProjectHelper.isInsideProjectDependencies(getCursor())) {
                     return a;
                 }
 
@@ -164,8 +145,8 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                     if (!found && element instanceof Toml.Literal) {
                         Object val = ((Toml.Literal) element).getValue();
                         if (val instanceof String) {
-                            String depName = extractPackageName((String) val);
-                            if (PythonResolutionResult.normalizeName(depName).equals(normalizedName)) {
+                            String depName = PyProjectHelper.extractPackageName((String) val);
+                            if (depName != null && PythonResolutionResult.normalizeName(depName).equals(normalizedName)) {
                                 found = true;
                                 removedIdx = i;
                                 continue;
@@ -196,64 +177,10 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
         }.visitNonNull(document, ctx);
 
         if (updated != document) {
-            // Regenerate lock file
-            String pyprojectContent = updated.printAll();
-            UvLockRegeneration.Result lockResult = UvLockRegeneration.regenerate(pyprojectContent);
-            if (lockResult.isSuccess()) {
-                acc.updatedLockFiles.put(sourcePath, lockResult.getLockFileContent());
-            } else {
-                acc.failedProjects.add(sourcePath);
-                updated = Markup.warn(updated, new RuntimeException(
-                        "uv lock regeneration failed: " + lockResult.getErrorMessage()));
-            }
-
-            // Update the marker
-            PythonResolutionResult marker = updated.getMarkers()
-                    .findFirst(PythonResolutionResult.class).orElse(null);
-            if (marker != null) {
-                PythonResolutionResult newMarker = PythonDependencyParser.createMarker(updated, null);
-                if (newMarker != null) {
-                    updated = updated.withMarkers(updated.getMarkers()
-                            .removeByType(PythonResolutionResult.class)
-                            .addIfAbsent(newMarker.withId(marker.getId())));
-                }
-            }
+            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, acc.updatedLockFiles);
         }
 
         return updated;
     }
 
-    private static String extractPackageName(String pep508Spec) {
-        String trimmed = pep508Spec.trim();
-        int end = 0;
-        while (end < trimmed.length()) {
-            char c = trimmed.charAt(end);
-            if (c == '[' || c == '>' || c == '<' || c == '=' || c == '!' || c == '~' || c == ';' || c == ' ') {
-                break;
-            }
-            end++;
-        }
-        return trimmed.substring(0, end).trim();
-    }
-
-    private static String correspondingPyprojectPath(String uvLockPath) {
-        if (uvLockPath.contains("/")) {
-            return uvLockPath.substring(0, uvLockPath.lastIndexOf('/') + 1) + "pyproject.toml";
-        }
-        return "pyproject.toml";
-    }
-
-    private static Toml.Document reparseToml(Toml.Document original, String newContent) {
-        TomlParser parser = new TomlParser();
-        Parser.Input input = Parser.Input.fromString(original.getSourcePath(), newContent);
-        List<SourceFile> parsed = new ArrayList<>();
-        parser.parseInputs(Collections.singletonList(input), null,
-                new InMemoryExecutionContext(Throwable::printStackTrace)).forEach(parsed::add);
-        if (!parsed.isEmpty() && parsed.get(0) instanceof Toml.Document) {
-            Toml.Document newDoc = (Toml.Document) parsed.get(0);
-            return newDoc.withId(original.getId())
-                    .withMarkers(original.getMarkers());
-        }
-        return original;
-    }
 }
