@@ -518,22 +518,30 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 int indent = getCursor().getNearestMessage("lastIndent", 0);
                 if (evaluate(() -> wrappingStyle.getTextBlocks().getAlignWhenMultiline(), false)) {
                     if (!literal.getPrefix().getLastWhitespace().contains("\n")) {
-                        if (getCursor().getParent().getValue() instanceof JRightPadded) {
-                            indent = positionService.columnsOf(getCursor().getParent().getParent(), literal).getStartColumn() - 1 + literal.getPrefix().getIndent().length(); // since position is index-1-based
+                        if (getCursor().getParent() != null && getCursor().getParent(2) != null && getCursor().getParent().getValue() instanceof JRightPadded) {
+                            indent = positionService.columnsOf(getCursor().getParent(2), literal).getStartColumn() - 1 + literal.getPrefix().getIndent().length(); // since position is index-1-based
                         } else {
                             ColSpan colSpan = positionService.columnsOf(getCursor(), literal);
                             indent += colSpan.getStartColumn() - colSpan.getIndent() - 1; // since position is index-1-based
                         }
                     }
                 } else {
+                    if (getCursor().getParent() != null && getCursor().getParent(2) != null && getCursor().getParent().getValue() instanceof JRightPadded) {
+                        indent = getCursor().getParent(2).getNearestMessage("lastIndent", 0);
+                        if (literal.getPrefix().getLastWhitespace().contains("\n")) {
+                            indent += style.getContinuationIndent();
+                        }
+                    }
                     indent += style.getContinuationIndent();
                 }
                 if (currentIndent != indent) {
                     StringBuilder builder = new StringBuilder().append("\"\"\"");
                     for (String line : lines) {
                         builder.append('\n');
-                        shift(builder, indent);
-                        builder.append(line);
+                        if (!line.isEmpty()) {
+                            shift(builder, indent);
+                            builder.append(line);
+                        }
                     }
                     literal = literal.withValueSource(builder.toString()).withValue(content);
                 }
