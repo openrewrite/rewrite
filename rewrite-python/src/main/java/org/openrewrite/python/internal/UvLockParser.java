@@ -176,7 +176,7 @@ public class UvLockParser {
             }
             Toml.KeyValue kv = (Toml.KeyValue) value;
             if (!(kv.getKey() instanceof Toml.Identifier) ||
-                !"source".equals(((Toml.Identifier) kv.getKey()).getName())) {
+                    !"source".equals(((Toml.Identifier) kv.getKey()).getName())) {
                 continue;
             }
             if (kv.getValue() instanceof Toml.Table) {
@@ -211,7 +211,7 @@ public class UvLockParser {
             }
             Toml.KeyValue kv = (Toml.KeyValue) value;
             if (!(kv.getKey() instanceof Toml.Identifier) ||
-                !"dependencies".equals(((Toml.Identifier) kv.getKey()).getName())) {
+                    !"dependencies".equals(((Toml.Identifier) kv.getKey()).getName())) {
                 continue;
             }
             if (kv.getValue() instanceof Toml.Array) {

@@ -23,10 +23,10 @@ import org.openrewrite.toml.tree.TomlValue;
 
 import java.nio.file.Path;
 import java.util.*;
-
-import static org.openrewrite.Tree.randomId;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static org.openrewrite.Tree.randomId;
 
 /**
  * Extracts dependency metadata from a parsed pyproject.toml AST (Toml.Document).
@@ -105,7 +105,7 @@ public class PythonDependencyParser {
             if (value instanceof Toml.KeyValue) {
                 Toml.KeyValue kv = (Toml.KeyValue) value;
                 if (kv.getKey() instanceof Toml.Identifier &&
-                    key.equals(((Toml.Identifier) kv.getKey()).getName())) {
+                        key.equals(((Toml.Identifier) kv.getKey()).getName())) {
                     if (kv.getValue() instanceof Toml.Literal) {
                         Object val = ((Toml.Literal) kv.getValue()).getValue();
                         return val instanceof String ? (String) val : null;
@@ -124,7 +124,7 @@ public class PythonDependencyParser {
             if (value instanceof Toml.KeyValue) {
                 Toml.KeyValue kv = (Toml.KeyValue) value;
                 if (kv.getKey() instanceof Toml.Identifier &&
-                    key.equals(((Toml.Identifier) kv.getKey()).getName())) {
+                        key.equals(((Toml.Identifier) kv.getKey()).getName())) {
                     if (kv.getValue() instanceof Toml.Array) {
                         return parseDependencyArray((Toml.Array) kv.getValue());
                     }
@@ -164,7 +164,7 @@ public class PythonDependencyParser {
                 if (value instanceof Toml.KeyValue) {
                     Toml.KeyValue kv = (Toml.KeyValue) value;
                     if (kv.getKey() instanceof Toml.Identifier &&
-                        "optional-dependencies".equals(((Toml.Identifier) kv.getKey()).getName())) {
+                            "optional-dependencies".equals(((Toml.Identifier) kv.getKey()).getName())) {
                         if (kv.getValue() instanceof Toml.Table) {
                             return parseOptionalDependenciesFromTable((Toml.Table) kv.getValue());
                         }
@@ -191,7 +191,7 @@ public class PythonDependencyParser {
             }
             Toml.KeyValue kv = (Toml.KeyValue) value;
             if (!(kv.getKey() instanceof Toml.Identifier) ||
-                !"license".equals(((Toml.Identifier) kv.getKey()).getName())) {
+                    !"license".equals(((Toml.Identifier) kv.getKey()).getName())) {
                 continue;
             }
             // PEP 639: license = "MIT"
@@ -277,11 +277,11 @@ public class PythonDependencyParser {
 
     private static final Pattern PEP_508_PATTERN = Pattern.compile(
             "^\\s*" +
-            "([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)" +  // name
-            "(?:\\s*\\[([^\\]]+)\\])?" +                         // extras (optional)
-            "(?:\\s*([^;]+?))?" +                                // version constraint (optional)
-            "(?:\\s*;\\s*(.+))?" +                               // marker (optional)
-            "\\s*$"
+                    "([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)" +  // name
+                    "(?:\\s*\\[([^\\]]+)\\])?" +                         // extras (optional)
+                    "(?:\\s*([^;]+?))?" +                                // version constraint (optional)
+                    "(?:\\s*;\\s*(.+))?" +                               // marker (optional)
+                    "\\s*$"
     );
 
     static @Nullable Dependency parsePep508(String spec) {
