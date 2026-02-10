@@ -97,7 +97,7 @@ val pythonInstall by tasks.registering(Exec::class) {
     dependsOn(pythonUpgradePip)
 
     workingDir = pythonDir
-    commandLine(pipExe.absolutePath, "install", "-e", ".")
+    commandLine(pipExe.absolutePath, "install", "-e", ".[dev]")
 
     // Re-run if pyproject.toml changes
     inputs.file(pythonDir.resolve("pyproject.toml"))
@@ -155,8 +155,23 @@ testing {
     }
 }
 
+val pytestTest by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Run Python pytest tests"
+
+    dependsOn(pythonInstall, "generateTestClasspath")
+
+    workingDir = pythonDir
+    commandLine(pythonExe.absolutePath, "-m", "pytest", "tests/", "-v")
+
+    inputs.dir(pythonDir.resolve("src"))
+    inputs.dir(pythonDir.resolve("tests"))
+    inputs.file(pythonDir.resolve("pyproject.toml"))
+}
+
 tasks.named("check") {
     dependsOn(testing.suites.named("py2CompatibilityTest"))
+    dependsOn(pytestTest)
 }
 
 // Run tests serially to avoid issues with concurrent Python RPC processes
