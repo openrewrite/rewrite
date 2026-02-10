@@ -114,42 +114,22 @@ val nugetVersion: String = if (System.getenv("CI") != null) {
     project.version.toString().replace("-SNAPSHOT", "-dev")
 }
 
-val csharpCsproj = csharpDir.resolve("OpenRewrite/OpenRewrite.csproj")
-
-// Task to update version in .csproj
-val csharpUpdateVersion by tasks.registering {
-    group = "csharp"
-    description = "Update version in OpenRewrite.csproj"
-
-    inputs.property("version", nugetVersion)
-    outputs.file(csharpCsproj)
-
-    doLast {
-        val content = csharpCsproj.readText()
-        val updated = content.replace(
-            Regex("""<Version>[^<]*</Version>"""),
-            "<Version>${nugetVersion}</Version>"
-        )
-        csharpCsproj.writeText(updated)
-        logger.lifecycle("Updated OpenRewrite.csproj version to $nugetVersion")
-    }
-}
-
 // Task to pack the C# project as a NuGet tool package
+// Version is injected via /p:Version so the .csproj is never modified
 val csharpPack by tasks.registering(Exec::class) {
     group = "csharp"
     description = "Pack C# project as NuGet package"
-
-    dependsOn(csharpUpdateVersion)
 
     workingDir = csharpDir
     commandLine(
         findDotnet(), "pack",
         "--configuration", "Release",
-        "--output", "dist"
+        "--output", "dist",
+        "/p:Version=$nugetVersion"
     )
 
     inputs.dir(csharpDir.resolve("OpenRewrite"))
+    inputs.property("version", nugetVersion)
     outputs.dir(csharpDir.resolve("dist"))
 
     doFirst {
