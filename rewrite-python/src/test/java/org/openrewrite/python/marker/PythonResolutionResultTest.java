@@ -30,24 +30,24 @@ class PythonResolutionResultTest {
     @Test
     void getResolvedDependencyByName() {
         ResolvedDependency requests = new ResolvedDependency(
-                "requests", "2.31.0", "https://pypi.org/simple", null);
+          "requests", "2.31.0", "https://pypi.org/simple", null);
 
         PythonResolutionResult marker = new PythonResolutionResult(
-                randomId(),
-                "test-project",
-                "1.0.0",
-                null,
-                null,
-                "pyproject.toml",
-                ">=3.10",
-                null,
-                Collections.emptyList(),
-                Collections.emptyList(),
-                Collections.emptyMap(),
-                Collections.emptyMap(),
-                Collections.singletonList(requests),
-                null,
-                null
+          randomId(),
+          "test-project",
+          "1.0.0",
+          null,
+          null,
+          "pyproject.toml",
+          ">=3.10",
+          null,
+          Collections.emptyList(),
+          Collections.emptyList(),
+          Collections.emptyMap(),
+          Collections.emptyMap(),
+          Collections.singletonList(requests),
+          null,
+          null
         );
 
         assertThat(marker.getResolvedDependency("requests")).isEqualTo(requests);
@@ -57,24 +57,24 @@ class PythonResolutionResultTest {
     @Test
     void getResolvedDependencyNormalizesName() {
         ResolvedDependency dep = new ResolvedDependency(
-                "my-cool-package", "1.0.0", null, null);
+          "my-cool-package", "1.0.0", null, null);
 
         PythonResolutionResult marker = new PythonResolutionResult(
-                randomId(),
-                "test",
-                "1.0.0",
-                null,
-                null,
-                "pyproject.toml",
-                null,
-                null,
-                Collections.emptyList(),
-                Collections.emptyList(),
-                Collections.emptyMap(),
-                Collections.emptyMap(),
-                Collections.singletonList(dep),
-                null,
-                null
+          randomId(),
+          "test",
+          "1.0.0",
+          null,
+          null,
+          "pyproject.toml",
+          null,
+          null,
+          Collections.emptyList(),
+          Collections.emptyList(),
+          Collections.emptyMap(),
+          Collections.emptyMap(),
+          Collections.singletonList(dep),
+          null,
+          null
         );
 
         // Dashes, underscores, and dots are normalized
@@ -94,35 +94,35 @@ class PythonResolutionResultTest {
     @Test
     void fieldAccess() {
         List<Dependency> buildRequires = Arrays.asList(
-                new Dependency("hatchling", null, null, null, null));
+          new Dependency("hatchling", null, null, null, null));
         List<Dependency> deps = Arrays.asList(
-                new Dependency("requests", ">=2.28.0", null, null, null),
-                new Dependency("click", ">=8.0", null, null, null));
+          new Dependency("requests", ">=2.28.0", null, null, null),
+          new Dependency("click", ">=8.0", null, null, null));
 
         Map<String, List<Dependency>> optDeps = new LinkedHashMap<>();
         optDeps.put("dev", Collections.singletonList(
-                new Dependency("pytest", ">=7.0", null, null, null)));
+          new Dependency("pytest", ">=7.0", null, null, null)));
 
         Map<String, List<Dependency>> depGroups = new LinkedHashMap<>();
         depGroups.put("test", Collections.singletonList(
-                new Dependency("coverage", ">=7.0", null, null, null)));
+          new Dependency("coverage", ">=7.0", null, null, null)));
 
         PythonResolutionResult marker = new PythonResolutionResult(
-                randomId(),
-                "my-project",
-                "1.0.0",
-                "A description",
-                "MIT",
-                "pyproject.toml",
-                ">=3.10",
-                "hatchling.build",
-                buildRequires,
-                deps,
-                optDeps,
-                depGroups,
-                Collections.emptyList(),
-                PackageManager.Uv,
-                null
+          randomId(),
+          "my-project",
+          "1.0.0",
+          "A description",
+          "MIT",
+          "pyproject.toml",
+          ">=3.10",
+          "hatchling.build",
+          buildRequires,
+          deps,
+          optDeps,
+          depGroups,
+          Collections.emptyList(),
+          PackageManager.Uv,
+          null
         );
 
         assertThat(marker.getName()).isEqualTo("my-project");

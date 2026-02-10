@@ -48,30 +48,30 @@ class PyProjectTomlParserTest {
     @Test
     void parsesPyprojectTomlWithMarker() {
         String pyprojectToml = """
-                [project]
-                name = "my-project"
-                version = "1.0.0"
-                description = "A test project"
-                requires-python = ">=3.10"
-                dependencies = [
-                    "requests>=2.28.0",
-                    "click>=8.0",
-                ]
-
-                [build-system]
-                requires = ["hatchling"]
-                build-backend = "hatchling.build"
-                """;
+          [project]
+          name = "my-project"
+          version = "1.0.0"
+          description = "A test project"
+          requires-python = ">=3.10"
+          dependencies = [
+              "requests>=2.28.0",
+              "click>=8.0",
+          ]
+          
+          [build-system]
+          requires = ["hatchling"]
+          build-backend = "hatchling.build"
+          """;
 
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromString(
-                Paths.get("pyproject.toml"),
-                pyprojectToml
+          Paths.get("pyproject.toml"),
+          pyprojectToml
         );
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
-                null,
-                new InMemoryExecutionContext(Throwable::printStackTrace)
+          Collections.singletonList(input),
+          null,
+          new InMemoryExecutionContext(Throwable::printStackTrace)
         ).collect(Collectors.toList());
 
         assertThat(parsed).hasSize(1);
@@ -98,35 +98,35 @@ class PyProjectTomlParserTest {
     @Test
     void parsesWithResolvedDependencies(@TempDir Path tempDir) throws IOException {
         String pyprojectToml = """
-                [project]
-                name = "my-project"
-                version = "1.0.0"
-                dependencies = [
-                    "requests>=2.28.0",
-                ]
-
-                [build-system]
-                requires = ["hatchling"]
-                build-backend = "hatchling.build"
-                """;
+          [project]
+          name = "my-project"
+          version = "1.0.0"
+          dependencies = [
+              "requests>=2.28.0",
+          ]
+          
+          [build-system]
+          requires = ["hatchling"]
+          build-backend = "hatchling.build"
+          """;
 
         String uvLock = """
-                version = 1
-                requires-python = ">=3.10"
-
-                [[package]]
-                name = "requests"
-                version = "2.31.0"
-                source = { registry = "https://pypi.org/simple" }
-                dependencies = [
-                    { name = "certifi", specifier = ">=2017.4.17" },
-                ]
-
-                [[package]]
-                name = "certifi"
-                version = "2024.2.2"
-                source = { registry = "https://pypi.org/simple" }
-                """;
+          version = 1
+          requires-python = ">=3.10"
+          
+          [[package]]
+          name = "requests"
+          version = "2.31.0"
+          source = { registry = "https://pypi.org/simple" }
+          dependencies = [
+              { name = "certifi", specifier = ">=2017.4.17" },
+          ]
+          
+          [[package]]
+          name = "certifi"
+          version = "2024.2.2"
+          source = { registry = "https://pypi.org/simple" }
+          """;
 
         // Write files to temp directory
         Files.write(tempDir.resolve("pyproject.toml"), pyprojectToml.getBytes());
@@ -135,9 +135,9 @@ class PyProjectTomlParserTest {
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
-                tempDir,
-                new InMemoryExecutionContext(Throwable::printStackTrace)
+          Collections.singletonList(input),
+          tempDir,
+          new InMemoryExecutionContext(Throwable::printStackTrace)
         ).collect(Collectors.toList());
 
         assertThat(parsed).hasSize(1);
@@ -165,21 +165,21 @@ class PyProjectTomlParserTest {
     @Test
     void parsesWithoutLockFile() {
         String pyprojectToml = """
-                [project]
-                name = "no-lock"
-                version = "0.1.0"
-                dependencies = ["requests>=2.28.0"]
-                """;
+          [project]
+          name = "no-lock"
+          version = "0.1.0"
+          dependencies = ["requests>=2.28.0"]
+          """;
 
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromString(
-                Paths.get("pyproject.toml"),
-                pyprojectToml
+          Paths.get("pyproject.toml"),
+          pyprojectToml
         );
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
-                null,
-                new InMemoryExecutionContext(Throwable::printStackTrace)
+          Collections.singletonList(input),
+          null,
+          new InMemoryExecutionContext(Throwable::printStackTrace)
         ).collect(Collectors.toList());
 
         assertThat(parsed).hasSize(1);
@@ -194,26 +194,26 @@ class PyProjectTomlParserTest {
     @Test
     void parsesLicenseAndDependencyGroups() {
         String pyprojectToml = """
-                [project]
-                name = "licensed-project"
-                version = "1.0.0"
-                license = "Apache-2.0"
-                dependencies = ["requests>=2.28.0"]
-
-                [dependency-groups]
-                dev = ["pytest>=7.0", "mypy>=1.0"]
-                test = ["coverage>=7.0"]
-                """;
+          [project]
+          name = "licensed-project"
+          version = "1.0.0"
+          license = "Apache-2.0"
+          dependencies = ["requests>=2.28.0"]
+          
+          [dependency-groups]
+          dev = ["pytest>=7.0", "mypy>=1.0"]
+          test = ["coverage>=7.0"]
+          """;
 
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromString(
-                Paths.get("pyproject.toml"),
-                pyprojectToml
+          Paths.get("pyproject.toml"),
+          pyprojectToml
         );
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
-                null,
-                new InMemoryExecutionContext(Throwable::printStackTrace)
+          Collections.singletonList(input),
+          null,
+          new InMemoryExecutionContext(Throwable::printStackTrace)
         ).collect(Collectors.toList());
 
         assertThat(parsed).hasSize(1);

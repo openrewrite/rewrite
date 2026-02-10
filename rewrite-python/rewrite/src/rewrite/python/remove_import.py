@@ -142,11 +142,17 @@ class RemoveImport(PythonVisitor):
                     # so the next statement can inherit it if needed
                     removed_prefix = stmt.prefix
                     changed = True
-                elif result is not stmt:
-                    # Statement was modified — preserve padding
-                    new_padded_stmts.append(JRightPadded(result, padded.after, padded.markers))
-                    changed = True
                 else:
+                    if result is not stmt:
+                        padded = JRightPadded(result, padded.after, padded.markers)
+                        changed = True
+                    # Transfer removed statement's prefix to this statement
+                    if removed_prefix is not None:
+                        padded = JRightPadded(
+                            padded.element.replace(prefix=removed_prefix),
+                            padded.after, padded.markers
+                        )
+                        removed_prefix = None
                     new_padded_stmts.append(padded)
             else:
                 # Transfer removed statement's prefix to the next statement

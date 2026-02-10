@@ -308,18 +308,10 @@ class AddImport(PythonVisitor):
                 )
             padded_stmts.insert(insert_idx, new_padded)
         else:
-            # Inserting after existing imports. The preceding import's last
-            # name typically has '\n' in its after-padding, so the new import
-            # doesn't need its own '\n' prefix.
-            new_padded = JRightPadded(new_import.replace(prefix=Space.EMPTY), Space.EMPTY, Markers.EMPTY)
-            # Ensure the following statement has a '\n' prefix as separator
-            if insert_idx < len(padded_stmts):
-                next_stmt = padded_stmts[insert_idx]
-                if not next_stmt.element.prefix.whitespace:
-                    padded_stmts[insert_idx] = JRightPadded(
-                        next_stmt.element.replace(prefix=Space([], '\n')),
-                        next_stmt.after, next_stmt.markers
-                    )
+            # Inserting after existing imports. The new import needs '\n' as
+            # its prefix since each statement's prefix carries the newline
+            # that separates it from the preceding statement.
+            new_padded = JRightPadded(new_import.replace(prefix=Space([], '\n')), Space.EMPTY, Markers.EMPTY)
             padded_stmts.insert(insert_idx, new_padded)
 
         return cu.padding.replace(_statements=padded_stmts)

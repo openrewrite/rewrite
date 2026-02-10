@@ -84,7 +84,7 @@ class PythonDependencyParserTest {
     @Test
     void parsePep508Full() {
         Dependency dep = PythonDependencyParser.parsePep508(
-                "requests[security,socks]>=2.28.0,<3.0; python_version>='3.8'");
+          "requests[security,socks]>=2.28.0,<3.0; python_version>='3.8'");
         assertThat(dep).isNotNull();
         assertThat(dep.getName()).isEqualTo("requests");
         assertThat(dep.getVersionConstraint()).isEqualTo(">=2.28.0,<3.0");
@@ -103,20 +103,20 @@ class PythonDependencyParserTest {
     @Test
     void createMarkerFromPyprojectToml() {
         String toml = """
-                [project]
-                name = "my-project"
-                version = "1.0.0"
-                description = "A test project"
-                requires-python = ">=3.10"
-                dependencies = [
-                    "requests>=2.28.0",
-                    "click>=8.0",
-                ]
-
-                [build-system]
-                requires = ["hatchling"]
-                build-backend = "hatchling.build"
-                """;
+          [project]
+          name = "my-project"
+          version = "1.0.0"
+          description = "A test project"
+          requires-python = ">=3.10"
+          dependencies = [
+              "requests>=2.28.0",
+              "click>=8.0",
+          ]
+          
+          [build-system]
+          requires = ["hatchling"]
+          build-backend = "hatchling.build"
+          """;
 
         Toml.Document doc = parseToml(toml);
         PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
@@ -138,15 +138,15 @@ class PythonDependencyParserTest {
     @Test
     void createMarkerWithOptionalDependencies() {
         String toml = """
-                [project]
-                name = "my-project"
-                version = "1.0.0"
-                dependencies = ["requests>=2.28.0"]
-
-                [project.optional-dependencies]
-                dev = ["pytest>=7.0", "black>=22.0"]
-                docs = ["sphinx>=5.0"]
-                """;
+          [project]
+          name = "my-project"
+          version = "1.0.0"
+          dependencies = ["requests>=2.28.0"]
+          
+          [project.optional-dependencies]
+          dev = ["pytest>=7.0", "black>=22.0"]
+          docs = ["sphinx>=5.0"]
+          """;
 
         Toml.Document doc = parseToml(toml);
         PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
@@ -168,10 +168,10 @@ class PythonDependencyParserTest {
     @Test
     void createMarkerMinimal() {
         String toml = """
-                [project]
-                name = "minimal"
-                version = "0.1.0"
-                """;
+          [project]
+          name = "minimal"
+          version = "0.1.0"
+          """;
 
         Toml.Document doc = parseToml(toml);
         PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
@@ -188,11 +188,11 @@ class PythonDependencyParserTest {
     @Test
     void createMarkerWithSpdxLicense() {
         String toml = """
-                [project]
-                name = "my-project"
-                version = "1.0.0"
-                license = "MIT"
-                """;
+          [project]
+          name = "my-project"
+          version = "1.0.0"
+          license = "MIT"
+          """;
 
         Toml.Document doc = parseToml(toml);
         PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
@@ -204,11 +204,11 @@ class PythonDependencyParserTest {
     @Test
     void createMarkerWithDeprecatedLicenseTable() {
         String toml = """
-                [project]
-                name = "my-project"
-                version = "1.0.0"
-                license = {text = "Apache-2.0"}
-                """;
+          [project]
+          name = "my-project"
+          version = "1.0.0"
+          license = {text = "Apache-2.0"}
+          """;
 
         Toml.Document doc = parseToml(toml);
         PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
@@ -220,14 +220,14 @@ class PythonDependencyParserTest {
     @Test
     void createMarkerWithDependencyGroups() {
         String toml = """
-                [project]
-                name = "my-project"
-                version = "1.0.0"
-
-                [dependency-groups]
-                dev = ["pytest>=7.0", "mypy>=1.0"]
-                test = ["coverage>=7.0"]
-                """;
+          [project]
+          name = "my-project"
+          version = "1.0.0"
+          
+          [dependency-groups]
+          dev = ["pytest>=7.0", "mypy>=1.0"]
+          test = ["coverage>=7.0"]
+          """;
 
         Toml.Document doc = parseToml(toml);
         PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
@@ -249,13 +249,13 @@ class PythonDependencyParserTest {
     private static Toml.Document parseToml(String content) {
         TomlParser parser = new TomlParser();
         Parser.Input input = Parser.Input.fromString(
-                Paths.get("pyproject.toml"),
-                content
+          Paths.get("pyproject.toml"),
+          content
         );
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
-                null,
-                new InMemoryExecutionContext(Throwable::printStackTrace)
+          Collections.singletonList(input),
+          null,
+          new InMemoryExecutionContext(Throwable::printStackTrace)
         ).collect(Collectors.toList());
 
         assertThat(parsed).hasSize(1);

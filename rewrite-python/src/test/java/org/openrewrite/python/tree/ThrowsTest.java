@@ -22,6 +22,7 @@ import org.openrewrite.python.Python3Only;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.python.Assertions.python;
+
 class ThrowsTest implements RewriteTest {
 
     @Test

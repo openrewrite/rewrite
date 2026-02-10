@@ -26,16 +26,16 @@ import static org.openrewrite.python.Assertions.python;
 class TryTest implements RewriteTest {
 
     @CsvSource(textBlock = """
-      "" ,       ""
-      " ",       ""
-      "" ,       " "
-      "" ,       " TypeError"
-      "" ,       " TypeError "
-      "" ,       " TypeError as e"
-      "" ,       " TypeError  as e"
-      "" ,       " TypeError as  e"
-      "" ,       " TypeError as e "
-    """, quoteCharacter = '"')
+        "" ,       ""
+        " ",       ""
+        "" ,       " "
+        "" ,       " TypeError"
+        "" ,       " TypeError "
+        "" ,       " TypeError as e"
+        "" ,       " TypeError  as e"
+        "" ,       " TypeError as  e"
+        "" ,       " TypeError as e "
+      """, quoteCharacter = '"')
     @ParameterizedTest
     void tryExcept(String afterTry, String afterExcept) {
         rewriteRun(python(
@@ -50,12 +50,12 @@ class TryTest implements RewriteTest {
 
     @Python3Only
     @CsvSource(textBlock = """
-      "" ,       "* TypeError"
-      "" ,       "*  TypeError"
-      "" ,       "* TypeError as e"
-      "" ,       "*  TypeError as e"
-      "" ,       "*TypeError"
-    """, quoteCharacter = '"')
+        "" ,       "* TypeError"
+        "" ,       "*  TypeError"
+        "" ,       "* TypeError as e"
+        "" ,       "*  TypeError as e"
+        "" ,       "*TypeError"
+      """, quoteCharacter = '"')
     @ParameterizedTest
     void tryStarExcept(String afterTry, String afterExcept) {
         rewriteRun(python(
@@ -69,10 +69,10 @@ class TryTest implements RewriteTest {
     }
 
     @CsvSource(textBlock = """
-      " TypeError"          , " OSError"
-      " TypeError "          , " OSError"
-      " TypeError"          , " OSError "
-    """, quoteCharacter = '"')
+        " TypeError"          , " OSError"
+        " TypeError "          , " OSError"
+        " TypeError"          , " OSError "
+      """, quoteCharacter = '"')
     @ParameterizedTest
     void tryMultiExcept(String afterFirstExcept, String afterSecondExcept) {
         rewriteRun(python(
