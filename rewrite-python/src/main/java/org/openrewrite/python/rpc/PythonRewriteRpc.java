@@ -257,6 +257,12 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         private @Nullable Path workingDirectory;
 
+        /**
+         * The Python language version to parse. Defaults to "3" (Python 3).
+         * Set to "2" or "2.7" to parse Python 2 code.
+         */
+        private String pythonVersion = "3";
+
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
             return this;
@@ -339,6 +345,23 @@ public class PythonRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        /**
+         * Set the Python language version to parse.
+         * <p>
+         * Supported values:
+         * <ul>
+         *   <li>"2" or "2.7" - Parse Python 2.7 code using parso</li>
+         *   <li>"3" (default) - Parse Python 3 code using the standard ast module</li>
+         * </ul>
+         *
+         * @param pythonVersion The Python version to parse (e.g., "2", "2.7", "3")
+         * @return This builder
+         */
+        public Builder pythonVersion(String pythonVersion) {
+            this.pythonVersion = pythonVersion;
+            return this;
+        }
+
         @Override
         public PythonRewriteRpc get() {
             // Bootstrap openrewrite package if pip packages path is set
@@ -365,6 +388,9 @@ public class PythonRewriteRpc extends RewriteRpc {
             }
 
             process.environment().putAll(environment);
+
+            // Set the Python version for the parser
+            process.environment().put("REWRITE_PYTHON_VERSION", pythonVersion);
 
             // Set up PYTHONPATH for the rewrite package
             List<String> pythonPathParts = new ArrayList<>();

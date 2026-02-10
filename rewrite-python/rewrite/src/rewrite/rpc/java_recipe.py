@@ -36,9 +36,12 @@ Example:
             return JavaRecipeVisitor(self._java_recipe)
 """
 
-from typing import Any, Dict, List, Optional
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
+
+from rewrite.tree import Tree
+from rewrite.visitor import TreeVisitor
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +144,7 @@ def visit_with_java_recipe(
     return result.get('modified', False) if result else False
 
 
-class JavaRecipeVisitor:
+class JavaRecipeVisitor(TreeVisitor[Tree, Any]):
     """A visitor that delegates to a prepared Java recipe via RPC.
 
     This visitor can be used as the editor for a Python recipe that wants
@@ -155,15 +158,19 @@ class JavaRecipeVisitor:
     """
 
     def __init__(self, prepared_recipe: PreparedJavaRecipe, phase: str = 'edit'):
+        super().__init__()
         self._prepared_recipe = prepared_recipe
         self._phase = phase
 
-    def visit(self, tree: Any, ctx: Any, cursor: Any = None) -> Any:
+    def visit(self, tree: Optional[Tree], p: Any, parent: Any = None) -> Any:
         """Visit a tree by delegating to the Java recipe.
 
         This method sends the tree to Java for processing and retrieves
         the result.
         """
+        if tree is None:
+            return None
+
         from .server import local_objects, get_object_from_java
 
         # Ensure tree is in local_objects so Java can fetch it

@@ -244,7 +244,7 @@ class PythonTypeMapping:
         if isinstance(node, ast.Constant):
             return self._constant_type(node)
         elif isinstance(node, ast.Call):
-            return self.method_invocation_type(node)
+            return self.method_invocation_type(node)  # ty: ignore[invalid-return-type]
         elif isinstance(node, ast.Name):
             return self._name_type(node)
         elif isinstance(node, ast.Attribute):
@@ -755,7 +755,7 @@ class PythonTypeMapping:
         # Check for primitive types
         for py_type, java_type in _PYTHON_PRIMITIVES.items():
             if hover == py_type or hover.endswith(f': {py_type}'):
-                return java_type
+                return java_type  # ty: ignore[invalid-return-type]
 
         # Try to extract a type from various hover formats
         type_str = self._extract_type_from_hover(hover)
@@ -831,21 +831,21 @@ class PythonTypeMapping:
 
         # Handle Unknown type
         if type_str == 'Unknown':
-            return JavaType.Unknown()
+            return JavaType.Unknown()  # ty: ignore[invalid-return-type]
 
         # Handle module type: <module 'name'>
         module_match = re.match(r"<module\s+'([^']+)'", type_str)
         if module_match:
             module_name = module_match.group(1)
-            return self._create_class_type(module_name)
+            return self._create_class_type(module_name)  # ty: ignore[invalid-return-type]
 
         # Handle LiteralString (from ty) - treat as str
         if type_str == 'LiteralString':
-            return self._create_class_type('str')
+            return self._create_class_type('str')  # ty: ignore[invalid-return-type]
 
         # Check primitives first
         if type_str in _PYTHON_PRIMITIVES:
-            return _PYTHON_PRIMITIVES[type_str]
+            return _PYTHON_PRIMITIVES[type_str]  # ty: ignore[invalid-return-type]
 
         # Handle Literal["value"] - extract base type from the value
         literal_match = re.match(r'Literal\[(.+)\]', type_str)
@@ -854,13 +854,13 @@ class PythonTypeMapping:
             # Determine type from the literal value
             if (literal_value.startswith('"') and literal_value.endswith('"')) or \
                (literal_value.startswith("'") and literal_value.endswith("'")):
-                return self._create_class_type('str')
+                return self._create_class_type('str')  # ty: ignore[invalid-return-type]
             elif literal_value in ('True', 'False'):
                 return JavaType.Primitive.Boolean
             elif literal_value.isdigit() or (literal_value.startswith('-') and literal_value[1:].isdigit()):
                 return JavaType.Primitive.Int
             # Default to treating literal as str
-            return self._create_class_type('str')
+            return self._create_class_type('str')  # ty: ignore[invalid-return-type]
 
         # Handle Optional[T], List[T], etc.
         generic_match = re.match(r'(\w+)\[(.+)\]', type_str)
@@ -880,9 +880,9 @@ class PythonTypeMapping:
                     # For Optional[T], recurse on T
                     inner = generic_match.group(2)
                     return self._type_string_to_java_type(inner)
-                return self._create_class_type(type_mapping[base])
+                return self._create_class_type(type_mapping[base])  # ty: ignore[invalid-return-type]
             # Keep original casing for other types
-            return self._create_class_type(generic_match.group(1))
+            return self._create_class_type(generic_match.group(1))  # ty: ignore[invalid-return-type]
 
         # Handle union types: T | None, Union[T, None]
         if ' | ' in type_str:
@@ -892,10 +892,10 @@ class PythonTypeMapping:
                 if part not in ('None', 'NoneType', 'Unknown'):
                     return self._type_string_to_java_type(part)
             # If all parts are None/Unknown, return Unknown
-            return JavaType.Unknown()
+            return JavaType.Unknown()  # ty: ignore[invalid-return-type]
 
         # Default to class type
-        return self._create_class_type(type_str)
+        return self._create_class_type(type_str)  # ty: ignore[invalid-return-type]
 
     def _create_class_type(self, fqn: str) -> JavaType.Class:
         """Create a JavaType.Class from a fully qualified name.
@@ -918,7 +918,7 @@ class PythonTypeMapping:
         class_type._fully_qualified_name = fqn
         class_type._kind = JavaType.FullyQualified.Kind.Class
 
-        self._type_cache[fqn] = class_type
+        self._type_cache[fqn] = class_type  # ty: ignore[invalid-assignment]
         return class_type
 
     def _get_node_text(self, node: ast.expr) -> str:

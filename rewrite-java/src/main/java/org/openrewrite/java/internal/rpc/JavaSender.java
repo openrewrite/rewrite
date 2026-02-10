@@ -329,6 +329,8 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(literal, J.Literal::getValue);
         q.getAndSend(literal, J.Literal::getValueSource);
         q.getAndSendList(literal, J.Literal::getUnicodeEscapes, s -> s.getValueSourceIndex() + s.getCodePoint(), s -> {
+            q.getAndSend(s, J.Literal.UnicodeEscape::getValueSourceIndex);
+            q.getAndSend(s, J.Literal.UnicodeEscape::getCodePoint);
         });
         q.getAndSend(literal, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return literal;

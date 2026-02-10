@@ -501,6 +501,51 @@ class JavaTemplateTest6Test implements RewriteTest {
         );
     }
 
+    @Test
+    void annotateMethodInAnonymousClassAsFieldInitializerArgument() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
+                  if (m.getSimpleName().equals("compare") && m.getLeadingAnnotations().stream().noneMatch(
+                    a -> a.getSimpleName().equals("Deprecated"))) {
+                      return JavaTemplate.builder("@Deprecated")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              import java.util.Comparator;
+              import java.util.TreeSet;
+              class Test {
+                  TreeSet<String> set = new TreeSet<>(new Comparator<String>() {
+                      public int compare(String a, String b) {
+                          return a.compareTo(b);
+                      }
+                  });
+              }
+              """,
+            """
+              import java.util.Comparator;
+              import java.util.TreeSet;
+              class Test {
+                  TreeSet<String> set = new TreeSet<>(new Comparator<String>() {
+                      @Deprecated
+                      public int compare(String a, String b) {
+                          return a.compareTo(b);
+                      }
+                  });
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/6520")
     @Test
     void annotateMethodInAnonymousClassWithMultipleArgs() {

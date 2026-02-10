@@ -16,12 +16,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Union, TYPE_CHECKING
+from typing import Dict, List, Optional, Union, TYPE_CHECKING, cast
 
 from rewrite.java import J
-
-from .capture import Capture, RawCode, capture
+from .capture import Capture
 from .coordinates import PythonCoordinates
 from .engine import TemplateEngine, TemplateOptions
 
@@ -106,7 +104,7 @@ class Template:
         *,
         values: Optional[Union['MatchResult', Dict[str, J]]] = None,
         coordinates: Optional[PythonCoordinates] = None,
-    ) -> J:
+    ) -> Optional[J]:
         """
         Apply this template, returning the generated AST node.
 
@@ -135,7 +133,7 @@ class Template:
         values_dict: Dict[str, J] = {}
         if values is not None:
             if isinstance(values, dict):
-                values_dict = values
+                values_dict = cast(Dict[str, J], values)
             else:
                 # Assume it's a MatchResult
                 values_dict = values.as_dict()
@@ -153,7 +151,7 @@ class Template:
 
         # If no explicit coordinates, create default replacement coordinates
         if coordinates is None and cursor is not None:
-            tree = cursor.get_value()
+            tree = cursor.value
             if tree is not None:
                 result = TemplateEngine.apply_substitutions(
                     result if values_dict else template_tree,

@@ -81,9 +81,10 @@ class JavaVisitor(TreeVisitor[J, P]):
             if element is None:
                 return None
         after = self.visit_space(right.after, p)
-        if element is right.element and after is right.after:
+        markers = self.visit_markers(right.markers, p)
+        if element is right.element and after is right.after and markers is right.markers:
             return right
-        return right.replace(element=element, after=after)
+        return right.replace(element=element, after=after, markers=markers)
 
     def visit_container(
         self,

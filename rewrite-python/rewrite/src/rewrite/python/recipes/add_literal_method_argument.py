@@ -17,7 +17,7 @@ AddLiteralMethodArgument recipe for Python that delegates to Java's AddLiteralMe
 
 This recipe adds a literal argument to method invocations matching a pattern.
 """
-
+from dataclasses import field
 from typing import Any, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor, option
@@ -38,23 +38,23 @@ class AddLiteralMethodArgument(Recipe):
         )
     """
 
-    method_pattern: str = option(
+    method_pattern: str = field(metadata=option(
         display_name="Method pattern",
         description="A method pattern that matches method invocations to modify.",
         example="datetime.datetime now()"
-    )
+    ))
 
-    argument_index: int = option(
+    argument_index: int = field(metadata=option(
         display_name="Argument index",
         description="The zero-based position where to insert the argument.",
         example="0"
-    )
+    ))
 
-    literal: str = option(
+    literal: str = field(metadata=option(
         display_name="Literal",
         description="The literal value to add as an argument.",
         example="datetime.UTC"
-    )
+    ))
 
     def __init__(
         self,
