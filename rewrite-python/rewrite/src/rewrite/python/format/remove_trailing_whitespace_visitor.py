@@ -1,7 +1,6 @@
 from typing import Optional, cast
 
 import rewrite.java as j
-import rewrite.python as p
 from rewrite import Tree, Marker
 from rewrite.java import Space, J, TrailingComma
 from rewrite.python import PythonVisitor, CompilationUnit
@@ -9,7 +8,7 @@ from rewrite.visitor import P, Cursor, T
 
 
 class RemoveTrailingWhitespaceVisitor(PythonVisitor):
-    def __init__(self, stop_after: Optional[p.Tree] = None):
+    def __init__(self, stop_after: Optional[Tree] = None):
         self._stop_after = stop_after
         self._stop = False
 
