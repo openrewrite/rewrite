@@ -239,7 +239,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
         private final Map<String, String> environment = new HashMap<>();
         private Path dotnetPath = Paths.get("dotnet");
-        private @Nullable Path csharpProjectPath;
+        private @Nullable Path csharpServerEntry;
         private @Nullable Path log;
         private Duration timeout = Duration.ofSeconds(60);
         private boolean traceRpcMessages;
@@ -262,13 +262,16 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Path to the C# Rewrite.Server project.
+         * Entry point that launches the C# RPC server. When the path has a {@code .csproj}
+         * extension, the server is launched from source via {@code dotnet run --project}.
+         * Otherwise the path is treated as a published executable (DLL) and launched
+         * via {@code dotnet <path>}.
          *
-         * @param csharpProjectPath The path to the C# project directory containing Rewrite.Server
+         * @param csharpServerEntry Path to either a {@code .csproj} file or a published DLL
          * @return This builder
          */
-        public Builder csharpProjectPath(Path csharpProjectPath) {
-            this.csharpProjectPath = csharpProjectPath;
+        public Builder csharpServerEntry(Path csharpServerEntry) {
+            this.csharpServerEntry = csharpServerEntry;
             return this;
         }
 
@@ -309,17 +312,26 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
         @Override
         public CSharpRewriteRpc get() {
-            Path projectPath = findCSharpProjectPath();
-
-            Stream<@Nullable String> cmd = Stream.of(
-                    dotnetPath.toString(),
-                    "run",
-                    "--project", projectPath.resolve("OpenRewrite/OpenRewrite.csproj").toString(),
-                    "--framework", "net9.0",
-                    "--no-build",
-                    log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                    traceRpcMessages ? "--trace-rpc-messages" : null
-            );
+            Path entry = findCSharpServerEntry();
+            Stream<@Nullable String> cmd;
+            if (entry.toString().endsWith(".csproj")) {
+                cmd = Stream.of(
+                        dotnetPath.toString(),
+                        "run",
+                        "--project", entry.toAbsolutePath().normalize().toString(),
+                        "--framework", "net9.0",
+                        "--no-build",
+                        log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                        traceRpcMessages ? "--trace-rpc-messages" : null
+                );
+            } else {
+                cmd = Stream.of(
+                        dotnetPath.toString(),
+                        entry.toAbsolutePath().normalize().toString(),
+                        log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                        traceRpcMessages ? "--trace-rpc-messages" : null
+                );
+            }
 
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
             RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
@@ -342,9 +354,9 @@ public class CSharpRewriteRpc extends RewriteRpc {
             }
         }
 
-        private Path findCSharpProjectPath() {
-            if (csharpProjectPath != null) {
-                return csharpProjectPath;
+        private Path findCSharpServerEntry() {
+            if (csharpServerEntry != null) {
+                return csharpServerEntry;
             }
 
             // Try to find the C# project in the project structure
@@ -359,13 +371,14 @@ public class CSharpRewriteRpc extends RewriteRpc {
             };
 
             for (Path searchPath : searchPaths) {
-                if (searchPath != null && Files.exists(searchPath.resolve("OpenRewrite/OpenRewrite.csproj"))) {
-                    return searchPath.toAbsolutePath().normalize();
+                Path csproj = searchPath.resolve("OpenRewrite/OpenRewrite.csproj");
+                if (Files.exists(csproj)) {
+                    return csproj.toAbsolutePath().normalize();
                 }
             }
 
             throw new IllegalStateException(
-                    "Could not find C# Rewrite project. Please set csharpProjectPath() on the builder. " +
+                    "Could not find C# Rewrite project. Please set csharpServerEntry() on the builder. " +
                     "Expected to find OpenRewrite/OpenRewrite.csproj in the project directory.");
         }
     }
