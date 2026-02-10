@@ -3130,10 +3130,6 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
 
     @Test
     void shouldNotChangeDependencyWithImplicitlyDefinedVersionProperty() {
-        // When the dependency version uses an implicitly defined property like ${project.parent.version},
-        // and newVersion is specified, no changes should be made at all. This avoids partially
-        // updating the dependency (groupId/artifactId) while leaving the version property unchanged,
-        // which would break the intentional version relationship the user established.
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "org.junit.jupiter", "junit-jupiter-api",
