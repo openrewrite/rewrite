@@ -101,7 +101,6 @@ val pythonInstall by tasks.registering(Exec::class) {
 
     // Re-run if pyproject.toml changes
     inputs.file(pythonDir.resolve("pyproject.toml"))
-    outputs.file(venvDir.resolve("pyvenv.cfg"))
 
     doFirst {
         logger.lifecycle("Installing Python package with pip")
