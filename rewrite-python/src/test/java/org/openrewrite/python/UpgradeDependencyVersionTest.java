@@ -24,12 +24,12 @@ import java.nio.file.Path;
 import static org.openrewrite.python.Assertions.pyproject;
 import static org.openrewrite.python.Assertions.uv;
 
-class ChangeDependencyVersionTest implements RewriteTest {
+class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Test
     void changeVersionWithResolvedProject(@TempDir Path tempDir) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyVersion("requests", ">=2.31.0")),
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0")),
           uv(tempDir,
             pyproject(
               """
@@ -58,7 +58,7 @@ class ChangeDependencyVersionTest implements RewriteTest {
     @Test
     void changeVersionConstraint() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyVersion("requests", ">=2.31.0")),
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0")),
           pyproject(
             """
               [project]
@@ -85,7 +85,7 @@ class ChangeDependencyVersionTest implements RewriteTest {
     @Test
     void changeVersionWithExtras() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyVersion("requests", ">=2.31.0")),
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0")),
           pyproject(
             """
               [project]
@@ -110,7 +110,7 @@ class ChangeDependencyVersionTest implements RewriteTest {
     @Test
     void changeVersionWithMarker() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyVersion("requests", ">=2.31.0")),
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0")),
           pyproject(
             """
               [project]
@@ -135,7 +135,7 @@ class ChangeDependencyVersionTest implements RewriteTest {
     @Test
     void skipWhenNotPresent() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyVersion("nonexistent", ">=1.0")),
+          spec -> spec.recipe(new UpgradeDependencyVersion("nonexistent", ">=1.0")),
           pyproject(
             """
               [project]
@@ -152,7 +152,7 @@ class ChangeDependencyVersionTest implements RewriteTest {
     @Test
     void normalizeNameForMatching() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyVersion("typing_extensions", ">=4.8.0")),
+          spec -> spec.recipe(new UpgradeDependencyVersion("typing_extensions", ">=4.8.0")),
           pyproject(
             """
               [project]
@@ -177,7 +177,7 @@ class ChangeDependencyVersionTest implements RewriteTest {
     @Test
     void changeVersionInInlineList() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyVersion("requests", ">=2.31.0")),
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0")),
           pyproject(
             """
               [project]

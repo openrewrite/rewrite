@@ -70,6 +70,51 @@ class DependencyInsightTest implements RewriteTest {
     }
 
     @Test
+    void findTransitiveDependencyWithDataTable(@TempDir Path tempDir) {
+        rewriteRun(
+          spec -> spec
+            .recipe(new DependencyInsight("certifi", null, null))
+            .dataTable(PythonDependenciesInUse.Row.class, rows -> {
+                assertThat(rows).hasSizeGreaterThanOrEqualTo(2);
+                // Should have the direct dep (requests) that leads to certifi
+                assertThat(rows).anySatisfy(row -> {
+                    assertThat(row.getPackageName()).isEqualTo("requests");
+                    assertThat(row.getDirect()).isTrue();
+                    assertThat(row.getScope()).isEqualTo("dependencies");
+                });
+                // Should have the transitive dep (certifi) itself
+                assertThat(rows).anySatisfy(row -> {
+                    assertThat(row.getPackageName()).isEqualTo("certifi");
+                    assertThat(row.getDirect()).isFalse();
+                    assertThat(row.getVersion()).isNotNull();
+                });
+            }),
+          uv(tempDir,
+            pyproject(
+              """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = [
+                    "requests>=2.28.0",
+                    "click>=8.0",
+                ]
+                """,
+              """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = [
+                    ~~>\"requests>=2.28.0",
+                    "click>=8.0",
+                ]
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void findDirectDependencyByExactName() {
         rewriteRun(
           spec -> spec.recipe(new DependencyInsight("requests", null, null)),

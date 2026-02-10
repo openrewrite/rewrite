@@ -32,12 +32,12 @@ import org.openrewrite.toml.tree.TomlType;
 import java.util.*;
 
 /**
- * Change the version constraint for a dependency in {@code [project].dependencies} in pyproject.toml.
+ * Upgrade the version constraint for a dependency in {@code [project].dependencies} in pyproject.toml.
  * When uv is available, the uv.lock file is regenerated to reflect the change.
  */
 @EqualsAndHashCode(callSuper = false)
 @Value
-public class ChangeDependencyVersion extends ScanningRecipe<ChangeDependencyVersion.Accumulator> {
+public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVersion.Accumulator> {
 
     @Option(displayName = "Package name",
             description = "The PyPI package name to update.",
@@ -51,7 +51,7 @@ public class ChangeDependencyVersion extends ScanningRecipe<ChangeDependencyVers
 
     @Override
     public String getDisplayName() {
-        return "Change Python dependency version";
+        return "Upgrade Python dependency version";
     }
 
     @Override
@@ -61,7 +61,7 @@ public class ChangeDependencyVersion extends ScanningRecipe<ChangeDependencyVers
 
     @Override
     public String getDescription() {
-        return "Change the version constraint for a dependency in `[project].dependencies` in `pyproject.toml`. " +
+        return "Upgrade the version constraint for a dependency in `[project].dependencies` in `pyproject.toml`. " +
                 "When `uv` is available, the `uv.lock` file is regenerated.";
     }
 
