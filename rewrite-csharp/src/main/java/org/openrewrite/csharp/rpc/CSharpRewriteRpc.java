@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.marketplace.RecipeMarketplace;
@@ -29,8 +30,10 @@ import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -39,6 +42,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -118,13 +122,70 @@ public class CSharpRewriteRpc extends RewriteRpc {
     }
 
     /**
-     * Parses C# source files.
+     * Parses C# source files without type attribution.
      *
      * @param sourcePaths Paths to the C# source files to parse
      * @param ctx         Execution context for parsing
      * @return Stream of parsed source files
      */
     public Stream<SourceFile> parse(List<Path> sourcePaths, ExecutionContext ctx) {
+        return parse(sourcePaths, null, ctx);
+    }
+
+    /**
+     * Parses C# source files with optional assembly references for type attribution.
+     *
+     * @param sourcePaths        Paths to the C# source files to parse
+     * @param assemblyReferences NuGet package names, versioned package names (e.g., "Newtonsoft.Json@13.0.1"),
+     *                           or direct DLL paths. Null for syntax-only parsing.
+     * @param ctx                Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parse(List<Path> sourcePaths, @Nullable List<String> assemblyReferences, ExecutionContext ctx) {
+        List<ParseRequest.Input> inputs = sourcePaths.stream()
+                .map(p -> new ParseRequest.Input(p.toString(), null))
+                .collect(Collectors.toList());
+        return doParse(inputs, assemblyReferences, ctx);
+    }
+
+    /**
+     * Parses C# source files from Parser.Input objects with optional assembly references.
+     * Source text is read inline from each input, so files don't need to exist on disk.
+     *
+     * @param inputs             Parser inputs (may contain inline text)
+     * @param relativeTo         Base path for computing relative source paths
+     * @param assemblyReferences NuGet package names, versioned package names, or DLL paths.
+     *                           Null for syntax-only parsing.
+     * @param ctx                Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo,
+                                    @Nullable List<String> assemblyReferences, ExecutionContext ctx) {
+        List<ParseRequest.Input> parseInputs = new ArrayList<>();
+        for (Parser.Input input : inputs) {
+            String sourcePath = relativeTo != null
+                    ? relativeTo.relativize(input.getPath()).toString()
+                    : input.getPath().toString();
+            String text;
+            try (InputStream is = input.getSource(ctx)) {
+                byte[] buf = new byte[4096];
+                StringBuilder sb = new StringBuilder();
+                int n;
+                while ((n = is.read(buf)) != -1) {
+                    sb.append(new String(buf, 0, n, StandardCharsets.UTF_8));
+                }
+                text = sb.toString();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            parseInputs.add(new ParseRequest.Input(sourcePath, text));
+        }
+        return doParse(parseInputs, assemblyReferences, ctx);
+    }
+
+    private Stream<SourceFile> doParse(List<ParseRequest.Input> inputs,
+                                       @Nullable List<String> assemblyReferences,
+                                       ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
@@ -134,8 +195,8 @@ public class CSharpRewriteRpc extends RewriteRpc {
             @Override
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
-                    parsingListener.intermediateMessage("Starting C# parsing: " + sourcePaths.size() + " files");
-                    response = send("Parse", new ParseRequest(sourcePaths), ParseResponse.class);
+                    parsingListener.intermediateMessage("Starting C# parsing: " + inputs.size() + " files");
+                    response = send("Parse", new ParseRequest(inputs, assemblyReferences), ParseResponse.class);
                     parsingListener.intermediateMessage(String.format("Parsed %,d files", response.size()));
                 }
 

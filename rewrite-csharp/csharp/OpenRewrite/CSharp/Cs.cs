@@ -146,7 +146,8 @@ public sealed record DelegateInvocation(Guid Id) : Marker
 public sealed record PrimaryConstructor(Guid Id) : Marker, IRpcCodec<PrimaryConstructor>
 {
     public void RpcSend(PrimaryConstructor after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
-    public PrimaryConstructor RpcReceive(PrimaryConstructor before, RpcReceiveQueue q) => throw new NotImplementedException();
+    public PrimaryConstructor RpcReceive(PrimaryConstructor before, RpcReceiveQueue q) =>
+        before with { Id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse) };
 }
 
 /// <summary>
@@ -158,7 +159,8 @@ public sealed record PrimaryConstructor(Guid Id) : Marker, IRpcCodec<PrimaryCons
 public sealed record Struct(Guid Id) : Marker, IRpcCodec<Struct>
 {
     public void RpcSend(Struct after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
-    public Struct RpcReceive(Struct before, RpcReceiveQueue q) => throw new NotImplementedException();
+    public Struct RpcReceive(Struct before, RpcReceiveQueue q) =>
+        before with { Id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse) };
 }
 
 /// <summary>
@@ -169,7 +171,8 @@ public sealed record Struct(Guid Id) : Marker, IRpcCodec<Struct>
 public sealed record RecordClass(Guid Id) : Marker, IRpcCodec<RecordClass>
 {
     public void RpcSend(RecordClass after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
-    public RecordClass RpcReceive(RecordClass before, RpcReceiveQueue q) => throw new NotImplementedException();
+    public RecordClass RpcReceive(RecordClass before, RpcReceiveQueue q) =>
+        before with { Id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse) };
 }
 
 /// <summary>
@@ -181,7 +184,8 @@ public sealed record RecordClass(Guid Id) : Marker, IRpcCodec<RecordClass>
 public sealed record ExpressionBodied(Guid Id) : Marker, IRpcCodec<ExpressionBodied>
 {
     public void RpcSend(ExpressionBodied after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
-    public ExpressionBodied RpcReceive(ExpressionBodied before, RpcReceiveQueue q) => throw new NotImplementedException();
+    public ExpressionBodied RpcReceive(ExpressionBodied before, RpcReceiveQueue q) =>
+        before with { Id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse) };
 }
 
 /// <summary>
@@ -218,7 +222,8 @@ public sealed record TypeParameterBound(
 public sealed record Implicit(Guid Id) : Marker, IRpcCodec<Implicit>
 {
     public void RpcSend(Implicit after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
-    public Implicit RpcReceive(Implicit before, RpcReceiveQueue q) => throw new NotImplementedException();
+    public Implicit RpcReceive(Implicit before, RpcReceiveQueue q) =>
+        before with { Id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse) };
 }
 
 /// <summary>

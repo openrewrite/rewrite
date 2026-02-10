@@ -17,8 +17,10 @@ dependencies {
     implementation("io.moderne:jsonrpc:latest.integration")
 
     compileOnly(project(":rewrite-test"))
+    compileOnly(project(":rewrite-xml"))
 
     testImplementation(project(":rewrite-test"))
+    testImplementation(project(":rewrite-xml"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
     testRuntimeOnly(project(":rewrite-java-21"))
 }
