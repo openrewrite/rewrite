@@ -579,7 +579,14 @@ def handle_install_recipes(params: dict) -> dict:
 
 def _find_package_name(local_path: Path) -> Optional[str]:
     """Find the package name from a local path."""
-    import tomllib
+    import sys
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        try:
+            import tomli as tomllib  # type: ignore[import-not-found]
+        except ModuleNotFoundError:
+            return None
 
     # Try pyproject.toml first
     pyproject_path = local_path / 'pyproject.toml'

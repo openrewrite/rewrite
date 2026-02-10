@@ -961,9 +961,9 @@ class PythonRpcReceiver:
         elif isinstance(java_type, JT.Class):
             # Class: flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype,
             #        owningClass, annotations, interfaces, members, methods
-            flags = q.receive(getattr(java_type, '_flags_bit_map', 0))
+            flags = q.receive_defined(getattr(java_type, '_flags_bit_map', 0))
             kind = q.receive(getattr(java_type, '_kind', JT.FullyQualified.Kind.Class))
-            fqn = q.receive(getattr(java_type, '_fully_qualified_name', ''))
+            fqn = q.receive_defined(getattr(java_type, '_fully_qualified_name', ''))
             type_params = q.receive_list(getattr(java_type, '_type_parameters', None) or [],
                                           lambda t: self._receive_type(t, q))
             supertype = q.receive(getattr(java_type, '_supertype', None),
@@ -1274,9 +1274,9 @@ def _receive_java_type_class(cls, q: RpcReceiveQueue):
     # Receive fields in the same order as JavaTypeSender.visitClass:
     # flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype,
     # owningClass, annotations, interfaces, members, methods
-    flags = q.receive(getattr(cls, '_flags_bit_map', 0) if cls else 0)
+    flags = q.receive_defined(getattr(cls, '_flags_bit_map', 0) if cls else 0)
     kind = q.receive(getattr(cls, '_kind', JT.FullyQualified.Kind.Class) if cls else JT.FullyQualified.Kind.Class)
-    fqn = q.receive(getattr(cls, '_fully_qualified_name', '') if cls else '')
+    fqn = q.receive_defined(getattr(cls, '_fully_qualified_name', '') if cls else '')
     type_params = q.receive_list(getattr(cls, '_type_parameters', None) if cls else None)
     supertype = q.receive(getattr(cls, '_supertype', None) if cls else None)
     owning_class = q.receive(getattr(cls, '_owning_class', None) if cls else None)

@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, List, Type, TypeVar, TYPE_CHECKING
+from typing import Any, Dict, Generic, List, Type, TypeVar, TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from rewrite.execution import ExecutionContext
@@ -252,7 +252,8 @@ class DataTable(Generic[Row]):
         """
         columns = []
         if hasattr(self._row_type, "__dataclass_fields__"):
-            for field_name, field in self._row_type.__dataclass_fields__.items():
+            dc_fields: Dict[str, Any] = cast(Dict[str, Any], self._row_type.__dataclass_fields__)
+            for field_name, field in dc_fields.items():
                 if "column" in field.metadata:
                     col_desc = field.metadata["column"]
                     columns.append(

@@ -16,12 +16,11 @@
 
 from __future__ import annotations
 
-from typing import Dict, Optional, List, TYPE_CHECKING, cast, Any
+from typing import Dict, Optional, TYPE_CHECKING, cast
 
-from rewrite.java import J, Expression, Statement
+from rewrite.java import J
 from rewrite.java import tree as j
 from rewrite.python import tree as py
-
 from .capture import Capture
 from .placeholder import from_placeholder
 
@@ -233,7 +232,7 @@ class PatternMatchingComparator:
             return False
 
         # Compare arguments
-        return self._compare_arguments(pattern.arguments, target.arguments, cursor)
+        return self._compare_arguments(pattern.padding.arguments, target.padding.arguments, cursor)
 
     def _compare_arguments(
         self,
@@ -384,14 +383,14 @@ class PatternMatchingComparator:
             return False
 
         # Compare elements
-        pattern_elements = pattern.elements.elements if pattern.elements else []
-        target_elements = target.elements.elements if target.elements else []
+        pattern_elements = pattern.elements
+        target_elements = target.elements
 
         if len(pattern_elements) != len(target_elements):
             return False
 
         for p_elem, t_elem in zip(pattern_elements, target_elements):
-            if not self._compare(p_elem.element, t_elem.element, cursor):
+            if not self._compare(p_elem, t_elem, cursor):
                 return False
 
         return True
@@ -403,14 +402,14 @@ class PatternMatchingComparator:
         cursor: 'Cursor'
     ) -> bool:
         """Compare two Python dict literals."""
-        pattern_elements = pattern.elements.elements if pattern.elements else []
-        target_elements = target.elements.elements if target.elements else []
+        pattern_elements = pattern.elements
+        target_elements = target.elements
 
         if len(pattern_elements) != len(target_elements):
             return False
 
         for p_elem, t_elem in zip(pattern_elements, target_elements):
-            if not self._compare(p_elem.element, t_elem.element, cursor):
+            if not self._compare(p_elem, t_elem, cursor):
                 return False
 
         return True
