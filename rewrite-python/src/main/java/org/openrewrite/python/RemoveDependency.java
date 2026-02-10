@@ -55,8 +55,8 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
 
     @Override
     public String getDescription() {
-        return "Remove a dependency from the [project].dependencies array in pyproject.toml. " +
-                "When uv is available, the uv.lock file is regenerated.";
+        return "Remove a dependency from the `[project].dependencies` array in `pyproject.toml`. " +
+                "When `uv` is available, the `uv.lock` file is regenerated.";
     }
 
     static class Accumulator {

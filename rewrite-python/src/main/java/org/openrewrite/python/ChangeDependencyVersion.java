@@ -61,8 +61,8 @@ public class ChangeDependencyVersion extends ScanningRecipe<ChangeDependencyVers
 
     @Override
     public String getDescription() {
-        return "Change the version constraint for a dependency in [project].dependencies in pyproject.toml. " +
-                "When uv is available, the uv.lock file is regenerated.";
+        return "Change the version constraint for a dependency in `[project].dependencies` in `pyproject.toml`. " +
+                "When `uv` is available, the `uv.lock` file is regenerated.";
     }
 
     static class Accumulator {

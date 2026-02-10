@@ -67,8 +67,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
 
     @Override
     public String getDescription() {
-        return "Add a dependency to the [project].dependencies array in pyproject.toml. " +
-                "When uv is available, the uv.lock file is regenerated.";
+        return "Add a dependency to the `[project].dependencies` array in `pyproject.toml`. " +
+                "When `uv` is available, the `uv.lock` file is regenerated.";
     }
 
     static class Accumulator {
