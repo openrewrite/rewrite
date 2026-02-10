@@ -322,28 +322,23 @@ def handle_parse(params: dict) -> List[str]:
     """Handle a Parse RPC request."""
     inputs = params.get('inputs', [])
     relative_to = params.get('relativeTo')
-    logger.info(f"handle_parse: {len(inputs)} inputs, relativeTo={relative_to}")
     results = []
 
     for i, input_item in enumerate(inputs):
         if isinstance(input_item, str):
             # PathInput serialized via @JsonValue as a bare path string
-            logger.info(f"  [{i}] parsing file: {input_item}")
             result = parse_python_file(input_item, relative_to)
         elif 'path' in input_item:
             # File input as dict
-            logger.info(f"  [{i}] parsing file: {input_item['path']}")
             result = parse_python_file(input_item['path'], relative_to)
         elif 'text' in input_item or 'source' in input_item:
             # String input - Java sends 'text' and 'sourcePath'
             source = input_item.get('text') or input_item.get('source')
             path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-            logger.info(f"  [{i}] parsing source: {path}")
             result = parse_python_source(source, path, relative_to)
         else:
             logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
             continue
-        logger.info(f"  [{i}] result: {result}")
         results.append(result['id'])
 
     return results
@@ -405,9 +400,7 @@ def handle_get_object(params: dict) -> List[dict]:
         before = remote_objects.get(obj_id)
 
         q = RpcSendQueue(source_file_type)
-        logger.info(f"handle_get_object: starting generate for {obj_id}")
         result = q.generate(obj, before)
-        logger.info(f"handle_get_object: generate complete, {len(result)} items")
 
         # Update remote_objects to track that Java now has this version
         remote_objects[obj_id] = obj
