@@ -16,6 +16,18 @@ from ...visitor import P, T
 
 
 class AutoFormat(Recipe):
+    @property
+    def name(self) -> str:
+        return "org.openrewrite.python.format.AutoFormat"
+
+    @property
+    def display_name(self) -> str:
+        return "Auto-format Python code"
+
+    @property
+    def description(self) -> str:
+        return "Applies standard formatting to Python source code."
+
     def get_visitor(self):
         return AutoFormatVisitor()
 
