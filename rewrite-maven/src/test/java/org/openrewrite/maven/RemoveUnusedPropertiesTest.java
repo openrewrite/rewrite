@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -843,14 +844,13 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/6687")
     @Test
     void removesUnusedPropertiesInSinglePomWithResourceFilteringEnabled() {
         rewriteRun(
           pomXml(
             """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+            <project>
               <modelVersion>4.0.0</modelVersion>
               <groupId>com.sample</groupId>
               <artifactId>test.application</artifactId>
@@ -873,9 +873,7 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
             </project>
             """,
             """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+            <project>
               <modelVersion>4.0.0</modelVersion>
               <groupId>com.sample</groupId>
               <artifactId>test.application</artifactId>
