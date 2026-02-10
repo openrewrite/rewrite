@@ -5,6 +5,7 @@ from .blank_lines import BlankLinesVisitor
 from .minimum_viable_spacing import MinimumViableSpacingVisitor
 from .normalize_format import NormalizeFormatVisitor
 from .normalize_tabs_or_spaces import NormalizeTabsOrSpacesVisitor
+from .spaces_visitor import SpacesVisitor
 
 __all__ = [
     'AutoFormat',
@@ -12,4 +13,5 @@ __all__ = [
     'MinimumViableSpacingVisitor',
     'NormalizeFormatVisitor',
     'NormalizeTabsOrSpacesVisitor',
+    'SpacesVisitor',
 ]

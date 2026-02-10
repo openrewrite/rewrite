@@ -6,7 +6,8 @@ from .normalize_format import NormalizeFormatVisitor
 from .normalize_line_breaks_visitor import NormalizeLineBreaksVisitor
 from .normalize_tabs_or_spaces import NormalizeTabsOrSpacesVisitor
 from .remove_trailing_whitespace_visitor import RemoveTrailingWhitespaceVisitor
-from .. import TabsAndIndentsStyle
+from .spaces_visitor import SpacesVisitor
+from .. import TabsAndIndentsStyle, SpacesStyle
 from ..style import BlankLinesStyle, IntelliJ
 from ..visitor import PythonVisitor
 from ... import Recipe, Tree, Cursor
@@ -28,7 +29,7 @@ class AutoFormat(Recipe):
     def description(self) -> str:
         return "Applies standard formatting to Python source code."
 
-    def get_visitor(self):
+    def editor(self):
         return AutoFormatVisitor()
 
 
@@ -46,7 +47,7 @@ class AutoFormatVisitor(PythonVisitor[P]):
 
         tree = BlankLinesVisitor(cu.get_style(BlankLinesStyle) or IntelliJ.blank_lines(), self._stop_after).visit(tree, p, self._cursor.fork())
 
-        # TODO: SpacesVisitor - blocked on base PythonVisitor passing `loc` to visit_space/visit_right_padded/visit_container
+        tree = SpacesVisitor(cu.get_style(SpacesStyle) or IntelliJ.spaces(), self._stop_after).visit(tree, p, self._cursor.fork())
 
         tree = NormalizeTabsOrSpacesVisitor(
             cu.get_style(TabsAndIndentsStyle) or IntelliJ.tabs_and_indents(),
