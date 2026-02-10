@@ -159,7 +159,7 @@ val pytestTest by tasks.registering(Exec::class) {
     group = "verification"
     description = "Run Python pytest tests"
 
-    dependsOn(pythonInstall, "generateTestClasspath")
+    dependsOn(pythonInstall)
 
     workingDir = pythonDir
     commandLine(pythonExe.absolutePath, "-m", "pytest", "tests/", "-v")
@@ -340,6 +340,8 @@ val generateTestClasspath by tasks.registering {
          .joinToString(File.pathSeparator) { it.absolutePath }
         outputFile.writeText(classpath)
         logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
+
+
     }
 }
 
