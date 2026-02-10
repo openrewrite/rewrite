@@ -69,9 +69,11 @@ class ParserVisitor(ast.NodeVisitor):
         # Pre-compute byte-to-char mappings for lines with multi-byte characters
         self._byte_to_char = self._build_byte_to_char_mapping(source)
 
-        # Token infrastructure - _token_idx is the primary position tracker
+        # Normalize line endings for the tokenizer (it rejects mixed \r\n and \n),
+        # but keep the original source for whitespace extraction
+        tokenizer_source = source.replace('\r\n', '\n') if '\r\n' in source else source
         self._tokens, self._paren_pairs = self._build_tokens(
-            tokenize(BytesIO(source.encode('utf-8')).readline)
+            tokenize(BytesIO(tokenizer_source.encode('utf-8')).readline)
         )
         self._token_idx = 1  # Skip ENCODING token
 
@@ -129,7 +131,12 @@ class ParserVisitor(ast.NodeVisitor):
             # Scan from prev_end to find tok_start by tracking row/col
             scan = prev_end
             while scan < len(self._source) and (row < target_row or (row == target_row and col < target_col)):
-                if self._source[scan] == '\n':
+                if self._source[scan] == '\r' and scan + 1 < len(self._source) and self._source[scan + 1] == '\n':
+                    row += 1
+                    col = 0
+                    scan += 2
+                    continue
+                elif self._source[scan] == '\n':
                     row += 1
                     col = 0
                 else:
@@ -168,6 +175,24 @@ class ParserVisitor(ast.NodeVisitor):
                 elif tok.string == ')' and paren_stack:
                     paren_pairs[paren_stack.pop()] = len(result)
 
+            # Update row/col to the token's end position and compute prev_end
+            # by scanning the original source (handles \r\n correctly)
+            end_row, end_col = tok.end
+            scan_end = tok_start
+            while scan_end < len(self._source) and (row < end_row or (row == end_row and col < end_col)):
+                if self._source[scan_end] == '\r' and scan_end + 1 < len(self._source) and self._source[scan_end + 1] == '\n':
+                    row += 1
+                    col = 0
+                    scan_end += 2
+                    continue
+                elif self._source[scan_end] == '\n':
+                    row += 1
+                    col = 0
+                else:
+                    col += 1
+                scan_end += 1
+            prev_end = scan_end
+
             # Normalize ellipsis '...' into three '.' tokens only in relative imports
             # (between 'from' and 'import' keywords). Elsewhere '...' is the Ellipsis literal.
             if tok.string == '...' and in_from_import:
@@ -181,6 +206,10 @@ class ParserVisitor(ast.NodeVisitor):
                     )
                     result.append(dot_tok)
             else:
+                # Replace token string with original source text to preserve \r\n
+                original_text = self._source[tok_start:scan_end]
+                if original_text != tok.string and tok.type in (token.NEWLINE, token.NL, token.INDENT, token.STRING):
+                    tok = TokenInfo(tok.type, original_text, tok.start, tok.end, tok.line)
                 result.append(tok)
 
             # Track from/import context for ellipsis normalization
@@ -190,15 +219,6 @@ class ParserVisitor(ast.NodeVisitor):
                 else:
                     # Any other identifier (module name or 'import') ends the context
                     in_from_import = False
-
-            # Update row/col for token content
-            for c in tok.string:
-                if c == '\n':
-                    row += 1
-                    col = 0
-                else:
-                    col += 1
-            prev_end = tok_start + len(tok.string)
 
         return result, paren_pairs
 

@@ -131,6 +131,15 @@ class RecipeSpec:
     # Whether to validate parse/print idempotence
     check_parse_print_idempotence: bool = True
 
+    def with_recipe(self, recipe: Recipe) -> "RecipeSpec":
+        return RecipeSpec(recipe=recipe, execution_context=self.execution_context,
+                          check_parse_print_idempotence=self.check_parse_print_idempotence)
+
+    def with_recipes(self, *recipes: Recipe) -> "RecipeSpec":
+        if len(recipes) == 1:
+            return self.with_recipe(recipes[0])
+        return self.with_recipe(_CompositeRecipe(list(recipes)))
+
     def rewrite_run(self, *source_specs: SourceSpec) -> None:
         """
         Execute the recipe test with the given source specifications.
@@ -305,3 +314,30 @@ class RecipeSpec:
                 return actual  # Callable returned None = actual is acceptable
             return result
         return dedent(after) if after else actual
+
+
+class _CompositeRecipe(Recipe):
+
+    def __init__(self, recipes: List[Recipe]):
+        self._recipes = recipes
+
+    @property
+    def name(self) -> str:
+        return "org.openrewrite.composite"
+
+    @property
+    def display_name(self) -> str:
+        return "Composite recipe"
+
+    @property
+    def description(self) -> str:
+        return "Composite recipe for testing."
+
+    def recipe_list(self) -> List[Recipe]:
+        return self._recipes
+
+
+def rewrite_run(*source_specs: SourceSpec, spec: Optional[RecipeSpec] = None) -> None:
+    if spec is None:
+        spec = RecipeSpec()
+    spec.rewrite_run(*source_specs)
