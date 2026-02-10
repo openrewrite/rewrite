@@ -104,12 +104,12 @@ def dedent(s: Optional[str]) -> str:
     if not s:
         return ""
 
-    # Preserve \r\n sequences through dedent, since textwrap.dedent
-    # treats \r on whitespace-only lines as strippable whitespace
-    _CRLF = '\x00CRLF\x00'
-    s = s.replace('\r\n', _CRLF)
+    # Preserve \r\n sequences through dedent: replace \r\n with a marker
+    # that keeps the \n (so line boundaries survive for textwrap.dedent)
+    _CR = '\x00CR\x00'
+    s = s.replace('\r\n', _CR + '\n')
     s = textwrap.dedent(s)
-    return s.replace(_CRLF, '\r\n')
+    return s.replace(_CR + '\n', '\r\n')
 
 
 def python(
