@@ -215,8 +215,12 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     after = self._indent_to(right.after, indent)
 
                 else:
+                    method_select_indent = self.cursor.get_nearest_message("method_select_indent")
                     elem = self.visit_and_cast(elem, J, p)
-                    after = self.visit_space(right.after, p)
+                    if method_select_indent is not None:
+                        after = self._indent_to(right.after, method_select_indent)
+                    else:
+                        after = self.visit_space(right.after, p)
 
             else:
                 if rp_context in ("method_invocation_argument",):
@@ -424,6 +428,33 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         class_decl = class_decl.replace(body=self.visit_and_cast(
             class_decl.body, Block, p))
         return class_decl
+
+    def visit_method_invocation(self, method: MethodInvocation, p: P) -> J:
+        select = method.padding.select
+        if select is not None and '\n' in select.after.last_whitespace:
+            col = self._compute_select_column(method)
+            if col >= 0:
+                self.cursor.put_message("method_select_indent", col)
+        return super().visit_method_invocation(method, p)
+
+    def _compute_select_column(self, method: MethodInvocation) -> int:
+        from rewrite.python.printer import PythonPrinter
+        target = None
+        for c in self.cursor.get_path_as_cursors():
+            v = c.value
+            if isinstance(v, J):
+                target = v
+                if '\n' in v.prefix.whitespace:
+                    break
+        if target is None:
+            return -1
+        source = PythonPrinter().print(target)
+        select_source = PythonPrinter().print(method.select)
+        idx = source.find(select_source)
+        if idx < 0:
+            return -1
+        last_nl = source.rfind('\n', 0, idx)
+        return idx - last_nl - 1 if last_nl >= 0 else idx
 
     # -------------------------------------------------------------------------
     # Expression statement (docstring alignment)
