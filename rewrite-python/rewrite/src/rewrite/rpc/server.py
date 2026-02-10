@@ -209,20 +209,28 @@ def generate_id() -> str:
     return str(uuid4())
 
 
-def parse_python_file(path: str) -> dict:
+def parse_python_file(path: str, relative_to: Optional[str] = None) -> dict:
     """Parse a Python file and return its LST."""
     with open(path, 'r', encoding='utf-8') as f:
         source = f.read()
-    return parse_python_source(source, path)
+    return parse_python_source(source, path, relative_to)
 
 
-def parse_python_source(source: str, path: str = "<unknown>") -> dict:
+def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None) -> dict:
     """Parse Python source code and return its LST.
 
     The parser used depends on the REWRITE_PYTHON_VERSION environment variable:
     - "2" or "2.7": Use parso-based Py2ParserVisitor for Python 2 code
     - "3" (default): Use ast-based ParserVisitor for Python 3 code
     """
+    # Compute the source_path that will be stored on the LST
+    source_path = Path(path)
+    if relative_to is not None:
+        try:
+            source_path = source_path.relative_to(relative_to)
+        except ValueError:
+            pass  # path is not under relative_to, keep absolute
+
     try:
         from rewrite import Markers
 
@@ -250,7 +258,7 @@ def parse_python_source(source: str, path: str = "<unknown>") -> dict:
             # Convert to OpenRewrite LST
             cu = ParserVisitor(source, path).visit(tree)
 
-        cu = cu.replace(source_path=Path(path))
+        cu = cu.replace(source_path=source_path)
         cu = cu.replace(markers=Markers.EMPTY)
 
         # Store and return
@@ -263,14 +271,14 @@ def parse_python_source(source: str, path: str = "<unknown>") -> dict:
     except ImportError as e:
         logger.error(f"Failed to import parser: {e}")
         traceback.print_exc()
-        return _create_parse_error(path, str(e), source)
+        return _create_parse_error(str(source_path), str(e), source)
     except SyntaxError as e:
         logger.error(f"Syntax error parsing {path}: {e}")
-        return _create_parse_error(path, str(e), source)
+        return _create_parse_error(str(source_path), str(e), source)
     except Exception as e:
         logger.error(f"Error parsing {path}: {e}")
         traceback.print_exc()
-        return _create_parse_error(path, str(e), source)
+        return _create_parse_error(str(source_path), str(e), source)
 
 
 def _create_parse_error(path: str, message: str, source: str = '') -> dict:
@@ -313,19 +321,29 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
 def handle_parse(params: dict) -> List[str]:
     """Handle a Parse RPC request."""
     inputs = params.get('inputs', [])
+    relative_to = params.get('relativeTo')
+    logger.info(f"handle_parse: {len(inputs)} inputs, relativeTo={relative_to}")
     results = []
 
-    for input_item in inputs:
-        if 'path' in input_item:
-            # File input
-            result = parse_python_file(input_item['path'])
+    for i, input_item in enumerate(inputs):
+        if isinstance(input_item, str):
+            # PathInput serialized via @JsonValue as a bare path string
+            logger.info(f"  [{i}] parsing file: {input_item}")
+            result = parse_python_file(input_item, relative_to)
+        elif 'path' in input_item:
+            # File input as dict
+            logger.info(f"  [{i}] parsing file: {input_item['path']}")
+            result = parse_python_file(input_item['path'], relative_to)
         elif 'text' in input_item or 'source' in input_item:
             # String input - Java sends 'text' and 'sourcePath'
             source = input_item.get('text') or input_item.get('source')
             path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-            result = parse_python_source(source, path)
+            logger.info(f"  [{i}] parsing source: {path}")
+            result = parse_python_source(source, path, relative_to)
         else:
+            logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
             continue
+        logger.info(f"  [{i}] result: {result}")
         results.append(result['id'])
 
     return results
@@ -387,18 +405,18 @@ def handle_get_object(params: dict) -> List[dict]:
         before = remote_objects.get(obj_id)
 
         q = RpcSendQueue(source_file_type)
+        logger.info(f"handle_get_object: starting generate for {obj_id}")
         result = q.generate(obj, before)
-        logger.debug(f"GetObject result: {len(result)} items")
-        for i, item in enumerate(result[:10]):  # Log first 10 items
-            logger.debug(f"  [{i}] {item}")
+        logger.info(f"handle_get_object: generate complete, {len(result)} items")
 
         # Update remote_objects to track that Java now has this version
         remote_objects[obj_id] = obj
 
         return result
 
-    except Exception as e:
-        logger.error(f"Error serializing object: {e}")
+    except BaseException as e:
+        source_path = getattr(obj, 'source_path', None)
+        logger.error(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
         import traceback as tb
         tb.print_exc()
         return [{'state': 'END_OF_OBJECT'}]
