@@ -26,6 +26,7 @@ import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -104,6 +105,72 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
                 .filter(r -> normalizeName(r.getName()).equals(normalized))
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * Find a declared dependency by package name in the main {@code [project].dependencies} list.
+     *
+     * @param packageName The name of the package (case-insensitive, normalized per PEP 503)
+     * @return The dependency, or null if not found
+     */
+    public @Nullable Dependency findDependency(String packageName) {
+        String normalized = normalizeName(packageName);
+        return dependencies.stream()
+                .filter(d -> normalizeName(d.getName()).equals(normalized))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Find a declared dependency by package name across all scopes:
+     * dependencies, buildRequires, optionalDependencies, and dependencyGroups.
+     *
+     * @param packageName The name of the package (case-insensitive, normalized per PEP 503)
+     * @return The dependency, or null if not found in any scope
+     */
+    public @Nullable Dependency findDependencyInAnyScope(String packageName) {
+        String normalized = normalizeName(packageName);
+        for (Dependency dep : dependencies) {
+            if (normalizeName(dep.getName()).equals(normalized)) {
+                return dep;
+            }
+        }
+        for (Dependency dep : buildRequires) {
+            if (normalizeName(dep.getName()).equals(normalized)) {
+                return dep;
+            }
+        }
+        for (List<Dependency> deps : optionalDependencies.values()) {
+            for (Dependency dep : deps) {
+                if (normalizeName(dep.getName()).equals(normalized)) {
+                    return dep;
+                }
+            }
+        }
+        for (List<Dependency> deps : dependencyGroups.values()) {
+            for (Dependency dep : deps) {
+                if (normalizeName(dep.getName()).equals(normalized)) {
+                    return dep;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get all declared dependencies across all scopes as a flat list.
+     * Includes dependencies, buildRequires, optionalDependencies values, and dependencyGroups values.
+     */
+    public List<Dependency> getAllDeclaredDependencies() {
+        List<Dependency> all = new ArrayList<>(dependencies);
+        all.addAll(buildRequires);
+        for (List<Dependency> deps : optionalDependencies.values()) {
+            all.addAll(deps);
+        }
+        for (List<Dependency> deps : dependencyGroups.values()) {
+            all.addAll(deps);
+        }
+        return all;
     }
 
     /**

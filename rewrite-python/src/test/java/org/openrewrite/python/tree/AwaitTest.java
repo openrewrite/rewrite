@@ -28,8 +28,8 @@ class AwaitTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "await x",
-            "await  x"
+      "await x",
+      "await  x"
     })
     void await(@Language("py") String arg) {
         rewriteRun(python(arg));

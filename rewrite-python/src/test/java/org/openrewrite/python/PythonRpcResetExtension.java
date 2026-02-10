@@ -45,10 +45,10 @@ public class PythonRpcResetExtension implements BeforeEachCallback, AfterEachCal
         if (!factoryConfigured) {
             String pythonVersion = System.getProperty("rewrite.python.version", "3");
             PythonRewriteRpc.setFactory(
-                PythonRewriteRpc.builder()
-                    .pythonVersion(pythonVersion)
-                    .traceRpcMessages()
-                    .log(java.nio.file.Paths.get("build/python-rpc.log"))
+              PythonRewriteRpc.builder()
+                .pythonVersion(pythonVersion)
+                .traceRpcMessages()
+                .log(java.nio.file.Paths.get("build/python-rpc.log"))
             );
             factoryConfigured = true;
         }

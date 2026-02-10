@@ -34,16 +34,16 @@ class AutodetectTest implements RewriteTest {
         rewriteRun(
           hasIndentation(2),
           python(
-                """
-          if 1 > 0:
-           print("This one-space indent will be effectively ignored")
-
-          for i in range(1, 24):
-            print(i)
-            for j in range(1, i):
-              x = j * j
-              print(i, j)
-          """
+            """
+              if 1 > 0:
+               print("This one-space indent will be effectively ignored")
+              
+              for i in range(1, 24):
+                print(i)
+                for j in range(1, i):
+                  x = j * j
+                  print(i, j)
+              """
           )
         );
     }
@@ -53,16 +53,16 @@ class AutodetectTest implements RewriteTest {
         rewriteRun(
           hasIndentation(4),
           python(
-                """
-          if 1 > 0:
-           print("This one-space indent will be effectively ignored")
-
-          for i in range(1, 24):
-              print(i)
-              for j in range(1, i):
-                  x = j * j
-                  print(i, j)
-          """
+            """
+              if 1 > 0:
+               print("This one-space indent will be effectively ignored")
+              
+              for i in range(1, 24):
+                  print(i)
+                  for j in range(1, i):
+                      x = j * j
+                      print(i, j)
+              """
           )
         );
     }
@@ -88,12 +88,12 @@ class AutodetectTest implements RewriteTest {
               assertThat(style.getAroundOperators().getMultiplicative()).isTrue();
           }),
           python(
-                """
-            x = 1 + 2
-            y = 3 * 4
-            z = x + y
-            result = (x + y) * z
             """
+              x = 1 + 2
+              y = 3 * 4
+              z = x + y
+              result = (x + y) * z
+              """
           )
         );
     }
@@ -107,12 +107,12 @@ class AutodetectTest implements RewriteTest {
               assertThat(style.getAroundOperators().getMultiplicative()).isFalse();
           }),
           python(
-                """
-            x=1+2
-            y=3*4
-            z=x+y
-            result=(x+y)*z
             """
+              x=1+2
+              y=3*4
+              z=x+y
+              result=(x+y)*z
+              """
           )
         );
     }
@@ -125,12 +125,12 @@ class AutodetectTest implements RewriteTest {
               assertThat(style.getWithin().getMethodCallParentheses()).isTrue();
           }),
           python(
-                """
-            def test ( x, y ):
-                return x + y
-            
-            result = test ( 1, 2 )
             """
+              def test ( x, y ):
+                  return x + y
+              
+              result = test ( 1, 2 )
+              """
           )
         );
     }
@@ -143,12 +143,12 @@ class AutodetectTest implements RewriteTest {
               assertThat(style.getOther().getAfterColon()).isTrue();
           }),
           python(
-                """
-            def calculate(x : int, y : float) -> float:
-                return x + y
-            
-            result : float = calculate(1, 2.0)
             """
+              def calculate(x : int, y : float) -> float:
+                  return x + y
+              
+              result : float = calculate(1, 2.0)
+              """
           )
         );
     }
@@ -181,11 +181,11 @@ class AutodetectTest implements RewriteTest {
               assertThat(style.getWithin().getBraces()).isTrue();
           }),
           python(
-                """
-            numbers = [ 1, 2, 3 ]
-            data = { "a": 1, "b": 2 }
-            matrix = [ [ 1, 2 ], [ 3, 4 ] ]
             """
+              numbers = [ 1, 2, 3 ]
+              data = { "a": 1, "b": 2 }
+              matrix = [ [ 1, 2 ], [ 3, 4 ] ]
+              """
           )
         );
     }
@@ -198,11 +198,11 @@ class AutodetectTest implements RewriteTest {
               assertThat(style.getWithin().getBraces()).isTrue();
           }),
           python(
-                """
-            numbers = [  ]
-            data = {  }
-            matrix = [ [  ], [  ] ]
             """
+              numbers = [  ]
+              data = {  }
+              matrix = [ [  ], [  ] ]
+              """
           )
         );
     }
@@ -215,10 +215,10 @@ class AutodetectTest implements RewriteTest {
               assertThat(style.getWithin().getBraces()).isTrue();
           }),
           python(
-                """
-            squares = [ x*x for x in range(10) ]
-            evens = { x for x in range(20) if x % 2 == 0 }
             """
+              squares = [ x*x for x in range(10) ]
+              evens = { x for x in range(20) if x % 2 == 0 }
+              """
           )
         );
     }
@@ -231,9 +231,9 @@ class AutodetectTest implements RewriteTest {
     void autodetectChainedAssignmentSpacing(boolean hasSpaces, String code) {
         rewriteRun(
           hasSpacingStyle(style ->
-              assertThat(style.getAroundOperators().getAssignment())
-                .as("Assignment operators in chained assignments should%s have spaces", hasSpaces ? "" : " not")
-                .isEqualTo(hasSpaces)),
+            assertThat(style.getAroundOperators().getAssignment())
+              .as("Assignment operators in chained assignments should%s have spaces", hasSpaces ? "" : " not")
+              .isEqualTo(hasSpaces)),
           python("""
             %s
             %s
@@ -255,9 +255,9 @@ class AutodetectTest implements RewriteTest {
     void autodetectAssignmentOperationSpacing(boolean hasSpaces, String operation) {
         rewriteRun(
           hasSpacingStyle(style ->
-              assertThat(style.getAroundOperators().getAssignment())
-                .as("Compound assignment operators should%s have spaces", hasSpaces ? "" : " not")
-                .isEqualTo(hasSpaces)),
+            assertThat(style.getAroundOperators().getAssignment())
+              .as("Compound assignment operators should%s have spaces", hasSpaces ? "" : " not")
+              .isEqualTo(hasSpaces)),
           python("""
             %s
             """.formatted(
@@ -322,8 +322,8 @@ class AutodetectTest implements RewriteTest {
     void autodetectForLoop(boolean hasSpaces) {
         rewriteRun(
           hasSpacingStyle(style ->
-              assertThat(style.getOther().getBeforeColon())
-                .isEqualTo(hasSpaces)),
+            assertThat(style.getOther().getBeforeColon())
+              .isEqualTo(hasSpaces)),
           python("""
             for i in range(10)%s:
                 pass

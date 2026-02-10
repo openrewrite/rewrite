@@ -790,7 +790,7 @@ class ParserVisitor(ast.NodeVisitor):
             parenthesized,
             JContainer(
                 names_prefix,
-                [self.__pad_list_element(self.__convert(n), i == len(node.names) - 1) for i, n in
+                [self.__pad_list_element(self.__convert(n), i == len(node.names) - 1, pad_last=parenthesized) for i, n in
                  enumerate(node.names)],
                 Markers.EMPTY
             )
