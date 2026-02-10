@@ -2621,6 +2621,103 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/6630#issuecomment-3873627052")
+    @Test
+    void childRedefinesPropertyUsedNonConflictinglyInlinesVersionInParent() {
+        // When a child redefines a parent property and uses it for a non-matching dependency,
+        // the parent property is not updated even though the child would not be affected.
+        // This is overly conservative but safe: ChangePropertyValue via doAfterVisit does not
+        // scope to a single document, so it would also change the child's redefined property.
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "io.swagger",
+            "swagger-annotations",
+            "io.swagger.core.v3",
+            null,
+            "2.2.x",
+            null,
+            null,
+            null
+          )),
+          mavenProject("project",
+            pomXml(
+              //language=xml
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1</version>
+                  <properties>
+                    <version.swagger>1.5.16</version.swagger>
+                  </properties>
+                  <modules>
+                    <module>sub-project</module>
+                  </modules>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.swagger</groupId>
+                      <artifactId>swagger-annotations</artifactId>
+                      <version>${version.swagger}</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """,
+              //language=xml
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1</version>
+                  <properties>
+                    <version.swagger>1.5.16</version.swagger>
+                  </properties>
+                  <modules>
+                    <module>sub-project</module>
+                  </modules>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.swagger.core.v3</groupId>
+                      <artifactId>swagger-annotations</artifactId>
+                      <version>2.2.42</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """,
+              spec -> spec.path("pom.xml")
+            ),
+            mavenProject("sub-project",
+              pomXml(
+                //language=xml
+                """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>sub-project</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent-project</artifactId>
+                      <version>1</version>
+                      <relativePath>../pom.xml</relativePath>
+                    </parent>
+                    <properties>
+                      <version.swagger>1.5.17</version.swagger>
+                    </properties>
+                    <dependencies>
+                      <dependency>
+                        <groupId>io.swagger</groupId>
+                        <artifactId>swagger-models</artifactId>
+                        <version>${version.swagger}</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.path("sub-project/pom.xml")
+              )
+            )
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5965")
     @Test
     void changeDependencyGroupIdAndArtifactIdForEjbType() {
