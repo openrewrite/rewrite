@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Text.Json;
 using System.Xml.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
@@ -16,10 +17,19 @@ namespace Rewrite.CSharp.Rpc;
 
 public class RewriteRpcServer
 {
+    private static RewriteRpcServer? _current;
+
+    /// <summary>
+    /// The current RPC server instance, or null if not running.
+    /// Used by RpcVisitor and Preconditions to delegate to the Java peer.
+    /// </summary>
+    public static RewriteRpcServer? Current => _current;
+
     private readonly CSharpParser _parser = new();
     private readonly RecipeMarketplace _marketplace;
     private readonly Dictionary<string, Recipe> _preparedRecipes = new();
     private string? _recipesProjectDir;
+    private JsonRpc? _jsonRpc;
 
     /// <summary>
     /// Objects that have been parsed locally and are available for remote access.
@@ -35,6 +45,11 @@ public class RewriteRpcServer
     /// Referentially deduplicated objects and their ref IDs.
     /// </summary>
     private readonly Dictionary<object, int> _localRefs = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// Refs received from the remote process (Java) for deduplication.
+    /// </summary>
+    private readonly Dictionary<int, object> _remoteRefs = new();
 
     public RewriteRpcServer(RecipeMarketplace marketplace)
     {
@@ -81,25 +96,105 @@ public class RewriteRpcServer
             return Task.FromResult(sourceFileIds.ToArray());
         }
 
+        // Resolve assembly references into a Roslyn compilation if provided
+        Microsoft.CodeAnalysis.CSharp.CSharpCompilation? compilation = null;
+        var syntaxTrees = new List<Microsoft.CodeAnalysis.SyntaxTree>();
+        var sourceTexts = new Dictionary<string, string>();
+
+        // First pass: parse all syntax trees
         foreach (var input in request.Inputs)
         {
-            string content;
-            if (input.Text != null)
-            {
-                content = input.Text;
-            }
-            else
-            {
-                content = File.ReadAllText(input.SourcePath);
-            }
+            string content = input.Text ?? File.ReadAllText(input.SourcePath);
+            sourceTexts[input.SourcePath] = content;
+            var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(content, path: input.SourcePath);
+            syntaxTrees.Add(tree);
+        }
 
-            var cu = _parser.Parse(content, input.SourcePath);
+        // Create compilation if assembly references are provided (even if empty, to get framework refs)
+        if (request.AssemblyReferences != null)
+        {
+            var references = ResolveAssemblyReferences(request.AssemblyReferences);
+
+            compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+                "ParseCompilation",
+                syntaxTrees,
+                references,
+                new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                    Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+        }
+
+        // Second pass: create LST with optional type attribution
+        foreach (var tree in syntaxTrees)
+        {
+            var sourcePath = tree.FilePath;
+            var content = sourceTexts[sourcePath];
+            Microsoft.CodeAnalysis.SemanticModel? semanticModel =
+                compilation?.GetSemanticModel(tree);
+
+            var cu = _parser.Parse(content, sourcePath, semanticModel);
             var id = cu.Id.ToString();
             _localObjects[id] = cu;
             sourceFileIds.Add(id);
         }
 
         return Task.FromResult(sourceFileIds.ToArray());
+    }
+
+    /// <summary>
+    /// Resolves assembly reference strings to MetadataReference objects.
+    /// Supports direct DLL paths and includes core framework references.
+    /// </summary>
+    private List<Microsoft.CodeAnalysis.MetadataReference> ResolveAssemblyReferences(
+        List<string> assemblyReferences)
+    {
+        var references = new List<Microsoft.CodeAnalysis.MetadataReference>();
+
+        // Always include core framework assemblies
+        var trustedAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
+        if (trustedAssemblies != null)
+        {
+            foreach (var assemblyPath in trustedAssemblies.Split(Path.PathSeparator))
+            {
+                if (File.Exists(assemblyPath))
+                {
+                    references.Add(Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(assemblyPath));
+                }
+            }
+        }
+
+        // Resolve user-specified references
+        foreach (var reference in assemblyReferences)
+        {
+            if (File.Exists(reference) && reference.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            {
+                // Direct DLL path
+                references.Add(Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(reference));
+            }
+            else if (reference.Contains('@'))
+            {
+                // NuGet package with version: "PackageName@Version"
+                var parts = reference.Split('@', 2);
+                var packageName = parts[0];
+                var version = parts[1];
+
+                var dlls = FindPackageAssemblies(packageName, version);
+                if (dlls.Count == 0)
+                {
+                    // Package not in cache — download it
+                    var csprojPath = EnsureRecipesProject();
+                    RunDotnet($"add \"{csprojPath}\" package {packageName} --version {version}");
+                    RunDotnet($"restore \"{csprojPath}\"");
+                    dlls = FindPackageAssemblies(packageName, version);
+                }
+
+                foreach (var dll in dlls)
+                {
+                    references.Add(Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(dll));
+                }
+            }
+        }
+
+        return references;
     }
 
     [JsonRpcMethod("GetObject", UseSingleObjectParameterDeserialization = true)]
@@ -140,16 +235,43 @@ public class RewriteRpcServer
     }
 
     [JsonRpcMethod("Print", UseSingleObjectParameterDeserialization = true)]
-    public Task<string> Print(PrintRequest request)
+    public async Task<string> Print(PrintRequest request)
     {
-        if (!_localObjects.TryGetValue(request.TreeId, out var obj) || obj is not Tree tree)
+        var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
+        var printer = new CSharpPrinter<int>();
+        return printer.Print(tree);
+    }
+
+    /// <summary>
+    /// Fetches an object from the remote (Java) process by calling GetObject back.
+    /// This is the reverse of the local GetObject handler — instead of serializing
+    /// our local state, we ask Java to serialize its local state to us.
+    /// </summary>
+    private async Task<Tree> GetObjectFromRemoteAsync(string id, string? sourceFileType)
+    {
+        var localObject = _localObjects.GetValueOrDefault(id);
+
+        var q = new RpcReceiveQueue(
+            _remoteRefs,
+            () => _jsonRpc!.InvokeWithParameterObjectAsync<List<RpcObjectData>>(
+                "GetObject",
+                new GetObjectRequest { Id = id, SourceFileType = sourceFileType })
+                .GetAwaiter().GetResult(),
+            sourceFileType,
+            TreeCodec.Instance
+        );
+
+        var remoteObject = q.Receive(localObject, (Func<object, object>?)null);
+        if (q.Take().State != END_OF_OBJECT)
+            throw new InvalidOperationException("Expected END_OF_OBJECT");
+
+        if (remoteObject != null)
         {
-            throw new InvalidOperationException($"Tree not found: {request.TreeId}");
+            _remoteObjects[id] = remoteObject;
+            _localObjects[id] = remoteObject;
         }
 
-        var printer = new CSharpPrinter<int>();
-        var printed = printer.Print(tree);
-        return Task.FromResult(printed);
+        return (Tree)remoteObject!;
     }
 
     [JsonRpcMethod("GetMarketplace")]
@@ -565,17 +687,63 @@ public class RewriteRpcServer
         using var jsonRpc = new JsonRpc(handler);
 
         var server = new RewriteRpcServer(marketplace);
+        server._jsonRpc = jsonRpc;
+        _current = server;
         jsonRpc.AddLocalRpcTarget(server);
         jsonRpc.StartListening();
 
-        await jsonRpc.Completion.WaitAsync(cancellationToken);
+        try
+        {
+            await jsonRpc.Completion.WaitAsync(cancellationToken);
+        }
+        finally
+        {
+            _current = null;
+        }
     }
+
+    /// <summary>
+    /// Asks the Java peer to prepare a recipe by name and options.
+    /// Returns a response containing the edit visitor name for use with VisitOnRemoteAsync.
+    /// </summary>
+    public PrepareRecipeResponse PrepareRecipeOnRemote(string recipeId, Dictionary<string, object?>? options = null)
+    {
+        return _jsonRpc!.InvokeWithParameterObjectAsync<PrepareRecipeResponse>(
+            "PrepareRecipe",
+            new PrepareRecipeRequest { Id = recipeId, Options = options ?? new() }
+        ).GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Runs a prepared visitor on the Java peer. The tree must already be in _localObjects
+    /// so Java can fetch it via the GetObject callback.
+    /// Returns the (possibly modified) tree.
+    /// </summary>
+    public Tree VisitOnRemote(string visitorName, string treeId, string? sourceFileType)
+    {
+        var response = _jsonRpc!.InvokeWithParameterObjectAsync<VisitResponse>(
+            "Visit",
+            new VisitRequest { VisitorName = visitorName, TreeId = treeId, SourceFileType = sourceFileType }
+        ).GetAwaiter().GetResult();
+
+        if (response.Modified)
+        {
+            return GetObjectFromRemoteAsync(treeId, sourceFileType).GetAwaiter().GetResult();
+        }
+
+        return (Tree)_localObjects[treeId]!;
+    }
+
+    /// <summary>
+    /// Stores a tree in the local object cache so Java can fetch it via GetObject.
+    /// </summary>
+    internal void StoreLocalObject(string id, object obj) => _localObjects[id] = obj;
 
     private class TreeCodec : IRpcCodec
     {
         public static readonly TreeCodec Instance = new();
         public void RpcSend(object after, RpcSendQueue q) => new CSharpSender().Visit((J)after, q);
-        public object RpcReceive(object before, RpcReceiveQueue q) => throw new NotImplementedException();
+        public object RpcReceive(object before, RpcReceiveQueue q) => new CSharpReceiver().Visit((J)before, q)!;
     }
 }
 
@@ -584,6 +752,7 @@ public class RewriteRpcServer
 public class ParseRequest
 {
     public List<ParseInput>? Inputs { get; set; }
+    public List<string>? AssemblyReferences { get; set; }
 }
 
 public class ParseInput

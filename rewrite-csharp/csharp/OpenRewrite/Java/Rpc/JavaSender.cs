@@ -1,3 +1,4 @@
+using System.Linq;
 using Rewrite.Core;
 using Rewrite.Core.Rpc;
 using static Rewrite.Core.Rpc.Reference;
@@ -602,12 +603,128 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
         switch (javaType)
         {
+            case JavaType.Annotation annotation:
+                q.GetAndSend(annotation, a => AsRef(a.AnnotationType),
+                    t => VisitType(GetValueNonNull<JavaType>(t), q));
+                break;
+
+            case JavaType.MultiCatch multiCatch:
+                q.GetAndSendListAsRef(multiCatch, m => m.ThrowableTypes,
+                    t => TypeSignature(t), t => VisitType(t, q));
+                break;
+
+            case JavaType.Intersection intersection:
+                q.GetAndSendListAsRef(intersection, i => i.Bounds,
+                    t => TypeSignature(t), t => VisitType(t, q));
+                break;
+
+            case JavaType.Class cls:
+                q.GetAndSend(cls, c => c.FlagsBitMap);
+                q.GetAndSend(cls, c => c.ClassKind);
+                q.GetAndSend(cls, c => c.FullyQualifiedName);
+                q.GetAndSendListAsRef(cls, c => c.TypeParameters,
+                    t => TypeSignature(t), t => VisitType(t, q));
+                q.GetAndSend(cls, c => AsRef(c.Supertype),
+                    t => VisitType(GetValueNonNull<JavaType>(t), q));
+                q.GetAndSend(cls, c => AsRef(c.OwningClass),
+                    t => VisitType(GetValueNonNull<JavaType>(t), q));
+                q.GetAndSendListAsRef(cls, c => c.Annotations,
+                    t => TypeSignature(t), t => VisitType(t, q));
+                q.GetAndSendListAsRef(cls, c => c.Interfaces,
+                    t => TypeSignature(t), t => VisitType(t, q));
+                q.GetAndSendListAsRef(cls, c => c.Members,
+                    t => TypeSignature(t), t => VisitType(t, q));
+                q.GetAndSendListAsRef(cls, c => c.Methods,
+                    t => TypeSignature(t), t => VisitType(t, q));
+                break;
+
+            case JavaType.Parameterized parameterized:
+                q.GetAndSend(parameterized, p => AsRef(p.Type),
+                    t => VisitType(GetValueNonNull<JavaType>(t), q));
+                q.GetAndSendListAsRef(parameterized, p => p.TypeParameters,
+                    t => TypeSignature(t), t => VisitType(t, q));
+                break;
+
+            case JavaType.GenericTypeVariable generic:
+                q.GetAndSend(generic, g => g.Name);
+                q.GetAndSend(generic, g => g.Variance);
+                q.GetAndSendListAsRef(generic, g => g.Bounds,
+                    t => TypeSignature(t), t => VisitType(t, q));
+                break;
+
+            case JavaType.Array array:
+                q.GetAndSend(array, a => AsRef(a.ElemType),
+                    t => VisitType(GetValueNonNull<JavaType>(t), q));
+                q.GetAndSendListAsRef(array, a => a.Annotations,
+                    t => TypeSignature(t), t => VisitType(t, q));
+                break;
+
             case JavaType.Primitive primitive:
                 q.GetAndSend(primitive, p => GetPrimitiveKeyword(p.Kind));
+                break;
+
+            case JavaType.Method method:
+                q.GetAndSend(method, m => AsRef(m.DeclaringType),
+                    t => VisitType(GetValueNonNull<JavaType>(t), q));
+                q.GetAndSend(method, m => m.Name);
+                q.GetAndSend(method, m => m.FlagsBitMap);
+                q.GetAndSend(method, m => AsRef(m.ReturnType),
+                    t => VisitType(GetValueNonNull<JavaType>(t), q));
+                q.GetAndSendList(method, m => m.ParameterNames,
+                    s => s, null);
+                q.GetAndSendListAsRef(method, m => m.ParameterTypes,
+                    t => TypeSignature(t), t => VisitType(t, q));
+                q.GetAndSendListAsRef(method, m => m.ThrownExceptions,
+                    t => TypeSignature(t), t => VisitType(t, q));
+                q.GetAndSendListAsRef(method, m => m.Annotations,
+                    t => TypeSignature(t), t => VisitType(t, q));
+                q.GetAndSendList(method, m => m.DefaultValue,
+                    s => s, null);
+                q.GetAndSendList(method, m => m.DeclaredFormalTypeNames,
+                    s => s, null);
+                break;
+
+            case JavaType.Variable variable:
+                q.GetAndSend(variable, v => v.Name);
+                q.GetAndSend(variable, v => AsRef(v.Owner),
+                    t => VisitType(GetValueNonNull<JavaType>(t), q));
+                q.GetAndSend(variable, v => AsRef(v.Type),
+                    t => VisitType(GetValueNonNull<JavaType>(t), q));
+                q.GetAndSendListAsRef(variable, v => v.Annotations,
+                    t => TypeSignature(t), t => VisitType(t, q));
                 break;
         }
 
         return javaType;
+    }
+
+    /// <summary>
+    /// Produces a signature string for a JavaType, used as the identity function
+    /// for GetAndSendListAsRef. Matches DefaultJavaTypeSignatureBuilder.java.
+    /// </summary>
+    private static object TypeSignature(JavaType type)
+    {
+        return type switch
+        {
+            JavaType.Primitive p => p.Keyword,
+            JavaType.Class c => c.FullyQualifiedName,
+            JavaType.Parameterized p => TypeSignature(p.Type!) + "<" +
+                string.Join(", ", (p.TypeParameters ?? []).Select(TypeSignature)) + ">",
+            JavaType.GenericTypeVariable g => "Generic{" + g.Name + "}",
+            JavaType.Array a => TypeSignature(a.ElemType!) + "[]",
+            JavaType.Method m => TypeSignature(m.DeclaringType!) +
+                "{name=" + m.Name + ",return=" + TypeSignature(m.ReturnType!) +
+                ",parameters=[" + string.Join(",", (m.ParameterTypes ?? []).Select(TypeSignature)) + "]}",
+            JavaType.Variable v => TypeSignature(v.Owner!) +
+                "{name=" + v.Name + ",type=" + TypeSignature(v.Type!) + "}",
+            JavaType.MultiCatch mc => string.Join("|",
+                (mc.ThrowableTypes ?? []).Select(TypeSignature)),
+            JavaType.Intersection i => string.Join(" & ",
+                (i.Bounds ?? []).Select(TypeSignature)),
+            JavaType.Annotation a => "@" + (a.AnnotationType != null ? TypeSignature(a.AnnotationType) : "{undefined}"),
+            JavaType.Unknown => "{undefined}",
+            _ => "{undefined}"
+        };
     }
 
     private static string GetPrimitiveKeyword(JavaType.PrimitiveKind kind) => kind switch

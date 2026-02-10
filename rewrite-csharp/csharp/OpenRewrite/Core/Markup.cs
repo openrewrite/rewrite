@@ -18,7 +18,10 @@ public abstract record Markup(Guid Id, string Message, string? Detail) : Marker
 
         public Error RpcReceive(Error before, RpcReceiveQueue q)
         {
-            throw new NotImplementedException("Markup.Error.RpcReceive");
+            var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
+            var message = q.Receive(before.Message);
+            var detail = q.Receive(before.Detail);
+            return before with { Id = id, Message = message!, Detail = detail };
         }
     }
 
@@ -33,7 +36,10 @@ public abstract record Markup(Guid Id, string Message, string? Detail) : Marker
 
         public Warn RpcReceive(Warn before, RpcReceiveQueue q)
         {
-            throw new NotImplementedException("Markup.Warn.RpcReceive");
+            var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
+            var message = q.Receive(before.Message);
+            var detail = q.Receive(before.Detail);
+            return before with { Id = id, Message = message!, Detail = detail };
         }
     }
 
@@ -48,7 +54,10 @@ public abstract record Markup(Guid Id, string Message, string? Detail) : Marker
 
         public Info RpcReceive(Info before, RpcReceiveQueue q)
         {
-            throw new NotImplementedException("Markup.Info.RpcReceive");
+            var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
+            var message = q.Receive(before.Message);
+            var detail = q.Receive(before.Detail);
+            return before with { Id = id, Message = message!, Detail = detail };
         }
     }
 
@@ -63,7 +72,10 @@ public abstract record Markup(Guid Id, string Message, string? Detail) : Marker
 
         public Debug RpcReceive(Debug before, RpcReceiveQueue q)
         {
-            throw new NotImplementedException("Markup.Debug.RpcReceive");
+            var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
+            var message = q.Receive(before.Message);
+            var detail = q.Receive(before.Detail);
+            return before with { Id = id, Message = message!, Detail = detail };
         }
     }
 }

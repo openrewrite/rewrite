@@ -16,11 +16,10 @@
 package org.openrewrite.csharp.rpc;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.rpc.request.RpcRequest;
 
-import java.nio.file.Path;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * RPC request to parse C# source files.
@@ -32,11 +31,16 @@ class ParseRequest implements RpcRequest {
      */
     List<Input> inputs;
 
-    ParseRequest(List<Path> sourcePaths) {
-        this.inputs = sourcePaths.stream()
-                .map(p -> new Input(p.toString(), null))
-                .collect(Collectors.toList());
-    }
+    /**
+     * Assembly references for type attribution. Each entry is either:
+     * <ul>
+     *   <li>A NuGet package name (e.g., "Newtonsoft.Json")</li>
+     *   <li>A NuGet package name with version (e.g., "Newtonsoft.Json@13.0.1")</li>
+     *   <li>A direct path to a DLL file</li>
+     * </ul>
+     * When null, parsing proceeds without type attribution.
+     */
+    @Nullable List<String> assemblyReferences;
 
     @Value
     static class Input {
@@ -49,6 +53,6 @@ class ParseRequest implements RpcRequest {
          * Optional text content. If provided, the file is parsed from this text
          * instead of reading from the file system.
          */
-        String text;
+        @Nullable String text;
     }
 }
