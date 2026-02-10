@@ -1,8 +1,8 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using OpenRewrite.Java;
+using Rewrite.Java;
 
-namespace OpenRewrite.CSharp;
+namespace Rewrite.CSharp;
 
 /// <summary>
 /// Maps Roslyn semantic symbols to OpenRewrite JavaType.
@@ -118,20 +118,9 @@ internal class CSharpTypeMapping
             _typeCache[symbol] = parameterized;
 
             var rawType = MapNamedType(symbol.OriginalDefinition);
-
-            // Guard: if rawType resolved back to the same Parameterized (cache collision
-            // between symbol and OriginalDefinition) or is not a FullyQualified, fall back
-            if (ReferenceEquals(rawType, parameterized) || rawType is not JavaType.FullyQualified fq)
-            {
-                _typeCache.Remove(symbol);
-                // Fall through to create as a plain Class below
-            }
-            else
-            {
-                var typeArgs = symbol.TypeArguments.Select(MapType).ToList()!;
-                parameterized.UnsafeSet(fq, typeArgs!);
-                return parameterized;
-            }
+            var typeArgs = symbol.TypeArguments.Select(MapType).ToList()!;
+            parameterized.UnsafeSet(rawType as JavaType.FullyQualified, typeArgs!);
+            return parameterized;
         }
 
         // Shell cache pattern: create empty shell, cache it, then populate
@@ -254,13 +243,13 @@ internal class CSharpTypeMapping
     {
         long flags = 0;
         // Map accessibility
-        flags |= (long)(symbol.DeclaredAccessibility switch
+        flags |= symbol.DeclaredAccessibility switch
         {
             Accessibility.Public => 1,       // Flag.Public
             Accessibility.Private => 2,      // Flag.Private
             Accessibility.Protected => 4,    // Flag.Protected
             _ => 0
-        });
+        };
         if (symbol.IsStatic) flags |= 8;     // Flag.Static
         if (symbol.IsAbstract) flags |= 1024; // Flag.Abstract
         if (symbol.IsSealed) flags |= 16;     // Flag.Final (sealed ~ final)

@@ -25,8 +25,14 @@ public sealed record Markers(Guid Id, IList<Marker> MarkerList) : IRpcCodec<Mark
 
     public Markers RpcReceive(Markers before, RpcReceiveQueue q)
     {
-        // Receive-side not yet implemented
-        throw new NotImplementedException("Markers.RpcReceive");
+        var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
+        var markerList = q.ReceiveList(before.MarkerList, marker =>
+        {
+            if (marker is IRpcCodec codec)
+                return (Marker)codec.RpcReceive(marker, q);
+            return marker;
+        });
+        return before with { Id = id, MarkerList = markerList! };
     }
 
     public static readonly Markers Empty = new(Guid.Empty, []);

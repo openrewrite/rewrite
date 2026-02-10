@@ -54,7 +54,8 @@ public sealed record OmitParentheses(Guid Id) : Marker
 public sealed record Semicolon(Guid Id) : Marker, IRpcCodec<Semicolon>
 {
     public void RpcSend(Semicolon after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
-    public Semicolon RpcReceive(Semicolon before, RpcReceiveQueue q) => throw new NotImplementedException();
+    public Semicolon RpcReceive(Semicolon before, RpcReceiveQueue q) =>
+        before with { Id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse) };
 }
 
 /// <summary>

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.java.*;
@@ -33,10 +34,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -57,11 +55,10 @@ class CSharpRecipeTest implements RewriteTest {
                 basePath.resolve("rewrite-csharp/csharp"),
         };
         for (Path searchPath : searchPaths) {
-            Path csproj = searchPath.resolve("OpenRewrite/OpenRewrite.csproj");
-            if (csproj.toFile().exists()) {
+            if (searchPath.resolve("OpenRewrite/OpenRewrite.csproj").toFile().exists()) {
                 CSharpRewriteRpc.setFactory(
                         CSharpRewriteRpc.builder()
-                                .csharpServerEntry(csproj.toAbsolutePath().normalize())
+                                .csharpProjectPath(searchPath.toAbsolutePath().normalize())
                                 .log(Paths.get("/tmp/csharp-rpc.log"))
                 );
                 return;
@@ -76,12 +73,20 @@ class CSharpRecipeTest implements RewriteTest {
     }
 
     @Test
-    void verifyMethodTypeAttribution() throws java.io.IOException {
+    void verifyMethodTypeAttribution() {
         String source = "using Newtonsoft.Json;\nclass Foo {\n    void Test() {\n        var json = JsonConvert.SerializeObject(\"test\");\n    }\n}\n";
         CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
 
-        List<SourceFile> sourceFiles = parseSolutionWithRefs(rpc, source, "Test.cs",
-                "Newtonsoft.Json", "13.0.1");
+        Parser.Input input = new Parser.Input(
+                Paths.get("Test.cs"),
+                () -> new java.io.ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8))
+        );
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(input), Paths.get(""),
+                List.of("Newtonsoft.Json@13.0.1"),
+                new InMemoryExecutionContext()
+        ).toList();
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile sf = sourceFiles.getFirst();
@@ -100,30 +105,6 @@ class CSharpRecipeTest implements RewriteTest {
         assertThat(methodType.getDeclaringType()).isNotNull();
         assertThat(methodType.getDeclaringType().getFullyQualifiedName())
                 .isEqualTo("Newtonsoft.Json.JsonConvert");
-    }
-
-    private static List<SourceFile> parseSolutionWithRefs(CSharpRewriteRpc rpc, String source,
-                                                             String fileName, String packageName,
-                                                             String packageVersion) throws IOException {
-        Path tempDir = Files.createTempDirectory("csharp-recipe-test-");
-        Path csFile = tempDir.resolve(fileName);
-        try (OutputStream os = Files.newOutputStream(csFile)) {
-            os.write(source.getBytes(StandardCharsets.UTF_8));
-        }
-        String csprojContent =
-                "<Project Sdk=\"Microsoft.NET.Sdk\">\n" +
-                "  <PropertyGroup>\n" +
-                "    <TargetFramework>net10.0</TargetFramework>\n" +
-                "  </PropertyGroup>\n" +
-                "  <ItemGroup>\n" +
-                "    <PackageReference Include=\"" + packageName + "\" Version=\"" + packageVersion + "\" />\n" +
-                "  </ItemGroup>\n" +
-                "</Project>\n";
-        Path csproj = tempDir.resolve("Test.csproj");
-        try (OutputStream os = Files.newOutputStream(csproj)) {
-            os.write(csprojContent.getBytes(StandardCharsets.UTF_8));
-        }
-        return rpc.parseSolution(csproj, tempDir, new InMemoryExecutionContext()).toList();
     }
 
     private static J.MethodInvocation findFirstMethodInvocation(Object tree) {
@@ -166,12 +147,20 @@ class CSharpRecipeTest implements RewriteTest {
     }
 
     @Test
-    void directRecipeApplication() throws java.io.IOException {
+    void directRecipeApplication() {
         String source = "using Newtonsoft.Json;\nclass Foo {\n    void Test() {\n        var json = JsonConvert.SerializeObject(\"test\");\n    }\n}\n";
         CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
 
-        List<SourceFile> sourceFiles = parseSolutionWithRefs(rpc, source, "Test.cs",
-                "Newtonsoft.Json", "13.0.1");
+        Parser.Input input = new Parser.Input(
+                Paths.get("Test.cs"),
+                () -> new java.io.ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8))
+        );
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(input), Paths.get(""),
+                List.of("Newtonsoft.Json@13.0.1"),
+                new InMemoryExecutionContext()
+        ).toList();
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile sf = sourceFiles.getFirst();
