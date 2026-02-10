@@ -53,10 +53,10 @@ class CSharpRpcTest {
     @BeforeEach
     void setUp() {
         if (!factoryConfigured) {
-            Path csharpProjectPath = findCSharpProjectPath();
+            Path csharpServerEntry = findCSharpServerEntry();
             CSharpRewriteRpc.setFactory(
                     CSharpRewriteRpc.builder()
-                            .csharpProjectPath(csharpProjectPath)
+                            .csharpServerEntry(csharpServerEntry)
                             .traceRpcMessages(true)
                             .log(Paths.get("/tmp/csharp-rpc.log"))
             );
@@ -70,7 +70,7 @@ class CSharpRpcTest {
         CSharpRewriteRpc.shutdownCurrent();
     }
 
-    private static Path findCSharpProjectPath() {
+    private static Path findCSharpServerEntry() {
         // Try common locations relative to the test run directory
         Path basePath = Paths.get(System.getProperty("user.dir"));
         Path[] searchPaths = {
@@ -81,8 +81,9 @@ class CSharpRpcTest {
         };
 
         for (Path searchPath : searchPaths) {
-            if (searchPath.resolve("OpenRewrite/OpenRewrite.csproj").toFile().exists()) {
-                return searchPath.toAbsolutePath().normalize();
+            Path csproj = searchPath.resolve("OpenRewrite/OpenRewrite.csproj");
+            if (csproj.toFile().exists()) {
+                return csproj.toAbsolutePath().normalize();
             }
         }
 
