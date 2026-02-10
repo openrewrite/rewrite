@@ -17,7 +17,7 @@ package org.openrewrite.python.internal;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
+import org.openrewrite.python.marker.ResolvedDependency;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -62,13 +62,52 @@ class UvLockParserTest {
         assertThat(requests.getVersion()).isEqualTo("2.31.0");
         assertThat(requests.getSource()).isEqualTo("https://pypi.org/simple");
         assertThat(requests.getDependencies()).hasSize(2);
+        // Transitive deps are now ResolvedDependency references (linked by name)
         assertThat(requests.getDependencies().get(0).getName()).isEqualTo("certifi");
-        assertThat(requests.getDependencies().get(0).getVersionConstraint()).isEqualTo(">=2017.4.17");
+        assertThat(requests.getDependencies().get(0).getVersion()).isEqualTo("2024.2.2");
+        assertThat(requests.getDependencies().get(1).getName()).isEqualTo("charset-normalizer");
+        assertThat(requests.getDependencies().get(1).getVersion()).isEqualTo("3.3.2");
 
         ResolvedDependency certifi = resolved.get(1);
         assertThat(certifi.getName()).isEqualTo("certifi");
         assertThat(certifi.getVersion()).isEqualTo("2024.2.2");
         assertThat(certifi.getDependencies()).isNull();
+
+        // Verify identity: requests' transitive dep IS the same certifi object
+        assertThat(requests.getDependencies().get(0)).isSameAs(resolved.get(1));
+    }
+
+    @Test
+    void parseEditableSource() {
+        String uvLock = "" +
+                "version = 1\n" +
+                "\n" +
+                "[[package]]\n" +
+                "name = \"my-project\"\n" +
+                "version = \"0.1.0\"\n" +
+                "source = { editable = \".\" }\n";
+
+        List<ResolvedDependency> resolved = UvLockParser.parse(uvLock);
+
+        assertThat(resolved).hasSize(1);
+        assertThat(resolved.get(0).getName()).isEqualTo("my-project");
+        assertThat(resolved.get(0).getSource()).isEqualTo(".");
+    }
+
+    @Test
+    void parseVirtualSource() {
+        String uvLock = "" +
+                "version = 1\n" +
+                "\n" +
+                "[[package]]\n" +
+                "name = \"workspace-root\"\n" +
+                "version = \"0.1.0\"\n" +
+                "source = { virtual = \".\" }\n";
+
+        List<ResolvedDependency> resolved = UvLockParser.parse(uvLock);
+
+        assertThat(resolved).hasSize(1);
+        assertThat(resolved.get(0).getSource()).isEqualTo(".");
     }
 
     @Test

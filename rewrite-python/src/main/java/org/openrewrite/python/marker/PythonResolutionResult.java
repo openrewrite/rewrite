@@ -15,8 +15,6 @@
  */
 package org.openrewrite.python.marker;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.ToString;
 import lombok.Value;
 import lombok.With;
@@ -37,9 +35,11 @@ import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
  * Contains metadata about a Python project, parsed from pyproject.toml and uv.lock.
  * Attached as a marker to Toml.Document to provide dependency context for recipes.
  * <p>
- * The model separates requests (Dependency) from resolutions (ResolvedDependency):
- * - The dependency lists contain Dependency objects (what was requested in pyproject.toml)
- * - The resolvedDependencies list contains what was actually locked (from uv.lock)
+ * The model separates requests ({@link Dependency}) from resolutions ({@link ResolvedDependency}):
+ * <ul>
+ *   <li>The dependency lists contain {@link Dependency} objects (what was requested in pyproject.toml)</li>
+ *   <li>The resolvedDependencies list contains what was actually locked (from uv.lock)</li>
+ * </ul>
  */
 @Value
 @With
@@ -54,6 +54,12 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
 
     @Nullable String description;
 
+    /**
+     * SPDX license expression from [project].license (PEP 639),
+     * or the text value from the deprecated license = {text = "..."} form.
+     */
+    @Nullable String license;
+
     @ToString.Include
     String path;
 
@@ -65,7 +71,18 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
 
     List<Dependency> dependencies;
 
+    /**
+     * Published extras from [project.optional-dependencies].
+     * Keys are extra names (e.g. "security"), values are PEP 508 dependency lists.
+     */
     Map<String, List<Dependency>> optionalDependencies;
+
+    /**
+     * Unpublished dependency groups from [dependency-groups] (PEP 735).
+     * Keys are group names (e.g. "dev", "test"), values are PEP 508 dependency lists.
+     * Note: {include-group = "..."} entries are not represented here.
+     */
+    Map<String, List<Dependency>> dependencyGroups;
 
     List<ResolvedDependency> resolvedDependencies;
 
@@ -76,7 +93,7 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
     /**
      * Look up a resolved dependency by package name.
      *
-     * @param packageName The name of the package to look up (case-insensitive, normalized)
+     * @param packageName The name of the package to look up (case-insensitive, normalized per PEP 503)
      * @return The resolved dependency, or null if not found
      */
     public @Nullable ResolvedDependency getResolvedDependency(String packageName) {
@@ -87,6 +104,9 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
                 .orElse(null);
     }
 
+    /**
+     * Normalize a Python package name per PEP 503: lowercase, dashes/dots/underscores are equivalent.
+     */
     public static String normalizeName(String name) {
         return name.toLowerCase().replace('-', '_').replace('.', '_');
     }
@@ -97,6 +117,7 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
         q.getAndSend(after, PythonResolutionResult::getName);
         q.getAndSend(after, PythonResolutionResult::getVersion);
         q.getAndSend(after, PythonResolutionResult::getDescription);
+        q.getAndSend(after, PythonResolutionResult::getLicense);
         q.getAndSend(after, PythonResolutionResult::getPath);
         q.getAndSend(after, PythonResolutionResult::getRequiresPython);
         q.getAndSend(after, PythonResolutionResult::getBuildBackend);
@@ -107,6 +128,7 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
                 dep -> dep.getName() + "@" + dep.getVersionConstraint(),
                 dep -> dep.rpcSend(dep, q));
         q.getAndSend(after, PythonResolutionResult::getOptionalDependencies);
+        q.getAndSend(after, PythonResolutionResult::getDependencyGroups);
         q.getAndSendListAsRef(after, PythonResolutionResult::getResolvedDependencies,
                 resolved -> resolved.getName() + "@" + resolved.getVersion(),
                 resolved -> resolved.rpcSend(resolved, q));
@@ -123,6 +145,7 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
                 .withName(q.receive(before.name))
                 .withVersion(q.receive(before.version))
                 .withDescription(q.receive(before.description))
+                .withLicense(q.receive(before.license))
                 .withPath(q.receive(before.path))
                 .withRequiresPython(q.receive(before.requiresPython))
                 .withBuildBackend(q.receive(before.buildBackend))
@@ -131,115 +154,11 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
                 .withDependencies(q.receiveList(before.dependencies,
                         dep -> dep.rpcReceive(dep, q)))
                 .withOptionalDependencies(q.receive(before.optionalDependencies))
+                .withDependencyGroups(q.receive(before.dependencyGroups))
                 .withResolvedDependencies(q.receiveList(before.resolvedDependencies,
                         resolved -> resolved.rpcReceive(resolved, q)))
                 .withPackageManager(q.receiveAndGet(before.packageManager, toEnum(PackageManager.class)))
                 .withSourceIndexes(q.receiveList(before.sourceIndexes,
                         si -> si.rpcReceive(si, q)));
-    }
-
-    /**
-     * Represents a dependency request as declared in pyproject.toml.
-     * Parsed from PEP 508 dependency specification strings.
-     */
-    @Value
-    @With
-    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-    public static class Dependency implements RpcCodec<Dependency> {
-        String name;
-        @Nullable String versionConstraint;
-        @Nullable List<String> extras;
-        @Nullable String marker;
-
-        @ToString.Exclude
-        @Nullable ResolvedDependency resolved;
-
-        @Override
-        public void rpcSend(Dependency after, RpcSendQueue q) {
-            q.getAndSend(after, Dependency::getName);
-            q.getAndSend(after, Dependency::getVersionConstraint);
-            q.getAndSend(after, Dependency::getExtras);
-            q.getAndSend(after, Dependency::getMarker);
-            q.getAndSend(after, Dependency::getResolved);
-        }
-
-        @Override
-        public Dependency rpcReceive(Dependency before, RpcReceiveQueue q) {
-            return before
-                    .withName(q.receive(before.name))
-                    .withVersionConstraint(q.receive(before.versionConstraint))
-                    .withExtras(q.receive(before.extras))
-                    .withMarker(q.receive(before.marker))
-                    .withResolved(q.receive(before.resolved));
-        }
-    }
-
-    /**
-     * Represents a resolved dependency from uv.lock.
-     */
-    @Value
-    @With
-    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-    public static class ResolvedDependency implements RpcCodec<ResolvedDependency> {
-        @ToString.Include
-        String name;
-
-        @ToString.Include
-        String version;
-
-        @Nullable String source;
-
-        @Nullable List<Dependency> dependencies;
-
-        @Override
-        public void rpcSend(ResolvedDependency after, RpcSendQueue q) {
-            q.getAndSend(after, ResolvedDependency::getName);
-            q.getAndSend(after, ResolvedDependency::getVersion);
-            q.getAndSend(after, ResolvedDependency::getSource);
-            q.getAndSendListAsRef(after, r -> r.getDependencies() != null ? r.getDependencies() : emptyList(),
-                    dep -> dep.getName() + "@" + dep.getVersionConstraint(),
-                    dep -> dep.rpcSend(dep, q));
-        }
-
-        @Override
-        public ResolvedDependency rpcReceive(ResolvedDependency before, RpcReceiveQueue q) {
-            return before
-                    .withName(q.receive(before.name))
-                    .withVersion(q.receive(before.version))
-                    .withSource(q.receive(before.source))
-                    .withDependencies(q.receiveList(before.dependencies,
-                            dep -> dep.rpcReceive(dep, q)));
-        }
-    }
-
-    public enum PackageManager {
-        Uv,
-        Pip,
-        Pipenv,
-        Poetry,
-        Pdm
-    }
-
-    @Value
-    @With
-    public static class SourceIndex implements RpcCodec<SourceIndex> {
-        String name;
-        String url;
-        boolean defaultIndex;
-
-        @Override
-        public void rpcSend(SourceIndex after, RpcSendQueue q) {
-            q.getAndSend(after, SourceIndex::getName);
-            q.getAndSend(after, SourceIndex::getUrl);
-            q.getAndSend(after, SourceIndex::isDefaultIndex);
-        }
-
-        @Override
-        public SourceIndex rpcReceive(SourceIndex before, RpcReceiveQueue q) {
-            return before
-                    .withName(q.receive(before.name))
-                    .withUrl(q.receive(before.url))
-                    .withDefaultIndex(q.receive(before.defaultIndex));
-        }
     }
 }

@@ -21,14 +21,17 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.internal.PythonDependencyParser;
 import org.openrewrite.python.internal.UvLockParser;
+import org.openrewrite.python.marker.Dependency;
+import org.openrewrite.python.marker.PackageManager;
 import org.openrewrite.python.marker.PythonResolutionResult;
-import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
-import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
+import org.openrewrite.python.marker.ResolvedDependency;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -80,12 +83,24 @@ public class PyProjectTomlParser implements Parser {
         }
 
         marker = marker.withResolvedDependencies(resolvedDeps);
+        marker = marker.withPackageManager(PackageManager.Uv);
 
         // Link declared dependencies to their resolved versions
         marker = marker.withDependencies(linkResolved(marker.getDependencies(), resolvedDeps));
         marker = marker.withBuildRequires(linkResolved(marker.getBuildRequires(), resolvedDeps));
+        marker = marker.withOptionalDependencies(linkResolvedMap(marker.getOptionalDependencies(), resolvedDeps));
+        marker = marker.withDependencyGroups(linkResolvedMap(marker.getDependencyGroups(), resolvedDeps));
 
         return marker;
+    }
+
+    private Map<String, List<Dependency>> linkResolvedMap(Map<String, List<Dependency>> depMap,
+                                                            List<ResolvedDependency> resolved) {
+        Map<String, List<Dependency>> result = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Dependency>> entry : depMap.entrySet()) {
+            result.put(entry.getKey(), linkResolved(entry.getValue(), resolved));
+        }
+        return result;
     }
 
     private List<Dependency> linkResolved(List<Dependency> deps, List<ResolvedDependency> resolved) {

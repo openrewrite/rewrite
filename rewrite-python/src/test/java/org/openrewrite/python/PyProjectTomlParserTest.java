@@ -20,8 +20,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.python.marker.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult;
-import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.toml.tree.Toml;
 
 import java.io.IOException;
@@ -149,6 +149,9 @@ class PyProjectTomlParserTest {
         assertThat(marker.getResolvedDependency("certifi")).isNotNull();
         assertThat(marker.getResolvedDependency("certifi").getVersion()).isEqualTo("2024.2.2");
 
+        // Check package manager is detected from uv.lock
+        assertThat(marker.getPackageManager()).isEqualTo(org.openrewrite.python.marker.PackageManager.Uv);
+
         // Check declared dependency is linked to resolved
         Dependency requestsDep = marker.getDependencies().get(0);
         assertThat(requestsDep.getName()).isEqualTo("requests");
@@ -180,7 +183,42 @@ class PyProjectTomlParserTest {
         PythonResolutionResult marker = doc.getMarkers().findFirst(PythonResolutionResult.class).orElse(null);
         assertThat(marker).isNotNull();
         assertThat(marker.getName()).isEqualTo("no-lock");
+        assertThat(marker.getPackageManager()).isNull();
         assertThat(marker.getResolvedDependencies()).isEmpty();
+    }
+
+    @Test
+    void parsesLicenseAndDependencyGroups() {
+        String pyprojectToml = "" +
+                "[project]\n" +
+                "name = \"licensed-project\"\n" +
+                "version = \"1.0.0\"\n" +
+                "license = \"Apache-2.0\"\n" +
+                "dependencies = [\"requests>=2.28.0\"]\n" +
+                "\n" +
+                "[dependency-groups]\n" +
+                "dev = [\"pytest>=7.0\", \"mypy>=1.0\"]\n" +
+                "test = [\"coverage>=7.0\"]\n";
+
+        PyProjectTomlParser parser = new PyProjectTomlParser();
+        Parser.Input input = Parser.Input.fromString(
+                Paths.get("pyproject.toml"),
+                pyprojectToml
+        );
+        List<SourceFile> parsed = parser.parseInputs(
+                Collections.singletonList(input),
+                null,
+                new InMemoryExecutionContext(Throwable::printStackTrace)
+        ).collect(Collectors.toList());
+
+        assertThat(parsed).hasSize(1);
+        Toml.Document doc = (Toml.Document) parsed.get(0);
+        PythonResolutionResult marker = doc.getMarkers().findFirst(PythonResolutionResult.class).orElse(null);
+        assertThat(marker).isNotNull();
+        assertThat(marker.getLicense()).isEqualTo("Apache-2.0");
+        assertThat(marker.getDependencyGroups()).hasSize(2);
+        assertThat(marker.getDependencyGroups()).containsKeys("dev", "test");
+        assertThat(marker.getDependencyGroups().get("dev")).hasSize(2);
     }
 
     @Test

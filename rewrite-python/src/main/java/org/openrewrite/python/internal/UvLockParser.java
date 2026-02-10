@@ -19,8 +19,8 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
-import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
+import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.python.marker.ResolvedDependency;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlValue;
@@ -96,8 +96,19 @@ public class UvLockParser {
         return extractPackages(doc);
     }
 
+    /**
+     * Two-pass extraction:
+     * 1. Create all ResolvedDependency objects (without transitive deps linked)
+     * 2. Link transitive dependencies by looking up names in the resolved map
+     * <p>
+     * Python resolution is flat (one version per package), so each dependency
+     * name maps to exactly one ResolvedDependency.
+     */
     private static List<ResolvedDependency> extractPackages(Toml.Document doc) {
+        // Pass 1: Create all resolved entries and collect raw dependency names per package
         List<ResolvedDependency> resolved = new ArrayList<>();
+        Map<String, ResolvedDependency> byNormalizedName = new LinkedHashMap<>();
+        Map<String, List<String>> rawDepsPerPackage = new LinkedHashMap<>();
 
         for (TomlValue value : doc.getValues()) {
             if (!(value instanceof Toml.Table)) {
@@ -115,19 +126,49 @@ public class UvLockParser {
             }
 
             String source = extractSource(table);
-            List<Dependency> deps = extractDependencies(table);
+            List<String> depNames = extractDependencyNames(table);
 
-            resolved.add(new ResolvedDependency(
-                    name,
-                    version,
-                    source,
-                    deps.isEmpty() ? null : deps
-            ));
+            ResolvedDependency entry = new ResolvedDependency(name, version, source, null);
+            resolved.add(entry);
+            byNormalizedName.put(PythonResolutionResult.normalizeName(name), entry);
+            if (!depNames.isEmpty()) {
+                rawDepsPerPackage.put(PythonResolutionResult.normalizeName(name), depNames);
+            }
         }
 
-        return resolved;
+        // Pass 2: Link transitive dependencies
+        List<ResolvedDependency> linked = new ArrayList<>(resolved.size());
+        for (ResolvedDependency entry : resolved) {
+            String normalizedName = PythonResolutionResult.normalizeName(entry.getName());
+            List<String> depNames = rawDepsPerPackage.get(normalizedName);
+            if (depNames != null) {
+                List<ResolvedDependency> deps = new ArrayList<>();
+                for (String depName : depNames) {
+                    ResolvedDependency dep = byNormalizedName.get(PythonResolutionResult.normalizeName(depName));
+                    if (dep != null) {
+                        deps.add(dep);
+                    }
+                }
+                linked.add(entry.withDependencies(deps.isEmpty() ? null : deps));
+            } else {
+                linked.add(entry);
+            }
+        }
+
+        return linked;
     }
 
+    /**
+     * Extract the source URL/path from a [[package]] table.
+     * uv.lock uses inline tables for source with various keys:
+     * <ul>
+     *   <li>{@code { registry = "https://pypi.org/simple" }} — PyPI or custom index</li>
+     *   <li>{@code { editable = "." }} — local editable install</li>
+     *   <li>{@code { virtual = "." }} — virtual workspace member</li>
+     *   <li>{@code { path = "packages/foo" }} — local path dependency</li>
+     *   <li>{@code { git = "https://..." }} — git dependency</li>
+     * </ul>
+     */
     private static @Nullable String extractSource(Toml.Table packageTable) {
         for (Toml value : packageTable.getValues()) {
             if (!(value instanceof Toml.KeyValue)) {
@@ -140,22 +181,30 @@ public class UvLockParser {
             }
             if (kv.getValue() instanceof Toml.Table) {
                 Toml.Table sourceTable = (Toml.Table) kv.getValue();
-                return PythonDependencyParser.getStringValue(sourceTable, "registry");
+                // Try each known source type in order of likelihood
+                String[] sourceKeys = {"registry", "editable", "virtual", "path", "git"};
+                for (String key : sourceKeys) {
+                    String val = PythonDependencyParser.getStringValue(sourceTable, key);
+                    if (val != null) {
+                        return val;
+                    }
+                }
             }
         }
         return null;
     }
 
     /**
-     * Extract dependencies from a [[package]] table.
+     * Extract dependency names from a [[package]] table.
      * Dependencies in uv.lock look like:
      * <pre>
      * dependencies = [
      *     { name = "certifi", specifier = ">=2017.4.17" },
      * ]
      * </pre>
+     * We only need the names for linking to other ResolvedDependency entries.
      */
-    private static List<Dependency> extractDependencies(Toml.Table packageTable) {
+    private static List<String> extractDependencyNames(Toml.Table packageTable) {
         for (Toml value : packageTable.getValues()) {
             if (!(value instanceof Toml.KeyValue)) {
                 continue;
@@ -166,25 +215,18 @@ public class UvLockParser {
                 continue;
             }
             if (kv.getValue() instanceof Toml.Array) {
-                return parseDependencyInlineTables((Toml.Array) kv.getValue());
+                List<String> names = new ArrayList<>();
+                for (Toml item : ((Toml.Array) kv.getValue()).getValues()) {
+                    if (item instanceof Toml.Table) {
+                        String name = PythonDependencyParser.getStringValue((Toml.Table) item, "name");
+                        if (name != null) {
+                            names.add(name);
+                        }
+                    }
+                }
+                return names;
             }
         }
         return Collections.emptyList();
-    }
-
-    private static List<Dependency> parseDependencyInlineTables(Toml.Array array) {
-        List<Dependency> deps = new ArrayList<>();
-        for (Toml item : array.getValues()) {
-            if (item instanceof Toml.Table) {
-                Toml.Table inlineTable = (Toml.Table) item;
-                String name = PythonDependencyParser.getStringValue(inlineTable, "name");
-                String specifier = PythonDependencyParser.getStringValue(inlineTable, "specifier");
-                String marker = PythonDependencyParser.getStringValue(inlineTable, "marker");
-                if (name != null) {
-                    deps.add(new Dependency(name, specifier, null, marker, null));
-                }
-            }
-        }
-        return deps;
     }
 }

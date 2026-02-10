@@ -19,8 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.python.marker.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult;
-import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 
@@ -177,7 +177,67 @@ class PythonDependencyParserTest {
         assertThat(marker.getName()).isEqualTo("minimal");
         assertThat(marker.getDependencies()).isEmpty();
         assertThat(marker.getOptionalDependencies()).isEmpty();
+        assertThat(marker.getDependencyGroups()).isEmpty();
         assertThat(marker.getBuildRequires()).isEmpty();
+        assertThat(marker.getLicense()).isNull();
+    }
+
+    @Test
+    void createMarkerWithSpdxLicense() {
+        String toml = "" +
+                "[project]\n" +
+                "name = \"my-project\"\n" +
+                "version = \"1.0.0\"\n" +
+                "license = \"MIT\"\n";
+
+        Toml.Document doc = parseToml(toml);
+        PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
+
+        assertThat(marker).isNotNull();
+        assertThat(marker.getLicense()).isEqualTo("MIT");
+    }
+
+    @Test
+    void createMarkerWithDeprecatedLicenseTable() {
+        String toml = "" +
+                "[project]\n" +
+                "name = \"my-project\"\n" +
+                "version = \"1.0.0\"\n" +
+                "license = {text = \"Apache-2.0\"}\n";
+
+        Toml.Document doc = parseToml(toml);
+        PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
+
+        assertThat(marker).isNotNull();
+        assertThat(marker.getLicense()).isEqualTo("Apache-2.0");
+    }
+
+    @Test
+    void createMarkerWithDependencyGroups() {
+        String toml = "" +
+                "[project]\n" +
+                "name = \"my-project\"\n" +
+                "version = \"1.0.0\"\n" +
+                "\n" +
+                "[dependency-groups]\n" +
+                "dev = [\"pytest>=7.0\", \"mypy>=1.0\"]\n" +
+                "test = [\"coverage>=7.0\"]\n";
+
+        Toml.Document doc = parseToml(toml);
+        PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
+
+        assertThat(marker).isNotNull();
+        assertThat(marker.getDependencyGroups()).hasSize(2);
+        assertThat(marker.getDependencyGroups()).containsKeys("dev", "test");
+
+        List<Dependency> devGroup = marker.getDependencyGroups().get("dev");
+        assertThat(devGroup).hasSize(2);
+        assertThat(devGroup.get(0).getName()).isEqualTo("pytest");
+        assertThat(devGroup.get(1).getName()).isEqualTo("mypy");
+
+        List<Dependency> testGroup = marker.getDependencyGroups().get("test");
+        assertThat(testGroup).hasSize(1);
+        assertThat(testGroup.get(0).getName()).isEqualTo("coverage");
     }
 
     private static Toml.Document parseToml(String content) {

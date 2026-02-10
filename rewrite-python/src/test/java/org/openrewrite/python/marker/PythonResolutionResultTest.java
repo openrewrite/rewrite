@@ -16,8 +16,6 @@
 package org.openrewrite.python.marker;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
-import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 
 import java.util.*;
 
@@ -35,11 +33,13 @@ class PythonResolutionResultTest {
                 "test-project",
                 "1.0.0",
                 null,
+                null,
                 "pyproject.toml",
                 ">=3.10",
                 null,
                 Collections.emptyList(),
                 Collections.emptyList(),
+                Collections.emptyMap(),
                 Collections.emptyMap(),
                 Collections.singletonList(requests),
                 null,
@@ -60,11 +60,13 @@ class PythonResolutionResultTest {
                 "test",
                 "1.0.0",
                 null,
+                null,
                 "pyproject.toml",
                 null,
                 null,
                 Collections.emptyList(),
                 Collections.emptyList(),
+                Collections.emptyMap(),
                 Collections.emptyMap(),
                 Collections.singletonList(dep),
                 null,
@@ -97,30 +99,39 @@ class PythonResolutionResultTest {
         optDeps.put("dev", Collections.singletonList(
                 new Dependency("pytest", ">=7.0", null, null, null)));
 
+        Map<String, List<Dependency>> depGroups = new LinkedHashMap<>();
+        depGroups.put("test", Collections.singletonList(
+                new Dependency("coverage", ">=7.0", null, null, null)));
+
         PythonResolutionResult marker = new PythonResolutionResult(
                 UUID.randomUUID(),
                 "my-project",
                 "1.0.0",
                 "A description",
+                "MIT",
                 "pyproject.toml",
                 ">=3.10",
                 "hatchling.build",
                 buildRequires,
                 deps,
                 optDeps,
+                depGroups,
                 Collections.emptyList(),
-                PythonResolutionResult.PackageManager.Uv,
+                PackageManager.Uv,
                 null
         );
 
         assertThat(marker.getName()).isEqualTo("my-project");
         assertThat(marker.getVersion()).isEqualTo("1.0.0");
         assertThat(marker.getDescription()).isEqualTo("A description");
+        assertThat(marker.getLicense()).isEqualTo("MIT");
         assertThat(marker.getRequiresPython()).isEqualTo(">=3.10");
         assertThat(marker.getBuildBackend()).isEqualTo("hatchling.build");
         assertThat(marker.getBuildRequires()).hasSize(1);
         assertThat(marker.getDependencies()).hasSize(2);
         assertThat(marker.getOptionalDependencies()).containsKey("dev");
-        assertThat(marker.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Uv);
+        assertThat(marker.getDependencyGroups()).containsKey("test");
+        assertThat(marker.getDependencyGroups().get("test")).hasSize(1);
+        assertThat(marker.getPackageManager()).isEqualTo(PackageManager.Uv);
     }
 }
