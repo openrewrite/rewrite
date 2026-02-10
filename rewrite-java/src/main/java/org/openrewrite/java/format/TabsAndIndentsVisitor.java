@@ -34,8 +34,7 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.function.Supplier;
 
 public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
@@ -475,14 +474,28 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         int lastElementIndex = container.getElements().size() - 1;
-        js = ListUtils.map(container.getPadding().getElements(), (index, t) -> {
-            t = visitRightPadded(t, loc.getElementLocation(), p);
+        List<JRightPadded<J2>> originalElements = container.getPadding().getElements();
+        List<JRightPadded<J2>> newElements = new ArrayList<>(originalElements);
+        boolean changed = false;
+
+        for (int index = 0; index < originalElements.size(); index++) {
+            JRightPadded<J2> original = originalElements.get(index);
+            JRightPadded<J2> t = visitRightPadded(original, loc.getElementLocation(), p);
             if (index == lastElementIndex && t != null && t.getAfter().getLastWhitespace().contains("\n")) {
                 t = t.withAfter(indentTo(t.getAfter(), indent, loc.getElementLocation().getAfterLocation()));
             }
-            return t;
-        });
 
+            if (t != original && t != null) {
+                changed = true;
+                newElements.set(index, t);
+                // Update cursor so SourcePositionService calculates correct positions for subsequent elements
+                JContainer<J2> updatedContainer = JContainer.build(before, newElements, container.getMarkers());
+
+                setCursor(getCursor().withValue(updatedContainer));
+            }
+        }
+
+        js = changed ? newElements : originalElements;
 
         setCursor(getCursor().getParent());
         return js == container.getPadding().getElements() && before == container.getBefore() ?
@@ -505,10 +518,20 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 int indent = getCursor().getNearestMessage("lastIndent", 0);
                 if (evaluate(() -> wrappingStyle.getTextBlocks().getAlignWhenMultiline(), false)) {
                     if (!literal.getPrefix().getLastWhitespace().contains("\n")) {
-                        ColSpan colSpan = positionService.columnsOf(getCursor(), literal);
-                        indent += colSpan.getStartColumn() - colSpan.getIndent() - 1; // since position is index-1-based
+                        if (getCursor().getParent() != null && getCursor().getParent(2) != null && getCursor().getParent().getValue() instanceof JRightPadded) {
+                            indent = positionService.columnsOf(getCursor().getParent(2), literal).getStartColumn() - 1 + literal.getPrefix().getIndent().length(); // since position is index-1-based
+                        } else {
+                            ColSpan colSpan = positionService.columnsOf(getCursor(), literal);
+                            indent += colSpan.getStartColumn() - colSpan.getIndent() - 1; // since position is index-1-based
+                        }
                     }
                 } else {
+                    if (getCursor().getParent() != null && getCursor().getParent(2) != null && getCursor().getParent().getValue() instanceof JRightPadded) {
+                        indent = getCursor().getParent(2).getNearestMessage("lastIndent", 0);
+                        if (literal.getPrefix().getLastWhitespace().contains("\n")) {
+                            indent += style.getContinuationIndent();
+                        }
+                    }
                     indent += style.getContinuationIndent();
                 }
                 if (currentIndent != indent) {
