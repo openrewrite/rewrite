@@ -16,8 +16,8 @@
 package org.openrewrite.python.internal;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.python.marker.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlValue;
 

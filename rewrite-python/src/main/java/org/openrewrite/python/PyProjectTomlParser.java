@@ -21,10 +21,10 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.internal.PythonDependencyParser;
 import org.openrewrite.python.internal.UvLockParser;
-import org.openrewrite.python.marker.Dependency;
-import org.openrewrite.python.marker.PackageManager;
 import org.openrewrite.python.marker.PythonResolutionResult;
-import org.openrewrite.python.marker.ResolvedDependency;
+import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
+import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
+import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 

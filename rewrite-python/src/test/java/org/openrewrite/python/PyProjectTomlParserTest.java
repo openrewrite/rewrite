@@ -20,8 +20,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.python.marker.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.toml.tree.Toml;
 
 import java.io.IOException;
@@ -150,7 +150,7 @@ class PyProjectTomlParserTest {
         assertThat(marker.getResolvedDependency("certifi").getVersion()).isEqualTo("2024.2.2");
 
         // Check package manager is detected from uv.lock
-        assertThat(marker.getPackageManager()).isEqualTo(org.openrewrite.python.marker.PackageManager.Uv);
+        assertThat(marker.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Uv);
 
         // Check declared dependency is linked to resolved
         Dependency requestsDep = marker.getDependencies().get(0);

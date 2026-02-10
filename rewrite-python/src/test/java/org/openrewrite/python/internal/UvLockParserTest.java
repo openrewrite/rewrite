@@ -17,7 +17,7 @@ package org.openrewrite.python.internal;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.openrewrite.python.marker.ResolvedDependency;
+import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 
 import java.io.IOException;
 import java.nio.file.Files;

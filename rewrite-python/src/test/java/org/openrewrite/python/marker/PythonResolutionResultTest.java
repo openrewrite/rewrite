@@ -16,6 +16,9 @@
 package org.openrewrite.python.marker;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
+import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
+import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 
 import java.util.*;
 

@@ -15,6 +15,8 @@
  */
 package org.openrewrite.python.marker;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.ToString;
 import lombok.Value;
 import lombok.With;
@@ -160,5 +162,122 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
                 .withPackageManager(q.receiveAndGet(before.packageManager, toEnum(PackageManager.class)))
                 .withSourceIndexes(q.receiveList(before.sourceIndexes,
                         si -> si.rpcReceive(si, q)));
+    }
+
+    /**
+     * A dependency specification parsed from a PEP 508 string in pyproject.toml.
+     * Used for declared dependencies ({@code dependencies}, {@code buildRequires},
+     * {@code optionalDependencies}, {@code dependencyGroups}).
+     * <p>
+     * When a lock file is available, the {@code resolved} field links to the
+     * corresponding {@link ResolvedDependency} entry.
+     */
+    @Value
+    @With
+    public static class Dependency implements RpcCodec<Dependency> {
+        String name;
+        @Nullable String versionConstraint;
+        @Nullable List<String> extras;
+        @Nullable String marker;
+
+        @ToString.Exclude
+        @Nullable ResolvedDependency resolved;
+
+        @Override
+        public void rpcSend(Dependency after, RpcSendQueue q) {
+            q.getAndSend(after, Dependency::getName);
+            q.getAndSend(after, Dependency::getVersionConstraint);
+            q.getAndSend(after, Dependency::getExtras);
+            q.getAndSend(after, Dependency::getMarker);
+            q.getAndSend(after, Dependency::getResolved);
+        }
+
+        @Override
+        public Dependency rpcReceive(Dependency before, RpcReceiveQueue q) {
+            return before
+                    .withName(q.receive(before.name))
+                    .withVersionConstraint(q.receive(before.versionConstraint))
+                    .withExtras(q.receive(before.extras))
+                    .withMarker(q.receive(before.marker))
+                    .withResolved(q.receive(before.resolved));
+        }
+    }
+
+    /**
+     * A resolved (locked) dependency from uv.lock.
+     * <p>
+     * Python resolution is flat: each package name appears exactly once with one version.
+     * The {@code dependencies} list links directly to other {@code ResolvedDependency}
+     * instances (self-referential, like Maven's model), enabling graph traversal.
+     */
+    @Value
+    @With
+    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+    public static class ResolvedDependency implements RpcCodec<ResolvedDependency> {
+        @ToString.Include
+        String name;
+
+        @ToString.Include
+        String version;
+
+        @Nullable String source;
+
+        /**
+         * Direct dependencies of this resolved package. Each entry is a reference
+         * to another {@code ResolvedDependency} in the flat resolution list.
+         * Null when the package has no dependencies in the lock file.
+         */
+        @Nullable List<ResolvedDependency> dependencies;
+
+        @Override
+        public void rpcSend(ResolvedDependency after, RpcSendQueue q) {
+            q.getAndSend(after, ResolvedDependency::getName);
+            q.getAndSend(after, ResolvedDependency::getVersion);
+            q.getAndSend(after, ResolvedDependency::getSource);
+            q.getAndSendListAsRef(after, r -> r.getDependencies() != null ? r.getDependencies() : emptyList(),
+                    dep -> dep.getName() + "@" + dep.getVersion(),
+                    dep -> dep.rpcSend(dep, q));
+        }
+
+        @Override
+        public ResolvedDependency rpcReceive(ResolvedDependency before, RpcReceiveQueue q) {
+            return before
+                    .withName(q.receive(before.name))
+                    .withVersion(q.receive(before.version))
+                    .withSource(q.receive(before.source))
+                    .withDependencies(q.receiveList(before.dependencies,
+                            dep -> dep.rpcReceive(dep, q)));
+        }
+    }
+
+    public enum PackageManager {
+        Uv,
+        Pip,
+        Pipenv,
+        Poetry,
+        Pdm
+    }
+
+    @Value
+    @With
+    public static class SourceIndex implements RpcCodec<SourceIndex> {
+        String name;
+        String url;
+        boolean defaultIndex;
+
+        @Override
+        public void rpcSend(SourceIndex after, RpcSendQueue q) {
+            q.getAndSend(after, SourceIndex::getName);
+            q.getAndSend(after, SourceIndex::getUrl);
+            q.getAndSend(after, SourceIndex::isDefaultIndex);
+        }
+
+        @Override
+        public SourceIndex rpcReceive(SourceIndex before, RpcReceiveQueue q) {
+            return before
+                    .withName(q.receive(before.name))
+                    .withUrl(q.receive(before.url))
+                    .withDefaultIndex(q.receive(before.defaultIndex));
+        }
     }
 }
