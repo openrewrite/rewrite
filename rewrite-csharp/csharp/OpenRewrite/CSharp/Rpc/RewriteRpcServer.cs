@@ -400,7 +400,7 @@ public class RewriteRpcServer
         File.WriteAllText(csprojPath, """
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
-                <TargetFramework>net9.0</TargetFramework>
+                <TargetFramework>net10.0</TargetFramework>
               </PropertyGroup>
             </Project>
             """);
@@ -469,7 +469,7 @@ public class RewriteRpcServer
             return [];
 
         // Prefer TFMs in order of compatibility
-        string[] tfmPreference = ["net9.0", "net8.0", "net7.0", "net6.0", "netstandard2.1", "netstandard2.0"];
+        string[] tfmPreference = ["net10.0", "net9.0", "net8.0", "net7.0", "net6.0", "netstandard2.1", "netstandard2.0"];
 
         foreach (var tfm in tfmPreference)
         {

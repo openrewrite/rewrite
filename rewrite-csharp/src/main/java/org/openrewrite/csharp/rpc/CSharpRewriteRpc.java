@@ -319,7 +319,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
                         dotnetPath.toString(),
                         "run",
                         "--project", entry.toAbsolutePath().normalize().toString(),
-                        "--framework", "net9.0",
+                        "--framework", "net10.0",
                         "--no-build",
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         traceRpcMessages ? "--trace-rpc-messages" : null
