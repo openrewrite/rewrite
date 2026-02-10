@@ -7,7 +7,8 @@ from .normalize_line_breaks_visitor import NormalizeLineBreaksVisitor
 from .normalize_tabs_or_spaces import NormalizeTabsOrSpacesVisitor
 from .remove_trailing_whitespace_visitor import RemoveTrailingWhitespaceVisitor
 from .spaces_visitor import SpacesVisitor
-from .. import TabsAndIndentsStyle, SpacesStyle
+from .tabs_and_indents_visitor import TabsAndIndentsVisitor
+from .. import TabsAndIndentsStyle, SpacesStyle, OtherStyle
 from ..style import BlankLinesStyle, IntelliJ
 from ..visitor import PythonVisitor
 from ... import Recipe, Tree, Cursor
@@ -54,7 +55,11 @@ class AutoFormatVisitor(PythonVisitor[P]):
             self._stop_after
         ).visit(tree, p, self._cursor.fork())
 
-        # TODO: TabsAndIndentsVisitor - blocked on base PythonVisitor passing `loc` to visit_space/visit_right_padded/visit_container
+        tree = TabsAndIndentsVisitor(
+            cu.get_style(TabsAndIndentsStyle) or IntelliJ.tabs_and_indents(),
+            cu.get_style(OtherStyle) or IntelliJ.other(),
+            self._stop_after
+        ).visit(tree, p, self._cursor.fork())
 
         tree = NormalizeLineBreaksVisitor(cu.get_style(GeneralFormatStyle) or GeneralFormatStyle(False),
                                           self._stop_after).visit(tree, p, self._cursor.fork())

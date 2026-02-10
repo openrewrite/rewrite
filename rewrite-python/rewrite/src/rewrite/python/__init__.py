@@ -84,6 +84,7 @@ from rewrite.python.format import (
     NormalizeFormatVisitor,
     NormalizeTabsOrSpacesVisitor,
     SpacesVisitor,
+    TabsAndIndentsVisitor,
 )
 from rewrite.python.add_import import AddImport, AddImportOptions, maybe_add_import
 from rewrite.python.remove_import import RemoveImport, RemoveImportOptions, maybe_remove_import
@@ -172,6 +173,7 @@ __all__ = [
     "NormalizeFormatVisitor",
     "NormalizeTabsOrSpacesVisitor",
     "SpacesVisitor",
+    "TabsAndIndentsVisitor",
     # Import handling
     "AddImport",
     "AddImportOptions",
