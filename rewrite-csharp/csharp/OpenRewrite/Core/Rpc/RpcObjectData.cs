@@ -15,7 +15,7 @@ public sealed class RpcObjectData
 
     public int? Ref { get; init; }
 
-    public string? Trace { get; init; }
+    public object? Trace { get; init; }
 
     public T? GetValue<T>()
     {

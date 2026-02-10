@@ -25,6 +25,8 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.tree.ParseError;
@@ -33,6 +35,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -609,5 +612,135 @@ class CSharpRpcTest {
         // so the marketplace should be empty
         assertThat(marketplace.getAllRecipes()).isEmpty();
         assertThat(marketplace.getCategories()).isEmpty();
+    }
+
+    @Test
+    void parseWithTypeAttribution(@TempDir Path tempDir) throws IOException {
+        String source = """
+                using System;
+
+                namespace TypeTest
+                {
+                    public class Calculator
+                    {
+                        public int Add(int a, int b)
+                        {
+                            return a + b;
+                        }
+
+                        public string Greet(string name)
+                        {
+                            return "Hello, " + name;
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Calculator.cs");
+        Files.writeString(sourceFile, source);
+
+        // Parse with empty assembly references to trigger compilation creation
+        // (framework refs are automatically included)
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                Collections.emptyList(),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+        assertThat(parsed).isInstanceOf(Cs.CompilationUnit.class);
+
+        // Verify print roundtrip still works with type attribution
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+
+        // Navigate the tree: CompilationUnit -> namespace -> class -> methods
+        Cs.CompilationUnit cu = (Cs.CompilationUnit) parsed;
+        assertThat(cu.getMembers()).isNotEmpty();
+
+        // Find the namespace declaration
+        Statement namespaceMember = cu.getMembers().getFirst();
+
+        // Find the class declaration within the namespace
+        J.ClassDeclaration classDecl = findFirst(namespaceMember, J.ClassDeclaration.class);
+        assertThat(classDecl).as("ClassDeclaration should be found in tree").isNotNull();
+
+        // Find the Add method to verify it was parsed correctly
+        J.MethodDeclaration addMethod = findMethodByName(classDecl, "Add");
+        assertThat(addMethod).as("Add method should be found").isNotNull();
+
+        // Verify type attribution is present on the method
+        assertThat(addMethod.getMethodType())
+                .as("MethodType should be populated via type attribution")
+                .isNotNull();
+        assertThat(addMethod.getMethodType().getName()).isEqualTo("Add");
+        assertThat(addMethod.getMethodType().getReturnType()).isInstanceOf(JavaType.Primitive.class);
+        assertThat(((JavaType.Primitive) addMethod.getMethodType().getReturnType()).getKeyword()).isEqualTo("int");
+
+        // Verify parameter types
+        assertThat(addMethod.getMethodType().getParameterTypes()).hasSize(2);
+        assertThat(addMethod.getMethodType().getParameterTypes().get(0)).isInstanceOf(JavaType.Primitive.class);
+        assertThat(addMethod.getMethodType().getParameterNames()).containsExactly("a", "b");
+
+        // Verify declaring type
+        assertThat(addMethod.getMethodType().getDeclaringType()).isNotNull();
+        assertThat(addMethod.getMethodType().getDeclaringType().getFullyQualifiedName())
+                .isEqualTo("TypeTest.Calculator");
+
+        // Find the Greet method
+        J.MethodDeclaration greetMethod = findMethodByName(classDecl, "Greet");
+        assertThat(greetMethod).as("Greet method should be found").isNotNull();
+        assertThat(greetMethod.getMethodType()).isNotNull();
+        assertThat(greetMethod.getMethodType().getName()).isEqualTo("Greet");
+        assertThat(greetMethod.getMethodType().getReturnType()).isInstanceOf(JavaType.Primitive.class);
+        assertThat(((JavaType.Primitive) greetMethod.getMethodType().getReturnType()).getKeyword()).isEqualTo("String");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T findFirst(Object tree, Class<T> type) {
+        if (type.isInstance(tree)) {
+            return (T) tree;
+        }
+        if (tree instanceof Cs.CompilationUnit cu) {
+            for (Statement member : cu.getMembers()) {
+                T result = findFirst(member, type);
+                if (result != null) return result;
+            }
+        }
+        if (tree instanceof J.ClassDeclaration cd) {
+            for (Statement stmt : cd.getBody().getStatements()) {
+                T result = findFirst(stmt, type);
+                if (result != null) return result;
+            }
+        }
+        // Handle namespace declarations (which are in Cs.CompilationUnit.members)
+        if (tree instanceof Statement stmt) {
+            // Namespace members are accessible via the visitor pattern, but for
+            // simple traversal we check common wrapper types
+            if (tree instanceof Cs.BlockScopeNamespaceDeclaration ns) {
+                for (var member : ns.getMembers()) {
+                    T result = findFirst(member, type);
+                    if (result != null) return result;
+                }
+            }
+            if (tree instanceof Cs.FileScopeNamespaceDeclaration ns) {
+                for (var member : ns.getMembers()) {
+                    T result = findFirst(member, type);
+                    if (result != null) return result;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static J.MethodDeclaration findMethodByName(J.ClassDeclaration classDecl, String name) {
+        for (Statement stmt : classDecl.getBody().getStatements()) {
+            if (stmt instanceof J.MethodDeclaration md && md.getSimpleName().equals(name)) {
+                return md;
+            }
+        }
+        return null;
     }
 }
