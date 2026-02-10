@@ -1356,25 +1356,8 @@ class ParserVisitor(ast.NodeVisitor):
         if has_positional or has_keyword:
             # Process positional patterns
             for i, arg in enumerate(node.patterns):
-                arg_name = j.VariableDeclarations(
-                    random_id(),
-                    self.__whitespace(),
-                    Markers.EMPTY,
-                    [], [], None, None, [],
-                    [
-                        self.__pad_right(j.VariableDeclarations.NamedVariable(
-                            random_id(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            cast(j.Identifier, self.__convert(arg)),
-                            [],
-                            None,
-                            None
-                        ), Space.EMPTY)
-                    ]
-                )
                 is_last_positional = i == len(node.patterns) - 1
-                converted = self.__pad_list_element(arg_name, last=is_last_positional and not has_keyword,
+                converted = self.__pad_list_element(self.__convert_match_pattern(arg), last=is_last_positional and not has_keyword,
                                                     end_delim=')' if (is_last_positional and not has_keyword) else ',')
                 children.append(converted)
             # Process keyword patterns
