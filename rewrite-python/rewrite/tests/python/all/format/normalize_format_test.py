@@ -28,7 +28,7 @@ def test_remove_decorator():
             def f(n):
                 return n
             """,
-            after_recipe=assert_prefix(lambda cu: cu.statements[1], Space([], '\n'))
+            after_recipe=assert_prefix(lambda cu: cu.statements[1], Space([], '\n\n\n'))
         ),
         spec=RecipeSpec()
         .with_recipes(
