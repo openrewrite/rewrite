@@ -23,6 +23,8 @@ import org.openrewrite.toml.tree.TomlValue;
 
 import java.nio.file.Path;
 import java.util.*;
+
+import static org.openrewrite.Tree.randomId;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -63,7 +65,7 @@ public class PythonDependencyParser {
         String path = doc.getSourcePath().toString();
 
         return new PythonResolutionResult(
-                UUID.randomUUID(),
+                randomId(),
                 name,
                 version,
                 description,

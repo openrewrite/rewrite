@@ -23,6 +23,7 @@ import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.Tree.randomId;
 
 class PythonResolutionResultTest {
 
@@ -32,7 +33,7 @@ class PythonResolutionResultTest {
                 "requests", "2.31.0", "https://pypi.org/simple", null);
 
         PythonResolutionResult marker = new PythonResolutionResult(
-                UUID.randomUUID(),
+                randomId(),
                 "test-project",
                 "1.0.0",
                 null,
@@ -59,7 +60,7 @@ class PythonResolutionResultTest {
                 "my-cool-package", "1.0.0", null, null);
 
         PythonResolutionResult marker = new PythonResolutionResult(
-                UUID.randomUUID(),
+                randomId(),
                 "test",
                 "1.0.0",
                 null,
@@ -107,7 +108,7 @@ class PythonResolutionResultTest {
                 new Dependency("coverage", ">=7.0", null, null, null)));
 
         PythonResolutionResult marker = new PythonResolutionResult(
-                UUID.randomUUID(),
+                randomId(),
                 "my-project",
                 "1.0.0",
                 "A description",
