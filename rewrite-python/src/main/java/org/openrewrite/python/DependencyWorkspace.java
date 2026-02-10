@@ -99,11 +99,8 @@ class DependencyWorkspace {
                         pyprojectContent.getBytes(StandardCharsets.UTF_8)
                 );
 
-                // Create virtual environment with uv
-                runCommand(tempDir, "uv", "venv", ".venv");
-
-                // Install dependencies
-                runCommand(tempDir, "uv", "pip", "install", "-e", ".");
+                // Sync: creates .venv, generates uv.lock, and installs dependencies
+                runCommand(tempDir, "uv", "sync");
 
                 // Install ty for type stubs
                 runCommand(tempDir, "uv", "pip", "install", "ty");

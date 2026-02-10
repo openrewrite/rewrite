@@ -98,7 +98,7 @@ public class YamlResourceLoader implements ResourceLoader {
         this.recipeLoader = (recipeName, options) -> {
             RecipeListing listing = marketplace.findRecipe(recipeName);
             if (listing == null) {
-                throw new IllegalStateException("Unable to find recipe " + recipeName + " listed in " + source);
+                throw new RecipeNotFoundException(recipeName, source);
             }
             return listing.prepare(resolvers, options == null ? emptyMap() : options);
         };
@@ -356,6 +356,12 @@ public class YamlResourceLoader implements ResourceLoader {
             } catch (IllegalArgumentException ignored) {
                 // it's probably declarative
                 addLazyLoadRecipe.accept(recipeName);
+            } catch (RecipeNotFoundException e) {
+                addInvalidRecipeValidation(
+                        addValidation,
+                        recipeName,
+                        null,
+                        e.getMessage());
             } catch (NoClassDefFoundError e) {
                 addInvalidRecipeValidation(
                         addValidation,
@@ -385,6 +391,12 @@ public class YamlResourceLoader implements ResourceLoader {
                                     recipeArgs,
                                     "Unable to load Recipe: " + e);
                         }
+                    } catch (RecipeNotFoundException e) {
+                        addInvalidRecipeValidation(
+                                addValidation,
+                                recipeName,
+                                recipeArgs,
+                                e.getMessage());
                     } catch (NoClassDefFoundError e) {
                         addInvalidRecipeValidation(
                                 addValidation,
@@ -404,7 +416,7 @@ public class YamlResourceLoader implements ResourceLoader {
                         addValidation,
                         recipeName,
                         recipeArgs,
-                        "Unexpected declarative recipe parsing exception " + e.getClass().getName());
+                        "Unexpected declarative recipe parsing exception " + e.getClass().getName() + ": " + e.getMessage());
             }
         } else {
             addValidation.accept(invalid(

@@ -18,10 +18,12 @@ package org.openrewrite.python.tree;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.python.Python3Only;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.python.Assertions.python;
 
+@Python3Only
 class AwaitTest implements RewriteTest {
 
     @ParameterizedTest

@@ -169,12 +169,19 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     public Accumulator getInitialValue(ExecutionContext ctx) {
         Accumulator acc = new Accumulator();
         for (Recipe precondition : preconditions) {
-            if (precondition instanceof ScanningRecipe && isScanningRequired(precondition)) {
-                acc.recipeToAccumulator.put(precondition, ((ScanningRecipe<?>) precondition).getInitialValue(ctx));
-            }
+            registerNestedScanningRecipes(precondition, acc, ctx);
         }
         accumulator = acc;
         return acc;
+    }
+
+    private void registerNestedScanningRecipes(Recipe recipe, Accumulator acc, ExecutionContext ctx) {
+        if (recipe instanceof ScanningRecipe && isScanningRequired(recipe)) {
+            acc.recipeToAccumulator.put(recipe, ((ScanningRecipe<?>) recipe).getInitialValue(ctx));
+        }
+        for (Recipe nested : recipe.getRecipeList()) {
+            registerNestedScanningRecipes(nested, acc, ctx);
+        }
     }
 
     @Override
@@ -184,16 +191,23 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 for (Recipe precondition : preconditions) {
-                    if (precondition instanceof ScanningRecipe && isScanningRequired(precondition)) {
-                        ScanningRecipe preconditionRecipe = (ScanningRecipe) precondition;
-                        Object preconditionAcc = acc.recipeToAccumulator.get(precondition);
-                        preconditionRecipe.getScanner(preconditionAcc)
-                                .visit(tree, ctx);
-                    }
+                    scanNestedScanningRecipes(precondition, acc, tree, ctx);
                 }
                 return tree;
             }
         };
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void scanNestedScanningRecipes(Recipe recipe, Accumulator acc, @Nullable Tree tree, ExecutionContext ctx) {
+        if (recipe instanceof ScanningRecipe && isScanningRequired(recipe)) {
+            ScanningRecipe scanningRecipe = (ScanningRecipe) recipe;
+            Object recipeAcc = acc.recipeToAccumulator.get(recipe);
+            scanningRecipe.getScanner(recipeAcc).visit(tree, ctx);
+        }
+        for (Recipe nested : recipe.getRecipeList()) {
+            scanNestedScanningRecipes(nested, acc, tree, ctx);
+        }
     }
 
     public static class Accumulator {

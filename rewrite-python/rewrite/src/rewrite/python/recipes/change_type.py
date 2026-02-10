@@ -18,7 +18,7 @@ ChangeType recipe for Python that delegates to Java's ChangeType.
 This recipe changes type references from one fully qualified name to another,
 handling all the complexities of type attribution and imports.
 """
-
+from dataclasses import field
 from typing import Any, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor, option
@@ -42,24 +42,24 @@ class ChangeType(Recipe):
         )
     """
 
-    old_fully_qualified_type_name: str = option(
+    old_fully_qualified_type_name: str = field(metadata=option(
         display_name="Old fully-qualified type name",
         description="Fully-qualified class name of the original type.",
         example="ast.Num"
-    )
+    ))
 
-    new_fully_qualified_type_name: str = option(
+    new_fully_qualified_type_name: str = field(metadata=option(
         display_name="New fully-qualified type name",
         description="Fully-qualified class name of the replacement type.",
         example="ast.Constant"
-    )
+    ))
 
-    ignore_definition: bool = option(
+    ignore_definition: bool = field(metadata=option(
         display_name="Ignore type definition",
         description="When set to True, the definition of the old type will be left untouched. "
                     "This is useful when you're renaming the type itself.",
         required=False
-    )
+    ))
 
     def __init__(
         self,

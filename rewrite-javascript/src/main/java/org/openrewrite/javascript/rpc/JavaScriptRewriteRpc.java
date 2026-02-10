@@ -200,7 +200,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     public static class Builder implements Supplier<JavaScriptRewriteRpc> {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
         private final Map<String, String> environment = new HashMap<>();
-        private Path npxPath = Paths.get("npx");
+        private Path npxPath = System.getProperty("os.name").toLowerCase().contains("windows") ? Paths.get("npx.cmd") : Paths.get("npx");
         private @Nullable Path log;
         private @Nullable Path metricsCsv;
         private @Nullable Path recipeInstallDir;

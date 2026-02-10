@@ -19,13 +19,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.python.Python3Only;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.python.Assertions.python;
 
 class VariableScopeTest implements RewriteTest {
     @ParameterizedTest
-    @ValueSource(strings = {"nonlocal", "global"})
+    @ValueSource(strings = {"global"})
     void singleName(String kind) {
         rewriteRun(
           python(
@@ -37,9 +38,37 @@ class VariableScopeTest implements RewriteTest {
         );
     }
 
+    @Python3Only
     @ParameterizedTest
-    @ValueSource(strings = {"nonlocal", "global"})
+    @ValueSource(strings = {"nonlocal"})
+    void singleNameNonlocal(String kind) {
+        rewriteRun(
+          python(
+            """
+              def foo():
+                  %s x
+              """.formatted(kind)
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"global"})
     void multipleNames(String kind) {
+        rewriteRun(
+          python(
+            """
+              def foo():
+                  %s x, y, z
+              """.formatted(kind)
+          )
+        );
+    }
+
+    @Python3Only
+    @ParameterizedTest
+    @ValueSource(strings = {"nonlocal"})
+    void multipleNamesNonlocal(String kind) {
         rewriteRun(
           python(
             """

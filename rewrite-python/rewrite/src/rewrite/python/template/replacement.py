@@ -16,12 +16,12 @@
 
 from __future__ import annotations
 
-from typing import Dict, Optional, List, TYPE_CHECKING
+from typing import Dict, List, TYPE_CHECKING
 
-from rewrite.java import J, Space
+from rewrite.java import J
 from rewrite.java import tree as j
+from rewrite.java.support_types import JContainer
 from rewrite.python.visitor import PythonVisitor
-
 from .placeholder import from_placeholder
 
 if TYPE_CHECKING:
@@ -47,7 +47,7 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
         super().__init__()
         self._values = values
 
-    def visit_identifier(self, identifier: j.Identifier, p: None) -> J:
+    def visit_identifier(self, identifier: j.Identifier, p: None) -> J:  # ty: ignore[invalid-method-override]
         """
         Visit an identifier and replace if it's a placeholder.
 
@@ -86,10 +86,14 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
         )
         method = method.replace(markers=self.visit_markers(method.markers, p))
 
-        # Visit select (receiver expression)
+        # Visit select (receiver expression) — _select is JRightPadded
         if method.select is not None:
             new_select = self.visit_and_cast(method.select, type(method.select), p)
-            method = method.replace(select=new_select)
+            if new_select is not method.select:
+                padded_select = method.padding.select
+                method = method.padding.replace(
+                    _select=padded_select.replace(element=new_select)
+                )
 
         # Visit name
         new_name = self.visit_and_cast(method.name, j.Identifier, p)
@@ -102,15 +106,18 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
             # Type parameters don't usually contain placeholders but handle anyway
             pass
 
-        # Visit arguments
-        if method.arguments is not None:
-            new_args = []
-            for arg_padded in method.arguments.elements:
-                new_arg = self.visit(arg_padded.element, p)
-                if new_arg is not None:
-                    new_args.append(arg_padded.replace(element=new_arg))
-            method = method.replace(
-                arguments=method.arguments.replace(elements=new_args)
+        # Visit arguments — _arguments is JContainer[JRightPadded[Expression]]
+        padded_args = method.padding.arguments
+        if padded_args is not None:
+            new_padded = []
+            for rp in padded_args.padding.elements:
+                new_elem = self.visit(rp.element, p)
+                if new_elem is not None:
+                    new_padded.append(rp.replace(element=new_elem))
+            method = method.padding.replace(
+                _arguments=JContainer(
+                    padded_args.before, new_padded, padded_args.markers
+                )
             )
 
         return method

@@ -23,7 +23,7 @@ from rewrite.decorators import categorize
 from rewrite.marketplace import Python
 from rewrite.recipe import option
 from rewrite.java import J
-from rewrite.java.tree import Empty, FieldAccess, Identifier
+from rewrite.java.tree import Empty, FieldAccess, Identifier, Import
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
 from rewrite.python.add_import import AddImportOptions, maybe_add_import
@@ -164,7 +164,7 @@ class ChangeImport(Recipe):
 
                 return result
 
-            def visit_multi_import(self, multi: MultiImport, p: ExecutionContext) -> J:
+            def visit_multi_import(self, multi: MultiImport, p: ExecutionContext) -> Optional[J]:  # ty: ignore[invalid-method-override]
                 if not self.has_old_import:
                     return multi
 
@@ -209,50 +209,54 @@ class ChangeImport(Recipe):
                             return self._get_alias_name(imp) or ""
                 return None
 
-            def _remove_name_from_import(self, multi: MultiImport, name_to_remove: str) -> J:
+            def _remove_name_from_import(self, multi: MultiImport, name_to_remove: str) -> Optional[J]:
                 """Remove a specific name from a 'from X import a, b, c' statement."""
-                from rewrite.java.support_types import JContainer, JRightPadded
+                from rewrite.java.support_types import JContainer
                 from rewrite.java.tree import Space
-                from rewrite.markers import Markers
 
-                new_names = []
-                for imp in multi.names:
-                    name = self._get_qualid_name(imp.qualid)
-                    if name != name_to_remove:
-                        new_names.append(imp)
+                existing_padded = multi.padding.names.padding.elements
+                new_padded = [
+                    p for p in existing_padded
+                    if self._get_qualid_name(p.element.qualid) != name_to_remove
+                ]
 
-                if len(new_names) == 0:
-                    # All names removed - delete the statement
+                if len(new_padded) == 0:
                     return None
-                if len(new_names) < len(multi.names):
-                    return multi.replace(
-                        names=JContainer(
+                if len(new_padded) < len(existing_padded):
+                    # Fix up first element prefix
+                    first = new_padded[0]
+                    if first.element.prefix != Space.EMPTY:
+                        new_padded[0] = first.replace(_element=first.element.replace(prefix=Space.EMPTY))
+                    return multi.padding.replace(
+                        _names=JContainer(
                             multi.padding.names.before,
-                            [JRightPadded(n, Space.EMPTY, Markers.EMPTY) for n in new_names],
+                            new_padded,
                             multi.padding.names.markers
                         )
                     )
                 return multi
 
-            def _remove_module_from_import(self, multi: MultiImport, module_to_remove: str) -> J:
+            def _remove_module_from_import(self, multi: MultiImport, module_to_remove: str) -> Optional[J]:
                 """Remove a module from an import statement."""
-                from rewrite.java.support_types import JContainer, JRightPadded
+                from rewrite.java.support_types import JContainer
                 from rewrite.java.tree import Space
-                from rewrite.markers import Markers
 
-                new_names = []
-                for imp in multi.names:
-                    name = self._get_qualid_name(imp.qualid)
-                    if name != module_to_remove:
-                        new_names.append(imp)
+                existing_padded = multi.padding.names.padding.elements
+                new_padded = [
+                    p for p in existing_padded
+                    if self._get_qualid_name(p.element.qualid) != module_to_remove
+                ]
 
-                if len(new_names) == 0:
+                if len(new_padded) == 0:
                     return None
-                if len(new_names) < len(multi.names):
-                    return multi.replace(
-                        names=JContainer(
+                if len(new_padded) < len(existing_padded):
+                    first = new_padded[0]
+                    if first.element.prefix != Space.EMPTY:
+                        new_padded[0] = first.replace(_element=first.element.replace(prefix=Space.EMPTY))
+                    return multi.padding.replace(
+                        _names=JContainer(
                             multi.padding.names.before,
-                            [JRightPadded(n, Space.EMPTY, Markers.EMPTY) for n in new_names],
+                            new_padded,
                             multi.padding.names.markers
                         )
                     )
@@ -283,11 +287,11 @@ class ChangeImport(Recipe):
                     return ""
                 return str(name) if name else ""
 
-            def _get_alias_name(self, imp) -> Optional[str]:
+            def _get_alias_name(self, imp: Import) -> Optional[str]:
                 """Get the alias name from an Import, or None if no alias."""
                 if imp.alias is None:
                     return None
-                alias = imp.alias.element
+                alias = imp.alias
                 if isinstance(alias, Identifier):
                     return alias.simple_name
                 return None

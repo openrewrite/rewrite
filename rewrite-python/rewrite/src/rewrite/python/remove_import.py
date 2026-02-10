@@ -59,15 +59,15 @@ def maybe_remove_import(visitor: PythonVisitor, options: RemoveImportOptions) ->
         # Remove: from os.path import join
         maybe_remove_import(visitor, RemoveImportOptions(module='os.path', name='join'))
     """
-    if not hasattr(visitor, 'after_visit') or visitor.after_visit is None:
-        visitor.after_visit = []
+    if visitor._after_visit is None:
+        visitor._after_visit = []
 
-    for v in visitor.after_visit:
+    for v in visitor._after_visit:
         if isinstance(v, RemoveImport):
             if v.module == options.module and v.name == options.name:
                 return  # Already registered
 
-    visitor.after_visit.append(RemoveImport(options))
+    visitor._after_visit.append(RemoveImport(options))
 
 
 class RemoveImport(PythonVisitor):
@@ -129,26 +129,38 @@ class RemoveImport(PythonVisitor):
 
     def _remove_import(self, cu: CompilationUnit) -> CompilationUnit:
         """Remove the import from the compilation unit."""
-        new_statements = []
+        new_padded_stmts = []
         changed = False
+        removed_prefix = None
 
-        for stmt in cu.statements:
+        for padded in cu.padding.statements:
+            stmt = padded.element
             if isinstance(stmt, MultiImport):
                 result = self._process_multi_import(stmt)
                 if result is None:
-                    # Remove the entire statement
+                    # Remove the entire statement; remember its prefix
+                    # so the next statement can inherit it if needed
+                    removed_prefix = stmt.prefix
                     changed = True
                 elif result is not stmt:
-                    # Statement was modified
-                    new_statements.append(result)
+                    # Statement was modified — preserve padding
+                    new_padded_stmts.append(JRightPadded(result, padded.after, padded.markers))
                     changed = True
                 else:
-                    new_statements.append(stmt)
+                    new_padded_stmts.append(padded)
             else:
-                new_statements.append(stmt)
+                # Transfer removed statement's prefix to the next statement
+                if removed_prefix is not None:
+                    new_padded_stmts.append(JRightPadded(
+                        stmt.replace(prefix=removed_prefix),
+                        padded.after, padded.markers
+                    ))
+                    removed_prefix = None
+                else:
+                    new_padded_stmts.append(padded)
 
         if changed:
-            return cu.replace(statements=new_statements)
+            return cu.padding.replace(_statements=new_padded_stmts)
         return cu
 
     def _process_multi_import(self, multi: MultiImport) -> Optional[MultiImport]:
@@ -175,18 +187,21 @@ class RemoveImport(PythonVisitor):
                 return None
         else:
             # This is a "import X" statement
-            new_names = []
-            for imp in multi.names:
-                name = self._get_qualid_name(imp.qualid)
-                alias = self._get_alias_name(imp)
-                # Keep imports that don't match
+            existing_padded = multi.padding.names.padding.elements
+            new_padded = []
+            for padded_imp in existing_padded:
+                name = self._get_qualid_name(padded_imp.element.qualid)
                 if name != self.module:
-                    new_names.append(imp)
+                    new_padded.append(padded_imp)
 
-            if len(new_names) == 0:
+            if len(new_padded) == 0:
                 return None  # Remove entire statement
-            if len(new_names) < len(multi.names):
-                # Some names removed
+            if len(new_padded) < len(existing_padded):
+                # Fix up first element prefix
+                first = new_padded[0]
+                if first.element.prefix != Space.EMPTY:
+                    new_padded[0] = first.replace(_element=first.element.replace(prefix=Space.EMPTY))
+
                 return MultiImport(
                     multi.id,
                     multi.prefix,
@@ -195,7 +210,7 @@ class RemoveImport(PythonVisitor):
                     multi.parenthesized,
                     JContainer(
                         multi.padding.names.before,
-                        [self._pad_right(n) for n in new_names],
+                        new_padded,
                         multi.padding.names.markers
                     )
                 )
@@ -211,17 +226,23 @@ class RemoveImport(PythonVisitor):
         if from_name != self.module:
             return multi  # Different module
 
-        # Filter out the name we want to remove
-        new_names = []
-        for imp in multi.names:
-            name = self._get_qualid_name(imp.qualid)
+        # Filter padded elements, preserving their padding
+        existing_padded = multi.padding.names.padding.elements
+        new_padded = []
+        for padded_imp in existing_padded:
+            name = self._get_qualid_name(padded_imp.element.qualid)
             if name != self.name:
-                new_names.append(imp)
+                new_padded.append(padded_imp)
 
-        if len(new_names) == 0:
+        if len(new_padded) == 0:
             return None  # Remove entire statement
-        if len(new_names) < len(multi.names):
-            # Some names removed
+        if len(new_padded) < len(existing_padded):
+            # Fix up the first element's prefix to not have a leading space
+            # (only relevant if the removed element was the first one)
+            first = new_padded[0]
+            if first.element.prefix != Space.EMPTY:
+                new_padded[0] = first.replace(_element=first.element.replace(prefix=Space.EMPTY))
+
             return MultiImport(
                 multi.id,
                 multi.prefix,
@@ -230,7 +251,7 @@ class RemoveImport(PythonVisitor):
                 multi.parenthesized,
                 JContainer(
                     multi.padding.names.before,
-                    [self._pad_right(n) for n in new_names],
+                    new_padded,
                     multi.padding.names.markers
                 )
             )
@@ -266,7 +287,7 @@ class RemoveImport(PythonVisitor):
         """Get the alias name from an Import, or None if no alias."""
         if imp.alias is None:
             return None
-        alias = imp.alias.element
+        alias = imp.alias
         if isinstance(alias, Identifier):
             return alias.simple_name
         return None
