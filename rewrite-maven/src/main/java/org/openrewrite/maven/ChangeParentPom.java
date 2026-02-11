@@ -302,6 +302,13 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                             );
                             Pom updatedPom = mrr.getPom().getRequested().withParent(updatedParentRef);
                             ResolvedPom updatedResolvedPom = mrr.getPom().withRequested(updatedPom);
+                            try {
+                                MavenPomDownloader downloader = new MavenPomDownloader(
+                                        mrr.getProjectPoms(), ctx,
+                                        mrr.getMavenSettings(), mrr.getActiveProfiles());
+                                updatedResolvedPom = updatedResolvedPom.resolve(ctx, downloader);
+                            } catch (MavenDownloadingException ignored) {
+                            }
                             acc.updatedRootMarker = mrr.withPom(updatedResolvedPom);
                         }
                     } catch (MavenDownloadingException e) {
@@ -354,6 +361,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                     if (updatedMarker != null) {
                         d = d.withMarkers(d.getMarkers().computeByType(mrr,
                                 (original, ignored) -> updatedMarker));
+                        maybeUpdateModel();
                     }
                 }
                 return d;
