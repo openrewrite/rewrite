@@ -99,6 +99,9 @@ public class DependencyInsight extends Recipe {
 
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                if (!sourceFile.getMarkers().findFirst(PythonResolutionResult.class).isPresent()) {
+                    return false;
+                }
                 if (sourceFile instanceof Toml.Document) {
                     return sourceFile.getSourcePath().toString().endsWith("pyproject.toml");
                 }
@@ -107,8 +110,7 @@ public class DependencyInsight extends Recipe {
                             new SetupCfgParser().accept(sourceFile.getSourcePath());
                 }
                 if (sourceFile instanceof Py.CompilationUnit) {
-                    return "setup.py".equals(sourceFile.getSourcePath().getFileName().toString()) &&
-                            sourceFile.getMarkers().findFirst(PythonResolutionResult.class).isPresent();
+                    return "setup.py".equals(sourceFile.getSourcePath().getFileName().toString());
                 }
                 return false;
             }
