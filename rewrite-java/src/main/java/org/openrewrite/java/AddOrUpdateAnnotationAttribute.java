@@ -101,7 +101,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if (attributeValue != null && attributeValue.endsWith(".class") && StringUtils.countOccurrences(attributeValue, ".") > 1) {
                     maybeAddImport(attributeValue.substring(0, attributeValue.length() - 6));
                     newAttributeValue = attributeValue;
-                } else if (isFullyQualifiedEnumValue()) {
+                } else if (isFullyQualifiedEnumValue(a)) {
                     maybeAddImport(getEnumClassName(attributeValue), false);
                     newAttributeValue = getShortenedEnumValue(attributeValue);
                 } else {
@@ -117,7 +117,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if ("value".equals(attributeName())) {
                         return JavaTemplate.apply("#{}", getCursor(), a.getCoordinates().replaceArguments(), newAttributeValue);
                     }
-                    String attrVal = newAttributeValue.contains(",") && attributeIsArray(a) ? getAttributeValuesAsString() : newAttributeValue;
+                    String attrVal = newAttributeValue.contains(",") && attributeIsArray(a) ? getAttributeValuesAsString(a) : newAttributeValue;
                     return JavaTemplate.apply("#{} = #{}", getCursor(), a.getCoordinates().replaceArguments(), attributeName, attrVal);
                 }
 
@@ -139,7 +139,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 }
 
                 // ADD the value into the argument list when there was no existing value to update and no requirements on a pre-existing old value, e.g. @Foo(name="old") to @Foo(value="new", name="old")
-                if (oldAttributeValue == null && newAttributeValue != null && !attributeNameOrValIsAlreadyPresent(a.getArguments(), getAttributeValues())) {
+                if (oldAttributeValue == null && newAttributeValue != null && !attributeNameOrValIsAlreadyPresent(a.getArguments(), getAttributeValues(a))) {
                     J.Assignment as = createAnnotationAssignment(a, attributeName(), newAttributeValue);
                     List<Expression> args = a.getArguments();
                     // Case for existing attribute: `@Foo("q")` -> @Foo(value = "q")
@@ -168,7 +168,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if (exp instanceof J.NewArray) {
                     List<Expression> initializerList = requireNonNull(((J.NewArray) exp).getInitializer());
                     return as.withAssignment(((J.NewArray) exp)
-                            .withInitializer(updateInitializer(annotation, initializerList, getAttributeValues())));
+                            .withInitializer(updateInitializer(annotation, initializerList, getAttributeValues(annotation))));
                 }
                 if (exp instanceof J.Literal) {
                     if (!valueMatches(exp, oldAttributeValue) || newAttributeValue.equals(((J.Literal) exp).getValueSource())) {
@@ -176,7 +176,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     }
                     // If appendArray is true and attribute is an array, convert literal to array and append
                     if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
-                        return as.withAssignment(createNewArrayWithExistingAndNew(annotation, (J.Literal) exp, getAttributeValues()));
+                        return as.withAssignment(createNewArrayWithExistingAndNew(annotation, (J.Literal) exp, getAttributeValues(annotation)));
                     }
                     return as.withAssignment(createAnnotationLiteral(annotation, newAttributeValue));
                 }
@@ -205,7 +205,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     }
                     // If appendArray is true and attribute is an array, convert literal to array and append
                     if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
-                        return createNewArrayWithExistingAndNew(annotation, literal, getAttributeValues());
+                        return createNewArrayWithExistingAndNew(annotation, literal, getAttributeValues(annotation));
                     }
                     return createAnnotationLiteral(annotation, newAttributeValue);
                 }
@@ -230,7 +230,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         return fieldAccess;
                     }
                     String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ?
-                            getAttributeValues().stream().map(String::valueOf).collect(joining(",", "{", "}")) :
+                            getAttributeValues(annotation).stream().map(String::valueOf).collect(joining(",", "{", "}")) :
                             newAttributeValue;
                     //noinspection ConstantConditions
                     return JavaTemplate.<J.Annotation>apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), attrVal)
@@ -247,11 +247,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if (attributeName != null && !"value".equals(attributeValue)) {
                     return isAnnotationWithOnlyValueMethod(annotation) ? arrayValue : createAnnotationAssignment(annotation, "value", arrayValue);
                 }
-                return arrayValue.withInitializer(updateInitializer(annotation, requireNonNull(arrayValue.getInitializer()), getAttributeValues()));
+                return arrayValue.withInitializer(updateInitializer(annotation, requireNonNull(arrayValue.getInitializer()), getAttributeValues(annotation)));
             }
 
             private Expression createAnnotationLiteral(J.Annotation annotation, String newAttributeValue) {
-                String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ? getAttributeValuesAsString() : newAttributeValue;
+                String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ? getAttributeValuesAsString(annotation) : newAttributeValue;
                 //noinspection ConstantConditions
                 return JavaTemplate.<J.Annotation>apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), attrVal)
                         .getArguments().get(0);
@@ -291,11 +291,15 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return withoutClassSuffix.substring(withoutClassSuffix.lastIndexOf('.') + 1) + ".class";
     }
 
-    private boolean isFullyQualifiedEnumValue() {
+    private boolean isFullyQualifiedEnumValue(J.Annotation annotation) {
         // A fully qualified enum value has at least 2 dots in a single value: package.EnumClass.CONSTANT
         // e.g., org.example.Values.ONE
         // We check that the enum class portion (everything before the last dot) itself contains a dot
+        // Also verify the attribute type is not a String to avoid treating "some.dotted.string" as an enum
         if (attributeValue == null || attributeValue.endsWith(".class") || attributeValue.contains(",")) {
+            return false;
+        }
+        if (attributeIsString(annotation)) {
             return false;
         }
         int lastDot = attributeValue.lastIndexOf('.');
@@ -370,22 +374,22 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return list;
     }
 
-    private List<String> getAttributeValues() {
+    private List<String> getAttributeValues(J.Annotation annotation) {
         if (attributeValue == null) {
             return emptyList();
         }
         if (isFullyQualifiedClass()) {
             return singletonList(getFullyQualifiedClass(attributeValue));
         }
-        if (isFullyQualifiedEnumValue()) {
+        if (isFullyQualifiedEnumValue(annotation)) {
             return singletonList(getShortenedEnumValue(attributeValue));
         }
         String attributeValueCleanedUp = attributeValue.replaceAll("\\s+", "").replaceAll("[\\s+{}\"]", "");
         return Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
     }
 
-    private String getAttributeValuesAsString() {
-        return getAttributeValues().stream().map(String::valueOf).collect(joining("\", \"", "{\"", "\"}"));
+    private String getAttributeValuesAsString(J.Annotation annotation) {
+        return getAttributeValues(annotation).stream().map(String::valueOf).collect(joining("\", \"", "{\"", "\"}"));
     }
 
     private static boolean isAnnotationWithOnlyValueMethod(J.Annotation annotation) {

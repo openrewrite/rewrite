@@ -2573,4 +2573,42 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dottedStringValueIsNotTreatedAsEnum() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "some.dotted.value",
+            null,
+            null,
+            null
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String value();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo("some.dotted.value")
+              public class A {
+              }
+              """
+          )
+        );
+    }
 }
