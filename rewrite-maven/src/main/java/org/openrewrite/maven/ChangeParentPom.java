@@ -301,14 +301,10 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                                     targetRelativePath
                             );
                             Pom updatedPom = mrr.getPom().getRequested().withParent(updatedParentRef);
-                            ResolvedPom updatedResolvedPom = mrr.getPom().withRequested(updatedPom);
-                            try {
-                                MavenPomDownloader downloader = new MavenPomDownloader(
-                                        mrr.getProjectPoms(), ctx,
-                                        mrr.getMavenSettings(), mrr.getActiveProfiles());
-                                updatedResolvedPom = updatedResolvedPom.resolve(ctx, downloader);
-                            } catch (MavenDownloadingException ignored) {
-                            }
+                            ResolvedPom updatedResolvedPom = mrr.getPom()
+                                    .withRequested(updatedPom)
+                                    .resolve(ctx, new MavenPomDownloader(
+                                            mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles()));
                             acc.updatedRootMarker = mrr.withPom(updatedResolvedPom);
                         }
                     } catch (MavenDownloadingException e) {
