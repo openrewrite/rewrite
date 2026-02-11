@@ -284,7 +284,7 @@ public class PythonDependencyParser {
                     "\\s*$"
     );
 
-    static @Nullable Dependency parsePep508(String spec) {
+    public static @Nullable Dependency parsePep508(String spec) {
         Matcher m = PEP_508_PATTERN.matcher(spec);
         if (!m.matches()) {
             return null;

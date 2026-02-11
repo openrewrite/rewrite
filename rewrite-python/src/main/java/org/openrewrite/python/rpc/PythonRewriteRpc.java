@@ -18,9 +18,10 @@ package org.openrewrite.python.rpc;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.python.PyProjectTomlParser;
+import org.openrewrite.python.RequirementsTxtParser;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
@@ -175,7 +176,7 @@ public class PythonRewriteRpc extends RewriteRpc {
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
-        return StreamSupport.stream(new Spliterator<SourceFile>() {
+        Stream<SourceFile> rpcStream = StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
             private @Nullable ParseProjectResponse response;
 
@@ -214,6 +215,37 @@ public class PythonRewriteRpc extends RewriteRpc {
                 return response == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
             }
         }, false);
+
+        Stream<SourceFile> manifestStream = parseManifest(projectPath, relativeTo, ctx);
+        return Stream.concat(rpcStream, manifestStream);
+    }
+
+    private Stream<SourceFile> parseManifest(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {
+        Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
+
+        Path pyprojectPath = projectPath.resolve("pyproject.toml");
+        if (Files.exists(pyprojectPath)) {
+            Parser.Input input = Parser.Input.fromFile(pyprojectPath);
+            return new PyProjectTomlParser().parseInputs(
+                    Collections.singletonList(input), effectiveRelativeTo, ctx);
+        }
+
+        RequirementsTxtParser reqsParser = new RequirementsTxtParser();
+        try (Stream<Path> entries = Files.list(projectPath)) {
+            Path reqsPath = entries
+                    .filter(p -> reqsParser.accept(p.getFileName()))
+                    .findFirst()
+                    .orElse(null);
+            if (reqsPath != null) {
+                Parser.Input input = Parser.Input.fromFile(reqsPath);
+                return reqsParser.parseInputs(
+                        Collections.singletonList(input), effectiveRelativeTo, ctx);
+            }
+        } catch (IOException e) {
+            // Silently skip manifest parsing if we can't list the directory
+        }
+
+        return Stream.empty();
     }
 
     public static Builder builder() {

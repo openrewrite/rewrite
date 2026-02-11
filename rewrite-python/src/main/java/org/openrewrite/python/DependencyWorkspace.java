@@ -16,6 +16,7 @@
 package org.openrewrite.python;
 
 import lombok.experimental.UtilityClass;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.internal.UvExecutor;
 
 import java.io.IOException;
@@ -132,6 +133,113 @@ class DependencyWorkspace {
         }
     }
 
+    /**
+     * Gets or creates a workspace directory for a requirements.txt file.
+     * Returns null (graceful degradation) when uv is unavailable.
+     *
+     * @param requirementsContent The complete requirements.txt content
+     * @param originalFilePath    The original file path on disk (supports -r includes), or null
+     * @return Path to the workspace directory, or null if uv is unavailable
+     */
+    static @Nullable Path getOrCreateRequirementsWorkspace(String requirementsContent,
+                                                            @Nullable Path originalFilePath) {
+        String uvPath = UvExecutor.findUvExecutable();
+        if (uvPath == null) {
+            return null;
+        }
+
+        String hash = "req-" + hashContent(requirementsContent);
+
+        // Check in-memory cache
+        Path cached = cache.get(hash);
+        if (cached != null && isRequirementsWorkspaceValid(cached)) {
+            return cached;
+        }
+
+        // Check disk cache
+        Path workspaceDir = WORKSPACE_BASE.resolve(hash);
+        if (isRequirementsWorkspaceValid(workspaceDir)) {
+            cache.put(hash, workspaceDir);
+            return workspaceDir;
+        }
+
+        // Create new workspace
+        try {
+            Files.createDirectories(WORKSPACE_BASE);
+
+            Path tempDir = Files.createTempDirectory(WORKSPACE_BASE, hash + ".tmp-");
+
+            try {
+                // Create virtualenv
+                runCommandWithPath(tempDir, uvPath, "venv");
+
+                // Install dependencies from requirements file
+                Path reqFile;
+                if (originalFilePath != null && Files.exists(originalFilePath)) {
+                    reqFile = originalFilePath;
+                } else {
+                    reqFile = tempDir.resolve("requirements.txt");
+                    Files.write(reqFile, requirementsContent.getBytes(StandardCharsets.UTF_8));
+                }
+                runCommandWithPath(tempDir, uvPath, "pip", "install", "-r", reqFile.toString());
+
+                // Capture freeze output BEFORE installing ty
+                UvExecutor.RunResult freezeResult = UvExecutor.run(tempDir, uvPath, "pip", "freeze");
+                if (freezeResult.isSuccess()) {
+                    Files.write(
+                            tempDir.resolve("freeze.txt"),
+                            freezeResult.getStdout().getBytes(StandardCharsets.UTF_8)
+                    );
+                }
+
+                // Install ty for type stubs (after freeze so it's not in the dep model)
+                runCommandWithPath(tempDir, uvPath, "pip", "install", "ty");
+
+                // Move to final location
+                try {
+                    Files.move(tempDir, workspaceDir);
+                } catch (IOException e) {
+                    if (isRequirementsWorkspaceValid(workspaceDir)) {
+                        cleanupDirectory(tempDir);
+                    } else {
+                        throw e;
+                    }
+                }
+
+                cache.put(hash, workspaceDir);
+                return workspaceDir;
+
+            } catch (Exception e) {
+                cleanupDirectory(tempDir);
+                return null;
+            }
+
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    static String readFreezeOutput(Path workspaceDir) {
+        try {
+            return new String(Files.readAllBytes(workspaceDir.resolve("freeze.txt")), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
+    private static boolean isRequirementsWorkspaceValid(Path workspaceDir) {
+        return Files.exists(workspaceDir) &&
+                Files.isDirectory(workspaceDir.resolve(".venv")) &&
+                Files.exists(workspaceDir.resolve("freeze.txt"));
+    }
+
+    private static void runCommandWithPath(Path dir, String uvPath, String... args) throws IOException, InterruptedException {
+        UvExecutor.RunResult result = UvExecutor.run(dir, uvPath, args);
+        if (!result.isSuccess()) {
+            throw new RuntimeException("uv " + String.join(" ", args) + " failed with exit code: " + result.getExitCode());
+        }
+    }
+
     private static void runCommand(Path dir, String... command) throws IOException, InterruptedException {
         String uvPath = UvExecutor.findUvExecutable();
         if (uvPath == null) {
@@ -200,7 +308,13 @@ class DependencyWorkspace {
             Files.list(WORKSPACE_BASE)
                     .filter(Files::isDirectory)
                     .filter(dir -> !dir.getFileName().toString().contains(".tmp-"))
-                    .filter(DependencyWorkspace::isWorkspaceValid)
+                    .filter(dir -> {
+                        String name = dir.getFileName().toString();
+                        if (name.startsWith("req-")) {
+                            return isRequirementsWorkspaceValid(dir);
+                        }
+                        return isWorkspaceValid(dir);
+                    })
                     .sorted((a, b) -> {
                         try {
                             return Files.getLastModifiedTime(a).compareTo(Files.getLastModifiedTime(b));

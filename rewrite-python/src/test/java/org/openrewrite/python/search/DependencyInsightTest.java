@@ -24,6 +24,7 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.pyproject;
+import static org.openrewrite.python.Assertions.requirementsTxt;
 import static org.openrewrite.python.Assertions.uv;
 
 class DependencyInsightTest implements RewriteTest {
@@ -307,6 +308,52 @@ class DependencyInsightTest implements RewriteTest {
               dependencies = [
                   ~~>\"typing-extensions>=4.0.0",
               ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void findDirectDependencyInRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("requests", null, null)),
+          requirementsTxt(
+            """
+              requests>=2.28.0
+              click>=8.0
+              """,
+            """
+              ~~>requests>=2.28.0
+              click>=8.0
+              """
+          )
+        );
+    }
+
+    @Test
+    void findMultipleDependenciesInRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("*", null, null)),
+          requirementsTxt(
+            """
+              requests>=2.28.0
+              click>=8.0
+              """,
+            """
+              ~~>requests>=2.28.0
+              click>=8.0
+              """
+          )
+        );
+    }
+
+    @Test
+    void noMatchInRequirementsTxtReturnsUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("nonexistent", null, null)),
+          requirementsTxt(
+            """
+              requests>=2.28.0
               """
           )
         );
