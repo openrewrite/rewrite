@@ -18,7 +18,10 @@ package org.openrewrite.python;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.ScanningRecipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.toml.TomlIsoVisitor;
@@ -28,61 +31,45 @@ import org.openrewrite.toml.tree.TomlType;
 import java.util.*;
 
 /**
- * Upgrade the version constraint for a dependency in {@code [project].dependencies} in pyproject.toml.
+ * Change a dependency to a different package in pyproject.toml.
+ * Searches all dependency arrays in the document (no scope restriction).
  * When uv is available, the uv.lock file is regenerated to reflect the change.
  */
 @EqualsAndHashCode(callSuper = false)
 @Value
-public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVersion.Accumulator> {
+public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulator> {
 
-    @Option(displayName = "Package name",
-            description = "The PyPI package name to update.",
+    @Option(displayName = "Old package name",
+            description = "The current PyPI package name to replace.",
             example = "requests")
-    String packageName;
+    String oldPackageName;
+
+    @Option(displayName = "New package name",
+            description = "The new PyPI package name.",
+            example = "httpx")
+    String newPackageName;
 
     @Option(displayName = "New version",
-            description = "The new PEP 508 version constraint (e.g., `>=2.31.0`).",
-            example = ">=2.31.0")
+            description = "Optional new PEP 508 version constraint. If not specified, the original version constraint is preserved.",
+            example = ">=0.24.0",
+            required = false)
+    @Nullable
     String newVersion;
-
-    @Option(displayName = "Scope",
-            description = "The dependency scope to update in. Defaults to `project.dependencies`.",
-            valid = {"project.dependencies", "project.optional-dependencies", "dependency-groups"},
-            example = "project.dependencies",
-            required = false)
-    @Nullable
-    String scope;
-
-    @Option(displayName = "Group name",
-            description = "The group name, required when scope is `project.optional-dependencies` or `dependency-groups`.",
-            example = "dev",
-            required = false)
-    @Nullable
-    String groupName;
-
-    @Override
-    public Validated<Object> validate() {
-        Validated<Object> v = super.validate();
-        if ("project.optional-dependencies".equals(scope) || "dependency-groups".equals(scope)) {
-            v = v.and(Validated.required("groupName", groupName));
-        }
-        return v;
-    }
 
     @Override
     public String getDisplayName() {
-        return "Upgrade Python dependency version";
+        return "Change Python dependency";
     }
 
     @Override
     public String getInstanceNameSuffix() {
-        return String.format("`%s` to `%s`", packageName, newVersion);
+        return String.format("`%s` to `%s`", oldPackageName, newPackageName);
     }
 
     @Override
     public String getDescription() {
-        return "Upgrade the version constraint for a dependency in `[project].dependencies` in `pyproject.toml`. " +
-                "When `uv` is available, the `uv.lock` file is regenerated.";
+        return "Change a dependency to a different package in `pyproject.toml`. " +
+                "Searches all dependency arrays. When `uv` is available, the `uv.lock` file is regenerated.";
     }
 
     static class Accumulator {
@@ -110,20 +97,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }
 
                 PythonResolutionResult marker = resolution.get();
-
-                // Check if the dependency exists in the target scope and has a different version
-                PythonResolutionResult.Dependency dep = PyProjectHelper.findDependencyInScope(
-                        marker, packageName, scope, groupName);
-                if (dep == null) {
-                    return document;
+                if (marker.findDependencyInAnyScope(oldPackageName) != null) {
+                    acc.projectsToUpdate.add(document.getSourcePath().toString());
                 }
-
-                // Skip if the version constraint already matches
-                if (newVersion.equals(dep.getVersionConstraint())) {
-                    return document;
-                }
-
-                acc.projectsToUpdate.add(document.getSourcePath().toString());
                 return document;
             }
         };
@@ -137,7 +113,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 String sourcePath = document.getSourcePath().toString();
 
                 if (sourcePath.endsWith("pyproject.toml") && acc.projectsToUpdate.contains(sourcePath)) {
-                    return changeVersionInPyproject(document, ctx, acc);
+                    return changeDependencyInPyproject(document, ctx, acc);
                 }
 
                 if (sourcePath.endsWith("uv.lock")) {
@@ -153,8 +129,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         };
     }
 
-    private Toml.Document changeVersionInPyproject(Toml.Document document, ExecutionContext ctx, Accumulator acc) {
-        String normalizedName = PythonResolutionResult.normalizeName(packageName);
+    private Toml.Document changeDependencyInPyproject(Toml.Document document, ExecutionContext ctx, Accumulator acc) {
+        String normalizedOld = PythonResolutionResult.normalizeName(oldPackageName);
 
         Toml.Document updated = (Toml.Document) new TomlIsoVisitor<ExecutionContext>() {
             @Override
@@ -169,49 +145,35 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     return l;
                 }
 
-                // Check if we're inside the target dependency array
-                if (!isInsideTargetDependencies()) {
-                    return l;
-                }
-
-                // Check if this literal matches the package we're looking for
                 String spec = (String) val;
                 String depName = PyProjectHelper.extractPackageName(spec);
-                if (depName == null || !PythonResolutionResult.normalizeName(depName).equals(normalizedName)) {
+                if (depName == null || !PythonResolutionResult.normalizeName(depName).equals(normalizedOld)) {
                     return l;
                 }
 
-                // Build new PEP 508 string preserving extras and markers
-                String newSpec = buildNewSpec(spec, depName);
-                return l.withSource("\"" + newSpec + "\"").withValue(newSpec);
-            }
+                // Build new PEP 508 string
+                String extras = UpgradeDependencyVersion.extractExtras(spec);
+                String marker = UpgradeDependencyVersion.extractMarker(spec);
 
-            private boolean isInsideTargetDependencies() {
-                // Walk up the cursor to find the enclosing array, then check scope
-                Cursor c = getCursor();
-                while (c != null) {
-                    if (c.getValue() instanceof Toml.Array) {
-                        return PyProjectHelper.isInsideDependencyArray(c, scope, groupName);
-                    }
-                    c = c.getParent();
-                }
-                return false;
-            }
-
-            private String buildNewSpec(String oldSpec, String depName) {
-                // Parse extras and markers from old spec
-                String extras = extractExtras(oldSpec);
-                String marker = extractMarker(oldSpec);
-
-                StringBuilder sb = new StringBuilder(depName);
+                StringBuilder sb = new StringBuilder(newPackageName);
                 if (extras != null) {
                     sb.append('[').append(extras).append(']');
                 }
-                sb.append(newVersion);
+                if (newVersion != null) {
+                    sb.append(newVersion);
+                } else {
+                    // Preserve the original version constraint
+                    String originalVersion = extractVersionConstraint(spec, depName);
+                    if (originalVersion != null) {
+                        sb.append(originalVersion);
+                    }
+                }
                 if (marker != null) {
                     sb.append("; ").append(marker);
                 }
-                return sb.toString();
+
+                String newSpec = sb.toString();
+                return l.withSource("\"" + newSpec + "\"").withValue(newSpec);
             }
         }.visitNonNull(document, ctx);
 
@@ -222,22 +184,22 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return updated;
     }
 
-    static @Nullable String extractExtras(String pep508Spec) {
-        int start = pep508Spec.indexOf('[');
-        int end = pep508Spec.indexOf(']');
-        if (start >= 0 && end > start) {
-            return pep508Spec.substring(start + 1, end);
+    /**
+     * Extract the version constraint portion from a PEP 508 spec.
+     * Returns the version constraint (e.g. ">=2.28.0") or null if there is none.
+     */
+    private static @Nullable String extractVersionConstraint(String spec, String name) {
+        String remaining = spec.substring(name.length()).trim();
+        // Skip extras [...]
+        if (remaining.startsWith("[")) {
+            int end = remaining.indexOf(']');
+            if (end >= 0) {
+                remaining = remaining.substring(end + 1).trim();
+            }
         }
-        return null;
+        // Extract version constraint up to marker
+        int markerIdx = remaining.indexOf(';');
+        String versionPart = markerIdx >= 0 ? remaining.substring(0, markerIdx).trim() : remaining.trim();
+        return versionPart.isEmpty() ? null : versionPart;
     }
-
-    static @Nullable String extractMarker(String pep508Spec) {
-        int idx = pep508Spec.indexOf(';');
-        if (idx >= 0) {
-            String marker = pep508Spec.substring(idx + 1).trim();
-            return marker.isEmpty() ? null : marker;
-        }
-        return null;
-    }
-
 }

@@ -17,10 +17,8 @@ package org.openrewrite.python;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.ScanningRecipe;
-import org.openrewrite.TreeVisitor;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.*;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.toml.TomlIsoVisitor;
@@ -42,6 +40,30 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
             description = "The PyPI package name to remove.",
             example = "requests")
     String packageName;
+
+    @Option(displayName = "Scope",
+            description = "The dependency scope to remove from. Defaults to `project.dependencies`.",
+            valid = {"project.dependencies", "project.optional-dependencies", "dependency-groups"},
+            example = "project.dependencies",
+            required = false)
+    @Nullable
+    String scope;
+
+    @Option(displayName = "Group name",
+            description = "The group name, required when scope is `project.optional-dependencies` or `dependency-groups`.",
+            example = "dev",
+            required = false)
+    @Nullable
+    String groupName;
+
+    @Override
+    public Validated<Object> validate() {
+        Validated<Object> v = super.validate();
+        if ("project.optional-dependencies".equals(scope) || "dependency-groups".equals(scope)) {
+            v = v.and(Validated.required("groupName", groupName));
+        }
+        return v;
+    }
 
     @Override
     public String getDisplayName() {
@@ -85,8 +107,8 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
 
                 PythonResolutionResult marker = resolution.get();
 
-                // Check if the dependency exists
-                if (marker.findDependency(packageName) == null) {
+                // Check if the dependency exists in the target scope
+                if (PyProjectHelper.findDependencyInScope(marker, packageName, scope, groupName) == null) {
                     return document;
                 }
 
@@ -128,7 +150,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
             public Toml.Array visitArray(Toml.Array array, ExecutionContext ctx) {
                 Toml.Array a = super.visitArray(array, ctx);
 
-                if (!PyProjectHelper.isInsideProjectDependencies(getCursor())) {
+                if (!PyProjectHelper.isInsideDependencyArray(getCursor(), scope, groupName)) {
                     return a;
                 }
 
