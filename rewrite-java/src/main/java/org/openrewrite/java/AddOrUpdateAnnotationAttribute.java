@@ -299,6 +299,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         if (attributeValue == null || attributeValue.endsWith(".class") || attributeValue.contains(",")) {
             return false;
         }
+        // Require type information to safely determine if this is an enum value
+        // Without type info, we can't distinguish between a dotted string and an enum reference
+        if (!findMethod(annotation, attributeName()).isPresent()) {
+            return false;
+        }
         if (attributeIsString(annotation)) {
             return false;
         }
