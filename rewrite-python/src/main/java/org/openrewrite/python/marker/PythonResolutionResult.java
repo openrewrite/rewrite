@@ -87,6 +87,18 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
      */
     Map<String, List<Dependency>> dependencyGroups;
 
+    /**
+     * Constraint dependencies from [tool.uv.constraint-dependencies].
+     * These pin transitive dependency versions without adding them as direct dependencies.
+     */
+    List<Dependency> constraintDependencies;
+
+    /**
+     * Override dependencies from [tool.uv.override-dependencies].
+     * These force specific versions for all occurrences of a package in the resolution.
+     */
+    List<Dependency> overrideDependencies;
+
     List<ResolvedDependency> resolvedDependencies;
 
     @Nullable PackageManager packageManager;
@@ -154,6 +166,16 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
                 }
             }
         }
+        for (Dependency dep : constraintDependencies) {
+            if (normalizeName(dep.getName()).equals(normalized)) {
+                return dep;
+            }
+        }
+        for (Dependency dep : overrideDependencies) {
+            if (normalizeName(dep.getName()).equals(normalized)) {
+                return dep;
+            }
+        }
         return null;
     }
 
@@ -170,6 +192,8 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
         for (List<Dependency> deps : dependencyGroups.values()) {
             all.addAll(deps);
         }
+        all.addAll(constraintDependencies);
+        all.addAll(overrideDependencies);
         return all;
     }
 
@@ -198,6 +222,12 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
                 dep -> dep.rpcSend(dep, q));
         q.getAndSend(after, PythonResolutionResult::getOptionalDependencies);
         q.getAndSend(after, PythonResolutionResult::getDependencyGroups);
+        q.getAndSendListAsRef(after, PythonResolutionResult::getConstraintDependencies,
+                dep -> dep.getName() + "@" + dep.getVersionConstraint(),
+                dep -> dep.rpcSend(dep, q));
+        q.getAndSendListAsRef(after, PythonResolutionResult::getOverrideDependencies,
+                dep -> dep.getName() + "@" + dep.getVersionConstraint(),
+                dep -> dep.rpcSend(dep, q));
         q.getAndSendListAsRef(after, PythonResolutionResult::getResolvedDependencies,
                 resolved -> resolved.getName() + "@" + resolved.getVersion(),
                 resolved -> resolved.rpcSend(resolved, q));
@@ -224,6 +254,10 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
                         dep -> dep.rpcReceive(dep, q)))
                 .withOptionalDependencies(q.receive(before.optionalDependencies))
                 .withDependencyGroups(q.receive(before.dependencyGroups))
+                .withConstraintDependencies(q.receiveList(before.constraintDependencies,
+                        dep -> dep.rpcReceive(dep, q)))
+                .withOverrideDependencies(q.receiveList(before.overrideDependencies,
+                        dep -> dep.rpcReceive(dep, q)))
                 .withResolvedDependencies(q.receiveList(before.resolvedDependencies,
                         resolved -> resolved.rpcReceive(resolved, q)))
                 .withPackageManager(q.receiveAndGet(before.packageManager, toEnum(PackageManager.class)))

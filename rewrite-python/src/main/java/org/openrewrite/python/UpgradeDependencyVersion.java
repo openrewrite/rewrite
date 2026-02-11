@@ -47,7 +47,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Option(displayName = "Scope",
             description = "The dependency scope to update in. Defaults to `project.dependencies`.",
-            valid = {"project.dependencies", "project.optional-dependencies", "dependency-groups"},
+            valid = {"project.dependencies", "project.optional-dependencies", "dependency-groups",
+                    "tool.uv.constraint-dependencies", "tool.uv.override-dependencies"},
             example = "project.dependencies",
             required = false)
     @Nullable

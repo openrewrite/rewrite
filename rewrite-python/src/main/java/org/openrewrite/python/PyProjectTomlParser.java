@@ -90,6 +90,8 @@ public class PyProjectTomlParser implements Parser {
         marker = marker.withBuildRequires(linkResolved(marker.getBuildRequires(), resolvedDeps));
         marker = marker.withOptionalDependencies(linkResolvedMap(marker.getOptionalDependencies(), resolvedDeps));
         marker = marker.withDependencyGroups(linkResolvedMap(marker.getDependencyGroups(), resolvedDeps));
+        marker = marker.withConstraintDependencies(linkResolved(marker.getConstraintDependencies(), resolvedDeps));
+        marker = marker.withOverrideDependencies(linkResolved(marker.getOverrideDependencies(), resolvedDeps));
 
         return marker;
     }

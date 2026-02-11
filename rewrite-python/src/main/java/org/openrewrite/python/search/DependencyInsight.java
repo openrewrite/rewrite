@@ -50,7 +50,8 @@ public class DependencyInsight extends Recipe {
 
     @Option(displayName = "Scope",
             description = "Match dependencies in the specified scope. All scopes are searched by default.",
-            valid = {"project.dependencies", "build-system.requires", "project.optional-dependencies", "dependency-groups"},
+            valid = {"project.dependencies", "build-system.requires", "project.optional-dependencies", "dependency-groups",
+                    "tool.uv.constraint-dependencies", "tool.uv.override-dependencies"},
             example = "project.dependencies",
             required = false)
     @Nullable
@@ -78,7 +79,8 @@ public class DependencyInsight extends Recipe {
         Validated<Object> v = super.validate();
         if (scope != null) {
             Set<String> validScopes = new HashSet<>(asList("project.dependencies", "build-system.requires",
-                    "project.optional-dependencies", "dependency-groups"));
+                    "project.optional-dependencies", "dependency-groups",
+                    "tool.uv.constraint-dependencies", "tool.uv.override-dependencies"));
             v = v.and(Validated.test("scope", "scope is a valid Python dependency scope", scope, validScopes::contains));
         }
         return v;
@@ -177,6 +179,12 @@ public class DependencyInsight extends Recipe {
                     for (Map.Entry<String, List<Dependency>> entry : resolution.getDependencyGroups().entrySet()) {
                         collectFromDeclared(entry.getValue(), "dependency-groups/" + entry.getKey(), matcher);
                     }
+                }
+                if (scope == null || "tool.uv.constraint-dependencies".equals(scope)) {
+                    collectFromDeclared(resolution.getConstraintDependencies(), "tool.uv.constraint-dependencies", matcher);
+                }
+                if (scope == null || "tool.uv.override-dependencies".equals(scope)) {
+                    collectFromDeclared(resolution.getOverrideDependencies(), "tool.uv.override-dependencies", matcher);
                 }
             }
 

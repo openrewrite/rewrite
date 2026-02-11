@@ -142,6 +142,8 @@ public class PyProjectHelper {
      *   <li>{@code "build-system.requires"} → {@code [build-system].requires}</li>
      *   <li>{@code "project.optional-dependencies"} → {@code [project.optional-dependencies].<groupName>}</li>
      *   <li>{@code "dependency-groups"} → {@code [dependency-groups].<groupName>}</li>
+     *   <li>{@code "tool.uv.constraint-dependencies"} → {@code [tool.uv].constraint-dependencies}</li>
+     *   <li>{@code "tool.uv.override-dependencies"} → {@code [tool.uv].override-dependencies}</li>
      * </ul>
      */
     public static boolean isInsideDependencyArray(Cursor cursor, @Nullable String scope, @Nullable String groupName) {
@@ -159,6 +161,12 @@ public class PyProjectHelper {
         } else if ("dependency-groups".equals(scope)) {
             tableName = "dependency-groups";
             keyName = groupName;
+        } else if ("tool.uv.constraint-dependencies".equals(scope)) {
+            tableName = "tool.uv";
+            keyName = "constraint-dependencies";
+        } else if ("tool.uv.override-dependencies".equals(scope)) {
+            tableName = "tool.uv";
+            keyName = "override-dependencies";
         } else {
             return false;
         }
@@ -241,6 +249,10 @@ public class PyProjectHelper {
             }
             List<Dependency> deps = marker.getDependencyGroups().get(groupName);
             return deps != null ? findInList(deps, packageName) : null;
+        } else if ("tool.uv.constraint-dependencies".equals(scope)) {
+            return findInList(marker.getConstraintDependencies(), packageName);
+        } else if ("tool.uv.override-dependencies".equals(scope)) {
+            return findInList(marker.getOverrideDependencies(), packageName);
         }
         return null;
     }
