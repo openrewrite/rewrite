@@ -101,6 +101,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if (attributeValue != null && attributeValue.endsWith(".class") && StringUtils.countOccurrences(attributeValue, ".") > 1) {
                     maybeAddImport(attributeValue.substring(0, attributeValue.length() - 6));
                     newAttributeValue = attributeValue;
+                } else if (isFullyQualifiedEnumValue()) {
+                    maybeAddImport(getEnumClassName(attributeValue), false);
+                    newAttributeValue = getShortenedEnumValue(attributeValue);
                 } else {
                     newAttributeValue = maybeQuoteStringArgument(a, attributeValue);
                 }
@@ -288,6 +291,36 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return withoutClassSuffix.substring(withoutClassSuffix.lastIndexOf('.') + 1) + ".class";
     }
 
+    private boolean isFullyQualifiedEnumValue() {
+        // A fully qualified enum value has at least 2 dots in a single value: package.EnumClass.CONSTANT
+        // e.g., org.example.Values.ONE
+        // We check that the enum class portion (everything before the last dot) itself contains a dot
+        if (attributeValue == null || attributeValue.endsWith(".class") || attributeValue.contains(",")) {
+            return false;
+        }
+        int lastDot = attributeValue.lastIndexOf('.');
+        if (lastDot <= 0) {
+            return false;
+        }
+        String enumClassName = attributeValue.substring(0, lastDot);
+        return enumClassName.contains(".");
+    }
+
+    private static String getEnumClassName(String fqn) {
+        // Extract the enum class name from a fully qualified enum value
+        // e.g., org.example.Values.ONE -> org.example.Values
+        int lastDot = fqn.lastIndexOf('.');
+        return fqn.substring(0, lastDot);
+    }
+
+    private static String getShortenedEnumValue(String fqn) {
+        // Shorten org.example.Values.ONE to Values.ONE
+        String enumClassName = getEnumClassName(fqn);
+        String simpleName = enumClassName.substring(enumClassName.lastIndexOf('.') + 1);
+        String enumConstant = fqn.substring(fqn.lastIndexOf('.') + 1);
+        return simpleName + "." + enumConstant;
+    }
+
     private String attributeName() {
         return attributeName == null ? "value" : attributeName;
     }
@@ -343,6 +376,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         }
         if (isFullyQualifiedClass()) {
             return singletonList(getFullyQualifiedClass(attributeValue));
+        }
+        if (isFullyQualifiedEnumValue()) {
+            return singletonList(getShortenedEnumValue(attributeValue));
         }
         String attributeValueCleanedUp = attributeValue.replaceAll("\\s+", "").replaceAll("[\\s+{}\"]", "");
         return Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
