@@ -2482,4 +2482,49 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addFullyQualifiedEnumValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "org.example.Values.ONE",
+            null,
+            null,
+            null
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Values value();
+              }
+              """
+          ),
+          java(
+            """
+              package org.example;
+              public enum Values { ONE, TWO }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              import org.example.Values;
+
+              @Foo(Values.ONE)
+              public class A {
+              }
+              """
+          )
+        );
+    }
 }
