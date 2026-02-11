@@ -185,6 +185,45 @@ public final class Assertions {
         return text;
     }
 
+    public static SourceSpecs setupCfg(@Nullable String before) {
+        return setupCfg(before, s -> {
+        });
+    }
+
+    public static SourceSpecs setupCfg(@Nullable String before,
+                                        Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> text = new SourceSpec<>(
+                PlainText.class, null, SetupCfgParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        text.path("setup.cfg");
+        spec.accept(text);
+        return text;
+    }
+
+    public static SourceSpecs setupCfg(@Nullable String before,
+                                        @Nullable String after) {
+        return setupCfg(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs setupCfg(@Nullable String before,
+                                        @Nullable String after,
+                                        Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> text = new SourceSpec<>(
+                PlainText.class, null, SetupCfgParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        text.path("setup.cfg");
+        text.after(s -> after);
+        spec.accept(text);
+        return text;
+    }
+
     public static SourceSpecs python(@Language("py") @Nullable String before) {
         return python(before, s -> {
         });

@@ -40,7 +40,7 @@ import static java.util.Collections.synchronizedMap;
  * to enable proper type attribution via ty LSP.
  */
 @UtilityClass
-class DependencyWorkspace {
+public class DependencyWorkspace {
     private static final Path WORKSPACE_BASE = Paths.get(
             System.getProperty("java.io.tmpdir"),
             "openrewrite-python-workspaces"
@@ -219,6 +219,90 @@ class DependencyWorkspace {
         }
     }
 
+    /**
+     * Gets or creates a workspace directory for a setuptools project (setup.cfg / setup.py).
+     * Uses {@code uv pip install <projectDir>} to install the project and its dependencies.
+     * Returns null (graceful degradation) when uv is unavailable.
+     *
+     * @param manifestContent The setup.cfg (or setup.py) content for hashing
+     * @param projectDir      The project directory to install from, or null
+     * @return Path to the workspace directory, or null if uv is unavailable
+     */
+    public static @Nullable Path getOrCreateSetuptoolsWorkspace(String manifestContent,
+                                                                @Nullable Path projectDir) {
+        String uvPath = UvExecutor.findUvExecutable();
+        if (uvPath == null) {
+            return null;
+        }
+
+        String hash = "setup-" + hashContent(manifestContent);
+
+        // Check in-memory cache
+        Path cached = cache.get(hash);
+        if (cached != null && isRequirementsWorkspaceValid(cached)) {
+            return cached;
+        }
+
+        // Check disk cache
+        Path workspaceDir = WORKSPACE_BASE.resolve(hash);
+        if (isRequirementsWorkspaceValid(workspaceDir)) {
+            cache.put(hash, workspaceDir);
+            return workspaceDir;
+        }
+
+        if (projectDir == null || !Files.isDirectory(projectDir)) {
+            return null;
+        }
+
+        // Create new workspace
+        try {
+            Files.createDirectories(WORKSPACE_BASE);
+
+            Path tempDir = Files.createTempDirectory(WORKSPACE_BASE, hash + ".tmp-");
+
+            try {
+                // Create virtualenv
+                runCommandWithPath(tempDir, uvPath, "venv");
+
+                // Install from the project directory
+                runCommandWithPath(tempDir, uvPath, "pip", "install", projectDir.toString());
+
+                // Capture freeze output BEFORE installing ty
+                UvExecutor.RunResult freezeResult = UvExecutor.run(tempDir, uvPath, "pip", "freeze");
+                if (freezeResult.isSuccess()) {
+                    Files.write(
+                            tempDir.resolve("freeze.txt"),
+                            freezeResult.getStdout().getBytes(StandardCharsets.UTF_8)
+                    );
+                }
+
+                // Install ty for type stubs (after freeze so it's not in the dep model)
+                runCommandWithPath(tempDir, uvPath, "pip", "install", "ty");
+
+                // Move to final location
+                try {
+                    Files.move(tempDir, workspaceDir);
+                } catch (IOException e) {
+                    if (isRequirementsWorkspaceValid(workspaceDir)) {
+                        cleanupDirectory(tempDir);
+                    } else {
+                        throw e;
+                    }
+                }
+
+                cache.put(hash, workspaceDir);
+                return workspaceDir;
+
+            } catch (Exception e) {
+                cleanupDirectory(tempDir);
+                return null;
+            }
+
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
     static String readFreezeOutput(Path workspaceDir) {
         try {
             return new String(Files.readAllBytes(workspaceDir.resolve("freeze.txt")), StandardCharsets.UTF_8);
@@ -310,7 +394,7 @@ class DependencyWorkspace {
                     .filter(dir -> !dir.getFileName().toString().contains(".tmp-"))
                     .filter(dir -> {
                         String name = dir.getFileName().toString();
-                        if (name.startsWith("req-")) {
+                        if (name.startsWith("req-") || name.startsWith("setup-")) {
                             return isRequirementsWorkspaceValid(dir);
                         }
                         return isWorkspaceValid(dir);

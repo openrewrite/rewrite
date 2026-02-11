@@ -20,8 +20,11 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marketplace.RecipeMarketplace;
-import org.openrewrite.python.PyProjectTomlParser;
-import org.openrewrite.python.RequirementsTxtParser;
+import org.openrewrite.python.*;
+import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
+import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
+import org.openrewrite.python.tree.Py;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
@@ -216,17 +219,94 @@ public class PythonRewriteRpc extends RewriteRpc {
             }
         }, false);
 
+        // For setup.py-only projects (no pyproject.toml, no setup.cfg),
+        // attach the marker to the Py.CompilationUnit already in the RPC stream
+        boolean hasPyproject = Files.exists(projectPath.resolve("pyproject.toml"));
+        boolean hasSetupCfg = Files.exists(projectPath.resolve("setup.cfg"));
+        boolean hasSetupPy = Files.exists(projectPath.resolve("setup.py"));
+
+        if (!hasPyproject && !hasSetupCfg && hasSetupPy) {
+            PythonResolutionResult marker = createSetupPyMarker(projectPath, relativeTo, ctx);
+            if (marker != null) {
+                final PythonResolutionResult finalMarker = marker;
+                rpcStream = rpcStream.map(sf -> {
+                    if (sf instanceof Py.CompilationUnit &&
+                            sf.getSourcePath().getFileName().toString().equals("setup.py")) {
+                        return sf.withMarkers(sf.getMarkers().addIfAbsent(finalMarker));
+                    }
+                    return sf;
+                });
+            }
+        }
+
         Stream<SourceFile> manifestStream = parseManifest(projectPath, relativeTo, ctx);
         return Stream.concat(rpcStream, manifestStream);
+    }
+
+    private @Nullable PythonResolutionResult createSetupPyMarker(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {
+        Path setupPyPath = projectPath.resolve("setup.py");
+        if (!Files.exists(setupPyPath)) {
+            return null;
+        }
+
+        String source;
+        try {
+            source = new String(Files.readAllBytes(setupPyPath), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return null;
+        }
+
+        Path workspace = DependencyWorkspace.getOrCreateSetuptoolsWorkspace(source, projectPath);
+        if (workspace == null) {
+            return null;
+        }
+
+        List<ResolvedDependency> resolvedDeps = RequirementsTxtParser.parseFreezeOutput(workspace);
+        if (resolvedDeps.isEmpty()) {
+            return null;
+        }
+
+        List<Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolvedDeps);
+
+        Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
+        String path = effectiveRelativeTo.relativize(setupPyPath).toString();
+
+        return new PythonResolutionResult(
+                org.openrewrite.Tree.randomId(),
+                null,
+                null,
+                null,
+                null,
+                path,
+                null,
+                null,
+                Collections.emptyList(),
+                deps,
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                resolvedDeps,
+                PythonResolutionResult.PackageManager.Uv,
+                null
+        );
     }
 
     private Stream<SourceFile> parseManifest(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {
         Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
 
+        // Priority: pyproject.toml > setup.cfg > requirements.txt
+        // Note: setup.py is NOT handled here — it's already in the RPC stream as Py.CompilationUnit
+
         Path pyprojectPath = projectPath.resolve("pyproject.toml");
         if (Files.exists(pyprojectPath)) {
             Parser.Input input = Parser.Input.fromFile(pyprojectPath);
             return new PyProjectTomlParser().parseInputs(
+                    Collections.singletonList(input), effectiveRelativeTo, ctx);
+        }
+
+        Path setupCfgPath = projectPath.resolve("setup.cfg");
+        if (Files.exists(setupCfgPath)) {
+            Parser.Input input = Parser.Input.fromFile(setupCfgPath);
+            return new SetupCfgParser().parseInputs(
                     Collections.singletonList(input), effectiveRelativeTo, ctx);
         }
 

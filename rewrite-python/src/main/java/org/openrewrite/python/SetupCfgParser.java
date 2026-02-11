@@ -27,23 +27,18 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Parser for requirements.txt files that delegates to {@link PlainTextParser} and attaches a
- * {@link PythonResolutionResult} marker with dependency metadata resolved via {@code uv pip freeze}.
+ * Parser for setup.cfg files that delegates to {@link PlainTextParser} and attaches a
+ * {@link PythonResolutionResult} marker with dependency metadata resolved via
+ * {@code uv pip install <projectDir>} and {@code uv pip freeze}.
  */
-public class RequirementsTxtParser implements Parser {
-
-    private static final Pattern FILENAME_PATTERN = Pattern.compile(
-            "requirements(-[\\w-]+)?\\.(txt|in)"
-    );
+public class SetupCfgParser implements Parser {
 
     private final PlainTextParser plainTextParser = new PlainTextParser();
 
@@ -55,22 +50,23 @@ public class RequirementsTxtParser implements Parser {
             }
             PlainText text = (PlainText) sf;
 
-            @Nullable Path originalFilePath = null;
+            @Nullable Path projectDir = null;
             if (relativeTo != null) {
-                originalFilePath = relativeTo.resolve(text.getSourcePath());
+                Path filePath = relativeTo.resolve(text.getSourcePath());
+                projectDir = filePath.getParent();
             }
-            Path workspace = DependencyWorkspace.getOrCreateRequirementsWorkspace(
-                    text.getText(), originalFilePath);
+            Path workspace = DependencyWorkspace.getOrCreateSetuptoolsWorkspace(
+                    text.getText(), projectDir);
             if (workspace == null) {
                 return sf;
             }
 
-            List<ResolvedDependency> resolvedDeps = parseFreezeOutput(workspace);
+            List<ResolvedDependency> resolvedDeps = RequirementsTxtParser.parseFreezeOutput(workspace);
             if (resolvedDeps.isEmpty()) {
                 return sf;
             }
 
-            List<Dependency> deps = dependenciesFromResolved(resolvedDeps);
+            List<Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolvedDeps);
 
             PythonResolutionResult marker = new PythonResolutionResult(
                     randomId(),
@@ -94,51 +90,14 @@ public class RequirementsTxtParser implements Parser {
         });
     }
 
-    public static List<ResolvedDependency> parseFreezeOutput(Path workspace) {
-        String freezeContent = DependencyWorkspace.readFreezeOutput(workspace);
-        return parseFreezeLines(freezeContent);
-    }
-
-    static List<ResolvedDependency> parseFreezeLines(String freezeContent) {
-        List<ResolvedDependency> resolved = new ArrayList<>();
-        for (String line : freezeContent.split("\n")) {
-            String trimmed = line.trim();
-            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-                continue;
-            }
-            int eqIdx = trimmed.indexOf("==");
-            if (eqIdx > 0) {
-                String name = trimmed.substring(0, eqIdx).trim();
-                String version = trimmed.substring(eqIdx + 2).trim();
-                resolved.add(new ResolvedDependency(name, version, null, null));
-            }
-        }
-        return resolved;
-    }
-
-    /**
-     * Convert resolved dependencies into declared dependencies.
-     * Since {@code uv pip freeze} produces a flat list without distinguishing
-     * direct from transitive, all resolved packages are treated as dependencies
-     * so that client code traversing {@code getDependencies()} will find every package.
-     */
-    public static List<Dependency> dependenciesFromResolved(List<ResolvedDependency> resolved) {
-        List<Dependency> deps = new ArrayList<>(resolved.size());
-        for (ResolvedDependency r : resolved) {
-            deps.add(new Dependency(r.getName(), "==" + r.getVersion(), null, null, r));
-        }
-        return deps;
-    }
-
     @Override
     public boolean accept(Path path) {
-        String filename = path.getFileName().toString();
-        return FILENAME_PATTERN.matcher(filename).matches();
+        return "setup.cfg".equals(path.getFileName().toString());
     }
 
     @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
-        return prefix.resolve("requirements.txt");
+        return prefix.resolve("setup.cfg");
     }
 
     public static Builder builder() {
@@ -152,13 +111,13 @@ public class RequirementsTxtParser implements Parser {
         }
 
         @Override
-        public RequirementsTxtParser build() {
-            return new RequirementsTxtParser();
+        public SetupCfgParser build() {
+            return new SetupCfgParser();
         }
 
         @Override
         public String getDslName() {
-            return "requirements.txt";
+            return "setup.cfg";
         }
     }
 }

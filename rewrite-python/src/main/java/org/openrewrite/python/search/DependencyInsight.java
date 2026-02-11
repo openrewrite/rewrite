@@ -21,7 +21,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.python.RequirementsTxtParser;
+import org.openrewrite.python.SetupCfgParser;
 import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.tree.Py;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
@@ -101,7 +103,12 @@ public class DependencyInsight extends Recipe {
                     return sourceFile.getSourcePath().toString().endsWith("pyproject.toml");
                 }
                 if (sourceFile instanceof PlainText) {
-                    return new RequirementsTxtParser().accept(sourceFile.getSourcePath());
+                    return new RequirementsTxtParser().accept(sourceFile.getSourcePath()) ||
+                            new SetupCfgParser().accept(sourceFile.getSourcePath());
+                }
+                if (sourceFile instanceof Py.CompilationUnit) {
+                    return "setup.py".equals(sourceFile.getSourcePath().getFileName().toString()) &&
+                            sourceFile.getMarkers().findFirst(PythonResolutionResult.class).isPresent();
                 }
                 return false;
             }
@@ -112,7 +119,10 @@ public class DependencyInsight extends Recipe {
                     return visitPyprojectToml((Toml.Document) tree, ctx);
                 }
                 if (tree instanceof PlainText) {
-                    return visitRequirementsTxt((PlainText) tree, ctx);
+                    return visitPlainText((PlainText) tree, ctx);
+                }
+                if (tree instanceof Py.CompilationUnit) {
+                    return visitSetupPy((Py.CompilationUnit) tree, ctx);
                 }
                 return tree;
             }
@@ -153,7 +163,7 @@ public class DependencyInsight extends Recipe {
                 return result != null ? result : document;
             }
 
-            private PlainText visitRequirementsTxt(PlainText text, ExecutionContext ctx) {
+            private PlainText visitPlainText(PlainText text, ExecutionContext ctx) {
                 Optional<PythonResolutionResult> pyResolution = text.getMarkers()
                         .findFirst(PythonResolutionResult.class);
 
@@ -171,6 +181,26 @@ public class DependencyInsight extends Recipe {
 
                 emitDataTableRows(ctx);
                 return SearchResult.found(text);
+            }
+
+            private Py.CompilationUnit visitSetupPy(Py.CompilationUnit cu, ExecutionContext ctx) {
+                Optional<PythonResolutionResult> pyResolution = cu.getMarkers()
+                        .findFirst(PythonResolutionResult.class);
+
+                if (!pyResolution.isPresent()) {
+                    return cu;
+                }
+
+                resolution = pyResolution.get();
+                matchedPackages.clear();
+                collectMatches(packageNameMatcher);
+
+                if (matchedPackages.isEmpty()) {
+                    return cu;
+                }
+
+                emitDataTableRows(ctx);
+                return SearchResult.found(cu);
             }
 
             private void emitDataTableRows(ExecutionContext ctx) {
