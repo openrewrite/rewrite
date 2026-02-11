@@ -94,8 +94,9 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
     List<Dependency> constraintDependencies;
 
     /**
-     * Override dependencies from [tool.uv.override-dependencies].
+     * Override dependencies from [tool.uv.override-dependencies] or [tool.pdm.overrides].
      * These force specific versions for all occurrences of a package in the resolution.
+     * The {@link #packageManager} field indicates which TOML section these came from.
      */
     List<Dependency> overrideDependencies;
 

@@ -66,6 +66,15 @@ public class PythonDependencyParser {
         List<Dependency> constraintDependencies = getDependencyList(uvTable, "constraint-dependencies");
         List<Dependency> overrideDependencies = getDependencyList(uvTable, "override-dependencies");
 
+        // PDM overrides serve the same purpose as uv override-dependencies
+        List<Dependency> pdmOverrides = getPdmOverrides(tables);
+        if (!pdmOverrides.isEmpty()) {
+            overrideDependencies = pdmOverrides;
+        }
+
+        // Detect package manager from tool sections
+        PythonResolutionResult.PackageManager packageManager = detectPackageManager(tables);
+
         String path = doc.getSourcePath().toString();
 
         return new PythonResolutionResult(
@@ -84,7 +93,7 @@ public class PythonDependencyParser {
                 constraintDependencies,
                 overrideDependencies,
                 Collections.emptyList(),
-                null,
+                packageManager,
                 null
         );
     }
@@ -271,6 +280,46 @@ public class PythonDependencyParser {
             }
         }
         return result;
+    }
+
+    /**
+     * Extract PDM overrides from [tool.pdm.overrides].
+     * Each entry is a key-value pair where key = package name, value = version constraint string.
+     */
+    private static List<Dependency> getPdmOverrides(Map<String, Toml.Table> tables) {
+        Toml.Table pdmOverridesTable = tables.get("tool.pdm.overrides");
+        if (pdmOverridesTable == null) {
+            return Collections.emptyList();
+        }
+        List<Dependency> result = new ArrayList<>();
+        for (Toml value : pdmOverridesTable.getValues()) {
+            if (value instanceof Toml.KeyValue) {
+                Toml.KeyValue kv = (Toml.KeyValue) value;
+                if (kv.getKey() instanceof Toml.Identifier && kv.getValue() instanceof Toml.Literal) {
+                    String pkgName = ((Toml.Identifier) kv.getKey()).getName();
+                    Object val = ((Toml.Literal) kv.getValue()).getValue();
+                    if (val instanceof String) {
+                        result.add(new Dependency(pkgName, (String) val, null, null, null));
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Detect the package manager from tool-specific table names.
+     */
+    private static PythonResolutionResult.@Nullable PackageManager detectPackageManager(Map<String, Toml.Table> tables) {
+        for (String tableName : tables.keySet()) {
+            if ("tool.pdm".equals(tableName) || tableName.startsWith("tool.pdm.")) {
+                return PythonResolutionResult.PackageManager.Pdm;
+            }
+            if ("tool.uv".equals(tableName) || tableName.startsWith("tool.uv.")) {
+                return PythonResolutionResult.PackageManager.Uv;
+            }
+        }
+        return null;
     }
 
     // PEP 508 parsing: name[extras](version_constraint);marker

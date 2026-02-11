@@ -251,10 +251,29 @@ public class PyProjectHelper {
             return deps != null ? findInList(deps, packageName) : null;
         } else if ("tool.uv.constraint-dependencies".equals(scope)) {
             return findInList(marker.getConstraintDependencies(), packageName);
-        } else if ("tool.uv.override-dependencies".equals(scope)) {
+        } else if ("tool.uv.override-dependencies".equals(scope) || "tool.pdm.overrides".equals(scope)) {
             return findInList(marker.getOverrideDependencies(), packageName);
         }
         return null;
+    }
+
+    /**
+     * Check whether a cursor path represents a position inside the
+     * {@code [tool.pdm.overrides]} table in a pyproject.toml.
+     */
+    public static boolean isInsidePdmOverridesTable(Cursor cursor) {
+        Cursor c = cursor;
+        while (c != null) {
+            Object val = c.getValue();
+            if (val instanceof Toml.Table) {
+                Toml.Table table = (Toml.Table) val;
+                if (table.getName() != null && "tool.pdm.overrides".equals(table.getName().getName())) {
+                    return true;
+                }
+            }
+            c = c.getParent();
+        }
+        return false;
     }
 
     private static @Nullable Dependency findInList(List<Dependency> deps, String packageName) {

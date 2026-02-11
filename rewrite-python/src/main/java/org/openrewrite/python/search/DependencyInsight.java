@@ -51,7 +51,7 @@ public class DependencyInsight extends Recipe {
     @Option(displayName = "Scope",
             description = "Match dependencies in the specified scope. All scopes are searched by default.",
             valid = {"project.dependencies", "build-system.requires", "project.optional-dependencies", "dependency-groups",
-                    "tool.uv.constraint-dependencies", "tool.uv.override-dependencies"},
+                    "tool.uv.constraint-dependencies", "tool.uv.override-dependencies", "tool.pdm.overrides"},
             example = "project.dependencies",
             required = false)
     @Nullable
@@ -80,7 +80,8 @@ public class DependencyInsight extends Recipe {
         if (scope != null) {
             Set<String> validScopes = new HashSet<>(asList("project.dependencies", "build-system.requires",
                     "project.optional-dependencies", "dependency-groups",
-                    "tool.uv.constraint-dependencies", "tool.uv.override-dependencies"));
+                    "tool.uv.constraint-dependencies", "tool.uv.override-dependencies",
+                    "tool.pdm.overrides"));
             v = v.and(Validated.test("scope", "scope is a valid Python dependency scope", scope, validScopes::contains));
         }
         return v;
@@ -183,8 +184,9 @@ public class DependencyInsight extends Recipe {
                 if (scope == null || "tool.uv.constraint-dependencies".equals(scope)) {
                     collectFromDeclared(resolution.getConstraintDependencies(), "tool.uv.constraint-dependencies", matcher);
                 }
-                if (scope == null || "tool.uv.override-dependencies".equals(scope)) {
-                    collectFromDeclared(resolution.getOverrideDependencies(), "tool.uv.override-dependencies", matcher);
+                if (scope == null || "tool.uv.override-dependencies".equals(scope) || "tool.pdm.overrides".equals(scope)) {
+                    String scopeName = "tool.pdm.overrides".equals(scope) ? "tool.pdm.overrides" : "tool.uv.override-dependencies";
+                    collectFromDeclared(resolution.getOverrideDependencies(), scopeName, matcher);
                 }
             }
 

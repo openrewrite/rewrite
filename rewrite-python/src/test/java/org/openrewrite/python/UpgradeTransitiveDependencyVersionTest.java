@@ -256,4 +256,183 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    // --- PDM tests ---
+
+    @Test
+    void addPdmOverrideForTransitiveDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("certifi", ">=2024.1.1")),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+
+              [tool.pdm.overrides]
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+
+              [tool.pdm.overrides]
+              certifi = ">=2024.1.1"
+              """
+          )
+        );
+    }
+
+    @Test
+    void addPdmOverrideToExistingEntries() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("certifi", ">=2024.1.1")),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+
+              [tool.pdm.overrides]
+              urllib3 = ">=2.0"
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+
+              [tool.pdm.overrides]
+              urllib3 = ">=2.0"
+              certifi = ">=2024.1.1"
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradePdmOverride() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("certifi", ">=2024.1.1")),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+
+              [tool.pdm.overrides]
+              certifi = ">=2023.1.1"
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+
+              [tool.pdm.overrides]
+              certifi = ">=2024.1.1"
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipPdmWhenDirectDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("requests", ">=2.31.0")),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+
+              [tool.pdm.overrides]
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipPdmWhenOverrideAlreadyMatches() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("certifi", ">=2024.1.1")),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+
+              [tool.pdm.overrides]
+              certifi = ">=2024.1.1"
+              """
+          )
+        );
+    }
+
+    // --- Fallback tests (unknown package manager) ---
+
+    @Test
+    void addDirectDependencyForUnknownPackageManager() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("certifi", ">=2024.1.1")),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+                  "certifi>=2024.1.1",
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipFallbackWhenDirectDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("requests", ">=2.31.0")),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+              """
+          )
+        );
+    }
 }
