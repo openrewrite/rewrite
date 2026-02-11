@@ -2369,4 +2369,115 @@ class ChangeParentPomTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6717")
+    @Test
+    void submoduleParentModelDependencyManagementUpdated() {
+        rewriteRun(
+            spec -> spec.recipe(new ChangeParentPom(
+                "org.junit",
+                null,
+                "junit-bom",
+                null,
+                "6.0.1",
+                null,
+                null,
+                null,
+                false,
+                null
+            )),
+            mavenProject(
+                "sample-parent",
+                pomXml(
+                    """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.example</groupId>
+                      <artifactId>sample-parent</artifactId>
+                      <version>${revision}</version>
+                      <packaging>pom</packaging>
+
+                      <modules>
+                        <module>sample-rest</module>
+                      </modules>
+
+                      <parent>
+                        <groupId>org.junit</groupId>
+                        <artifactId>junit-bom</artifactId>
+                        <version>5.10.3</version>
+                        <relativePath/>
+                      </parent>
+                    </project>
+                    """,
+                    """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.example</groupId>
+                      <artifactId>sample-parent</artifactId>
+                      <version>${revision}</version>
+                      <packaging>pom</packaging>
+
+                      <modules>
+                        <module>sample-rest</module>
+                      </modules>
+
+                      <parent>
+                        <groupId>org.junit</groupId>
+                        <artifactId>junit-bom</artifactId>
+                        <version>6.0.1</version>
+                        <relativePath/>
+                      </parent>
+                    </project>
+                    """,
+                    spec -> spec.path("pom.xml")
+                ),
+                mavenProject(
+                    "sample-rest",
+                    pomXml(
+                        """
+                        <project>
+                          <modelVersion>4.0.0</modelVersion>
+                          <artifactId>sample-rest</artifactId>
+                          <packaging>jar</packaging>
+
+                          <parent>
+                            <groupId>com.example</groupId>
+                            <artifactId>sample-parent</artifactId>
+                            <version>${revision}</version>
+                            <relativePath>../pom.xml</relativePath>
+                          </parent>
+                        </project>
+                        """,
+                        """
+                        <project>
+                          <modelVersion>4.0.0</modelVersion>
+                          <artifactId>sample-rest</artifactId>
+                          <packaging>jar</packaging>
+
+                          <parent>
+                            <groupId>com.example</groupId>
+                            <artifactId>sample-parent</artifactId>
+                            <version>${revision}</version>
+                            <relativePath>../pom.xml</relativePath>
+                          </parent>
+                        </project>
+                        """,
+                        spec -> spec.path("sample-rest/pom.xml").afterRecipe(doc -> {
+                            MavenResolutionResult result = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                            assertThat(result.getParent()).isNotNull();
+                            assertThat(requireNonNull(result.getParent().getPom().getRequested().getParent()).getVersion())
+                                .describedAs("Parent's parent version should be updated to 6.0.1")
+                                .isEqualTo("6.0.1");
+                            assertThat(result.getParent().getPom().getDependencyManagement())
+                                .describedAs("Parent's dependency management should not contain old junit 5.10.3 entries")
+                                .noneMatch(dep -> dep.getGav().toString().equals("org.junit.jupiter:junit-jupiter:5.10.3"));
+                            assertThat(result.getParent().getPom().getDependencyManagement())
+                                .describedAs("Parent's dependency management should contain new junit 6.0.1 entries")
+                                .anyMatch(dep -> dep.getGav().toString().equals("org.junit.jupiter:junit-jupiter:6.0.1"));
+                        })
+                    )
+                )
+            )
+        );
+    }
 }
