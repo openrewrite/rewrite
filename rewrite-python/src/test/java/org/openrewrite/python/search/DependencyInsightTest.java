@@ -40,7 +40,7 @@ class DependencyInsightTest implements RewriteTest {
                 assertThat(row.getPackageName()).isEqualTo("requests");
                 assertThat(row.getVersion()).isNotNull();
                 assertThat(row.getVersionConstraint()).isEqualTo(">=2.28.0");
-                assertThat(row.getScope()).isEqualTo("dependencies");
+                assertThat(row.getScope()).isEqualTo("project.dependencies");
                 assertThat(row.getDirect()).isTrue();
                 assertThat(row.getCount()).isEqualTo(1);
             }),
@@ -80,7 +80,7 @@ class DependencyInsightTest implements RewriteTest {
                 assertThat(rows).anySatisfy(row -> {
                     assertThat(row.getPackageName()).isEqualTo("requests");
                     assertThat(row.getDirect()).isTrue();
-                    assertThat(row.getScope()).isEqualTo("dependencies");
+                    assertThat(row.getScope()).isEqualTo("project.dependencies");
                 });
                 // Should have the transitive dep (certifi) itself
                 assertThat(rows).anySatisfy(row -> {
@@ -188,7 +188,7 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void findInBuildRequires() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("hatchling", "buildRequires", null)),
+          spec -> spec.recipe(new DependencyInsight("hatchling", "build-system.requires", null)),
           pyproject(
             """
               [project]
@@ -217,7 +217,7 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void findInDependencyGroups() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("pytest*", "dependencyGroups", null)),
+          spec -> spec.recipe(new DependencyInsight("pytest*", "dependency-groups", null)),
           pyproject(
             """
               [project]
@@ -244,7 +244,7 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void scopeFilterExcludesOtherScopes() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("requests", "buildRequires", null)),
+          spec -> spec.recipe(new DependencyInsight("requests", "build-system.requires", null)),
           pyproject(
             """
               [project]
@@ -263,7 +263,7 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void findMultipleMatchingDependencies() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("*", "dependencies", null)),
+          spec -> spec.recipe(new DependencyInsight("*", "project.dependencies", null)),
           pyproject(
             """
               [project]

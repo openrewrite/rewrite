@@ -45,6 +45,31 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             example = ">=2.31.0")
     String newVersion;
 
+    @Option(displayName = "Scope",
+            description = "The dependency scope to update in. Defaults to `project.dependencies`.",
+            valid = {"project.dependencies", "project.optional-dependencies", "dependency-groups",
+                    "tool.uv.constraint-dependencies", "tool.uv.override-dependencies"},
+            example = "project.dependencies",
+            required = false)
+    @Nullable
+    String scope;
+
+    @Option(displayName = "Group name",
+            description = "The group name, required when scope is `project.optional-dependencies` or `dependency-groups`.",
+            example = "dev",
+            required = false)
+    @Nullable
+    String groupName;
+
+    @Override
+    public Validated<Object> validate() {
+        Validated<Object> v = super.validate();
+        if ("project.optional-dependencies".equals(scope) || "dependency-groups".equals(scope)) {
+            v = v.and(Validated.required("groupName", groupName));
+        }
+        return v;
+    }
+
     @Override
     public String getDisplayName() {
         return "Upgrade Python dependency version";
@@ -87,8 +112,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
                 PythonResolutionResult marker = resolution.get();
 
-                // Check if the dependency exists and has a different version
-                PythonResolutionResult.Dependency dep = marker.findDependency(packageName);
+                // Check if the dependency exists in the target scope and has a different version
+                PythonResolutionResult.Dependency dep = PyProjectHelper.findDependencyInScope(
+                        marker, packageName, scope, groupName);
                 if (dep == null) {
                     return document;
                 }
@@ -144,8 +170,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     return l;
                 }
 
-                // Check if we're inside [project].dependencies array
-                if (!isInsideProjectDependencies()) {
+                // Check if we're inside the target dependency array
+                if (!isInsideTargetDependencies()) {
                     return l;
                 }
 
@@ -161,33 +187,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return l.withSource("\"" + newSpec + "\"").withValue(newSpec);
             }
 
-            private boolean isInsideProjectDependencies() {
-                // Walk up the cursor to verify we're inside [project].dependencies
+            private boolean isInsideTargetDependencies() {
+                // Walk up the cursor to find the enclosing array, then check scope
                 Cursor c = getCursor();
-                boolean inArray = false;
-                boolean inDependencies = false;
-                boolean inProject = false;
-
                 while (c != null) {
-                    Object value = c.getValue();
-                    if (value instanceof Toml.Array) {
-                        inArray = true;
-                    } else if (value instanceof Toml.KeyValue && inArray) {
-                        Toml.KeyValue kv = (Toml.KeyValue) value;
-                        if (kv.getKey() instanceof Toml.Identifier &&
-                                "dependencies".equals(((Toml.Identifier) kv.getKey()).getName())) {
-                            inDependencies = true;
-                        }
-                    } else if (value instanceof Toml.Table && inDependencies) {
-                        Toml.Table table = (Toml.Table) value;
-                        if (table.getName() != null && "project".equals(table.getName().getName())) {
-                            inProject = true;
-                            break;
-                        }
+                    if (c.getValue() instanceof Toml.Array) {
+                        return PyProjectHelper.isInsideDependencyArray(c, scope, groupName);
                     }
                     c = c.getParent();
                 }
-                return inProject;
+                return false;
             }
 
             private String buildNewSpec(String oldSpec, String depName) {

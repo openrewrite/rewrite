@@ -55,8 +55,9 @@ public class DependencyInsight extends Recipe {
 
     @Option(displayName = "Scope",
             description = "Match dependencies in the specified scope. All scopes are searched by default.",
-            valid = {"dependencies", "buildRequires", "optionalDependencies", "dependencyGroups"},
-            example = "dependencies",
+            valid = {"project.dependencies", "build-system.requires", "project.optional-dependencies", "dependency-groups",
+                    "tool.uv.constraint-dependencies", "tool.uv.override-dependencies", "tool.pdm.overrides"},
+            example = "project.dependencies",
             required = false)
     @Nullable
     String scope;
@@ -82,8 +83,10 @@ public class DependencyInsight extends Recipe {
     public Validated<Object> validate() {
         Validated<Object> v = super.validate();
         if (scope != null) {
-            Set<String> validScopes = new HashSet<>(asList("dependencies", "buildRequires",
-                    "optionalDependencies", "dependencyGroups"));
+            Set<String> validScopes = new HashSet<>(asList("project.dependencies", "build-system.requires",
+                    "project.optional-dependencies", "dependency-groups",
+                    "tool.uv.constraint-dependencies", "tool.uv.override-dependencies",
+                    "tool.pdm.overrides"));
             v = v.and(Validated.test("scope", "scope is a valid Python dependency scope", scope, validScopes::contains));
         }
         return v;
@@ -227,21 +230,28 @@ public class DependencyInsight extends Recipe {
                 }
 
                 // Collect declared dependencies by scope
-                if (scope == null || "dependencies".equals(scope)) {
-                    collectFromDeclared(resolution.getDependencies(), "dependencies", matcher);
+                if (scope == null || "project.dependencies".equals(scope)) {
+                    collectFromDeclared(resolution.getDependencies(), "project.dependencies", matcher);
                 }
-                if (scope == null || "buildRequires".equals(scope)) {
-                    collectFromDeclared(resolution.getBuildRequires(), "buildRequires", matcher);
+                if (scope == null || "build-system.requires".equals(scope)) {
+                    collectFromDeclared(resolution.getBuildRequires(), "build-system.requires", matcher);
                 }
-                if (scope == null || "optionalDependencies".equals(scope)) {
+                if (scope == null || "project.optional-dependencies".equals(scope)) {
                     for (Map.Entry<String, List<Dependency>> entry : resolution.getOptionalDependencies().entrySet()) {
-                        collectFromDeclared(entry.getValue(), "optionalDependencies/" + entry.getKey(), matcher);
+                        collectFromDeclared(entry.getValue(), "project.optional-dependencies/" + entry.getKey(), matcher);
                     }
                 }
-                if (scope == null || "dependencyGroups".equals(scope)) {
+                if (scope == null || "dependency-groups".equals(scope)) {
                     for (Map.Entry<String, List<Dependency>> entry : resolution.getDependencyGroups().entrySet()) {
-                        collectFromDeclared(entry.getValue(), "dependencyGroups/" + entry.getKey(), matcher);
+                        collectFromDeclared(entry.getValue(), "dependency-groups/" + entry.getKey(), matcher);
                     }
+                }
+                if (scope == null || "tool.uv.constraint-dependencies".equals(scope)) {
+                    collectFromDeclared(resolution.getConstraintDependencies(), "tool.uv.constraint-dependencies", matcher);
+                }
+                if (scope == null || "tool.uv.override-dependencies".equals(scope) || "tool.pdm.overrides".equals(scope)) {
+                    String scopeName = "tool.pdm.overrides".equals(scope) ? "tool.pdm.overrides" : "tool.uv.override-dependencies";
+                    collectFromDeclared(resolution.getOverrideDependencies(), scopeName, matcher);
                 }
             }
 
