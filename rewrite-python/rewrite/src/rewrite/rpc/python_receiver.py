@@ -18,15 +18,12 @@ Python RPC Receiver that mirrors Java's PythonReceiver structure.
 This uses the visitor pattern with pre_visit handling common fields (id, prefix, markers)
 and type-specific visit methods handling only additional fields.
 """
+from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, TypeVar, List
-from uuid import UUID
+from typing import Any, Callable, Optional, Type, TypeVar
 
-from rewrite import Markers
-from rewrite.utils import replace_if_changed
 from rewrite.java import Space, JRightPadded, JLeftPadded, JContainer, J
 from rewrite.python import CompilationUnit
-from rewrite.python.support_types import Py
 from rewrite.python.tree import (
     Async, Await, Binary, ChainedAssignment, ExceptionType,
     LiteralType, TypeHint, ExpressionStatement, ExpressionTypeTree,
@@ -36,8 +33,20 @@ from rewrite.python.tree import (
     Star, NamedArgument, TypeHintedExpression, ErrorFrom, MatchCase, Slice
 )
 from rewrite.rpc.receive_queue import RpcReceiveQueue
+from rewrite.utils import replace_if_changed
 
 T = TypeVar('T')
+E = TypeVar('E', bound=Enum)
+
+
+def _to_enum(enum_class: Type[E]) -> Callable[[Any], E]:
+    """Create a mapping function that converts string values to enum members.
+
+    Similar to Java's toEnum(EnumClass.class) used in RPC deserialization.
+    """
+    def mapper(value: Any) -> E:
+        return enum_class[value] if isinstance(value, str) else value
+    return mapper
 
 
 class PythonRpcReceiver:
@@ -204,7 +213,7 @@ class PythonRpcReceiver:
 
     def _visit_binary(self, binary: Binary, q: RpcReceiveQueue) -> Binary:
         left = q.receive(binary.left)
-        operator = q.receive(binary.padding.operator)
+        operator = q.receive(binary.padding.operator, lambda lp: self._receive_left_padded(lp, q, _to_enum(Binary.Type)))
         negation = q.receive(binary.negation)
         right = q.receive(binary.right)
         type_ = q.receive(binary.type)
@@ -262,7 +271,7 @@ class PythonRpcReceiver:
         return replace_if_changed(dl, elements=elements, type=type_)
 
     def _visit_collection_literal(self, cl: CollectionLiteral, q: RpcReceiveQueue) -> CollectionLiteral:
-        kind = q.receive(cl.kind)
+        kind = _to_enum(CollectionLiteral.Kind)(q.receive(cl.kind))
         elements = q.receive(cl.padding.elements)
         type_ = q.receive(cl.type)
         return replace_if_changed(cl, kind=kind, elements=elements, type=type_)
@@ -276,7 +285,7 @@ class PythonRpcReceiver:
     def _visit_formatted_string_value(self, v: FormattedString.Value, q: RpcReceiveQueue) -> FormattedString.Value:
         expression = q.receive(v.padding.expression)
         debug = q.receive(v.padding.debug)
-        conversion = q.receive(v.conversion)
+        conversion = _to_enum(FormattedString.Value.Conversion)(q.receive(v.conversion))
         format_ = q.receive(v.format)
         return replace_if_changed(v, expression=expression, debug=debug, conversion=conversion, format=format_)
 
@@ -290,7 +299,7 @@ class PythonRpcReceiver:
         return replace_if_changed(tew, statement=statement, else_block=else_block)
 
     def _visit_comprehension_expression(self, ce: ComprehensionExpression, q: RpcReceiveQueue) -> ComprehensionExpression:
-        kind = q.receive(ce.kind)
+        kind = _to_enum(ComprehensionExpression.Kind)(q.receive(ce.kind))
         result = q.receive(ce.result)
         clauses = q.receive_list(ce.clauses)
         suffix = q.receive(ce.suffix)
@@ -325,7 +334,7 @@ class PythonRpcReceiver:
         return replace_if_changed(ut, types=types, type=type_)
 
     def _visit_variable_scope(self, vs: VariableScope, q: RpcReceiveQueue) -> VariableScope:
-        kind = q.receive(vs.kind)
+        kind = _to_enum(VariableScope.Kind)(q.receive(vs.kind))
         names = q.receive_list(vs.padding.names)
         return replace_if_changed(vs, kind=kind, names=names)
 
@@ -334,13 +343,13 @@ class PythonRpcReceiver:
         return replace_if_changed(del_, targets=targets)
 
     def _visit_special_parameter(self, sp: SpecialParameter, q: RpcReceiveQueue) -> SpecialParameter:
-        kind = q.receive(sp.kind)
+        kind = _to_enum(SpecialParameter.Kind)(q.receive(sp.kind))
         type_hint = q.receive(sp.type_hint)
         type_ = q.receive(sp.type)
         return replace_if_changed(sp, kind=kind, type_hint=type_hint, type=type_)
 
     def _visit_star(self, star: Star, q: RpcReceiveQueue) -> Star:
-        kind = q.receive(star.kind)
+        kind = _to_enum(Star.Kind)(q.receive(star.kind))
         expression = q.receive(star.expression)
         type_ = q.receive(star.type)
         return replace_if_changed(star, kind=kind, expression=expression, type=type_)
@@ -370,7 +379,7 @@ class PythonRpcReceiver:
         return replace_if_changed(mc, pattern=pattern, guard=guard, type=type_)
 
     def _visit_match_case_pattern(self, p: MatchCase.Pattern, q: RpcReceiveQueue) -> MatchCase.Pattern:
-        kind = q.receive(p.kind)
+        kind = _to_enum(MatchCase.Pattern.Kind)(q.receive(p.kind))
         children = q.receive(p.padding.children)
         type_ = q.receive(p.type)
         return replace_if_changed(p, kind=kind, children=children, type=type_)
@@ -533,14 +542,16 @@ class PythonRpcReceiver:
         return replace_if_changed(block, static=static, statements=statements, end=end)
 
     def _visit_j_unary(self, unary, q: RpcReceiveQueue):
-        operator = q.receive(unary.padding.operator)
+        from rewrite.java.tree import Unary
+        operator = q.receive(unary.padding.operator, lambda lp: self._receive_left_padded(lp, q, _to_enum(Unary.Type)))
         expression = q.receive(unary.expression)
         type_ = q.receive(unary.type)
         return replace_if_changed(unary, operator=operator, expression=expression, type=type_)
 
     def _visit_j_binary(self, binary, q: RpcReceiveQueue):
+        from rewrite.java.tree import Binary as JBinary
         left = q.receive(binary.left)
-        operator = q.receive(binary.padding.operator)
+        operator = q.receive(binary.padding.operator, lambda lp: self._receive_left_padded(lp, q, _to_enum(JBinary.Type)))
         right = q.receive(binary.right)
         type_ = q.receive(binary.type)
         return replace_if_changed(binary, left=left, operator=operator, right=right, type=type_)
@@ -552,8 +563,9 @@ class PythonRpcReceiver:
         return replace_if_changed(assign, variable=variable, assignment=assignment, type=type_)
 
     def _visit_j_assignment_operation(self, assign, q: RpcReceiveQueue):
+        from rewrite.java.tree import AssignmentOperation
         variable = q.receive(assign.variable)
-        operator = q.receive(assign.padding.operator)
+        operator = q.receive(assign.padding.operator, lambda lp: self._receive_left_padded(lp, q, _to_enum(AssignmentOperation.Type)))
         assignment = q.receive(assign.assignment)
         type_ = q.receive(assign.type)
         return replace_if_changed(assign, variable=variable, operator=operator, assignment=assignment, type=type_)
@@ -702,9 +714,10 @@ class PythonRpcReceiver:
                                   permits=permits, body=body)
 
     def _visit_j_class_declaration_kind(self, kind, q: RpcReceiveQueue):
+        from rewrite.java.tree import ClassDeclaration
         # Note: _pre_visit is already called by _visit before this method
         annotations = q.receive_list(kind.annotations)
-        type_ = q.receive(kind.type)  # Enum type
+        type_ = _to_enum(ClassDeclaration.Kind.Type)(q.receive(kind.type))
         return replace_if_changed(kind, annotations=annotations, type=type_)
 
     def _visit_j_method_declaration(self, method, q: RpcReceiveQueue):
@@ -741,7 +754,8 @@ class PythonRpcReceiver:
         return replace_if_changed(switch, selector=selector, cases=cases)
 
     def _visit_j_case(self, case, q: RpcReceiveQueue):
-        type_ = q.receive(case.type)  # Enum type
+        from rewrite.java.tree import Case
+        type_ = _to_enum(Case.Type)(q.receive(case.type))
         case_labels = q.receive(case.padding.case_labels)
         statements = q.receive(case.padding.statements)
         body = q.receive(case.padding.body, lambda rp: self._receive_right_padded(rp, q) if rp else None)
@@ -785,8 +799,9 @@ class PythonRpcReceiver:
         return replace_if_changed(parens, tree=tree)
 
     def _visit_j_modifier(self, mod, q: RpcReceiveQueue):
+        from rewrite.java.tree import Modifier
         keyword = q.receive(mod.keyword)
-        type_ = q.receive(mod.type)  # Enum type
+        type_ = _to_enum(Modifier.Type)(q.receive(mod.type))
         annotations = q.receive_list(mod.annotations)
         return replace_if_changed(mod, keyword=keyword, type=type_, annotations=annotations)
 
@@ -869,7 +884,7 @@ class PythonRpcReceiver:
 
         return JRightPadded(element, after, markers)
 
-    def _receive_left_padded(self, lp: JLeftPadded, q: RpcReceiveQueue) -> Optional[JLeftPadded]:
+    def _receive_left_padded(self, lp: JLeftPadded, q: RpcReceiveQueue, element_mapping: Optional[Callable[[Any], Any]] = None) -> Optional[JLeftPadded]:
         """Receive a JLeftPadded wrapper."""
         if lp is None:
             return None
@@ -877,6 +892,8 @@ class PythonRpcReceiver:
         # Codec registry handles type dispatch automatically
         before = q.receive_defined(lp.before)
         element = q.receive(lp.element)
+        if element_mapping is not None:
+            element = element_mapping(element)
         markers = q.receive_markers(lp.markers)
 
         if before is lp.before and element is lp.element and markers is lp.markers:
@@ -966,7 +983,7 @@ class PythonRpcReceiver:
             # Class: flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype,
             #        owningClass, annotations, interfaces, members, methods
             flags = q.receive_defined(getattr(java_type, '_flags_bit_map', 0))
-            kind = q.receive(getattr(java_type, '_kind', JT.FullyQualified.Kind.Class))
+            kind = _to_enum(JT.FullyQualified.Kind)(q.receive(getattr(java_type, '_kind', JT.FullyQualified.Kind.Class)))
             fqn = q.receive_defined(getattr(java_type, '_fully_qualified_name', ''))
             type_params = q.receive_list(getattr(java_type, '_type_parameters', None) or [],
                                           lambda t: self._receive_type(t, q))
@@ -1279,7 +1296,7 @@ def _receive_java_type_class(cls, q: RpcReceiveQueue):
     # flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype,
     # owningClass, annotations, interfaces, members, methods
     flags = q.receive_defined(getattr(cls, '_flags_bit_map', 0) if cls else 0)
-    kind = q.receive(getattr(cls, '_kind', JT.FullyQualified.Kind.Class) if cls else JT.FullyQualified.Kind.Class)
+    kind = _to_enum(JT.FullyQualified.Kind)(q.receive(getattr(cls, '_kind', JT.FullyQualified.Kind.Class) if cls else JT.FullyQualified.Kind.Class))
     fqn = q.receive_defined(getattr(cls, '_fully_qualified_name', '') if cls else '')
     type_params = q.receive_list(getattr(cls, '_type_parameters', None) if cls else None)
     supertype = q.receive(getattr(cls, '_supertype', None) if cls else None)
@@ -1308,8 +1325,7 @@ def _receive_java_type_class(cls, q: RpcReceiveQueue):
 def _register_java_type_codecs():
     """Register codecs for JavaType classes."""
     from rewrite.java.support_types import JavaType as JT
-    from rewrite.rpc.receive_queue import register_codec_with_both_names, register_receive_codec, register_send_codec
-    from rewrite.rpc.send_queue import RpcSendQueue
+    from rewrite.rpc.receive_queue import register_codec_with_both_names
 
     # JavaType.Primitive - special handling to consume keyword
     register_codec_with_both_names(
@@ -1572,7 +1588,7 @@ def _register_python_marker_codecs():
     # Quoted - has id and style (enum)
     def _receive_quoted(marker: Quoted, q: RpcReceiveQueue) -> Quoted:
         new_id = q.receive_defined(marker.id)
-        new_style = q.receive_defined(marker.style)
+        new_style = _to_enum(Quoted.Style)(q.receive_defined(marker.style))
         if new_id is marker.id and new_style is marker.style:
             return marker
         result = marker

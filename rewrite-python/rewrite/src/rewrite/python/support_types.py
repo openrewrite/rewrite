@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import replace, dataclass
-from enum import Enum
 from typing import TypeVar, Any, Optional, TYPE_CHECKING
 
 from rewrite import TreeVisitor, Markers
