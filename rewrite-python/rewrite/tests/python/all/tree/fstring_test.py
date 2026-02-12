@@ -85,7 +85,6 @@ def test_concat_fstring_6():
            ))
 
 
-@pytest.mark.xfail(reason="F-strings with nested f-string literal concatenations are not yet supported", strict=True)
 def test_concat_fstring_7():
     # language=python
     RecipeSpec().rewrite_run(python("""
@@ -247,3 +246,20 @@ def test_nested_fstring_with_format_value():
 def test_adjoining_expressions():
     # language=python
     RecipeSpec().rewrite_run(python("""a = f'{1}{0}'"""))
+
+
+def test_nested_fstring_in_expression():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """
+        name = "Alice"
+        score = 87
+        max_score = 100
+
+        percentage = (score / max_score) * 100
+
+        message = f"{name} scored {score}/{max_score}, which is {f'{percentage:.1f}'}% of the total."
+
+        print(message)
+        """
+    ))
