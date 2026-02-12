@@ -27,6 +27,15 @@ FSTRING_START = getattr(token, 'FSTRING_START', -2)
 FSTRING_MIDDLE = getattr(token, 'FSTRING_MIDDLE', -3)
 FSTRING_END = getattr(token, 'FSTRING_END', -4)
 
+# T-string token types (Python 3.14+) - define fallbacks for older versions
+TSTRING_START = getattr(token, 'TSTRING_START', -5)
+TSTRING_MIDDLE = getattr(token, 'TSTRING_MIDDLE', -6)
+TSTRING_END = getattr(token, 'TSTRING_END', -7)
+
+# AST types for t-strings (Python 3.14+); sentinels on older versions
+_TemplateStr = getattr(ast, 'TemplateStr', type('_TemplateStr', (), {}))
+_Interpolation = getattr(ast, 'Interpolation', type('_Interpolation', (), {}))
+
 # Token types to skip when looking for significant (non-whitespace) tokens
 _SKIP_TOKEN_TYPES = (token.NL, token.NEWLINE, token.INDENT, token.DEDENT,
                      token.COMMENT, token.ENCODING, token.ENDMARKER, WHITESPACE_TOKEN)
@@ -118,7 +127,7 @@ class ParserVisitor(ast.NodeVisitor):
         row = 1       # current row (1-based like tokenize)
         col = 0       # current column (0-based like tokenize)
         in_from_import = False  # track if we're between 'from' and 'import' keywords
-        fstring_depth = 0  # track nested f-string depth
+        formatted_string_depth = 0  # track nested f-string/t-string depth
 
         for tok in raw_tokens:
             # ENCODING token is virtual (doesn't consume source text)
@@ -151,7 +160,7 @@ class ParserVisitor(ast.NodeVisitor):
             if tok_start > prev_end:
                 ws_text = self._source[prev_end:tok_start]
                 # Skip single-character brace gaps inside f-strings (escaped {{ or }})
-                is_escaped_brace = fstring_depth > 0 and ws_text in ('{', '}')
+                is_escaped_brace = formatted_string_depth > 0 and ws_text in ('{', '}')
                 if not is_escaped_brace:
                     ws_tok = TokenInfo(
                         WHITESPACE_TOKEN,
@@ -162,11 +171,11 @@ class ParserVisitor(ast.NodeVisitor):
                     )
                     result.append(ws_tok)
 
-            # Track f-string depth for whitespace injection.
-            if tok.type == FSTRING_START:
-                fstring_depth += 1
-            elif tok.type == FSTRING_END:
-                fstring_depth -= 1
+            # Track f-string/t-string depth for whitespace injection.
+            if tok.type in (FSTRING_START, TSTRING_START):
+                formatted_string_depth += 1
+            elif tok.type in (FSTRING_END, TSTRING_END):
+                formatted_string_depth -= 1
 
             # Track paren pairs
             if tok.type == token.OP:
@@ -2357,7 +2366,77 @@ class ParserVisitor(ast.NodeVisitor):
 
         return res
 
+    def visit_TemplateStr(self, node):
+        leading_prefix = self.__whitespace()
+
+        tok = self._skip_whitespace_tokens()
+        while tok.type not in (TSTRING_START, token.STRING):
+            tok = self._advance_token()
+
+        value_idx = 0
+        res = None
+        is_first = True
+        # Loop while we have STRING or TSTRING_START tokens to process
+        while True:
+            if is_first:
+                prefix = leading_prefix
+                tok = self._skip_whitespace_tokens()
+            else:
+                # Peek at next token to check for string concatenation
+                save_idx = self._token_idx
+                saw_statement_end = False
+                while self._token_idx < len(self._tokens):
+                    peek_tok = self._tokens[self._token_idx]
+                    if peek_tok.type == token.NEWLINE:
+                        saw_statement_end = True
+                        self._token_idx += 1
+                    elif peek_tok.type in (token.NL, token.INDENT, token.DEDENT, token.COMMENT,
+                                           token.ENCODING, token.ENDMARKER, WHITESPACE_TOKEN):
+                        self._token_idx += 1
+                    else:
+                        break
+                if saw_statement_end or peek_tok.type not in (token.STRING, TSTRING_START):
+                    self._token_idx = save_idx
+                    break
+                self._token_idx = save_idx
+                prefix = self.__whitespace()
+                tok = self._skip_whitespace_tokens()
+
+            if tok.type == token.STRING:
+                ast_value = node.values[value_idx] if value_idx < len(node.values) else ast.Constant(value=ast.literal_eval(tok.string))
+                current, tok = self.__map_literal(ast_value, tok)
+                current = current.replace(prefix=prefix)
+                if value_idx < len(node.values) and isinstance(node.values[value_idx], ast.Constant):
+                    expected_value = cast(ast.Constant, node.values[value_idx]).value
+                    if isinstance(expected_value, str) and current.value == expected_value:
+                        value_idx += 1
+            elif tok.type == TSTRING_START:
+                current, tok, value_idx = self.__map_fstring(node, prefix, tok, value_idx)
+            else:
+                break
+
+            if res is None:
+                res = current
+            else:
+                res = py.Binary(
+                    random_id(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    res,
+                    self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
+                    None,
+                    current,
+                    self._type_mapping.type(node)
+                )
+
+            is_first = False
+
+        return res
+
     def visit_FormattedValue(self, node):
+        raise ValueError("This method should not be called directly")
+
+    def visit_Interpolation(self, node):
         raise ValueError("This method should not be called directly")
 
     def visit_Lambda(self, node):
@@ -3175,13 +3254,23 @@ class ParserVisitor(ast.NodeVisitor):
             raise ValueError(f"Unsupported operator: {op}")
         return self.__pad_left(self.__source_before(op_str), op)
 
-    def __map_fstring(self, node: ast.JoinedStr, prefix: Space, tok: TokenInfo, value_idx: int = 0) -> \
+    def __map_fstring(self, node, prefix: Space, tok: TokenInfo, value_idx: int = 0, *,
+                      _start=None, _middle=None, _end=None) -> \
             Tuple[J, TokenInfo, int]:
-        """Map an f-string to a FormattedString AST node.
+        """Map an f-string or t-string to a FormattedString AST node.
 
         Uses _token_idx directly to iterate through tokens.
+        Token type parameters (_start/_middle/_end) are auto-detected from the
+        current token when not provided, allowing this method to handle both
+        f-strings and t-strings.
         """
-        if tok.type != FSTRING_START:
+        if _start is None:
+            if tok.type == TSTRING_START:
+                _start, _middle, _end = TSTRING_START, TSTRING_MIDDLE, TSTRING_END
+            else:
+                _start, _middle, _end = FSTRING_START, FSTRING_MIDDLE, FSTRING_END
+
+        if tok.type != _start:
             if len(node.values) == 1 and isinstance(node.values[0], ast.Constant):
                 # format specifiers are stored as f-strings in the AST; e.g. `f'{1:n}'`
                 format_val = node.values[0].value
@@ -3204,13 +3293,13 @@ class ParserVisitor(ast.NodeVisitor):
             consume_end_delim = False
         else:
             delimiter = tok.string
-            tok = self._advance_token()  # consume FSTRING_START, get next
+            tok = self._advance_token()  # consume start token, get next
             consume_end_delim = True
 
-        # tokenizer tokens: FSTRING_START, FSTRING_MIDDLE, OP, ..., OP, FSTRING_MIDDLE, FSTRING_END
+        # tokenizer tokens: START, MIDDLE, OP, ..., OP, MIDDLE, END
         parts = []
         prev_token_idx = -1
-        while tok.type != FSTRING_END and value_idx < len(node.values):
+        while tok.type != _end and value_idx < len(node.values):
             # Safety check: ensure loop is making progress
             if self._token_idx == prev_token_idx:
                 raise RuntimeError(
@@ -3226,11 +3315,11 @@ class ParserVisitor(ast.NodeVisitor):
                 continue
 
             value = node.values[value_idx]
-            if tok.type == FSTRING_MIDDLE:
-                # Accumulate text from consecutive FSTRING_MIDDLE tokens
+            if tok.type == _middle:
+                # Accumulate text from consecutive MIDDLE tokens
                 s = tok.string
-                tok = self._advance_token()  # consume first FSTRING_MIDDLE, get next
-                while tok.type == FSTRING_MIDDLE:
+                tok = self._advance_token()  # consume first MIDDLE, get next
+                while tok.type == _middle:
                     s += tok.string
                     tok = self._advance_token()  # consume and get next
                 # For value_source, escape braces so the printer outputs them correctly
@@ -3252,23 +3341,24 @@ class ParserVisitor(ast.NodeVisitor):
                     value_idx += 1
             elif tok.type == token.OP and tok.string == '{':
                 tok = self._advance_token()  # consume '{', get next
-                if not isinstance(value, ast.FormattedValue):
+                if not isinstance(value, (ast.FormattedValue, _Interpolation)):
                     # this is the case when using the `=` "debug specifier"
                     value_idx += 1
                     value = node.values[value_idx]
 
-                if isinstance(cast(ast.FormattedValue, value).value, ast.JoinedStr):
-                    joined = cast(ast.JoinedStr, cast(ast.FormattedValue, value).value)
+                value_inner = value.value if isinstance(value, (ast.FormattedValue, _Interpolation)) else None
+                if isinstance(value_inner, (ast.JoinedStr, _TemplateStr)):
+                    joined = value_inner
                     nested, tok, inner_vi = self.__map_fstring(joined, Space.EMPTY, tok)
 
                     # Handle concatenated f-strings/strings within this expression
                     while True:
                         peek_tok, _ = self._peek_significant_token()
-                        if peek_tok.type not in (FSTRING_START, token.STRING):
+                        if peek_tok.type not in (FSTRING_START, TSTRING_START, token.STRING):
                             break
                         concat_prefix = self.__whitespace()
                         tok = self._tokens[self._token_idx]
-                        if tok.type == FSTRING_START:
+                        if tok.type in (FSTRING_START, TSTRING_START):
                             right, tok, inner_vi = self.__map_fstring(joined, concat_prefix, tok, inner_vi)
                         else:
                             ast_val = (joined.values[inner_vi]
@@ -3287,18 +3377,18 @@ class ParserVisitor(ast.NodeVisitor):
                     expr = self.__pad_right(nested, Space.EMPTY)
                 else:
                     expr = self.__pad_right(
-                        self.__convert(cast(ast.FormattedValue, value).value),
+                        self.__convert(value_inner),
                         self.__whitespace()
                     )
 
                 # Scan for specifiers (debug, conversion, format) - applies to both nested f-string and regular expressions
-                while self._token_idx < len(self._tokens) and self._tokens[self._token_idx].type not in (FSTRING_END, FSTRING_MIDDLE):
+                while self._token_idx < len(self._tokens) and self._tokens[self._token_idx].type not in (_end, _middle):
                     tok = self._next_token()  # get current and advance (we need to examine current token)
                     if tok.type == token.OP and tok.string in ('!'):
                         break
                     la_tok = self._tokens[self._token_idx]
                     if tok.type == token.OP and tok.string == '}' and (
-                            la_tok.type in (FSTRING_END, FSTRING_MIDDLE) or (
+                            la_tok.type in (_end, _middle) or (
                             la_tok.type == token.OP and la_tok.string == '{')):
                         break
                     # Debug specifier '=' - break regardless of what follows (whitespace is valid after '=')
@@ -3333,7 +3423,8 @@ class ParserVisitor(ast.NodeVisitor):
                     if conv is not None:
                         self._token_idx += 1  # advance past ':' (only needed after conversion)
                     format_spec, tok, _ = self.__map_fstring(
-                        cast(ast.JoinedStr, cast(ast.FormattedValue, value).format_spec), Space.EMPTY, self._tokens[self._token_idx])
+                        cast(ast.JoinedStr, value.format_spec), Space.EMPTY, self._tokens[self._token_idx],
+                        _start=_start, _middle=_middle, _end=_end)
                 else:
                     format_spec = None
 
@@ -3352,13 +3443,13 @@ class ParserVisitor(ast.NodeVisitor):
                 if (format_spec is not None or conv is not None or debug is not None) and self._tokens[self._token_idx].string == '}':
                     self._token_idx += 1
                 tok = self._tokens[self._token_idx]
-            elif tok.type == FSTRING_END:
+            elif tok.type == _end:
                 raise NotImplementedError("Unsupported: String concatenation with f-strings")
 
         if consume_end_delim:
-            tok = self._advance_token()  # consume FSTRING_END, get next
-        elif tok.type == FSTRING_MIDDLE and len(tok.string) == 0:
-            tok = self._advance_token()  # consume empty FSTRING_MIDDLE, get next
+            tok = self._advance_token()  # consume end token, get next
+        elif tok.type == _middle and len(tok.string) == 0:
+            tok = self._advance_token()  # consume empty MIDDLE token, get next
 
         return (py.FormattedString(
             random_id(),

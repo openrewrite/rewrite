@@ -5,4 +5,4 @@ import sys
 # so test files must be excluded from collection entirely.
 collect_ignore = []
 if sys.version_info < (3, 14):
-    collect_ignore = ["test_tstring_template.py"]
+    collect_ignore = ["test_tstring_template.py", "test_tstring_parsing.py"]
