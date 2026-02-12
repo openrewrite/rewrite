@@ -26,6 +26,13 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             CsLambda csl => VisitCsLambda(csl, p),
             IsPattern ip => VisitIsPattern(ip, p),
             StatementExpression se => VisitStatementExpression(se, p),
+            SizeOf sof => VisitSizeOf(sof, p),
+            UnsafeStatement us => VisitUnsafeStatement(us, p),
+            FixedStatement fs => VisitFixedStatement(fs, p),
+            PointerType pt => VisitPointerType(pt, p),
+            DefaultExpression de2 => VisitDefaultExpression(de2, p),
+            ExternAlias ea => VisitExternAlias(ea, p),
+            InitializerExpression ie => VisitInitializerExpression(ie, p),
             RelationalPattern rp => VisitRelationalPattern(rp, p),
             PropertyPattern pp => VisitPropertyPattern(pp, p),
             TypeParameterBound tpb => VisitTypeParameterBound(tpb, p),
@@ -49,6 +56,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             ErrorDirective ed => VisitErrorDirective(ed, p),
             WarningDirective wd => VisitWarningDirective(wd, p),
             LineDirective ld => VisitLineDirective(ld, p),
+            NullSafeExpression nse => VisitNullSafeExpression(nse, p),
             _ => throw new InvalidOperationException($"Unknown Cs tree type: {tree.GetType().Name}")
         };
     }
@@ -166,6 +174,64 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             return se with { Statement = s };
         }
         return se;
+    }
+
+    public virtual J VisitSizeOf(SizeOf sizeOf, P p)
+    {
+        Visit(sizeOf.Expression, p);
+        return sizeOf;
+    }
+
+    public virtual J VisitUnsafeStatement(UnsafeStatement unsafeStatement, P p)
+    {
+        Visit(unsafeStatement.Block, p);
+        return unsafeStatement;
+    }
+
+    public virtual J VisitPointerType(PointerType pointerType, P p)
+    {
+        Visit(pointerType.ElementType.Element, p);
+        return pointerType;
+    }
+
+    public virtual J VisitFixedStatement(FixedStatement fixedStatement, P p)
+    {
+        Visit(fixedStatement.Declarations, p);
+        Visit(fixedStatement.Block, p);
+        return fixedStatement;
+    }
+
+    public virtual J VisitExternAlias(ExternAlias externAlias, P p)
+    {
+        Visit(externAlias.Identifier.Element, p);
+        return externAlias;
+    }
+
+    public virtual J VisitInitializerExpression(InitializerExpression initializerExpression, P p)
+    {
+        foreach (var expr in initializerExpression.Expressions.Elements)
+        {
+            Visit(expr.Element, p);
+        }
+        return initializerExpression;
+    }
+
+    public virtual J VisitNullSafeExpression(NullSafeExpression nullSafeExpression, P p)
+    {
+        Visit(nullSafeExpression.Expression, p);
+        return nullSafeExpression;
+    }
+
+    public virtual J VisitDefaultExpression(DefaultExpression defaultExpression, P p)
+    {
+        if (defaultExpression.TypeOperator != null)
+        {
+            foreach (var paddedType in defaultExpression.TypeOperator.Elements)
+            {
+                Visit(paddedType.Element, p);
+            }
+        }
+        return defaultExpression;
     }
 
     public virtual J VisitCsLambda(CsLambda csLambda, P p)

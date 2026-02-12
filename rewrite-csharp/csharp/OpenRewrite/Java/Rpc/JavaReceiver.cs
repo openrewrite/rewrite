@@ -73,6 +73,9 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             MethodInvocation mi => VisitMethodInvocation(mi, q),
             NewClass nc => VisitNewClass(nc, q),
             NewArray na => VisitNewArray(na, q),
+            InstanceOf io => VisitInstanceOf(io, q),
+            NullableType nt => VisitNullableType(nt, q),
+            ParameterizedType pt => VisitParameterizedType(pt, q),
             ArrayType at => VisitArrayType(at, q),
             ArrayAccess aa => VisitArrayAccess(aa, q),
             ArrayDimension ad => VisitArrayDimension(ad, q),
@@ -82,6 +85,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             SwitchExpression se => VisitSwitchExpression(se, q),
             Case cs => VisitCase(cs, q),
             DeconstructionPattern dp => VisitDeconstructionPattern(dp, q),
+            Label lbl => VisitLabel(lbl, q),
             Synchronized sync => VisitSynchronized(sync, q),
             TypeCast tc => VisitTypeCast(tc, q),
             Package pkg => VisitPackage(pkg, q),
@@ -128,6 +132,42 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var index = q.Receive(arrayDimension.Index, rp => VisitRightPadded(rp, q));
         return arrayDimension with { Id = _pvId, Prefix = _pvPrefix, Markers = _pvMarkers,
             Index = index! };
+    }
+
+    public override J VisitLabel(Label label, RpcReceiveQueue q)
+    {
+        var labelName = q.Receive(label.LabelName, rp => VisitRightPadded(rp, q));
+        var statement = q.Receive(label.Statement, s => (Statement)VisitNonNull(s, q));
+        return label with { Id = _pvId, Prefix = _pvPrefix, Markers = _pvMarkers,
+            LabelName = labelName!, Statement = statement! };
+    }
+
+    public override J VisitInstanceOf(InstanceOf instanceOf, RpcReceiveQueue q)
+    {
+        var expression = q.Receive(instanceOf.Expression, rp => VisitRightPadded(rp, q));
+        var clazz = q.Receive(instanceOf.Clazz, el => (J)VisitNonNull(el, q));
+        var pattern = q.Receive(instanceOf.Pattern, el => (J)VisitNonNull(el, q));
+        var type = q.Receive(instanceOf.Type, t => VisitType(t, q)!);
+        var modifier = q.Receive(instanceOf.InstanceOfModifier, m => (Modifier)VisitNonNull(m, q));
+        return instanceOf with { Id = _pvId, Prefix = _pvPrefix, Markers = _pvMarkers,
+            Expression = expression!, Clazz = clazz!, Pattern = pattern, Type = type, InstanceOfModifier = modifier };
+    }
+
+    public override J VisitNullableType(NullableType nullableType, RpcReceiveQueue q)
+    {
+        var annotations = q.ReceiveList(nullableType.Annotations, a => (Annotation)VisitNonNull(a, q));
+        var typeTreePadded = q.Receive(nullableType.TypeTreePadded, t => VisitRightPadded(t, q));
+        return nullableType with { Id = _pvId, Prefix = _pvPrefix, Markers = _pvMarkers,
+            Annotations = annotations!, TypeTreePadded = typeTreePadded! };
+    }
+
+    public override J VisitParameterizedType(ParameterizedType type, RpcReceiveQueue q)
+    {
+        var clazz = q.Receive((J)type.Clazz, el => (J)VisitNonNull(el, q));
+        var typeParameters = q.Receive(type.TypeParameters, c => VisitContainer(c, q));
+        var javaType = q.Receive(type.Type, t => VisitType(t, q)!);
+        return type with { Id = _pvId, Prefix = _pvPrefix, Markers = _pvMarkers,
+            Clazz = (NameTree)clazz!, TypeParameters = typeParameters, Type = javaType };
     }
 
     public override J VisitArrayType(ArrayType arrayType, RpcReceiveQueue q)
@@ -437,11 +477,26 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     public J VisitModifier(Modifier modifier, RpcReceiveQueue q)
     {
         // Java model has a keyword string field; consume for protocol compatibility
-        q.Receive(GetModifierKeyword(modifier.Type));
+        var keyword = q.Receive(modifier.Keyword ?? GetModifierKeyword(modifier.Type));
         var modifierType = q.Receive(modifier.Type);
+        // Map LanguageExtension back to the correct C# modifier type using the keyword
+        string? storedKeyword = null;
+        if (modifierType == Modifier.ModifierType.LanguageExtension && keyword != null)
+        {
+            var mapped = MapKeywordToModifierType(keyword);
+            if (mapped != null)
+            {
+                modifierType = mapped.Value;
+            }
+            else
+            {
+                // Truly a language extension (e.g. "event") — store keyword for printing
+                storedKeyword = keyword;
+            }
+        }
         var annotations = q.ReceiveList(modifier.Annotations, a => (Annotation)VisitNonNull(a, q));
         return modifier with { Id = _pvId, Prefix = _pvPrefix, Markers = _pvMarkers,
-            Type = modifierType, Annotations = annotations! };
+            Type = modifierType, Annotations = annotations!, Keyword = storedKeyword };
     }
 
     public override J VisitNewArray(NewArray newArray, RpcReceiveQueue q)
@@ -827,5 +882,26 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         Modifier.ModifierType.In => "in",
         Modifier.ModifierType.LanguageExtension => "",
         _ => type.ToString().ToLowerInvariant()
+    };
+
+    /// <summary>
+    /// Maps a keyword string back to the correct C# modifier type.
+    /// Used when Java sends LanguageExtension for C#-specific modifiers.
+    /// </summary>
+    private static Modifier.ModifierType? MapKeywordToModifierType(string keyword) => keyword switch
+    {
+        "internal" => Modifier.ModifierType.Internal,
+        "override" => Modifier.ModifierType.Override,
+        "virtual" => Modifier.ModifierType.Virtual,
+        "readonly" => Modifier.ModifierType.Readonly,
+        "const" => Modifier.ModifierType.Const,
+        "new" => Modifier.ModifierType.New,
+        "extern" => Modifier.ModifierType.Extern,
+        "unsafe" => Modifier.ModifierType.Unsafe,
+        "partial" => Modifier.ModifierType.Partial,
+        "ref" => Modifier.ModifierType.Ref,
+        "out" => Modifier.ModifierType.Out,
+        "in" => Modifier.ModifierType.In,
+        _ => null
     };
 }

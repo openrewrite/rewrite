@@ -132,6 +132,9 @@ class CSharpRpcTest {
         // Verify print roundtrip - the printed output should match the input
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
+
+        // Verify no unparsed code hiding in spaces
+
     }
 
     @Test
@@ -166,6 +169,7 @@ class CSharpRpcTest {
         // Verify print roundtrip
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
+
     }
 
     @Test
@@ -215,6 +219,7 @@ class CSharpRpcTest {
         // Verify print roundtrip
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
+
     }
 
     @Test
@@ -292,6 +297,7 @@ class CSharpRpcTest {
         // Verify print roundtrip
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
+
     }
 
     @Test
@@ -331,6 +337,7 @@ class CSharpRpcTest {
         // Verify print roundtrip
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
+
     }
 
     @Test
@@ -375,6 +382,7 @@ class CSharpRpcTest {
         // Verify print roundtrip
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
+
     }
 
     @Test
@@ -406,6 +414,7 @@ class CSharpRpcTest {
         // Verify print roundtrip
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
+
     }
 
     @Test
@@ -439,6 +448,7 @@ class CSharpRpcTest {
 
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
+
     }
 
     @Test
@@ -472,6 +482,7 @@ class CSharpRpcTest {
 
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
+
     }
 
     @Test
@@ -501,6 +512,7 @@ class CSharpRpcTest {
 
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
+
     }
 
     @Test
@@ -533,6 +545,7 @@ class CSharpRpcTest {
 
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
+
     }
 
     @Test
@@ -567,6 +580,7 @@ class CSharpRpcTest {
 
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
+
     }
 
     @Test
@@ -601,6 +615,147 @@ class CSharpRpcTest {
 
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
+
+    }
+
+    @Test
+    void parseClassWithFields(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class Person
+                    {
+                        private readonly string _name;
+                        public static int Count = 0;
+                        private readonly List<string> _items = new();
+                        private const int MaxItems = 100;
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Person.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+
+    }
+
+    @Test
+    void parseClassWithConstructor(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class Animal
+                    {
+                        private readonly string _name;
+
+                        public Animal(string name)
+                        {
+                            _name = name;
+                        }
+
+                        public string GetName()
+                        {
+                            return _name;
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Animal.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+
+    }
+
+    @Test
+    void parseConstructorWithInitializer(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class Base
+                    {
+                        public Base(int x)
+                        {
+                        }
+                    }
+
+                    public class Derived : Base
+                    {
+                        public Derived(int x) : base(x)
+                        {
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Derived.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+
+    }
+
+    @Test
+    void parseExpressionBodiedConstructor(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class Point
+                    {
+                        private int _x;
+
+                        public Point(int x) => _x = x;
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Point.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+
     }
 
     @Test
@@ -657,6 +812,7 @@ class CSharpRpcTest {
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
 
+
         // Navigate the tree: CompilationUnit -> namespace -> class -> methods
         Cs.CompilationUnit cu = (Cs.CompilationUnit) parsed;
         assertThat(cu.getMembers()).isNotEmpty();
@@ -697,6 +853,494 @@ class CSharpRpcTest {
         assertThat(greetMethod.getMethodType().getName()).isEqualTo("Greet");
         assertThat(greetMethod.getMethodType().getReturnType()).isInstanceOf(JavaType.Primitive.class);
         assertThat(((JavaType.Primitive) greetMethod.getMethodType().getReturnType()).getKeyword()).isEqualTo("String");
+    }
+
+    @Test
+    void parseBaseExpression(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class Animal
+                    {
+                        public virtual string Name { get; set; }
+                    }
+
+                    public class Dog : Animal
+                    {
+                        public void Speak()
+                        {
+                            var name = base.Name;
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Dog.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseGenericTypes(@TempDir Path tempDir) throws IOException {
+        String source = """
+                using System.Collections.Generic;
+
+                namespace Models
+                {
+                    public class Container
+                    {
+                        private List<string> _items = new List<string>();
+                        private Dictionary<string, int> _counts = new Dictionary<string, int>();
+
+                        public List<string> GetItems()
+                        {
+                            return _items;
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Container.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseEventFieldDeclaration(@TempDir Path tempDir) throws IOException {
+        String source = """
+                using System;
+
+                namespace Models
+                {
+                    public class Button
+                    {
+                        public event EventHandler Click;
+                        public event EventHandler<string> TextChanged;
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Button.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseLocalFunction(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class Calculator
+                    {
+                        public int Compute(int x)
+                        {
+                            int Double(int n)
+                            {
+                                return n * 2;
+                            }
+
+                            return Double(x);
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Calculator.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseThrowExpression(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class Validator
+                    {
+                        public string GetValue(bool valid, string value) =>
+                            valid ? value : throw new System.InvalidOperationException();
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Validator.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseTypeOfExpression(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class TypeHelper
+                    {
+                        public System.Type GetIntType()
+                        {
+                            return typeof(int);
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("TypeHelper.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseSizeOf(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class SizeHelper
+                    {
+                        public int GetIntSize()
+                        {
+                            return sizeof(int);
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("SizeHelper.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseLabeledStatement(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class LabelHelper
+                    {
+                        public void Process()
+                        {
+                        start:
+                            Console.WriteLine("Hello");
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("LabelHelper.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseUnsafeStatement(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class UnsafeHelper
+                    {
+                        public unsafe int GetSize()
+                        {
+                            unsafe
+                            {
+                                return sizeof(int);
+                            }
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("UnsafeHelper.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseDefaultExpression(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class DefaultHelper
+                    {
+                        public int GetDefault()
+                        {
+                            int x = default(int);
+                            string s = default;
+                            return x;
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("DefaultHelper.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseFixedStatement(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class FixedHelper
+                    {
+                        public unsafe void Process(byte[] data)
+                        {
+                            fixed (byte* p = data)
+                            {
+                            }
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("FixedHelper.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseInitializerExpression(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class Person
+                    {
+                        public string Name { get; set; }
+                        public int Age { get; set; }
+                    }
+
+                    public class Factory
+                    {
+                        public Person Create()
+                        {
+                            return new Person { Name = "John", Age = 25 };
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Factory.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseDestructorDeclaration(@TempDir Path tempDir) throws IOException {
+        String source = """
+                class Resource
+                {
+                    ~Resource()
+                    {
+                        Cleanup();
+                    }
+
+                    void Cleanup() { }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Resource.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseNullForgivingOperator(@TempDir Path tempDir) throws IOException {
+        String source = """
+                class C
+                {
+                    string x = null!;
+                    string y = GetValue()!;
+
+                    static string GetValue() => null!;
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("C.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseNullableType(@TempDir Path tempDir) throws IOException {
+        String source = """
+                class C
+                {
+                    int? x;
+                    string? y;
+
+                    int? Add(int? a, string? b)
+                    {
+                        return a;
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("C.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
     }
 
     @SuppressWarnings("unchecked")

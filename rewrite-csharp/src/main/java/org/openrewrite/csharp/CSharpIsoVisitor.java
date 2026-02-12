@@ -68,6 +68,11 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
+    public Cs.Keyword visitKeyword(Cs.Keyword keyword, P p) {
+        return (Cs.Keyword) super.visitKeyword(keyword, p);
+    }
+
+    @Override
     public Cs.Argument visitArgument(Cs.Argument argument, P p) {
         return (Cs.Argument) super.visitArgument(argument, p);
     }
@@ -172,10 +177,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
         return (Cs.PropertyDeclaration) super.visitPropertyDeclaration(propertyDeclaration, p);
     }
 
-    @Override
-    public Cs.Keyword visitKeyword(Cs.Keyword keyword, P p) {
-        return (Cs.Keyword) super.visitKeyword(keyword, p);
-    }
 
     @Override
     public Cs.Lambda visitLambda(Cs.Lambda lambda, P p) {
@@ -257,10 +258,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
         return (Cs.TupleExpression) super.visitTupleExpression(tupleExpression, p);
     }
 
-    @Override
-    public Cs.Constructor visitConstructor(Cs.Constructor constructor, P p) {
-        return (Cs.Constructor) super.visitConstructor(constructor, p);
-    }
 
     @Override
     public Cs.DestructorDeclaration visitDestructorDeclaration(Cs.DestructorDeclaration destructorDeclaration, P p) {
@@ -272,10 +269,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
         return (Cs.Unary) super.visitUnary(unary, p);
     }
 
-    @Override
-    public Cs.ConstructorInitializer visitConstructorInitializer(Cs.ConstructorInitializer constructorInitializer, P p) {
-        return (Cs.ConstructorInitializer) super.visitConstructorInitializer(constructorInitializer, p);
-    }
 
     @Override
     public Cs.TupleType visitTupleType(Cs.TupleType tupleType, P p) {
@@ -305,6 +298,11 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     @Override
     public Cs.Yield visitYield(Cs.Yield yield, P p) {
         return (Cs.Yield) super.visitYield(yield, p);
+    }
+
+    @Override
+    public Cs.SizeOf visitSizeOf(Cs.SizeOf sizeOf, P p) {
+        return (Cs.SizeOf) super.visitSizeOf(sizeOf, p);
     }
 
     @Override

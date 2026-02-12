@@ -123,6 +123,12 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitKeyword(Cs.Keyword keyword, RpcReceiveQueue q) {
+        return keyword
+                .withKind(q.receiveAndGet(keyword.getKind(), toEnum(Cs.Keyword.KeywordKind.class)));
+    }
+
+    @Override
     public J visitArgument(Cs.Argument argument, RpcReceiveQueue q) {
         return argument
                 .getPadding().withNameColumn(q.receive(argument.getPadding().getNameColumn(), el -> visitRightPadded(el, q)))
@@ -288,11 +294,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .getPadding().withInitializer(q.receive(propertyDeclaration.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
     }
 
-    @Override
-    public J visitKeyword(Cs.Keyword keyword, RpcReceiveQueue q) {
-        return keyword
-                .withKind(q.receiveAndGet(keyword.getKind(), toEnum(Cs.Keyword.KeywordKind.class)));
-    }
 
     @Override
     public J visitLambda(Cs.Lambda lambda, RpcReceiveQueue q) {
@@ -421,12 +422,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .getPadding().withArguments(q.receive(tupleExpression.getPadding().getArguments(), el -> visitContainer(el, q)));
     }
 
-    @Override
-    public J visitConstructor(Cs.Constructor constructor, RpcReceiveQueue q) {
-        return constructor
-                .withInitializer(q.receive(constructor.getInitializer(), el -> (Cs.ConstructorInitializer) visitNonNull(el, q)))
-                .withConstructorCore(q.receive(constructor.getConstructorCore(), el -> (J.MethodDeclaration) visitNonNull(el, q)));
-    }
 
     @Override
     public J visitDestructorDeclaration(Cs.DestructorDeclaration destructorDeclaration, RpcReceiveQueue q) {
@@ -442,12 +437,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withType(q.receive(unary.getType(), type -> visitType(type, q)));
     }
 
-    @Override
-    public J visitConstructorInitializer(Cs.ConstructorInitializer constructorInitializer, RpcReceiveQueue q) {
-        return constructorInitializer
-                .withKeyword(q.receive(constructorInitializer.getKeyword(), el -> (Cs.Keyword) visitNonNull(el, q)))
-                .getPadding().withArguments(q.receive(constructorInitializer.getPadding().getArguments(), el -> visitContainer(el, q)));
-    }
 
     @Override
     public J visitTupleType(Cs.TupleType tupleType, RpcReceiveQueue q) {
@@ -487,6 +476,13 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
         return yield
                 .withReturnOrBreakKeyword(q.receive(yield.getReturnOrBreakKeyword(), el -> (Cs.Keyword) visitNonNull(el, q)))
                 .withExpression(q.receive(yield.getExpression(), el -> (Expression) visitNonNull(el, q)));
+    }
+
+    @Override
+    public J visitSizeOf(Cs.SizeOf sizeOf, RpcReceiveQueue q) {
+        return sizeOf
+                .withExpression(q.receive(sizeOf.getExpression(), el -> (Expression) visitNonNull(el, q)))
+                .withType(q.receive(sizeOf.getType(), t -> visitType(t, q)));
     }
 
     @Override
