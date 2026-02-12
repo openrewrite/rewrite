@@ -99,7 +99,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                 String newAttributeValue;
                 if (isFullyQualifiedClass()) {
-                    maybeAddImport(attributeValue.substring(0, attributeValue.length() - 6));
+                    maybeAddImport(attributeValue.substring(0, attributeValue.length() - 6), false);
                     newAttributeValue = attributeValue;
                 } else if (isFullyQualifiedEnumValue(a)) {
                     maybeAddImport(getEnumClassName(attributeValue), false);
@@ -152,6 +152,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                 if (original != a) {
                     doAfterVisit(new SimplifySingleElementAnnotation().getVisitor());
+                    if (isFullyQualifiedClass()) {
+                        doAfterVisit(new ShortenFullyQualifiedTypeReferences().getVisitor());
+                    }
                 }
                 return maybeAutoFormat(original, a, ctx);
             }
@@ -299,8 +302,19 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 // Add new values, skipping duplicates - use template for non-string values
                 for (String attribute : newValues) {
                     if (!attributeNameOrValIsAlreadyPresent(initializer, singleton(attribute))) {
+                        JavaTemplate.Builder templateBuilder = JavaTemplate.builder("#{}");
+                        String templateValue = attribute;
+                        // For FQ classes, add stub so type info is resolved and use FQ name in template
+                        if (isFullyQualifiedClass()) {
+                            String fqClassName = attributeValue.substring(0, attributeValue.length() - 6);
+                            String packageName = fqClassName.substring(0, fqClassName.lastIndexOf('.'));
+                            String simpleName = fqClassName.substring(fqClassName.lastIndexOf('.') + 1);
+                            templateBuilder = templateBuilder.javaParser(JavaParser.fromJavaVersion()
+                                    .dependsOn("package " + packageName + "; public class " + simpleName + " {}"));
+                            templateValue = fqClassName + ".class";
+                        }
                         //noinspection ConstantConditions
-                        Expression newExpr = JavaTemplate.<J.Annotation>apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), attribute)
+                        Expression newExpr = templateBuilder.build().<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), templateValue)
                                 .getArguments().get(0).withPrefix(SINGLE_SPACE);
                         initializer.add(newExpr);
                     }
@@ -510,7 +524,17 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         } else if (e instanceof J.Literal) {
             return values.contains(((J.Literal) e).getValue() + "");
         } else if (e instanceof J.FieldAccess) {
-            return values.contains(e.toString());
+            J.FieldAccess fa = (J.FieldAccess) e;
+            String fullString = fa.toString();
+            if (values.contains(fullString)) {
+                return true;
+            }
+            // For class literals, also check the simple name (e.g., com.example.MyClass.class -> MyClass.class)
+            if (fullString.endsWith(".class") && fa.getTarget() instanceof J.FieldAccess) {
+                String simpleName = getFullyQualifiedClass(fullString);
+                return values.contains(simpleName);
+            }
+            return false;
         } else if (e instanceof J.NewArray) {
             List<Expression> initializer = ((J.NewArray) e).getInitializer();
             return (initializer == null && attributeValue == null) || (initializer != null && attributeNameOrValIsAlreadyPresent(initializer, values));

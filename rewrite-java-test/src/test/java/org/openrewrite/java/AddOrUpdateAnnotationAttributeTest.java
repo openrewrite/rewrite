@@ -23,6 +23,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -2764,6 +2765,49 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Foo;
 
               @Foo({Integer.class, Long.class})
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendFullyQualifiedClassValueToExistingClassAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "com.example.MyClass.class",
+            null,
+            null,
+            true
+          )).typeValidationOptions(TypeValidation.all()),
+          java(
+            """
+              package com.example;
+              public class MyClass {}
+              """
+          ),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?>[] value();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(Integer.class)
+              public class A {}
+              """,
+            """
+              import com.example.MyClass;
+              import org.example.Foo;
+
+              @Foo({Integer.class, MyClass.class})
               public class A {}
               """
           )
