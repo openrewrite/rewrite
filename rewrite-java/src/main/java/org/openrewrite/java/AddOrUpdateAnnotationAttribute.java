@@ -99,11 +99,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                 String newAttributeValue;
                 if (isFullyQualifiedClass()) {
-                    // onlyIfReferenced=false because the shortened form isn't in the code yet
                     maybeAddImport(attributeValue.substring(0, attributeValue.length() - 6), false);
                     newAttributeValue = attributeValue;
                 } else if (isFullyQualifiedEnumValue(a)) {
-                    // onlyIfReferenced=false because the shortened form isn't in the code yet
                     maybeAddImport(getEnumClassName(attributeValue), false);
                     newAttributeValue = getShortenedEnumValue(attributeValue);
                 } else {
