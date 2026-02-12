@@ -23,7 +23,6 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
-import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -2781,7 +2780,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             null,
             null,
             true
-          )).typeValidationOptions(TypeValidation.all()),
+          )),
           java(
             """
               package com.example;
