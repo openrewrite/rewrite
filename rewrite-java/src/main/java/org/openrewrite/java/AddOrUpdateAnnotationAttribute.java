@@ -292,19 +292,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     }
 
     private boolean isFullyQualifiedEnumValue(J.Annotation annotation) {
-        // A fully qualified enum value has at least 2 dots in a single value: package.EnumClass.CONSTANT
-        // e.g., org.example.Values.ONE
-        // We check that the enum class portion (everything before the last dot) itself contains a dot
-        // Also verify the attribute type is not a String to avoid treating "some.dotted.string" as an enum
         if (attributeValue == null || attributeValue.endsWith(".class") || attributeValue.contains(",")) {
             return false;
         }
-        // Require type information to safely determine if this is an enum value
-        // Without type info, we can't distinguish between a dotted string and an enum reference
-        if (!findMethod(annotation, attributeName()).isPresent()) {
-            return false;
-        }
-        if (attributeIsString(annotation)) {
+        if (!attributeValue.matches("[\\w.$]+") ||
+            !findMethod(annotation, attributeName()).isPresent() ||
+            attributeIsString(annotation)) {
             return false;
         }
         int lastDot = attributeValue.lastIndexOf('.');
