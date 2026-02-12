@@ -2285,6 +2285,10 @@ class ParserVisitor(ast.NodeVisitor):
         while tok.type not in (FSTRING_START, token.STRING):
             tok = self._advance_token()
 
+        # Python < 3.12: f-strings are a single STRING token; store as opaque J.Literal
+        if FSTRING_START == -2 and tok.type == token.STRING:
+            return self.__map_fstring_as_literal(node, leading_prefix, tok)
+
         value_idx = 0
         res = None
         is_first = True
@@ -3174,6 +3178,65 @@ class ParserVisitor(ast.NodeVisitor):
         except KeyError:
             raise ValueError(f"Unsupported operator: {op}")
         return self.__pad_left(self.__source_before(op_str), op)
+
+    def __map_fstring_as_literal(self, node: ast.JoinedStr, leading_prefix: Space, tok: TokenInfo) -> J:
+        """Fallback for Python < 3.12: treat f-string as an opaque J.Literal.
+
+        On Python < 3.12, the tokenizer produces a single STRING token for the
+        entire f-string. We store it as a J.Literal, preserving round-trip
+        fidelity but without structural access to the f-string internals.
+        Handles implicit string concatenation (e.g. f"a" "b").
+        """
+        res = None
+        prefix = leading_prefix
+        is_first = True
+        while True:
+            if not is_first:
+                save_idx = self._token_idx
+                saw_statement_end = False
+                while self._token_idx < len(self._tokens):
+                    peek_tok = self._tokens[self._token_idx]
+                    if peek_tok.type == token.NEWLINE:
+                        saw_statement_end = True
+                        self._token_idx += 1
+                    elif peek_tok.type in (token.NL, token.INDENT, token.DEDENT, token.COMMENT,
+                                           token.ENCODING, token.ENDMARKER, WHITESPACE_TOKEN):
+                        self._token_idx += 1
+                    else:
+                        break
+                if saw_statement_end or peek_tok.type != token.STRING:
+                    self._token_idx = save_idx
+                    break
+                self._token_idx = save_idx
+                prefix = self.__whitespace()
+                tok = self._skip_whitespace_tokens()
+
+            value_source = tok.string
+            self._advance_token()
+            current = j.Literal(
+                random_id(),
+                prefix,
+                Markers.EMPTY,
+                None,
+                value_source,
+                None,
+                JavaType.Primitive.String,
+            )
+            if res is None:
+                res = current
+            else:
+                res = py.Binary(
+                    random_id(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    res,
+                    self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
+                    None,
+                    current,
+                    self._type_mapping.type(node)
+                )
+            is_first = False
+        return res
 
     def __map_fstring(self, node: ast.JoinedStr, prefix: Space, tok: TokenInfo, value_idx: int = 0) -> \
             Tuple[J, TokenInfo, int]:
