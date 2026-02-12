@@ -2575,6 +2575,78 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void appendClassValueToExistingClassAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "Long.class",
+            null,
+            null,
+            true
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?>[] value();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(Integer.class)
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo({Integer.class, Long.class})
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendClassValueToExistingNamedClassAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "classes",
+            "Long.class",
+            null,
+            null,
+            true
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?>[] classes();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(classes = Integer.class)
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(classes = {Integer.class, Long.class})
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
     void dottedStringValueIsNotTreatedAsEnum() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(

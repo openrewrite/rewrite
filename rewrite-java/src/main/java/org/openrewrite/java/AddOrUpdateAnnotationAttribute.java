@@ -187,6 +187,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (isFullyQualifiedClass() && getFullyQualifiedClass(newAttributeValue).equals(exp.toString())) {
                         return as;
                     }
+                    if (newAttributeValue.equals(exp.toString())) {
+                        return as;
+                    }
+                    // If appendArray is true and attribute is an array, convert FieldAccess to array and append
+                    if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
+                        return as.withAssignment(createNewArrayWithExistingAndNew(annotation, (J.FieldAccess) exp, getAttributeValues(annotation)));
+                    }
                     //noinspection ConstantConditions
                     return JavaTemplate.<J.Annotation>apply("#{} = #{}", getCursor(), as.getCoordinates().replace(), var_.getSimpleName(), newAttributeValue)
                             .getArguments().get(annotation.getArguments().indexOf(as));
@@ -228,6 +235,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     }
                     if (!valueMatches(fieldAccess, oldAttributeValue) || newAttributeValue.equals(fieldAccess.toString())) {
                         return fieldAccess;
+                    }
+                    // If appendArray is true and attribute is an array, convert FieldAccess to array and append
+                    if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
+                        return createNewArrayWithExistingAndNew(annotation, fieldAccess, getAttributeValues(annotation));
                     }
                     String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ?
                             getAttributeValues(annotation).stream().map(String::valueOf).collect(joining(",", "{", "}")) :
@@ -276,6 +287,26 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 // Use a template to create the array structure, then replace the initializer
                 //noinspection ConstantConditions
                 J.NewArray template = (J.NewArray) JavaTemplate.<J.Annotation>apply("{#{any()}}", getCursor(), annotation.getCoordinates().replaceArguments(), existingLiteral)
+                        .getArguments().get(0);
+                return template.withInitializer(initializer);
+            }
+
+            private J.NewArray createNewArrayWithExistingAndNew(J.Annotation annotation, J.FieldAccess existingFieldAccess, List<String> newValues) {
+                List<Expression> initializer = new ArrayList<>();
+                // Add the existing field access value first
+                initializer.add(existingFieldAccess.withPrefix(SINGLE_SPACE));
+                // Add new values, skipping duplicates - use template for non-string values
+                for (String attribute : newValues) {
+                    if (!attributeNameOrValIsAlreadyPresent(initializer, singleton(attribute))) {
+                        //noinspection ConstantConditions
+                        Expression newExpr = JavaTemplate.<J.Annotation>apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), attribute)
+                                .getArguments().get(0).withPrefix(SINGLE_SPACE);
+                        initializer.add(newExpr);
+                    }
+                }
+                // Use a template to create the array structure, then replace the initializer
+                //noinspection ConstantConditions
+                J.NewArray template = (J.NewArray) JavaTemplate.<J.Annotation>apply("{#{any()}}", getCursor(), annotation.getCoordinates().replaceArguments(), existingFieldAccess)
                         .getArguments().get(0);
                 return template.withInitializer(initializer);
             }
