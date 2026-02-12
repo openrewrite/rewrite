@@ -438,23 +438,52 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         return super().visit_method_invocation(method, p)
 
     def _compute_select_column(self, method: MethodInvocation) -> int:
-        from rewrite.python.printer import PythonPrinter
-        target = None
+        from rewrite.python.printer import PythonPrinter, PrintOutputCapture
+
+        line_start = None
         for c in self.cursor.get_path_as_cursors():
             v = c.value
             if isinstance(v, J):
-                target = v
+                line_start = v
                 if '\n' in v.prefix.whitespace:
                     break
-        if target is None:
+        if line_start is None:
             return -1
-        source = PythonPrinter().print(target)
-        select_source = PythonPrinter().print(method.select)
-        idx = source.find(select_source)
-        if idx < 0:
-            return -1
-        last_nl = source.rfind('\n', 0, idx)
-        return idx - last_nl - 1 if last_nl >= 0 else idx
+
+        select = method.select
+
+        class _ColumnCounter(PrintOutputCapture):
+            def __init__(self):
+                super().__init__()
+                self.col = 0
+                self.found = False
+
+            def append(self, text):
+                if text and not self.found:
+                    for ch in text:
+                        self.col = 0 if ch == '\n' else self.col + 1
+                return self
+
+        class _Printer(PythonPrinter):
+            def __init__(self, target):
+                super().__init__()
+                orig_visit = self._delegate.visit
+                def _check(tree, p):
+                    if tree is target:
+                        p.found = True
+                        return tree
+                    return orig_visit(tree, p) if not p.found else tree
+                self._delegate.visit = _check
+
+            def visit(self, tree, p, parent=None):
+                if p.found or tree is select:
+                    p.found = True
+                    return tree
+                return super().visit(tree, p)
+
+        counter = _ColumnCounter()
+        _Printer(select).print(line_start, counter)
+        return counter.col if counter.found else -1
 
     # -------------------------------------------------------------------------
     # Expression statement (docstring alignment)
