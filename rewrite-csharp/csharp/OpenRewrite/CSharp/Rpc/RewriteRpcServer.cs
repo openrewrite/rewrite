@@ -84,6 +84,8 @@ public class RewriteRpcServer
             "org.openrewrite.csharp.marker.RecordClass");
         RpcSendQueue.RegisterJavaTypeName(typeof(ExpressionBodied),
             "org.openrewrite.csharp.marker.ExpressionBodied");
+        RpcSendQueue.RegisterJavaTypeName(typeof(OmitParentheses),
+            "org.openrewrite.java.marker.OmitParentheses");
     }
 
     [JsonRpcMethod("Parse", UseSingleObjectParameterDeserialization = true)]
@@ -195,6 +197,179 @@ public class RewriteRpcServer
         }
 
         return references;
+    }
+
+    [JsonRpcMethod("ParseProject", UseSingleObjectParameterDeserialization = true)]
+    public Task<List<ParseProjectResponseItem>> ParseProject(ParseProjectRequest request)
+    {
+        var items = new List<ParseProjectResponseItem>();
+        var projectPath = ResolvePath(request.ProjectPath);
+
+        if (!File.Exists(projectPath))
+        {
+            throw new FileNotFoundException($".csproj not found: {projectPath}");
+        }
+
+        var projectDir = Path.GetDirectoryName(projectPath)!;
+        var relativeTo = request.RelativeTo != null ? ResolvePath(request.RelativeTo) : projectDir;
+
+        // Read the .csproj to extract PackageReferences
+        var doc = XDocument.Load(projectPath);
+        var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
+
+        var packageReferences = doc.Descendants(ns + "PackageReference")
+            .Select(e =>
+            {
+                var name = e.Attribute("Include")?.Value ?? "";
+                var version = e.Attribute("Version")?.Value;
+                return version != null ? $"{name}@{version}" : name;
+            })
+            .Where(s => !string.IsNullOrEmpty(s))
+            .ToList();
+
+        // Discover user source files
+        var exclusionSet = new HashSet<string>(request.Exclusions ?? [], StringComparer.OrdinalIgnoreCase);
+        var userFiles = DiscoverSourceFiles(projectDir, exclusionSet);
+
+        // Discover generated files from obj/
+        var generatedFiles = DiscoverGeneratedFiles(projectDir);
+
+        // Parse all syntax trees, using relative paths as the tree file path
+        // so that the CompilationUnit.SourcePath is set correctly
+        var syntaxTrees = new List<Microsoft.CodeAnalysis.SyntaxTree>();
+        var sourceTexts = new Dictionary<string, string>();
+        var generatedRelativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var filePath in userFiles.Concat(generatedFiles))
+        {
+            string content = File.ReadAllText(filePath);
+            var sourcePath = Path.GetRelativePath(relativeTo, filePath);
+            sourceTexts[sourcePath] = content;
+            // Use the relative path as the tree's file path — the CSharpParser uses
+            // node.SyntaxTree.FilePath to set the CompilationUnit.SourcePath
+            var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(content, path: sourcePath);
+            syntaxTrees.Add(tree);
+
+            if (generatedFiles.Contains(filePath))
+            {
+                generatedRelativePaths.Add(sourcePath);
+            }
+        }
+
+        // Create compilation with resolved references
+        var references = ResolveAssemblyReferences(packageReferences);
+        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+            "ParseProjectCompilation",
+            syntaxTrees,
+            references,
+            new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+
+        // Build LSTs
+        foreach (var tree in syntaxTrees)
+        {
+            var sourcePath = tree.FilePath;
+            var content = sourceTexts[sourcePath];
+            var semanticModel = compilation.GetSemanticModel(tree);
+
+            var cu = _parser.Parse(content, sourcePath, semanticModel);
+            var id = cu.Id.ToString();
+            _localObjects[id] = cu;
+
+            items.Add(new ParseProjectResponseItem
+            {
+                Id = id,
+                SourceFileType = "org.openrewrite.csharp.tree.Cs$CompilationUnit",
+                Generated = generatedRelativePaths.Contains(sourcePath)
+            });
+        }
+
+        return Task.FromResult(items);
+    }
+
+    /// <summary>
+    /// Discovers C# source files in the project directory, excluding bin/, obj/, and user-specified patterns.
+    /// </summary>
+    private static HashSet<string> DiscoverSourceFiles(string projectDir, HashSet<string> exclusions)
+    {
+        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var file in Directory.EnumerateFiles(projectDir, "*.cs", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(projectDir, file);
+
+            // Skip bin/ and obj/ directories
+            if (relativePath.StartsWith("bin" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+                relativePath.StartsWith("obj" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            // Check user exclusions
+            bool excluded = false;
+            foreach (var exclusion in exclusions)
+            {
+                if (relativePath.Contains(exclusion, StringComparison.OrdinalIgnoreCase))
+                {
+                    excluded = true;
+                    break;
+                }
+            }
+
+            if (!excluded)
+            {
+                files.Add(ResolvePath(file));
+            }
+        }
+
+        return files;
+    }
+
+    /// <summary>
+    /// Discovers source-generator-produced files in the obj/ directory.
+    /// Source generators write output to obj/{Config}/{TFM}/generated/{GeneratorAssembly}/{GeneratorName}/*.cs
+    /// </summary>
+    private static HashSet<string> DiscoverGeneratedFiles(string projectDir)
+    {
+        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var objDir = Path.Combine(projectDir, "obj");
+
+        if (!Directory.Exists(objDir))
+        {
+            return files;
+        }
+
+        // Search for generated/ directories under obj/
+        // Pattern: obj/{Config}/{TFM}/generated/**/*.cs
+        foreach (var dir in Directory.EnumerateDirectories(objDir, "generated", SearchOption.AllDirectories))
+        {
+            foreach (var file in Directory.EnumerateFiles(dir, "*.cs", SearchOption.AllDirectories))
+            {
+                files.Add(ResolvePath(file));
+            }
+        }
+
+        return files;
+    }
+
+    /// <summary>
+    /// Resolves a path to its canonical form.
+    /// On macOS, /var and /tmp are "firmlinks" to /private/var and /private/tmp,
+    /// which are not detected as regular symlinks by .NET. Java sends paths through
+    /// /var/ while .NET file enumeration resolves through /private/var/, causing
+    /// Path.GetRelativePath to fail. This method normalizes both forms.
+    /// </summary>
+    private static string ResolvePath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        if (OperatingSystem.IsMacOS())
+        {
+            if (fullPath.StartsWith("/var/"))
+                fullPath = "/private" + fullPath;
+            else if (fullPath.StartsWith("/tmp/"))
+                fullPath = "/private" + fullPath;
+        }
+        return fullPath;
     }
 
     [JsonRpcMethod("GetObject", UseSingleObjectParameterDeserialization = true)]
@@ -879,4 +1054,18 @@ public class VisitRequest
 public class VisitResponse
 {
     public bool Modified { get; set; }
+}
+
+public class ParseProjectRequest
+{
+    public string ProjectPath { get; set; } = "";
+    public List<string>? Exclusions { get; set; }
+    public string? RelativeTo { get; set; }
+}
+
+public class ParseProjectResponseItem
+{
+    public string Id { get; set; } = "";
+    public string SourceFileType { get; set; } = "";
+    public bool Generated { get; set; }
 }

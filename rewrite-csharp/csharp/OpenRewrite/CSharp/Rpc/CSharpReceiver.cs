@@ -59,6 +59,13 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             CsLambda csl => VisitCsLambda(csl, q),
             IsPattern ip => VisitIsPattern(ip, q),
             StatementExpression se => VisitStatementExpression(se, q),
+            SizeOf sof => VisitSizeOf(sof, q),
+            UnsafeStatement us => VisitUnsafeStatement(us, q),
+            FixedStatement fs => VisitFixedStatement(fs, q),
+            PointerType pt => VisitPointerType(pt, q),
+            DefaultExpression de2 => VisitDefaultExpression(de2, q),
+            ExternAlias ea => VisitExternAlias(ea, q),
+            InitializerExpression ie => VisitInitializerExpression(ie, q),
             RelationalPattern rp => VisitRelationalPattern(rp, q),
             PropertyPattern pp => VisitPropertyPattern(pp, q),
             TypeParameterBound tpb => VisitTypeParameterBound(tpb, q),
@@ -82,6 +89,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             ErrorDirective ed => VisitErrorDirective(ed, q),
             WarningDirective wd => VisitWarningDirective(wd, q),
             LineDirective ld => VisitLineDirective(ld, q),
+            NullSafeExpression nse => VisitNullSafeExpression(nse, q),
             _ => throw new InvalidOperationException($"Unknown Cs tree type: {tree.GetType().FullName}")
         };
 
@@ -277,6 +285,69 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var statement = q.Receive((J)se.Statement, el => (J)VisitNonNull(el, q));
         return se with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
             Statement = (Statement)statement! };
+    }
+
+    // ---- SizeOf ----
+    public override J VisitSizeOf(SizeOf sizeOf, RpcReceiveQueue q)
+    {
+        var expression = q.Receive((J)sizeOf.Expression, el => (J)VisitNonNull(el, q));
+        var type = q.Receive(sizeOf.Type, t => VisitType(t, q)!);
+        return sizeOf with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
+            Expression = (Expression)expression!, Type = type };
+    }
+
+    // ---- UnsafeStatement ----
+    public override J VisitUnsafeStatement(UnsafeStatement unsafeStatement, RpcReceiveQueue q)
+    {
+        var block = q.Receive((J)unsafeStatement.Block, el => (J)VisitNonNull(el, q));
+        return unsafeStatement with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
+            Block = (Block)block! };
+    }
+
+    // ---- PointerType ----
+    public override J VisitPointerType(PointerType pointerType, RpcReceiveQueue q)
+    {
+        var elementType = q.Receive(pointerType.ElementType, rp => VisitRightPadded(rp, q));
+        return pointerType with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
+            ElementType = elementType! };
+    }
+
+    // ---- FixedStatement ----
+    public override J VisitFixedStatement(FixedStatement fixedStatement, RpcReceiveQueue q)
+    {
+        var declarations = q.Receive((J)fixedStatement.Declarations, el => (J)VisitNonNull(el, q));
+        var block = q.Receive((J)fixedStatement.Block, el => (J)VisitNonNull(el, q));
+        return fixedStatement with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
+            Declarations = (ControlParentheses<VariableDeclarations>)declarations!, Block = (Block)block! };
+    }
+
+    // ---- DefaultExpression ----
+    public override J VisitDefaultExpression(DefaultExpression defaultExpression, RpcReceiveQueue q)
+    {
+        var typeOperator = q.Receive(defaultExpression.TypeOperator, c => VisitContainer(c, q));
+        return defaultExpression with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
+            TypeOperator = typeOperator };
+    }
+
+    public override J VisitExternAlias(ExternAlias externAlias, RpcReceiveQueue q)
+    {
+        var identifier = q.Receive(externAlias.Identifier, lp => _delegate.VisitLeftPadded(lp, q));
+        return externAlias with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
+            Identifier = identifier! };
+    }
+
+    public override J VisitInitializerExpression(InitializerExpression initializerExpression, RpcReceiveQueue q)
+    {
+        var expressions = q.Receive(initializerExpression.Expressions, c => VisitContainer(c, q));
+        return initializerExpression with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
+            Expressions = expressions! };
+    }
+
+    public override J VisitNullSafeExpression(NullSafeExpression nullSafeExpression, RpcReceiveQueue q)
+    {
+        var expression = q.Receive(nullSafeExpression.ExpressionPadded, el => VisitRightPadded(el, q));
+        return nullSafeExpression with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
+            ExpressionPadded = expression! };
     }
 
     // ---- RelationalPattern ----

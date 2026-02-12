@@ -61,6 +61,19 @@ public class CSharpParser implements Parser {
         return prefix.resolve("source.cs");
     }
 
+    /**
+     * Parses an entire C# project from a .csproj file.
+     * Discovers source files, resolves NuGet references, and includes source-generator
+     * output from obj/ for complete type attribution.
+     *
+     * @param csprojPath Path to the .csproj file
+     * @param ctx        Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public static Stream<SourceFile> parseProject(Path csprojPath, ExecutionContext ctx) {
+        return CSharpRewriteRpc.getOrStart().parseProject(csprojPath, ctx);
+    }
+
     public static Builder builder() {
         return new Builder();
     }
