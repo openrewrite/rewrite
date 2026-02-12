@@ -848,18 +848,12 @@ class JavaVisitor(TreeVisitor[J, P]):
         if not isinstance(temp_expr, j.MethodInvocation):
             return temp_expr
         method = temp_expr
-        method = method.replace(markers=self.visit_markers(method.markers, p))
-        method = method.padding.replace(
-            select=self.visit_right_padded(method.padding.select, p)
-        )
         method = method.replace(
-            type_parameters=self.visit_container(method.padding.type_parameters, p)
-        )
-        method = method.replace(
-            name=self.visit_and_cast(method.name, j.Identifier, p)
-        )
-        method = method.replace(
-            arguments=self.visit_container(method.padding.arguments, p)
+            markers=self.visit_markers(method.markers, p),
+            select=self.visit_right_padded(method.padding.select, p),
+            type_parameters=self.visit_container(method.padding.type_parameters, p),
+            name=self.visit_and_cast(method.name, j.Identifier, p),
+            arguments=self.visit_container(method.padding.arguments, p),
         )
         return method
 

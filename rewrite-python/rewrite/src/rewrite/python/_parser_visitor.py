@@ -1492,13 +1492,33 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_TypeVar(self, node) -> j.TypeParameter:
-        """Visit a TypeVar (e.g., T or T: int)."""
+        """Visit a TypeVar (e.g., T, T: int, T = int, or T: int = "default")."""
         prefix = self.__whitespace()
         name = self.__convert_name(node.name)
+        default = getattr(node, 'default_value', None)
         if node.bound:
+            if default:
+                bounds = JContainer(
+                    self.__source_before(':'),
+                    [
+                        self.__pad_right(self.__convert(node.bound), self.__source_before('=')),
+                        self.__pad_right(self.__convert(default), Space.EMPTY),
+                    ],
+                    Markers.EMPTY
+                )
+            else:
+                bounds = JContainer(
+                    self.__source_before(':'),
+                    [self.__pad_right(self.__convert(node.bound), Space.EMPTY)],
+                    Markers.EMPTY
+                )
+        elif default:
             bounds = JContainer(
-                self.__source_before(':'),
-                [self.__pad_right(self.__convert(node.bound), Space.EMPTY)],
+                self.__source_before('='),
+                [
+                    self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY),
+                    self.__pad_right(self.__convert(default), Space.EMPTY),
+                ],
                 Markers.EMPTY
             )
         else:
@@ -1514,7 +1534,7 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_ParamSpec(self, node) -> j.TypeParameter:
-        """Visit a ParamSpec (e.g., **P)."""
+        """Visit a ParamSpec (e.g., **P or **P = [int, str])."""
         prefix = self.__whitespace()
         modifier = j.Modifier(
             random_id(),
@@ -1525,6 +1545,18 @@ class ParserVisitor(ast.NodeVisitor):
             []
         )
         name = self.__convert_name(node.name)
+        default = getattr(node, 'default_value', None)
+        if default:
+            bounds = JContainer(
+                self.__source_before('='),
+                [
+                    self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY),
+                    self.__pad_right(self.__convert(default), Space.EMPTY),
+                ],
+                Markers.EMPTY
+            )
+        else:
+            bounds = None
         return j.TypeParameter(
             random_id(),
             prefix,
@@ -1532,11 +1564,11 @@ class ParserVisitor(ast.NodeVisitor):
             [],  # annotations
             [modifier],
             name,
-            None  # no bounds
+            bounds
         )
 
     def visit_TypeVarTuple(self, node) -> j.TypeParameter:
-        """Visit a TypeVarTuple (e.g., *Ts)."""
+        """Visit a TypeVarTuple (e.g., *Ts or *Ts = *tuple[int, ...])."""
         prefix = self.__whitespace()
         modifier = j.Modifier(
             random_id(),
@@ -1547,6 +1579,18 @@ class ParserVisitor(ast.NodeVisitor):
             []
         )
         name = self.__convert_name(node.name)
+        default = getattr(node, 'default_value', None)
+        if default:
+            bounds = JContainer(
+                self.__source_before('='),
+                [
+                    self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY),
+                    self.__pad_right(self.__convert(default), Space.EMPTY),
+                ],
+                Markers.EMPTY
+            )
+        else:
+            bounds = None
         return j.TypeParameter(
             random_id(),
             prefix,
@@ -1554,7 +1598,7 @@ class ParserVisitor(ast.NodeVisitor):
             [],  # annotations
             [modifier],
             name,
-            None  # no bounds
+            bounds
         )
 
     def visit_TypeAlias(self, node):

@@ -1,4 +1,3 @@
-import inspect
 from dataclasses import replace as dataclass_replace
 from typing import Any, Callable, TypeVar, List, Union, cast
 from uuid import UUID, uuid4
@@ -71,7 +70,10 @@ def list_map(fn: FnType[T], lst: List[T]) -> List[T]:
     changed = False
     mapped_lst = None
 
-    with_index = len(inspect.signature(fn).parameters) == 2
+    arg_count = fn.__code__.co_argcount
+    if hasattr(fn, '__self__'):  # bound method — co_argcount includes self
+        arg_count -= 1
+    with_index = arg_count == 2
     for index, original in enumerate(lst):
         new = fn(original, index) if with_index else fn(original)  # type: ignore
         if new is None:
@@ -96,7 +98,10 @@ def list_flat_map(fn: FlatMapFnType[T], lst: List[T]) -> List[T]:
     changed = False
     result: List[T] = []
 
-    with_index = len(inspect.signature(fn).parameters) == 2
+    arg_count = fn.__code__.co_argcount
+    if hasattr(fn, '__self__'):  # bound method — co_argcount includes self
+        arg_count -= 1
+    with_index = arg_count == 2
     for index, item in enumerate(lst):
         new_items = fn(item, index) if with_index else fn(item)  # type: ignore
         if new_items is None:
