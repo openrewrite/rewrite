@@ -22,6 +22,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.tree.Cs;
+import org.openrewrite.marker.Generated;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
@@ -119,6 +121,93 @@ public class CSharpRewriteRpc extends RewriteRpc {
         if (current != null) {
             current.reset();
         }
+    }
+
+    /**
+     * Parses an entire C# project from a .csproj file.
+     * Discovers source files, resolves NuGet references, and includes source-generator
+     * output from obj/ for complete type attribution.
+     *
+     * @param projectPath Path to the .csproj file
+     * @param ctx         Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parseProject(Path projectPath, ExecutionContext ctx) {
+        return parseProject(projectPath, null, null, ctx);
+    }
+
+    /**
+     * Parses an entire C# project from a .csproj file.
+     *
+     * @param projectPath Path to the .csproj file
+     * @param exclusions  Optional glob patterns to exclude from parsing
+     * @param ctx         Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, ExecutionContext ctx) {
+        return parseProject(projectPath, exclusions, null, ctx);
+    }
+
+    /**
+     * Parses an entire C# project from a .csproj file.
+     *
+     * @param projectPath Path to the .csproj file
+     * @param exclusions  Optional glob patterns to exclude from parsing
+     * @param relativeTo  Optional path to make source file paths relative to. If not specified,
+     *                    paths are relative to the .csproj directory.
+     * @param ctx         Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
+
+        return StreamSupport.stream(new Spliterator<SourceFile>() {
+            private int index = 0;
+            private @Nullable ParseProjectResponse response;
+
+            @Override
+            public boolean tryAdvance(Consumer<? super SourceFile> action) {
+                if (response == null) {
+                    parsingListener.intermediateMessage("Starting C# project parsing: " + projectPath);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo), ParseProjectResponse.class);
+                    parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
+                }
+
+                if (index >= response.size()) {
+                    return false;
+                }
+
+                ParseProjectResponse.Item item = response.get(index);
+                index++;
+
+                SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
+
+                // Add Generated marker to source-generator-produced files
+                if (item.isGenerated()) {
+                    sourceFile = sourceFile.withMarkers(
+                            sourceFile.getMarkers().add(new Generated(UUID.randomUUID())));
+                }
+
+                parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
+                action.accept(sourceFile);
+                return true;
+            }
+
+            @Override
+            public @Nullable Spliterator<SourceFile> trySplit() {
+                return null;
+            }
+
+            @Override
+            public long estimateSize() {
+                return response == null ? Long.MAX_VALUE : response.size() - index;
+            }
+
+            @Override
+            public int characteristics() {
+                return response == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
+            }
+        }, false);
     }
 
     /**

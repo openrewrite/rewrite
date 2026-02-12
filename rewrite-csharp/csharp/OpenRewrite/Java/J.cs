@@ -41,9 +41,12 @@ public sealed record NullSafe(Guid Id) : Marker
 /// Marker indicating parentheses should be omitted in NewClass.
 /// Used for object initializers without constructor arguments: new Foo { X = 1 }
 /// </summary>
-public sealed record OmitParentheses(Guid Id) : Marker
+public sealed record OmitParentheses(Guid Id) : Marker, IRpcCodec<OmitParentheses>
 {
     public static OmitParentheses Instance { get; } = new(Guid.Empty);
+    public void RpcSend(OmitParentheses after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public OmitParentheses RpcReceive(OmitParentheses before, RpcReceiveQueue q) =>
+        before with { Id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse) };
 }
 
 /// <summary>
@@ -698,6 +701,50 @@ public sealed record AssignmentOperation(
 }
 
 /// <summary>
+/// A labeled statement (e.g., myLabel: statement).
+/// </summary>
+public sealed record Label(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    JRightPadded<Identifier> LabelName,
+    Statement Statement
+) : J, Statement
+{
+    public Label WithId(Guid id) => this with { Id = id };
+    public Label WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public Label WithMarkers(Markers markers) => this with { Markers = markers };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// An instanceof expression. Also used for C# typeof(T) where expression is J.Empty.
+/// </summary>
+public sealed record InstanceOf(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    JRightPadded<Expression> Expression,
+    J Clazz,
+    J? Pattern,
+    JavaType? Type,
+    Modifier? InstanceOfModifier
+) : J, Expression
+{
+    public InstanceOf WithId(Guid id) => this with { Id = id };
+    public InstanceOf WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public InstanceOf WithMarkers(Markers markers) => this with { Markers = markers };
+    public InstanceOf WithExpression(JRightPadded<Expression> expression) => this with { Expression = expression };
+    public InstanceOf WithClazz(J clazz) => this with { Clazz = clazz };
+    public InstanceOf WithPattern(J? pattern) => this with { Pattern = pattern };
+    public InstanceOf WithType(JavaType? type) => this with { Type = type };
+    public InstanceOf WithModifier(Modifier? modifier) => this with { InstanceOfModifier = modifier };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
 /// A method invocation (e.g., foo.Bar(), Console.WriteLine("hello"), Bar&lt;T&gt;(x)).
 /// </summary>
 public sealed record MethodInvocation(
@@ -919,7 +966,8 @@ public sealed record Modifier(
     Space Prefix,
     Markers Markers,
     Modifier.ModifierType Type,
-    IList<Annotation> Annotations
+    IList<Annotation> Annotations,
+    string? Keyword = null
 ) : J
 {
     public enum ModifierType
@@ -1021,6 +1069,52 @@ public sealed record ArrayDimension(
     public ArrayDimension WithPrefix(Space prefix) => this with { Prefix = prefix };
     public ArrayDimension WithMarkers(Markers markers) => this with { Markers = markers };
     public ArrayDimension WithIndex(JRightPadded<Expression> index) => this with { Index = index };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A parameterized type expression (e.g., List&lt;int&gt;, Dictionary&lt;string, int&gt;).
+/// </summary>
+public sealed record ParameterizedType(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    NameTree Clazz,                         // The raw type name (e.g., List, Dictionary)
+    JContainer<Expression>? TypeParameters, // The type arguments: <int>, <string, int>
+    JavaType? Type
+) : J, TypeTree, Expression
+{
+    public ParameterizedType WithId(Guid id) => this with { Id = id };
+    public ParameterizedType WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public ParameterizedType WithMarkers(Markers markers) => this with { Markers = markers };
+    public ParameterizedType WithClazz(NameTree clazz) => this with { Clazz = clazz };
+    public ParameterizedType WithTypeParameters(JContainer<Expression>? typeParameters) => this with { TypeParameters = typeParameters };
+    public ParameterizedType WithType(JavaType? type) => this with { Type = type };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A nullable type expression (e.g., int?, string?).
+/// The typeTree holds the base type and the right padding holds any space before the '?'.
+/// </summary>
+public sealed record NullableType(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    IList<Annotation> Annotations,
+    JRightPadded<TypeTree> TypeTreePadded,
+    JavaType? Type
+) : J, TypeTree, Expression
+{
+    public TypeTree TypeTree => TypeTreePadded.Element;
+    public NullableType WithId(Guid id) => this with { Id = id };
+    public NullableType WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public NullableType WithMarkers(Markers markers) => this with { Markers = markers };
+    public NullableType WithAnnotations(IList<Annotation> annotations) => this with { Annotations = annotations };
+    public NullableType WithTypeTreePadded(JRightPadded<TypeTree> typeTreePadded) => this with { TypeTreePadded = typeTreePadded };
+    public NullableType WithType(JavaType? type) => this with { Type = type };
 
     Tree Tree.WithId(Guid id) => WithId(id);
 }

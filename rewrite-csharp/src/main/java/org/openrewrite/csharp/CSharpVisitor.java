@@ -133,6 +133,11 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         return nameColon.getPadding().withName(visitRightPadded(nameColon.getPadding().getName(), CsRightPadded.Location.NAME_COLON_NAME, p));
     }
 
+    public J visitKeyword(Cs.Keyword keyword, P p) {
+        keyword = keyword.withPrefix(visitSpace(keyword.getPrefix(), CsSpace.Location.KEYWORD_PREFIX, p));
+        return keyword.withMarkers(visitMarkers(keyword.getMarkers(), p));
+    }
+
     public J visitArgument(Cs.Argument argument, P p) {
         argument = argument.withPrefix(visitSpace(argument.getPrefix(), CsSpace.Location.ARGUMENT_PREFIX, p));
         Expression tempExpression = (Expression) visitExpression(argument, p);
@@ -425,10 +430,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         return propertyDeclaration.getPadding().withInitializer(visitLeftPadded(propertyDeclaration.getPadding().getInitializer(), CsLeftPadded.Location.PROPERTY_DECLARATION_INITIALIZER, p));
     }
 
-    public J visitKeyword(Cs.Keyword keyword, P p) {
-        keyword = keyword.withPrefix(visitSpace(keyword.getPrefix(), CsSpace.Location.KEYWORD_PREFIX, p));
-        return keyword.withMarkers(visitMarkers(keyword.getMarkers(), p));
-    }
 
     public J visitLambda(Cs.Lambda lambda, P p) {
         lambda = lambda.withPrefix(visitSpace(lambda.getPrefix(), CsSpace.Location.LAMBDA_PREFIX, p));
@@ -605,18 +606,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         return tupleExpression.getPadding().withArguments(visitContainer(tupleExpression.getPadding().getArguments(), CsContainer.Location.TUPLE_EXPRESSION_ARGUMENTS, p));
     }
 
-    public J visitConstructor(Cs.Constructor constructor, P p) {
-        constructor = constructor.withPrefix(visitSpace(constructor.getPrefix(), CsSpace.Location.CONSTRUCTOR_PREFIX, p));
-        Statement tempStatement = (Statement) visitStatement(constructor, p);
-        if (!(tempStatement instanceof Cs.Constructor))
-        {
-            return tempStatement;
-        }
-        constructor = (Cs.Constructor) tempStatement;
-        constructor = constructor.withMarkers(visitMarkers(constructor.getMarkers(), p));
-        constructor = constructor.withInitializer(visitAndCast(constructor.getInitializer(), p));
-        return constructor.withConstructorCore(visitAndCast(constructor.getConstructorCore(), p));
-    }
 
     public J visitDestructorDeclaration(Cs.DestructorDeclaration destructorDeclaration, P p) {
         destructorDeclaration = destructorDeclaration.withPrefix(visitSpace(destructorDeclaration.getPrefix(), CsSpace.Location.DESTRUCTOR_DECLARATION_PREFIX, p));
@@ -649,12 +638,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         return unary.withExpression(visitAndCast(unary.getExpression(), p));
     }
 
-    public J visitConstructorInitializer(Cs.ConstructorInitializer constructorInitializer, P p) {
-        constructorInitializer = constructorInitializer.withPrefix(visitSpace(constructorInitializer.getPrefix(), CsSpace.Location.CONSTRUCTOR_INITIALIZER_PREFIX, p));
-        constructorInitializer = constructorInitializer.withMarkers(visitMarkers(constructorInitializer.getMarkers(), p));
-        constructorInitializer = constructorInitializer.withKeyword(visitAndCast(constructorInitializer.getKeyword(), p));
-        return constructorInitializer.getPadding().withArguments(visitContainer(constructorInitializer.getPadding().getArguments(), CsContainer.Location.CONSTRUCTOR_INITIALIZER_ARGUMENTS, p));
-    }
 
     public J visitTupleType(Cs.TupleType tupleType, P p) {
         tupleType = tupleType.withPrefix(visitSpace(tupleType.getPrefix(), CsSpace.Location.TUPLE_TYPE_PREFIX, p));
@@ -729,6 +712,18 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         yield = yield.withMarkers(visitMarkers(yield.getMarkers(), p));
         yield = yield.withReturnOrBreakKeyword(visitAndCast(yield.getReturnOrBreakKeyword(), p));
         return yield.withExpression(visitAndCast(yield.getExpression(), p));
+    }
+
+    public J visitSizeOf(Cs.SizeOf sizeOf, P p) {
+        sizeOf = sizeOf.withPrefix(visitSpace(sizeOf.getPrefix(), CsSpace.Location.SIZE_OF_PREFIX, p));
+        Expression tempExpression = (Expression) visitExpression(sizeOf, p);
+        if (!(tempExpression instanceof Cs.SizeOf)) {
+            return tempExpression;
+        }
+        sizeOf = (Cs.SizeOf) tempExpression;
+        sizeOf = sizeOf.withMarkers(visitMarkers(sizeOf.getMarkers(), p));
+        sizeOf = sizeOf.withExpression(visitAndCast(sizeOf.getExpression(), p));
+        return sizeOf;
     }
 
     public J visitDefaultExpression(Cs.DefaultExpression defaultExpression, P p) {

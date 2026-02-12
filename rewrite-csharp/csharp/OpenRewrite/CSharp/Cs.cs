@@ -434,6 +434,105 @@ public sealed record StatementExpression(
 }
 
 /// <summary>
+/// A C# sizeof expression, e.g. sizeof(int).
+/// </summary>
+public sealed record SizeOf(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    Expression Expression,
+    JavaType? Type
+) : Cs, Expression
+{
+    public SizeOf WithId(Guid id) => this with { Id = id };
+    public SizeOf WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public SizeOf WithMarkers(Markers markers) => this with { Markers = markers };
+    public SizeOf WithExpression(Expression expression) => this with { Expression = expression };
+    public SizeOf WithType(JavaType? type) => this with { Type = type };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A C# unsafe statement block, e.g. unsafe { int* p = &amp;x; }
+/// </summary>
+public sealed record UnsafeStatement(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    Block Block
+) : Cs, Statement
+{
+    public UnsafeStatement WithId(Guid id) => this with { Id = id };
+    public UnsafeStatement WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public UnsafeStatement WithMarkers(Markers markers) => this with { Markers = markers };
+    public UnsafeStatement WithBlock(Block block) => this with { Block = block };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A C# default expression: default(T) or standalone default.
+/// TypeOperator is null for standalone default, contains the type for default(T).
+/// </summary>
+public sealed record DefaultExpression(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    JContainer<TypeTree>? TypeOperator
+) : Cs, Expression
+{
+    public DefaultExpression WithId(Guid id) => this with { Id = id };
+    public DefaultExpression WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public DefaultExpression WithMarkers(Markers markers) => this with { Markers = markers };
+    public DefaultExpression WithTypeOperator(JContainer<TypeTree>? typeOperator) => this with { TypeOperator = typeOperator };
+
+    public JavaType? Type => null; // Type is derived from the TypeOperator elements on the Java side
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A C# pointer type, e.g. int*, byte*.
+/// </summary>
+public sealed record PointerType(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    JRightPadded<TypeTree> ElementType
+) : Cs, TypeTree, Expression
+{
+    public PointerType WithId(Guid id) => this with { Id = id };
+    public PointerType WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public PointerType WithMarkers(Markers markers) => this with { Markers = markers };
+    public PointerType WithElementType(JRightPadded<TypeTree> elementType) => this with { ElementType = elementType };
+
+    public JavaType? Type => null;
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A C# fixed statement, e.g. fixed (int* p = array) { ... }
+/// </summary>
+public sealed record FixedStatement(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    ControlParentheses<VariableDeclarations> Declarations,
+    Block Block
+) : Cs, Statement
+{
+    public FixedStatement WithId(Guid id) => this with { Id = id };
+    public FixedStatement WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public FixedStatement WithMarkers(Markers markers) => this with { Markers = markers };
+    public FixedStatement WithDeclarations(ControlParentheses<VariableDeclarations> declarations) => this with { Declarations = declarations };
+    public FixedStatement WithBlock(Block block) => this with { Block = block };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
 /// A C# property pattern that matches object properties.
 /// Examples:
 ///   { Length: > 5 }                  // Property pattern
@@ -911,6 +1010,72 @@ public sealed record TupleType(
 }
 
 /// <summary>
+/// A C# extern alias directive.
+/// Examples:
+///   extern alias MyAlias;
+/// </summary>
+public sealed record ExternAlias(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    JLeftPadded<Identifier> Identifier
+) : Cs, Statement
+{
+    public ExternAlias WithId(Guid id) => this with { Id = id };
+    public ExternAlias WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public ExternAlias WithMarkers(Markers markers) => this with { Markers = markers };
+    public ExternAlias WithIdentifier(JLeftPadded<Identifier> identifier) => this with { Identifier = identifier };
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A C# initializer expression (object/collection initializer).
+/// Examples:
+///   { Name = "John", Age = 25 }      // object initializer
+///   { 1, 2, 3 }                      // collection initializer
+///   { { "a", 1 }, { "b", 2 } }      // dictionary initializer
+/// </summary>
+public sealed record InitializerExpression(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    JContainer<Expression> Expressions  // Before = space before {
+) : Cs, Expression
+{
+    public InitializerExpression WithId(Guid id) => this with { Id = id };
+    public InitializerExpression WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public InitializerExpression WithMarkers(Markers markers) => this with { Markers = markers };
+    public InitializerExpression WithExpressions(JContainer<Expression> expressions) => this with { Expressions = expressions };
+
+    public JavaType? Type => null;
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
+/// A null-forgiving (null-suppression) expression: expr!
+/// The right padding on the expression holds any space before the '!'.
+/// </summary>
+public sealed record NullSafeExpression(
+    Guid Id,
+    Space Prefix,
+    Markers Markers,
+    JRightPadded<Expression> ExpressionPadded
+) : Cs, Expression
+{
+    public Expression Expression => ExpressionPadded.Element;
+    public NullSafeExpression WithId(Guid id) => this with { Id = id };
+    public NullSafeExpression WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public NullSafeExpression WithMarkers(Markers markers) => this with { Markers = markers };
+    public NullSafeExpression WithExpressionPadded(JRightPadded<Expression> expressionPadded) => this with { ExpressionPadded = expressionPadded };
+
+    public JavaType? Type => null;
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+/// <summary>
 /// A C# tuple expression (literal or deconstruction target).
 /// Examples:
 ///   (1, 2)                          // tuple literal
@@ -931,3 +1096,4 @@ public sealed record TupleExpression(
 
     Tree Tree.WithId(Guid id) => WithId(id);
 }
+

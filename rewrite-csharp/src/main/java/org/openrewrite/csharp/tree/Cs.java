@@ -23,8 +23,10 @@ import org.openrewrite.*;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
 import org.openrewrite.csharp.service.CSharpNamingService;
+import org.openrewrite.csharp.service.CSharpWhitespaceValidationService;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NamingService;
+import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.rpc.request.Print;
@@ -282,6 +284,9 @@ public interface Cs extends J {
         public <S, T extends S> T service(Class<S> service) {
             if (NamingService.class.getName().equals(service.getName())) {
                 return (T) new CSharpNamingService();
+            }
+            if (WhitespaceValidationService.class.getName().equals(service.getName())) {
+                return (T) new CSharpWhitespaceValidationService();
             }
             return JavaSourceFile.super.service(service);
         }
@@ -1150,6 +1155,37 @@ public interface Cs extends J {
         }
     }
 
+    @Getter
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class Keyword implements Cs {
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        KeywordKind kind;
+
+        @Override
+        public @Nullable <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitKeyword(this, p);
+        }
+
+        public enum KeywordKind {
+            Ref, Out, Await, Base, This, Break, Return, Not, Default, Case, Checked, Unchecked, Operator
+        }
+    }
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3116,50 +3152,6 @@ public interface Cs extends J {
         }
     }
 
-    @Getter
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    final class Keyword implements Cs {
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Getter
-        KeywordKind kind;
-
-        @Override
-        public @Nullable <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitKeyword(this, p);
-        }
-
-        public enum KeywordKind {
-            Ref,
-            Out,
-            Await,
-            Base,
-            This,
-            Break,
-            Return,
-            Not,
-            Default,
-            Case,
-            Checked,
-            Unchecked,
-            Operator
-        }
-    }
-
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -4453,61 +4445,6 @@ public interface Cs extends J {
         }
     }
 
-    /**
-     * Represents a C# constructor declaration which may include an optional constructor initializer.
-     * <p>
-     * For example:
-     * <pre>
-     *   // Constructor with no initializer
-     *   public MyClass() {
-     *   }
-     *
-     *   // Constructor with base class initializer
-     *   public MyClass(int x) : base(x) {
-     *   }
-     *
-     *   // Constructor with this initializer
-     *   public MyClass(string s) : this(int.Parse(s)) {
-     *   }
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PUBLIC)
-    public class Constructor implements Cs, Statement {
-        @Getter
-        @With
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @Getter
-        @With
-        Space prefix;
-
-        @Getter
-        @With
-        Markers markers;
-
-        @Getter
-        @With
-        @Nullable
-        ConstructorInitializer initializer;
-
-        @Getter
-        @With
-        J.MethodDeclaration constructorCore;
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitConstructor(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-    }
 
     /**
      * Represents a C# destructor which is a method called before an object is destroyed by the garbage collector.
@@ -4711,88 +4648,6 @@ public interface Cs extends J {
     }
 
 
-    /**
-     * Represents a constructor initializer which is a call to another constructor, either in the same class (this)
-     * or in the base class (base).
-     * Examples:
-     * <pre>
-     * class Person {
-     * // Constructor with 'this' initializer
-     * public Person(string name) : this(name, 0) { }
-     * // Constructor with 'base' initializer
-     * public Person(string name, int age) : base(name) { }
-     * }
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ConstructorInitializer implements Cs {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Getter
-        Keyword keyword;
-
-        JContainer<Expression> arguments;
-
-        public List<Expression> getArguments() {
-            return arguments.getElements();
-        }
-
-        public ConstructorInitializer withArguments(List<Expression> arguments) {
-            return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitConstructorInitializer(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ConstructorInitializer t;
-
-            public JContainer<Expression> getArguments() {
-                return t.arguments;
-            }
-
-            public ConstructorInitializer withArguments(JContainer<Expression> arguments) {
-                return t.arguments == arguments ? t : new ConstructorInitializer(t.id, t.prefix, t.markers, t.keyword, arguments);
-            }
-        }
-    }
 
     /**
      * Represents a C# tuple type specification, which allows grouping multiple types into a single type.
@@ -5339,6 +5194,49 @@ public interface Cs extends J {
             public DefaultExpression withTypeOperator(@Nullable JContainer<TypeTree> typeOperator) {
                 return t.typeOperator == typeOperator ? t : new DefaultExpression(t.id, t.prefix, t.markers, typeOperator);
             }
+        }
+    }
+
+    /**
+     * Represents a C# sizeof expression, e.g. {@code sizeof(int)}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @Data
+    final class SizeOf implements Cs, Expression, TypedTree {
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression expression;
+
+        @With
+        @Nullable
+        @Getter
+        JavaType type;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitSizeOf(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
     }
 

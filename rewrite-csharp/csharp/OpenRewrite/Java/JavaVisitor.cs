@@ -45,6 +45,9 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             MethodInvocation mi => VisitMethodInvocation(mi, p),
             NewClass nc => VisitNewClass(nc, p),
             NewArray na => VisitNewArray(na, p),
+            InstanceOf io => VisitInstanceOf(io, p),
+            NullableType nt => VisitNullableType(nt, p),
+            ParameterizedType pt => VisitParameterizedType(pt, p),
             ArrayType at => VisitArrayType(at, p),
             ArrayAccess aa => VisitArrayAccess(aa, p),
             ArrayDimension ad => VisitArrayDimension(ad, p),
@@ -53,6 +56,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             SwitchExpression se => VisitSwitchExpression(se, p),
             Case cs => VisitCase(cs, p),
             DeconstructionPattern dp => VisitDeconstructionPattern(dp, p),
+            Label lbl => VisitLabel(lbl, p),
             Synchronized sync => VisitSynchronized(sync, p),
             TypeCast tc => VisitTypeCast(tc, p),
             Package pkg => VisitPackage(pkg, p),
@@ -470,6 +474,41 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         return na;
+    }
+
+    public virtual J VisitLabel(Label label, P p)
+    {
+        Visit(label.LabelName.Element, p);
+        Visit(label.Statement, p);
+        return label;
+    }
+
+    public virtual J VisitInstanceOf(InstanceOf instanceOf, P p)
+    {
+        Visit(instanceOf.Expression.Element, p);
+        Visit(instanceOf.Clazz, p);
+        if (instanceOf.Pattern != null) Visit(instanceOf.Pattern, p);
+        if (instanceOf.InstanceOfModifier != null) Visit(instanceOf.InstanceOfModifier, p);
+        return instanceOf;
+    }
+
+    public virtual J VisitNullableType(NullableType nullableType, P p)
+    {
+        Visit(nullableType.TypeTree, p);
+        return nullableType;
+    }
+
+    public virtual J VisitParameterizedType(ParameterizedType pt, P p)
+    {
+        Visit(pt.Clazz, p);
+        if (pt.TypeParameters != null)
+        {
+            foreach (var paddedParam in pt.TypeParameters.Elements)
+            {
+                Visit(paddedParam.Element, p);
+            }
+        }
+        return pt;
     }
 
     public virtual J VisitArrayType(ArrayType at, P p)

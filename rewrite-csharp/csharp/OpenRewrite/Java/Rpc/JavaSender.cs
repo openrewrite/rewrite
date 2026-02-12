@@ -64,6 +64,9 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             MethodInvocation mi => VisitMethodInvocation(mi, q),
             NewClass nc => VisitNewClass(nc, q),
             NewArray na => VisitNewArray(na, q),
+            InstanceOf io => VisitInstanceOf(io, q),
+            NullableType nt => VisitNullableType(nt, q),
+            ParameterizedType pt => VisitParameterizedType(pt, q),
             ArrayType at => VisitArrayType(at, q),
             ArrayAccess aa => VisitArrayAccess(aa, q),
             ArrayDimension ad => VisitArrayDimension(ad, q),
@@ -73,6 +76,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             SwitchExpression se => VisitSwitchExpression(se, q),
             Case cs => VisitCase(cs, q),
             DeconstructionPattern dp => VisitDeconstructionPattern(dp, q),
+            Label lbl => VisitLabel(lbl, q),
             Synchronized sync => VisitSynchronized(sync, q),
             TypeCast tc => VisitTypeCast(tc, q),
             Package pkg => VisitPackage(pkg, q),
@@ -109,6 +113,38 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     {
         q.GetAndSend(arrayDimension, a => a.Index, idx => VisitRightPadded(idx, q));
         return arrayDimension;
+    }
+
+    public override J VisitLabel(Label label, RpcSendQueue q)
+    {
+        q.GetAndSend(label, l => l.LabelName, lbl => VisitRightPadded(lbl, q));
+        q.GetAndSend(label, l => l.Statement, stmt => Visit(stmt, q));
+        return label;
+    }
+
+    public override J VisitInstanceOf(InstanceOf instanceOf, RpcSendQueue q)
+    {
+        q.GetAndSend(instanceOf, i => i.Expression, expr => VisitRightPadded(expr, q));
+        q.GetAndSend(instanceOf, i => i.Clazz, clazz => Visit(clazz, q));
+        q.GetAndSend(instanceOf, i => i.Pattern, pattern => Visit(pattern, q));
+        q.GetAndSend(instanceOf, i => AsRef(i.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
+        q.GetAndSend(instanceOf, i => i.InstanceOfModifier, m => Visit(m, q));
+        return instanceOf;
+    }
+
+    public override J VisitNullableType(NullableType nullableType, RpcSendQueue q)
+    {
+        q.GetAndSendList(nullableType, n => n.Annotations, a => a.Id, a => Visit(a, q));
+        q.GetAndSend(nullableType, n => n.TypeTreePadded, t => VisitRightPadded(t, q));
+        return nullableType;
+    }
+
+    public override J VisitParameterizedType(ParameterizedType type, RpcSendQueue q)
+    {
+        q.GetAndSend(type, t => (J)t.Clazz, clazz => Visit(clazz, q));
+        q.GetAndSend(type, t => t.TypeParameters, p => VisitContainer(p, q));
+        q.GetAndSend(type, t => AsRef(t.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
+        return type;
     }
 
     public override J VisitArrayType(ArrayType arrayType, RpcSendQueue q)
@@ -364,9 +400,10 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
     public J VisitModifier(Modifier modifier, RpcSendQueue q)
     {
-        // Java model has a keyword string field; derive from ModifierType for protocol compatibility
-        q.GetAndSend(modifier, m => GetModifierKeyword(m.Type));
-        q.GetAndSend(modifier, m => m.Type);
+        // Java model has a keyword string field; use stored keyword for LanguageExtension, derive for others
+        q.GetAndSend(modifier, m => m.Keyword ?? GetModifierKeyword(m.Type));
+        // C#-specific modifier types must be mapped to LanguageExtension for Java interop
+        q.GetAndSend(modifier, m => MapModifierTypeForJava(m.Type));
         q.GetAndSendList(modifier, m => m.Annotations, a => a.Id, annot => Visit(annot, q));
         return modifier;
     }
@@ -776,5 +813,33 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         Modifier.ModifierType.In => "in",
         Modifier.ModifierType.LanguageExtension => "",
         _ => type.ToString().ToLowerInvariant()
+    };
+
+    /// <summary>
+    /// Maps C#-specific modifier types to LanguageExtension for Java interop.
+    /// Java's J.Modifier.Type enum only contains modifiers shared across languages.
+    /// C#-only modifiers (partial, internal, virtual, override, etc.) are sent as
+    /// LanguageExtension with the actual keyword preserved in the keyword field.
+    /// </summary>
+    private static Modifier.ModifierType MapModifierTypeForJava(Modifier.ModifierType type) => type switch
+    {
+        // These exist in Java's J.Modifier.Type enum
+        Modifier.ModifierType.Default => type,
+        Modifier.ModifierType.Public => type,
+        Modifier.ModifierType.Protected => type,
+        Modifier.ModifierType.Private => type,
+        Modifier.ModifierType.Abstract => type,
+        Modifier.ModifierType.Static => type,
+        Modifier.ModifierType.Final => type,
+        Modifier.ModifierType.Sealed => type,
+        Modifier.ModifierType.Transient => type,
+        Modifier.ModifierType.Volatile => type,
+        Modifier.ModifierType.Synchronized => type,
+        Modifier.ModifierType.Native => type,
+        Modifier.ModifierType.Strictfp => type,
+        Modifier.ModifierType.Async => type,
+        Modifier.ModifierType.LanguageExtension => type,
+        // C#-specific modifiers map to LanguageExtension
+        _ => Modifier.ModifierType.LanguageExtension
     };
 }

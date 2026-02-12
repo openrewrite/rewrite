@@ -349,6 +349,8 @@ public class RpcReceiveQueue
                 typeof(Rewrite.CSharp.RecordClass),
             "org.openrewrite.csharp.marker.ExpressionBodied" =>
                 typeof(Rewrite.CSharp.ExpressionBodied),
+            "org.openrewrite.java.marker.OmitParentheses" =>
+                typeof(Rewrite.Java.OmitParentheses),
 
             _ => FromJavaTypeNameByConvention(javaTypeName)
         };
