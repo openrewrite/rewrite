@@ -3181,20 +3181,6 @@ class ParserVisitor(ast.NodeVisitor):
                 tok = self._advance_token()
                 continue
 
-            # Handle nested FSTRING_START - this indicates nested f-string concatenation
-            # which is not fully supported. Skip to prevent infinite loop.
-            if tok.type == FSTRING_START:
-                # Skip until we find the matching FSTRING_END
-                depth = 1
-                while depth > 0 and self._token_idx < len(self._tokens):
-                    tok = self._advance_token()
-                    if tok.type == FSTRING_START:
-                        depth += 1
-                    elif tok.type == FSTRING_END:
-                        depth -= 1
-                tok = self._advance_token() if self._token_idx < len(self._tokens) - 1 else tok
-                continue
-
             value = node.values[value_idx]
             if tok.type == FSTRING_MIDDLE:
                 # Accumulate text from consecutive FSTRING_MIDDLE tokens
@@ -3228,12 +3214,33 @@ class ParserVisitor(ast.NodeVisitor):
                     value = node.values[value_idx]
 
                 if isinstance(cast(ast.FormattedValue, value).value, ast.JoinedStr):
-                    nested, tok, _ = self.__map_fstring(cast(ast.JoinedStr, cast(ast.FormattedValue, value).value),
-                                                        Space.EMPTY, tok)
-                    expr = self.__pad_right(
-                        nested,
-                        Space.EMPTY
-                    )
+                    joined = cast(ast.JoinedStr, cast(ast.FormattedValue, value).value)
+                    nested, tok, inner_vi = self.__map_fstring(joined, Space.EMPTY, tok)
+
+                    # Handle concatenated f-strings/strings within this expression
+                    while True:
+                        peek_tok, _ = self._peek_significant_token()
+                        if peek_tok.type not in (FSTRING_START, token.STRING):
+                            break
+                        concat_prefix = self.__whitespace()
+                        tok = self._tokens[self._token_idx]
+                        if tok.type == FSTRING_START:
+                            right, tok, inner_vi = self.__map_fstring(joined, concat_prefix, tok, inner_vi)
+                        else:
+                            ast_val = (joined.values[inner_vi]
+                                       if inner_vi < len(joined.values)
+                                       else ast.Constant(value=ast.literal_eval(tok.string)))
+                            right, tok = self.__map_literal(ast_val, tok)
+                            right = right.replace(prefix=concat_prefix)
+                        nested = py.Binary(
+                            random_id(), Space.EMPTY, Markers.EMPTY,
+                            nested,
+                            self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
+                            None, right,
+                            self._type_mapping.type(node)
+                        )
+
+                    expr = self.__pad_right(nested, Space.EMPTY)
                 else:
                     expr = self.__pad_right(
                         self.__convert(cast(ast.FormattedValue, value).value),
