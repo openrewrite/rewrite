@@ -2771,6 +2771,58 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void appendFullyQualifiedClassValueFromSamePackage() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "com.example.MyConfig.class",
+            null,
+            null,
+            true
+          )),
+          java(
+            """
+              package com.example;
+              public class MyConfig {}
+              """
+          ),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?>[] value();
+              }
+              """
+          ),
+          java(
+            """
+              package com.example;
+
+              import org.example.Foo;
+
+              @Foo(OtherConfig.class)
+              public class Application {}
+              """,
+            """
+              package com.example;
+
+              import org.example.Foo;
+
+              @Foo({OtherConfig.class, MyConfig.class})
+              public class Application {}
+              """
+          ),
+          java(
+            """
+              package com.example;
+              public class OtherConfig {}
+              """
+          )
+        );
+    }
+
+    @Test
     void appendFullyQualifiedClassValueToExistingClassAttribute() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(

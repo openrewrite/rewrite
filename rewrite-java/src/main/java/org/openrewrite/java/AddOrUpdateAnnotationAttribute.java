@@ -152,6 +152,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                 if (original != a) {
                     doAfterVisit(new SimplifySingleElementAnnotation().getVisitor());
+                    if (isFullyQualifiedClass()) {
+                        doAfterVisit(new ShortenFullyQualifiedTypeReferences().getVisitor());
+                    }
                 }
                 return maybeAutoFormat(original, a, ctx);
             }
