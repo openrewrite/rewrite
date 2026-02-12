@@ -2482,4 +2482,460 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addFullyQualifiedEnumValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "org.example.Values.ONE",
+            null,
+            null,
+            null
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Values value();
+              }
+              """
+          ),
+          java(
+            """
+              package org.example;
+              public enum Values { ONE, TWO }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              import org.example.Values;
+
+              @Foo(Values.ONE)
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateToFullyQualifiedEnumValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "org.example.Values.TWO",
+            null,
+            null,
+            null
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Values value();
+              }
+              """
+          ),
+          java(
+            """
+              package org.example;
+              public enum Values { ONE, TWO }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              import org.example.Values;
+
+              @Foo(Values.ONE)
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              import org.example.Values;
+
+              @Foo(Values.TWO)
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendClassValueToExistingClassAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "Long.class",
+            null,
+            null,
+            true
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?>[] value();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(Integer.class)
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo({Integer.class, Long.class})
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void addStringValueToExistingValueArrayWithoutAppend() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.springframework.context.annotation.ImportResource",
+            null,
+            "classpath:b.xml",
+            null,
+            null,
+            false
+          )),
+          java(
+            """
+              package org.springframework.context.annotation;
+              public @interface ImportResource {
+                  String[] value() default {};
+                  String[] locations() default {};
+                  Class<?> reader() default Object.class;
+              }
+              """
+          ),
+          java(
+            """
+              package com.example;
+
+              import org.springframework.context.annotation.ImportResource;
+
+              @ImportResource(value = {"classpath:a.xml"})
+              public class Application {
+              }
+              """,
+            """
+              package com.example;
+
+              import org.springframework.context.annotation.ImportResource;
+
+              @ImportResource("classpath:b.xml")
+              public class Application {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendStringValueToExistingValueArray() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.springframework.context.annotation.ImportResource",
+            null,
+            "classpath:b.xml",
+            null,
+            null,
+            true
+          )),
+          java(
+            """
+              package org.springframework.context.annotation;
+              public @interface ImportResource {
+                  String[] value() default {};
+                  String[] locations() default {};
+                  Class<?> reader() default Object.class;
+              }
+              """
+          ),
+          java(
+            """
+              package com.example;
+
+              import org.springframework.context.annotation.ImportResource;
+
+              @ImportResource(value = {"classpath:a.xml"})
+              public class Application {
+              }
+              """,
+            """
+              package com.example;
+
+              import org.springframework.context.annotation.ImportResource;
+
+              @ImportResource({"classpath:a.xml", "classpath:b.xml"})
+              public class Application {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendStringValueToExistingEmptyValueArray() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "hello",
+            null,
+            null,
+            true
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(value = {})
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo("hello")
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void addMultipleClassValuesToAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "Integer.class,Long.class",
+            null,
+            null,
+            null
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?>[] value();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo({Integer.class, Long.class})
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendFullyQualifiedClassValueFromSamePackage() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "com.example.MyConfig.class",
+            null,
+            null,
+            true
+          )),
+          java(
+            """
+              package com.example;
+              public class MyConfig {}
+              """
+          ),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?>[] value();
+              }
+              """
+          ),
+          java(
+            """
+              package com.example;
+
+              import org.example.Foo;
+
+              @Foo(OtherConfig.class)
+              public class Application {}
+              """,
+            """
+              package com.example;
+
+              import org.example.Foo;
+
+              @Foo({OtherConfig.class, MyConfig.class})
+              public class Application {}
+              """
+          ),
+          java(
+            """
+              package com.example;
+              public class OtherConfig {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendFullyQualifiedClassValueToExistingClassAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "com.example.MyClass.class",
+            null,
+            null,
+            true
+          )),
+          java(
+            """
+              package com.example;
+              public class MyClass {}
+              """
+          ),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?>[] value();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(Integer.class)
+              public class A {}
+              """,
+            """
+              import com.example.MyClass;
+              import org.example.Foo;
+
+              @Foo({Integer.class, MyClass.class})
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendClassValueToExistingNamedClassAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "classes",
+            "Long.class",
+            null,
+            null,
+            true
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?>[] classes();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(classes = Integer.class)
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(classes = {Integer.class, Long.class})
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void dottedStringValueIsNotTreatedAsEnum() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            null,
+            "some.dotted.value",
+            null,
+            null,
+            null
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String value();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo("some.dotted.value")
+              public class A {
+              }
+              """
+          )
+        );
+    }
 }
