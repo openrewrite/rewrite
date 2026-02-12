@@ -286,7 +286,7 @@ class TemplateBuilder:
 
 
 def template(
-    code: str,
+    code,
     *,
     imports: Optional[List[str]] = None,
     **captures: Capture
@@ -297,9 +297,10 @@ def template(
     This is the primary factory function for creating templates.
 
     Args:
-        code: Python code with {name} placeholders.
+        code: Python code with {name} placeholders, or a t-string
+              (Python 3.14+) with Capture/RawCode interpolations.
         imports: Optional import statements for type resolution.
-        **captures: Named capture specifications.
+        **captures: Named capture specifications (not allowed with t-strings).
 
     Returns:
         A Template instance.
@@ -312,12 +313,26 @@ def template(
         expr = capture('expr')
         tmpl = template("print({expr})", expr=expr)
 
+        # With t-string (Python 3.14+)
+        expr = capture('expr')
+        tmpl = template(t"print({expr})")
+
         # With imports
         tmpl = template(
             "datetime.now()",
             imports=["from datetime import datetime"]
         )
     """
+    from ._tstring_support import is_tstring, convert_tstring
+
+    if is_tstring(code):
+        if captures:
+            raise TypeError(
+                "Cannot pass keyword captures when using a t-string; "
+                "interpolate Capture objects directly in the t-string instead"
+            )
+        code, captures = convert_tstring(code)
+
     return Template(
         code=code,
         captures=captures,
