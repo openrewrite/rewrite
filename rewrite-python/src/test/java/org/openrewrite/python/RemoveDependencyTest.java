@@ -29,7 +29,7 @@ class RemoveDependencyTest implements RewriteTest {
     @Test
     void removeDependencyWithResolvedProject(@TempDir Path tempDir) {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("click")),
+          spec -> spec.recipe(new RemoveDependency("click", null, null)),
           uv(tempDir,
             pyproject(
               """
@@ -57,7 +57,7 @@ class RemoveDependencyTest implements RewriteTest {
     @Test
     void removeDependencyFromList() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("click")),
+          spec -> spec.recipe(new RemoveDependency("click", null, null)),
           pyproject(
             """
               [project]
@@ -85,7 +85,7 @@ class RemoveDependencyTest implements RewriteTest {
     @Test
     void removeFirstDependency() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("requests")),
+          spec -> spec.recipe(new RemoveDependency("requests", null, null)),
           pyproject(
             """
               [project]
@@ -111,7 +111,7 @@ class RemoveDependencyTest implements RewriteTest {
     @Test
     void removeLastDependency() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("click")),
+          spec -> spec.recipe(new RemoveDependency("click", null, null)),
           pyproject(
             """
               [project]
@@ -137,7 +137,7 @@ class RemoveDependencyTest implements RewriteTest {
     @Test
     void skipWhenNotPresent() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("nonexistent")),
+          spec -> spec.recipe(new RemoveDependency("nonexistent", null, null)),
           pyproject(
             """
               [project]
@@ -154,7 +154,7 @@ class RemoveDependencyTest implements RewriteTest {
     @Test
     void normalizeNameForMatching() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("typing_extensions")),
+          spec -> spec.recipe(new RemoveDependency("typing_extensions", null, null)),
           pyproject(
             """
               [project]
@@ -180,7 +180,7 @@ class RemoveDependencyTest implements RewriteTest {
     @Test
     void removeFromInlineList() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("requests")),
+          spec -> spec.recipe(new RemoveDependency("requests", null, null)),
           pyproject(
             """
               [project]
@@ -193,6 +193,70 @@ class RemoveDependencyTest implements RewriteTest {
               name = "myapp"
               version = "1.0.0"
               dependencies = ["click>=8.0"]
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeFromOptionalDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("pytest-cov", "project.optional-dependencies", "dev")),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = ["requests>=2.28.0"]
+
+              [project.optional-dependencies]
+              dev = [
+                  "pytest>=7.0",
+                  "pytest-cov>=4.0",
+              ]
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = ["requests>=2.28.0"]
+
+              [project.optional-dependencies]
+              dev = [
+                  "pytest>=7.0",
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeFromDependencyGroup() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("mypy", "dependency-groups", "dev")),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = ["requests>=2.28.0"]
+
+              [dependency-groups]
+              dev = [
+                  "pytest>=7.0",
+                  "mypy>=1.0",
+              ]
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = ["requests>=2.28.0"]
+
+              [dependency-groups]
+              dev = [
+                  "pytest>=7.0",
+              ]
               """
           )
         );
