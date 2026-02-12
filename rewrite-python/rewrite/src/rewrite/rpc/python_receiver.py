@@ -1196,6 +1196,16 @@ def _receive_parse_exception_result(marker, q: RpcReceiveQueue):
     )
 
 
+def _send_search_result(marker, q):
+    """Codec for sending SearchResult marker.
+
+    Fields are sent in the order expected by Java's SearchResult.rpcReceive():
+    id, description
+    """
+    q.get_and_send(marker, lambda x: str(x.id))
+    q.get_and_send(marker, lambda x: x.description)
+
+
 def _send_parse_exception_result(marker, q):
     """Codec for sending ParseExceptionResult marker.
 
@@ -1443,12 +1453,13 @@ def _register_core_marker_codecs():
         _receive_markers,
         lambda: Markers.EMPTY
     )
-    # SearchResult - has specific fields to receive
+    # SearchResult - has specific fields to receive/send
     register_codec_with_both_names(
         'org.openrewrite.marker.SearchResult',
         SearchResult,
         _receive_search_result,
-        make_dataclass_factory(SearchResult)
+        make_dataclass_factory(SearchResult),
+        sender=_send_search_result
     )
     # ParseExceptionResult - has specific fields to receive/send
     register_codec_with_both_names(
