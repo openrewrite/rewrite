@@ -99,7 +99,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                 String newAttributeValue;
                 if (isFullyQualifiedClass()) {
-                    maybeAddImport(attributeValue.substring(0, attributeValue.length() - 6), false);
+                    maybeAddImport(attributeValue.substring(0, attributeValue.length() - 6));
                     newAttributeValue = attributeValue;
                 } else if (isFullyQualifiedEnumValue(a)) {
                     maybeAddImport(getEnumClassName(attributeValue), false);
