@@ -24,14 +24,11 @@ class StyleHelperTest {
 
     @Test
     void mergeTabsAndIndentsStyles() {
-        var merged = StyleHelper.merge(IntelliJ.tabsAndIndents(),
-                new TabsAndIndentsStyle(true, 1, 1, 2, true, new TabsAndIndentsStyle.MethodDeclarationParameters(true), new TabsAndIndentsStyle.RecordComponents(true)));
+        var merged = StyleHelper.merge(IntelliJ.tabsAndIndents(), new TabsAndIndentsStyle(true, 1, 1, 2, true));
         assertThat(merged.getUseTabCharacter()).isTrue();
         assertThat(merged.getTabSize()).isEqualTo(1);
         assertThat(merged.getIndentSize()).isEqualTo(1);
         assertThat(merged.getContinuationIndent()).isEqualTo(2);
-        assertThat(merged.getMethodDeclarationParameters().getAlignWhenMultiple()).isTrue();
-        assertThat(merged.getRecordComponents().getAlignWhenMultiple()).isTrue();
         assertThat(merged.getIndentsRelativeToExpressionStart()).isTrue();
     }
 

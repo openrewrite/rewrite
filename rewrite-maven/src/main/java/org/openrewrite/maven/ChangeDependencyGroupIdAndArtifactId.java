@@ -119,7 +119,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
     }
 
     String description = "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before. " +
-                "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided.";
+                "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided. " +
+                "Exclusions that reference the old dependency coordinates will also be updated to match the new coordinates.";
 
     @Override
     public Validated<Object> validate() {
@@ -163,6 +164,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             Optional.ofNullable(newArtifactId).orElse(oldArtifactId),
                             newVersion, versionPattern).getVisitor());
                 }
+                // Update any exclusions that reference the old coordinates
+                if (newGroupId != null || newArtifactId != null) {
+                    doAfterVisit(new ChangeExclusion(
+                            oldGroupId, oldArtifactId,
+                            newGroupId, newArtifactId).getVisitor());
+                }
                 return super.visitDocument(document, ctx);
             }
 
@@ -179,6 +186,13 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 boolean isAnnotationProcessorPath = isAnnotationProcessorPathTag(oldGroupId, oldArtifactId);
                 boolean deferUpdate = false;
                 if (isOldDependencyTag || isPluginDependency || isAnnotationProcessorPath) {
+                    if (newVersion != null) {
+                        String currentVersionValue = t.getChildValue("version").orElse(null);
+                        if (isImplicitlyDefinedVersionProperty(currentVersionValue)) {
+                            return t;
+                        }
+                    }
+
                     String groupId = newGroupId;
                     if (groupId != null) {
                         t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("groupId").orElse(null), groupId).visitNonNull(t, ctx);
@@ -209,7 +223,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                                 if (!configuredToOverrideManagedVersion && newDependencyManaged || (oldDependencyDefinedManaged && configuredToChangeManagedDependency)) {
                                     t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false, true).visit(t, ctx);
                                 } else {
-                                    // Otherwise, change the version to the new value.
                                     String versionTagValue = t.getChildValue("version").orElse(null);
                                     if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
                                         t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);

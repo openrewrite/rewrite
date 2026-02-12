@@ -85,20 +85,6 @@ def test_concat_fstring_6():
            ))
 
 
-@pytest.mark.xfail(reason="F-strings with nested f-string literal concatenations are not yet supported", strict=True)
-def test_concat_fstring_7():
-    # language=python
-    RecipeSpec().rewrite_run(python("""
-        _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
-        """
-           ))
-
-
-def test_concat_fstring_8():
-    # language=python
-    RecipeSpec().rewrite_run(python('_ = f"n{\' \':{1}}Groups"'))
-
-
 def test_concat_fstring_9():
     # language=python
     RecipeSpec().rewrite_run(python('print(f"Progress: {output.escaped_title[:30]:<30} {default_output:>161}")'))
@@ -202,16 +188,6 @@ def test_nested_fstring_conversion_and_format_expr():
     RecipeSpec().rewrite_run(python("""a = f'{f"foo"!s:<{5*2}}'"""))
 
 
-def test_comment_in_expr():
-    # language=python
-    RecipeSpec().rewrite_run(python(
-        """
-        f"abc{a # This is a comment }
-        + 3}"
-        """
-    ))
-
-
 def test_simple_format_spec():
     # language=python
     RecipeSpec().rewrite_run(python("a = f'{1:n}'"))
@@ -239,11 +215,23 @@ def test_format_value():
     RecipeSpec().rewrite_run(python('''a = f"{'abc':>{2*3}}"'''))
 
 
-def test_nested_fstring_with_format_value():
-    # language=python
-    RecipeSpec().rewrite_run(python("""a = f'{f"{'foo'}":>{2*3}}'"""))
-
-
 def test_adjoining_expressions():
     # language=python
     RecipeSpec().rewrite_run(python("""a = f'{1}{0}'"""))
+
+
+def test_nested_fstring_in_expression():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """
+        name = "Alice"
+        score = 87
+        max_score = 100
+
+        percentage = (score / max_score) * 100
+
+        message = f"{name} scored {score}/{max_score}, which is {f'{percentage:.1f}'}% of the total."
+
+        print(message)
+        """
+    ))

@@ -107,6 +107,136 @@ class SearchResult(Marker):
     def description(self) -> Optional[str]:
         return self._description
 
+    def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
+        desc = self._description or ""
+        return comment_wrapper(f"({desc})" if desc else "")
+
+
+class Markup(Marker, ABC):
+    """
+    Base class for markup markers that provide visual indicators (warnings, errors, info, debug).
+
+    Markup markers are used to annotate code with messages that can be displayed
+    in various ways depending on the tooling.
+    """
+
+    @property
+    @abstractmethod
+    def message(self) -> str:
+        """The primary message to display."""
+        ...
+
+    @property
+    @abstractmethod
+    def detail(self) -> Optional[str]:
+        """Additional detail, shown in verbose mode."""
+        ...
+
+    def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
+        if verbose and self.detail:
+            return comment_wrapper(f"({self.detail})")
+        return comment_wrapper(f"({self.message})")
+
+    @staticmethod
+    def warn(message: str, detail: Optional[str] = None) -> 'MarkupWarn':
+        """Create a warning markup marker."""
+        return MarkupWarn(random_id(), message, detail)
+
+    @staticmethod
+    def error(message: str, detail: Optional[str] = None) -> 'MarkupError':
+        """Create an error markup marker."""
+        return MarkupError(random_id(), message, detail)
+
+    @staticmethod
+    def info(message: str, detail: Optional[str] = None) -> 'MarkupInfo':
+        """Create an info markup marker."""
+        return MarkupInfo(random_id(), message, detail)
+
+    @staticmethod
+    def debug(message: str, detail: Optional[str] = None) -> 'MarkupDebug':
+        """Create a debug markup marker."""
+        return MarkupDebug(random_id(), message, detail)
+
+
+@dataclass(frozen=True, eq=False)
+class MarkupWarn(Markup):
+    """Warning markup marker for deprecations and other warnings."""
+    _id: UUID
+    _message: str
+    _detail: Optional[str] = None
+
+    @property
+    def id(self) -> UUID:
+        return self._id
+
+    @property
+    def message(self) -> str:
+        return self._message
+
+    @property
+    def detail(self) -> Optional[str]:
+        return self._detail
+
+
+@dataclass(frozen=True, eq=False)
+class MarkupError(Markup):
+    """Error markup marker for errors and issues."""
+    _id: UUID
+    _message: str
+    _detail: Optional[str] = None
+
+    @property
+    def id(self) -> UUID:
+        return self._id
+
+    @property
+    def message(self) -> str:
+        return self._message
+
+    @property
+    def detail(self) -> Optional[str]:
+        return self._detail
+
+
+@dataclass(frozen=True, eq=False)
+class MarkupInfo(Markup):
+    """Info markup marker for informational messages."""
+    _id: UUID
+    _message: str
+    _detail: Optional[str] = None
+
+    @property
+    def id(self) -> UUID:
+        return self._id
+
+    @property
+    def message(self) -> str:
+        return self._message
+
+    @property
+    def detail(self) -> Optional[str]:
+        return self._detail
+
+
+@dataclass(frozen=True, eq=False)
+class MarkupDebug(Markup):
+    """Debug markup marker for debugging information."""
+    _id: UUID
+    _message: str
+    _detail: Optional[str] = None
+
+    @property
+    def id(self) -> UUID:
+        return self._id
+
+    @property
+    def message(self) -> str:
+        return self._message
+
+    @property
+    def detail(self) -> Optional[str]:
+        return self._detail
+
 
 @dataclass(frozen=True, eq=False)
 class UnknownJavaMarker(Marker):
@@ -154,3 +284,9 @@ class ParseExceptionResult(Marker):
     @property
     def message(self) -> str:
         return self._message
+
+    _tree_type: Optional[str] = None
+
+    @property
+    def tree_type(self) -> Optional[str]:
+        return self._tree_type

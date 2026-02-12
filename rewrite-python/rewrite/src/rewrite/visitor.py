@@ -175,9 +175,10 @@ class TreeVisitor(ABC, Generic[T, P]):
     def visit_markers(self, markers: Markers, p: P) -> Markers:
         if markers is None or markers is Markers.EMPTY:
             return Markers.EMPTY
-        elif len(markers.markers) == 0:
+        ms = markers._markers  # bypass @property in hot path
+        if len(ms) == 0:
             return markers
-        return markers.replace(markers=list_map(lambda m: self.visit_marker(m, p), markers.markers))
+        return markers.replace(markers=list_map(lambda m: self.visit_marker(m, p), ms))
 
     def visit_marker(self, marker: Marker, p: P) -> Marker:
         return marker

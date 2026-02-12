@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.java.Assertions.mavenProject;
@@ -2807,6 +2808,363 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1330")
+    @Test
+    void versionNotDroppedWhenDependencyExcludedByOtherDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "com.fasterxml.jackson.jaxrs",
+            "jackson-jaxrs-json-provider",
+            "com.fasterxml.jackson.jakarta.rs",
+            "jackson-jakarta-rs-json-provider",
+            "2.x",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.swagger.core.v3</groupId>
+                          <artifactId>swagger-jaxrs2</artifactId>
+                          <version>2.2.20</version>
+                          <scope>provided</scope>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>com.fasterxml.jackson.jaxrs</groupId>
+                                  <artifactId>*</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.jaxrs</groupId>
+                          <artifactId>jackson-jaxrs-json-provider</artifactId>
+                          <version>2.9.7</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.swagger.core.v3</groupId>
+                          <artifactId>swagger-jaxrs2</artifactId>
+                          <version>2.2.20</version>
+                          <scope>provided</scope>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>com.fasterxml.jackson.jaxrs</groupId>
+                                  <artifactId>*</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
+                          <artifactId>jackson-jakarta-rs-json-provider</artifactId>
+                          <version>2.21.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1330")
+    @Test
+    void versionNotDroppedWhenTransitiveDependencyHasManagedVersion() {
+        // This test verifies that when changing a dependency's GAV, the version is preserved
+        // even when a transitive dependency's parent POM has the new artifact in its dependencyManagement.
+        // The swagger-jaxrs2-jakarta artifact's parent POM (swagger-project-jakarta) has
+        // jackson-jakarta-rs-json-provider in its dependencyManagement, but this should NOT
+        // cause the version to be dropped from our direct dependency.
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "com.fasterxml.jackson.jaxrs",
+            "jackson-jaxrs-json-provider",
+            "com.fasterxml.jackson.jakarta.rs",
+            "jackson-jakarta-rs-json-provider",
+            "2.x",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.swagger.core.v3</groupId>
+                          <artifactId>swagger-jaxrs2-jakarta</artifactId>
+                          <version>2.2.20</version>
+                          <scope>provided</scope>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>com.fasterxml.jackson.jaxrs</groupId>
+                                  <artifactId>*</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.jaxrs</groupId>
+                          <artifactId>jackson-jaxrs-json-provider</artifactId>
+                          <version>2.9.7</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.swagger.core.v3</groupId>
+                          <artifactId>swagger-jaxrs2-jakarta</artifactId>
+                          <version>2.2.20</version>
+                          <scope>provided</scope>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>com.fasterxml.jackson.jaxrs</groupId>
+                                  <artifactId>*</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
+                          <artifactId>jackson-jakarta-rs-json-provider</artifactId>
+                          <version>2.21.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1330")
+    @Test
+    void versionNotDroppedWhenSwaggerMigratedFirst() {
+        // This test reproduces the exact scenario from customer-requests #1330
+        // where both swagger-jaxrs2 and jackson-jaxrs-json-provider are migrated,
+        // and the exclusion is not updated to match the new groupId.
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: com.example.Test
+            displayName: test
+            description: test recipe.
+            recipeList:
+              - org.openrewrite.maven.ChangeDependencyGroupIdAndArtifactId:
+                  oldGroupId: io.swagger.core.v3
+                  oldArtifactId: swagger-jaxrs2
+                  newArtifactId: swagger-jaxrs2-jakarta
+              - org.openrewrite.maven.ChangeDependencyGroupIdAndArtifactId:
+                  oldGroupId: com.fasterxml.jackson.jaxrs
+                  oldArtifactId: jackson-jaxrs-json-provider
+                  newGroupId: com.fasterxml.jackson.jakarta.rs
+                  newArtifactId: jackson-jakarta-rs-json-provider
+                  newVersion: 2.13.x
+              - org.openrewrite.maven.ChangeManagedDependencyGroupIdAndArtifactId:
+                  oldGroupId: com.fasterxml.jackson.jaxrs
+                  oldArtifactId: jackson-jaxrs-json-provider
+                  newGroupId: com.fasterxml.jackson.jakarta.rs
+                  newArtifactId: jackson-jakarta-rs-json-provider
+                  newVersion: 2.13.x
+            """, "com.example.Test"),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <swagger-jaxrs2.version>2.2.20</swagger-jaxrs2.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.swagger.core.v3</groupId>
+                          <artifactId>swagger-jaxrs2</artifactId>
+                          <version>${swagger-jaxrs2.version}</version>
+                          <scope>provided</scope>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>com.fasterxml.jackson.jaxrs</groupId>
+                                  <artifactId>*</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.jaxrs</groupId>
+                          <artifactId>jackson-jaxrs-json-provider</artifactId>
+                          <version>2.9.7</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <swagger-jaxrs2.version>2.2.20</swagger-jaxrs2.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.swagger.core.v3</groupId>
+                          <artifactId>swagger-jaxrs2-jakarta</artifactId>
+                          <version>${swagger-jaxrs2.version}</version>
+                          <scope>provided</scope>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>com.fasterxml.jackson.jaxrs</groupId>
+                                  <artifactId>*</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
+                          <artifactId>jackson-jakarta-rs-json-provider</artifactId>
+                          <version>2.13.5</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1330")
+    @Test
+    void exclusionUpdatedWhenDependencyGroupIdChanges() {
+        // When changing a dependency's groupId/artifactId, any exclusions that match
+        // the old coordinates should be updated to match the new coordinates.
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "com.fasterxml.jackson.jaxrs",
+            "jackson-jaxrs-json-provider",
+            "com.fasterxml.jackson.jakarta.rs",
+            "jackson-jakarta-rs-json-provider",
+            "2.x",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.swagger.core.v3</groupId>
+                          <artifactId>swagger-jaxrs2-jakarta</artifactId>
+                          <version>2.2.20</version>
+                          <scope>provided</scope>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>com.fasterxml.jackson.jaxrs</groupId>
+                                  <artifactId>jackson-jaxrs-json-provider</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.jaxrs</groupId>
+                          <artifactId>jackson-jaxrs-json-provider</artifactId>
+                          <version>2.9.7</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>io.swagger.core.v3</groupId>
+                          <artifactId>swagger-jaxrs2-jakarta</artifactId>
+                          <version>2.2.20</version>
+                          <scope>provided</scope>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
+                                  <artifactId>jackson-jakarta-rs-json-provider</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
+                          <artifactId>jackson-jakarta-rs-json-provider</artifactId>
+                          <version>2.21.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldNotChangeDependencyWithImplicitlyDefinedVersionProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.junit.jupiter", "junit-jupiter-api",
+            "org.junit.jupiter", "junit-jupiter-engine",
+            "5.x", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>5.7.2</version>
+              </project>
+              """,
+            SourceSpec::skip
+          ),
+          mavenProject("my-child",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>5.7.2</version>
+                    </parent>
+                    <artifactId>my-child</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-api</artifactId>
+                            <version>${project.parent.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
           )
         );
     }

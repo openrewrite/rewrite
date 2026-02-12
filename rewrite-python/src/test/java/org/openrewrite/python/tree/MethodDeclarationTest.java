@@ -19,6 +19,7 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.python.Python3Only;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.python.Assertions.python;
@@ -34,9 +35,24 @@ class MethodDeclarationTest implements RewriteTest {
       "a, b, *args",
       "a, b, *args, **kwargs",
       "a, b, *args, **kwargs",
-      "a, b, *, c=1"
     })
     void functionDefinition(@Language("py") String args) {
+        rewriteRun(
+          python(
+            """
+              def foo(%s):
+                  pass
+              """.formatted(args)
+          )
+        );
+    }
+
+    @Python3Only
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "a, b, *, c=1"
+    })
+    void functionDefinitionKeywordOnly(@Language("py") String args) {
         rewriteRun(
           python(
             """
@@ -101,6 +117,7 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @Python3Only
     @Test
     void typedParams() {
         rewriteRun(

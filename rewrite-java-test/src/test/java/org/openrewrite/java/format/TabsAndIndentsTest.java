@@ -23,11 +23,16 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
+import org.openrewrite.java.style.WrappingAndBracesStyle;
+import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -40,7 +45,18 @@ class TabsAndIndentsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new TabsAndIndents());
+        spec.recipe(new AutoFormat(null))
+          .parser(JavaParser.fromJavaVersion().styles(singletonList(
+            new NamedStyles(
+              Tree.randomId(), "test", "test", "test", emptySet(),
+              List.of(
+                IntelliJ.wrappingAndBraces()
+                  .withKeepWhenFormatting(IntelliJ.wrappingAndBraces().getKeepWhenFormatting().withSimpleMethodsInOneLine(true))
+                  .withMethodAnnotations(IntelliJ.wrappingAndBraces().getMethodAnnotations().withWrap(LineWrapSetting.DoNotWrap)),
+                IntelliJ.blankLines().withMinimum(IntelliJ.blankLines().getMinimum().withAroundMethod(0).withAroundClass(0))
+              )
+            )
+          )));
     }
 
     // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
@@ -52,6 +68,13 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               class Test {{
+                  if (true == false)
+               doTheThing();
+                  else if (true == false)
+                doTheOtherThing();
+                  else
+                 somethingElseEntirely();
+
                   if (true == false)
                   doTheThing();
 
@@ -67,15 +90,24 @@ class TabsAndIndentsTest implements RewriteTest {
               }
               """,
             """
-              class Test {{
-                  if (true == false)
-                      doTheThing();
+              class Test {
+                  {
+                      if (true == false)
+                          doTheThing();
+                      else if (true == false)
+                          doTheOtherThing();
+                      else
+                          somethingElseEntirely();
 
-                  doTheOtherThing();
-                  somethingElseEntirely();
-
-                  foo();
-              }
+                      if (true == false)
+                          doTheThing();
+    
+                      doTheOtherThing();
+                      somethingElseEntirely();
+    
+                      foo();
+                  }
+                  
                   public static void doTheThing() {}
                   public static void doTheOtherThing() {}
                   public static void somethingElseEntirely() {}
@@ -86,12 +118,19 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    private static Consumer<RecipeSpec> tabsAndIndents(UnaryOperator<TabsAndIndentsStyle> with) {
+    private static Consumer<RecipeSpec> autoFormat(UnaryOperator<TabsAndIndentsStyle> with) {
+        return autoFormat(with, wrap -> wrap);
+    }
+
+    private static Consumer<RecipeSpec> autoFormat(UnaryOperator<TabsAndIndentsStyle> with, UnaryOperator<WrappingAndBracesStyle> wrap) {
         return spec -> spec.recipe(new TabsAndIndents())
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
             new NamedStyles(
               Tree.randomId(), "test", "Test", "Test", emptySet(),
-              singletonList(with.apply(IntelliJ.tabsAndIndents()))
+              Arrays.asList(
+                with.apply(IntelliJ.tabsAndIndents()),
+                wrap.apply(IntelliJ.wrappingAndBraces())
+              )
             )
           )));
     }
@@ -105,7 +144,7 @@ class TabsAndIndentsTest implements RewriteTest {
             """
               class A {
                   {
-                      if(true)
+                      if (true)
                           foo();
                           foo();
                         /*
@@ -113,20 +152,22 @@ class TabsAndIndentsTest implements RewriteTest {
                    line-two
                    */
                   }
+
                   static void foo() {}
               }
               """,
             """
               class A {
                   {
-                      if(true)
+                      if (true)
                           foo();
                       foo();
                       /*
-                 line-one
-                line-two
-                */
+                   line-one
+                 line-two
+                 */
                   }
+
                   static void foo() {}
               }
               """
@@ -215,7 +256,9 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignMethodDeclarationParamsWhenContinuationIndent() {
         rewriteRun(
-          tabsAndIndents(style -> style.withMethodDeclarationParameters(new TabsAndIndentsStyle.MethodDeclarationParameters(false))),
+          autoFormat(
+            tabs -> tabs,
+            wrap -> wrap.withMethodDeclarationParameters(wrap.getMethodDeclarationParameters().withAlignWhenMultiline(false))),
           java(
             """
               class Test {
@@ -250,7 +293,9 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void firstParameterNameConflictWithReturnTypeAndMethodName() {
         rewriteRun(
-          tabsAndIndents(style -> style.withMethodDeclarationParameters(new TabsAndIndentsStyle.MethodDeclarationParameters(true))),
+          autoFormat(
+            tabs -> tabs,
+            wrap -> wrap.withMethodDeclarationParameters(wrap.getMethodDeclarationParameters().withAlignWhenMultiline(true))),
           java(
             """
               class Test {
@@ -275,7 +320,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignMethodDeclarationParamsWhenContinuationIndentUsingTabs() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
+          autoFormat(style -> style.withUseTabCharacter(true)),
           java(
             """
             import java.util.*;
@@ -340,7 +385,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void methodChain() {
         rewriteRun(
-          tabsAndIndents(style -> style.withContinuationIndent(2)),
+          autoFormat(style -> style.withContinuationIndent(2)),
           java(
             """
               class Test {
@@ -471,6 +516,7 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               import java.util.Collection;
+              
               class Test {
                   Test withData(Object... arg0) {
                       return this;
@@ -497,6 +543,7 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               import java.util.*;
+              
               class Test {
                   Test withData(Object... arg0) {
                       return this;
@@ -556,6 +603,7 @@ class TabsAndIndentsTest implements RewriteTest {
             """
               import java.util.*;
               import java.util.stream.Collectors;
+              
               class Test {
                   void method(Collection<List<String>> c) {
                       c.stream().map(x -> x.stream().max((r1, r2) -> {
@@ -578,6 +626,7 @@ class TabsAndIndentsTest implements RewriteTest {
             """
               import java.util.*;
               import java.util.stream.Collectors;
+              
               class Test {
                   void method(Collection<List<String>> c) {
                       c.stream().map(x -> x.stream().max((r1, r2) ->
@@ -619,12 +668,12 @@ class TabsAndIndentsTest implements RewriteTest {
      */
     @SuppressWarnings("EnhancedSwitchMigration")
     @Test
-    void tabsAndIndents() {
+    void autoFormat() {
         rewriteRun(
-          java("public interface I1{}"),
-          java("public interface I2{}"),
-          java("public class E1 extends Exception{}"),
-          java("public class E2 extends Exception{}"),
+          java("public interface I1{}", SourceSpec::skip),
+          java("public interface I2{}", SourceSpec::skip),
+          java("public class E1 extends Exception{}", SourceSpec::skip),
+          java("public class E2 extends Exception{}", SourceSpec::skip),
           java(
             """
               public class Test {
@@ -832,11 +881,10 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void forLoop() {
         rewriteRun(
-          tabsAndIndents(style -> style.withContinuationIndent(2)),
+          autoFormat(style -> style.withContinuationIndent(2)),
           java(
             """
               public class Test {
@@ -887,7 +935,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void methodDeclaration() {
         rewriteRun(
-          tabsAndIndents(style -> style.withContinuationIndent(2)),
+          autoFormat(style -> style.withContinuationIndent(2)),
           java(
             """
               public class Test {
@@ -946,7 +994,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void noIndexOutOfBoundsUsingTabs() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true).withTabSize(1).withIndentSize(1)),
+          autoFormat(style -> style.withUseTabCharacter(true).withTabSize(1).withIndentSize(1)),
           java(
             """
               class Test {
@@ -1027,6 +1075,7 @@ class TabsAndIndentsTest implements RewriteTest {
             """
               import lombok.EqualsAndHashCode;
               import java.util.UUID;
+              
               class Test {
                   @SuppressWarnings(
                           value = "unchecked"
@@ -1095,7 +1144,7 @@ class TabsAndIndentsTest implements RewriteTest {
     void tabs() {
         rewriteRun(
           // TIP: turn on "Show Whitespaces" in the IDE to see this test clearly
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
+          autoFormat(style -> style.withUseTabCharacter(true)),
           java(
             """
               public class A {
@@ -1152,7 +1201,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void shiftRightTabs() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
+          autoFormat(style -> style.withUseTabCharacter(true)),
           java(
             """
               public class Test {
@@ -1221,7 +1270,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void shiftLeftTabs() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
+          autoFormat(style -> style.withUseTabCharacter(true)),
           java(
             """
               public class Test {
@@ -1314,6 +1363,7 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               import java.io.File;
+              
               class Test {
                   void method(int n, File f, int m, int l) {
                       method(n, new File(
@@ -1375,6 +1425,7 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
+              
               class Test {
                   Test t = this;
                   Test method(Stream n, int m) {
@@ -1411,6 +1462,7 @@ class TabsAndIndentsTest implements RewriteTest {
               """,
             """
               import java.util.function.Supplier;
+              
               public class Test {
                   public void method(int n) {
                       Supplier<Integer> ns = () ->
@@ -1428,6 +1480,7 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               import java.util.function.Supplier;
+              
               class Test {
                   void method(Supplier<String> s, int n) {
                       method(() -> {
@@ -1461,6 +1514,7 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               import java.io.IOException;
+              
               class Test {
                   void method() throws IOException,
                           Exception {
@@ -1479,8 +1533,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void twoTypeParameters() {
         rewriteRun(
-          java("interface A {}"),
-          java("interface B{}"),
+          java("interface A {}", SourceSpec::skip),
+          java("interface B {}", SourceSpec::skip),
           java(
             """
               class Test<A,
@@ -1494,8 +1548,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void twoImplements() {
         rewriteRun(
-          java("interface A {}"),
-          java("interface B{}"),
+          java("interface A {}", SourceSpec::skip),
+          java("interface B{}", SourceSpec::skip),
           java(
             """
               class Test implements A,
@@ -1570,7 +1624,8 @@ class TabsAndIndentsTest implements RewriteTest {
                   ()
                   throws Exception {
                       try
-                      (InputStream is = new ByteArrayInputStream(new byte[0])) {}
+                      (InputStream is = new ByteArrayInputStream(new byte[0])) {
+                      }
                       int n[] =
                       {0};
                       switch (1) {
@@ -1588,6 +1643,7 @@ class TabsAndIndentsTest implements RewriteTest {
               import java.io.InputStream;
               import java.io.Serializable;
               import java.lang.annotation.Retention;
+              
               @Retention
                       (value = "1.0")
               public
@@ -1601,7 +1657,8 @@ class TabsAndIndentsTest implements RewriteTest {
                           ()
                           throws Exception {
                       try
-                              (InputStream is = new ByteArrayInputStream(new byte[0])) {}
+                              (InputStream is = new ByteArrayInputStream(new byte[0])) {
+                      }
                       int n[] =
                               {0};
                       switch (1) {
@@ -1673,6 +1730,7 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               import java.io.File;
+              
               class Test {
                   void method(int m, File f, File f2) {
                       method(m, new File(
@@ -1736,6 +1794,7 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               import java.util.function.Function;
+              
               abstract class Test {
                   abstract Test a(Function<Test, Test> f);
                   abstract Test b(Function<Test, Test> f);
@@ -1787,6 +1846,7 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
+              
               public class Test {
                   boolean b;
                   public Stream<Test> method() {
@@ -1808,7 +1868,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void punctuation() {
         rewriteRun(
-          tabsAndIndents(style -> style.withContinuationIndent(2)),
+          autoFormat(style -> style.withContinuationIndent(2)),
           java(
             """
               import java.util.function.Function;
@@ -2103,7 +2163,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignBlockPrefixes() {
         rewriteRun(
-          spec -> spec.recipe(new AutoFormat(null, false)),
+          spec -> spec.recipe(new AutoFormat(null)),
           java(
             """
               public class Test {
@@ -2163,8 +2223,10 @@ class TabsAndIndentsTest implements RewriteTest {
               """,
             """
               public class WhitespaceIsHard {
-                  /* align comment */ public void method() { /* tricky */
-                      /* align comment */ int var = 10; /* tricky */
+                  /* align comment */
+                  public void method() { /* tricky */
+                      /* align comment */
+                      int var = 10; /* tricky */
                       // align comment and end paren.
                   }
               }
@@ -2324,11 +2386,13 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void useContinuationIndentExtendsOnNewLine() {
         rewriteRun(
-          java("package org.a; public class A {}"),
+          java("package org.a; public class A {}", SourceSpec::skip),
           java(
             """
               package org.b;
+              
               import org.a.A;
+              
               class B
                       extends A {
               }
@@ -2341,11 +2405,13 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignIdentifierOnNewLine() {
         rewriteRun(
-          java("package org.a; public class A {}"),
+          java("package org.a; public class A {}", SourceSpec::skip),
           java(
             """
               package org.b;
+              
               import org.a.A;
+              
               class B extends
                       A {
               }
@@ -2486,6 +2552,7 @@ class TabsAndIndentsTest implements RewriteTest {
               """,
             """
               import java.io.*;
+              
               class Test {
                   void method(String file1, String file2) {
                       try (FileInputStream fis1 = new FileInputStream(file1);
@@ -2523,6 +2590,7 @@ class TabsAndIndentsTest implements RewriteTest {
             """,
             """
             import java.io.*;
+            
             class Test {
                 void method(String file1, String file2) {
                     try (
@@ -2536,6 +2604,172 @@ class TabsAndIndentsTest implements RewriteTest {
                 }
             }
             """
+          )
+        );
+    }
+
+    @Test
+    void textBlocksAligned() {
+        rewriteRun(
+          autoFormat(
+            tabs -> tabs,
+            wrap -> wrap.withTextBlocks(wrap.getTextBlocks().withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              class Test {
+                  private final String foo = ""\"
+                    YES
+                    ""\";
+                  private final String bar =
+                    ""\"
+                      NO
+                      ""\";
+                  private final String singleLine = ""\"
+                    noEndLine""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                        indent me!
+                        ""\", ""\"
+                        indent me too!
+                        ""\");
+                      method(
+                        ""\"
+                        indent me!
+                        ""\",
+                        ""\"
+                        indent me too!
+                        ""\"
+                      );
+                  }
+              }
+              """,
+            """
+              class Test {
+                  private final String foo = ""\"
+                                             YES
+                                             ""\";
+                  private final String bar =
+                          ""\"
+                          NO
+                          ""\";
+                  private final String singleLine = ""\"
+                                                    noEndLine""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                             indent me!
+                             ""\", ""\"
+                                   indent me too!
+                                   ""\");
+                      method(
+                              ""\"
+                              indent me!
+                              ""\",
+                              ""\"
+                              indent me too!
+                              ""\"
+                      );
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void textBlocksNotAligned() {
+        rewriteRun(
+          autoFormat(
+            spaces -> spaces,
+            wrap -> wrap
+          ),
+          java(
+            """
+              class Test {
+                  private final String foo = ""\"
+                    YES
+                    ""\";
+                  private final String bar =
+                    ""\"
+                      NO
+                      ""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                        indent me!
+                        ""\", ""\"
+                              indent me too!
+                              ""\");
+                      method(
+                        ""\"
+                        indent me!
+                        ""\",
+                        ""\"
+                        indent me too!
+                        ""\"
+                      );
+                  }
+              }
+              """,
+            """
+              class Test {
+                  private final String foo = ""\"
+                          YES
+                          ""\";
+                  private final String bar =
+                          ""\"
+                                  NO
+                                  ""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                              indent me!
+                              ""\", ""\"
+                              indent me too!
+                              ""\");
+                      method(
+                              ""\"
+                                      indent me!
+                                      ""\",
+                              ""\"
+                                      indent me too!
+                                      ""\"
+                      );
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void textBlocksNotAlignedTabs() {
+        rewriteRun(
+          autoFormat(
+            spaces -> spaces.withUseTabCharacter(true),
+            wrap -> wrap
+          ),
+          java(
+            """
+              class Test {
+                  private final String foo = ""\"
+              YES
+              ""\";
+                  private final String bar =
+              ""\"
+              NO
+              ""\";
+              }
+              """,
+            """
+              class Test { 
+                  private final String foo = ""\"
+              \t\t\tYES
+              \t\t\t""\";
+                  private final String bar =
+              \t\t\t""\"
+              \t\t\t\t\tNO
+              \t\t\t\t\t""\";
+              }
+              """
           )
         );
     }

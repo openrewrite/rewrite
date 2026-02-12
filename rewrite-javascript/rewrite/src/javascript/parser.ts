@@ -43,7 +43,6 @@ import {
     getPreviousSibling,
     hasFlowAnnotation,
     isStatement,
-    isValidSurrogateRange,
     TextSpan
 } from "./parser-utils";
 import {JavaScriptTypeMapping} from "./type-mapping";
@@ -195,9 +194,10 @@ export class JavaScriptParser extends Parser {
             if (this.relativeTo && !path.isAbsolute(sourcePath)) {
                 sourcePath = path.join(this.relativeTo, sourcePath);
             }
-            inputFiles.set(sourcePath, input);
+            const normalizedSourcePath = path.normalize(sourcePath);
+            inputFiles.set(normalizedSourcePath, input);
             // Remove from cache if previously cached
-            this.sourceFileCache && this.sourceFileCache.delete(sourcePath);
+            this.sourceFileCache && this.sourceFileCache.delete(normalizedSourcePath);
         }
 
         // Create a new CompilerHost within parseInputs
@@ -211,8 +211,9 @@ export class JavaScriptParser extends Parser {
 
         // Override getSourceFile
         host.getSourceFile = (fileName, languageVersion, onError) => {
+            const normalizedFileName = path.normalize(fileName);
             // Check if the SourceFile is in the cache
-            let sourceFile = this.sourceFileCache && this.sourceFileCache.get(fileName);
+            let sourceFile = this.sourceFileCache && this.sourceFileCache.get(normalizedFileName);
             if (sourceFile) {
                 return sourceFile;
             }
@@ -221,17 +222,17 @@ export class JavaScriptParser extends Parser {
             let sourceText: string | undefined;
 
             // For input files
-            const input = inputFiles.get(fileName);
+            const input = inputFiles.get(normalizedFileName);
             if (input) {
                 sourceText = parserInputRead(input);
             } else {
                 // For dependency files
-                sourceText = ts.sys.readFile(fileName);
+                sourceText = ts.sys.readFile(normalizedFileName);
             }
 
             if (sourceText !== undefined) {
                 // Determine script kind based on file extension
-                const scriptKind = getScriptKindFromFileName(fileName);
+                const scriptKind = getScriptKindFromFileName(normalizedFileName);
 
                 // Build CreateSourceFileOptions with jsDocParsingMode
                 const sourceFileOptions: ts.CreateSourceFileOptions = typeof languageVersion === 'number'
@@ -244,27 +245,29 @@ export class JavaScriptParser extends Parser {
                         jsDocParsingMode: ts.JSDocParsingMode.ParseNone // We override this as otherwise invalid JSDoc causes parse errors
                     };
 
-                sourceFile = ts.createSourceFile(fileName, sourceText, sourceFileOptions, true, scriptKind);
+                sourceFile = ts.createSourceFile(normalizedFileName, sourceText, sourceFileOptions, true, scriptKind);
                 // Cache the SourceFile if it's a dependency
                 if (!input && this.sourceFileCache) {
-                    this.sourceFileCache.set(fileName, sourceFile);
+                    this.sourceFileCache.set(normalizedFileName, sourceFile);
                 }
                 return sourceFile;
             }
 
-            if (onError) onError(`File not found: ${fileName}`);
+            if (onError) onError(`File not found: ${normalizedFileName}`);
             return undefined;
         };
 
         // Override fileExists
         host.fileExists = (fileName) => {
-            return inputFiles.has(fileName) || ts.sys.fileExists(fileName);
+            const normalizedFileName = path.normalize(fileName);
+            return inputFiles.has(normalizedFileName) || ts.sys.fileExists(normalizedFileName);
         };
 
         // Override readFile
         host.readFile = (fileName) => {
-            const input = inputFiles.get(fileName);
-            return input ? parserInputRead(input) : ts.sys.readFile(fileName);
+            const normalizedFileName = path.normalize(fileName);
+            const input = inputFiles.get(normalizedFileName);
+            return input ? parserInputRead(input) : ts.sys.readFile(normalizedFileName);
         };
 
         // Custom module resolution to handle in-memory imports
@@ -272,7 +275,8 @@ export class JavaScriptParser extends Parser {
         // but our source files only exist in memory (in the inputFiles map)
         host.resolveModuleNameLiterals = (moduleLiterals, containingFile) => {
             const resolvedModules: ts.ResolvedModuleWithFailedLookupLocations[] = [];
-            const containingDir = path.dirname(containingFile);
+            const normalizedFileName = path.normalize(containingFile);
+            const containingDir = path.dirname(normalizedFileName);
 
             for (const moduleLiteral of moduleLiterals) {
                 const moduleName = moduleLiteral.text;
@@ -312,7 +316,7 @@ export class JavaScriptParser extends Parser {
                 // Fall back to TypeScript's default resolution for node_modules and absolute paths
                 const result = ts.resolveModuleName(
                     moduleName,
-                    containingFile,
+                    normalizedFileName,
                     this.compilerOptions,
                     host
                 );
@@ -640,7 +644,7 @@ export class JavaScriptParserVisitor {
         return {
             kind: J.Kind.RightPadded,
             element: t,
-            after: trailing,
+            after: trailing ?? emptySpace,
             markers: markers ?? emptyMarkers
         };
     }
@@ -673,7 +677,7 @@ export class JavaScriptParserVisitor {
     private leftPadded<T extends J | J.Space | number | string | boolean>(before: J.Space, t: T, markers?: Markers): J.LeftPadded<T> {
         return {
             kind: J.Kind.LeftPadded,
-            before: before,
+            before: before ?? emptySpace,
             element: t,
             markers: markers ?? emptyMarkers
         };
@@ -908,19 +912,17 @@ export class JavaScriptParserVisitor {
     private mapLiteral(node: ts.LiteralExpression | ts.TrueLiteral | ts.FalseLiteral | ts.NullLiteral | ts.Identifier
         | ts.TemplateHead | ts.TemplateMiddle | ts.TemplateTail | ts.JsxText, value: any): J.Literal {
 
-        let valueSource = node.getText();
-        if (!isValidSurrogateRange(valueSource)) {
-            // TODO: Fix to prevent ingestion failure for invalid surrogate pairs. Should be reworked with J.Literal.UnicodeEscape
-            throw new InvalidSurrogatesNotSupportedError();
-        }
+        const valueSource = node.getText();
+        const { cleanedSource, unicodeEscapes } = extractSurrogateEscapes(valueSource);
 
         return {
             kind: J.Kind.Literal,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            value: value,
-            valueSource: valueSource,
+            value: unicodeEscapes.length > 0 ? cleanedSource : value,
+            valueSource: cleanedSource,
+            unicodeEscapes: unicodeEscapes.length > 0 ? unicodeEscapes : undefined,
             type: this.mapPrimitiveType(node)
         };
     }
@@ -4671,11 +4673,56 @@ class FlowSyntaxNotSupportedError extends SyntaxError {
     }
 }
 
-class InvalidSurrogatesNotSupportedError extends SyntaxError {
-    constructor(message: string = "String literal contains invalid surrogate pairs, that is not supported") {
-        super(message);
-        this.name = "InvalidSurrogatesNotSupportedError";
+const SURR_FIRST = 0xD800;
+const SURR_LAST = 0xDFFF;
+
+/**
+ * Extracts invalid UTF-16 surrogate pairs from a string literal's value source.
+ * Unmatched UTF-16 surrogate pairs (composed of two escape and code point pairs) are unserializable
+ * by technologies like Jackson. So we separate and store the code point off and reconstruct
+ * the escape sequence when printing later.
+ * We only escape unicode characters that are part of UTF-16 surrogate pairs. Others are generally
+ * treated well by tools like Jackson.
+ *
+ * Handles both:
+ * 1. Unicode escape sequences (\uXXXX) where XXXX is in the surrogate range
+ * 2. Raw surrogate characters in the source (character codes 0xD800-0xDFFF)
+ */
+function extractSurrogateEscapes(valueSource: string): { cleanedSource: string, unicodeEscapes: J.LiteralUnicodeEscape[] } {
+    const unicodeEscapes: J.LiteralUnicodeEscape[] = [];
+    let cleanedSource = '';
+    let cleanedIndex = 0;
+
+    for (let j = 0; j < valueSource.length; j++) {
+        const c = valueSource.charAt(j);
+        const charCode = valueSource.charCodeAt(j);
+
+        // Check for unicode escape sequence: \uXXXX
+        // Ensure we're not escaped (previous char is not \) or we're at the start
+        if (c === '\\' && j < valueSource.length - 1 && (j === 0 || valueSource.charAt(j - 1) !== '\\')) {
+            if (valueSource.charAt(j + 1) === 'u' && j < valueSource.length - 5) {
+                const codePoint = valueSource.substring(j + 2, j + 6);
+                const codePointNumeric = parseInt(codePoint, 16);
+                if (!isNaN(codePointNumeric) && codePointNumeric >= SURR_FIRST && codePointNumeric <= SURR_LAST) {
+                    unicodeEscapes.push({ valueSourceIndex: cleanedIndex, codePoint });
+                    j += 5; // Skip the \uXXXX sequence (we're already at \, skip u and 4 hex digits)
+                    continue;
+                }
+            }
+        }
+
+        // Check for raw surrogate characters in the source
+        if (charCode >= SURR_FIRST && charCode <= SURR_LAST) {
+            const codePoint = charCode.toString(16).toUpperCase().padStart(4, '0');
+            unicodeEscapes.push({ valueSourceIndex: cleanedIndex, codePoint });
+            continue;
+        }
+
+        cleanedSource += c;
+        cleanedIndex++;
     }
+
+    return { cleanedSource, unicodeEscapes };
 }
 
 Parsers.registerParser("javascript", JavaScriptParser);

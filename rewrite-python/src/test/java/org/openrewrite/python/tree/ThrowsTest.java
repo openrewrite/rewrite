@@ -18,9 +18,11 @@ package org.openrewrite.python.tree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.python.Python3Only;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.python.Assertions.python;
+
 class ThrowsTest implements RewriteTest {
 
     @Test
@@ -44,6 +46,7 @@ class ThrowsTest implements RewriteTest {
         );
     }
 
+    @Python3Only
     @ParameterizedTest
     @ValueSource(strings = {
       "x from None",

@@ -211,6 +211,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         Recipe recipe = client().prepareRecipe("org.openrewrite.example.npm.change-version",
           Map.of("version", "1.0.0"));
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Change version in `package.json`");
+        assertThat(recipe.getDescriptor().getOptions().size()).isEqualTo(1);
     }
 
     @SuppressWarnings("JSUnusedLocalSymbols")

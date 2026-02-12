@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.KotlinVisitor;
+import org.openrewrite.kotlin.marker.IsNullSafe;
 import org.openrewrite.kotlin.tree.K;
 
 import java.time.Duration;
@@ -84,11 +85,16 @@ public class EqualsMethodUsage extends Recipe {
             public J visitMethodInvocation(J.MethodInvocation method,
                                            ExecutionContext ctx) {
                 method = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                // Don't transform safe-call method invocations (obj?.equals(other)) because
+                // they have different null semantics than obj == other:
+                // - obj?.equals(other) returns Boolean? (null if obj is null)
+                // - obj == other returns Boolean (false if obj is null)
                 if ("equals".equals(method.getSimpleName()) &&
                     method.getMethodType() != null &&
                     method.getArguments().size() == 1 &&
                     TypeUtils.isOfClassType(method.getMethodType().getReturnType(), "kotlin.Boolean") &&
-                    method.getSelect() != null
+                    method.getSelect() != null &&
+                    !method.getMarkers().findFirst(IsNullSafe.class).isPresent()
                 ) {
                     Expression lhs = method.getSelect();
                     Expression rhs = method.getArguments().get(0);
