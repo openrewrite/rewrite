@@ -18,7 +18,9 @@ dependencies {
     implementation(kotlin("compiler-embeddable", kotlinVersion))
     implementation(kotlin("stdlib", kotlinVersion))
 
-    testImplementation("org.jetbrains.kotlin:kotlin-metadata-jvm:2.1.0")
+    testImplementation("org.jetbrains.kotlin:kotlin-metadata-jvm:2.1.0") {
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
+    }
 
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testImplementation(project(":rewrite-test"))
@@ -43,7 +45,6 @@ recipeDependencies {
     testParserClasspath("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.8.1")
     testParserClasspath("org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.6.3")
 }
-
 
 java {
     toolchain {
