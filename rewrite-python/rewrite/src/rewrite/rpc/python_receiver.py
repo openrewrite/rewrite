@@ -1024,18 +1024,10 @@ class PythonRpcReceiver:
 # Register marker codecs
 def _register_marker_codecs():
     """Register receive and send codecs for Java marker types."""
-    from rewrite import Markers
     from rewrite.java.markers import Semicolon, TrailingComma, OmitParentheses
     from rewrite.java.support_types import Space
-    from rewrite.rpc.receive_queue import register_codec_with_both_names, register_send_codec
+    from rewrite.rpc.receive_queue import register_codec_with_both_names
     from rewrite.rpc.send_queue import RpcSendQueue
-
-    # Markers send codec (Markers uses special handling in receive_queue, but needs send codec)
-    def _send_markers(markers: Markers, q: RpcSendQueue) -> None:
-        q.get_and_send(markers, lambda x: x.id)
-        q.get_and_send_list(markers, lambda x: x.markers, lambda m: m.id, None)
-
-    register_send_codec(Markers, _send_markers)
 
     # Receive codecs
     def _receive_semicolon(semicolon: Semicolon, q: RpcReceiveQueue) -> Semicolon:
@@ -1217,6 +1209,33 @@ def _send_parse_exception_result(marker, q):
     q.get_and_send(marker, lambda x: x.exception_type)
     q.get_and_send(marker, lambda x: x.message)
     q.get_and_send(marker, lambda x: x.tree_type)
+
+
+def _receive_markup_marker(marker, q: RpcReceiveQueue, cls):
+    """Generic codec for receiving Markup markers (Warn/Error/Info/Debug).
+
+    All four share the same fields in the same order: id, message, detail.
+    Matches Java's Markup.{Warn,Error,Info,Debug}.rpcReceive().
+    """
+    from uuid import UUID
+
+    id_str = q.receive(str(marker.id) if marker else None)
+    message = q.receive(marker.message if marker else None)
+    detail = q.receive(marker.detail if marker else None)
+
+    new_id = UUID(id_str) if id_str else (marker.id if marker else None)
+    return cls(_id=new_id, _message=message, _detail=detail)
+
+
+def _send_markup_marker(marker, q):
+    """Generic codec for sending Markup markers (Warn/Error/Info/Debug).
+
+    All four share the same fields in the same order: id, message, detail.
+    Matches Java's Markup.{Warn,Error,Info,Debug}.rpcSend().
+    """
+    q.get_and_send(marker, lambda x: str(x.id))
+    q.get_and_send(marker, lambda x: x.message)
+    q.get_and_send(marker, lambda x: x.detail)
 
 
 def _receive_style(style, q: RpcReceiveQueue):
@@ -1471,6 +1490,24 @@ def _register_core_marker_codecs():
     )
 
 
+def _register_markup_marker_codecs():
+    """Register codecs for Markup marker types (Warn, Error, Info, Debug)."""
+    from rewrite.markers import MarkupWarn, MarkupError, MarkupInfo, MarkupDebug
+    from rewrite.rpc.receive_queue import register_codec_with_both_names
+    from uuid import uuid4
+
+    for java_suffix, py_cls in [
+        ('Warn', MarkupWarn),
+        ('Error', MarkupError),
+        ('Info', MarkupInfo),
+        ('Debug', MarkupDebug),
+    ]:
+        java_type = f'org.openrewrite.marker.Markup${java_suffix}'
+        receive = lambda marker, q, c=py_cls: _receive_markup_marker(marker, q, c)
+        factory = lambda c=py_cls: c(_id=uuid4(), _message='', _detail=None)
+        register_codec_with_both_names(java_type, py_cls, receive, factory, _send_markup_marker)
+
+
 def _register_style_codecs():
     """Register codecs for style types."""
     from rewrite.style import GeneralFormatStyle, NamedStyles
@@ -1695,6 +1732,7 @@ _register_tree_codecs()
 _register_support_type_codecs()
 _register_java_type_codecs()  # JavaType.Primitive handling
 _register_core_marker_codecs()
+_register_markup_marker_codecs()  # Markup.Warn, Error, Info, Debug
 _register_style_codecs()
 _register_parse_error_codec()  # ParseError handling
 _register_python_marker_codecs()  # Python-specific markers including PrintSyntax, ExecSyntax
