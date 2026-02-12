@@ -3141,6 +3141,39 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5134")
+    @Test
+    void issue5134() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.server.servlet",
+            //language=yaml
+            "application-display-name:\"application\"",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+            server:
+              port: 8080
+              servlet:
+                context-path: /api
+            """,
+            """
+            server:
+              port: 8080
+              servlet:
+                context-path: /api
+                application-display-name: application
+            """
+          )
+        );
+    }
+
     @SuppressWarnings("DataFlowIssue")
     @Test
     void sourceNull() {
