@@ -98,7 +98,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 }
 
                 String newAttributeValue;
-                if (attributeValue != null && attributeValue.endsWith(".class") && StringUtils.countOccurrences(attributeValue, ".") > 1) {
+                if (isFullyQualifiedClass()) {
                     maybeAddImport(attributeValue.substring(0, attributeValue.length() - 6));
                     newAttributeValue = attributeValue;
                 } else if (isFullyQualifiedEnumValue(a)) {
@@ -115,7 +115,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         return a;
                     }
                     if ("value".equals(attributeName())) {
-                        return JavaTemplate.apply("#{}", getCursor(), a.getCoordinates().replaceArguments(), newAttributeValue);
+                        String attrVal = newAttributeValue.contains(",") && attributeIsArray(a) ? getAttributeValuesAsArray(a) : newAttributeValue;
+                        return JavaTemplate.apply("#{}", getCursor(), a.getCoordinates().replaceArguments(), attrVal);
                     }
                     String attrVal = newAttributeValue.contains(",") && attributeIsArray(a) ? getAttributeValuesAsString(a) : newAttributeValue;
                     return JavaTemplate.apply("#{} = #{}", getCursor(), a.getCoordinates().replaceArguments(), attributeName, attrVal);
@@ -314,7 +315,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     }
 
     private boolean isFullyQualifiedClass() {
-        return attributeValue != null && attributeValue.endsWith(".class") && StringUtils.countOccurrences(attributeValue, ".") > 1;
+        return attributeValue != null &&
+               !attributeValue.contains(",") &&
+               attributeValue.endsWith(".class") &&
+               StringUtils.countOccurrences(attributeValue, ".") > 1;
     }
 
     private static String getFullyQualifiedClass(String fqn) {
@@ -421,6 +425,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
     private String getAttributeValuesAsString(J.Annotation annotation) {
         return getAttributeValues(annotation).stream().map(String::valueOf).collect(joining("\", \"", "{\"", "\"}"));
+    }
+
+    private String getAttributeValuesAsArray(J.Annotation annotation) {
+        return getAttributeValues(annotation).stream().map(String::valueOf).collect(joining(", ", "{", "}"));
     }
 
     private static boolean isAnnotationWithOnlyValueMethod(J.Annotation annotation) {
