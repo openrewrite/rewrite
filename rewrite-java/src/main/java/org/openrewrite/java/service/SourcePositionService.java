@@ -23,11 +23,10 @@ import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.service.Span.ColSpan;
 import org.openrewrite.java.tree.*;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * Service for computing source code position metrics such as column alignment positions and tree element lengths.
@@ -203,6 +202,20 @@ public class SourcePositionService {
         JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
             @Nullable
             J foundJ = null;
+
+            @Override
+            protected void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location, String suffixBetween, @Nullable String after, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                if (container != null && !container.getPadding().getElements().isEmpty() && cursor.getValue() instanceof JContainer) {
+                    Set<UUID> elements = container.getElements().stream().map(Tree::getId).collect(Collectors.toSet());
+                    ((JContainer<? extends J>) cursor.getValue()).getElements().stream().map(Tree::getId).forEach(elements::remove);
+                    if (elements.isEmpty()) {
+                        //if no elements remain, we should continue our search with the input cursor to receive its changes.
+                        super.visitContainer(before, cursor.getValue(), location, suffixBetween, after, p);
+                        return;
+                    }
+                }
+                super.visitContainer(before, container, location, suffixBetween, after, p);
+            }
 
             @Override
             protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, PrintOutputCapture<TreeVisitor<?, ?>> p) {

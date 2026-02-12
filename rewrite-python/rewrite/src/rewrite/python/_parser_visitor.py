@@ -1208,10 +1208,12 @@ class ParserVisitor(ast.NodeVisitor):
     def visit_MatchSequence(self, node):
         prefix = self.__whitespace()
         end_delim = None
-        if self.__skip('['):
+        if self.__at_token('[') and self.__is_own_sequence_delimiter(node, '['):
+            self.__skip('[')
             kind = py.MatchCase.Pattern.Kind.SEQUENCE_LIST
             end_delim = ']'
-        elif self.__skip('('):
+        elif self.__at_token('(') and self.__is_own_sequence_delimiter(node, '('):
+            self.__skip('(')
             kind = py.MatchCase.Pattern.Kind.SEQUENCE_TUPLE
             end_delim = ')'
         else:
@@ -1356,25 +1358,8 @@ class ParserVisitor(ast.NodeVisitor):
         if has_positional or has_keyword:
             # Process positional patterns
             for i, arg in enumerate(node.patterns):
-                arg_name = j.VariableDeclarations(
-                    random_id(),
-                    self.__whitespace(),
-                    Markers.EMPTY,
-                    [], [], None, None, [],
-                    [
-                        self.__pad_right(j.VariableDeclarations.NamedVariable(
-                            random_id(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            cast(j.Identifier, self.__convert(arg)),
-                            [],
-                            None,
-                            None
-                        ), Space.EMPTY)
-                    ]
-                )
                 is_last_positional = i == len(node.patterns) - 1
-                converted = self.__pad_list_element(arg_name, last=is_last_positional and not has_keyword,
+                converted = self.__pad_list_element(self.__convert_match_pattern(arg), last=is_last_positional and not has_keyword,
                                                     end_delim=')' if (is_last_positional and not has_keyword) else ',')
                 children.append(converted)
             # Process keyword patterns
@@ -3338,3 +3323,26 @@ class ParserVisitor(ast.NodeVisitor):
         if self._token_idx >= len(self._tokens):
             return False
         return self._tokens[self._token_idx].string == s
+
+    def __is_own_sequence_delimiter(self, node, delim: str) -> bool:
+        """Check if the delimiter at the current token belongs to this MatchSequence.
+
+        When the current token is '[' (or '('), it could belong to this
+        sequence or to its first child (e.g., ``[c], _`` vs ``[c, _]``).
+
+        If the first child pattern is itself a MatchSequence, the delimiter
+        might belong to the child.  We disambiguate by peeking at the next
+        token: if it is also a delimiter (``[`` or ``(``), the current one
+        opens this sequence (e.g., ``[[a], b]``); otherwise the current
+        delimiter belongs to the child (e.g., ``[c], _``).
+        """
+        import ast as stdlib_ast
+        if node.patterns and isinstance(node.patterns[0], stdlib_ast.MatchSequence):
+            # The first child is also a sequence — check whether there are
+            # two consecutive delimiters, meaning the outer one is ours.
+            next_idx = self._token_idx + 1
+            if next_idx < len(self._tokens):
+                next_tok = self._tokens[next_idx].string
+                return next_tok in ('[', '(')
+            return False
+        return True

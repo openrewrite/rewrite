@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 
@@ -128,13 +129,59 @@ public class PyProjectHelper {
      * the {@code [project].dependencies} array in a pyproject.toml.
      */
     public static boolean isInsideProjectDependencies(Cursor cursor) {
+        return isInsideDependencyArray(cursor, null, null);
+    }
+
+    /**
+     * Check whether a cursor path represents a position inside a dependency array
+     * for the given scope and optional group name.
+     * <p>
+     * Scope values use TOML dotted-key path syntax:
+     * <ul>
+     *   <li>{@code null} or {@code "project.dependencies"} → {@code [project].dependencies}</li>
+     *   <li>{@code "build-system.requires"} → {@code [build-system].requires}</li>
+     *   <li>{@code "project.optional-dependencies"} → {@code [project.optional-dependencies].<groupName>}</li>
+     *   <li>{@code "dependency-groups"} → {@code [dependency-groups].<groupName>}</li>
+     *   <li>{@code "tool.uv.constraint-dependencies"} → {@code [tool.uv].constraint-dependencies}</li>
+     *   <li>{@code "tool.uv.override-dependencies"} → {@code [tool.uv].override-dependencies}</li>
+     * </ul>
+     */
+    public static boolean isInsideDependencyArray(Cursor cursor, @Nullable String scope, @Nullable String groupName) {
+        String tableName;
+        String keyName;
+        if (scope == null || "project.dependencies".equals(scope)) {
+            tableName = "project";
+            keyName = "dependencies";
+        } else if ("build-system.requires".equals(scope)) {
+            tableName = "build-system";
+            keyName = "requires";
+        } else if ("project.optional-dependencies".equals(scope)) {
+            tableName = "project.optional-dependencies";
+            keyName = groupName;
+        } else if ("dependency-groups".equals(scope)) {
+            tableName = "dependency-groups";
+            keyName = groupName;
+        } else if ("tool.uv.constraint-dependencies".equals(scope)) {
+            tableName = "tool.uv";
+            keyName = "constraint-dependencies";
+        } else if ("tool.uv.override-dependencies".equals(scope)) {
+            tableName = "tool.uv";
+            keyName = "override-dependencies";
+        } else {
+            return false;
+        }
+
+        if (keyName == null) {
+            return false;
+        }
+
         Cursor parent = cursor.getParentTreeCursor();
         if (!(parent.getValue() instanceof Toml.KeyValue)) {
             return false;
         }
         Toml.KeyValue kv = parent.getValue();
         if (!(kv.getKey() instanceof Toml.Identifier) ||
-                !"dependencies".equals(((Toml.Identifier) kv.getKey()).getName())) {
+                !keyName.equals(((Toml.Identifier) kv.getKey()).getName())) {
             return false;
         }
 
@@ -143,6 +190,99 @@ public class PyProjectHelper {
             return false;
         }
         Toml.Table table = tableParent.getValue();
-        return table.getName() != null && "project".equals(table.getName().getName());
+        if (table.getName() == null) {
+            return false;
+        }
+
+        if (tableName.equals(table.getName().getName())) {
+            return true;
+        }
+
+        // For project.optional-dependencies, also handle the nested form where
+        // [project] contains optional-dependencies = { groupName = [...] }
+        if ("project.optional-dependencies".equals(scope) && "project".equals(table.getName().getName())) {
+            // Check if parent KV is inside another KV with key "optional-dependencies"
+            Cursor kvCursor = parent;
+            while (kvCursor != null) {
+                Object val = kvCursor.getValue();
+                if (val instanceof Toml.KeyValue) {
+                    Toml.KeyValue outerKv = (Toml.KeyValue) val;
+                    if (outerKv.getKey() instanceof Toml.Identifier &&
+                            "optional-dependencies".equals(((Toml.Identifier) outerKv.getKey()).getName())) {
+                        return true;
+                    }
+                }
+                kvCursor = kvCursor.getParent();
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Find a dependency in the specified scope of the marker.
+     *
+     * @param marker      the resolution result marker
+     * @param packageName the package name to find
+     * @param scope       the scope to search (null means project.dependencies)
+     * @param groupName   the group name (required for optional-dependencies and dependency-groups)
+     * @return the dependency, or null if not found
+     */
+    public static @Nullable Dependency findDependencyInScope(
+            PythonResolutionResult marker,
+            String packageName,
+            @Nullable String scope,
+            @Nullable String groupName) {
+        if (scope == null || "project.dependencies".equals(scope)) {
+            return marker.findDependency(packageName);
+        } else if ("build-system.requires".equals(scope)) {
+            return findInList(marker.getBuildRequires(), packageName);
+        } else if ("project.optional-dependencies".equals(scope)) {
+            if (groupName == null) {
+                return null;
+            }
+            List<Dependency> deps = marker.getOptionalDependencies().get(groupName);
+            return deps != null ? findInList(deps, packageName) : null;
+        } else if ("dependency-groups".equals(scope)) {
+            if (groupName == null) {
+                return null;
+            }
+            List<Dependency> deps = marker.getDependencyGroups().get(groupName);
+            return deps != null ? findInList(deps, packageName) : null;
+        } else if ("tool.uv.constraint-dependencies".equals(scope)) {
+            return findInList(marker.getConstraintDependencies(), packageName);
+        } else if ("tool.uv.override-dependencies".equals(scope) || "tool.pdm.overrides".equals(scope)) {
+            return findInList(marker.getOverrideDependencies(), packageName);
+        }
+        return null;
+    }
+
+    /**
+     * Check whether a cursor path represents a position inside the
+     * {@code [tool.pdm.overrides]} table in a pyproject.toml.
+     */
+    public static boolean isInsidePdmOverridesTable(Cursor cursor) {
+        Cursor c = cursor;
+        while (c != null) {
+            Object val = c.getValue();
+            if (val instanceof Toml.Table) {
+                Toml.Table table = (Toml.Table) val;
+                if (table.getName() != null && "tool.pdm.overrides".equals(table.getName().getName())) {
+                    return true;
+                }
+            }
+            c = c.getParent();
+        }
+        return false;
+    }
+
+    private static @Nullable Dependency findInList(List<Dependency> deps, String packageName) {
+        String normalized = PythonResolutionResult.normalizeName(packageName);
+        for (Dependency dep : deps) {
+            if (PythonResolutionResult.normalizeName(dep.getName()).equals(normalized)) {
+                return dep;
+            }
+        }
+        return null;
     }
 }

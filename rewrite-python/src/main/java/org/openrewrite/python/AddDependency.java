@@ -18,10 +18,7 @@ package org.openrewrite.python;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.ScanningRecipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.marker.PythonResolutionResult;
@@ -54,6 +51,31 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
             required = false)
     @Nullable
     String version;
+
+    @Option(displayName = "Scope",
+            description = "The dependency scope to add to. Defaults to `project.dependencies`.",
+            valid = {"project.dependencies", "project.optional-dependencies", "dependency-groups",
+                    "tool.uv.constraint-dependencies", "tool.uv.override-dependencies"},
+            example = "project.dependencies",
+            required = false)
+    @Nullable
+    String scope;
+
+    @Option(displayName = "Group name",
+            description = "The group name, required when scope is `project.optional-dependencies` or `dependency-groups`.",
+            example = "dev",
+            required = false)
+    @Nullable
+    String groupName;
+
+    @Override
+    public Validated<Object> validate() {
+        Validated<Object> v = super.validate();
+        if ("project.optional-dependencies".equals(scope) || "dependency-groups".equals(scope)) {
+            v = v.and(Validated.required("groupName", groupName));
+        }
+        return v;
+    }
 
     @Override
     public String getDisplayName() {
@@ -97,8 +119,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
 
                 PythonResolutionResult marker = resolution.get();
 
-                // Check if the dependency already exists
-                if (marker.findDependency(packageName) != null) {
+                // Check if the dependency already exists in the target scope
+                if (PyProjectHelper.findDependencyInScope(marker, packageName, scope, groupName) != null) {
                     return document;
                 }
 
@@ -140,7 +162,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
             public Toml.Array visitArray(Toml.Array array, ExecutionContext ctx) {
                 Toml.Array a = super.visitArray(array, ctx);
 
-                if (!PyProjectHelper.isInsideProjectDependencies(getCursor())) {
+                if (!PyProjectHelper.isInsideDependencyArray(getCursor(), scope, groupName)) {
                     return a;
                 }
 
