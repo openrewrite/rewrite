@@ -255,7 +255,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if (newAttributeValue == null) {
                     return null;
                 }
-                if (attributeName != null && !"value".equals(attributeValue)) {
+                if (attributeName != null && !"value".equals(attributeName)) {
                     return isAnnotationWithOnlyValueMethod(annotation) ? arrayValue : createAnnotationAssignment(annotation, "value", arrayValue);
                 }
                 return arrayValue.withInitializer(updateInitializer(annotation, requireNonNull(arrayValue.getInitializer()), getAttributeValues(annotation)));
