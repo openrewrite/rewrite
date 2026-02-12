@@ -383,7 +383,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 }
                 newItemsList.add(new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attribute, maybeQuoteStringArgument(annotation, attribute), null, JavaType.Primitive.String));
             }
-            return ListUtils.concatAll(initializerList, newItemsList);
+            // Filter out empty elements (e.g., from an empty array initializer `{}`)
+            List<Expression> nonEmptyInitializer = ListUtils.map(initializerList, it -> it instanceof J.Empty ? null : it);
+            return ListUtils.concatAll(nonEmptyInitializer, newItemsList);
         }
 
         // If no option is defined, replace the old array elements with the new elements
