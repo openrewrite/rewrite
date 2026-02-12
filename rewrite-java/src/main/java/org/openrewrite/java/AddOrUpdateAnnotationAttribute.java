@@ -99,9 +99,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                 String newAttributeValue;
                 if (isFullyQualifiedClass()) {
+                    // onlyIfReferenced=false because the shortened form isn't in the code yet
                     maybeAddImport(attributeValue.substring(0, attributeValue.length() - 6), false);
                     newAttributeValue = attributeValue;
                 } else if (isFullyQualifiedEnumValue(a)) {
+                    // onlyIfReferenced=false because the shortened form isn't in the code yet
                     maybeAddImport(getEnumClassName(attributeValue), false);
                     newAttributeValue = getShortenedEnumValue(attributeValue);
                 } else {
@@ -344,9 +346,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         if (attributeValue == null || attributeValue.endsWith(".class") || attributeValue.contains(",")) {
             return false;
         }
-        if (!attributeValue.matches("[\\w.$]+") ||
-            !findMethod(annotation, attributeName()).isPresent() ||
-            attributeIsString(annotation)) {
+        if (!attributeValue.matches("[\\w.$]+") || !attributeIsEnum(annotation)) {
             return false;
         }
         int lastDot = attributeValue.lastIndexOf('.');
@@ -490,6 +490,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     private boolean attributeIsString(J.Annotation annotation) {
         return findMethod(annotation, attributeName())
                 .map(it -> TypeUtils.isOfClassType(it.getReturnType(), "java.lang.String"))
+                .orElse(false);
+    }
+
+    private boolean attributeIsEnum(J.Annotation annotation) {
+        return findMethod(annotation, attributeName())
+                .map(it -> it.getReturnType() instanceof JavaType.FullyQualified &&
+                           ((JavaType.FullyQualified) it.getReturnType()).getKind() == JavaType.FullyQualified.Kind.Enum)
                 .orElse(false);
     }
 
