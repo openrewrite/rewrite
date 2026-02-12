@@ -6,7 +6,6 @@ from rewrite.python import AutoFormat
 from rewrite.test import rewrite_run, python, RecipeSpec
 
 
-@pytest.mark.xfail(reason='Empty diff: visitor creates new AST objects without changing output')
 def test_deeply_nested_indentation():
     rewrite_run(
         # language=python
@@ -170,7 +169,6 @@ def test_return_with_tuple():
     )
 
 
-@pytest.mark.xfail(reason='Empty diff: visitor creates new AST objects without changing output')
 def test_yield_and_yield_from():
     rewrite_run(
         # language=python

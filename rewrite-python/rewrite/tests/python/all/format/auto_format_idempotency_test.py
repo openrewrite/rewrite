@@ -50,7 +50,6 @@ def test_idempotent_class_with_methods():
     )
 
 
-@pytest.mark.xfail(reason='Empty diff: visitor creates new AST objects without changing output')
 def test_idempotent_imports():
     rewrite_run(
         # language=python
@@ -73,7 +72,6 @@ def test_idempotent_imports():
     )
 
 
-@pytest.mark.xfail(reason='Empty diff: visitor creates new AST objects without changing output')
 def test_idempotent_operators():
     rewrite_run(
         # language=python
@@ -154,7 +152,6 @@ def test_idempotent_comprehensions():
     )
 
 
-@pytest.mark.xfail(reason='Empty diff: visitor creates new AST objects without changing output')
 def test_idempotent_type_hints():
     rewrite_run(
         # language=python
@@ -182,7 +179,6 @@ def test_idempotent_type_hints():
     )
 
 
-@pytest.mark.xfail(reason='Empty diff: visitor creates new AST objects without changing output')
 def test_idempotent_decorators():
     rewrite_run(
         # language=python
@@ -484,7 +480,6 @@ def test_idempotent_multiline_strings():
     )
 
 
-@pytest.mark.xfail(reason='Empty diff: visitor creates new AST objects without changing output')
 def test_idempotent_async_await():
     rewrite_run(
         # language=python
@@ -512,7 +507,6 @@ def test_idempotent_async_await():
     )
 
 
-@pytest.mark.xfail(reason='Empty diff: visitor creates new AST objects without changing output')
 def test_idempotent_match_case():
     rewrite_run(
         # language=python
@@ -540,7 +534,6 @@ def test_idempotent_match_case():
     )
 
 
-@pytest.mark.xfail(reason='Empty diff: visitor creates new AST objects without changing output')
 def test_idempotent_walrus_operator():
     rewrite_run(
         # language=python
@@ -598,7 +591,6 @@ def test_idempotent_multiline_method_chain():
     )
 
 
-@pytest.mark.xfail(reason='Empty diff: visitor creates new AST objects without changing output')
 def test_idempotent_comments_everywhere():
     rewrite_run(
         # language=python
@@ -670,7 +662,6 @@ def test_idempotent_empty_containers():
     )
 
 
-@pytest.mark.xfail(reason='Empty diff: visitor creates new AST objects without changing output')
 def test_idempotent_complex_defaults():
     rewrite_run(
         # language=python
@@ -694,7 +685,6 @@ def test_idempotent_complex_defaults():
     )
 
 
-@pytest.mark.xfail(reason='Empty diff: visitor creates new AST objects without changing output')
 def test_idempotent_class_inheritance():
     rewrite_run(
         # language=python

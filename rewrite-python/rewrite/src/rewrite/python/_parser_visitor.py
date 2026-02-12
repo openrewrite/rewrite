@@ -605,7 +605,7 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY,
             j.ControlParentheses(
                 random_id(),
-                self.__whitespace(),
+                Space.EMPTY,
                 Markers.EMPTY,
                 self.__pad_right(self.__convert(node.test), Space.EMPTY)
             ),
@@ -629,7 +629,7 @@ class ParserVisitor(ast.NodeVisitor):
             prefix = self.__source_before('elif')
         else:
             prefix = self.__source_before('if')
-        condition = j.ControlParentheses(random_id(), self.__whitespace(), Markers.EMPTY,
+        condition = j.ControlParentheses(random_id(), Space.EMPTY, Markers.EMPTY,
                                          self.__pad_right(self.__convert(node.test), Space.EMPTY))
         then = self.__pad_right(self.__convert_block(node.body), Space.EMPTY)
         elze = None
@@ -781,14 +781,16 @@ class ParserVisitor(ast.NodeVisitor):
 
     def visit_Import(self, node):
         # TODO only use `MultiImport` when necessary (requires corresponding changes to printer)
+        prefix = self.__source_before('import')
+        names_prefix = self.__whitespace()
         return py.MultiImport(
             random_id(),
-            self.__source_before('import'),
+            prefix,
             Markers.EMPTY,
             None,
             False,
             JContainer(
-                Space.EMPTY,
+                names_prefix,
                 [self.__pad_list_element(self.__convert(n), i == len(node.names) - 1, pad_last=False) for i, n in
                  enumerate(node.names)],
                 Markers.EMPTY
@@ -1116,7 +1118,7 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY,
             j.ControlParentheses(
                 random_id(),
-                self.__whitespace(),
+                Space.EMPTY,
                 Markers.EMPTY,
                 self.__pad_right(self.__convert(node.subject), Space.EMPTY)
             ),
@@ -1688,6 +1690,7 @@ class ParserVisitor(ast.NodeVisitor):
             )
 
     def visit_BoolOp(self, node):
+        prefix = self.__whitespace()
         left = self.__convert(node.values[0])
         for right_expr in node.values[1:]:
             left = j.Binary(
@@ -1699,7 +1702,7 @@ class ParserVisitor(ast.NodeVisitor):
                 self.__convert(right_expr),
                 self._type_mapping.type(node)
             )
-        return left
+        return left.replace(prefix=prefix)
 
     def visit_Call(self, node):
         prefix = self.__whitespace()
