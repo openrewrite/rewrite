@@ -87,7 +87,6 @@ def test_multiline_function_call_with_keyword_args():
     )
 
 
-@pytest.mark.xfail(reason='Formatter incorrectly modifies well-formatted code')
 def test_decorator_with_complex_expression():
     rewrite_run(
         # language=python
@@ -114,7 +113,6 @@ def test_decorator_with_complex_expression():
     )
 
 
-@pytest.mark.xfail(reason='Formatter incorrectly modifies well-formatted code')
 def test_class_with_multiple_bases_multiline():
     rewrite_run(
         # language=python
@@ -135,7 +133,6 @@ def test_class_with_multiple_bases_multiline():
     )
 
 
-@pytest.mark.xfail(reason='Formatter incorrectly modifies well-formatted code')
 def test_assignment_with_multiline_rhs():
     rewrite_run(
         # language=python
@@ -242,7 +239,6 @@ def test_semicolon_separated_statements():
     )
 
 
-@pytest.mark.xfail(reason='Formatter incorrectly modifies well-formatted code')
 def test_backslash_line_continuation():
     rewrite_run(
         # language=python
@@ -329,7 +325,6 @@ def test_subscript_with_complex_slices():
     )
 
 
-@pytest.mark.xfail(reason='Formatter incorrectly modifies well-formatted code')
 def test_delete_statement():
     rewrite_run(
         # language=python

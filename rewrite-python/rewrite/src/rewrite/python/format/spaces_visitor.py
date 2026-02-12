@@ -366,7 +366,6 @@ class SpacesVisitor(PythonVisitor):
 
     def visit_parentheses(self, parentheses: Parentheses, p: P) -> J:
         p2 = cast(Parentheses, super().visit_parentheses(parentheses, p))
-        p2 = p2.replace(prefix=update_space(p2.prefix, False))
         p2 = p2.padding.replace(tree=p2.padding.tree.replace(after=update_space(p2.padding.tree.after, False)))
         return p2
 

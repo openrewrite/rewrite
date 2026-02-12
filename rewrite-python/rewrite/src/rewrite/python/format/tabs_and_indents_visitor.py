@@ -6,7 +6,7 @@ from enum import Enum, auto
 from typing import TypeVar, Optional, cast, List
 
 from rewrite.java import tree as j
-from rewrite.java.support_types import J, Space, Comment
+from rewrite.java.support_types import J, Space, Comment, Statement
 from rewrite.java.tree import (
     JRightPadded, JLeftPadded, JContainer, Block, ArrayDimension,
     ClassDeclaration, Empty, MethodDeclaration, MethodInvocation,
@@ -17,6 +17,7 @@ from rewrite.java.markers import TrailingComma
 from rewrite.python import (
     PythonVisitor, TabsAndIndentsStyle, DictLiteral, CollectionLiteral,
     ExpressionStatement, OtherStyle, IntelliJ, ComprehensionExpression, PyComment,
+    TrailingElseWrapper,
 )
 from rewrite.tree import Tree
 from rewrite.visitor import P, T, Cursor
@@ -79,6 +80,11 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 if self._other.use_continuation_indent.collections_and_comprehensions else self.IndentType.INDENT)
         elif isinstance(tree, ExpressionStatement):
             pass
+        elif isinstance(tree, Binary):
+            if self.cursor.first_enclosing(j.Parentheses) is not None:
+                self.cursor.put_message("indent_type", self.IndentType.ALIGN)
+            else:
+                self.cursor.put_message("indent_type", self.IndentType.INDENT)
         elif isinstance(tree, j.Expression):
             self.cursor.put_message("indent_type", self.IndentType.INDENT)
 
@@ -274,7 +280,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         if isinstance(parent_tree, MethodDeclaration):
             rp_context = "method_declaration_parameter"
             needs_continuation_on_before = True
-        elif isinstance(parent_tree, MethodInvocation):
+        elif isinstance(parent_tree, (MethodInvocation, Annotation)):
             rp_context = "method_invocation_argument"
         elif isinstance(parent_tree, DictLiteral):
             rp_context = "dict_literal_element"
@@ -300,10 +306,12 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 self.cursor.put_message("indent_type",
                     self.IndentType.CONTINUATION_INDENT if self._other.use_continuation_indent.method_declaration_parameters
                     else self.IndentType.INDENT)
-            elif isinstance(parent_tree, MethodInvocation):
+            elif isinstance(parent_tree, (MethodInvocation, Annotation)):
                 self.cursor.put_message("indent_type",
                     self.IndentType.CONTINUATION_INDENT if self._other.use_continuation_indent.method_call_arguments
                     else self.IndentType.INDENT)
+            elif isinstance(parent_tree, ClassDeclaration):
+                self.cursor.put_message("indent_type", self.IndentType.CONTINUATION_INDENT)
             before = self.visit_space(container.before, p)
             js = list_map(lambda t: self.visit_right_padded(t, p), container.padding.elements)
 
@@ -370,6 +378,26 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
 
         return try_
 
+    def visit_trailing_else_wrapper(self, wrapper: TrailingElseWrapper, p: P) -> J:
+        wrapper = wrapper.replace(prefix=self.visit_space(wrapper.prefix, p))
+
+        temp_stmt = cast(Statement, self.visit_statement(wrapper, p))
+        if not isinstance(temp_stmt, type(wrapper)):
+            return temp_stmt
+        wrapper = temp_stmt
+
+        wrapper = wrapper.replace(markers=self.visit_markers(wrapper.markers, p))
+        wrapper = wrapper.replace(
+            statement=self.visit_and_cast(wrapper.statement, Statement, p)
+        )
+
+        self.cursor.put_message("space_context", "else_prefix")
+        wrapper = wrapper.padding.replace(
+            else_block=self.visit_left_padded(wrapper.padding.else_block, p)
+        )
+        self.cursor.put_message("space_context", None)
+        return wrapper
+
     def visit_else(self, else_: j.If.Else, p: P) -> J:
         self.cursor.put_message("space_context", "else_prefix")
         else_ = else_.replace(prefix=self.visit_space(else_.prefix, p))
@@ -428,6 +456,56 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         class_decl = class_decl.replace(body=self.visit_and_cast(
             class_decl.body, Block, p))
         return class_decl
+
+    def visit_parentheses(self, parens: j.Parentheses, p: P) -> J:
+        parens = parens.replace(prefix=self.visit_space(parens.prefix, p))
+        temp_expr = self.visit_expression(parens, p)
+        if not isinstance(temp_expr, j.Parentheses):
+            return temp_expr
+        parens = temp_expr
+        parens = parens.replace(markers=self.visit_markers(parens.markers, p))
+
+        tree_rp = parens.padding.tree
+        elem = tree_rp.element
+        if isinstance(elem, J):
+            elem = self.visit_and_cast(elem, J, p)
+
+        after = tree_rp.after
+        if '\n' in after.last_whitespace:
+            # Close paren should align to the enclosing indent level
+            indent = cast(int, self.cursor.parent_or_throw.get_nearest_message("last_indent")) or 0
+            after = self._indent_to(after, indent)
+        else:
+            after = self.visit_space(after, p)
+
+        if elem is not tree_rp.element or after is not tree_rp.after:
+            parens = parens.padding.replace(tree=tree_rp.replace(element=elem, after=after))
+        return parens
+
+    def visit_binary(self, binary: Binary, p: P) -> J:
+        if self.cursor.first_enclosing(j.Parentheses) is not None:
+            # Inside parentheses: operator before spaces align to same indent as first line
+            binary = binary.replace(prefix=self.visit_space(binary.prefix, p))
+            temp_expr = self.visit_expression(binary, p)
+            if not isinstance(temp_expr, Binary):
+                return temp_expr
+            binary = temp_expr
+            binary = binary.replace(markers=self.visit_markers(binary.markers, p))
+            binary = binary.replace(left=self.visit_and_cast(binary.left, j.Expression, p))
+
+            op = binary.padding.operator
+            if '\n' in op.before.last_whitespace:
+                indent = cast(int, self.cursor.get_nearest_message("last_indent")) or 0
+                before = self._indent_to(op.before, indent)
+                if before is not op.before:
+                    binary = binary.padding.replace(operator=op.replace(before=before))
+            else:
+                binary = binary.padding.replace(
+                    operator=self.visit_left_padded(binary.padding.operator, p))
+
+            binary = binary.replace(right=self.visit_and_cast(binary.right, j.Expression, p))
+            return binary
+        return super().visit_binary(binary, p)
 
     def visit_method_invocation(self, method: MethodInvocation, p: P) -> J:
         select = method.padding.select

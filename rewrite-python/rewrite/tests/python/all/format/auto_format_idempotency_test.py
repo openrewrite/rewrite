@@ -228,7 +228,6 @@ def test_idempotent_decorators():
     )
 
 
-@pytest.mark.xfail(reason='Formatter incorrectly modifies well-formatted code')
 def test_idempotent_try_except():
     rewrite_run(
         # language=python

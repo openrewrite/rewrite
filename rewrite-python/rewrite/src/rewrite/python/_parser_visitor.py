@@ -502,7 +502,7 @@ class ParserVisitor(ast.NodeVisitor):
             random_id(),
             self.__source_before('del'),
             Markers.EMPTY,
-            [self.__pad_list_element(self.__convert(e), last=i == len(node.targets) - 1) for i, e in
+            [self.__pad_list_element(self.__convert(e), last=i == len(node.targets) - 1, pad_last=False) for i, e in
              enumerate(node.targets)]
         )
 
