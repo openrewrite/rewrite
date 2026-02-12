@@ -122,6 +122,12 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitKeyword(Cs.Keyword keyword, RpcSendQueue q) {
+        q.getAndSend(keyword, Cs.Keyword::getKind);
+        return keyword;
+    }
+
+    @Override
     public J visitArgument(Cs.Argument argument, RpcSendQueue q) {
         q.getAndSend(argument, a -> a.getPadding().getNameColumn(), el -> visitRightPadded(el, q));
         q.getAndSend(argument, Cs.Argument::getRefKindKeyword, el -> visit(el, q));
@@ -287,11 +293,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         return propertyDeclaration;
     }
 
-    @Override
-    public J visitKeyword(Cs.Keyword keyword, RpcSendQueue q) {
-        q.getAndSend(keyword, Cs.Keyword::getKind);
-        return keyword;
-    }
 
     @Override
     public J visitLambda(Cs.Lambda lambda, RpcSendQueue q) {
@@ -422,12 +423,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         return tupleExpression;
     }
 
-    @Override
-    public J visitConstructor(Cs.Constructor constructor, RpcSendQueue q) {
-        q.getAndSend(constructor, Cs.Constructor::getInitializer, el -> visit(el, q));
-        q.getAndSend(constructor, Cs.Constructor::getConstructorCore, el -> visit(el, q));
-        return constructor;
-    }
 
     @Override
     public J visitDestructorDeclaration(Cs.DestructorDeclaration destructorDeclaration, RpcSendQueue q) {
@@ -443,12 +438,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         return unary;
     }
 
-    @Override
-    public J visitConstructorInitializer(Cs.ConstructorInitializer constructorInitializer, RpcSendQueue q) {
-        q.getAndSend(constructorInitializer, Cs.ConstructorInitializer::getKeyword, el -> visit(el, q));
-        q.getAndSend(constructorInitializer, c -> c.getPadding().getArguments(), el -> visitContainer(el, q));
-        return constructorInitializer;
-    }
 
     @Override
     public J visitTupleType(Cs.TupleType tupleType, RpcSendQueue q) {
@@ -488,6 +477,13 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(yield, Cs.Yield::getReturnOrBreakKeyword, el -> visit(el, q));
         q.getAndSend(yield, Cs.Yield::getExpression, el -> visit(el, q));
         return yield;
+    }
+
+    @Override
+    public J visitSizeOf(Cs.SizeOf sizeOf, RpcSendQueue q) {
+        q.getAndSend(sizeOf, Cs.SizeOf::getExpression, el -> visit(el, q));
+        q.getAndSend(sizeOf, s -> asRef(s.getType()), type -> visitType(getValueNonNull(type), q));
+        return sizeOf;
     }
 
     @Override

@@ -146,6 +146,27 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         return fieldAccess;
     }
 
+    public override J VisitNullableType(NullableType nullableType, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(nullableType, p);
+        VisitRightPadded(nullableType.TypeTreePadded, null, p);
+        p.Append('?');
+        AfterSyntax(nullableType, p);
+        return nullableType;
+    }
+
+    public override J VisitParameterizedType(ParameterizedType type, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(type, p);
+        Visit(type.Clazz, p);
+        if (type.TypeParameters != null)
+        {
+            VisitContainer("<", type.TypeParameters, ",", ">", p);
+        }
+        AfterSyntax(type, p);
+        return type;
+    }
+
     public override J VisitArrayAccess(ArrayAccess arrayAccess, PrintOutputCapture<P> p)
     {
         var isMultiDim = arrayAccess.Markers.FindFirst<MultiDimensionalArray>() != null;
@@ -302,7 +323,18 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // Print body/initializer if present
         if (nc.Body != null)
         {
-            VisitBlock(nc.Body, p);
+            // Check if body wraps an InitializerExpression (C# object/collection initializer)
+            if (nc.Body.Statements.Count == 1 &&
+                nc.Body.Statements[0].Element is ExpressionStatement es &&
+                es.Expression is InitializerExpression initExpr)
+            {
+                VisitSpace(nc.Body.Prefix, p);
+                Visit(initExpr, p);
+            }
+            else
+            {
+                VisitBlock(nc.Body, p);
+            }
         }
 
         AfterSyntax(nc, p);
@@ -462,6 +494,99 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         return se;
     }
 
+    public override J VisitSizeOf(SizeOf sizeOf, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(sizeOf, p);
+        p.Append("sizeof");
+        p.Append('(');
+        Visit(sizeOf.Expression, p);
+        p.Append(')');
+        AfterSyntax(sizeOf, p);
+        return sizeOf;
+    }
+
+    public override J VisitUnsafeStatement(UnsafeStatement unsafeStatement, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(unsafeStatement, p);
+        p.Append("unsafe");
+        Visit(unsafeStatement.Block, p);
+        AfterSyntax(unsafeStatement, p);
+        return unsafeStatement;
+    }
+
+    public override J VisitPointerType(PointerType pointerType, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(pointerType, p);
+        Visit(pointerType.ElementType.Element, p);
+        VisitSpace(pointerType.ElementType.After, p);
+        p.Append('*');
+        AfterSyntax(pointerType, p);
+        return pointerType;
+    }
+
+    public override J VisitFixedStatement(FixedStatement fixedStatement, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(fixedStatement, p);
+        p.Append("fixed");
+        // Print ControlParentheses<VariableDeclarations> manually
+        VisitSpace(fixedStatement.Declarations.Prefix, p);
+        p.Append('(');
+        VisitVariableDeclarationsWithoutSemicolon(fixedStatement.Declarations.Tree.Element, p);
+        VisitSpace(fixedStatement.Declarations.Tree.After, p);
+        p.Append(')');
+        Visit(fixedStatement.Block, p);
+        AfterSyntax(fixedStatement, p);
+        return fixedStatement;
+    }
+
+    public override J VisitExternAlias(ExternAlias externAlias, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(externAlias, p);
+        p.Append("extern");
+        VisitSpace(externAlias.Identifier.Before, p);
+        p.Append("alias");
+        Visit(externAlias.Identifier.Element, p);
+        p.Append(';');
+        AfterSyntax(externAlias, p);
+        return externAlias;
+    }
+
+    public override J VisitInitializerExpression(InitializerExpression initializerExpression, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(initializerExpression, p);
+        VisitContainer("{", initializerExpression.Expressions, ",", "}", p);
+        AfterSyntax(initializerExpression, p);
+        return initializerExpression;
+    }
+
+    public override J VisitNullSafeExpression(NullSafeExpression nullSafeExpression, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(nullSafeExpression, p);
+        VisitRightPadded(nullSafeExpression.ExpressionPadded, null, p);
+        p.Append('!');
+        AfterSyntax(nullSafeExpression, p);
+        return nullSafeExpression;
+    }
+
+    public override J VisitDefaultExpression(DefaultExpression defaultExpression, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(defaultExpression, p);
+        p.Append("default");
+        if (defaultExpression.TypeOperator != null)
+        {
+            VisitSpace(defaultExpression.TypeOperator.Before, p);
+            p.Append('(');
+            foreach (var paddedType in defaultExpression.TypeOperator.Elements)
+            {
+                Visit(paddedType.Element, p);
+                VisitSpace(paddedType.After, p);
+            }
+            p.Append(')');
+        }
+        AfterSyntax(defaultExpression, p);
+        return defaultExpression;
+    }
+
     public override J VisitRelationalPattern(RelationalPattern rp, PrintOutputCapture<P> p)
     {
         BeforeSyntax(rp, p);
@@ -558,7 +683,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         foreach (var mod in prop.Modifiers)
         {
             VisitSpace(mod.Prefix, p);
-            p.Append(GetModifierString(mod.Type));
+            p.Append(GetModifierString(mod));
         }
 
         // Print type
@@ -592,7 +717,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         foreach (var mod in accessor.Modifiers)
         {
             VisitSpace(mod.Prefix, p);
-            p.Append(GetModifierString(mod.Type));
+            p.Append(GetModifierString(mod));
         }
 
         // Print keyword (get/set/init)
@@ -704,7 +829,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         foreach (var mod in classDecl.Modifiers)
         {
             VisitSpace(mod.Prefix, p);
-            p.Append(GetModifierString(mod.Type));
+            p.Append(GetModifierString(mod));
         }
 
         // Print class kind (class, struct, record, interface, etc.)
@@ -919,7 +1044,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         foreach (var mod in method.Modifiers)
         {
             VisitSpace(mod.Prefix, p);
-            p.Append(GetModifierString(mod.Type));
+            p.Append(GetModifierString(mod));
         }
 
         // Print return type
@@ -957,6 +1082,15 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             }
         }
         p.Append(')');
+
+        // Print constructor initializer if present (: base(...) or : this(...))
+        // Stored in defaultValue as JLeftPadded<MethodInvocation>
+        if (method.DefaultValue != null)
+        {
+            VisitSpace(method.DefaultValue.Before, p);
+            p.Append(':');
+            Visit(method.DefaultValue.Element, p);
+        }
 
         // Print body or semicolon (for interface methods without body)
         if (method.Markers.FindFirst<ExpressionBodied>() != null && method.Body != null)
@@ -1033,6 +1167,17 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         p.Append(';');
         AfterSyntax(dwl, p);
         return dwl;
+    }
+
+    public override J VisitLabel(Label label, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(label, p);
+        Visit(label.LabelName.Element, p);
+        VisitSpace(label.LabelName.After, p);
+        p.Append(':');
+        Visit(label.Statement, p);
+        AfterSyntax(label, p);
+        return label;
     }
 
     public override J VisitSynchronized(Synchronized sync, PrintOutputCapture<P> p)
@@ -1172,9 +1317,39 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         BeforeSyntax(thr, p);
         p.Append("throw");
         Visit(thr.Exception, p);
-        p.Append(';');
+        // Suppress semicolon when throw is used as an expression (wrapped in StatementExpression)
+        if (Cursor.Parent?.Value is not StatementExpression)
+        {
+            p.Append(';');
+        }
         AfterSyntax(thr, p);
         return thr;
+    }
+
+    public override J VisitInstanceOf(InstanceOf instanceOf, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(instanceOf, p);
+        if (instanceOf.Expression.Element is Empty)
+        {
+            // typeof(T)
+            p.Append("typeof");
+            p.Append('(');
+            Visit(instanceOf.Clazz, p);
+            p.Append(')');
+        }
+        else
+        {
+            Visit(instanceOf.Expression.Element, p);
+            VisitSpace(instanceOf.Expression.After, p);
+            p.Append("is");
+            Visit(instanceOf.Clazz, p);
+            if (instanceOf.Pattern != null)
+            {
+                Visit(instanceOf.Pattern, p);
+            }
+        }
+        AfterSyntax(instanceOf, p);
+        return instanceOf;
     }
 
     public override J VisitBreak(Break brk, PrintOutputCapture<P> p)
@@ -1618,7 +1793,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         foreach (var mod in csLambda.Modifiers)
         {
             VisitSpace(mod.Prefix, p);
-            p.Append(GetModifierString(mod.Type));
+            p.Append(GetModifierString(mod));
         }
 
         // Print optional return type
@@ -1812,7 +1987,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         foreach (var mod in varDecl.Modifiers)
         {
             VisitSpace(mod.Prefix, p);
-            p.Append(GetModifierString(mod.Type));
+            p.Append(GetModifierString(mod));
         }
 
         // Print type
@@ -1872,9 +2047,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         };
     }
 
-    private static string GetModifierString(Modifier.ModifierType type)
+    private static string GetModifierString(Modifier mod)
     {
-        return type switch
+        return mod.Type switch
         {
             Modifier.ModifierType.Public => "public",
             Modifier.ModifierType.Private => "private",
@@ -1896,6 +2071,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             Modifier.ModifierType.Ref => "ref",
             Modifier.ModifierType.Out => "out",
             Modifier.ModifierType.In => "in",
+            Modifier.ModifierType.LanguageExtension => mod.Keyword ?? "",
             _ => ""
         };
     }

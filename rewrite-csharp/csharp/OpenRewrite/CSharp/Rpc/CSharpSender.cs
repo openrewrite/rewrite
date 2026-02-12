@@ -65,6 +65,13 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             CsLambda csl => VisitCsLambda(csl, q),
             IsPattern ip => VisitIsPattern(ip, q),
             StatementExpression se => VisitStatementExpression(se, q),
+            SizeOf sof => VisitSizeOf(sof, q),
+            UnsafeStatement us => VisitUnsafeStatement(us, q),
+            FixedStatement fs => VisitFixedStatement(fs, q),
+            PointerType pt => VisitPointerType(pt, q),
+            DefaultExpression de2 => VisitDefaultExpression(de2, q),
+            ExternAlias ea => VisitExternAlias(ea, q),
+            InitializerExpression ie => VisitInitializerExpression(ie, q),
             RelationalPattern rp => VisitRelationalPattern(rp, q),
             PropertyPattern pp => VisitPropertyPattern(pp, q),
             TypeParameterBound tpb => VisitTypeParameterBound(tpb, q),
@@ -88,6 +95,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             ErrorDirective ed => VisitErrorDirective(ed, q),
             WarningDirective wd => VisitWarningDirective(wd, q),
             LineDirective ld => VisitLineDirective(ld, q),
+            NullSafeExpression nse => VisitNullSafeExpression(nse, q),
             _ => throw new InvalidOperationException($"Unknown Cs tree type: {tree.GetType().FullName}")
         };
 
@@ -244,6 +252,56 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     {
         q.GetAndSend(se, s => (J)s.Statement, el => Visit(el, q));
         return se;
+    }
+
+    public override J VisitSizeOf(SizeOf sizeOf, RpcSendQueue q)
+    {
+        q.GetAndSend(sizeOf, s => (J)s.Expression, el => Visit(el, q));
+        q.GetAndSend(sizeOf, s => AsRef(s.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
+        return sizeOf;
+    }
+
+    public override J VisitUnsafeStatement(UnsafeStatement unsafeStatement, RpcSendQueue q)
+    {
+        q.GetAndSend(unsafeStatement, u => (J)u.Block, el => Visit(el, q));
+        return unsafeStatement;
+    }
+
+    public override J VisitPointerType(PointerType pointerType, RpcSendQueue q)
+    {
+        q.GetAndSend(pointerType, p => p.ElementType, el => VisitRightPadded(el, q));
+        return pointerType;
+    }
+
+    public override J VisitFixedStatement(FixedStatement fixedStatement, RpcSendQueue q)
+    {
+        q.GetAndSend(fixedStatement, f => (J)f.Declarations, el => Visit(el, q));
+        q.GetAndSend(fixedStatement, f => (J)f.Block, el => Visit(el, q));
+        return fixedStatement;
+    }
+
+    public override J VisitDefaultExpression(DefaultExpression defaultExpression, RpcSendQueue q)
+    {
+        q.GetAndSend(defaultExpression, d => d.TypeOperator, el => VisitContainer(el, q));
+        return defaultExpression;
+    }
+
+    public override J VisitExternAlias(ExternAlias externAlias, RpcSendQueue q)
+    {
+        q.GetAndSend(externAlias, e => e.Identifier, el => VisitLeftPadded(el, q));
+        return externAlias;
+    }
+
+    public override J VisitInitializerExpression(InitializerExpression initializerExpression, RpcSendQueue q)
+    {
+        q.GetAndSend(initializerExpression, i => i.Expressions, el => VisitContainer(el, q));
+        return initializerExpression;
+    }
+
+    public override J VisitNullSafeExpression(NullSafeExpression nullSafeExpression, RpcSendQueue q)
+    {
+        q.GetAndSend(nullSafeExpression, n => n.ExpressionPadded, el => VisitRightPadded(el, q));
+        return nullSafeExpression;
     }
 
     public override J VisitRelationalPattern(RelationalPattern rp, RpcSendQueue q)

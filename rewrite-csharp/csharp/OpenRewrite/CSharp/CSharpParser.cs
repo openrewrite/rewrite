@@ -51,9 +51,16 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
     public new CompilationUnit VisitCompilationUnit(CompilationUnitSyntax node)
     {
-        var prefix = ExtractPrefix(node);
-
         var members = new List<Statement>();
+
+        // Process directives at the very start of the file (before any usings/members)
+        // These would otherwise be absorbed into the CompilationUnit prefix
+        var leadingDirectives = ProcessGapDirectives(node.SpanStart);
+        members.AddRange(leadingDirectives);
+
+        // If leading directives were found, don't extract prefix — the trailing
+        // whitespace after the last directive naturally becomes the next member's prefix
+        var prefix = leadingDirectives.Count > 0 ? Space.Empty : ExtractPrefix(node);
 
         // Handle using directives
         foreach (var usingDirective in node.Usings)
@@ -935,6 +942,206 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             returnType,
             name,
             paramsContainer,
+            null, // Throws
+            body,
+            null, // DefaultValue
+            _typeMapping?.MethodType(node)
+        );
+    }
+
+    public override J VisitConstructorDeclaration(ConstructorDeclarationSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+
+        // Parse modifiers
+        var modifiers = new List<Modifier>();
+        foreach (var mod in node.Modifiers)
+        {
+            var modPrefix = ExtractSpaceBefore(mod);
+            _cursor = mod.Span.End;
+            modifiers.Add(new Modifier(
+                Guid.NewGuid(), modPrefix, Markers.Empty, MapModifier(mod.Kind()), []
+            ));
+        }
+
+        // Constructor has no return type
+
+        // Parse name (class name)
+        var namePrefix = ExtractSpaceBefore(node.Identifier);
+        _cursor = node.Identifier.Span.End;
+        var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, node.Identifier.Text, null);
+
+        // Parse parameters (same pattern as VisitMethodDeclaration)
+        var paramsPrefix = ExtractSpaceBefore(node.ParameterList.OpenParenToken);
+        _cursor = node.ParameterList.OpenParenToken.Span.End;
+
+        var parameters = new List<JRightPadded<Statement>>();
+        for (int i = 0; i < node.ParameterList.Parameters.Count; i++)
+        {
+            var p = node.ParameterList.Parameters[i];
+            var paramStatement = ConvertParameter(p);
+            if (paramStatement is Statement stmt)
+            {
+                Space afterSpace = Space.Empty;
+                if (i < node.ParameterList.Parameters.Count - 1)
+                {
+                    var separatorToken = node.ParameterList.Parameters.GetSeparator(i);
+                    afterSpace = ExtractSpaceBefore(separatorToken);
+                    _cursor = separatorToken.Span.End;
+                }
+                else
+                {
+                    afterSpace = ExtractSpaceBefore(node.ParameterList.CloseParenToken);
+                }
+                parameters.Add(new JRightPadded<Statement>(stmt, afterSpace, Markers.Empty));
+            }
+        }
+
+        if (parameters.Count == 0)
+        {
+            var emptySpace = ExtractSpaceBefore(node.ParameterList.CloseParenToken);
+            paramsPrefix = new Space(paramsPrefix.Whitespace, paramsPrefix.Comments);
+        }
+
+        _cursor = node.ParameterList.CloseParenToken.Span.End;
+
+        var paramsContainer = new JContainer<Statement>(
+            paramsPrefix, parameters, Markers.Empty
+        );
+
+        // Parse optional initializer: `: base(args)` or `: this(args)`
+        // Stored as JLeftPadded<MethodInvocation> in defaultValue
+        JLeftPadded<Expression>? defaultValue = null;
+        if (node.Initializer != null)
+        {
+            var colonPrefix = ExtractSpaceBefore(node.Initializer.ColonToken);
+            _cursor = node.Initializer.ColonToken.Span.End;
+
+            var kwPrefix = ExtractSpaceBefore(node.Initializer.ThisOrBaseKeyword);
+            _cursor = node.Initializer.ThisOrBaseKeyword.Span.End;
+            var kwName = node.Initializer.ThisOrBaseKeyword.Kind() == SyntaxKind.BaseKeyword
+                ? "base" : "this";
+
+            var arguments = ParseArgumentList(node.Initializer.ArgumentList);
+
+            var initInvocation = new MethodInvocation(
+                Guid.NewGuid(), kwPrefix, Markers.Empty,
+                null, // select
+                new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, kwName, null),
+                null, // typeParameters
+                arguments,
+                null // methodType
+            );
+
+            defaultValue = new JLeftPadded<Expression>(colonPrefix, initInvocation);
+        }
+
+        // Parse body or expression body
+        Block? body = null;
+        Markers methodMarkers = Markers.Empty;
+        if (node.ExpressionBody != null)
+        {
+            var arrowPrefix = ExtractSpaceBefore(node.ExpressionBody.ArrowToken);
+            _cursor = node.ExpressionBody.ArrowToken.Span.End;
+            var expr = (Expression)Visit(node.ExpressionBody.Expression)!;
+
+            var returnStmt = new Return(Guid.NewGuid(), Space.Empty, Markers.Empty, expr);
+            body = new Block(Guid.NewGuid(), arrowPrefix, Markers.Empty,
+                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+                [new JRightPadded<Statement>(returnStmt, Space.Empty, Markers.Empty)],
+                Space.Empty);
+
+            _cursor = node.SemicolonToken.Span.End;
+            methodMarkers = Markers.Build([new ExpressionBodied(Guid.NewGuid())]);
+        }
+        else if (node.Body != null)
+        {
+            body = (Block)VisitBlock(node.Body);
+        }
+        else if (node.SemicolonToken != default)
+        {
+            _cursor = node.SemicolonToken.Span.End;
+        }
+
+        return new MethodDeclaration(
+            Guid.NewGuid(),
+            prefix,
+            methodMarkers,
+            [],
+            modifiers,
+            null, // TypeParameters
+            null, // ReturnTypeExpression (constructors have none)
+            name,
+            paramsContainer,
+            null, // Throws
+            body,
+            defaultValue,
+            _typeMapping?.MethodType(node)
+        );
+    }
+
+    public override J VisitDestructorDeclaration(DestructorDeclarationSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+
+        // Parse modifiers (destructors can have extern)
+        var modifiers = new List<Modifier>();
+        foreach (var mod in node.Modifiers)
+        {
+            var modPrefix = ExtractSpaceBefore(mod);
+            _cursor = mod.Span.End;
+            modifiers.Add(new Modifier(
+                Guid.NewGuid(), modPrefix, Markers.Empty,
+                MapModifier(mod.Kind()), []
+            ));
+        }
+
+        // Parse ~Name: tilde is part of the name
+        var tildePrefix = ExtractSpaceBefore(node.TildeToken);
+        _cursor = node.TildeToken.Span.End;
+        var namePrefix = ExtractSpaceBefore(node.Identifier);
+        _cursor = node.Identifier.Span.End;
+        var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty,
+            "~" + node.Identifier.Text, null);
+
+        // Parse empty parameter list
+        var paramsPrefix = ExtractSpaceBefore(node.ParameterList.OpenParenToken);
+        _cursor = node.ParameterList.OpenParenToken.Span.End;
+        var emptySpace = ExtractSpaceBefore(node.ParameterList.CloseParenToken);
+        _cursor = node.ParameterList.CloseParenToken.Span.End;
+        var paramsContainer = new JContainer<Statement>(paramsPrefix, [], Markers.Empty);
+
+        // Parse body
+        Block? body = null;
+        Markers methodMarkers = Markers.Empty;
+        if (node.ExpressionBody != null)
+        {
+            var arrowPrefix = ExtractSpaceBefore(node.ExpressionBody.ArrowToken);
+            _cursor = node.ExpressionBody.ArrowToken.Span.End;
+            var expr = (Expression)Visit(node.ExpressionBody.Expression)!;
+            var returnStmt = new Return(Guid.NewGuid(), Space.Empty, Markers.Empty, expr);
+            body = new Block(Guid.NewGuid(), arrowPrefix, Markers.Empty,
+                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+                [new JRightPadded<Statement>(returnStmt, Space.Empty, Markers.Empty)],
+                Space.Empty);
+            _cursor = node.SemicolonToken.Span.End;
+            methodMarkers = Markers.Build([new ExpressionBodied(Guid.NewGuid())]);
+        }
+        else if (node.Body != null)
+        {
+            body = (Block)VisitBlock(node.Body);
+        }
+        else if (node.SemicolonToken != default)
+        {
+            _cursor = node.SemicolonToken.Span.End;
+        }
+
+        return new MethodDeclaration(
+            Guid.NewGuid(), prefix, methodMarkers,
+            [], modifiers,
+            null, // TypeParameters
+            null, // ReturnTypeExpression (destructors have none)
+            name, paramsContainer,
             null, // Throws
             body,
             null, // DefaultValue
@@ -2124,6 +2331,169 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         );
     }
 
+    public override J VisitLabeledStatement(LabeledStatementSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+
+        // Parse the label identifier
+        var labelName = new Identifier(
+            Guid.NewGuid(),
+            Space.Empty,
+            Markers.Empty,
+            node.Identifier.Text,
+            null
+        );
+        _cursor = node.Identifier.Span.End;
+
+        // Parse the colon — space before it becomes the right-padding
+        var colonPrefix = ExtractSpaceBefore(node.ColonToken);
+        _cursor = node.ColonToken.Span.End;
+
+        var labelPadded = new JRightPadded<Identifier>(labelName, colonPrefix, Markers.Empty);
+
+        // Parse the statement that follows the label
+        var statement = (Statement)Visit(node.Statement)!;
+
+        return new Label(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            labelPadded,
+            statement
+        );
+    }
+
+    public override J VisitUnsafeStatement(UnsafeStatementSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.UnsafeKeyword.Span.End;
+        var block = (Block)Visit(node.Block)!;
+        return new UnsafeStatement(Guid.NewGuid(), prefix, Markers.Empty, block);
+    }
+
+    public override J VisitFixedStatement(FixedStatementSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.FixedKeyword.Span.End;
+
+        // Parse control parentheses with variable declaration
+        var openParenPrefix = ExtractSpaceBefore(node.OpenParenToken);
+        _cursor = node.OpenParenToken.Span.End;
+
+        var declaration = (VariableDeclarations)Visit(node.Declaration)!;
+
+        var closeParenAfter = ExtractSpaceBefore(node.CloseParenToken);
+        _cursor = node.CloseParenToken.Span.End;
+
+        var declarations = new ControlParentheses<VariableDeclarations>(
+            Guid.NewGuid(),
+            openParenPrefix,
+            Markers.Empty,
+            new JRightPadded<VariableDeclarations>(declaration, closeParenAfter, Markers.Empty)
+        );
+
+        var statement = (Statement)Visit(node.Statement)!;
+
+        return new FixedStatement(Guid.NewGuid(), prefix, Markers.Empty, declarations, (Block)statement);
+    }
+
+    public override J VisitExternAliasDirective(ExternAliasDirectiveSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.ExternKeyword.Span.End;
+
+        var aliasPrefix = ExtractSpaceBefore(node.AliasKeyword);
+        _cursor = node.AliasKeyword.Span.End;
+
+        var identifierPrefix = ExtractSpaceBefore(node.Identifier);
+        _cursor = node.Identifier.Span.End;
+
+        var identifier = new Identifier(Guid.NewGuid(), identifierPrefix, Markers.Empty,
+            node.Identifier.Text, null);
+
+        // Consume semicolon
+        _cursor = node.SemicolonToken.Span.End;
+
+        return new ExternAlias(Guid.NewGuid(), prefix, Markers.Empty,
+            new JLeftPadded<Identifier>(aliasPrefix, identifier));
+    }
+
+    public override J VisitInitializerExpression(InitializerExpressionSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.OpenBraceToken.Span.End;
+
+        var elements = new List<JRightPadded<Expression>>();
+        for (int i = 0; i < node.Expressions.Count; i++)
+        {
+            var expr = (Expression)Visit(node.Expressions[i])!;
+            var afterSpace = Space.Empty;
+            if (i < node.Expressions.Count - 1)
+            {
+                var sep = node.Expressions.GetSeparator(i);
+                afterSpace = ExtractSpaceBefore(sep);
+                _cursor = sep.Span.End;
+            }
+            else
+            {
+                // Check for trailing comma
+                if (node.Expressions.SeparatorCount > i)
+                {
+                    var sep = node.Expressions.GetSeparator(i);
+                    afterSpace = ExtractSpaceBefore(sep);
+                    _cursor = sep.Span.End;
+                }
+                else
+                {
+                    afterSpace = ExtractSpaceBefore(node.CloseBraceToken);
+                }
+            }
+
+            elements.Add(new JRightPadded<Expression>(expr, afterSpace, Markers.Empty));
+        }
+
+        if (node.Expressions.Count == 0)
+        {
+            // Empty initializer: { }
+            // Capture space before close brace
+        }
+
+        _cursor = node.CloseBraceToken.Span.End;
+
+        var containerBefore = Space.Empty; // Space before { is in prefix
+        return new InitializerExpression(Guid.NewGuid(), prefix, Markers.Empty,
+            new JContainer<Expression>(containerBefore, elements, Markers.Empty));
+    }
+
+    public override J VisitDefaultExpression(DefaultExpressionSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.Keyword.Span.End;
+
+        // Parse parentheses and type: (T)
+        SkipTo(node.OpenParenToken.SpanStart);
+        var beforeParen = ExtractSpaceBefore(node.OpenParenToken);
+        _cursor = node.OpenParenToken.Span.End;
+
+        var type = (TypeTree)VisitType(node.Type);
+
+        var afterType = ExtractSpaceBefore(node.CloseParenToken);
+        _cursor = node.CloseParenToken.Span.End;
+
+        var typeContainer = new JContainer<TypeTree>(
+            beforeParen,
+            [new JRightPadded<TypeTree>(type, afterType, Markers.Empty)],
+            Markers.Empty
+        );
+
+        return new DefaultExpression(Guid.NewGuid(), prefix, Markers.Empty, typeContainer);
+    }
+
+    // C# `lock` maps to J.Synchronized intentionally — do NOT replace with a Cs.LockStatement.
+    // The Java-side Cs model has a Cs.LockStatement but it is unused; J.Synchronized is the
+    // correct mapping because lock and synchronized have identical semantics and structure
+    // (keyword + parenthesized expression + block), and using the J type means existing Java
+    // recipes and visitors work on C# lock statements without any extra dispatch.
     public override J VisitLockStatement(LockStatementSyntax node)
     {
         var prefix = ExtractPrefix(node);
@@ -2545,6 +2915,103 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         );
     }
 
+    public override J VisitRefExpression(RefExpressionSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.RefKeyword.Span.End;
+
+        var expr = Visit(node.Expression);
+        if (expr is not Expression e)
+        {
+            throw new InvalidOperationException($"Expected Expression but got {expr?.GetType().Name}");
+        }
+
+        return new RefExpression(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            RefKind.Ref,
+            e
+        );
+    }
+
+    public override J VisitThrowExpression(ThrowExpressionSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.ThrowKeyword.Span.End;
+
+        var expr = Visit(node.Expression);
+        if (expr is not Expression e)
+        {
+            throw new InvalidOperationException($"Expected Expression but got {expr?.GetType().Name}");
+        }
+
+        var throwStatement = new Throw(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            e
+        );
+
+        return new StatementExpression(
+            Guid.NewGuid(),
+            Space.Empty,
+            Markers.Empty,
+            throwStatement
+        );
+    }
+
+    public override J VisitTypeOfExpression(TypeOfExpressionSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.Keyword.Span.End;
+
+        // Skip the open paren
+        SkipTo(node.OpenParenToken.SpanStart);
+        SkipToken(node.OpenParenToken);
+
+        var type = (J)VisitType(node.Type);
+
+        // Skip the close paren
+        SkipTo(node.CloseParenToken.SpanStart);
+        SkipToken(node.CloseParenToken);
+
+        return new InstanceOf(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            new JRightPadded<Expression>(new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty), Space.Empty, Markers.Empty),
+            type,
+            null,
+            _typeMapping?.Type(node),
+            null
+        );
+    }
+
+    public override J VisitSizeOfExpression(SizeOfExpressionSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.Keyword.Span.End;
+
+        // Skip the open paren
+        SkipTo(node.OpenParenToken.SpanStart);
+        SkipToken(node.OpenParenToken);
+
+        var type = (Expression)VisitType(node.Type);
+
+        // Skip the close paren
+        SkipTo(node.CloseParenToken.SpanStart);
+        SkipToken(node.CloseParenToken);
+
+        return new SizeOf(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            type,
+            _typeMapping?.Type(node)
+        );
+    }
+
     public override J VisitBreakStatement(BreakStatementSyntax node)
     {
         var prefix = ExtractPrefix(node);
@@ -2610,6 +3077,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     {
         var prefix = ExtractPrefix(node);
 
+        // Standalone 'default' literal (C# 7.1+)
+        if (node.Kind() == SyntaxKind.DefaultLiteralExpression)
+        {
+            _cursor = node.Token.Span.End;
+            return new DefaultExpression(Guid.NewGuid(), prefix, Markers.Empty, null);
+        }
+
         var valueSource = node.Token.Text;
         var value = node.Token.Value;
 
@@ -2630,6 +3104,20 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     }
 
     public override J VisitThisExpression(ThisExpressionSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.Token.Span.End;
+
+        return new Identifier(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            node.Token.Text,
+            _typeMapping?.Type(node)
+        );
+    }
+
+    public override J VisitBaseExpression(BaseExpressionSyntax node)
     {
         var prefix = ExtractPrefix(node);
         _cursor = node.Token.Span.End;
@@ -2794,10 +3282,30 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     {
         var prefix = ExtractPrefix(node);
 
-        var operand = Visit(node.Operand);
-        if (operand is not Expression expr)
+        // Null-forgiving operator: expr!
+        if (node.IsKind(SyntaxKind.SuppressNullableWarningExpression))
         {
-            throw new InvalidOperationException($"Expected Expression but got {operand?.GetType().Name}");
+            var operand = Visit(node.Operand);
+            if (operand is not Expression expr)
+            {
+                throw new InvalidOperationException($"Expected Expression but got {operand?.GetType().Name}");
+            }
+
+            var bangPrefix = ExtractSpaceBefore(node.OperatorToken);
+            _cursor = node.OperatorToken.Span.End;
+
+            return new NullSafeExpression(
+                Guid.NewGuid(),
+                prefix,
+                Markers.Empty,
+                new JRightPadded<Expression>(expr, bangPrefix, Markers.Empty)
+            );
+        }
+
+        var operand2 = Visit(node.Operand);
+        if (operand2 is not Expression expr2)
+        {
+            throw new InvalidOperationException($"Expected Expression but got {operand2?.GetType().Name}");
         }
 
         var operatorPrefix = ExtractSpaceBefore(node.OperatorToken);
@@ -2810,7 +3318,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             prefix,
             Markers.Empty,
             new JLeftPadded<Unary.OperatorType>(operatorPrefix, opType),
-            expr,
+            expr2,
             _typeMapping?.Type(node)
         );
     }
@@ -3351,8 +3859,19 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         Identifier name;
         if (node.Name is GenericNameSyntax genericName)
         {
-            // Generic member access (e.g., foo.Bar<T>) - not yet fully supported
-            throw new NotSupportedException($"Generic member access expressions not yet supported: {node}");
+            // Generic member access (e.g., foo.Bar<T>) — in non-invocation context
+            // Parse the name and advance past type arguments
+            var namePrefix = ExtractSpaceBefore(genericName.Identifier);
+            _cursor = genericName.Identifier.Span.End;
+            name = new Identifier(
+                Guid.NewGuid(),
+                namePrefix,
+                Markers.Empty,
+                genericName.Identifier.Text,
+                null
+            );
+            // Advance cursor past the type argument list
+            _cursor = genericName.TypeArgumentList.Span.End;
         }
         else
         {
@@ -3804,7 +4323,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             );
         }
 
-        // TODO: Handle initializer (node.Initializer) later
+        // Parse initializer if present (e.g., new Foo { X = 1, Y = 2 })
+        Block? body = null;
+        if (node.Initializer != null)
+        {
+            body = WrapInitializerAsBlock(node.Initializer);
+        }
 
         return new NewClass(
             Guid.NewGuid(),
@@ -3814,7 +4338,38 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             newSpace,
             clazz,
             arguments,
-            null,  // body (for initializers)
+            body,
+            _typeMapping?.MethodType(node)
+        );
+    }
+
+    public override J VisitImplicitObjectCreationExpression(ImplicitObjectCreationExpressionSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+
+        // Skip 'new' keyword
+        _cursor = node.NewKeyword.Span.End;
+
+        // No type name for implicit object creation (e.g., `new()`)
+        // Space between 'new' and '(' is captured by ParseArgumentList's argsPrefix
+        var arguments = ParseArgumentList(node.ArgumentList);
+
+        // Parse initializer if present
+        Block? body = null;
+        if (node.Initializer != null)
+        {
+            body = WrapInitializerAsBlock(node.Initializer);
+        }
+
+        return new NewClass(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            null,  // enclosing
+            Space.Empty,  // no type between new and args
+            null,  // clazz (implicit type)
+            arguments,
+            null,  // body
             _typeMapping?.MethodType(node)
         );
     }
@@ -5076,11 +5631,120 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         return new JContainer<Expression>(typeArgsPrefix, typeArgs, Markers.Empty);
     }
 
+    /// <summary>
+    /// Parses a VariableDeclarationSyntax (type + variables) into a VariableDeclarations.
+    /// Used by VisitLocalDeclarationStatement and VisitFixedStatement.
+    /// </summary>
+    public override J VisitVariableDeclaration(VariableDeclarationSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+
+        // Parse the type
+        var typeExpr = VisitType(node.Type);
+
+        // Parse variables
+        var variables = new List<JRightPadded<NamedVariable>>();
+        for (int i = 0; i < node.Variables.Count; i++)
+        {
+            var v = node.Variables[i];
+            var varPrefix = ExtractPrefix(v);
+
+            // Parse the variable name
+            var namePrefix = ExtractSpaceBefore(v.Identifier);
+            _cursor = v.Identifier.Span.End;
+            var name = new Identifier(
+                Guid.NewGuid(),
+                namePrefix,
+                Markers.Empty,
+                v.Identifier.Text,
+                null
+            );
+
+            // Parse initializer if present
+            JLeftPadded<Expression>? initializer = null;
+            if (v.Initializer != null)
+            {
+                var equalsPrefix = ExtractSpaceBefore(v.Initializer.EqualsToken);
+                _cursor = v.Initializer.EqualsToken.Span.End;
+
+                var initExpr = Visit(v.Initializer.Value);
+                if (initExpr is Expression expr)
+                {
+                    initializer = new JLeftPadded<Expression>(equalsPrefix, expr);
+                }
+            }
+
+            var namedVar = new NamedVariable(
+                Guid.NewGuid(),
+                varPrefix,
+                Markers.Empty,
+                name,
+                [],
+                initializer,
+                _typeMapping?.VariableType(v)
+            );
+
+            // Handle comma separator for multiple variables
+            Space afterSpace = Space.Empty;
+            if (i < node.Variables.Count - 1)
+            {
+                var separatorToken = node.Variables.GetSeparator(i);
+                afterSpace = ExtractSpaceBefore(separatorToken);
+                _cursor = separatorToken.Span.End;
+            }
+
+            variables.Add(new JRightPadded<NamedVariable>(namedVar, afterSpace, Markers.Empty));
+        }
+
+        return new VariableDeclarations(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            [],
+            [],
+            typeExpr,
+            null,
+            [],
+            variables
+        );
+    }
+
     public override J VisitLocalDeclarationStatement(LocalDeclarationStatementSyntax node)
     {
         var prefix = ExtractPrefix(node);
 
         // Parse modifiers (const, etc.)
+        var modifiers = new List<Modifier>();
+        foreach (var mod in node.Modifiers)
+        {
+            var modPrefix = ExtractSpaceBefore(mod);
+            _cursor = mod.Span.End;
+            modifiers.Add(new Modifier(
+                Guid.NewGuid(),
+                modPrefix,
+                Markers.Empty,
+                MapModifier(mod.Kind()),
+                []
+            ));
+        }
+
+        // Parse the variable declaration (type + variables)
+        var varDecl = (VariableDeclarations)Visit(node.Declaration)!;
+
+        // Consume the semicolon
+        SkipTo(node.SemicolonToken.SpanStart);
+        SkipToken(node.SemicolonToken);
+
+        // Merge modifiers and prefix from the statement level into the VariableDeclarations
+        return varDecl with { Prefix = prefix, Modifiers = modifiers };
+    }
+
+    public override J VisitFieldDeclaration(FieldDeclarationSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+
+        // Parse modifiers — attributes on fields are skipped for now as
+        // LeadingAnnotations takes IList<Modifier> in the C# model
         var modifiers = new List<Modifier>();
         foreach (var mod in node.Modifiers)
         {
@@ -5172,6 +5836,248 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         );
     }
 
+    public override J VisitEventFieldDeclaration(EventFieldDeclarationSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+
+        // Parse modifiers — includes the 'event' keyword
+        var modifiers = new List<Modifier>();
+        foreach (var mod in node.Modifiers)
+        {
+            var modPrefix = ExtractSpaceBefore(mod);
+            _cursor = mod.Span.End;
+            modifiers.Add(new Modifier(
+                Guid.NewGuid(),
+                modPrefix,
+                Markers.Empty,
+                MapModifier(mod.Kind()),
+                []
+            ));
+        }
+
+        // Parse the 'event' keyword as a modifier
+        var eventPrefix = ExtractSpaceBefore(node.EventKeyword);
+        _cursor = node.EventKeyword.Span.End;
+        modifiers.Add(new Modifier(
+            Guid.NewGuid(),
+            eventPrefix,
+            Markers.Empty,
+            Modifier.ModifierType.LanguageExtension,
+            [],
+            "event"
+        ));
+
+        // Parse the variable declaration (same as field declaration)
+        var declaration = node.Declaration;
+
+        // Parse the type
+        var typeExpr = VisitType(declaration.Type);
+
+        // Parse variables
+        var variables = new List<JRightPadded<NamedVariable>>();
+        for (int i = 0; i < declaration.Variables.Count; i++)
+        {
+            var v = declaration.Variables[i];
+            var varPrefix = ExtractPrefix(v);
+
+            var namePrefix = ExtractSpaceBefore(v.Identifier);
+            _cursor = v.Identifier.Span.End;
+            var name = new Identifier(
+                Guid.NewGuid(),
+                namePrefix,
+                Markers.Empty,
+                v.Identifier.Text,
+                null
+            );
+
+            JLeftPadded<Expression>? initializer = null;
+            if (v.Initializer != null)
+            {
+                var equalsPrefix = ExtractSpaceBefore(v.Initializer.EqualsToken);
+                _cursor = v.Initializer.EqualsToken.Span.End;
+
+                var initExpr = Visit(v.Initializer.Value);
+                if (initExpr is Expression expr)
+                {
+                    initializer = new JLeftPadded<Expression>(equalsPrefix, expr);
+                }
+            }
+
+            var namedVar = new NamedVariable(
+                Guid.NewGuid(),
+                varPrefix,
+                Markers.Empty,
+                name,
+                [],
+                initializer,
+                _typeMapping?.VariableType(v)
+            );
+
+            Space afterSpace = Space.Empty;
+            if (i < declaration.Variables.Count - 1)
+            {
+                var separatorToken = declaration.Variables.GetSeparator(i);
+                afterSpace = ExtractSpaceBefore(separatorToken);
+                _cursor = separatorToken.Span.End;
+            }
+
+            variables.Add(new JRightPadded<NamedVariable>(namedVar, afterSpace, Markers.Empty));
+        }
+
+        SkipTo(node.SemicolonToken.SpanStart);
+        SkipToken(node.SemicolonToken);
+
+        return new VariableDeclarations(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            [],
+            modifiers,
+            typeExpr,
+            null,
+            [],
+            variables
+        );
+    }
+
+    public override J VisitLocalFunctionStatement(LocalFunctionStatementSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+
+        // Parse modifiers (async, static, etc.)
+        var modifiers = new List<Modifier>();
+        foreach (var mod in node.Modifiers)
+        {
+            var modPrefix = ExtractSpaceBefore(mod);
+            _cursor = mod.Span.End;
+            modifiers.Add(new Modifier(
+                Guid.NewGuid(),
+                modPrefix,
+                Markers.Empty,
+                MapModifier(mod.Kind()),
+                []
+            ));
+        }
+
+        // Parse return type
+        var returnType = VisitType(node.ReturnType);
+
+        // Parse the function name
+        var namePrefix = ExtractSpaceBefore(node.Identifier);
+        _cursor = node.Identifier.Span.End;
+        var name = new Identifier(
+            Guid.NewGuid(),
+            namePrefix,
+            Markers.Empty,
+            node.Identifier.Text,
+            null
+        );
+
+        // Parse parameters
+        var paramsPrefix = ExtractSpaceBefore(node.ParameterList.OpenParenToken);
+        _cursor = node.ParameterList.OpenParenToken.Span.End;
+
+        var parameters = new List<JRightPadded<Statement>>();
+        for (int i = 0; i < node.ParameterList.Parameters.Count; i++)
+        {
+            var p = node.ParameterList.Parameters[i];
+            var paramStatement = ConvertParameter(p);
+            if (paramStatement is Statement stmt)
+            {
+                Space afterSpace = Space.Empty;
+                if (i < node.ParameterList.Parameters.Count - 1)
+                {
+                    var separatorToken = node.ParameterList.Parameters.GetSeparator(i);
+                    afterSpace = ExtractSpaceBefore(separatorToken);
+                    _cursor = separatorToken.Span.End;
+                }
+                else
+                {
+                    afterSpace = ExtractSpaceBefore(node.ParameterList.CloseParenToken);
+                }
+                parameters.Add(new JRightPadded<Statement>(stmt, afterSpace, Markers.Empty));
+            }
+        }
+
+        if (parameters.Count == 0)
+        {
+            var emptySpace = ExtractSpaceBefore(node.ParameterList.CloseParenToken);
+            paramsPrefix = new Space(paramsPrefix.Whitespace, paramsPrefix.Comments);
+        }
+
+        _cursor = node.ParameterList.CloseParenToken.Span.End;
+
+        var paramsContainer = new JContainer<Statement>(
+            paramsPrefix,
+            parameters,
+            Markers.Empty
+        );
+
+        // Parse body
+        Block? body = null;
+        if (node.Body != null)
+        {
+            body = (Block)VisitBlock(node.Body);
+        }
+        else if (node.ExpressionBody != null)
+        {
+            var arrowPrefix = ExtractSpaceBefore(node.ExpressionBody.ArrowToken);
+            _cursor = node.ExpressionBody.ArrowToken.Span.End;
+            var expr = (Expression)Visit(node.ExpressionBody.Expression)!;
+
+            var returnStmt = new Return(Guid.NewGuid(), Space.Empty, Markers.Empty, expr);
+            body = new Block(Guid.NewGuid(), arrowPrefix, Markers.Empty,
+                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+                [new JRightPadded<Statement>(returnStmt, Space.Empty, Markers.Empty)],
+                Space.Empty);
+
+            _cursor = node.SemicolonToken.Span.End;
+        }
+
+        return new MethodDeclaration(
+            Guid.NewGuid(),
+            prefix,
+            node.ExpressionBody != null
+                ? Markers.Build([new ExpressionBodied(Guid.NewGuid())])
+                : Markers.Empty,
+            [],
+            modifiers,
+            null, // TypeParameters
+            returnType,
+            name,
+            paramsContainer,
+            null, // Throws
+            body,
+            null, // DefaultValue
+            _typeMapping?.MethodType(node)
+        );
+    }
+
+    /// <summary>
+    /// Wraps an InitializerExpressionSyntax into a J.Block containing a single
+    /// StatementExpression(InitializerExpression). Used for NewClass.body.
+    /// </summary>
+    private Block WrapInitializerAsBlock(InitializerExpressionSyntax initSyntax)
+    {
+        var initExpr = (InitializerExpression)VisitInitializerExpression(initSyntax);
+        // Wrap InitializerExpression in a Block. The Block prefix gets the space before the initializer.
+        // Move the InitializerExpression prefix to the Block prefix.
+        var blockPrefix = initExpr.Prefix;
+        initExpr = initExpr with { Prefix = Space.Empty };
+        return new Block(
+            Guid.NewGuid(),
+            blockPrefix,
+            Markers.Empty,
+            new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+            [new JRightPadded<Statement>(
+                new ExpressionStatement(Guid.NewGuid(), initExpr),
+                Space.Empty,
+                Markers.Empty
+            )],
+            Space.Empty
+        );
+    }
+
     private TypeTree? VisitType(TypeSyntax type)
     {
         var prefix = ExtractPrefix(type);
@@ -5224,6 +6130,29 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     _typeMapping?.Type(identifier)
                 );
             }
+        }
+        else if (type is GenericNameSyntax genericName)
+        {
+            // Handle generic types like List<int>, Dictionary<string, int>
+            _cursor = genericName.Identifier.Span.End;
+            var clazz = new Identifier(
+                Guid.NewGuid(),
+                prefix,
+                Markers.Empty,
+                genericName.Identifier.Text,
+                null
+            );
+
+            var typeParams = ParseTypeArgumentList(genericName.TypeArgumentList);
+
+            return new ParameterizedType(
+                Guid.NewGuid(),
+                Space.Empty,
+                Markers.Empty,
+                clazz,
+                typeParams,
+                _typeMapping?.Type(type)
+            );
         }
         else if (type is QualifiedNameSyntax qualified)
         {
@@ -5321,6 +6250,44 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 prefix,
                 Markers.Empty,
                 new JContainer<VariableDeclarations>(Space.Empty, elements, Markers.Empty)
+            );
+        }
+        else if (type is NullableTypeSyntax nullableType)
+        {
+            var elementType = VisitType(nullableType.ElementType);
+            if (elementType == null)
+            {
+                throw new InvalidOperationException($"Unable to parse nullable element type: {nullableType.ElementType}");
+            }
+
+            var questionPrefix = ExtractSpaceBefore(nullableType.QuestionToken);
+            _cursor = nullableType.QuestionToken.Span.End;
+
+            return new NullableType(
+                Guid.NewGuid(),
+                prefix,
+                Markers.Empty,
+                [],
+                new JRightPadded<TypeTree>(elementType, questionPrefix, Markers.Empty),
+                _typeMapping?.Type(type)
+            );
+        }
+        else if (type is PointerTypeSyntax pointerType)
+        {
+            var elementType = VisitType(pointerType.ElementType);
+            if (elementType == null)
+            {
+                throw new InvalidOperationException($"Unable to parse pointer element type: {pointerType.ElementType}");
+            }
+
+            var starPrefix = ExtractSpaceBefore(pointerType.AsteriskToken);
+            _cursor = pointerType.AsteriskToken.Span.End;
+
+            return new PointerType(
+                Guid.NewGuid(),
+                prefix,
+                Markers.Empty,
+                new JRightPadded<TypeTree>(elementType, starPrefix, Markers.Empty)
             );
         }
 
