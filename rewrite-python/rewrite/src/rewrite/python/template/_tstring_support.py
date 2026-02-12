@@ -55,11 +55,11 @@ def convert_tstring(tpl: Any) -> Tuple[str, Dict[str, Capture]]:
     parts: list[str] = []
     captures: Dict[str, Capture] = {}
 
-    for arg in tpl.args:
+    for arg in tpl:
         if isinstance(arg, str):
             parts.append(arg)
         elif hasattr(arg, 'value'):
-            # Interpolation object: has .value and .expression
+            # Interpolation object: has .value, .expression, .conversion, .format_spec
             value = arg.value
             if isinstance(value, Capture):
                 parts.append('{' + value.name + '}')

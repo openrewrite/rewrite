@@ -19,10 +19,13 @@ class MockInterpolation:
 
 
 class MockTemplate:
-    """Simulates a string.templatelib.Template with .args iterable."""
+    """Simulates a string.templatelib.Template with iterable interface."""
 
     def __init__(self, *args):
-        self.args = args
+        self._args = args
+
+    def __iter__(self):
+        return iter(self._args)
 
 
 class TestIsTstring:
