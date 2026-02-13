@@ -312,7 +312,7 @@ class PythonPrinter:
 
     def _visit_markers(self, markers: Markers, p: PrintOutputCapture) -> Markers:
         """Visit markers that need printing (like TrailingComma, Semicolon)."""
-        for marker in markers.markers:
+        for marker in markers._markers:
             if isinstance(marker, Semicolon):
                 p.append(';')
             elif isinstance(marker, TrailingComma):
@@ -1064,7 +1064,7 @@ class PythonJavaPrinter:
 
     def _visit_markers(self, markers: Markers, p: PrintOutputCapture) -> Markers:
         """Visit markers that need printing (like TrailingComma, Semicolon)."""
-        for marker in markers.markers:
+        for marker in markers._markers:
             self._visit_marker(marker, p)
         return markers
 
@@ -1697,14 +1697,34 @@ class PythonJavaPrinter:
         return throw
 
     def visit_type_parameter(self, type_param: 'j.TypeParameter', p: PrintOutputCapture) -> J:
-        """Visit a type parameter (Python 3.12+ PEP 695)."""
+        """Visit a type parameter (Python 3.12+ PEP 695, 3.13+ PEP 696 defaults)."""
+        from rewrite.java import tree as j
         self._before_syntax(type_param, p)
         # Visit modifiers (for * and ** prefixes)
         for mod in type_param.modifiers:
             self.visit(mod, p)
         self.visit(type_param.name, p)
-        # Visit bounds (for T: int style bounds in Python)
-        self._visit_container(":", type_param.padding.bounds, ",", "", p)
+        # Visit bounds: 1-element = constraint only, 2-element = [constraint, default]
+        bounds = type_param.padding.bounds
+        if bounds is not None:
+            elements = bounds.padding.elements
+            if len(elements) == 1:
+                # Legacy: only constraint, no default
+                self._visit_space(bounds.before, p)
+                p.append(":")
+                self._visit_right_padded(elements[0], p)
+            elif len(elements) == 2:
+                constraint = elements[0]
+                default = elements[1]
+                if not isinstance(constraint.element, j.Empty):
+                    self._visit_space(bounds.before, p)
+                    p.append(":")
+                    self._visit_right_padded(constraint, p)
+                if not isinstance(default.element, j.Empty):
+                    if isinstance(constraint.element, j.Empty):
+                        self._visit_space(bounds.before, p)
+                    p.append("=")
+                    self._visit_right_padded(default, p)
         self._after_syntax(type_param, p)
         return type_param
 

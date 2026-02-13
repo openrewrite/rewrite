@@ -238,7 +238,7 @@ class Pattern:
 
 
 def pattern(
-    code: str,
+    code,
     *,
     imports: Optional[List[str]] = None,
     **captures: Capture
@@ -249,9 +249,10 @@ def pattern(
     This is the primary factory function for creating patterns.
 
     Args:
-        code: Python code with {name} placeholders.
+        code: Python code with {name} placeholders, or a t-string
+              (Python 3.14+) with Capture/RawCode interpolations.
         imports: Optional import statements for type resolution.
-        **captures: Named capture specifications.
+        **captures: Named capture specifications (not allowed with t-strings).
 
     Returns:
         A Pattern instance.
@@ -261,6 +262,10 @@ def pattern(
         x = capture('x')
         pat = pattern("print({x})", x=x)
 
+        # With t-string (Python 3.14+)
+        x = capture('x')
+        pat = pattern(t"print({x})")
+
         # Pattern with multiple captures
         a, b = capture('a'), capture('b')
         pat = pattern("{a} + {b}", a=a, b=b)
@@ -269,6 +274,16 @@ def pattern(
         args = capture('args', variadic=True)
         pat = pattern("func({args})", args=args)
     """
+    from rewrite.python.template._tstring_support import is_tstring, convert_tstring
+
+    if is_tstring(code):
+        if captures:
+            raise TypeError(
+                "Cannot pass keyword captures when using a t-string; "
+                "interpolate Capture objects directly in the t-string instead"
+            )
+        code, captures = convert_tstring(code)
+
     return Pattern(
         code=code,
         captures=captures,

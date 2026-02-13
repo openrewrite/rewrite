@@ -63,6 +63,9 @@ def _common_margin(s1, s2):
 
 
 def _concatenate_prefix(j: J, prefix: Space) -> J2:
+    if prefix.is_empty():
+        return j
+
     shift = _common_margin(None, j.prefix.whitespace)
 
     def modify_comment(c: PyComment) -> PyComment:

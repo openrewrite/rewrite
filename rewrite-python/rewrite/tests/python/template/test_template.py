@@ -190,3 +190,42 @@ class TestTemplateBuilder:
         assert builder.code("x") is builder
         assert builder.raw("y") is builder
         assert builder.imports("import z") is builder
+
+
+class TestTemplateApply:
+    """Tests for Template.apply()."""
+
+    def test_apply_no_captures_returns_tree(self):
+        """Test that apply with no captures returns a tree."""
+        tmpl = template("x + 1")
+        result = tmpl.apply(cursor=None)
+        assert result is not None
+
+    def test_apply_with_dict_values(self):
+        """Test applying a template with dict values."""
+        expr = capture('expr')
+        tmpl = template("print({expr})", expr=expr)
+
+        ident = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "hello", None, None)
+        result = tmpl.apply(cursor=None, values={'expr': ident})
+
+        assert isinstance(result, j.MethodInvocation)
+        assert len(result.arguments) == 1
+        assert isinstance(result.arguments[0], j.Identifier)
+        assert result.arguments[0].simple_name == "hello"
+
+    def test_apply_with_match_result(self):
+        """Test applying a template with a MatchResult."""
+        from rewrite.python.template import MatchResult
+
+        expr = capture('expr')
+        tmpl = template("print({expr})", expr=expr)
+
+        ident = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "world", None, None)
+        match_result = MatchResult({'expr': ident})
+        result = tmpl.apply(cursor=None, values=match_result)
+
+        assert isinstance(result, j.MethodInvocation)
+        assert len(result.arguments) == 1
+        assert isinstance(result.arguments[0], j.Identifier)
+        assert result.arguments[0].simple_name == "world"
