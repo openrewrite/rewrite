@@ -279,8 +279,6 @@ class SpacesVisitor(PythonVisitor):
             b = self._apply_binary_space_around(b, True)
         elif op in [Binary.Type.FloorDivision, Binary.Type.MatrixMultiplication]:
             b = self._apply_binary_space_around(b, self._style.around_operators.multiplicative)
-        elif op == Binary.Type.StringConcatenation:
-            b = self._apply_binary_space_around(b, self._style.around_operators.additive)
         elif op == Binary.Type.Power:
             b = self._apply_binary_space_around(b, self._style.around_operators.power)
 
@@ -366,7 +364,6 @@ class SpacesVisitor(PythonVisitor):
 
     def visit_parentheses(self, parentheses: Parentheses, p: P) -> J:
         p2 = cast(Parentheses, super().visit_parentheses(parentheses, p))
-        p2 = p2.replace(prefix=update_space(p2.prefix, False))
         p2 = p2.padding.replace(tree=p2.padding.tree.replace(after=update_space(p2.padding.tree.after, False)))
         return p2
 
@@ -467,13 +464,19 @@ class SpacesVisitor(PythonVisitor):
 
     def visit_type_hint(self, type_hint: TypeHint, p: P) -> J:
         th: TypeHint = cast(TypeHint, super().visit_type_hint(type_hint, p))
-        th = space_before(th, self._style.other.before_colon)
+        # Don't apply before_colon to return type annotations (handled by visit_method_declaration)
+        parent = self.cursor.parent_tree_cursor()
+        if not (parent and isinstance(parent.value, MethodDeclaration)):
+            th = space_before(th, self._style.other.before_colon)
         th = th.replace(type_tree=space_before(th.type_tree, self._style.other.after_colon))
         return th
 
     def visit_expression_type_tree(self, expression_type_tree: ExpressionTypeTree, p: P) -> J:
         ett = cast(ExpressionTypeTree, super().visit_expression_type_tree(expression_type_tree, p))
-        ett = space_before(ett, False)
+        # Don't remove space when inside ClassDeclaration (handled by visit_class_declaration)
+        parent = self.cursor.parent_tree_cursor()
+        if not (parent and isinstance(parent.value, ClassDeclaration)):
+            ett = space_before(ett, False)
         return ett
 
     def visit_comprehension_expression(self, comprehension_expression: ComprehensionExpression, p: P) -> J:
