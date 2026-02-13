@@ -254,7 +254,7 @@ class PythonTypeMapping:
 
     def _constant_type(self, node: ast.Constant) -> Optional[JavaType]:
         """Get the type for a constant/literal node."""
-        if isinstance(node.value, str):
+        if isinstance(node.value, (str, bytes)):
             return JavaType.Primitive.String
         elif isinstance(node.value, bool):
             return JavaType.Primitive.Boolean
