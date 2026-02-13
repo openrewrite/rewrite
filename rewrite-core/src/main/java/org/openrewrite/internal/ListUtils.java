@@ -215,8 +215,7 @@ public final class ListUtils {
         }
 
         if (newLs != ls && nullEncountered) {
-            //noinspection StatementWithEmptyBody
-            while (newLs.remove(null)) ;
+            newLs.removeIf(Objects::isNull);
         }
 
         //noinspection NullableProblems
