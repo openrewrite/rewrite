@@ -107,6 +107,7 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
     inputs.files(fileTree("rewrite/test"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.files("rewrite/build/test-results/jest/junit.xml")
+    outputs.cacheIf { true }
 
     args = listOf("run", "ci:test")
 }
@@ -123,6 +124,7 @@ val npmBuild = tasks.register<NpmTask>("npmBuild") {
     inputs.files(fileTree("rewrite/src"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(file("rewrite/dist/"))
+    outputs.cacheIf { true }
 
     val versionTxt = file("src/main/resources/META-INF/version.txt")
     outputs.file(versionTxt)
@@ -172,6 +174,7 @@ val npmFixturesBuild = tasks.register<NpmTask>("npmFixturesBuild") {
     inputs.files(fileTree("rewrite/fixtures"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(file("rewrite/dist-fixtures/"))
+    outputs.cacheIf { true }
 
     args = listOf("run", "build:fixtures")
 }
