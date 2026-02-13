@@ -20,8 +20,8 @@ class SpacesVisitor(PythonVisitor):
         self._before_parentheses = style.before_parentheses
         self._stop_after = stop_after
 
-    def visit_class_declaration(self, class_declaration: ClassDeclaration, p: P) -> J:
-        c = cast(ClassDeclaration, super().visit_class_declaration(class_declaration, p))
+    def visit_class_declaration(self, class_decl: ClassDeclaration, p: P) -> J:
+        c = cast(ClassDeclaration, super().visit_class_declaration(class_decl, p))
 
         if c.padding.implements is not None:
             c = c.padding.replace(
@@ -51,8 +51,8 @@ class SpacesVisitor(PythonVisitor):
                                           c.padding.implements.padding.elements)))
         return c
 
-    def visit_method_declaration(self, method_declaration: MethodDeclaration, p: P) -> J:
-        m: MethodDeclaration = cast(MethodDeclaration, super().visit_method_declaration(method_declaration, p))
+    def visit_method_declaration(self, method: MethodDeclaration, p: P) -> J:
+        m: MethodDeclaration = cast(MethodDeclaration, super().visit_method_declaration(method, p))
 
         m = m.padding.replace(
             parameters=space_before_container(m.padding.parameters, self._style.before_parentheses.method_declaration)
@@ -105,14 +105,14 @@ class SpacesVisitor(PythonVisitor):
         c = cast(Try.Catch, super().visit_catch(catch, p))
         return c
 
-    def visit_control_parentheses(self, control_parentheses: ControlParentheses[J2], p: P) -> J:
-        cp = cast(ControlParentheses[J2], super().visit_control_parentheses(control_parentheses, p))
+    def visit_control_parentheses(self, control_parens: ControlParentheses[J2], p: P) -> J:
+        cp = cast(ControlParentheses[J2], super().visit_control_parentheses(control_parens, p))
         cp = space_before(cp, False)
         cp = cp.padding.replace(tree=cp.padding.tree.replace(element=space_before(cp.tree, True)))
         return cp
 
-    def visit_named_argument(self, named_argument: NamedArgument, p: P) -> J:
-        a = cast(NamedArgument, super().visit_named_argument(named_argument, p))
+    def visit_named_argument(self, named: NamedArgument, p: P) -> J:
+        a = cast(NamedArgument, super().visit_named_argument(named, p))
         if a.padding.value is not None:
             a = a.padding.replace(
                 value=space_before_left_padded(a.padding.value, self._style.around_operators.eq_in_keyword_argument))
@@ -126,8 +126,8 @@ class SpacesVisitor(PythonVisitor):
             return c.parent_tree_cursor() is not None and isinstance(c.parent_tree_cursor().value, MethodDeclaration)
         return False
 
-    def visit_variable(self, named_variable: VariableDeclarations.NamedVariable, p: P) -> J:
-        v = cast(VariableDeclarations.NamedVariable, super().visit_variable(named_variable, p))
+    def visit_variable(self, variable: VariableDeclarations.NamedVariable, p: P) -> J:
+        v = cast(VariableDeclarations.NamedVariable, super().visit_variable(variable, p))
 
         if not self._part_of_method_header(self.cursor):
             return v
@@ -147,8 +147,8 @@ class SpacesVisitor(PythonVisitor):
         b = space_before(b, self._style.other.before_colon)
         return b
 
-    def visit_method_invocation(self, method_invocation: MethodInvocation, p: P) -> J:
-        m: MethodInvocation = cast(MethodInvocation, super().visit_method_invocation(method_invocation, p))
+    def visit_method_invocation(self, method: MethodInvocation, p: P) -> J:
+        m: MethodInvocation = cast(MethodInvocation, super().visit_method_invocation(method, p))
 
         m = m.padding.replace(arguments=m.padding.arguments.replace(
             before=Space.SINGLE_SPACE if self._style.before_parentheses.method_call else Space.EMPTY))
@@ -215,15 +215,15 @@ class SpacesVisitor(PythonVisitor):
                 element=space_before(a.padding.assignment.element, self._style.around_operators.assignment)))
         return a
 
-    def visit_assignment_operation(self, assignment_operation: AssignmentOperation, p: P) -> J:
-        a: AssignmentOperation = cast(AssignmentOperation, super().visit_assignment_operation(assignment_operation, p))
+    def visit_assignment_operation(self, assign_op: AssignmentOperation, p: P) -> J:
+        a: AssignmentOperation = cast(AssignmentOperation, super().visit_assignment_operation(assign_op, p))
         operator: JLeftPadded = a.padding.operator
         a = a.padding.replace(
             operator=operator.replace(before=update_space(operator.before, self._style.around_operators.assignment)))
         return a.replace(assignment=space_before(a.assignment, self._style.around_operators.assignment))
 
-    def visit_chained_assignment(self, chained_assignment: ChainedAssignment, p: P) -> J:
-        a: ChainedAssignment = cast(ChainedAssignment, super().visit_chained_assignment(chained_assignment, p))
+    def visit_chained_assignment(self, chained: ChainedAssignment, p: P) -> J:
+        a: ChainedAssignment = cast(ChainedAssignment, super().visit_chained_assignment(chained, p))
         a = a.padding.replace(
             variables=list_map(lambda v: v.replace(after=update_space(v.after, self._style.around_operators.assignment)), a.padding.variables))
 
@@ -233,8 +233,8 @@ class SpacesVisitor(PythonVisitor):
 
         return a.replace(assignment=space_before(a.assignment, self._style.around_operators.assignment))
 
-    def visit_member_reference(self, member_reference: MemberReference, p: P) -> J:
-        m: MemberReference = cast(MemberReference, super().visit_member_reference(member_reference, p))
+    def visit_member_reference(self, member_ref: MemberReference, p: P) -> J:
+        m: MemberReference = cast(MemberReference, super().visit_member_reference(member_ref, p))
 
         if m.padding.type_parameters is not None:
             raise NotImplementedError("Type parameters are not supported yet")
@@ -284,8 +284,8 @@ class SpacesVisitor(PythonVisitor):
 
         return b
 
-    def visit_if(self, if_stm: If, p: P) -> J:
-        if_: j.If = cast(If, super().visit_if(if_stm, p))
+    def visit_if(self, if_: If, p: P) -> J:
+        if_: j.If = cast(If, super().visit_if(if_, p))
 
         if_ = if_.replace(if_condition=
             if_.if_condition.padding.replace(
@@ -298,8 +298,8 @@ class SpacesVisitor(PythonVisitor):
         e = e.padding.replace(body=space_before_right_padded_element(e.padding.body, self._style.other.before_colon))
         return e
 
-    def visit_slice(self, slice: Slice, p: P) -> J:
-        s: Slice = cast(Slice, super().visit_slice(slice, p))
+    def visit_slice(self, slice_: Slice, p: P) -> J:
+        s: Slice = cast(Slice, super().visit_slice(slice_, p))
         use_space = self._style.within.brackets
 
         if s.padding.start is not None:
@@ -314,8 +314,8 @@ class SpacesVisitor(PythonVisitor):
                 s = s.padding.replace(step=space_after_right_padded(s.padding.step, use_space))
         return s
 
-    def visit_for_each_loop(self, for_loop: j.ForEachLoop, p: P) -> J:
-        fl = cast(j.ForEachLoop, super().visit_for_each_loop(for_loop, p))
+    def visit_for_each_loop(self, for_each: j.ForEachLoop, p: P) -> J:
+        fl = cast(j.ForEachLoop, super().visit_for_each_loop(for_each, p))
         control = fl.control
 
         # Set single space before loop target e.g. for    i in...: <-> for i in ...:
@@ -362,13 +362,13 @@ class SpacesVisitor(PythonVisitor):
 
         return pt
 
-    def visit_parentheses(self, parentheses: Parentheses, p: P) -> J:
-        p2 = cast(Parentheses, super().visit_parentheses(parentheses, p))
+    def visit_parentheses(self, parens: Parentheses, p: P) -> J:
+        p2 = cast(Parentheses, super().visit_parentheses(parens, p))
         p2 = p2.padding.replace(tree=p2.padding.tree.replace(after=update_space(p2.padding.tree.after, False)))
         return p2
 
-    def visit_collection_literal(self, collection_literal: CollectionLiteral, p: P) -> J:
-        cl = cast(CollectionLiteral, super().visit_collection_literal(collection_literal, p))
+    def visit_collection_literal(self, collection: CollectionLiteral, p: P) -> J:
+        cl = cast(CollectionLiteral, super().visit_collection_literal(collection, p))
 
         def _process_element(index, arg, args_size, use_space):
             if index == 0:
@@ -401,8 +401,8 @@ class SpacesVisitor(PythonVisitor):
 
         return cl
 
-    def visit_dict_literal(self, dict_literal: DictLiteral, p: P) -> J:
-        dl = cast(DictLiteral, super().visit_dict_literal(dict_literal, p))
+    def visit_dict_literal(self, dict_lit: DictLiteral, p: P) -> J:
+        dl = cast(DictLiteral, super().visit_dict_literal(dict_lit, p))
 
         def _process_kv_pair(c: JRightPadded[KeyValue], idx: int, arg_size) -> JRightPadded[KeyValue]:
             if idx == 0 or idx == arg_size - 1:
@@ -430,8 +430,8 @@ class SpacesVisitor(PythonVisitor):
         )
         return dl
 
-    def visit_multi_import(self, multi_import: MultiImport, p: P) -> J:
-        mi: MultiImport = cast(MultiImport, super().visit_multi_import(multi_import, p))
+    def visit_multi_import(self, multi: MultiImport, p: P) -> J:
+        mi: MultiImport = cast(MultiImport, super().visit_multi_import(multi, p))
 
         if mi.padding.from_ is not None:
             mi = mi.padding.replace(
@@ -462,8 +462,8 @@ class SpacesVisitor(PythonVisitor):
             imp = imp.padding.replace(alias=space_before_left_padded(imp.padding.alias, True))
         return imp
 
-    def visit_type_hint(self, type_hint: TypeHint, p: P) -> J:
-        th: TypeHint = cast(TypeHint, super().visit_type_hint(type_hint, p))
+    def visit_type_hint(self, hint: TypeHint, p: P) -> J:
+        th: TypeHint = cast(TypeHint, super().visit_type_hint(hint, p))
         # Don't apply before_colon to return type annotations (handled by visit_method_declaration)
         parent = self.cursor.parent_tree_cursor()
         if not (parent and isinstance(parent.value, MethodDeclaration)):
@@ -471,16 +471,16 @@ class SpacesVisitor(PythonVisitor):
         th = th.replace(type_tree=space_before(th.type_tree, self._style.other.after_colon))
         return th
 
-    def visit_expression_type_tree(self, expression_type_tree: ExpressionTypeTree, p: P) -> J:
-        ett = cast(ExpressionTypeTree, super().visit_expression_type_tree(expression_type_tree, p))
+    def visit_expression_type_tree(self, expr_tree: ExpressionTypeTree, p: P) -> J:
+        ett = cast(ExpressionTypeTree, super().visit_expression_type_tree(expr_tree, p))
         # Don't remove space when inside ClassDeclaration (handled by visit_class_declaration)
         parent = self.cursor.parent_tree_cursor()
         if not (parent and isinstance(parent.value, ClassDeclaration)):
             ett = space_before(ett, False)
         return ett
 
-    def visit_comprehension_expression(self, comprehension_expression: ComprehensionExpression, p: P) -> J:
-        ce = cast(ComprehensionExpression, super().visit_comprehension_expression(comprehension_expression, p))
+    def visit_comprehension_expression(self, comp: ComprehensionExpression, p: P) -> J:
+        ce = cast(ComprehensionExpression, super().visit_comprehension_expression(comp, p))
 
         if ce.kind == ComprehensionExpression.Kind.LIST:
             ce = ce.replace(result=space_before(ce.result, self._style.within.brackets))
@@ -494,18 +494,18 @@ class SpacesVisitor(PythonVisitor):
 
         return ce
 
-    def visit_key_value(self, key_value: KeyValue, p: P) -> J:
-        kv = cast(KeyValue, super().visit_key_value(key_value, p))
+    def visit_key_value(self, kv: KeyValue, p: P) -> J:
+        kv = cast(KeyValue, super().visit_key_value(kv, p))
         kv = kv.replace(value=space_before(kv.value, self._style.other.after_colon))
         return kv.padding.replace(key=space_after_right_padded(kv.padding.key, self._style.other.before_colon))
 
-    def visit_comprehension_condition(self, condition: ComprehensionExpression.Condition, p: P) -> J:
+    def visit_comprehension_condition(self, condition: ComprehensionExpression.Condition, p: P) -> ComprehensionExpression.Condition:
         cond = super().visit_comprehension_condition(condition, p)
         cond = space_before(cond, True)
         cond = cond.replace(expression=space_before(cond.expression, True))
         return cond
 
-    def visit_comprehension_clause(self, clause: ComprehensionExpression.Clause, p: P) -> J:
+    def visit_comprehension_clause(self, clause: ComprehensionExpression.Clause, p: P) -> ComprehensionExpression.Clause:
         cc = super().visit_comprehension_clause(clause, p)
 
         cc = space_before(cc, True)

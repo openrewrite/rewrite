@@ -16,18 +16,18 @@ class BlankLinesVisitor(PythonVisitor):
         self._stop_after = stop_after
         self._stop = False
 
-    def visit_compilation_unit(self, compilation_unit: CompilationUnit, p: P) -> J:
-        if not compilation_unit.prefix.comments:
-            compilation_unit = compilation_unit.replace(prefix=Space.EMPTY)
-        return super().visit_compilation_unit(compilation_unit, p)
+    def visit_compilation_unit(self, cu: CompilationUnit, p: P) -> J:
+        if not cu.prefix.comments:
+            cu = cu.replace(prefix=Space.EMPTY)
+        return super().visit_compilation_unit(cu, p)
 
-    def visit_statement(self, statement: Statement, p: P) -> J:
-        statement = super().visit_statement(statement, p)
+    def visit_statement(self, stmt: Statement, p: P) -> J:
+        stmt = super().visit_statement(stmt, p)
 
         parent_cursor = self.cursor.parent_tree_cursor()
         top_level = isinstance(parent_cursor.value, CompilationUnit)
 
-        if isinstance(statement, (Import, MultiImport)):
+        if isinstance(stmt, (Import, MultiImport)):
             parent_cursor.put_message('prev_import', True)
             prev_import = False
         else:
@@ -36,35 +36,35 @@ class BlankLinesVisitor(PythonVisitor):
                 parent_cursor.put_message('prev_import', False)
 
         if top_level:
-            if statement == cast(CompilationUnit, parent_cursor.value).statements[0]:
-                statement = statement.replace(prefix=statement.prefix.replace(whitespace=''))
+            if stmt == cast(CompilationUnit, parent_cursor.value).statements[0]:
+                stmt = stmt.replace(prefix=stmt.prefix.replace(whitespace=''))
             else:
-                min_lines = max(self._style.minimum.around_top_level_classes_functions if isinstance(statement, (ClassDeclaration, MethodDeclaration)) else 0,
+                min_lines = max(self._style.minimum.around_top_level_classes_functions if isinstance(stmt, (ClassDeclaration, MethodDeclaration)) else 0,
                                 self._style.minimum.after_top_level_imports if prev_import else 0)
-                statement = _adjusted_lines_for_tree(statement, min_lines, self._style.keep_maximum.in_declarations)
+                stmt = _adjusted_lines_for_tree(stmt, min_lines, self._style.keep_maximum.in_declarations)
         else:
             in_block = isinstance(parent_cursor.value, Block)
             in_class = in_block and isinstance(parent_cursor.parent_tree_cursor().value, ClassDeclaration)
             min_lines = 0
             if in_class:
-                is_first = cast(Block, parent_cursor.value).statements[0] is statement
-                if not is_first and isinstance(statement, MethodDeclaration):
+                is_first = cast(Block, parent_cursor.value).statements[0] is stmt
+                if not is_first and isinstance(stmt, MethodDeclaration):
                     min_lines = max(min_lines, self._style.minimum.around_method)
-                elif not is_first and isinstance(statement, ClassDeclaration):
+                elif not is_first and isinstance(stmt, ClassDeclaration):
                     min_lines = max(min_lines, self._style.minimum.around_class)
-                elif is_first and isinstance(statement, MethodDeclaration):
+                elif is_first and isinstance(stmt, MethodDeclaration):
                     min_lines = max(min_lines, self._style.minimum.before_first_method)
 
             # This seems to correspond to how IntelliJ interprets this configuration
             max_lines = self._style.keep_maximum.in_declarations if \
-                isinstance(statement, (ClassDeclaration, MethodDeclaration)) else \
+                isinstance(stmt, (ClassDeclaration, MethodDeclaration)) else \
                 self._style.keep_maximum.in_code
 
             if prev_import:
                 min_lines = max(min_lines, self._style.minimum.after_local_imports)
 
-            statement = _adjusted_lines_for_tree(statement, min_lines, max_lines)
-        return statement
+            stmt = _adjusted_lines_for_tree(stmt, min_lines, max_lines)
+        return stmt
 
     def post_visit(self, tree: T, p: P) -> Optional[T]:
         if self._stop_after and tree == self._stop_after:

@@ -12,10 +12,10 @@ class RemoveTrailingWhitespaceVisitor(PythonVisitor):
         self._stop_after = stop_after
         self._stop = False
 
-    def visit_compilation_unit(self, compilation_unit: CompilationUnit, p: P) -> J:
-        if not compilation_unit.prefix.comments:
-            compilation_unit = compilation_unit.replace(prefix=Space.EMPTY)
-        cu: j.CompilationUnit = cast(j.CompilationUnit, super().visit_compilation_unit(compilation_unit, p))
+    def visit_compilation_unit(self, cu: CompilationUnit, p: P) -> J:
+        if not cu.prefix.comments:
+            cu = cu.replace(prefix=Space.EMPTY)
+        cu: j.CompilationUnit = cast(j.CompilationUnit, super().visit_compilation_unit(cu, p))
 
         if cu.eof.whitespace:
             clean = "".join([_ for _ in cu.eof.whitespace if _ in ['\n', '\r']])

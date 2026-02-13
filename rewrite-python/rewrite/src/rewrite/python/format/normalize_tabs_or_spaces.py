@@ -18,7 +18,7 @@ class NormalizeTabsOrSpacesVisitor(PythonVisitor):
         self._style = style
         self._stop = False
 
-    def visit_space(self, space: Space, p):
+    def visit_space(self, space: Optional[Space], p):
         if not space or space is Space.EMPTY:
             return space
 

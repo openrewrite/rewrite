@@ -661,16 +661,16 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             (expr.value_source.startswith("'''") and expr.value_source.endswith("'''"))) and \
             cursor.first_enclosing(Block) is not None
 
-    def visit_expression_statement(self, expression_statement: ExpressionStatement, p: P) -> J:
-        if self._is_doc_comment(expression_statement, self.cursor):
-            prefix_before = len(expression_statement.prefix.last_whitespace.split("\n")[-1])
-            stm = cast(ExpressionStatement, super().visit_expression_statement(expression_statement, p))
+    def visit_expression_statement(self, expr_stmt: ExpressionStatement, p: P) -> J:
+        if self._is_doc_comment(expr_stmt, self.cursor):
+            prefix_before = len(expr_stmt.prefix.last_whitespace.split("\n")[-1])
+            stm = cast(ExpressionStatement, super().visit_expression_statement(expr_stmt, p))
             literal = cast(Literal, stm.expression)
             shift = len(stm.prefix.last_whitespace.split("\n")[-1]) - prefix_before
             return stm.replace(expression=
                 literal.replace(value_source=textwrap.indent(str(literal.value_source), shift * " ")[shift:]))
 
-        return super().visit_expression_statement(expression_statement, p)
+        return super().visit_expression_statement(expr_stmt, p)
 
     # -------------------------------------------------------------------------
     # First parameter offset calculation

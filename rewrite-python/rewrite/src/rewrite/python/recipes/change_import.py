@@ -170,17 +170,17 @@ class ChangeImport(Recipe):
 
                 return result
 
-            def visit_import(self, imp: Import, p: ExecutionContext) -> Optional[J]:
+            def visit_import(self, import_: Import, p: ExecutionContext) -> Optional[J]:  # ty: ignore[invalid-method-override]
                 if not self.has_old_import or old_name:
-                    return imp
+                    return import_
                 if self.cursor.first_enclosing(MultiImport):
-                    return imp
-                alias = self._check_for_old_single_import(imp)
+                    return import_
+                alias = self._check_for_old_single_import(import_)
                 if alias is None:
-                    return imp
+                    return import_
                 return None
 
-            def visit_multi_import(self, multi: MultiImport, p: ExecutionContext) -> Optional[J]:
+            def visit_multi_import(self, multi: MultiImport, p: ExecutionContext) -> Optional[J]:  # ty: ignore[invalid-method-override]
                 if not self.has_old_import:
                     return multi
 

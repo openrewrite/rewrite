@@ -47,18 +47,18 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
         super().__init__()
         self._values = values
 
-    def visit_identifier(self, identifier: j.Identifier, p: None) -> J:
+    def visit_identifier(self, ident: j.Identifier, p: None) -> J:
         """
         Visit an identifier and replace if it's a placeholder.
 
         Args:
-            identifier: The identifier node.
+            ident: The identifier node.
             p: Visitor parameter (unused).
 
         Returns:
             The replacement value if this is a placeholder, otherwise the identifier.
         """
-        name = identifier.simple_name
+        name = ident.simple_name
         capture_name = from_placeholder(name)
 
         if capture_name is not None and capture_name in self._values:
@@ -66,12 +66,12 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
 
             # Preserve the placeholder's prefix (whitespace before)
             if hasattr(replacement, 'prefix'):
-                replacement = replacement.replace(prefix=identifier.prefix)
+                replacement = replacement.replace(prefix=ident.prefix)
 
             return replacement
 
         # Not a placeholder or no value provided, continue normally
-        return super().visit_identifier(identifier, p)
+        return super().visit_identifier(ident, p)
 
     def visit_method_invocation(self, method: j.MethodInvocation, p: None) -> J:
         """

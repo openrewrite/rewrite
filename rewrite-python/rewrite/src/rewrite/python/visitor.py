@@ -176,7 +176,7 @@ class PythonVisitor(JavaVisitor[P]):
         )
         return collection
 
-    def visit_compilation_unit(self, cu: CompilationUnit, p: P) -> J:
+    def visit_compilation_unit(self, cu: CompilationUnit, p: P) -> J:  # ty: ignore[invalid-method-override]
         """Visit a Python compilation unit (module)."""
         cu = cu.replace(prefix=self.visit_space(cu.prefix, p))
         cu = cu.replace(markers=self.visit_markers(cu.markers, p))
