@@ -159,6 +159,14 @@ def test_debug_with_trailing_whitespace():
     RecipeSpec().rewrite_run(python("a = f'{1= !a}'"))
 
 
+def test_debug_with_format_spec():
+    # language=python
+    RecipeSpec().rewrite_run(python("a = f'{last_error=:#x}'"))
+    # debug `=` with format spec after other expressions
+    # language=python
+    RecipeSpec().rewrite_run(python("""a = f"kernel32.{name} ({last_error=:#x})" """))
+
+
 def test_all_specifiers():
     # language=python
     RecipeSpec().rewrite_run(python("a = f'{1=!a:0>6}'"))
