@@ -269,7 +269,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
 
     def visit_container(self, container: Optional[JContainer], p: P) -> Optional[JContainer]:
         if container is None:
-            return container  # type: ignore
+            return container
 
         self._cursor = Cursor(self._cursor, container)
 
@@ -407,7 +407,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         else_ = else_.padding.replace(body=self.visit_right_padded(else_.padding.body, p))
         return else_
 
-    def visit_compilation_unit(self, cu, p: P) -> J:  # ty: ignore[invalid-method-override]
+    def visit_compilation_unit(self, cu, p: P) -> J:
         self.cursor.put_message("space_context", "compilation_unit_prefix")
         cu = cu.replace(prefix=self.visit_space(cu.prefix, p))
         self.cursor.put_message("space_context", None)
@@ -589,6 +589,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         # Build initial cursor with proper J parent so context-dependent
         # printing (e.g., = vs :=) works correctly
         initial = Cursor(None, Cursor.ROOT_VALUE)
+        assert line_start_cursor is not None
         for c in line_start_cursor.get_path_as_cursors():
             v = c.value
             if v is line_start:
@@ -699,6 +700,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     self.cursor.parent_or_throw.put_message("last_indent", indent + self._style.continuation_indent)
 
         elem = self.visit_and_cast(elem, J, p)
+        assert elem is not None
         after = self._indent_to(right.after, indent)
         if after.comments or "\n" in after.last_whitespace:
             parent = self.cursor.parent_tree_cursor()

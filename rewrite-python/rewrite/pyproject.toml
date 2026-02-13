@@ -36,7 +36,7 @@ dev = [
     "ruff>=0.1.0",
 ]
 typing = [
-    "ty>=0.0.15",  # Required for type attribution with Java recipes
+    "ty>=0.0.17",  # Required for type attribution with Java recipes
 ]
 publish = [
     "build>=1.0.0",
@@ -82,8 +82,11 @@ include = ["src"]
 # - invalid-argument-type: ~200 errors from Self type vs concrete type in accept_*() methods
 #   (tracked as ty bug: https://github.com/astral-sh/ty/issues/2255)
 # - unresolved-reference: TYPE_CHECKING forward references
+# - invalid-method-override: ~30 errors from visitor pattern parameter name mismatches
+#   (e.g. visit_compilation_unit(cu) vs visit_compilation_unit(compilation_unit))
 invalid-argument-type = "ignore"
 unresolved-reference = "ignore"
+invalid-method-override = "ignore"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

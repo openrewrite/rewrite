@@ -11,7 +11,7 @@ J2 = TypeVar('J2', bound=J)
 
 
 class BlankLinesVisitor(PythonVisitor):
-    def __init__(self, style: BlankLinesStyle, stop_after: Tree = None):
+    def __init__(self, style: BlankLinesStyle, stop_after: Optional[Tree] = None):
         self._style = style
         self._stop_after = stop_after
         self._stop = False
@@ -72,7 +72,7 @@ class BlankLinesVisitor(PythonVisitor):
         return tree
 
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
-        return tree if self._stop else super().visit(tree, p, parent)
+        return cast(Optional[T], tree if self._stop else super().visit(tree, p, parent))
 
 
 def _adjusted_lines_for_right_padded(tree: JRightPadded[J2], min_lines: int, max_lines: int) -> JRightPadded[J2]:

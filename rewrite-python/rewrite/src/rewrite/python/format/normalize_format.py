@@ -11,7 +11,7 @@ J2 = TypeVar('J2', bound=J)
 
 
 class NormalizeFormatVisitor(PythonVisitor):
-    def __init__(self, stop_after: Tree = None):
+    def __init__(self, stop_after: Optional[Tree] = None):
         self._stop_after = stop_after
         self._stop = False
 
@@ -46,7 +46,7 @@ class NormalizeFormatVisitor(PythonVisitor):
         return tree
 
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
-        return tree if self._stop else super().visit(tree, p, parent)
+        return cast(Optional[T], tree if self._stop else super().visit(tree, p, parent))
 
 
 def _common_margin(s1, s2):
@@ -62,7 +62,7 @@ def _common_margin(s1, s2):
     return s2 if len(s2) < len(s1) else s1
 
 
-def _concatenate_prefix(j: J, prefix: Space) -> J2:
+def _concatenate_prefix(j: J2, prefix: Space) -> J2:
     if prefix.is_empty():
         return j
 

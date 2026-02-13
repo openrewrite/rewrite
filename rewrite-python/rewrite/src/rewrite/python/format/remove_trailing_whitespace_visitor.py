@@ -24,13 +24,13 @@ class RemoveTrailingWhitespaceVisitor(PythonVisitor):
         return cu
 
     def visit_space(self, space: Optional[Space], p: P) -> Space:
-        s = cast(Space, super().visit_space(space, p))
+        s = super().visit_space(space, p)
         if not s or not s.whitespace:
             return s
         return self._normalize_whitespace(s)
 
     def visit_marker(self, marker: Marker, p: P) -> Marker:
-        m = cast(Marker, super().visit_marker(marker, p))
+        m = super().visit_marker(marker, p)
         if isinstance(m, TrailingComma):
             return m.replace(suffix=self._normalize_whitespace(m.suffix))
         return m
@@ -51,4 +51,4 @@ class RemoveTrailingWhitespaceVisitor(PythonVisitor):
         return tree
 
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
-        return tree if self._stop else super().visit(tree, p, parent)
+        return cast(Optional[T], tree if self._stop else super().visit(tree, p, parent))

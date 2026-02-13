@@ -13,7 +13,7 @@ J2 = TypeVar('J2', bound=J)
 # TODO consider supporting multiline string literals
 class NormalizeTabsOrSpacesVisitor(PythonVisitor):
 
-    def __init__(self, style: TabsAndIndentsStyle, stop_after: Tree = None):
+    def __init__(self, style: TabsAndIndentsStyle, stop_after: Optional[Tree] = None):
         self._stop_after = stop_after
         self._style = style
         self._stop = False
@@ -81,4 +81,4 @@ class NormalizeTabsOrSpacesVisitor(PythonVisitor):
         return tree
 
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
-        return tree if self._stop else super().visit(tree, p, parent)
+        return cast(Optional[T], tree if self._stop else super().visit(tree, p, parent))

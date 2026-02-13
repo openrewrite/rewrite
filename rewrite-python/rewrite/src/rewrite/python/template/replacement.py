@@ -47,7 +47,7 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
         super().__init__()
         self._values = values
 
-    def visit_identifier(self, identifier: j.Identifier, p: None) -> J:  # ty: ignore[invalid-method-override]
+    def visit_identifier(self, identifier: j.Identifier, p: None) -> J:
         """
         Visit an identifier and replace if it's a placeholder.
 
@@ -91,6 +91,7 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
             new_select = self.visit_and_cast(method.select, type(method.select), p)
             if new_select is not method.select:
                 padded_select = method.padding.select
+                assert padded_select is not None
                 method = method.padding.replace(
                     _select=padded_select.replace(element=new_select)
                 )

@@ -180,7 +180,7 @@ class ChangeImport(Recipe):
                     return imp
                 return None
 
-            def visit_multi_import(self, multi: MultiImport, p: ExecutionContext) -> Optional[J]:  # ty: ignore[invalid-method-override]
+            def visit_multi_import(self, multi: MultiImport, p: ExecutionContext) -> Optional[J]:
                 if not self.has_old_import:
                     return multi
 

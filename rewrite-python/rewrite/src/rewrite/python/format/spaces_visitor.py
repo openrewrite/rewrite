@@ -500,13 +500,13 @@ class SpacesVisitor(PythonVisitor):
         return kv.padding.replace(key=space_after_right_padded(kv.padding.key, self._style.other.before_colon))
 
     def visit_comprehension_condition(self, condition: ComprehensionExpression.Condition, p: P) -> J:
-        cond = cast(ComprehensionExpression.Condition, super().visit_comprehension_condition(condition, p))
+        cond = super().visit_comprehension_condition(condition, p)
         cond = space_before(cond, True)
         cond = cond.replace(expression=space_before(cond.expression, True))
         return cond
 
     def visit_comprehension_clause(self, clause: ComprehensionExpression.Clause, p: P) -> J:
-        cc = cast(ComprehensionExpression.Clause, super().visit_comprehension_clause(clause, p))
+        cc = super().visit_comprehension_clause(clause, p)
 
         cc = space_before(cc, True)
 
@@ -520,15 +520,15 @@ class SpacesVisitor(PythonVisitor):
 
 
 def space_before(j: J2, add_space: bool) -> J2:
-    prefix: Space = cast(Space, j.prefix)
+    prefix: Space = j.prefix
 
     if prefix.comments or ('\n' in prefix.whitespace):
         return j
 
     if add_space and not_single_space(prefix.whitespace):
-        return j.replace(prefix=prefix.replace(whitespace=" "))
+        return j.replace(prefix=prefix.replace(whitespace=" "))  # ty: ignore[unresolved-attribute]
     elif not add_space and only_spaces_and_not_empty(prefix.whitespace):
-        return j.replace(prefix=prefix.replace(whitespace=""))
+        return j.replace(prefix=prefix.replace(whitespace=""))  # ty: ignore[unresolved-attribute]
 
     return j
 
@@ -568,7 +568,7 @@ def space_suffix(comment: j.Comment, add_space: bool) -> j.Comment:
 
 
 def space_before_left_padded(j: JLeftPadded[J2], add_space) -> JLeftPadded[J2]:
-    space: Space = cast(Space, j.before)
+    space: Space = j.before
     if space.comments or '\\' in space.whitespace:
         return j
 
