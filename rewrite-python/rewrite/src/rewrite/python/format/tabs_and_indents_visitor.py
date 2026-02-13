@@ -17,7 +17,7 @@ from rewrite.java.markers import TrailingComma
 from rewrite.python import (
     PythonVisitor, TabsAndIndentsStyle, DictLiteral, CollectionLiteral,
     ExpressionStatement, OtherStyle, IntelliJ, ComprehensionExpression, PyComment,
-    TrailingElseWrapper,
+    TrailingElseWrapper, Binary as PyBinary,
 )
 from rewrite.tree import Tree
 from rewrite.visitor import P, T, Cursor
@@ -80,7 +80,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 if self._other.use_continuation_indent.collections_and_comprehensions else self.IndentType.INDENT)
         elif isinstance(tree, ExpressionStatement):
             pass
-        elif isinstance(tree, Binary):
+        elif isinstance(tree, (Binary, PyBinary)):
             if self.cursor.first_enclosing(j.Parentheses) is not None:
                 self.cursor.put_message("indent_type", self.IndentType.ALIGN)
             else:
@@ -467,6 +467,14 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
 
         tree_rp = parens.padding.tree
         elem = tree_rp.element
+
+        # When a Binary expression starts on the same line as '(', compute
+        # its column and set last_indent so continuation lines align there
+        if isinstance(elem, (Binary, PyBinary)) and '\n' not in elem.prefix.last_whitespace:
+            col = self._compute_column_of(elem)
+            if col >= 0:
+                self.cursor.put_message("last_indent", col)
+
         if isinstance(elem, J):
             elem = self.visit_and_cast(elem, J, p)
 
@@ -510,10 +518,87 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
     def visit_method_invocation(self, method: MethodInvocation, p: P) -> J:
         select = method.padding.select
         if select is not None and '\n' in select.after.last_whitespace:
-            col = self._compute_select_column(method)
-            if col >= 0:
-                self.cursor.put_message("method_select_indent", col)
+            # Skip column alignment for method chains inside parentheses.
+            # A chain exists when the method's select is itself a
+            # MethodInvocation, or when there's an enclosing
+            # MethodInvocation between this node and the Parentheses.
+            skip = isinstance(select.element, MethodInvocation)
+            if not skip:
+                for c in self.cursor.get_path_as_cursors():
+                    v = c.value
+                    if v is method:
+                        continue
+                    if isinstance(v, j.Parentheses):
+                        break
+                    if isinstance(v, MethodInvocation):
+                        skip = True
+                        break
+            if not skip:
+                col = self._compute_select_column(method)
+                if col >= 0:
+                    self.cursor.put_message("method_select_indent", col)
         return super().visit_method_invocation(method, p)
+
+    def _compute_column_of(self, target: Tree) -> int:
+        """Compute the column position of a target tree element by printing from line start."""
+        from rewrite.python.printer import PythonPrinter, PrintOutputCapture
+
+        line_start = None
+        line_start_cursor = None
+        for c in self.cursor.get_path_as_cursors():
+            v = c.value
+            if isinstance(v, J):
+                line_start = v
+                line_start_cursor = c
+                if '\n' in v.prefix.whitespace:
+                    break
+        if line_start is None:
+            return -1
+
+        class _ColumnCounter(PrintOutputCapture):
+            def __init__(self):
+                super().__init__()
+                self.col = 0
+                self.found = False
+
+            def append(self, text):
+                if text and not self.found:
+                    for ch in text:
+                        self.col = 0 if ch == '\n' else self.col + 1
+                return self
+
+        class _Printer(PythonPrinter):
+            def __init__(self):
+                super().__init__()
+                orig_visit = self._delegate.visit
+                def _check(tree, p):
+                    if tree is target:
+                        p.found = True
+                        return tree
+                    return orig_visit(tree, p) if not p.found else tree
+                self._delegate.visit = _check
+
+            def visit(self, tree, p, parent=None):
+                if p.found or tree is target:
+                    p.found = True
+                    return tree
+                return super().visit(tree, p)
+
+        counter = _ColumnCounter()
+        printer = _Printer()
+        # Build initial cursor with proper J parent so context-dependent
+        # printing (e.g., = vs :=) works correctly
+        initial = Cursor(None, Cursor.ROOT_VALUE)
+        for c in line_start_cursor.get_path_as_cursors():
+            v = c.value
+            if v is line_start:
+                continue
+            if isinstance(v, J):
+                initial = Cursor(Cursor(None, Cursor.ROOT_VALUE), v)
+                break
+        printer.set_cursor(initial)
+        printer.visit(line_start, counter)
+        return counter.col if counter.found else -1
 
     def _compute_select_column(self, method: MethodInvocation) -> int:
         from rewrite.python.printer import PythonPrinter, PrintOutputCapture

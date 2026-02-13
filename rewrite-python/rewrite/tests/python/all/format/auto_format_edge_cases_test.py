@@ -256,7 +256,6 @@ def test_backslash_line_continuation():
     )
 
 
-@pytest.mark.xfail(reason='Formatter incorrectly modifies well-formatted code')
 def test_parenthesized_line_continuation():
     rewrite_run(
         # language=python

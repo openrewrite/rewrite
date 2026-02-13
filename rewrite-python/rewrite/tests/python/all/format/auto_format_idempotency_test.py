@@ -1,5 +1,3 @@
-import pytest
-
 from rewrite.python import AutoFormat
 from rewrite.test import rewrite_run, python, RecipeSpec
 
@@ -570,7 +568,6 @@ def test_idempotent_chained_method_calls():
     )
 
 
-@pytest.mark.xfail(reason='Formatter incorrectly modifies well-formatted code')
 def test_idempotent_multiline_method_chain():
     rewrite_run(
         # language=python
@@ -621,7 +618,6 @@ def test_idempotent_comments_everywhere():
     )
 
 
-@pytest.mark.xfail(reason='Formatter incorrectly modifies well-formatted code')
 def test_idempotent_string_concatenation():
     rewrite_run(
         # language=python

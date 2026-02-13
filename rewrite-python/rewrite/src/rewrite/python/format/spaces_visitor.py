@@ -279,8 +279,6 @@ class SpacesVisitor(PythonVisitor):
             b = self._apply_binary_space_around(b, True)
         elif op in [Binary.Type.FloorDivision, Binary.Type.MatrixMultiplication]:
             b = self._apply_binary_space_around(b, self._style.around_operators.multiplicative)
-        elif op == Binary.Type.StringConcatenation:
-            b = self._apply_binary_space_around(b, self._style.around_operators.additive)
         elif op == Binary.Type.Power:
             b = self._apply_binary_space_around(b, self._style.around_operators.power)
 
