@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.marketplace.*;
@@ -125,6 +126,31 @@ class RewriteRpcTest implements RewriteTest {
         Recipe recipe = client.prepareRecipe("org.openrewrite.text.Find",
           Map.of("find", "hello"));
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Find text");
+    }
+
+    @Test
+    void prepareRecipeFallsBackToRecipeLoaderWhenResolverMissing() {
+        // Install a listing for a recipe that exists on the classpath, but with a
+        // "maven" ecosystem bundle. The server only has a "runtime" resolver, so
+        // listing.prepare() will fail. The fix falls through to RecipeLoader which
+        // finds the class directly.
+        RecipeListing mavenListing = new RecipeListing(
+          null,
+          "org.openrewrite.text.ChangeText",
+          "Change text",
+          "Change the contents of text files.",
+          null,
+          List.of(new OptionDescriptor("toText", "java.lang.String",
+            "To text", "The text to change to.", null, null, true, null)),
+          List.of(),
+          1,
+          new RecipeBundle("maven", "org.openrewrite:rewrite-core", null, "1.0.0", null)
+        );
+        marketplace.install(mavenListing, List.of());
+
+        Recipe recipe = client.prepareRecipe("org.openrewrite.text.ChangeText",
+          Map.of("toText", "hello"));
+        assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Change text");
     }
 
     @Disabled("Disabled until https://github.com/openrewrite/rewrite/pull/5260 is complete")
