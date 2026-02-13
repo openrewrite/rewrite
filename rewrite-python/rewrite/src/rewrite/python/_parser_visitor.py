@@ -3484,10 +3484,10 @@ class ParserVisitor(ast.NodeVisitor):
 
                 # format specifier
                 if tok.type == token.OP and tok.string == ':':
-                    # After conversion handling: _token_idx points to ':' (need to advance)
+                    # After conversion or debug handling: _token_idx points to ':' (need to advance)
                     # After scanning loop only: _token_idx already points past ':' (don't advance)
-                    if conv is not None:
-                        self._token_idx += 1  # advance past ':' (only needed after conversion)
+                    if conv is not None or debug is not None:
+                        self._token_idx += 1  # advance past ':' (needed after conversion or debug specifier)
                     format_spec, tok, _ = self.__map_fstring(
                         cast(ast.JoinedStr, value.format_spec), Space.EMPTY, self._tokens[self._token_idx],
                         _start=_start, _middle=_middle, _end=_end)
