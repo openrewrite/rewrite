@@ -34,8 +34,8 @@ dependencies {
 
     // Kotlin libraries for KotlinDeprecationRecipeGenerator
     // Pin to versions compiled with Kotlin 1.9 metadata (compatible with parser's Kotlin 1.9.25 compiler)
-    testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
-    testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.3")
+//    testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+//    testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.3")
 }
 
 recipeDependencies {
