@@ -27,7 +27,7 @@ def _get_template_type():
     global _TemplateType
     if _TemplateType is None:
         try:
-            from string.templatelib import Template
+            from string.templatelib import Template  # ty: ignore[unresolved-import]  # Python 3.14+
             _TemplateType = Template
         except (ImportError, ModuleNotFoundError):
             _TemplateType = type('_NoMatch', (), {})  # sentinel: never matches
