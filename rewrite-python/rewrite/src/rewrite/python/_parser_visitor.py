@@ -780,7 +780,11 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_Import(self, node):
-        # TODO only use `MultiImport` when necessary (requires corresponding changes to printer)
+        if len(node.names) == 1:
+            prefix = self.__source_before('import')
+            imp = self.__convert(node.names[0])
+            return imp.replace(prefix=prefix, qualid=imp.qualid.replace(prefix=imp.prefix))
+
         return py.MultiImport(
             random_id(),
             self.__source_before('import'),

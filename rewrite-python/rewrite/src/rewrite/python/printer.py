@@ -1474,7 +1474,14 @@ class PythonJavaPrinter:
 
         self._before_syntax(import_, p)
 
+        from rewrite.python import tree as _py
+        is_standalone = not self.get_cursor().first_enclosing(_py.MultiImport)
+        if is_standalone:
+            p.append("import")
+
         if isinstance(import_.qualid.target, j.Empty):
+            if is_standalone:
+                self._visit_space(import_.qualid.prefix, p)
             self.visit(import_.qualid.name, p)
         else:
             self.visit(import_.qualid, p)
