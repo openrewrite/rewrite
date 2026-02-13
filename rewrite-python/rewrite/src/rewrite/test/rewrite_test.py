@@ -178,6 +178,12 @@ class RecipeSpec:
                 self._expect_parse_print_idempotence(parsed)
             all_parsed.extend(parsed)
 
+        # Apply before_recipe hooks (after idempotence check, before recipe execution)
+        all_parsed = [
+            (spec, spec.before_recipe(sf) or sf) if spec.before_recipe else (spec, sf)
+            for spec, sf in all_parsed
+        ]
+
         # Run the recipe
         source_files = [sf for _, sf in all_parsed]
         lss = InMemoryLargeSourceSet(source_files)
@@ -220,12 +226,6 @@ class RecipeSpec:
             # Parse the source
             source = dedent(spec.before)
             parsed = self._parse_python(source, source_path)
-
-            # Call before_recipe hook if provided
-            if spec.before_recipe:
-                modified = spec.before_recipe(parsed)
-                if modified is not None:
-                    parsed = modified
 
             result.append((spec, parsed))
 
