@@ -31,7 +31,7 @@ def test_unicode_char_normalization():
 # noinspection PyUnresolvedReferences
 def test_qualified():
     # language=python
-    RecipeSpec().rewrite_run(python("import xml.dom"))
+    RecipeSpec().rewrite_run(python("import xml.dom", after_recipe=_assert_single_j_import))
 
 
 # noinspection PyUnresolvedReferences
