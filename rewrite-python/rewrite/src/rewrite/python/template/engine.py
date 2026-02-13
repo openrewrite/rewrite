@@ -325,6 +325,18 @@ class TemplateEngine:
                 result,
             )
 
+        # Auto-format the result
+        try:
+            from ..format import maybe_auto_format
+            original = coordinates.tree
+            result = maybe_auto_format(
+                original, result, None, None,
+                cursor.parent if cursor.parent is not None else None
+            )
+        except (ValueError, AttributeError):
+            # No CompilationUnit in cursor ancestry — skip formatting
+            pass
+
         return result
 
     @classmethod
