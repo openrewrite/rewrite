@@ -192,6 +192,139 @@ class TestTemplateBuilder:
         assert builder.imports("import z") is builder
 
 
+class TestTemplateApplyRecipe:
+    """End-to-end tests for pattern match + template apply in recipes."""
+
+    def test_replace_method_call_with_assignment(self):
+        """Test that pattern({obj}.setX({val})) + template({obj}.x = {val}) produces '=' not ':='."""
+        from rewrite import ExecutionContext, Recipe, TreeVisitor
+        from rewrite.python.visitor import PythonVisitor
+        from rewrite.python.template import pattern, capture
+        from rewrite.java.tree import MethodInvocation
+        from rewrite.test import RecipeSpec, python
+
+        obj = capture('obj')
+        val = capture('val')
+        pat = pattern("{obj}.setDaemon({val})", obj=obj, val=val)
+        tmpl = template("{obj}.daemon = {val}", obj=obj, val=val)
+
+        class TestRecipe(Recipe):
+            @property
+            def name(self) -> str:
+                return "test.ReplaceSetterWithAssignment"
+
+            @property
+            def display_name(self) -> str:
+                return "Test"
+
+            @property
+            def description(self) -> str:
+                return "Test"
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_method_invocation(self, method, p):
+                        method = super().visit_method_invocation(method, p)
+                        match = pat.match(method, self.cursor)
+                        if match:
+                            return tmpl.apply(self.cursor, values=match)
+                        return method
+                return Visitor()
+
+        spec = RecipeSpec(recipe=TestRecipe())
+        spec.rewrite_run(
+            python(
+                "thread.setDaemon(True)",
+                "thread.daemon = True",
+            )
+        )
+
+    def test_replace_method_call_with_method_call(self):
+        """Test that pattern(datetime.utcnow()) + template(datetime.now(datetime.UTC)) works."""
+        from rewrite import ExecutionContext, Recipe, TreeVisitor
+        from rewrite.python.visitor import PythonVisitor
+        from rewrite.python.template import pattern, capture
+        from rewrite.java.tree import MethodInvocation
+        from rewrite.test import RecipeSpec, python
+
+        pat = pattern("datetime.utcnow()")
+        tmpl = template("datetime.now(datetime.UTC)")
+
+        class TestRecipe(Recipe):
+            @property
+            def name(self) -> str:
+                return "test.ReplaceUtcNow"
+
+            @property
+            def display_name(self) -> str:
+                return "Test"
+
+            @property
+            def description(self) -> str:
+                return "Test"
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_method_invocation(self, method, p):
+                        method = super().visit_method_invocation(method, p)
+                        match = pat.match(method, self.cursor)
+                        if match:
+                            return tmpl.apply(self.cursor, values=match)
+                        return method
+                return Visitor()
+
+        spec = RecipeSpec(recipe=TestRecipe())
+        spec.rewrite_run(
+            python(
+                "now = datetime.utcnow()",
+                "now = datetime.now(datetime.UTC)",
+            )
+        )
+
+    def test_replace_method_call_with_field_access(self):
+        """Test that pattern({obj}.getName()) + template({obj}.name) works."""
+        from rewrite import ExecutionContext, Recipe, TreeVisitor
+        from rewrite.python.visitor import PythonVisitor
+        from rewrite.python.template import pattern, capture
+        from rewrite.java.tree import MethodInvocation
+        from rewrite.test import RecipeSpec, python
+
+        obj = capture('obj')
+        pat = pattern("{obj}.getName()", obj=obj)
+        tmpl = template("{obj}.name", obj=obj)
+
+        class TestRecipe(Recipe):
+            @property
+            def name(self) -> str:
+                return "test.ReplaceGetterWithProperty"
+
+            @property
+            def display_name(self) -> str:
+                return "Test"
+
+            @property
+            def description(self) -> str:
+                return "Test"
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_method_invocation(self, method, p):
+                        method = super().visit_method_invocation(method, p)
+                        match = pat.match(method, self.cursor)
+                        if match:
+                            return tmpl.apply(self.cursor, values=match)
+                        return method
+                return Visitor()
+
+        spec = RecipeSpec(recipe=TestRecipe())
+        spec.rewrite_run(
+            python(
+                "name = thread.getName()",
+                "name = thread.name",
+            )
+        )
+
+
 class TestTemplateApply:
     """Tests for Template.apply()."""
 
