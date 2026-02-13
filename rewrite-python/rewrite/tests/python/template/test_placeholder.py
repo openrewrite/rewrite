@@ -135,3 +135,54 @@ class TestValidateCaptures:
         captures = {'x': capture('x')}
         with pytest.raises(ValueError, match="undefined"):
             validate_captures("{x} + {y}", captures)
+
+
+class TestPlaceholderEdgeCases:
+    """Tests for edge cases in placeholder handling."""
+
+    def test_placeholder_with_underscore_name(self):
+        """Test finding a placeholder with an underscore-prefixed name."""
+        placeholders = find_placeholders("{_private}")
+        assert len(placeholders) == 1
+        assert placeholders[0].name == '_private'
+
+    def test_placeholder_with_digits(self):
+        """Test finding a placeholder with digits in the name."""
+        placeholders = find_placeholders("{var2}")
+        assert len(placeholders) == 1
+        assert placeholders[0].name == 'var2'
+
+    def test_duplicate_placeholder_name(self):
+        """Test finding duplicate placeholder names."""
+        placeholders = find_placeholders("{x} + {x}")
+        assert len(placeholders) == 2
+        assert placeholders[0].name == 'x'
+        assert placeholders[1].name == 'x'
+
+    def test_placeholder_at_start(self):
+        """Test finding a placeholder at the start of the code."""
+        placeholders = find_placeholders("{x} + 1")
+        assert len(placeholders) == 1
+        assert placeholders[0].name == 'x'
+        assert placeholders[0].start == 0
+
+    def test_placeholder_at_end(self):
+        """Test finding a placeholder at the end of the code."""
+        placeholders = find_placeholders("1 + {x}")
+        assert len(placeholders) == 1
+        assert placeholders[0].name == 'x'
+
+    def test_from_placeholder_empty_name(self):
+        """Test from_placeholder with empty name between prefix and suffix."""
+        result = from_placeholder("__placeholder___")
+        assert result == ""
+
+    def test_substitute_preserves_surrounding_code(self):
+        """Test that substitution preserves surrounding code."""
+        captures = {'x': capture('x'), 'y': capture('y')}
+        result, mapping = substitute_placeholders("foo({x}, bar, {y})", captures)
+        assert result.startswith("foo(")
+        assert ", bar, " in result
+        assert result.endswith(")")
+        assert "__placeholder_x__" in result
+        assert "__placeholder_y__" in result
