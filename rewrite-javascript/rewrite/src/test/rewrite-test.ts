@@ -100,6 +100,25 @@ export class RecipeSpec {
             allParsed.push(...parsed);
         }
 
+        // Apply beforeRecipe hooks (after idempotence check, before recipe execution)
+        for (let i = 0; i < allParsed.length; i++) {
+            const [spec, sourceFile] = allParsed[i];
+            if (spec.beforeRecipe) {
+                const b = spec.beforeRecipe(sourceFile);
+                if (b !== undefined) {
+                    if (b instanceof Promise) {
+                        const mapped = await b;
+                        if (mapped === undefined) {
+                            throw new Error("Expected beforeRecipe to return a SourceFile, but got undefined. Did you forget a return statement?");
+                        }
+                        allParsed[i] = [spec, mapped];
+                    } else {
+                        allParsed[i] = [spec, b as SourceFile];
+                    }
+                }
+            }
+        }
+
         const changeset = (await scheduleRun(this.recipe,
             allParsed.map(([_, sourceFile]) => sourceFile),
             this.recipeExecutionContext)).changeset;
@@ -131,14 +150,15 @@ export class RecipeSpec {
     private async expectResultsToMatchAfter(specs: SourceSpec<any>[], changeset: Result[], parsed: [SourceSpec<any>, SourceFile][]) {
         for (const spec of specs) {
             const matchingSpec = parsed.find(([s, _]) => s === spec);
-            const after = changeset.find(c => {
+            const result = changeset.find(c => {
                 if (c.before) {
                     return c.before === matchingSpec![1];
                 } else if (c.after) {
                     const matchingSpec = specs.find(s => s.path === c.after!.sourcePath);
                     return !!matchingSpec;
                 }
-            })?.after;
+            });
+            const after = result && result.after !== result.before ? result.after : undefined;
 
             if (!spec.after) {
                 if (after) {
@@ -200,21 +220,7 @@ export class RecipeSpec {
         for await (const sourceFile of parser.parse(...before.map(([_, parserInput]) => parserInput))) {
             parsed.push(sourceFile);
         }
-        const specToParsed: [SourceSpec<any>, SourceFile][] = before.map(([spec, _], i) => [spec, parsed[i]]);
-        return await mapAsync(specToParsed, async ([spec, sourceFile]) => {
-            const b = spec.beforeRecipe ? spec.beforeRecipe(sourceFile) : sourceFile;
-            if (b !== undefined) {
-                if (b instanceof Promise) {
-                    const mapped = await b;
-                    if (mapped === undefined) {
-                        throw new Error("Expected beforeRecipe to return a SourceFile, but got undefined. Did you forget a return statement?");
-                    }
-                    return [spec, mapped];
-                }
-                return [spec, b as SourceFile];
-            }
-            return [spec, sourceFile];
-        });
+        return before.map(([spec, _], i): [SourceSpec<any>, SourceFile] => [spec, parsed[i]]);
     }
 
     private async expectWhitespaceNotToContainNonwhitespaceCharacters(parsed: [SourceSpec<any>, SourceFile][]) {
