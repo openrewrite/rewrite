@@ -27,6 +27,9 @@ import org.openrewrite.rpc.RewriteRpcProcessManager;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import org.openrewrite.Parser;
+import org.openrewrite.python.PyProjectTomlParser;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -175,7 +178,7 @@ public class PythonRewriteRpc extends RewriteRpc {
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
-        return StreamSupport.stream(new Spliterator<SourceFile>() {
+        Stream<SourceFile> rpcStream = StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
             private @Nullable ParseProjectResponse response;
 
@@ -214,6 +217,17 @@ public class PythonRewriteRpc extends RewriteRpc {
                 return response == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
             }
         }, false);
+
+        // Parse pyproject.toml if present
+        Path pyprojectPath = projectPath.resolve("pyproject.toml");
+        if (Files.exists(pyprojectPath)) {
+            Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
+            Parser.Input input = Parser.Input.fromFile(pyprojectPath);
+            Stream<SourceFile> pyprojectStream = new PyProjectTomlParser().parseInputs(
+                    Collections.singletonList(input), effectiveRelativeTo, ctx);
+            return Stream.concat(rpcStream, pyprojectStream);
+        }
+        return rpcStream;
     }
 
     public static Builder builder() {
