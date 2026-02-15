@@ -350,16 +350,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             ));
         }
 
-        // Parse the 'enum' keyword
-        var kindPrefix = ExtractSpaceBefore(node.EnumKeyword);
+        // 'enum' keyword prefix stored as left padding of name
+        var enumPrefix = ExtractSpaceBefore(node.EnumKeyword);
         _cursor = node.EnumKeyword.Span.End;
-        var kind = new ClassDeclaration.Kind(
-            Guid.NewGuid(),
-            kindPrefix,
-            Markers.Empty,
-            [],
-            ClassDeclaration.KindType.Enum
-        );
 
         // Parse the name
         var namePrefix = ExtractSpaceBefore(node.Identifier);
@@ -373,7 +366,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         );
 
         // Parse base list (underlying type like : byte)
-        JLeftPadded<TypeTree>? extends = null;
+        JLeftPadded<TypeTree>? baseType = null;
         if (node.BaseList != null)
         {
             var colonPrefix = ExtractSpaceBefore(node.BaseList.ColonToken);
@@ -381,116 +374,93 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
             if (node.BaseList.Types.Count > 0)
             {
-                var baseType = (TypeTree)Visit(node.BaseList.Types[0].Type)!;
-                extends = new JLeftPadded<TypeTree>(colonPrefix, baseType);
+                var bt = (TypeTree)Visit(node.BaseList.Types[0].Type)!;
+                baseType = new JLeftPadded<TypeTree>(colonPrefix, bt);
             }
         }
 
-        // Parse enum body
-        var body = VisitEnumBody(node);
-
-        return new ClassDeclaration(
-            Guid.NewGuid(),
-            prefix,
-            Markers.Empty,
-            [],
-            modifiers,
-            kind,
-            name,
-            null, // TypeParameters (enums don't have generics)
-            null, // PrimaryConstructor
-            extends,
-            null, // Implements
-            null, // Permits
-            body,
-            null  // Type
-        );
-    }
-
-    private Block VisitEnumBody(EnumDeclarationSyntax node)
-    {
-        var prefix = ExtractSpaceBefore(node.OpenBraceToken);
+        // Parse members
+        var membersPrefix = ExtractSpaceBefore(node.OpenBraceToken);
         _cursor = node.OpenBraceToken.Span.End;
 
-        var statements = new List<JRightPadded<Statement>>();
-
-        // Parse enum members as EnumValueSet
+        JContainer<Expression>? members = null;
         if (node.Members.Count > 0)
         {
-            var enumValues = new List<JRightPadded<EnumValue>>();
-
+            var memberList = new List<JRightPadded<Expression>>();
             for (int i = 0; i < node.Members.Count; i++)
             {
                 var member = node.Members[i];
-                var memberPrefix = ExtractPrefix(member);
+                var memberJ = (Expression)VisitEnumMemberDeclaration(member);
 
-                // Parse member name
-                var memberNamePrefix = ExtractSpaceBefore(member.Identifier);
-                _cursor = member.Identifier.Span.End;
-                var memberName = new Identifier(
-                    Guid.NewGuid(),
-                    memberNamePrefix,
-                    Markers.Empty,
-                    member.Identifier.Text,
-                    null
-                );
-
-                // Parse optional initializer
-                JLeftPadded<Expression>? initializer = null;
-                if (member.EqualsValue != null)
-                {
-                    var equalsPrefix = ExtractSpaceBefore(member.EqualsValue.EqualsToken);
-                    _cursor = member.EqualsValue.EqualsToken.Span.End;
-
-                    var valueExpr = Visit(member.EqualsValue.Value);
-                    if (valueExpr is Expression expr)
-                    {
-                        initializer = new JLeftPadded<Expression>(equalsPrefix, expr);
-                    }
-                }
-
-                var enumValue = new EnumValue(
-                    Guid.NewGuid(),
-                    memberPrefix,
-                    Markers.Empty,
-                    [],
-                    memberName,
-                    initializer
-                );
-
-                // Get trailing space (before comma or end)
-                Space afterSpace = Space.Empty;
-                if (i < node.Members.Count - 1)
+                Space afterSpace;
+                if (i < node.Members.SeparatorCount)
                 {
                     var separator = node.Members.GetSeparator(i);
                     afterSpace = ExtractSpaceBefore(separator);
                     _cursor = separator.Span.End;
                 }
+                else
+                {
+                    afterSpace = ExtractSpaceBefore(node.CloseBraceToken);
+                }
 
-                enumValues.Add(new JRightPadded<EnumValue>(enumValue, afterSpace, Markers.Empty));
+                memberList.Add(new JRightPadded<Expression>(memberJ, afterSpace, Markers.Empty));
             }
 
-            var enumValueSet = new EnumValueSet(
-                Guid.NewGuid(),
-                Space.Empty,
-                Markers.Empty,
-                enumValues,
-                false
-            );
-
-            statements.Add(new JRightPadded<Statement>(enumValueSet, Space.Empty, Markers.Empty));
+            members = new JContainer<Expression>(membersPrefix, memberList, Markers.Empty);
+        }
+        else
+        {
+            members = new JContainer<Expression>(membersPrefix, [], Markers.Empty);
         }
 
-        var end = ExtractSpaceBefore(node.CloseBraceToken);
         _cursor = node.CloseBraceToken.Span.End;
 
-        return new Block(
+        return new EnumDeclaration(
             Guid.NewGuid(),
             prefix,
             Markers.Empty,
-            new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
-            statements,
-            end
+            null,
+            modifiers,
+            new JLeftPadded<Identifier>(enumPrefix, name),
+            baseType,
+            members
+        );
+    }
+
+    public override J VisitEnumMemberDeclaration(EnumMemberDeclarationSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+
+        _cursor = node.Identifier.Span.End;
+        var name = new Identifier(
+            Guid.NewGuid(),
+            Space.Empty,
+            Markers.Empty,
+            node.Identifier.Text,
+            null
+        );
+
+        JLeftPadded<Expression>? initializer = null;
+        if (node.EqualsValue != null)
+        {
+            var equalsPrefix = ExtractSpaceBefore(node.EqualsValue.EqualsToken);
+            _cursor = node.EqualsValue.EqualsToken.Span.End;
+
+            var valueExpr = Visit(node.EqualsValue.Value);
+            if (valueExpr is Expression expr)
+            {
+                initializer = new JLeftPadded<Expression>(equalsPrefix, expr);
+            }
+        }
+
+        return new EnumMemberDeclaration(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            [],
+            name,
+            initializer
         );
     }
 
@@ -548,7 +518,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         JContainer<TypeParameter>? typeParameters = null;
         if (node.TypeParameterList != null)
         {
-            typeParameters = ParseTypeParameterList(node.TypeParameterList);
+            typeParameters = ParseTypeParameterList(node.TypeParameterList, node.ConstraintClauses);
         }
 
         // Parse primary constructor (C# 12)
@@ -611,11 +581,17 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             }
         }
 
-        // Parse constraint clauses (C# type parameter constraints)
-        // These are stored in TypeParameter.Bounds following the pigeonhole principle
-        if (node.ConstraintClauses.Count > 0 && typeParameters != null)
+        // Constraint clauses are now integrated into type parameters via ConstrainedTypeParameter
+        // (handled in ParseTypeParameterList above). Parse any remaining constraint text for
+        // type declarations without type parameters.
+        if (node.TypeParameterList == null && node.ConstraintClauses.Count > 0)
         {
-            typeParameters = ParseConstraintClauses(node.ConstraintClauses, typeParameters);
+            // Skip constraint clause text if type has no type parameters
+            // (shouldn't happen in valid C#, but handle gracefully)
+            foreach (var clause in node.ConstraintClauses)
+            {
+                _cursor = clause.Span.End;
+            }
         }
 
         // Parse the body (check for semicolon-terminated records first)
@@ -645,21 +621,17 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             body = VisitClassBody(node);
         }
 
-        // If there's a primary constructor, add it as the first statement in the body
+        var classMarkers = Markers.Empty;
+
+        // If there's a primary constructor, prepend it as the first statement in the body.
+        // The MethodDeclaration already carries a PrimaryConstructor marker to identify it.
         if (primaryConstructorMethod != null)
         {
-            var bodyStatements = new List<JRightPadded<Statement>>
-            {
-                new JRightPadded<Statement>(primaryConstructorMethod, Space.Empty, Markers.Empty)
-            };
+            var bodyStatements = new List<JRightPadded<Statement>>();
+            bodyStatements.Add(new JRightPadded<Statement>(primaryConstructorMethod, Space.Empty, Markers.Empty));
             bodyStatements.AddRange(body.Statements);
             body = body with { Statements = bodyStatements };
         }
-
-        // Build markers - add PrimaryConstructor marker if applicable
-        var classMarkers = primaryConstructorMethod != null
-            ? Markers.Build([new PrimaryConstructor(Guid.NewGuid())])
-            : Markers.Empty;
 
         return new ClassDeclaration(
             Guid.NewGuid(),
@@ -670,10 +642,10 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             kind,
             name,
             typeParameters,
-            null, // PrimaryConstructor field (not used - we use marker pattern instead)
+            null, // PrimaryConstructor (stored in body instead)
             extends,
             implements,
-            null, // Permits
+            null, // Permits (Java-only)
             body,
             _typeMapping?.ClassType(node)
         );
@@ -1550,16 +1522,16 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             throw new InvalidOperationException($"Expected Expression but got {selectorExpr?.GetType().Name}");
         }
 
-        // Space before 'switch' keyword
+        // Space before 'switch' keyword (stored as right padding of expression)
         var selectorAfter = ExtractSpaceBefore(node.SwitchKeyword);
         _cursor = node.SwitchKeyword.Span.End;
 
-        // Space before '{'
+        // Space before '{' (stored as JContainer prefix for arms)
         var armsPrefix = ExtractSpaceBefore(node.OpenBraceToken);
         _cursor = node.OpenBraceToken.Span.End;
 
-        // Parse each arm as a Case with CaseType.Rule
-        var arms = new List<JRightPadded<Statement>>();
+        // Parse each arm as SwitchExpressionArm
+        var arms = new List<JRightPadded<SwitchExpressionArm>>();
         for (int i = 0; i < node.Arms.Count; i++)
         {
             var arm = node.Arms[i];
@@ -1567,69 +1539,46 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
             // Parse the pattern
             var pattern = Visit(arm.Pattern);
-            if (pattern is not J patternJ)
+            if (pattern is not Pattern patternNode)
             {
-                throw new InvalidOperationException($"Expected J but got {pattern?.GetType().Name}");
+                throw new InvalidOperationException($"Expected Pattern but got {pattern?.GetType().Name}");
             }
 
-            // Determine space after pattern (before 'when' or '=>')
-            Expression? guard = null;
-            Space patternAfter;
-            Space beforeArrow;
+            // Parse when clause if present
+            JLeftPadded<Expression>? whenExpression = null;
             if (arm.WhenClause != null)
             {
-                // Space before 'when' keyword goes in pattern's After
-                patternAfter = ExtractSpaceBefore(arm.WhenClause.WhenKeyword);
+                var whenPrefix = ExtractSpaceBefore(arm.WhenClause.WhenKeyword);
                 _cursor = arm.WhenClause.WhenKeyword.Span.End;
 
-                // Parse the guard condition - its prefix is space after 'when'
                 var condition = Visit(arm.WhenClause.Condition);
                 if (condition is Expression condExpr)
                 {
-                    guard = condExpr;
+                    whenExpression = new JLeftPadded<Expression>(whenPrefix, condExpr);
                 }
-
-                // Capture space before '=>' (after guard condition)
-                beforeArrow = ExtractSpaceBefore(arm.EqualsGreaterThanToken);
-            }
-            else
-            {
-                // No guard: space before '=>' goes in pattern's After
-                patternAfter = ExtractSpaceBefore(arm.EqualsGreaterThanToken);
-                beforeArrow = Space.Empty;
             }
 
-            // Move past '=>'
+            // Space before '=>' (stored as left padding of expression)
+            var beforeArrow = ExtractSpaceBefore(arm.EqualsGreaterThanToken);
             _cursor = arm.EqualsGreaterThanToken.Span.End;
 
-            // Parse the result expression - its prefix is space after '=>'
-            // When there's a guard, prepend beforeArrow to result's prefix
+            // Parse the result expression
             var resultExpr = Visit(arm.Expression);
-            if (resultExpr is not J result)
+            if (resultExpr is not Expression result)
             {
-                throw new InvalidOperationException($"Expected J but got {resultExpr?.GetType().Name}");
+                throw new InvalidOperationException($"Expected Expression but got {resultExpr?.GetType().Name}");
             }
 
-            var caseLabels = new JContainer<J>(
-                Space.Empty,
-                [new JRightPadded<J>(patternJ, patternAfter, Markers.Empty)],
-                Markers.Empty
-            );
-
-            // For Body, we use a creative encoding: Body.After = space before '=>' (when guard present)
-            // The printer prints Body.After, then '=>', then Body.Element
-            var switchArm = new Case(
+            var switchArm = new SwitchExpressionArm(
                 Guid.NewGuid(),
                 armPrefix,
                 Markers.Empty,
-                CaseType.Rule,
-                caseLabels,
-                guard,
-                new JContainer<Statement>(Space.Empty, [], Markers.Empty),  // Empty statements for Rule type
-                new JRightPadded<J>(result, beforeArrow, Markers.Empty)     // Body.After = space before '=>'
+                patternNode,
+                whenExpression,
+                new JLeftPadded<Expression>(beforeArrow, result)
             );
 
-            // Handle comma separator - space after the arm is before the comma
+            // Handle comma separator
             Space armAfter;
             if (i < node.Arms.SeparatorCount)
             {
@@ -1639,48 +1588,21 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             }
             else
             {
-                // Last arm - space before '}' goes in its After
+                // Last arm - space before '}'
                 armAfter = ExtractSpaceBefore(node.CloseBraceToken);
             }
 
-            arms.Add(new JRightPadded<Statement>(switchArm, armAfter, Markers.Empty));
-        }
-
-        // Space before '}' is on last arm's After, extract it for Block.End
-        var blockEnd = arms.Count > 0 ? arms[^1].After : Space.Empty;
-        if (arms.Count > 0)
-        {
-            arms[^1] = arms[^1] with { After = Space.Empty };
+            arms.Add(new JRightPadded<SwitchExpressionArm>(switchArm, armAfter, Markers.Empty));
         }
 
         _cursor = node.CloseBraceToken.Span.End;
-
-        // Create ControlParentheses for selector (no actual parens for C#)
-        // Prefix is empty (no '('), Tree.Element is selector, Tree.After is space before 'switch'
-        var selectorParens = new ControlParentheses<Expression>(
-            Guid.NewGuid(),
-            Space.Empty,  // No space before '(' since there's no '('
-            Markers.Empty,
-            new JRightPadded<Expression>(selector, selectorAfter, Markers.Empty)
-        );
-
-        // Create Block for cases
-        var casesBlock = new Block(
-            Guid.NewGuid(),
-            armsPrefix,  // Space before '{'
-            Markers.Empty,
-            new JRightPadded<bool>(false, Space.Empty, Markers.Empty),  // Not static
-            arms,
-            blockEnd     // Space before '}'
-        );
 
         return new SwitchExpression(
             Guid.NewGuid(),
             prefix,
             Markers.Empty,
-            selectorParens,
-            casesBlock,
-            _typeMapping?.Type(node)
+            new JRightPadded<Expression>(selector, selectorAfter, Markers.Empty),
+            new JContainer<SwitchExpressionArm>(armsPrefix, arms, Markers.Empty)
         );
     }
 
@@ -1967,16 +1889,21 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
     public override J VisitConstantPattern(ConstantPatternSyntax node)
     {
-        // Constant pattern just wraps an expression - visit and return the inner expression
-        return Visit(node.Expression)!;
+        var prefix = ExtractPrefix(node);
+        var value = (Expression)Visit(node.Expression)!;
+        return new ConstantPattern(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            value
+        );
     }
 
     public override J VisitDiscardPattern(DiscardPatternSyntax node)
     {
-        // Discard pattern is just the _ underscore
         var prefix = ExtractPrefix(node);
         _cursor = node.UnderscoreToken.Span.End;
-        return new Identifier(Guid.NewGuid(), prefix, Markers.Empty, "_", null);
+        return new DiscardPattern(Guid.NewGuid(), prefix, Markers.Empty, null);
     }
 
     public override J VisitTypePattern(TypePatternSyntax node)
@@ -2545,11 +2472,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         _cursor = node.ReturnOrBreakKeyword.Span.End;
 
         var kind = node.ReturnOrBreakKeyword.Kind() == SyntaxKind.ReturnKeyword
-            ? YieldStatementKind.Return
-            : YieldStatementKind.Break;
+            ? KeywordKind.Return
+            : KeywordKind.Break;
+
+        var keyword = new Keyword(Guid.NewGuid(), keywordPrefix, Markers.Empty, kind);
 
         // Parse optional expression (only for yield return)
-        Expression? value = null;
+        Expression? expression = null;
         if (node.Expression != null)
         {
             var expr = Visit(node.Expression);
@@ -2557,19 +2486,195 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             {
                 throw new InvalidOperationException($"Expected Expression but got {expr?.GetType().Name}");
             }
-            value = e;
+            expression = e;
         }
 
         // Skip semicolon
         _cursor = node.SemicolonToken.Span.End;
 
-        return new YieldStatement(
+        return new Yield(
             Guid.NewGuid(),
             prefix,
             Markers.Empty,
-            new JLeftPadded<YieldStatementKind>(keywordPrefix, kind),
-            value
+            keyword,
+            expression
         );
+    }
+
+    public override J VisitCheckedStatement(CheckedStatementSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.Keyword.Span.End;
+
+        var kind = node.Keyword.IsKind(SyntaxKind.CheckedKeyword) ? KeywordKind.Checked : KeywordKind.Unchecked;
+        var keyword = new Keyword(Guid.NewGuid(), Space.Empty, Markers.Empty, kind);
+
+        var block = (Block)Visit(node.Block)!;
+
+        return new CheckedStatement(Guid.NewGuid(), prefix, Markers.Empty, keyword, block);
+    }
+
+    public override J VisitCheckedExpression(CheckedExpressionSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.Keyword.Span.End;
+
+        var kind = node.Keyword.IsKind(SyntaxKind.CheckedKeyword) ? KeywordKind.Checked : KeywordKind.Unchecked;
+        var keyword = new Keyword(Guid.NewGuid(), Space.Empty, Markers.Empty, kind);
+
+        // Parse the parenthesized expression
+        var openParenPrefix = ExtractSpaceBefore(node.OpenParenToken);
+        _cursor = node.OpenParenToken.Span.End;
+
+        var expr = (Expression)Visit(node.Expression)!;
+
+        var closeParenPrefix = ExtractSpaceBefore(node.CloseParenToken);
+        _cursor = node.CloseParenToken.Span.End;
+
+        var controlParens = new ControlParentheses<Expression>(
+            Guid.NewGuid(),
+            openParenPrefix,
+            Markers.Empty,
+            new JRightPadded<Expression>(expr, closeParenPrefix, Markers.Empty)
+        );
+
+        return new CheckedExpression(Guid.NewGuid(), prefix, Markers.Empty, keyword, controlParens);
+    }
+
+    public override J VisitRangeExpression(RangeExpressionSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+
+        // Parse optional start expression
+        JRightPadded<Expression>? start = null;
+        if (node.LeftOperand != null)
+        {
+            var startExpr = (Expression)Visit(node.LeftOperand)!;
+            var afterStart = ExtractSpaceBefore(node.OperatorToken);
+            start = new JRightPadded<Expression>(startExpr, afterStart, Markers.Empty);
+        }
+
+        _cursor = node.OperatorToken.Span.End;
+
+        // Parse optional end expression
+        Expression? end = null;
+        if (node.RightOperand != null)
+        {
+            end = (Expression)Visit(node.RightOperand)!;
+        }
+
+        return new RangeExpression(Guid.NewGuid(), prefix, Markers.Empty, start, end);
+    }
+
+    public override J VisitStackAllocArrayCreationExpression(StackAllocArrayCreationExpressionSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.StackAllocKeyword.Span.End;
+
+        // Parse the array type as a J.NewArray (reusing VisitArrayCreationExpression logic)
+        // The type is an ArrayTypeSyntax like "int[3]"
+        var arrayPrefix = ExtractPrefix(node.Type);
+
+        TypeTree? typeExpression = null;
+        var dimensions = new List<ArrayDimension>();
+
+        if (node.Type is ArrayTypeSyntax arrayType)
+        {
+            typeExpression = VisitType(arrayType.ElementType);
+
+            foreach (var rankSpec in arrayType.RankSpecifiers)
+            {
+                var bracketPrefix = ExtractSpaceBefore(rankSpec.OpenBracketToken);
+                _cursor = rankSpec.OpenBracketToken.Span.End;
+
+                for (int i = 0; i < rankSpec.Sizes.Count; i++)
+                {
+                    var size = rankSpec.Sizes[i];
+                    var dimPrefix = i == 0 ? bracketPrefix : ExtractPrefix(size);
+
+                    if (size is OmittedArraySizeExpressionSyntax)
+                    {
+                        var afterSpace = ExtractSpaceBefore(rankSpec.CloseBracketToken);
+                        dimensions.Add(new ArrayDimension(
+                            Guid.NewGuid(), dimPrefix, Markers.Empty,
+                            new JRightPadded<Expression>(
+                                new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty),
+                                afterSpace, Markers.Empty)));
+                    }
+                    else
+                    {
+                        var sizeExpr = (Expression)Visit(size)!;
+                        Space afterSpace;
+                        if (i < rankSpec.Sizes.Count - 1)
+                        {
+                            afterSpace = ExtractSpaceBefore(rankSpec.Sizes.GetSeparator(i));
+                            _cursor = rankSpec.Sizes.GetSeparator(i).Span.End;
+                        }
+                        else
+                        {
+                            afterSpace = ExtractSpaceBefore(rankSpec.CloseBracketToken);
+                        }
+                        dimensions.Add(new ArrayDimension(
+                            Guid.NewGuid(), dimPrefix, Markers.Empty,
+                            new JRightPadded<Expression>(sizeExpr, afterSpace, Markers.Empty)));
+                    }
+                }
+
+                _cursor = rankSpec.CloseBracketToken.Span.End;
+            }
+        }
+
+        // Parse optional initializer
+        JContainer<Expression>? initializer = null;
+        if (node.Initializer != null)
+        {
+            initializer = ParseArrayInitializer(node.Initializer);
+        }
+
+        var newArray = new NewArray(
+            Guid.NewGuid(), arrayPrefix, Markers.Empty,
+            typeExpression, dimensions, initializer, null);
+
+        return new StackAllocExpression(Guid.NewGuid(), prefix, Markers.Empty, newArray);
+    }
+
+    public override J VisitCollectionExpression(CollectionExpressionSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.OpenBracketToken.Span.End;
+
+        var elements = new List<JRightPadded<Expression>>();
+        for (var i = 0; i < node.Elements.Count; i++)
+        {
+            var element = node.Elements[i];
+            Expression expr;
+            if (element is ExpressionElementSyntax exprElem)
+            {
+                expr = (Expression)Visit(exprElem.Expression)!;
+            }
+            else
+            {
+                expr = (Expression)Visit(element)!;
+            }
+
+            Space afterSpace;
+            if (i < node.Elements.SeparatorCount)
+            {
+                var separator = node.Elements.GetSeparator(i);
+                afterSpace = ExtractSpaceBefore(separator);
+                _cursor = separator.Span.End;
+            }
+            else
+            {
+                afterSpace = ExtractSpaceBefore(node.CloseBracketToken);
+            }
+
+            elements.Add(new JRightPadded<Expression>(expr, afterSpace, Markers.Empty));
+        }
+
+        _cursor = node.CloseBracketToken.Span.End;
+
+        return new CollectionExpression(Guid.NewGuid(), prefix, Markers.Empty, elements, null);
     }
 
     public override J VisitForStatement(ForStatementSyntax node)
@@ -5170,35 +5275,51 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     }
 
     /// <summary>
-    /// Parses a type parameter list for generic types/methods.
-    /// Example: &lt;T, U&gt;
+    /// Parses a type parameter list for generic types/methods, merging any constraint clauses
+    /// into ConstrainedTypeParameter objects stored in J.TypeParameter.Bounds[0].
+    /// Example: &lt;T, U&gt; where T : class, IDisposable where U : new()
     /// </summary>
-    private JContainer<TypeParameter> ParseTypeParameterList(TypeParameterListSyntax typeParamList)
+    private JContainer<TypeParameter> ParseTypeParameterList(
+        TypeParameterListSyntax typeParamList,
+        SyntaxList<TypeParameterConstraintClauseSyntax> constraintClauses)
     {
         var containerPrefix = ExtractSpaceBefore(typeParamList.LessThanToken);
         _cursor = typeParamList.LessThanToken.Span.End;
+
+        // Build a lookup from type parameter name to its constraint clause
+        var constraintsByName = new Dictionary<string, TypeParameterConstraintClauseSyntax>();
+        foreach (var clause in constraintClauses)
+        {
+            constraintsByName[clause.Name.Identifier.Text] = clause;
+        }
 
         var typeParams = new List<JRightPadded<TypeParameter>>();
         for (var i = 0; i < typeParamList.Parameters.Count; i++)
         {
             var param = typeParamList.Parameters[i];
 
+            // Parse attribute lists on type parameter (e.g., [MaybeNull] T)
+            var attrLists = new List<AttributeList>();
+            foreach (var attrListSyntax in param.AttributeLists)
+            {
+                attrLists.Add((AttributeList)Visit(attrListSyntax)!);
+            }
+
             // Parse variance modifier (in/out) if present
-            var modifiers = new List<Modifier>();
-            if (param.VarianceKeyword.IsKind(SyntaxKind.InKeyword) ||
-                param.VarianceKeyword.IsKind(SyntaxKind.OutKeyword))
+            JLeftPadded<ConstrainedTypeParameter.VarianceKind>? variance = null;
+            if (param.VarianceKeyword.IsKind(SyntaxKind.InKeyword))
             {
                 var varPrefix = ExtractSpaceBefore(param.VarianceKeyword);
                 _cursor = param.VarianceKeyword.Span.End;
-                modifiers.Add(new Modifier(
-                    Guid.NewGuid(),
-                    varPrefix,
-                    Markers.Empty,
-                    param.VarianceKeyword.IsKind(SyntaxKind.InKeyword)
-                        ? Modifier.ModifierType.LanguageExtension
-                        : Modifier.ModifierType.LanguageExtension,
-                    []
-                ));
+                variance = new JLeftPadded<ConstrainedTypeParameter.VarianceKind>(
+                    varPrefix, ConstrainedTypeParameter.VarianceKind.In);
+            }
+            else if (param.VarianceKeyword.IsKind(SyntaxKind.OutKeyword))
+            {
+                var varPrefix = ExtractSpaceBefore(param.VarianceKeyword);
+                _cursor = param.VarianceKeyword.Span.End;
+                variance = new JLeftPadded<ConstrainedTypeParameter.VarianceKind>(
+                    varPrefix, ConstrainedTypeParameter.VarianceKind.Out);
             }
 
             // Parse the type parameter name
@@ -5210,16 +5331,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 Markers.Empty,
                 param.Identifier.Text,
                 null
-            );
-
-            var typeParam = new TypeParameter(
-                Guid.NewGuid(),
-                Space.Empty,
-                Markers.Empty,
-                [],
-                modifiers,
-                name,
-                null // Bounds are handled separately via ConstraintClauses
             );
 
             // After space is before the comma or closing >
@@ -5235,56 +5346,55 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 afterSpace = ExtractSpaceBefore(typeParamList.GreaterThanToken);
             }
 
+            // Create a ConstrainedTypeParameter without constraint data for now
+            // (constraints will be merged after parsing the constraint clauses)
+            var ctp = new ConstrainedTypeParameter(
+                Guid.NewGuid(),
+                Space.Empty,
+                Markers.Empty,
+                attrLists,
+                variance,
+                name,
+                null, // WhereConstraint (populated below if constraint clause exists)
+                null, // Constraints (populated below if constraint clause exists)
+                null  // Type
+            );
+
+            // Wrap in J.TypeParameter with the ConstrainedTypeParameter in Bounds[0]
+            var bounds = new JContainer<TypeTree>(
+                Space.Empty,
+                [new JRightPadded<TypeTree>(ctp, Space.Empty, Markers.Empty)],
+                Markers.Empty
+            );
+
+            var typeParam = new TypeParameter(
+                Guid.NewGuid(),
+                Space.Empty,
+                Markers.Empty,
+                [],    // Annotations
+                [],    // Modifiers
+                name,  // Name
+                bounds
+            );
+
             typeParams.Add(new JRightPadded<TypeParameter>(typeParam, afterSpace, Markers.Empty));
         }
 
         _cursor = typeParamList.GreaterThanToken.Span.End;
 
-        return new JContainer<TypeParameter>(containerPrefix, typeParams, Markers.Empty);
-    }
-
-    /// <summary>
-    /// Parses C# type parameter constraint clauses and adds them to the corresponding TypeParameters.
-    /// For example: `where T : class, IDisposable where U : new()`
-    /// Each constraint becomes a Cs.TypeParameterBound in TypeParameter.Bounds.
-    /// </summary>
-    private JContainer<TypeParameter> ParseConstraintClauses(
-        SyntaxList<TypeParameterConstraintClauseSyntax> constraintClauses,
-        JContainer<TypeParameter> typeParameters)
-    {
-        // Build a dictionary of type parameter name -> index for quick lookup
-        var paramIndices = new Dictionary<string, int>();
-        for (var i = 0; i < typeParameters.Elements.Count; i++)
-        {
-            var tp = typeParameters.Elements[i].Element;
-            if (tp.Name is Identifier id)
-            {
-                paramIndices[id.SimpleName] = i;
-            }
-        }
-
-        // Make a mutable copy of the elements
-        var elements = typeParameters.Elements.ToList();
-
+        // Now parse constraint clauses and merge them into the corresponding type parameters
         foreach (var clause in constraintClauses)
         {
-            var paramName = clause.Name.Identifier.Text;
-            if (!paramIndices.TryGetValue(paramName, out var index))
-            {
-                // Constraint for unknown type parameter - skip
-                continue;
-            }
-
             // Space before "where" keyword
             var wherePrefix = ExtractSpaceBefore(clause.WhereKeyword);
             _cursor = clause.WhereKeyword.Span.End;
 
-            // Parse the type parameter name in the constraint clause (e.g., T in "where T :")
-            var namePrefix = ExtractSpaceBefore(clause.Name.Identifier);
+            // Parse the constraint name identifier (e.g., T in "where T :")
+            var constraintNamePrefix = ExtractSpaceBefore(clause.Name.Identifier);
             _cursor = clause.Name.Identifier.Span.End;
-            var constraintName = new Identifier(
+            var whereIdentifier = new Identifier(
                 Guid.NewGuid(),
-                namePrefix,
+                constraintNamePrefix,
                 Markers.Empty,
                 clause.Name.Identifier.Text,
                 null
@@ -5294,107 +5404,107 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var beforeColon = ExtractSpaceBefore(clause.ColonToken);
             _cursor = clause.ColonToken.Span.End;
 
-            // Parse constraints into TypeParameterBound elements
-            var bounds = new List<JRightPadded<TypeTree>>();
+            // The WhereConstraint is a JLeftPadded<Identifier> where:
+            // - Left padding = space before "where" keyword
+            // - Identifier = the type param name in the constraint, right-padded with space before ":"
+            var whereConstraint = new JLeftPadded<Identifier>(wherePrefix, whereIdentifier);
+
+            // Parse individual constraints
+            var constraints = new List<JRightPadded<Expression>>();
             for (var i = 0; i < clause.Constraints.Count; i++)
             {
                 var constraint = clause.Constraints[i];
-                var constraintTree = ParseConstraint(constraint);
+                var constraintExpr = ParseConstraintExpression(constraint);
 
-                TypeParameterBound bound;
-                if (i == 0)
-                {
-                    // First bound carries the "where T :" info
-                    bound = new TypeParameterBound(
-                        Guid.NewGuid(),
-                        wherePrefix,
-                        Markers.Empty,
-                        constraintName,
-                        beforeColon,
-                        constraintTree
-                    );
-                }
-                else
-                {
-                    // Subsequent bounds: constraint has its own prefix (space after comma)
-                    bound = new TypeParameterBound(
-                        Guid.NewGuid(),
-                        Space.Empty,
-                        Markers.Empty,
-                        null,
-                        null,
-                        constraintTree
-                    );
-                }
-
-                Space afterSpace;
+                Space constraintAfterSpace;
                 if (i < clause.Constraints.Count - 1)
                 {
                     var separator = clause.Constraints.GetSeparator(i);
-                    afterSpace = ExtractSpaceBefore(separator);
+                    constraintAfterSpace = ExtractSpaceBefore(separator);
                     _cursor = separator.Span.End;
                 }
                 else
                 {
-                    afterSpace = Space.Empty;
+                    constraintAfterSpace = Space.Empty;
                 }
 
-                bounds.Add(new JRightPadded<TypeTree>(bound, afterSpace, Markers.Empty));
+                constraints.Add(new JRightPadded<Expression>(constraintExpr, constraintAfterSpace, Markers.Empty));
             }
 
-            var boundsContainer = new JContainer<TypeTree>(Space.Empty, bounds, Markers.Empty);
+            var constraintsContainer = new JContainer<Expression>(beforeColon, constraints, Markers.Empty);
 
-            // Update the type parameter with bounds
-            var oldParam = elements[index];
-            var newParam = oldParam.Element with { Bounds = boundsContainer };
-            elements[index] = new JRightPadded<TypeParameter>(newParam, oldParam.After, oldParam.Markers);
+            // Find the matching type parameter and update its ConstrainedTypeParameter
+            var paramName = clause.Name.Identifier.Text;
+            for (var pi = 0; pi < typeParams.Count; pi++)
+            {
+                var tp = typeParams[pi];
+                if (tp.Element.Bounds != null)
+                {
+                    var ctp = (ConstrainedTypeParameter)tp.Element.Bounds.Elements[0].Element;
+                    if (ctp.Name.SimpleName == paramName)
+                    {
+                        var updatedCtp = ctp with
+                        {
+                            WhereConstraint = whereConstraint,
+                            Constraints = constraintsContainer
+                        };
+                        var updatedBounds = new JContainer<TypeTree>(
+                            tp.Element.Bounds.Before,
+                            [new JRightPadded<TypeTree>(updatedCtp, Space.Empty, Markers.Empty)],
+                            tp.Element.Bounds.Markers
+                        );
+                        typeParams[pi] = tp.WithElement(tp.Element with { Bounds = updatedBounds });
+                        break;
+                    }
+                }
+            }
         }
 
-        return new JContainer<TypeParameter>(typeParameters.Before, elements, typeParameters.Markers);
+        return new JContainer<TypeParameter>(containerPrefix, typeParams, Markers.Empty);
     }
 
     /// <summary>
-    /// Parses a single type parameter constraint.
+    /// Parses a single type parameter constraint into an Expression.
+    /// Type constraints (e.g., IDisposable) are parsed as TypeTree (which extends Expression).
+    /// Other constraints (class, struct, new(), default) are parsed as their respective Cs types.
     /// </summary>
-    private TypeTree ParseConstraint(TypeParameterConstraintSyntax constraint)
+    private Expression ParseConstraintExpression(TypeParameterConstraintSyntax constraint)
     {
         switch (constraint)
         {
             case TypeConstraintSyntax typeConstraint:
-                return (TypeTree)Visit(typeConstraint.Type)!;
+            {
+                // TypeTree types (Identifier, ParameterizedType, etc.) implement Expression
+                return (Expression)Visit(typeConstraint.Type)!;
+            }
 
             case ClassOrStructConstraintSyntax classOrStruct:
             {
                 var prefix = ExtractSpaceBefore(classOrStruct.ClassOrStructKeyword);
                 _cursor = classOrStruct.ClassOrStructKeyword.Span.End;
-                // Handle 'class?', 'struct', 'notnull', 'unmanaged'
-                var keyword = classOrStruct.ClassOrStructKeyword.Text;
                 if (classOrStruct.QuestionToken != default)
                 {
-                    keyword += "?";
                     _cursor = classOrStruct.QuestionToken.Span.End;
                 }
-                return new Identifier(
+                var kind = classOrStruct.ClassOrStructKeyword.IsKind(SyntaxKind.ClassKeyword)
+                    ? ClassOrStructConstraint.TypeKind.Class
+                    : ClassOrStructConstraint.TypeKind.Struct;
+                return new ClassOrStructConstraint(
                     Guid.NewGuid(),
                     prefix,
                     Markers.Empty,
-                    keyword,
-                    null
+                    kind
                 );
             }
 
             case ConstructorConstraintSyntax newConstraint:
             {
-                // Use Identifier with "new()" as the name for round-trip preservation
-                // NewClass doesn't implement TypeTree, so we use this simpler approach
                 var prefix = ExtractSpaceBefore(newConstraint.NewKeyword);
                 _cursor = newConstraint.CloseParenToken.Span.End;
-                return new Identifier(
+                return new ConstructorConstraint(
                     Guid.NewGuid(),
                     prefix,
-                    Markers.Empty,
-                    "new()",
-                    null
+                    Markers.Empty
                 );
             }
 
@@ -5402,12 +5512,10 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             {
                 var prefix = ExtractSpaceBefore(defaultConstraint.DefaultKeyword);
                 _cursor = defaultConstraint.DefaultKeyword.Span.End;
-                return new Identifier(
+                return new DefaultConstraint(
                     Guid.NewGuid(),
                     prefix,
-                    Markers.Empty,
-                    "default",
-                    null
+                    Markers.Empty
                 );
             }
 
@@ -6666,6 +6774,320 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         }
 
         return new LineDirective(Guid.NewGuid(), prefix, Markers.Empty, LineKind.Numeric, line, file);
+    }
+
+    #endregion
+
+    #region LINQ
+
+    public override J VisitQueryExpression(QueryExpressionSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+
+        var fromClause = (FromClause)VisitFromClause(node.FromClause);
+        var body = (QueryBody)VisitQueryBody(node.Body);
+
+        return new QueryExpression(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            fromClause,
+            body
+        );
+    }
+
+    public override J VisitQueryBody(QueryBodySyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+
+        var clauses = new List<QueryClause>();
+        foreach (var clause in node.Clauses)
+        {
+            var visited = Visit(clause);
+            if (visited is QueryClause qc)
+                clauses.Add(qc);
+        }
+
+        SelectOrGroupClause? selectOrGroup = null;
+        if (node.SelectOrGroup != null)
+        {
+            var visited = Visit(node.SelectOrGroup);
+            selectOrGroup = visited as SelectOrGroupClause;
+        }
+
+        QueryContinuation? continuation = null;
+        if (node.Continuation != null)
+        {
+            continuation = (QueryContinuation)VisitQueryContinuation(node.Continuation);
+        }
+
+        return new QueryBody(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            clauses,
+            selectOrGroup,
+            continuation
+        );
+    }
+
+    public override J VisitFromClause(FromClauseSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.FromKeyword.Span.End;
+
+        // Optional type
+        TypeTree? typeIdentifier = null;
+        if (node.Type != null)
+        {
+            typeIdentifier = (TypeTree)Visit(node.Type);
+        }
+
+        // Identifier with right padding (space before "in")
+        var identPrefix = ExtractSpaceBefore(node.Identifier);
+        _cursor = node.Identifier.Span.End;
+        var ident = new Identifier(
+            Guid.NewGuid(), identPrefix, Markers.Empty,
+            node.Identifier.Text, null
+        );
+        var afterIdent = ExtractSpaceBefore(node.InKeyword);
+        _cursor = node.InKeyword.Span.End;
+
+        // Expression
+        var expression = (Expression)Visit(node.Expression);
+
+        return new FromClause(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            typeIdentifier,
+            new JRightPadded<Identifier>(ident, afterIdent, Markers.Empty),
+            expression
+        );
+    }
+
+    public override J VisitLetClause(LetClauseSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.LetKeyword.Span.End;
+
+        // Identifier with right padding (space before "=")
+        var identPrefix = ExtractSpaceBefore(node.Identifier);
+        _cursor = node.Identifier.Span.End;
+        var ident = new Identifier(
+            Guid.NewGuid(), identPrefix, Markers.Empty,
+            node.Identifier.Text, null
+        );
+        var afterIdent = ExtractSpaceBefore(node.EqualsToken);
+        _cursor = node.EqualsToken.Span.End;
+
+        var expression = (Expression)Visit(node.Expression);
+
+        return new LetClause(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            new JRightPadded<Identifier>(ident, afterIdent, Markers.Empty),
+            expression
+        );
+    }
+
+    public override J VisitJoinClause(JoinClauseSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.JoinKeyword.Span.End;
+
+        // Identifier
+        var identPrefix = ExtractSpaceBefore(node.Identifier);
+        _cursor = node.Identifier.Span.End;
+        var ident = new Identifier(
+            Guid.NewGuid(), identPrefix, Markers.Empty,
+            node.Identifier.Text, null
+        );
+        var afterIdent = ExtractSpaceBefore(node.InKeyword);
+        _cursor = node.InKeyword.Span.End;
+
+        // In expression
+        var inExpr = (Expression)Visit(node.InExpression);
+        var afterInExpr = ExtractSpaceBefore(node.OnKeyword);
+        _cursor = node.OnKeyword.Span.End;
+
+        // Left expression (on)
+        var leftExpr = (Expression)Visit(node.LeftExpression);
+        var afterLeftExpr = ExtractSpaceBefore(node.EqualsKeyword);
+        _cursor = node.EqualsKeyword.Span.End;
+
+        // Right expression (equals)
+        var rightExpr = (Expression)Visit(node.RightExpression);
+
+        // Optional into
+        JLeftPadded<JoinIntoClause>? into = null;
+        if (node.Into != null)
+        {
+            var intoPrefix = ExtractPrefix(node.Into);
+            var joinInto = (JoinIntoClause)VisitJoinIntoClause(node.Into);
+            into = new JLeftPadded<JoinIntoClause>(intoPrefix, joinInto);
+        }
+
+        return new JoinClause(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            new JRightPadded<Identifier>(ident, afterIdent, Markers.Empty),
+            new JRightPadded<Expression>(inExpr, afterInExpr, Markers.Empty),
+            new JRightPadded<Expression>(leftExpr, afterLeftExpr, Markers.Empty),
+            rightExpr,
+            into
+        );
+    }
+
+    public override J VisitJoinIntoClause(JoinIntoClauseSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.IntoKeyword.Span.End;
+
+        var identPrefix = ExtractSpaceBefore(node.Identifier);
+        _cursor = node.Identifier.Span.End;
+        var ident = new Identifier(
+            Guid.NewGuid(), identPrefix, Markers.Empty,
+            node.Identifier.Text, null
+        );
+
+        return new JoinIntoClause(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            ident
+        );
+    }
+
+    public override J VisitWhereClause(WhereClauseSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.WhereKeyword.Span.End;
+
+        var condition = (Expression)Visit(node.Condition);
+
+        return new WhereClause(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            condition
+        );
+    }
+
+    public override J VisitOrderByClause(OrderByClauseSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.OrderByKeyword.Span.End;
+
+        var orderings = new List<JRightPadded<Ordering>>();
+        for (int i = 0; i < node.Orderings.Count; i++)
+        {
+            var orderingSyntax = node.Orderings[i];
+            var ordering = (Ordering)VisitOrdering(orderingSyntax);
+
+            Space after = Space.Empty;
+            if (i < node.Orderings.SeparatorCount)
+            {
+                var separator = node.Orderings.GetSeparator(i);
+                after = ExtractSpaceBefore(separator);
+                _cursor = separator.Span.End;
+            }
+
+            orderings.Add(new JRightPadded<Ordering>(ordering, after, Markers.Empty));
+        }
+
+        return new OrderByClause(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            orderings
+        );
+    }
+
+    public override J VisitOrdering(OrderingSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+
+        var expression = (Expression)Visit(node.Expression);
+
+        DirectionKind? direction = null;
+        Space afterExpr = Space.Empty;
+        if (node.AscendingOrDescendingKeyword != default)
+        {
+            afterExpr = ExtractSpaceBefore(node.AscendingOrDescendingKeyword);
+            _cursor = node.AscendingOrDescendingKeyword.Span.End;
+            direction = node.AscendingOrDescendingKeyword.Kind() == SyntaxKind.DescendingKeyword
+                ? DirectionKind.Descending
+                : DirectionKind.Ascending;
+        }
+
+        return new Ordering(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            new JRightPadded<Expression>(expression, afterExpr, Markers.Empty),
+            direction
+        );
+    }
+
+    public override J VisitSelectClause(SelectClauseSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.SelectKeyword.Span.End;
+
+        var expression = (Expression)Visit(node.Expression);
+
+        return new SelectClause(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            expression
+        );
+    }
+
+    public override J VisitGroupClause(GroupClauseSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.GroupKeyword.Span.End;
+
+        var groupExpr = (Expression)Visit(node.GroupExpression);
+        var afterGroupExpr = ExtractSpaceBefore(node.ByKeyword);
+        _cursor = node.ByKeyword.Span.End;
+
+        var key = (Expression)Visit(node.ByExpression);
+
+        return new GroupClause(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            new JRightPadded<Expression>(groupExpr, afterGroupExpr, Markers.Empty),
+            key
+        );
+    }
+
+    public override J VisitQueryContinuation(QueryContinuationSyntax node)
+    {
+        var prefix = ExtractPrefix(node);
+        _cursor = node.IntoKeyword.Span.End;
+
+        var identPrefix = ExtractSpaceBefore(node.Identifier);
+        _cursor = node.Identifier.Span.End;
+        var ident = new Identifier(
+            Guid.NewGuid(), identPrefix, Markers.Empty,
+            node.Identifier.Text, null
+        );
+
+        var body = (QueryBody)VisitQueryBody(node.Body);
+
+        return new QueryContinuation(
+            Guid.NewGuid(),
+            prefix,
+            Markers.Empty,
+            ident,
+            body
+        );
     }
 
     #endregion

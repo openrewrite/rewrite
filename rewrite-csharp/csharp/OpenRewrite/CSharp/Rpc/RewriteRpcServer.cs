@@ -60,8 +60,11 @@ public class RewriteRpcServer
             "org.openrewrite.csharp.tree.Cs$BlockScopeNamespaceDeclaration");
         RpcSendQueue.RegisterJavaTypeName(typeof(CsLambda),
             "org.openrewrite.csharp.tree.Cs$Lambda");
-        RpcSendQueue.RegisterJavaTypeName(typeof(YieldStatement),
-            "org.openrewrite.csharp.tree.Cs$Yield");
+        // Cs-prefixed types in C# that correspond to unprefixed Java names
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsMethodDeclaration),
+            "org.openrewrite.csharp.tree.Cs$MethodDeclaration");
+        RpcSendQueue.RegisterJavaTypeName(typeof(ConstrainedTypeParameter),
+            "org.openrewrite.csharp.tree.Cs$ConstrainedTypeParameter");
 
         // Types in nagoya's Rewrite.Java namespace that don't follow nesting conventions
         RpcSendQueue.RegisterJavaTypeName(typeof(Java.NamedVariable),
@@ -86,6 +89,32 @@ public class RewriteRpcServer
             "org.openrewrite.csharp.marker.ExpressionBodied");
         RpcSendQueue.RegisterJavaTypeName(typeof(OmitParentheses),
             "org.openrewrite.java.marker.OmitParentheses");
+
+        // LINQ types live in Linq$ not Cs$ on the Java side
+        RpcSendQueue.RegisterJavaTypeName(typeof(QueryExpression),
+            "org.openrewrite.csharp.tree.Linq$QueryExpression");
+        RpcSendQueue.RegisterJavaTypeName(typeof(QueryBody),
+            "org.openrewrite.csharp.tree.Linq$QueryBody");
+        RpcSendQueue.RegisterJavaTypeName(typeof(FromClause),
+            "org.openrewrite.csharp.tree.Linq$FromClause");
+        RpcSendQueue.RegisterJavaTypeName(typeof(LetClause),
+            "org.openrewrite.csharp.tree.Linq$LetClause");
+        RpcSendQueue.RegisterJavaTypeName(typeof(JoinClause),
+            "org.openrewrite.csharp.tree.Linq$JoinClause");
+        RpcSendQueue.RegisterJavaTypeName(typeof(JoinIntoClause),
+            "org.openrewrite.csharp.tree.Linq$JoinIntoClause");
+        RpcSendQueue.RegisterJavaTypeName(typeof(WhereClause),
+            "org.openrewrite.csharp.tree.Linq$WhereClause");
+        RpcSendQueue.RegisterJavaTypeName(typeof(OrderByClause),
+            "org.openrewrite.csharp.tree.Linq$OrderByClause");
+        RpcSendQueue.RegisterJavaTypeName(typeof(Ordering),
+            "org.openrewrite.csharp.tree.Linq$Ordering");
+        RpcSendQueue.RegisterJavaTypeName(typeof(SelectClause),
+            "org.openrewrite.csharp.tree.Linq$SelectClause");
+        RpcSendQueue.RegisterJavaTypeName(typeof(GroupClause),
+            "org.openrewrite.csharp.tree.Linq$GroupClause");
+        RpcSendQueue.RegisterJavaTypeName(typeof(QueryContinuation),
+            "org.openrewrite.csharp.tree.Linq$QueryContinuation");
     }
 
     [JsonRpcMethod("Parse", UseSingleObjectParameterDeserialization = true)]
