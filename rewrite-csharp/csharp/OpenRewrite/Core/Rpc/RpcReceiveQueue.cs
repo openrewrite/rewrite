@@ -329,8 +329,11 @@ public class RpcReceiveQueue
                 typeof(Rewrite.CSharp.NamespaceDeclaration),
             "org.openrewrite.csharp.tree.Cs$Lambda" =>
                 typeof(Rewrite.CSharp.CsLambda),
-            "org.openrewrite.csharp.tree.Cs$Yield" =>
-                typeof(Rewrite.CSharp.YieldStatement),
+            // Cs-prefixed types that correspond to unprefixed Java names
+            "org.openrewrite.csharp.tree.Cs$MethodDeclaration" =>
+                typeof(Rewrite.CSharp.CsMethodDeclaration),
+            "org.openrewrite.csharp.tree.Cs$ConstrainedTypeParameter" =>
+                typeof(Rewrite.CSharp.ConstrainedTypeParameter),
             "org.openrewrite.csharp.tree.Cs$ExpressionStatement" =>
                 typeof(Rewrite.Java.ExpressionStatement),
             "org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable" =>
@@ -377,6 +380,13 @@ public class RpcReceiveQueue
         {
             var name = javaTypeName["org.openrewrite.java.tree.".Length..];
             return FindType("Rewrite.Java", name);
+        }
+
+        // Pattern: org.openrewrite.csharp.tree.Linq$ClassName → Rewrite.CSharp.ClassName
+        if (javaTypeName.StartsWith("org.openrewrite.csharp.tree.Linq$"))
+        {
+            var name = javaTypeName["org.openrewrite.csharp.tree.Linq$".Length..];
+            return FindType("Rewrite.CSharp", name);
         }
 
         // Pattern: org.openrewrite.csharp.tree.Cs$ClassName → Rewrite.CSharp.ClassName
