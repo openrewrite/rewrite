@@ -345,7 +345,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(na, p);
 
-        p.Append("new");
+        // Don't print "new" when inside a stackalloc expression
+        if (Cursor.GetParentTreeCursor().Value is not StackAllocExpression)
+        {
+            p.Append("new");
+        }
 
         // Print type expression if present
         if (na.TypeExpression != null)
@@ -455,24 +459,69 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         return de;
     }
 
-    public override J VisitTypeParameterBound(TypeParameterBound tpb, PrintOutputCapture<P> p)
+    public override J VisitConstrainedTypeParameter(ConstrainedTypeParameter ctp, PrintOutputCapture<P> p)
     {
-        BeforeSyntax(tpb, p);
-
-        if (tpb.Name != null)
+        BeforeSyntax(ctp, p);
+        PrintConstrainedTypeParameterDecl(ctp, p);
+        if (ctp.WhereConstraint != null)
         {
-            // First bound: print "where T :"
-            p.Append("where");
-            Visit(tpb.Name, p);
-            VisitSpace(tpb.BeforeColon!, p);
-            p.Append(':');
+            PrintConstrainedTypeParameterConstraints(ctp, p);
+        }
+        AfterSyntax(ctp, p);
+        return ctp;
+    }
+
+    /// <summary>
+    /// Prints the declaration part of a ConstrainedTypeParameter: attributes, variance, name.
+    /// Used in the type parameter list between &lt; and &gt;.
+    /// </summary>
+    private void PrintConstrainedTypeParameterDecl(ConstrainedTypeParameter ctp, PrintOutputCapture<P> p)
+    {
+        // Print attributes
+        foreach (var attr in ctp.AttributeLists)
+        {
+            Visit(attr, p);
         }
 
-        // Print the constraint type
-        Visit(tpb.Bound, p);
+        // Print variance (in/out)
+        if (ctp.Variance != null)
+        {
+            VisitSpace(ctp.Variance.Before, p);
+            p.Append(ctp.Variance.Element == ConstrainedTypeParameter.VarianceKind.In ? "in" : "out");
+        }
 
-        AfterSyntax(tpb, p);
-        return tpb;
+        // Print name
+        Visit(ctp.Name, p);
+    }
+
+    /// <summary>
+    /// Prints the constraint part of a ConstrainedTypeParameter: where T : constraint1, constraint2
+    /// Used after the base type list.
+    /// </summary>
+    private void PrintConstrainedTypeParameterConstraints(ConstrainedTypeParameter ctp, PrintOutputCapture<P> p)
+    {
+        if (ctp.WhereConstraint == null) return;
+
+        VisitSpace(ctp.WhereConstraint.Before, p);
+        p.Append("where");
+        Visit(ctp.WhereConstraint.Element, p);
+
+        // Print constraints: the container's Before holds the space before ":"
+        if (ctp.Constraints != null)
+        {
+            VisitSpace(ctp.Constraints.Before, p);
+            p.Append(':');
+            for (var i = 0; i < ctp.Constraints.Elements.Count; i++)
+            {
+                var constraint = ctp.Constraints.Elements[i];
+                Visit(constraint.Element, p);
+                if (i < ctp.Constraints.Elements.Count - 1)
+                {
+                    VisitSpace(constraint.After, p);
+                    p.Append(',');
+                }
+            }
+        }
     }
 
     public override J VisitIsPattern(IsPattern ip, PrintOutputCapture<P> p)
@@ -812,6 +861,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
         foreach (var stmt in block.Statements)
         {
+            // Skip primary constructor MethodDeclaration — already printed by VisitClassDeclaration
+            if (stmt.Element is MethodDeclaration md && md.Markers.FindFirst<PrimaryConstructor>() != null)
+                continue;
             Visit(stmt.Element, p);
         }
 
@@ -862,7 +914,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         VisitSpace(classDecl.Name.Prefix, p);
         p.Append(classDecl.Name.SimpleName);
 
-        // Print type parameters (generics)
+        // Print type parameters (generics) — only print <attrs variance name, ...>
         if (classDecl.TypeParameters != null)
         {
             VisitSpace(classDecl.TypeParameters.Before, p);
@@ -870,7 +922,16 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             for (var i = 0; i < classDecl.TypeParameters.Elements.Count; i++)
             {
                 var typeParam = classDecl.TypeParameters.Elements[i];
-                Visit(typeParam.Element.Name, p);
+                // The ConstrainedTypeParameter is in Bounds[0]
+                if (typeParam.Element.Bounds?.Elements.Count > 0 &&
+                    typeParam.Element.Bounds.Elements[0].Element is ConstrainedTypeParameter ctp)
+                {
+                    PrintConstrainedTypeParameterDecl(ctp, p);
+                }
+                else
+                {
+                    Visit(typeParam.Element.Name, p);
+                }
                 if (i < classDecl.TypeParameters.Elements.Count - 1)
                 {
                     VisitSpace(typeParam.After, p);
@@ -885,43 +946,39 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         }
 
         // Print primary constructor (C# 12) if present
-        // Find the synthesized MethodDeclaration marked with PrimaryConstructor
-        if (classDecl.Markers.FindFirst<PrimaryConstructor>() != null)
+        // Find the synthesized MethodDeclaration marked with PrimaryConstructor in the body
+        foreach (var stmt in classDecl.Body.Statements)
         {
-            foreach (var stmt in classDecl.Body.Statements)
+            if (stmt.Element is MethodDeclaration method &&
+                method.Markers.FindFirst<PrimaryConstructor>() != null)
             {
-                if (stmt.Element is MethodDeclaration method &&
-                    method.Markers.FindFirst<PrimaryConstructor>() != null)
+                // Print the parameters
+                var paramsContainer = method.Parameters;
+                VisitSpace(paramsContainer.Before, p);
+                p.Append('(');
+                for (var i = 0; i < paramsContainer.Elements.Count; i++)
                 {
-                    // Print the parameters
-                    var paramsContainer = method.Parameters;
-                    VisitSpace(paramsContainer.Before, p);
-                    p.Append('(');
-                    for (var i = 0; i < paramsContainer.Elements.Count; i++)
+                    var param = paramsContainer.Elements[i];
+                    if (param.Element is VariableDeclarations vd)
                     {
-                        var param = paramsContainer.Elements[i];
-                        // Use VisitVariableDeclarationsWithoutSemicolon for parameters
-                        if (param.Element is VariableDeclarations vd)
-                        {
-                            VisitVariableDeclarationsWithoutSemicolon(vd, p);
-                        }
-                        else
-                        {
-                            Visit(param.Element, p);
-                        }
-                        if (i < paramsContainer.Elements.Count - 1)
-                        {
-                            VisitSpace(param.After, p);
-                            p.Append(',');
-                        }
-                        else
-                        {
-                            VisitSpace(param.After, p);
-                        }
+                        VisitVariableDeclarationsWithoutSemicolon(vd, p);
                     }
-                    p.Append(')');
-                    break;
+                    else
+                    {
+                        Visit(param.Element, p);
+                    }
+                    if (i < paramsContainer.Elements.Count - 1)
+                    {
+                        VisitSpace(param.After, p);
+                        p.Append(',');
+                    }
+                    else
+                    {
+                        VisitSpace(param.After, p);
+                    }
                 }
+                p.Append(')');
+                break;
             }
         }
 
@@ -936,7 +993,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
         if (classDecl.Implements != null)
         {
-            // Container.Before = space before first comma
             VisitSpace(classDecl.Implements.Before, p);
 
             for (var i = 0; i < classDecl.Implements.Elements.Count; i++)
@@ -948,23 +1004,16 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             }
         }
 
-        // Print type parameter constraints (C# uses 'where T : class' syntax)
+        // Print type parameter constraints (where clauses)
         if (classDecl.TypeParameters != null)
         {
             foreach (var typeParam in classDecl.TypeParameters.Elements)
             {
-                if (typeParam.Element.Bounds != null)
+                if (typeParam.Element.Bounds?.Elements.Count > 0 &&
+                    typeParam.Element.Bounds.Elements[0].Element is ConstrainedTypeParameter ctp2 &&
+                    ctp2.WhereConstraint != null)
                 {
-                    for (var i = 0; i < typeParam.Element.Bounds.Elements.Count; i++)
-                    {
-                        var bound = typeParam.Element.Bounds.Elements[i];
-                        Visit(bound.Element, p);
-                        if (i < typeParam.Element.Bounds.Elements.Count - 1)
-                        {
-                            VisitSpace(bound.After, p);
-                            p.Append(',');
-                        }
-                    }
+                    PrintConstrainedTypeParameterConstraints(ctp2, p);
                 }
             }
         }
@@ -972,7 +1021,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // Print body (check for semicolon-terminated record)
         if (classDecl.Body.Markers.FindFirst<Semicolon>() != null)
         {
-            // Positional record with semicolon: record Person(string Name);
             VisitSpace(classDecl.Body.Prefix, p);
             p.Append(';');
         }
@@ -998,6 +1046,10 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             _ => "class"
         };
     }
+
+    // CsClassDeclaration and CsTypeParameter have been replaced by J.ClassDeclaration
+    // with ConstrainedTypeParameter in J.TypeParameter.Bounds. Printing is handled by
+    // VisitClassDeclaration above and VisitConstrainedTypeParameter.
 
     public override J VisitEnumValueSet(EnumValueSet enumValueSet, PrintOutputCapture<P> p)
     {
@@ -1475,15 +1527,14 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         return ae;
     }
 
-    public override J VisitYieldStatement(YieldStatement yield, PrintOutputCapture<P> p)
+    public override J VisitYield(Yield yield, PrintOutputCapture<P> p)
     {
         BeforeSyntax(yield, p);
         p.Append("yield");
-        VisitSpace(yield.ReturnOrBreakKeyword.Before, p);
-        p.Append(yield.ReturnOrBreakKeyword.Element == YieldStatementKind.Return ? "return" : "break");
-        if (yield.Value != null)
+        Visit(yield.ReturnOrBreakKeyword, p);
+        if (yield.Expression != null)
         {
-            Visit(yield.Value, p);
+            Visit(yield.Expression, p);
         }
         p.Append(';');
         AfterSyntax(yield, p);
@@ -1687,25 +1738,25 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(se, p);
 
-        // Print selector expression (no parentheses for C#)
-        Visit(se.Selector.Tree.Element, p);
+        // Print selector expression
+        Visit(se.ExpressionPadded.Element, p);
 
         // Space before 'switch' keyword
-        VisitSpace(se.Selector.Tree.After, p);
+        VisitSpace(se.ExpressionPadded.After, p);
         p.Append("switch");
 
-        // Space before '{'
-        VisitSpace(se.Cases.Prefix, p);
+        // Print arms container
+        VisitSpace(se.Arms.Before, p);
         p.Append('{');
 
-        // Print each arm (Case elements - VisitCase checks context to skip "case" keyword)
-        for (int i = 0; i < se.Cases.Statements.Count; i++)
+        var armElements = se.Arms.Elements;
+        for (int i = 0; i < armElements.Count; i++)
         {
-            var armPadded = se.Cases.Statements[i];
+            var armPadded = armElements[i];
             Visit(armPadded.Element, p);
 
             // Print comma separator (except for last arm)
-            if (i < se.Cases.Statements.Count - 1)
+            if (i < armElements.Count - 1)
             {
                 VisitSpace(armPadded.After, p);
                 p.Append(',');
@@ -1713,11 +1764,234 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         }
 
         // Space before '}'
-        VisitSpace(se.Cases.End, p);
+        if (armElements.Count > 0)
+        {
+            VisitSpace(armElements[^1].After, p);
+        }
         p.Append('}');
 
         AfterSyntax(se, p);
         return se;
+    }
+
+    public override J VisitSwitchExpressionArm(SwitchExpressionArm arm, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(arm, p);
+
+        // Print pattern
+        Visit(arm.Pattern, p);
+
+        // Print when clause if present
+        if (arm.WhenExpression != null)
+        {
+            VisitSpace(arm.WhenExpression.Before, p);
+            p.Append("when");
+            Visit(arm.WhenExpression.Element, p);
+        }
+
+        // Print => expression
+        VisitSpace(arm.ExpressionPadded.Before, p);
+        p.Append("=>");
+        Visit(arm.ExpressionPadded.Element, p);
+
+        AfterSyntax(arm, p);
+        return arm;
+    }
+
+    public override J VisitConstantPattern(ConstantPattern cp, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(cp, p);
+        Visit(cp.Value, p);
+        AfterSyntax(cp, p);
+        return cp;
+    }
+
+    public override J VisitDiscardPattern(DiscardPattern dp, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(dp, p);
+        p.Append('_');
+        AfterSyntax(dp, p);
+        return dp;
+    }
+
+    public override J VisitEnumDeclaration(EnumDeclaration ed, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(ed, p);
+
+        // Print modifiers
+        foreach (var mod in ed.Modifiers)
+        {
+            VisitSpace(mod.Prefix, p);
+            p.Append(GetModifierString(mod));
+        }
+
+        // Print 'enum' keyword (stored as left padding of name)
+        VisitSpace(ed.NamePadded.Before, p);
+        p.Append("enum");
+
+        // Print name
+        Visit(ed.NamePadded.Element, p);
+
+        // Print base type if present
+        if (ed.BaseType != null)
+        {
+            VisitSpace(ed.BaseType.Before, p);
+            p.Append(':');
+            Visit(ed.BaseType.Element, p);
+        }
+
+        // Print members
+        if (ed.Members != null)
+        {
+            VisitSpace(ed.Members.Before, p);
+            p.Append('{');
+            var elements = ed.Members.Elements;
+            for (int i = 0; i < elements.Count; i++)
+            {
+                Visit(elements[i].Element, p);
+                if (i < elements.Count - 1)
+                {
+                    VisitSpace(elements[i].After, p);
+                    p.Append(',');
+                }
+            }
+            if (elements.Count > 0)
+            {
+                VisitSpace(elements[^1].After, p);
+            }
+            p.Append('}');
+        }
+
+        AfterSyntax(ed, p);
+        return ed;
+    }
+
+    public override J VisitEnumMemberDeclaration(EnumMemberDeclaration emd, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(emd, p);
+        Visit(emd.Name, p);
+        if (emd.Initializer != null)
+        {
+            VisitSpace(emd.Initializer.Before, p);
+            p.Append('=');
+            Visit(emd.Initializer.Element, p);
+        }
+        AfterSyntax(emd, p);
+        return emd;
+    }
+
+    public override J VisitCheckedExpression(CheckedExpression ce, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(ce, p);
+        Visit(ce.CheckedOrUncheckedKeyword, p);
+        VisitControlParentheses(ce.ExpressionValue, p);
+        AfterSyntax(ce, p);
+        return ce;
+    }
+
+    public override J VisitCheckedStatement(CheckedStatement cs2, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(cs2, p);
+        Visit(cs2.KeywordValue, p);
+        Visit(cs2.Block, p);
+        AfterSyntax(cs2, p);
+        return cs2;
+    }
+
+    public override J VisitKeyword(Keyword kw, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(kw, p);
+        p.Append(kw.Kind switch
+        {
+            KeywordKind.Ref => "ref",
+            KeywordKind.Out => "out",
+            KeywordKind.Await => "await",
+            KeywordKind.Base => "base",
+            KeywordKind.This => "this",
+            KeywordKind.Break => "break",
+            KeywordKind.Return => "return",
+            KeywordKind.Not => "not",
+            KeywordKind.Default => "default",
+            KeywordKind.Case => "case",
+            KeywordKind.Checked => "checked",
+            KeywordKind.Unchecked => "unchecked",
+            KeywordKind.Operator => "operator",
+            _ => throw new InvalidOperationException($"Unknown keyword kind: {kw.Kind}")
+        });
+        AfterSyntax(kw, p);
+        return kw;
+    }
+
+    public override J VisitRangeExpression(RangeExpression re, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(re, p);
+        if (re.Start != null)
+        {
+            Visit(re.Start.Element, p);
+            VisitSpace(re.Start.After, p);
+        }
+        p.Append("..");
+        if (re.End != null)
+        {
+            Visit(re.End, p);
+        }
+        AfterSyntax(re, p);
+        return re;
+    }
+
+    public override J VisitStackAllocExpression(StackAllocExpression sae, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(sae, p);
+        p.Append("stackalloc");
+        Visit(sae.Expression, p);
+        AfterSyntax(sae, p);
+        return sae;
+    }
+
+    public override J VisitCollectionExpression(CollectionExpression ce, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(ce, p);
+        p.Append('[');
+        for (int i = 0; i < ce.Elements.Count; i++)
+        {
+            var rp = ce.Elements[i];
+            Visit(rp.Element, p);
+            VisitSpace(rp.After, p);
+            if (i < ce.Elements.Count - 1)
+            {
+                p.Append(',');
+            }
+        }
+        p.Append(']');
+        AfterSyntax(ce, p);
+        return ce;
+    }
+
+    // TypeParameterConstraintClause and TypeConstraint are deleted —
+    // constraint printing now handled by PrintConstrainedTypeParameterConstraints
+
+    public override J VisitClassOrStructConstraint(ClassOrStructConstraint cosc, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(cosc, p);
+        p.Append(cosc.Kind == ClassOrStructConstraint.TypeKind.Class ? "class" : "struct");
+        AfterSyntax(cosc, p);
+        return cosc;
+    }
+
+    public override J VisitConstructorConstraint(ConstructorConstraint cc, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(cc, p);
+        p.Append("new()");
+        AfterSyntax(cc, p);
+        return cc;
+    }
+
+    public override J VisitDefaultConstraint(DefaultConstraint dc, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(dc, p);
+        p.Append("default");
+        AfterSyntax(dc, p);
+        return dc;
     }
 
     public override J VisitLambda(Lambda lambda, PrintOutputCapture<P> p)
@@ -2424,6 +2698,148 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         p.Append(before);
         VisitRightPadded(container.Elements, suffixBetween, p);
         p.Append(after ?? "");
+    }
+
+    #endregion
+
+    #region LINQ
+
+    public override J VisitQueryExpression(QueryExpression qe, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(qe, p);
+        Visit(qe.FromClause, p);
+        Visit(qe.Body, p);
+        AfterSyntax(qe, p);
+        return qe;
+    }
+
+    public override J VisitQueryBody(QueryBody qb, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(qb, p);
+        foreach (var clause in qb.Clauses)
+        {
+            Visit(clause, p);
+        }
+        if (qb.SelectOrGroup != null)
+        {
+            Visit(qb.SelectOrGroup, p);
+        }
+        if (qb.Continuation != null)
+        {
+            Visit(qb.Continuation, p);
+        }
+        AfterSyntax(qb, p);
+        return qb;
+    }
+
+    public override J VisitFromClause(FromClause fc, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(fc, p);
+        p.Append("from");
+        if (fc.TypeIdentifier != null)
+        {
+            Visit(fc.TypeIdentifier, p);
+        }
+        VisitRightPadded(fc.IdentifierPadded, "in", p);
+        Visit(fc.Expression, p);
+        AfterSyntax(fc, p);
+        return fc;
+    }
+
+    public override J VisitLetClause(LetClause lc, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(lc, p);
+        p.Append("let");
+        VisitRightPadded(lc.IdentifierPadded, "=", p);
+        Visit(lc.Expression, p);
+        AfterSyntax(lc, p);
+        return lc;
+    }
+
+    public override J VisitJoinClause(JoinClause jc, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(jc, p);
+        p.Append("join");
+        VisitRightPadded(jc.IdentifierPadded, "in", p);
+        VisitRightPadded(jc.InExpression, "on", p);
+        VisitRightPadded(jc.LeftExpression, "equals", p);
+        Visit(jc.RightExpression, p);
+        if (jc.Into != null)
+        {
+            VisitSpace(jc.Into.Before, p);
+            Visit(jc.Into.Element, p);
+        }
+        AfterSyntax(jc, p);
+        return jc;
+    }
+
+    public override J VisitJoinIntoClause(JoinIntoClause jic, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(jic, p);
+        p.Append("into");
+        Visit(jic.Identifier, p);
+        AfterSyntax(jic, p);
+        return jic;
+    }
+
+    public override J VisitWhereClause(WhereClause wc, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(wc, p);
+        p.Append("where");
+        Visit(wc.Condition, p);
+        AfterSyntax(wc, p);
+        return wc;
+    }
+
+    public override J VisitOrderByClause(OrderByClause obc, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(obc, p);
+        p.Append("orderby");
+        VisitRightPadded(obc.Orderings, ",", p);
+        AfterSyntax(obc, p);
+        return obc;
+    }
+
+    public override J VisitOrdering(Ordering ord, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(ord, p);
+        Visit(ord.Expression, p);
+        if (ord.Direction != null)
+        {
+            VisitSpace(ord.ExpressionPadded.After, p);
+            p.Append(ord.Direction == DirectionKind.Ascending ? "ascending" : "descending");
+        }
+        AfterSyntax(ord, p);
+        return ord;
+    }
+
+    public override J VisitSelectClause(SelectClause sc, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(sc, p);
+        p.Append("select");
+        Visit(sc.Expression, p);
+        AfterSyntax(sc, p);
+        return sc;
+    }
+
+    public override J VisitGroupClause(GroupClause gc, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(gc, p);
+        p.Append("group");
+        VisitRightPadded(gc.GroupExpression, "by", p);
+        Visit(gc.Key, p);
+        AfterSyntax(gc, p);
+        return gc;
+    }
+
+    public override J VisitQueryContinuation(QueryContinuation qcont, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(qcont, p);
+        p.Append("into");
+        Visit(qcont.Identifier, p);
+        Visit(qcont.Body, p);
+        AfterSyntax(qcont, p);
+        return qcont;
     }
 
     #endregion
