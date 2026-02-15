@@ -35,11 +35,11 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             InitializerExpression ie => VisitInitializerExpression(ie, p),
             RelationalPattern rp => VisitRelationalPattern(rp, p),
             PropertyPattern pp => VisitPropertyPattern(pp, p),
-            TypeParameterBound tpb => VisitTypeParameterBound(tpb, p),
+            ConstrainedTypeParameter ctp => VisitConstrainedTypeParameter(ctp, p),
             InterpolatedString istr => VisitInterpolatedString(istr, p),
             Interpolation interp => VisitInterpolation(interp, p),
             AwaitExpression ae => VisitAwaitExpression(ae, p),
-            YieldStatement ys => VisitYieldStatement(ys, p),
+            Yield ys => VisitYield(ys, p),
             NamespaceDeclaration ns => VisitNamespaceDeclaration(ns, p),
             TupleType tt => VisitTupleType(tt, p),
             TupleExpression te => VisitTupleExpression(te, p),
@@ -57,6 +57,83 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             WarningDirective wd => VisitWarningDirective(wd, p),
             LineDirective ld => VisitLineDirective(ld, p),
             NullSafeExpression nse => VisitNullSafeExpression(nse, p),
+            // New types
+            Keyword kw => VisitKeyword(kw, p),
+            CsArgument csa => VisitCsArgument(csa, p),
+            NameColon nc => VisitNameColon(nc, p),
+            AnnotatedStatement ans => VisitAnnotatedStatement(ans, p),
+            ArrayRankSpecifier ars => VisitArrayRankSpecifier(ars, p),
+            AssignmentOperation ao => VisitAssignmentOperation(ao, p),
+            StackAllocExpression sae => VisitStackAllocExpression(sae, p),
+            GotoStatement gs => VisitGotoStatement(gs, p),
+            EventDeclaration evd => VisitEventDeclaration(evd, p),
+            CsBinary csb => VisitCsBinary(csb, p),
+            CollectionExpression ce => VisitCollectionExpression(ce, p),
+            CsExpressionStatement ces => VisitCsExpressionStatement(ces, p),
+            ForEachVariableLoop fevl => VisitForEachVariableLoop(fevl, p),
+            ForEachVariableLoopControl fevlc => VisitForEachVariableLoopControl(fevlc, p),
+            CsMethodDeclaration cmd => VisitCsMethodDeclaration(cmd, p),
+            UsingStatement ust => VisitUsingStatement(ust, p),
+            AllowsConstraintClause acc => VisitAllowsConstraintClause(acc, p),
+            RefStructConstraint rsc => VisitRefStructConstraint(rsc, p),
+            ClassOrStructConstraint cosc => VisitClassOrStructConstraint(cosc, p),
+            ConstructorConstraint cc => VisitConstructorConstraint(cc, p),
+            DefaultConstraint dc => VisitDefaultConstraint(dc, p),
+            SingleVariableDesignation svd => VisitSingleVariableDesignation(svd, p),
+            ParenthesizedVariableDesignation pvd => VisitParenthesizedVariableDesignation(pvd, p),
+            DiscardVariableDesignation dvd => VisitDiscardVariableDesignation(dvd, p),
+            CsUnary csu => VisitCsUnary(csu, p),
+            TupleElement tel => VisitTupleElement(tel, p),
+            CsNewClass csnc => VisitCsNewClass(csnc, p),
+            ImplicitElementAccess iea => VisitImplicitElementAccess(iea, p),
+            UnaryPattern up => VisitUnaryPattern(up, p),
+            TypePattern tp => VisitTypePattern(tp, p),
+            BinaryPattern bp => VisitBinaryPattern(bp, p),
+            ConstantPattern cp => VisitConstantPattern(cp, p),
+            DiscardPattern dp => VisitDiscardPattern(dp, p),
+            ListPattern lp => VisitListPattern(lp, p),
+            ParenthesizedPattern pap => VisitParenthesizedPattern(pap, p),
+            RecursivePattern rcp => VisitRecursivePattern(rcp, p),
+            VarPattern vp => VisitVarPattern(vp, p),
+            PositionalPatternClause ppc => VisitPositionalPatternClause(ppc, p),
+            SlicePattern sp => VisitSlicePattern(sp, p),
+            PropertyPatternClause ppclause => VisitPropertyPatternClause(ppclause, p),
+            Subpattern sub => VisitSubpattern(sub, p),
+            SwitchExpression swe => VisitSwitchExpression(swe, p),
+            SwitchExpressionArm swea => VisitSwitchExpressionArm(swea, p),
+            SwitchSection ss => VisitSwitchSection(ss, p),
+            DefaultSwitchLabel dsl => VisitDefaultSwitchLabel(dsl, p),
+            CasePatternSwitchLabel cpsl => VisitCasePatternSwitchLabel(cpsl, p),
+            SwitchStatement sws => VisitSwitchStatement(sws, p),
+            LockStatement ls => VisitLockStatement(ls, p),
+            CheckedExpression che => VisitCheckedExpression(che, p),
+            CheckedStatement chs => VisitCheckedStatement(chs, p),
+            RangeExpression rang => VisitRangeExpression(rang, p),
+            IndexerDeclaration idxd => VisitIndexerDeclaration(idxd, p),
+            DelegateDeclaration deld => VisitDelegateDeclaration(deld, p),
+            ConversionOperatorDeclaration cod => VisitConversionOperatorDeclaration(cod, p),
+            OperatorDeclaration opd => VisitOperatorDeclaration(opd, p),
+            EnumDeclaration enumd => VisitEnumDeclaration(enumd, p),
+            EnumMemberDeclaration enummd => VisitEnumMemberDeclaration(enummd, p),
+            AliasQualifiedName aqn => VisitAliasQualifiedName(aqn, p),
+            CsArrayType csat => VisitCsArrayType(csat, p),
+            CsTryCatch cstc => VisitCsTryCatch(cstc, p),
+            CsTry cstry => VisitCsTry(cstry, p),
+            PointerFieldAccess pfa => VisitPointerFieldAccess(pfa, p),
+            RefType rt => VisitRefType(rt, p),
+            // LINQ
+            QueryExpression qe => VisitQueryExpression(qe, p),
+            QueryBody qb => VisitQueryBody(qb, p),
+            FromClause fc => VisitFromClause(fc, p),
+            LetClause lc => VisitLetClause(lc, p),
+            JoinClause jc => VisitJoinClause(jc, p),
+            JoinIntoClause jic => VisitJoinIntoClause(jic, p),
+            WhereClause wc => VisitWhereClause(wc, p),
+            OrderByClause obc => VisitOrderByClause(obc, p),
+            Ordering ord => VisitOrdering(ord, p),
+            SelectClause sc => VisitSelectClause(sc, p),
+            GroupClause gc => VisitGroupClause(gc, p),
+            QueryContinuation qcont => VisitQueryContinuation(qcont, p),
             _ => throw new InvalidOperationException($"Unknown Cs tree type: {tree.GetType().Name}")
         };
     }
@@ -317,31 +394,10 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         return pp;
     }
 
-    public virtual J VisitTypeParameterBound(TypeParameterBound tpb, P p)
+    public virtual J VisitConstrainedTypeParameter(ConstrainedTypeParameter ctp, P p)
     {
-        TypeTree? name = tpb.Name;
-        if (name != null)
-        {
-            var visitedName = Visit(name, p);
-            if (visitedName is TypeTree n && !ReferenceEquals(n, name))
-            {
-                name = n;
-            }
-        }
-
-        var bound = Visit(tpb.Bound, p);
-
-        if (!ReferenceEquals(name, tpb.Name) ||
-            (bound is TypeTree b && !ReferenceEquals(b, tpb.Bound)))
-        {
-            return tpb with
-            {
-                Name = name,
-                Bound = bound is TypeTree newBound ? newBound : tpb.Bound
-            };
-        }
-
-        return tpb;
+        Visit(ctp.Name, p);
+        return ctp;
     }
 
     public virtual J VisitInterpolatedString(InterpolatedString istr, P p)
@@ -421,16 +477,10 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         return ae;
     }
 
-    public virtual J VisitYieldStatement(YieldStatement yield, P p)
+    public virtual J VisitYield(Yield yield, P p)
     {
-        if (yield.Value != null)
-        {
-            var value = Visit(yield.Value, p);
-            if (value is Expression v && !ReferenceEquals(v, yield.Value))
-            {
-                return yield with { Value = v };
-            }
-        }
+        Visit(yield.ReturnOrBreakKeyword, p);
+        if (yield.Expression != null) Visit(yield.Expression, p);
         return yield;
     }
 
@@ -612,5 +662,446 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     public virtual J VisitLineDirective(LineDirective lineDirective, P p)
     {
         return lineDirective;
+    }
+
+    // ---- New types ----
+
+    public virtual J VisitKeyword(Keyword keyword, P p) => keyword;
+
+    public virtual J VisitCsArgument(CsArgument csArgument, P p)
+    {
+        Visit(csArgument.Expression, p);
+        return csArgument;
+    }
+
+    public virtual J VisitNameColon(NameColon nameColon, P p) => nameColon;
+
+    public virtual J VisitAnnotatedStatement(AnnotatedStatement annotatedStatement, P p)
+    {
+        Visit(annotatedStatement.Statement, p);
+        return annotatedStatement;
+    }
+
+    public virtual J VisitArrayRankSpecifier(ArrayRankSpecifier arrayRankSpecifier, P p) => arrayRankSpecifier;
+
+    public virtual J VisitAssignmentOperation(AssignmentOperation assignmentOperation, P p)
+    {
+        Visit(assignmentOperation.Variable, p);
+        Visit(assignmentOperation.AssignmentValue, p);
+        return assignmentOperation;
+    }
+
+    public virtual J VisitStackAllocExpression(StackAllocExpression stackAllocExpression, P p)
+    {
+        Visit(stackAllocExpression.Expression, p);
+        return stackAllocExpression;
+    }
+
+    public virtual J VisitGotoStatement(GotoStatement gotoStatement, P p)
+    {
+        if (gotoStatement.Target != null) Visit(gotoStatement.Target, p);
+        return gotoStatement;
+    }
+
+    public virtual J VisitEventDeclaration(EventDeclaration eventDeclaration, P p)
+    {
+        Visit(eventDeclaration.TypeExpression, p);
+        Visit(eventDeclaration.Name, p);
+        return eventDeclaration;
+    }
+
+    public virtual J VisitCsBinary(CsBinary csBinary, P p)
+    {
+        Visit(csBinary.Left, p);
+        Visit(csBinary.Right, p);
+        return csBinary;
+    }
+
+    public virtual J VisitCollectionExpression(CollectionExpression collectionExpression, P p) => collectionExpression;
+
+    public virtual J VisitCsExpressionStatement(CsExpressionStatement csExpressionStatement, P p)
+    {
+        Visit(csExpressionStatement.Expression, p);
+        return csExpressionStatement;
+    }
+
+    public virtual J VisitForEachVariableLoop(ForEachVariableLoop forEachVariableLoop, P p)
+    {
+        Visit(forEachVariableLoop.ControlElement, p);
+        Visit(forEachVariableLoop.Body.Element, p);
+        return forEachVariableLoop;
+    }
+
+    public virtual J VisitForEachVariableLoopControl(ForEachVariableLoopControl control, P p)
+    {
+        Visit(control.Variable.Element, p);
+        Visit(control.Iterable.Element, p);
+        return control;
+    }
+
+    public virtual J VisitCsMethodDeclaration(CsMethodDeclaration methodDeclaration, P p)
+    {
+        Visit(methodDeclaration.ReturnTypeExpression, p);
+        Visit(methodDeclaration.Name, p);
+        if (methodDeclaration.Body != null) Visit(methodDeclaration.Body, p);
+        return methodDeclaration;
+    }
+
+    public virtual J VisitUsingStatement(UsingStatement usingStatement, P p)
+    {
+        Visit(usingStatement.ExpressionPadded.Element, p);
+        Visit(usingStatement.Statement, p);
+        return usingStatement;
+    }
+
+    public virtual J VisitAllowsConstraintClause(AllowsConstraintClause clause, P p) => clause;
+    public virtual J VisitRefStructConstraint(RefStructConstraint constraint, P p) => constraint;
+    public virtual J VisitClassOrStructConstraint(ClassOrStructConstraint constraint, P p) => constraint;
+    public virtual J VisitConstructorConstraint(ConstructorConstraint constraint, P p) => constraint;
+    public virtual J VisitDefaultConstraint(DefaultConstraint constraint, P p) => constraint;
+
+    public virtual J VisitSingleVariableDesignation(SingleVariableDesignation designation, P p)
+    {
+        Visit(designation.Name, p);
+        return designation;
+    }
+
+    public virtual J VisitParenthesizedVariableDesignation(ParenthesizedVariableDesignation designation, P p) => designation;
+
+    public virtual J VisitDiscardVariableDesignation(DiscardVariableDesignation designation, P p)
+    {
+        Visit(designation.Discard, p);
+        return designation;
+    }
+
+    public virtual J VisitCsUnary(CsUnary csUnary, P p)
+    {
+        Visit(csUnary.Expression, p);
+        return csUnary;
+    }
+
+    public virtual J VisitTupleElement(TupleElement tupleElement, P p)
+    {
+        Visit(tupleElement.ElementType, p);
+        if (tupleElement.Name != null) Visit(tupleElement.Name, p);
+        return tupleElement;
+    }
+
+    public virtual J VisitCsNewClass(CsNewClass csNewClass, P p)
+    {
+        Visit(csNewClass.NewClassCore, p);
+        if (csNewClass.Initializer != null) Visit(csNewClass.Initializer, p);
+        return csNewClass;
+    }
+
+    public virtual J VisitImplicitElementAccess(ImplicitElementAccess implicitElementAccess, P p) => implicitElementAccess;
+
+    public virtual J VisitUnaryPattern(UnaryPattern unaryPattern, P p)
+    {
+        Visit(unaryPattern.Operator, p);
+        Visit(unaryPattern.PatternValue, p);
+        return unaryPattern;
+    }
+
+    public virtual J VisitTypePattern(TypePattern typePattern, P p)
+    {
+        Visit(typePattern.TypeIdentifier, p);
+        if (typePattern.Designation != null) Visit(typePattern.Designation, p);
+        return typePattern;
+    }
+
+    public virtual J VisitBinaryPattern(BinaryPattern binaryPattern, P p)
+    {
+        Visit(binaryPattern.Left, p);
+        Visit(binaryPattern.Right, p);
+        return binaryPattern;
+    }
+
+    public virtual J VisitConstantPattern(ConstantPattern constantPattern, P p)
+    {
+        Visit(constantPattern.Value, p);
+        return constantPattern;
+    }
+
+    public virtual J VisitDiscardPattern(DiscardPattern discardPattern, P p) => discardPattern;
+
+    public virtual J VisitListPattern(ListPattern listPattern, P p)
+    {
+        if (listPattern.Designation != null) Visit(listPattern.Designation, p);
+        return listPattern;
+    }
+
+    public virtual J VisitParenthesizedPattern(ParenthesizedPattern parenthesizedPattern, P p) => parenthesizedPattern;
+
+    public virtual J VisitRecursivePattern(RecursivePattern recursivePattern, P p)
+    {
+        if (recursivePattern.TypeQualifier != null) Visit(recursivePattern.TypeQualifier, p);
+        if (recursivePattern.PositionalPattern != null) Visit(recursivePattern.PositionalPattern, p);
+        if (recursivePattern.PropertyPatternValue != null) Visit(recursivePattern.PropertyPatternValue, p);
+        if (recursivePattern.Designation != null) Visit(recursivePattern.Designation, p);
+        return recursivePattern;
+    }
+
+    public virtual J VisitVarPattern(VarPattern varPattern, P p)
+    {
+        Visit(varPattern.Designation, p);
+        return varPattern;
+    }
+
+    public virtual J VisitPositionalPatternClause(PositionalPatternClause clause, P p) => clause;
+    public virtual J VisitSlicePattern(SlicePattern slicePattern, P p) => slicePattern;
+    public virtual J VisitPropertyPatternClause(PropertyPatternClause clause, P p) => clause;
+
+    public virtual J VisitSubpattern(Subpattern subpattern, P p)
+    {
+        if (subpattern.Name != null) Visit(subpattern.Name, p);
+        Visit(subpattern.PatternValue.Element, p);
+        return subpattern;
+    }
+
+    public virtual J VisitSwitchExpression(SwitchExpression switchExpression, P p)
+    {
+        Visit(switchExpression.ExpressionPadded.Element, p);
+        foreach (var arm in switchExpression.Arms.Elements)
+            Visit(arm.Element, p);
+        return switchExpression;
+    }
+
+    public virtual J VisitSwitchExpressionArm(SwitchExpressionArm arm, P p)
+    {
+        Visit(arm.Pattern, p);
+        Visit(arm.ExpressionPadded.Element, p);
+        return arm;
+    }
+
+    public virtual J VisitSwitchSection(SwitchSection switchSection, P p) => switchSection;
+    public virtual J VisitDefaultSwitchLabel(DefaultSwitchLabel label, P p) => label;
+
+    public virtual J VisitCasePatternSwitchLabel(CasePatternSwitchLabel label, P p)
+    {
+        Visit(label.Pattern, p);
+        return label;
+    }
+
+    public virtual J VisitSwitchStatement(SwitchStatement switchStatement, P p) => switchStatement;
+
+    public virtual J VisitLockStatement(LockStatement lockStatement, P p)
+    {
+        Visit(lockStatement.ExpressionValue, p);
+        Visit(lockStatement.StatementPadded.Element, p);
+        return lockStatement;
+    }
+
+    public virtual J VisitCheckedExpression(CheckedExpression checkedExpression, P p)
+    {
+        Visit(checkedExpression.CheckedOrUncheckedKeyword, p);
+        Visit(checkedExpression.ExpressionValue, p);
+        return checkedExpression;
+    }
+
+    public virtual J VisitCheckedStatement(CheckedStatement checkedStatement, P p)
+    {
+        Visit(checkedStatement.KeywordValue, p);
+        Visit(checkedStatement.Block, p);
+        return checkedStatement;
+    }
+
+    public virtual J VisitRangeExpression(RangeExpression rangeExpression, P p)
+    {
+        if (rangeExpression.Start != null) Visit(rangeExpression.Start.Element, p);
+        if (rangeExpression.End != null) Visit(rangeExpression.End, p);
+        return rangeExpression;
+    }
+
+    public virtual J VisitIndexerDeclaration(IndexerDeclaration indexerDeclaration, P p)
+    {
+        Visit(indexerDeclaration.TypeExpression, p);
+        Visit(indexerDeclaration.Indexer, p);
+        return indexerDeclaration;
+    }
+
+    public virtual J VisitDelegateDeclaration(DelegateDeclaration delegateDeclaration, P p)
+    {
+        Visit(delegateDeclaration.ReturnType.Element, p);
+        Visit(delegateDeclaration.IdentifierName, p);
+        return delegateDeclaration;
+    }
+
+    public virtual J VisitConversionOperatorDeclaration(ConversionOperatorDeclaration conversion, P p)
+    {
+        Visit(conversion.ReturnType.Element, p);
+        if (conversion.Body != null) Visit(conversion.Body, p);
+        return conversion;
+    }
+
+    public virtual J VisitOperatorDeclaration(OperatorDeclaration operatorDeclaration, P p)
+    {
+        Visit(operatorDeclaration.ReturnType, p);
+        Visit(operatorDeclaration.Body, p);
+        return operatorDeclaration;
+    }
+
+    public virtual J VisitEnumDeclaration(EnumDeclaration enumDeclaration, P p) => enumDeclaration;
+
+    public virtual J VisitEnumMemberDeclaration(EnumMemberDeclaration enumMember, P p)
+    {
+        Visit(enumMember.Name, p);
+        return enumMember;
+    }
+
+    public virtual J VisitAliasQualifiedName(AliasQualifiedName aliasQualifiedName, P p)
+    {
+        Visit(aliasQualifiedName.Name, p);
+        return aliasQualifiedName;
+    }
+
+    public virtual J VisitCsArrayType(CsArrayType csArrayType, P p)
+    {
+        if (csArrayType.TypeExpression != null) Visit(csArrayType.TypeExpression, p);
+        return csArrayType;
+    }
+
+    public virtual J VisitCsTryCatch(CsTryCatch csTryCatch, P p)
+    {
+        Visit(csTryCatch.Parameter, p);
+        Visit(csTryCatch.Body, p);
+        return csTryCatch;
+    }
+
+    public virtual J VisitCsTry(CsTry csTry, P p)
+    {
+        Visit(csTry.Body, p);
+        foreach (var c in csTry.Catches) Visit(c, p);
+        return csTry;
+    }
+
+    public virtual J VisitPointerFieldAccess(PointerFieldAccess pointerFieldAccess, P p)
+    {
+        Visit(pointerFieldAccess.Target, p);
+        Visit(pointerFieldAccess.NamePadded.Element, p);
+        return pointerFieldAccess;
+    }
+
+    public virtual J VisitRefType(RefType refType, P p)
+    {
+        Visit(refType.TypeIdentifier, p);
+        return refType;
+    }
+
+    // ---- LINQ ----
+
+    public virtual J VisitQueryExpression(QueryExpression queryExpression, P p)
+    {
+        var fromClause = (FromClause)VisitFromClause(queryExpression.FromClause, p);
+        var body = (QueryBody)VisitQueryBody(queryExpression.Body, p);
+        return queryExpression with { FromClause = fromClause, Body = body };
+    }
+
+    public virtual J VisitQueryBody(QueryBody queryBody, P p)
+    {
+        var clauses = new List<QueryClause>();
+        bool changed = false;
+        foreach (var clause in queryBody.Clauses)
+        {
+            var visited = (QueryClause)Visit(clause, p)!;
+            if (!ReferenceEquals(visited, clause)) changed = true;
+            clauses.Add(visited);
+        }
+        SelectOrGroupClause? selectOrGroup = queryBody.SelectOrGroup;
+        if (selectOrGroup != null)
+        {
+            var visited = (SelectOrGroupClause)Visit(selectOrGroup, p)!;
+            if (!ReferenceEquals(visited, selectOrGroup)) { changed = true; selectOrGroup = visited; }
+        }
+        QueryContinuation? continuation = queryBody.Continuation;
+        if (continuation != null)
+        {
+            var visited = (QueryContinuation)VisitQueryContinuation(continuation, p);
+            if (!ReferenceEquals(visited, continuation)) { changed = true; continuation = visited; }
+        }
+        return changed ? queryBody with { Clauses = clauses, SelectOrGroup = selectOrGroup, Continuation = continuation } : queryBody;
+    }
+
+    public virtual J VisitFromClause(FromClause fromClause, P p)
+    {
+        var expr = Visit(fromClause.Expression, p);
+        if (expr is Expression e && !ReferenceEquals(e, fromClause.Expression))
+            return fromClause with { Expression = e };
+        return fromClause;
+    }
+
+    public virtual J VisitLetClause(LetClause letClause, P p)
+    {
+        var expr = Visit(letClause.Expression, p);
+        if (expr is Expression e && !ReferenceEquals(e, letClause.Expression))
+            return letClause with { Expression = e };
+        return letClause;
+    }
+
+    public virtual J VisitJoinClause(JoinClause joinClause, P p)
+    {
+        Visit(joinClause.InExpression.Element, p);
+        Visit(joinClause.LeftExpression.Element, p);
+        Visit(joinClause.RightExpression, p);
+        return joinClause;
+    }
+
+    public virtual J VisitJoinIntoClause(JoinIntoClause joinIntoClause, P p)
+    {
+        Visit(joinIntoClause.Identifier, p);
+        return joinIntoClause;
+    }
+
+    public virtual J VisitWhereClause(WhereClause whereClause, P p)
+    {
+        var condition = Visit(whereClause.Condition, p);
+        if (condition is Expression e && !ReferenceEquals(e, whereClause.Condition))
+            return whereClause with { Condition = e };
+        return whereClause;
+    }
+
+    public virtual J VisitOrderByClause(OrderByClause orderByClause, P p)
+    {
+        var orderings = new List<JRightPadded<Ordering>>();
+        bool changed = false;
+        foreach (var rp in orderByClause.Orderings)
+        {
+            var visited = (Ordering)VisitOrdering(rp.Element, p);
+            if (!ReferenceEquals(visited, rp.Element)) changed = true;
+            orderings.Add(rp with { Element = visited });
+        }
+        return changed ? orderByClause with { Orderings = orderings } : orderByClause;
+    }
+
+    public virtual J VisitOrdering(Ordering ordering, P p)
+    {
+        var expr = Visit(ordering.Expression, p);
+        if (expr is Expression e && !ReferenceEquals(e, ordering.Expression))
+            return ordering with { ExpressionPadded = ordering.ExpressionPadded with { Element = e } };
+        return ordering;
+    }
+
+    public virtual J VisitSelectClause(SelectClause selectClause, P p)
+    {
+        var expr = Visit(selectClause.Expression, p);
+        if (expr is Expression e && !ReferenceEquals(e, selectClause.Expression))
+            return selectClause with { Expression = e };
+        return selectClause;
+    }
+
+    public virtual J VisitGroupClause(GroupClause groupClause, P p)
+    {
+        Visit(groupClause.GroupExpression.Element, p);
+        Visit(groupClause.Key, p);
+        return groupClause;
+    }
+
+    public virtual J VisitQueryContinuation(QueryContinuation queryContinuation, P p)
+    {
+        Visit(queryContinuation.Identifier, p);
+        var body = (QueryBody)VisitQueryBody(queryContinuation.Body, p);
+        if (!ReferenceEquals(body, queryContinuation.Body))
+            return queryContinuation with { Body = body };
+        return queryContinuation;
     }
 }

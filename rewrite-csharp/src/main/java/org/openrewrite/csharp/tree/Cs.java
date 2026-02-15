@@ -3216,214 +3216,7 @@ public interface Cs extends J {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ClassDeclaration implements Cs, Statement, TypedTree {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Getter
-        List<Cs.AttributeList> attributeList;
-
-        @With
-        @Getter
-        List<Modifier> modifiers;
-
-        J.ClassDeclaration.Kind kind;
-
-        public J.ClassDeclaration.Kind.Type getKind() {
-            return kind.getType();
-        }
-
-        public Cs.ClassDeclaration withKind(J.ClassDeclaration.Kind.Type type) {
-            J.ClassDeclaration.Kind k = getPadding().getKind();
-            if (k.getType() == type) {
-                return this;
-            }
-            return getPadding().withKind(k.withType(type));
-        }
-
-        @With
-        @Getter
-        Identifier name;
-
-        @Nullable
-        JContainer<Cs.TypeParameter> typeParameters;
-
-        public @Nullable List<Cs.TypeParameter> getTypeParameters() {
-            return typeParameters == null ? null : typeParameters.getElements();
-        }
-
-        public Cs.ClassDeclaration withTypeParameters(@Nullable List<Cs.TypeParameter> typeParameters) {
-            return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
-        }
-
-        @Nullable
-        JContainer<Statement> primaryConstructor;
-
-        public @Nullable List<Statement> getPrimaryConstructor() {
-            return primaryConstructor == null ? null : primaryConstructor.getElements();
-        }
-
-        public Cs.ClassDeclaration withPrimaryConstructor(@Nullable List<Statement> primaryConstructor) {
-            return getPadding().withPrimaryConstructor(JContainer.withElementsNullable(this.primaryConstructor, primaryConstructor));
-        }
-
-        @Nullable
-        JLeftPadded<TypeTree> extendings;
-
-        public @Nullable TypeTree getExtendings() {
-            return extendings == null ? null : extendings.getElement();
-        }
-
-        public Cs.ClassDeclaration withExtendings(@Nullable TypeTree extendings) {
-            return getPadding().withExtendings(JLeftPadded.withElement(this.extendings, extendings));
-        }
-
-        @Nullable
-        JContainer<TypeTree> implementings;
-
-        public @Nullable List<TypeTree> getImplementings() {
-            return implementings == null ? null : implementings.getElements();
-        }
-
-        public Cs.ClassDeclaration withImplementings(@Nullable List<TypeTree> implementings) {
-            return getPadding().withImplementings(JContainer.withElementsNullable(this.implementings, implementings));
-        }
-
-        @With
-        @Getter
-        @Nullable
-        Block body;
-
-        @Nullable
-        JContainer<TypeParameterConstraintClause> typeParameterConstraintClauses;
-
-        public @Nullable List<TypeParameterConstraintClause> getTypeParameterConstraintClauses() {
-            return typeParameterConstraintClauses == null ? null : typeParameterConstraintClauses.getElements();
-        }
-
-        public Cs.ClassDeclaration withTypeParameterConstraintClauses(@Nullable List<TypeParameterConstraintClause> typeParameterConstraintClauses) {
-            return getPadding().withTypeParameterConstraintClauses(JContainer.withElementsNullable(this.typeParameterConstraintClauses, typeParameterConstraintClauses));
-        }
-
-        @Getter
-        JavaType.@Nullable FullyQualified type;
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public Cs.ClassDeclaration withType(@Nullable JavaType type) {
-            if (type == this.type) {
-                return this;
-            }
-
-            if (type != null && !(type instanceof JavaType.FullyQualified)) {
-                throw new IllegalArgumentException("A class can only be type attributed with a fully qualified type name");
-            }
-
-            return new Cs.ClassDeclaration(id, prefix, markers, attributeList, modifiers, kind, name, typeParameters, primaryConstructor, extendings, implementings, body, typeParameterConstraintClauses, (JavaType.FullyQualified) type);
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitClassDeclaration(this, p);
-        }
-
-        @Override
-        @Transient
-        public  CoordinateBuilder.@Nullable ClassDeclaration getCoordinates() {
-            //todo: Setup coordinate builder - atm it's private
-//            return new CoordinateBuilder.ClassDeclaration(this);
-            return null;
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Cs.ClassDeclaration t;
-
-            public @Nullable JContainer<Statement> getPrimaryConstructor() {
-                return t.primaryConstructor;
-            }
-
-            public Cs.ClassDeclaration withPrimaryConstructor(@Nullable JContainer<Statement> primaryConstructor) {
-                return t.primaryConstructor == primaryConstructor ? t : new Cs.ClassDeclaration(t.id, t.prefix, t.markers, t.attributeList, t.modifiers, t.kind, t.name, t.typeParameters, primaryConstructor, t.extendings, t.implementings, t.body, t.typeParameterConstraintClauses, t.type);
-            }
-
-            public @Nullable JLeftPadded<TypeTree> getExtendings() {
-                return t.extendings;
-            }
-
-            public Cs.ClassDeclaration withExtendings(@Nullable JLeftPadded<TypeTree> extendings) {
-                return t.extendings == extendings ? t : new Cs.ClassDeclaration(t.id, t.prefix, t.markers, t.attributeList, t.modifiers, t.kind, t.name, t.typeParameters, t.primaryConstructor, extendings, t.implementings, t.body, t.typeParameterConstraintClauses, t.type);
-            }
-
-            public @Nullable JContainer<TypeTree> getImplementings() {
-                return t.implementings;
-            }
-
-            public Cs.ClassDeclaration withImplementings(@Nullable JContainer<TypeTree> implementings) {
-                return t.implementings == implementings ? t : new Cs.ClassDeclaration(t.id, t.prefix, t.markers, t.attributeList, t.modifiers, t.kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, implementings, t.body, t.typeParameterConstraintClauses, t.type);
-            }
-
-
-            public J.ClassDeclaration.Kind getKind() {
-                return t.kind;
-            }
-
-            public Cs.ClassDeclaration withKind(J.ClassDeclaration.Kind kind) {
-                return t.kind == kind ? t : new Cs.ClassDeclaration(t.id, t.prefix, t.markers, t.attributeList, t.modifiers, kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.body, t.typeParameterConstraintClauses, t.type);
-            }
-
-            public @Nullable JContainer<Cs.TypeParameter> getTypeParameters() {
-                return t.typeParameters;
-            }
-
-            public Cs.ClassDeclaration withTypeParameters(@Nullable JContainer<Cs.TypeParameter> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new Cs.ClassDeclaration(t.id, t.prefix, t.markers, t.attributeList, t.modifiers, t.kind, t.name, typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.body, t.typeParameterConstraintClauses, t.type);
-            }
-
-            public @Nullable JContainer<TypeParameterConstraintClause> getTypeParameterConstraintClauses() {
-                return t.typeParameterConstraintClauses;
-            }
-
-            public Cs.ClassDeclaration withTypeParameterConstraintClauses(@Nullable JContainer<TypeParameterConstraintClause> typeParameterConstraintClauses) {
-                return t.typeParameterConstraintClauses == typeParameterConstraintClauses ? t : new Cs.ClassDeclaration(t.id, t.prefix, t.markers, t.attributeList, t.modifiers, t.kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.body, typeParameterConstraintClauses, t.type);
-            }
-        }
-    }
-
+    // Cs.ClassDeclaration DELETED — use J.ClassDeclaration with ConstrainedTypeParameter in J.TypeParameter.Bounds
 
     //  CS specific method exists to allow for modelling for the following not possible in J version:
     // - implicit interface implementations
@@ -3460,7 +3253,7 @@ public interface Cs extends J {
         List<Modifier> modifiers;
 
         @Nullable
-        JContainer<Cs.TypeParameter> typeParameters;
+        JContainer<J.TypeParameter> typeParameters;
 
         @With
         @Getter
@@ -3508,17 +3301,7 @@ public interface Cs extends J {
             if (type == this.methodType) {
                 return this;
             }
-            return new Cs.MethodDeclaration(id, prefix, markers, attributes, modifiers, typeParameters, returnTypeExpression, explicitInterfaceSpecifier, name, parameters, body, type, typeParameterConstraintClauses);
-        }
-
-        JContainer<TypeParameterConstraintClause> typeParameterConstraintClauses;
-
-        public List<TypeParameterConstraintClause> getTypeParameterConstraintClauses() {
-            return typeParameterConstraintClauses.getElements();
-        }
-
-        public Cs.MethodDeclaration withTypeParameterConstraintClauses(List<TypeParameterConstraintClause> typeParameterConstraintClauses) {
-            return getPadding().withTypeParameterConstraintClauses(JContainer.withElementsNullable(this.typeParameterConstraintClauses, typeParameterConstraintClauses));
+            return new Cs.MethodDeclaration(id, prefix, markers, attributes, modifiers, typeParameters, returnTypeExpression, explicitInterfaceSpecifier, name, parameters, body, type);
         }
 
         @Override
@@ -3567,7 +3350,7 @@ public interface Cs extends J {
             }
 
             public Cs.MethodDeclaration withParameters(JContainer<Statement> parameters) {
-                return t.parameters == parameters ? t : new Cs.MethodDeclaration(t.id, t.prefix, t.markers, t.attributes, t.modifiers, t.typeParameters, t.returnTypeExpression, t.explicitInterfaceSpecifier, t.name, parameters, t.body, t.methodType, t.typeParameterConstraintClauses);
+                return t.parameters == parameters ? t : new Cs.MethodDeclaration(t.id, t.prefix, t.markers, t.attributes, t.modifiers, t.typeParameters, t.returnTypeExpression, t.explicitInterfaceSpecifier, t.name, parameters, t.body, t.methodType);
             }
 
             public @Nullable JRightPadded<TypeTree> getExplicitInterfaceSpecifier() {
@@ -3575,24 +3358,16 @@ public interface Cs extends J {
             }
 
             public Cs.MethodDeclaration withExplicitInterfaceSpecifier(JRightPadded<TypeTree> explicitInterfaceSpecifier) {
-                return t.explicitInterfaceSpecifier == explicitInterfaceSpecifier ? t : new Cs.MethodDeclaration(t.id, t.prefix, t.markers, t.attributes, t.modifiers, t.typeParameters, t.returnTypeExpression, explicitInterfaceSpecifier, t.name, t.parameters, t.body, t.methodType, t.typeParameterConstraintClauses);
+                return t.explicitInterfaceSpecifier == explicitInterfaceSpecifier ? t : new Cs.MethodDeclaration(t.id, t.prefix, t.markers, t.attributes, t.modifiers, t.typeParameters, t.returnTypeExpression, explicitInterfaceSpecifier, t.name, t.parameters, t.body, t.methodType);
             }
 
 
-            public @Nullable JContainer<Cs.TypeParameter> getTypeParameters() {
+            public @Nullable JContainer<J.TypeParameter> getTypeParameters() {
                 return t.typeParameters;
             }
 
-            public Cs.MethodDeclaration withTypeParameters(@Nullable JContainer<Cs.TypeParameter> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new Cs.MethodDeclaration(t.id, t.prefix, t.markers, t.attributes, t.modifiers, typeParameters, t.returnTypeExpression, t.explicitInterfaceSpecifier, t.name, t.parameters, t.body, t.methodType, t.typeParameterConstraintClauses);
-            }
-
-            public @Nullable JContainer<TypeParameterConstraintClause> getTypeParameterConstraintClauses() {
-                return t.typeParameterConstraintClauses;
-            }
-
-            public Cs.MethodDeclaration withTypeParameterConstraintClauses(@Nullable JContainer<TypeParameterConstraintClause> typeParameterConstraintClauses) {
-                return t.typeParameterConstraintClauses == typeParameterConstraintClauses ? t : new Cs.MethodDeclaration(t.id, t.prefix, t.markers, t.attributes, t.modifiers, t.typeParameters, t.returnTypeExpression, t.explicitInterfaceSpecifier, t.name, t.parameters, t.body, t.methodType, typeParameterConstraintClauses);
+            public Cs.MethodDeclaration withTypeParameters(@Nullable JContainer<J.TypeParameter> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new Cs.MethodDeclaration(t.id, t.prefix, t.markers, t.attributes, t.modifiers, typeParameters, t.returnTypeExpression, t.explicitInterfaceSpecifier, t.name, t.parameters, t.body, t.methodType);
             }
         }
 
@@ -3683,181 +3458,8 @@ public interface Cs extends J {
     }
     //endregion
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class TypeParameterConstraintClause implements Cs {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-
-        /**
-         * class A&lt;T&gt; where <b><i>T</i></b> : class
-         */
-        JRightPadded<Identifier> typeParameter;
-        /**
-         * class A&lt;T&gt; where T : <b><i>class, ISomething</i></b>
-         */
-        JContainer<TypeParameterConstraint> typeParameterConstraints;
-
-        public Identifier getTypeParameter() {
-            return typeParameter.getElement();
-        }
-
-        public TypeParameterConstraintClause withTypeParameter(Identifier typeParameter) {
-            return getPadding().withTypeParameter(JRightPadded.withElement(this.typeParameter, typeParameter));
-        }
-
-        public List<TypeParameterConstraint> getTypeParameterConstraints() {
-            return typeParameterConstraints.getElements();
-        }
-
-        public TypeParameterConstraintClause withTypeParameterConstraints(List<TypeParameterConstraint> typeParameterConstraints) {
-            return getPadding().withTypeParameterConstraints(JContainer.withElementsNullable(this.typeParameterConstraints, typeParameterConstraints));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitTypeParameterConstraintClause(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final TypeParameterConstraintClause t;
-
-            public @Nullable JRightPadded<Identifier> getTypeParameter() {
-                return t.typeParameter;
-            }
-
-            public TypeParameterConstraintClause withTypeParameter(@Nullable JRightPadded<Identifier> typeParameter) {
-                return t.typeParameter == typeParameter ? t : new TypeParameterConstraintClause(t.id, t.prefix, t.markers, typeParameter, t.typeParameterConstraints);
-            }
-
-            public @Nullable JContainer<TypeParameterConstraint> getTypeParameterConstraints() {
-                return t.typeParameterConstraints;
-            }
-
-            public TypeParameterConstraintClause withTypeParameterConstraints(@Nullable JContainer<TypeParameterConstraint> typeConstraints) {
-                return t.typeParameterConstraints == typeConstraints ? t : new TypeParameterConstraintClause(t.id, t.prefix, t.markers, t.typeParameter, typeConstraints);
-            }
-        }
-    }
-
-    interface TypeParameterConstraint extends J {
-    }
-
-    /**
-     * Represents a type constraint in a type parameter's constraint clause.
-     * Example: where T : SomeClass
-     * where T : IInterface
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class TypeConstraint implements Cs, TypeParameterConstraint, TypedTree {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Getter
-        TypeTree typeExpression;
-
-        @Override
-        public JavaType getType() {
-            return typeExpression.getType();
-        }
-
-        @Override
-        public TypeConstraint withType(@Nullable JavaType type) {
-            return getPadding().withType(this.typeExpression.withType(type));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitTypeConstraint(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.pd != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final TypeConstraint pd;
-
-            public TypeTree getType() {
-                return pd.typeExpression;
-            }
-
-            public TypeConstraint withType(TypeTree type) {
-                return pd.typeExpression == type ? pd : new TypeConstraint(pd.id,
-                        pd.prefix,
-                        pd.markers,
-                        type);
-            }
-        }
-    }
-
-    /* ------------------ */
-
-    interface AllowsConstraint extends J {
-    }
+    // TypeParameterConstraintClause, TypeParameterConstraint, TypeConstraint, AllowsConstraint DELETED
+    // — absorbed into ConstrainedTypeParameter
 
     /**
      * Represents an `allows` constraint in a where clause.
@@ -3867,7 +3469,7 @@ public interface Cs extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class AllowsConstraintClause implements Cs, TypeParameterConstraint {
+    final class AllowsConstraintClause implements Cs, Expression {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -3885,14 +3487,30 @@ public interface Cs extends J {
         @Getter
         Markers markers;
 
-        JContainer<AllowsConstraint> expressions;
+        JContainer<Expression> expressions;
 
-        public List<AllowsConstraint> getExpressions() {
+        public List<Expression> getExpressions() {
             return expressions.getElements();
         }
 
-        public AllowsConstraintClause withExpressions(List<AllowsConstraint> expressions) {
+        public AllowsConstraintClause withExpressions(List<Expression> expressions) {
             return getPadding().withExpressions(JContainer.withElements(this.expressions, expressions));
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return null;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public AllowsConstraintClause withType(@Nullable JavaType type) {
+            return this;
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         @Override
@@ -3919,11 +3537,11 @@ public interface Cs extends J {
         public static class Padding {
             private final AllowsConstraintClause t;
 
-            public JContainer<AllowsConstraint> getExpressions() {
+            public JContainer<Expression> getExpressions() {
                 return t.expressions;
             }
 
-            public AllowsConstraintClause withExpressions(JContainer<AllowsConstraint> expressions) {
+            public AllowsConstraintClause withExpressions(JContainer<Expression> expressions) {
                 return t.expressions == expressions ? t : new AllowsConstraintClause(t.id, t.prefix, t.markers, expressions);
             }
         }
@@ -3936,7 +3554,7 @@ public interface Cs extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    final class RefStructConstraint implements Cs, AllowsConstraint {
+    final class RefStructConstraint implements Cs, Expression {
         @With
         @Getter
         @EqualsAndHashCode.Include
@@ -3949,6 +3567,22 @@ public interface Cs extends J {
         @With
         @Getter
         Markers markers;
+
+        @Override
+        public @Nullable JavaType getType() {
+            return null;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public RefStructConstraint withType(@Nullable JavaType type) {
+            return this;
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
 
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
@@ -3964,7 +3598,7 @@ public interface Cs extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    final class ClassOrStructConstraint implements Cs, TypeParameterConstraint {
+    final class ClassOrStructConstraint implements Cs, Expression {
         @With
         @Getter
         @EqualsAndHashCode.Include
@@ -3988,6 +3622,22 @@ public interface Cs extends J {
         }
 
         @Override
+        public @Nullable JavaType getType() {
+            return null;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public ClassOrStructConstraint withType(@Nullable JavaType type) {
+            return this;
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
             return v.visitClassOrStructConstraint(this, p);
         }
@@ -4004,7 +3654,7 @@ public interface Cs extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    final class ConstructorConstraint implements Cs, TypeParameterConstraint {
+    final class ConstructorConstraint implements Cs, Expression {
         @With
         @Getter
         @EqualsAndHashCode.Include
@@ -4017,6 +3667,22 @@ public interface Cs extends J {
         @With
         @Getter
         Markers markers;
+
+        @Override
+        public @Nullable JavaType getType() {
+            return null;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public ConstructorConstraint withType(@Nullable JavaType type) {
+            return this;
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
 
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
@@ -4035,7 +3701,7 @@ public interface Cs extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    final class DefaultConstraint implements Cs, TypeParameterConstraint {
+    final class DefaultConstraint implements Cs, Expression {
         @With
         @Getter
         @EqualsAndHashCode.Include
@@ -4048,6 +3714,22 @@ public interface Cs extends J {
         @With
         @Getter
         Markers markers;
+
+        @Override
+        public @Nullable JavaType getType() {
+            return null;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public DefaultConstraint withType(@Nullable JavaType type) {
+            return this;
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
 
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
@@ -7952,1098 +7634,6 @@ public interface Cs extends J {
 
 
     /**
-     * Represents a C# LINQ query expression that provides SQL-like syntax for working with collections.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Simple query
-     *     from user in users
-     *     where user.Age > 18
-     *     select user.Name
-     *
-     *     // Query with multiple clauses
-     *     from c in customers
-     *     join o in orders on c.Id equals o.CustomerId
-     *     where o.Total > 1000
-     *     orderby o.Date
-     *     select new { c.Name, o.Total }
-     *
-     *     // Query with multiple from clauses
-     *     from c in customers
-     *     from o in c.Orders
-     *     where o.Total > 1000
-     *     select new { c.Name, o.Total }
-     * </pre>
-     */
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PUBLIC)
-    final class QueryExpression implements Cs, Expression {
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * from user in users
-         * ^^^^^^^^^^^^^^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        FromClause fromClause;
-
-        /**
-         * <pre>
-         * from user in users
-         * where user.Age > 18
-         * select user.Name
-         * ^^^^^^^^^^^^^^^^^ excluding the from clause
-         * </pre>
-         */
-        @With
-        @Getter
-        QueryBody body;
-
-
-        @Override
-        public @Nullable JavaType getType() {
-            return fromClause.getType();
-        }
-
-        @Override
-        public QueryExpression withType(@Nullable JavaType type) {
-            return withFromClause(fromClause.withType(type));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitQueryExpression(this, p);
-        }
-
-        @Override
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-    }
-
-
-    public interface SelectOrGroupClause extends Cs {
-
-    }
-
-    /**
-     * Represents the body of a LINQ query expression, consisting of the query clauses and a final select or group clause.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Body of query includes everything after initial 'from':
-     *     from c in customers
-     *     where c.Age > 18       // Clauses part
-     *     orderby c.LastName     // Clauses part
-     *     select c.Name          // SelectOrGroup part
-     *     into oldCustomers      // Continuation part
-     *     where oldCustomers...
-     *
-     *     // Another example with join:
-     *     from o in orders
-     *     join c in customers    // Clauses part
-     *         on o.CustomerId equals c.Id
-     *     where o.Total > 1000   // Clauses part
-     *     select new { o, c }    // SelectOrGroup part
-     * </pre>
-     */
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PUBLIC)
-    final class QueryBody implements Cs {
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * from c in customers
-         * where c.Age > 18
-         * ^^^^^^^^^^^^^^^^
-         * orderby c.LastName
-         * ^^^^^^^^^^^^^^^^^^
-         * select c.Name
-         * </pre>
-         */
-        @With
-        @Getter
-        List<QueryClause> clauses;
-
-        /**
-         * <pre>
-         * from c in customers
-         * where c.Age > 18
-         * select c.Name
-         * ^^^^^^^^^^^^^ the final select or group clause
-         * </pre>
-         */
-        @With
-        @Getter
-        @Nullable
-        SelectOrGroupClause selectOrGroup;
-
-        /**
-         * <pre>
-         * from c in customers
-         * select c
-         * into temp            // Continuation starts here
-         * where temp.Age > 18
-         * select temp.Name
-         * </pre>
-         */
-        @With
-        @Getter
-        @Nullable
-        QueryContinuation continuation;
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitQueryBody(this, p);
-        }
-    }
-
-    interface QueryClause extends Cs {
-
-    }
-
-    /**
-     * Represents a LINQ from clause that introduces a range variable and its source collection.
-     * This is typically the initial clause of a LINQ query.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Simple from clause
-     *     from user in users
-     *
-     *     // With type
-     *     from Customer c in customers
-     *
-     *     // With pattern match
-     *     from (x, y) in points
-     *
-     *     // With type and pattern
-     *     from (int x, int y) in coordinates
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class FromClause implements Cs, QueryClause, Expression {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * from Customer c in customers
-         *     ^^^^^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        @Nullable
-        TypeTree typeIdentifier;
-
-        /**
-         * <pre>
-         * from Customer c in customers
-         *              ^^
-         * </pre>
-         */
-        JRightPadded<Identifier> identifier;
-
-        /**
-         * <pre>
-         * from user in users
-         *             ^^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        Expression expression;
-
-        public Expression getIdentifier() {
-            return identifier.getElement();
-        }
-
-        public FromClause withIdentifier(Identifier identifier) {
-            return getPadding().withIdentifier(this.identifier.withElement(identifier));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitFromClause(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @Override
-        public @Nullable JavaType getType() {
-            return expression.getType();
-        }
-
-        @Override
-        public FromClause withType(@Nullable JavaType type) {
-            return this.withExpression(expression.withType(type));
-        }
-
-        @Override
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final FromClause t;
-
-            public JRightPadded<Identifier> getIdentifier() {
-                return t.identifier;
-            }
-
-            public FromClause withIdentifier(JRightPadded<Identifier> identifier) {
-                return t.identifier == identifier ? t : new FromClause(t.id, t.prefix, t.markers, t.typeIdentifier, identifier, t.expression);
-            }
-        }
-    }
-
-    /**
-     * Represents a let clause in a C# LINQ query expression that introduces
-     * a new range variable based on a computation.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Simple let clause
-     *     from n in numbers
-     *     let square = n * n
-     *     select square
-     *
-     *     // Multiple let clauses
-     *     from s in strings
-     *     let length = s.Length
-     *     let upperCase = s.ToUpper()
-     *     select new { s, length, upperCase }
-     *
-     *     // Let with complex expressions
-     *     from p in people
-     *     let fullName = p.FirstName + " " + p.LastName
-     *     let age = DateTime.Now.Year - p.BirthYear
-     *     select new { fullName, age }
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class LetClause implements Cs, QueryClause {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * let square = n * n
-         *    ^^^^^^^^^
-         * </pre>
-         */
-        JRightPadded<J.Identifier> identifier;
-
-        /**
-         * <pre>
-         * let square = n * n
-         *             ^^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        Expression expression;
-
-        public J.Identifier getIdentifier() {
-            return identifier.getElement();
-        }
-
-        public LetClause withIdentifier(J.Identifier identifier) {
-            return getPadding().withIdentifier(JRightPadded.withElement(this.identifier, identifier));
-        }
-
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitLetClause(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final LetClause t;
-
-            public JRightPadded<J.Identifier> getIdentifier() {
-                return t.identifier;
-            }
-
-            public LetClause withIdentifier(JRightPadded<J.Identifier> identifier) {
-                return t.identifier == identifier ? t : new LetClause(t.id, t.prefix, t.markers, identifier, t.expression);
-            }
-        }
-    }
-
-    /**
-     * Represents a C# join clause in a LINQ query expression.
-     * <p>
-     * For example:
-     * <pre>
-     * // Simple join
-     * join customer in customers on order.CustomerId equals customer.Id
-     *
-     * // Join with into (group join)
-     * join category in categories
-     *   on product.CategoryId equals category.Id
-     *   into productCategories
-     *
-     * // Multiple joins
-     * from order in orders
-     * join customer in customers
-     *   on order.CustomerId equals customer.Id
-     * join employee in employees
-     *   on order.EmployeeId equals employee.Id
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class JoinClause implements Cs, QueryClause {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * join customer in customers
-         *     ^^^^^^^^^^^^
-         * </pre>
-         */
-        JRightPadded<Identifier> identifier;
-
-        /**
-         * <pre>
-         * join customer in customers on order.CustomerId equals customer.Id
-         *                 ^^^^^^^^^^^^^
-         * </pre>
-         */
-        JRightPadded<Expression> inExpression;
-
-        /**
-         * <pre>
-         * join customer in customers on order.CustomerId equals customer.Id
-         *                              ^^^^^^^^^^^^^^^^^^^^^^^^
-         * </pre>
-         */
-        JRightPadded<Expression> leftExpression;
-
-        /**
-         * <pre>
-         * join customer in customers on order.CustomerId equals customer.Id
-         *                                                      ^^^^^^^^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        Expression rightExpression;
-
-        /**
-         * <pre>
-         * join category in categories on product.CategoryId equals category.Id into productCategories
-         *                                                                     ^^^^^^^^^^^^^^^^^^^^^^^
-         * </pre>
-         */
-        @Nullable
-        JLeftPadded<JoinIntoClause> into;
-
-        public Identifier getIdentifier() {
-            return identifier.getElement();
-        }
-
-        public JoinClause withIdentifier(Identifier identifier) {
-            return getPadding().withIdentifier(this.identifier.withElement(identifier));
-        }
-
-        public Expression getInExpression() {
-            return inExpression.getElement();
-        }
-
-        public JoinClause withInExpression(Expression inExpression) {
-            return getPadding().withInExpression(this.inExpression.withElement(inExpression));
-        }
-
-        public Expression getLeftExpression() {
-            return leftExpression.getElement();
-        }
-
-        public JoinClause withLeftExpression(Expression leftExpression) {
-            return getPadding().withLeftExpression(this.leftExpression.withElement(leftExpression));
-        }
-
-
-        public @Nullable JoinIntoClause getInto() {
-            return into == null ? null : into.getElement();
-        }
-
-        public JoinClause withInto(@Nullable JoinIntoClause into) {
-            return getPadding().withInto(this.into.withElement(into));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitJoinClause(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final JoinClause t;
-
-            public JRightPadded<Identifier> getIdentifier() {
-                return t.identifier;
-            }
-
-            public JoinClause withIdentifier(JRightPadded<Identifier> identifier) {
-                return t.identifier == identifier ? t :
-                        new JoinClause(t.id, t.prefix, t.markers, identifier, t.inExpression,
-                                t.leftExpression, t.rightExpression, t.into);
-            }
-
-            public JRightPadded<Expression> getInExpression() {
-                return t.inExpression;
-            }
-
-            public JoinClause withInExpression(JRightPadded<Expression> inExpression) {
-                return t.inExpression == inExpression ? t :
-                        new JoinClause(t.id, t.prefix, t.markers, t.identifier, inExpression,
-                                t.leftExpression, t.rightExpression, t.into);
-            }
-
-            public JRightPadded<Expression> getLeftExpression() {
-                return t.leftExpression;
-            }
-
-            public JoinClause withLeftExpression(JRightPadded<Expression> leftExpression) {
-                return t.leftExpression == leftExpression ? t :
-                        new JoinClause(t.id, t.prefix, t.markers, t.identifier, t.inExpression,
-                                leftExpression, t.rightExpression, t.into);
-            }
-
-            public @Nullable JLeftPadded<JoinIntoClause> getInto() {
-                return t.into;
-            }
-
-            public JoinClause withInto(@Nullable JLeftPadded<JoinIntoClause> into) {
-                return t.into == into ? t :
-                        new JoinClause(t.id, t.prefix, t.markers, t.identifier, t.inExpression,
-                                t.leftExpression, t.rightExpression, into);
-            }
-        }
-    }
-
-    /**
-     * Represents the 'into' portion of a group join clause in C# LINQ syntax.
-     * Used to specify the identifier that will hold the grouped results.
-     * <p>
-     * For example:
-     * <pre>
-     * // Group join using into clause
-     * join category in categories
-     *    on product.CategoryId equals category.Id
-     *    into productCategories
-     *
-     * // Multiple group joins
-     * join orders in db.Orders
-     *    on customer.Id equals orders.CustomerId
-     *    into customerOrders
-     * join returns in db.Returns
-     *    on customer.Id equals returns.CustomerId
-     *    into customerReturns
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PUBLIC)
-    final class JoinIntoClause implements Cs, QueryClause {
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * into productCategories
-         *     ^^^^^^^^^^^^^^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        Identifier identifier;
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitJoinIntoClause(this, p);
-        }
-    }
-
-    /**
-     * Represents a C# LINQ where clause that filters elements in a query based on a condition.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Simple where clause
-     *     from p in people
-     *     where p.Age >= 18
-     *     select p
-     *
-     *     // Multiple where clauses
-     *     from p in people
-     *     where p.Age >= 18
-     *     where p.Name.StartsWith("J")
-     *     select p
-     *
-     *     // Where with complex condition
-     *     from o in orders
-     *     where o.Total > 1000 && o.Status == "Pending"
-     *     select o
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PUBLIC)
-    final class WhereClause implements Cs, QueryClause {
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * where p.Age >= 18
-         *      ^^^^^^^^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        Expression condition;
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitWhereClause(this, p);
-        }
-    }
-
-    /**
-     * Represents a C# LINQ orderby clause that specifies the ordering of results in a query.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Simple orderby with single key
-     *     from p in people
-     *     orderby p.LastName
-     *     select p
-     *
-     *     // Multiple orderings
-     *     from p in people
-     *     orderby p.LastName ascending, p.FirstName descending
-     *     select p
-     *
-     *     // Orderby with complex key expressions
-     *     from o in orders
-     *     orderby o.Customer.Name, o.Total * 1.08
-     *     select o
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class OrderByClause implements Cs, QueryClause {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * orderby p.LastName ascending, p.FirstName descending
-         *         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-         * </pre>
-         */
-        List<JRightPadded<Ordering>> orderings;
-
-        public List<Ordering> getOrderings() {
-            return JRightPadded.getElements(orderings);
-        }
-
-        public OrderByClause withOrderings(List<Ordering> orderings) {
-            return getPadding().withOrderings(JRightPadded.withElements(this.orderings, orderings));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitOrderByClause(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final OrderByClause t;
-
-            public List<JRightPadded<Ordering>> getOrderings() {
-                return t.orderings;
-            }
-
-            public OrderByClause withOrderings(List<JRightPadded<Ordering>> orderings) {
-                return t.orderings == orderings ? t : new OrderByClause(t.id, t.prefix, t.markers, orderings);
-            }
-        }
-    }
-
-    /**
-     * Represents a LINQ query continuation using the 'into' keyword, which allows query results to be
-     * further processed in subsequent query clauses.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Query continuation with grouping
-     *     from c in customers
-     *     group c by c.Country into g
-     *     select new { Country = g.Key, Count = g.Count() }
-     *
-     *     // Multiple continuations
-     *     from n in numbers
-     *     group n by n % 2 into g
-     *     select new { Modulo = g.Key, Items = g } into r
-     *     where r.Items.Count() > 2
-     *     select r
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PUBLIC)
-    final class QueryContinuation implements Cs {
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * group c by c.Country into g
-         *                         ^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        J.Identifier identifier;
-
-        /**
-         * <pre>
-         * group c by c.Country into g
-         * select new { Country = g.Key }
-         * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        QueryBody body;
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitQueryContinuation(this, p);
-        }
-    }
-
-
-    /**
-     * Represents a single ordering clause within C# orderby expression.
-     * <pre>
-     * orderby name ascending
-     * orderby age descending, name ascending
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Ordering implements Cs {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * orderby name ascending
-         *        ^^^^
-         * </pre>
-         */
-        JRightPadded<Expression> expression;
-
-        public Expression getExpression() {
-            return expression.getElement();
-        }
-
-        public Ordering withExpression(Expression expression) {
-            return getPadding().withExpression(this.expression.withElement(expression));
-        }
-
-        /**
-         * <pre>
-         * orderby name ascending
-         *             ^^^^^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        @Nullable
-        DirectionKind direction;
-
-        public enum DirectionKind {
-            Ascending,
-            Descending
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitOrdering(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Ordering t;
-
-            public JRightPadded<Expression> getExpression() {
-                return t.expression;
-            }
-
-            public Ordering withExpression(JRightPadded<Expression> expression) {
-                return t.expression == expression ? t : new Ordering(t.id, t.prefix, t.markers, expression, t.direction);
-            }
-        }
-    }
-
-    /**
-     * Represents a select clause in a LINQ expression in C#.
-     * <pre>
-     * // Simple select
-     * select item
-     *
-     * // Select with projection
-     * select new { Name = p.Name, Age = p.Age }
-     * </pre>
-     */
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PUBLIC)
-    final class SelectClause implements Cs, SelectOrGroupClause {
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * select item
-         *        ^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        Expression expression;
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitSelectClause(this, p);
-        }
-    }
-
-    /**
-     * Represents a group clause in a LINQ query.
-     * <pre>
-     * // Simple group by
-     * group item by key
-     *
-     * // Group by with complex key
-     * group customer by new { customer.State, customer.City }
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class GroupClause implements Cs, SelectOrGroupClause {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * group item by key
-         *       ^^^^
-         * </pre>
-         */
-        JRightPadded<Expression> groupExpression;
-
-        public Expression getGroupExpression() {
-            return groupExpression.getElement();
-        }
-
-        public GroupClause withGroupExpression(Expression groupExpression) {
-            return getPadding().withGroupExpression(this.groupExpression.withElement(groupExpression));
-        }
-
-        /**
-         * <pre>
-         * group item by key
-         *              ^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        Expression key;
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitGroupClause(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final GroupClause t;
-
-            public JRightPadded<Expression> getGroupExpression() {
-                return t.groupExpression;
-            }
-
-            public GroupClause withGroupExpression(JRightPadded<Expression> groupExpression) {
-                return t.groupExpression == groupExpression ? t : new GroupClause(t.id, t.prefix, t.markers, groupExpression, t.key);
-            }
-        }
-    }
-
-    /**
      * Represents a C# indexer declaration which allows objects to be indexed like arrays.
      * <pre>
      * // Simple indexer
@@ -9337,7 +7927,7 @@ public interface Cs extends J {
          * </pre>
          */
         @Nullable
-        JContainer<Cs.TypeParameter> typeParameters;
+        JContainer<J.TypeParameter> typeParameters;
 
         /**
          * <pre>
@@ -9347,20 +7937,11 @@ public interface Cs extends J {
          */
         JContainer<Statement> parameters;
 
-        /**
-         * <pre>
-         * public delegate T Factory<T>() where T : class;
-         *                               ^^^^^^^^^^^^^^^^
-         * </pre>
-         */
-        @Nullable
-        JContainer<TypeParameterConstraintClause> typeParameterConstraintClauses;
-
-        public List<Cs.TypeParameter> getTypeParameters() {
+        public List<J.TypeParameter> getTypeParameters() {
             return typeParameters == null ? Collections.emptyList() : typeParameters.getElements();
         }
 
-        public DelegateDeclaration withTypeParameters(@Nullable List<Cs.TypeParameter> typeParameters) {
+        public DelegateDeclaration withTypeParameters(@Nullable List<J.TypeParameter> typeParameters) {
             return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
         }
 
@@ -9370,14 +7951,6 @@ public interface Cs extends J {
 
         public DelegateDeclaration withParameters(List<Statement> parameters) {
             return getPadding().withParameters(JContainer.withElements(this.parameters, parameters));
-        }
-
-        public List<TypeParameterConstraintClause> getTypeParameterConstraintClauses() {
-            return typeParameterConstraintClauses == null ? Collections.emptyList() : typeParameterConstraintClauses.getElements();
-        }
-
-        public DelegateDeclaration withTypeParameterConstraintClauses(@Nullable List<TypeParameterConstraintClause> clauses) {
-            return getPadding().withTypeParameterConstraintClauses(JContainer.withElementsNullable(this.typeParameterConstraintClauses, clauses));
         }
 
         @Override
@@ -9416,17 +7989,17 @@ public interface Cs extends J {
             public DelegateDeclaration withReturnType(JLeftPadded<TypeTree> returnType) {
                 return t.returnType == returnType ? t : new DelegateDeclaration(t.id, t.prefix, t.markers, t.attributes,
                         t.modifiers, returnType, t.identifier, t.typeParameters,
-                        t.parameters, t.typeParameterConstraintClauses);
+                        t.parameters);
             }
 
-            public @Nullable JContainer<Cs.TypeParameter> getTypeParameters() {
+            public @Nullable JContainer<J.TypeParameter> getTypeParameters() {
                 return t.typeParameters;
             }
 
-            public DelegateDeclaration withTypeParameters(@Nullable JContainer<Cs.TypeParameter> typeParameters) {
+            public DelegateDeclaration withTypeParameters(@Nullable JContainer<J.TypeParameter> typeParameters) {
                 return t.typeParameters == typeParameters ? t : new DelegateDeclaration(t.id, t.prefix, t.markers, t.attributes,
                         t.modifiers, t.returnType, t.identifier, typeParameters,
-                        t.parameters, t.typeParameterConstraintClauses);
+                        t.parameters);
             }
 
             public JContainer<Statement> getParameters() {
@@ -9436,17 +8009,7 @@ public interface Cs extends J {
             public DelegateDeclaration withParameters(JContainer<Statement> parameters) {
                 return t.parameters == parameters ? t : new DelegateDeclaration(t.id, t.prefix, t.markers, t.attributes,
                         t.modifiers, t.returnType, t.identifier, t.typeParameters,
-                        parameters, t.typeParameterConstraintClauses);
-            }
-
-            public @Nullable JContainer<TypeParameterConstraintClause> getTypeParameterConstraintClauses() {
-                return t.typeParameterConstraintClauses;
-            }
-
-            public DelegateDeclaration withTypeParameterConstraintClauses(@Nullable JContainer<TypeParameterConstraintClause> clauses) {
-                return t.typeParameterConstraintClauses == clauses ? t : new DelegateDeclaration(t.id, t.prefix, t.markers, t.attributes,
-                        t.modifiers, t.returnType, t.identifier, t.typeParameters,
-                        t.parameters, clauses);
+                        parameters);
             }
         }
     }
@@ -9654,28 +8217,22 @@ public interface Cs extends J {
     }
 
     /**
-     * Represents a C# type parameter in generic type declarations, including optional variance and constraints.
+     * C#-specific type parameter data stored in {@code J.TypeParameter.Bounds[0]}.
+     * Carries attribute lists, variance (in/out), the type parameter name, and
+     * optional where-clause constraint information.
      * <p>
      * For example:
      * <pre>
-     *     // Simple type parameter
-     *     class Container&lt;T&gt;
-     *
-     *     // Type parameter with variance
-     *     interface IEnumerable&lt;out T&gt;
-     *
-     *     // Type parameter with attributes
-     *     class Handler&lt;[Category("A")] T&gt;
-     *
-     *     // Type parameter with variance and attributes
-     *     interface IComparer&lt;[NotNull] in T&gt;
+     *     class MyClass&lt;[Attr] in T, out U&gt;
+     *         where T : class, IDisposable, new()
+     *         where U : struct
      * </pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class TypeParameter implements Cs {
+    final class ConstrainedTypeParameter implements Cs, TypeTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -9699,39 +8256,74 @@ public interface Cs extends J {
 
         /**
          * <pre>
-         * interface IEnumerable<out T>
-         *                      ^^^
+         * interface IEnumerable&lt;out T&gt;
+         *                       ^^^
          * </pre>
          */
         @Nullable
         JLeftPadded<VarianceKind> variance;
 
         /**
-         * <pre>
-         * class Container<T>
-         *                 ^
-         * </pre>
+         * The type parameter name inside angle brackets.
+         * Same instance as the parent {@code J.TypeParameter.Name}.
          */
         @With
         @Getter
         Identifier name;
+
+        /**
+         * The {@code where T} portion. Before = space before {@code where},
+         * Element.Prefix = space before T.
+         * Null when no where clause exists for this type parameter.
+         */
+        @Nullable
+        JLeftPadded<Identifier> whereConstraint;
+
+        /**
+         * The constraints after the colon: {@code : class, IDisposable, new()}.
+         * Before = space before {@code :}.
+         * Null when no where clause exists for this type parameter.
+         */
+        @Nullable
+        JContainer<Expression> constraints;
 
         public enum VarianceKind {
             In,
             Out
         }
 
+        @Nullable
+        @With
+        @Getter
+        JavaType type;
+
         public @Nullable VarianceKind getVariance() {
             return variance == null ? null : variance.getElement();
         }
 
-        public Cs.TypeParameter withVariance(@Nullable VarianceKind variance) {
+        public ConstrainedTypeParameter withVariance(@Nullable VarianceKind variance) {
             return getPadding().withVariance(JLeftPadded.withElement(this.variance, variance));
+        }
+
+        public @Nullable Identifier getWhereConstraint() {
+            return whereConstraint == null ? null : whereConstraint.getElement();
+        }
+
+        public ConstrainedTypeParameter withWhereConstraint(@Nullable Identifier whereConstraint) {
+            return getPadding().withWhereConstraint(JLeftPadded.withElement(this.whereConstraint, whereConstraint));
+        }
+
+        public @Nullable List<Expression> getConstraints() {
+            return constraints == null ? null : constraints.getElements();
+        }
+
+        public ConstrainedTypeParameter withConstraints(@Nullable List<Expression> constraints) {
+            return getPadding().withConstraints(JContainer.withElementsNullable(this.constraints, constraints));
         }
 
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitTypeParameter(this, p);
+            return v.visitConstrainedTypeParameter(this, p);
         }
 
         public Padding getPadding() {
@@ -9751,14 +8343,30 @@ public interface Cs extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final Cs.TypeParameter t;
+            private final ConstrainedTypeParameter t;
 
             public @Nullable JLeftPadded<VarianceKind> getVariance() {
                 return t.variance;
             }
 
-            public Cs.TypeParameter withVariance(@Nullable JLeftPadded<VarianceKind> variance) {
-                return t.variance == variance ? t : new Cs.TypeParameter(t.id, t.prefix, t.markers, t.attributeLists, variance, t.name);
+            public ConstrainedTypeParameter withVariance(@Nullable JLeftPadded<VarianceKind> variance) {
+                return t.variance == variance ? t : new ConstrainedTypeParameter(t.id, t.prefix, t.markers, t.attributeLists, variance, t.name, t.whereConstraint, t.constraints, t.type);
+            }
+
+            public @Nullable JLeftPadded<Identifier> getWhereConstraint() {
+                return t.whereConstraint;
+            }
+
+            public ConstrainedTypeParameter withWhereConstraint(@Nullable JLeftPadded<Identifier> whereConstraint) {
+                return t.whereConstraint == whereConstraint ? t : new ConstrainedTypeParameter(t.id, t.prefix, t.markers, t.attributeLists, t.variance, t.name, whereConstraint, t.constraints, t.type);
+            }
+
+            public @Nullable JContainer<Expression> getConstraints() {
+                return t.constraints;
+            }
+
+            public ConstrainedTypeParameter withConstraints(@Nullable JContainer<Expression> constraints) {
+                return t.constraints == constraints ? t : new ConstrainedTypeParameter(t.id, t.prefix, t.markers, t.attributeLists, t.variance, t.name, t.whereConstraint, constraints, t.type);
             }
         }
     }

@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.tree.Cs;
+import org.openrewrite.csharp.tree.Linq;
 import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.RpcSendQueue;
@@ -303,29 +304,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitClassDeclaration(Cs.ClassDeclaration classDeclaration, RpcSendQueue q) {
-        q.getAndSendList(classDeclaration, Cs.ClassDeclaration::getAttributeList, Tree::getId, el -> visit(el, q));
-        q.getAndSendList(classDeclaration, Cs.ClassDeclaration::getModifiers, Tree::getId, el -> visit(el, q));
-        q.getAndSend(classDeclaration, c -> c.getPadding().getKind(), el -> visitClassDeclarationKind(el, q));
-        q.getAndSend(classDeclaration, Cs.ClassDeclaration::getName, el -> visit(el, q));
-        q.getAndSend(classDeclaration, c -> c.getPadding().getTypeParameters(), el -> visitContainer(el, q));
-        q.getAndSend(classDeclaration, c -> c.getPadding().getPrimaryConstructor(), el -> visitContainer(el, q));
-        q.getAndSend(classDeclaration, c -> c.getPadding().getExtendings(), el -> visitLeftPadded(el, q));
-        q.getAndSend(classDeclaration, c -> c.getPadding().getImplementings(), el -> visitContainer(el, q));
-        q.getAndSend(classDeclaration, Cs.ClassDeclaration::getBody, el -> visit(el, q));
-        q.getAndSend(classDeclaration, c -> c.getPadding().getTypeParameterConstraintClauses(), el -> visitContainer(el, q));
-        q.getAndSend(classDeclaration, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        return classDeclaration;
-    }
-
-    private void visitClassDeclarationKind(J.ClassDeclaration.Kind kind, RpcSendQueue q) {
-        // preVisit is not automatically called in this case
-        preVisit(kind, q);
-        q.getAndSendList(kind, J.ClassDeclaration.Kind::getAnnotations, Tree::getId, el -> visit(el, q));
-        q.getAndSend(kind, J.ClassDeclaration.Kind::getType);
-    }
-
-    @Override
     public J visitMethodDeclaration(Cs.MethodDeclaration methodDeclaration, RpcSendQueue q) {
         q.getAndSendList(methodDeclaration, Cs.MethodDeclaration::getAttributes, Tree::getId, el -> visit(el, q));
         q.getAndSendList(methodDeclaration, Cs.MethodDeclaration::getModifiers, Tree::getId, el -> visit(el, q));
@@ -336,7 +314,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(methodDeclaration, m -> m.getPadding().getParameters(), el -> visitContainer(el, q));
         q.getAndSend(methodDeclaration, Cs.MethodDeclaration::getBody, el -> visit(el, q));
         q.getAndSend(methodDeclaration, el -> asRef(el.getMethodType()), el -> visitType(getValueNonNull(el), q));
-        q.getAndSend(methodDeclaration, m -> m.getPadding().getTypeParameterConstraintClauses(), el -> visitContainer(el, q));
         return methodDeclaration;
     }
 
@@ -349,16 +326,14 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitTypeParameterConstraintClause(Cs.TypeParameterConstraintClause typeParameterConstraintClause, RpcSendQueue q) {
-        q.getAndSend(typeParameterConstraintClause, t -> t.getPadding().getTypeParameter(), el -> visitRightPadded(el, q));
-        q.getAndSend(typeParameterConstraintClause, t -> t.getPadding().getTypeParameterConstraints(), el -> visitContainer(el, q));
-        return typeParameterConstraintClause;
-    }
-
-    @Override
-    public J visitTypeConstraint(Cs.TypeConstraint typeConstraint, RpcSendQueue q) {
-        q.getAndSend(typeConstraint, Cs.TypeConstraint::getTypeExpression, el -> visit(el, q));
-        return typeConstraint;
+    public J visitConstrainedTypeParameter(Cs.ConstrainedTypeParameter constrainedTypeParameter, RpcSendQueue q) {
+        q.getAndSendList(constrainedTypeParameter, Cs.ConstrainedTypeParameter::getAttributeLists, Tree::getId, el -> visit(el, q));
+        q.getAndSend(constrainedTypeParameter, c -> c.getPadding().getVariance(), el -> visitLeftPadded(el, q));
+        q.getAndSend(constrainedTypeParameter, Cs.ConstrainedTypeParameter::getName, el -> visit(el, q));
+        q.getAndSend(constrainedTypeParameter, c -> c.getPadding().getWhereConstraint(), el -> visitLeftPadded(el, q));
+        q.getAndSend(constrainedTypeParameter, c -> c.getPadding().getConstraints(), el -> visitContainer(el, q));
+        q.getAndSend(constrainedTypeParameter, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
+        return constrainedTypeParameter;
     }
 
     @Override
@@ -678,87 +653,87 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitQueryExpression(Cs.QueryExpression queryExpression, RpcSendQueue q) {
-        q.getAndSend(queryExpression, Cs.QueryExpression::getFromClause, el -> visit(el, q));
-        q.getAndSend(queryExpression, Cs.QueryExpression::getBody, el -> visit(el, q));
+    public J visitQueryExpression(Linq.QueryExpression queryExpression, RpcSendQueue q) {
+        q.getAndSend(queryExpression, Linq.QueryExpression::getFromClause, el -> visit(el, q));
+        q.getAndSend(queryExpression, Linq.QueryExpression::getBody, el -> visit(el, q));
         return queryExpression;
     }
 
     @Override
-    public J visitQueryBody(Cs.QueryBody queryBody, RpcSendQueue q) {
-        q.getAndSendList(queryBody, Cs.QueryBody::getClauses, Tree::getId, el -> visit(el, q));
-        q.getAndSend(queryBody, Cs.QueryBody::getSelectOrGroup, el -> visit(el, q));
-        q.getAndSend(queryBody, Cs.QueryBody::getContinuation, el -> visit(el, q));
+    public J visitQueryBody(Linq.QueryBody queryBody, RpcSendQueue q) {
+        q.getAndSendList(queryBody, Linq.QueryBody::getClauses, Tree::getId, el -> visit(el, q));
+        q.getAndSend(queryBody, Linq.QueryBody::getSelectOrGroup, el -> visit(el, q));
+        q.getAndSend(queryBody, Linq.QueryBody::getContinuation, el -> visit(el, q));
         return queryBody;
     }
 
     @Override
-    public J visitFromClause(Cs.FromClause fromClause, RpcSendQueue q) {
-        q.getAndSend(fromClause, Cs.FromClause::getTypeIdentifier, el -> visit(el, q));
+    public J visitFromClause(Linq.FromClause fromClause, RpcSendQueue q) {
+        q.getAndSend(fromClause, Linq.FromClause::getTypeIdentifier, el -> visit(el, q));
         q.getAndSend(fromClause, f -> f.getPadding().getIdentifier(), el -> visitRightPadded(el, q));
-        q.getAndSend(fromClause, Cs.FromClause::getExpression, el -> visit(el, q));
+        q.getAndSend(fromClause, Linq.FromClause::getExpression, el -> visit(el, q));
         return fromClause;
     }
 
     @Override
-    public J visitLetClause(Cs.LetClause letClause, RpcSendQueue q) {
+    public J visitLetClause(Linq.LetClause letClause, RpcSendQueue q) {
         q.getAndSend(letClause, l -> l.getPadding().getIdentifier(), el -> visitRightPadded(el, q));
-        q.getAndSend(letClause, Cs.LetClause::getExpression, el -> visit(el, q));
+        q.getAndSend(letClause, Linq.LetClause::getExpression, el -> visit(el, q));
         return letClause;
     }
 
     @Override
-    public J visitJoinClause(Cs.JoinClause joinClause, RpcSendQueue q) {
+    public J visitJoinClause(Linq.JoinClause joinClause, RpcSendQueue q) {
         q.getAndSend(joinClause, j -> j.getPadding().getIdentifier(), el -> visitRightPadded(el, q));
         q.getAndSend(joinClause, j -> j.getPadding().getInExpression(), el -> visitRightPadded(el, q));
         q.getAndSend(joinClause, j -> j.getPadding().getLeftExpression(), el -> visitRightPadded(el, q));
-        q.getAndSend(joinClause, Cs.JoinClause::getRightExpression, el -> visit(el, q));
+        q.getAndSend(joinClause, Linq.JoinClause::getRightExpression, el -> visit(el, q));
         q.getAndSend(joinClause, j -> j.getPadding().getInto(), el -> visitLeftPadded(el, q));
         return joinClause;
     }
 
     @Override
-    public J visitJoinIntoClause(Cs.JoinIntoClause joinIntoClause, RpcSendQueue q) {
-        q.getAndSend(joinIntoClause, Cs.JoinIntoClause::getIdentifier, el -> visit(el, q));
+    public J visitJoinIntoClause(Linq.JoinIntoClause joinIntoClause, RpcSendQueue q) {
+        q.getAndSend(joinIntoClause, Linq.JoinIntoClause::getIdentifier, el -> visit(el, q));
         return joinIntoClause;
     }
 
     @Override
-    public J visitWhereClause(Cs.WhereClause whereClause, RpcSendQueue q) {
-        q.getAndSend(whereClause, Cs.WhereClause::getCondition, el -> visit(el, q));
+    public J visitWhereClause(Linq.WhereClause whereClause, RpcSendQueue q) {
+        q.getAndSend(whereClause, Linq.WhereClause::getCondition, el -> visit(el, q));
         return whereClause;
     }
 
     @Override
-    public J visitOrderByClause(Cs.OrderByClause orderByClause, RpcSendQueue q) {
+    public J visitOrderByClause(Linq.OrderByClause orderByClause, RpcSendQueue q) {
         q.getAndSendList(orderByClause, o -> o.getPadding().getOrderings(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         return orderByClause;
     }
 
     @Override
-    public J visitQueryContinuation(Cs.QueryContinuation queryContinuation, RpcSendQueue q) {
-        q.getAndSend(queryContinuation, Cs.QueryContinuation::getIdentifier, el -> visit(el, q));
-        q.getAndSend(queryContinuation, Cs.QueryContinuation::getBody, el -> visit(el, q));
+    public J visitQueryContinuation(Linq.QueryContinuation queryContinuation, RpcSendQueue q) {
+        q.getAndSend(queryContinuation, Linq.QueryContinuation::getIdentifier, el -> visit(el, q));
+        q.getAndSend(queryContinuation, Linq.QueryContinuation::getBody, el -> visit(el, q));
         return queryContinuation;
     }
 
     @Override
-    public J visitOrdering(Cs.Ordering ordering, RpcSendQueue q) {
+    public J visitOrdering(Linq.Ordering ordering, RpcSendQueue q) {
         q.getAndSend(ordering, o -> o.getPadding().getExpression(), el -> visitRightPadded(el, q));
-        q.getAndSend(ordering, Cs.Ordering::getDirection);
+        q.getAndSend(ordering, Linq.Ordering::getDirection);
         return ordering;
     }
 
     @Override
-    public J visitSelectClause(Cs.SelectClause selectClause, RpcSendQueue q) {
-        q.getAndSend(selectClause, Cs.SelectClause::getExpression, el -> visit(el, q));
+    public J visitSelectClause(Linq.SelectClause selectClause, RpcSendQueue q) {
+        q.getAndSend(selectClause, Linq.SelectClause::getExpression, el -> visit(el, q));
         return selectClause;
     }
 
     @Override
-    public J visitGroupClause(Cs.GroupClause groupClause, RpcSendQueue q) {
+    public J visitGroupClause(Linq.GroupClause groupClause, RpcSendQueue q) {
         q.getAndSend(groupClause, g -> g.getPadding().getGroupExpression(), el -> visitRightPadded(el, q));
-        q.getAndSend(groupClause, Cs.GroupClause::getKey, el -> visit(el, q));
+        q.getAndSend(groupClause, Linq.GroupClause::getKey, el -> visit(el, q));
         return groupClause;
     }
 
@@ -782,7 +757,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(delegateDeclaration, Cs.DelegateDeclaration::getIdentifier, el -> visit(el, q));
         q.getAndSend(delegateDeclaration, d -> d.getPadding().getTypeParameters(), el -> visitContainer(el, q));
         q.getAndSend(delegateDeclaration, d -> d.getPadding().getParameters(), el -> visitContainer(el, q));
-        q.getAndSend(delegateDeclaration, d -> d.getPadding().getTypeParameterConstraintClauses(), el -> visitContainer(el, q));
         return delegateDeclaration;
     }
 
@@ -797,13 +771,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         return conversionOperatorDeclaration;
     }
 
-    @Override
-    public J visitTypeParameter(Cs.TypeParameter typeParameter, RpcSendQueue q) {
-        q.getAndSendList(typeParameter, Cs.TypeParameter::getAttributeLists, Tree::getId, el -> visit(el, q));
-        q.getAndSend(typeParameter, t -> t.getPadding().getVariance(), el -> visitLeftPadded(el, q));
-        q.getAndSend(typeParameter, Cs.TypeParameter::getName, el -> visit(el, q));
-        return typeParameter;
-    }
+    // Cs.TypeParameter sender DELETED — replaced by visitConstrainedTypeParameter
 
     @Override
     public J visitEnumDeclaration(Cs.EnumDeclaration enumDeclaration, RpcSendQueue q) {
