@@ -1944,6 +1944,237 @@ class CSharpRpcTest {
         assertThat(printed).isEqualTo(source);
     }
 
+    @Test
+    void parseAnonymousObjectCreation(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace App
+                {
+                    public class Demo
+                    {
+                        public void Run()
+                        {
+                            var obj = new { Name = "test", Age = 1 };
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Demo.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseWithExpression(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace App
+                {
+                    public record Person(string Name, int Age);
+
+                    public class Demo
+                    {
+                        public void Run()
+                        {
+                            var p = new Person("Alice", 30);
+                            var p2 = p with { Name = "Bob" };
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Demo.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseSpreadElement(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace App
+                {
+                    public class Demo
+                    {
+                        public void Run()
+                        {
+                            int[] a = [1, 2];
+                            int[] b = [..a, 3];
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Demo.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    // TODO: parseImplicitElementAccess — requires CsArgument type mapping (Cs$CsArgument not yet on Java side)
+
+    @Test
+    void parseAliasQualifiedName(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace App
+                {
+                    public class Demo
+                    {
+                        public void Run()
+                        {
+                            global::System.Console.WriteLine("hi");
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Demo.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseAnonymousMethodExpression(@TempDir Path tempDir) throws IOException {
+        String source = """
+                using System;
+
+                namespace App
+                {
+                    public class Demo
+                    {
+                        public void Run()
+                        {
+                            Func<int, int> f = delegate(int x) { return x + 1; };
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Demo.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseRefType(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace App
+                {
+                    public class Demo
+                    {
+                        private int _value;
+
+                        public ref int GetRef()
+                        {
+                            return ref _value;
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Demo.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    // TODO: parsePointerFieldAccess — requires address-of (&) operator support in unsafe context
+
+    @Test
+    void parseImplicitStackAlloc(@TempDir Path tempDir) throws IOException {
+        String source = """
+                using System;
+
+                namespace App
+                {
+                    public class Demo
+                    {
+                        public void Run()
+                        {
+                            Span<int> s = stackalloc[] { 1, 2, 3 };
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Demo.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
     private static J.MethodDeclaration findMethodByName(J.ClassDeclaration classDecl, String name) {
         for (Statement stmt : classDecl.getBody().getStatements()) {
             if (stmt instanceof J.MethodDeclaration md && md.getSimpleName().equals(name)) {

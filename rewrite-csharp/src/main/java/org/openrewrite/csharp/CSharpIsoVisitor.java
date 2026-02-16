@@ -74,11 +74,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
-    public Cs.Argument visitArgument(Cs.Argument argument, P p) {
-        return (Cs.Argument) super.visitArgument(argument, p);
-    }
-
-    @Override
     public Cs.AnnotatedStatement visitAnnotatedStatement(Cs.AnnotatedStatement annotatedStatement, P p) {
         return (Cs.AnnotatedStatement) super.visitAnnotatedStatement(annotatedStatement, p);
     }
@@ -178,7 +173,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
         return (Cs.PropertyDeclaration) super.visitPropertyDeclaration(propertyDeclaration, p);
     }
 
-
     @Override
     public Cs.Lambda visitLambda(Cs.Lambda lambda, P p) {
         return (Cs.Lambda) super.visitLambda(lambda, p);
@@ -249,7 +243,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
         return (Cs.TupleExpression) super.visitTupleExpression(tupleExpression, p);
     }
 
-
     @Override
     public Cs.DestructorDeclaration visitDestructorDeclaration(Cs.DestructorDeclaration destructorDeclaration, P p) {
         return (Cs.DestructorDeclaration) super.visitDestructorDeclaration(destructorDeclaration, p);
@@ -259,7 +252,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     public Cs.Unary visitUnary(Cs.Unary unary, P p) {
         return (Cs.Unary) super.visitUnary(unary, p);
     }
-
 
     @Override
     public Cs.TupleType visitTupleType(Cs.TupleType tupleType, P p) {
@@ -307,21 +299,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
-    public Cs.UnaryPattern visitUnaryPattern(Cs.UnaryPattern unaryPattern, P p) {
-        return (Cs.UnaryPattern) super.visitUnaryPattern(unaryPattern, p);
-    }
-
-    @Override
-    public Cs.TypePattern visitTypePattern(Cs.TypePattern typePattern, P p) {
-        return (Cs.TypePattern) super.visitTypePattern(typePattern, p);
-    }
-
-    @Override
-    public Cs.BinaryPattern visitBinaryPattern(Cs.BinaryPattern binaryPattern, P p) {
-        return (Cs.BinaryPattern) super.visitBinaryPattern(binaryPattern, p);
-    }
-
-    @Override
     public Cs.ConstantPattern visitConstantPattern(Cs.ConstantPattern constantPattern, P p) {
         return (Cs.ConstantPattern) super.visitConstantPattern(constantPattern, p);
     }
@@ -337,26 +314,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
-    public Cs.ParenthesizedPattern visitParenthesizedPattern(Cs.ParenthesizedPattern parenthesizedPattern, P p) {
-        return (Cs.ParenthesizedPattern) super.visitParenthesizedPattern(parenthesizedPattern, p);
-    }
-
-    @Override
-    public Cs.RecursivePattern visitRecursivePattern(Cs.RecursivePattern recursivePattern, P p) {
-        return (Cs.RecursivePattern) super.visitRecursivePattern(recursivePattern, p);
-    }
-
-    @Override
-    public Cs.VarPattern visitVarPattern(Cs.VarPattern varPattern, P p) {
-        return (Cs.VarPattern) super.visitVarPattern(varPattern, p);
-    }
-
-    @Override
-    public Cs.PositionalPatternClause visitPositionalPatternClause(Cs.PositionalPatternClause positionalPatternClause, P p) {
-        return (Cs.PositionalPatternClause) super.visitPositionalPatternClause(positionalPatternClause, p);
-    }
-
-    @Override
     public Cs.RelationalPattern visitRelationalPattern(Cs.RelationalPattern relationalPattern, P p) {
         return (Cs.RelationalPattern) super.visitRelationalPattern(relationalPattern, p);
     }
@@ -367,16 +324,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
-    public Cs.PropertyPatternClause visitPropertyPatternClause(Cs.PropertyPatternClause propertyPatternClause, P p) {
-        return (Cs.PropertyPatternClause) super.visitPropertyPatternClause(propertyPatternClause, p);
-    }
-
-    @Override
-    public Cs.Subpattern visitSubpattern(Cs.Subpattern subpattern, P p) {
-        return (Cs.Subpattern) super.visitSubpattern(subpattern, p);
-    }
-
-    @Override
     public Cs.SwitchExpression visitSwitchExpression(Cs.SwitchExpression switchExpression, P p) {
         return (Cs.SwitchExpression) super.visitSwitchExpression(switchExpression, p);
     }
@@ -384,31 +331,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     @Override
     public Cs.SwitchExpressionArm visitSwitchExpressionArm(Cs.SwitchExpressionArm switchExpressionArm, P p) {
         return (Cs.SwitchExpressionArm) super.visitSwitchExpressionArm(switchExpressionArm, p);
-    }
-
-    @Override
-    public Cs.SwitchSection visitSwitchSection(Cs.SwitchSection switchSection, P p) {
-        return (Cs.SwitchSection) super.visitSwitchSection(switchSection, p);
-    }
-
-    @Override
-    public Cs.DefaultSwitchLabel visitDefaultSwitchLabel(Cs.DefaultSwitchLabel defaultSwitchLabel, P p) {
-        return (Cs.DefaultSwitchLabel) super.visitDefaultSwitchLabel(defaultSwitchLabel, p);
-    }
-
-    @Override
-    public Cs.CasePatternSwitchLabel visitCasePatternSwitchLabel(Cs.CasePatternSwitchLabel casePatternSwitchLabel, P p) {
-        return (Cs.CasePatternSwitchLabel) super.visitCasePatternSwitchLabel(casePatternSwitchLabel, p);
-    }
-
-    @Override
-    public Cs.SwitchStatement visitSwitchStatement(Cs.SwitchStatement switchStatement, P p) {
-        return (Cs.SwitchStatement) super.visitSwitchStatement(switchStatement, p);
-    }
-
-    @Override
-    public Cs.LockStatement visitLockStatement(Cs.LockStatement lockStatement, P p) {
-        return (Cs.LockStatement) super.visitLockStatement(lockStatement, p);
     }
 
     @Override

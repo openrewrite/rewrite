@@ -125,26 +125,12 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             TupleElement tel => VisitTupleElement(tel, q),
             CsNewClass csnc => VisitCsNewClass(csnc, q),
             ImplicitElementAccess iea => VisitImplicitElementAccess(iea, q),
-            UnaryPattern up => VisitUnaryPattern(up, q),
-            TypePattern tp => VisitTypePattern(tp, q),
-            BinaryPattern bp => VisitBinaryPattern(bp, q),
             ConstantPattern cp => VisitConstantPattern(cp, q),
             DiscardPattern dp => VisitDiscardPattern(dp, q),
             ListPattern lp => VisitListPattern(lp, q),
-            ParenthesizedPattern pap => VisitParenthesizedPattern(pap, q),
-            RecursivePattern rcp => VisitRecursivePattern(rcp, q),
-            VarPattern vp => VisitVarPattern(vp, q),
-            PositionalPatternClause ppc => VisitPositionalPatternClause(ppc, q),
             SlicePattern sp => VisitSlicePattern(sp, q),
-            PropertyPatternClause ppclause => VisitPropertyPatternClause(ppclause, q),
-            Subpattern sub => VisitSubpattern(sub, q),
             SwitchExpression swe => VisitSwitchExpression(swe, q),
             SwitchExpressionArm swea => VisitSwitchExpressionArm(swea, q),
-            SwitchSection ss => VisitSwitchSection(ss, q),
-            DefaultSwitchLabel dsl => VisitDefaultSwitchLabel(dsl, q),
-            CasePatternSwitchLabel cpsl => VisitCasePatternSwitchLabel(cpsl, q),
-            SwitchStatement sws => VisitSwitchStatement(sws, q),
-            LockStatement ls => VisitLockStatement(ls, q),
             CheckedExpression che => VisitCheckedExpression(che, q),
             CheckedStatement chs => VisitCheckedStatement(chs, q),
             RangeExpression rang => VisitRangeExpression(rang, q),
@@ -160,6 +146,10 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             CsTry cstry => VisitCsTry(cstry, q),
             PointerFieldAccess pfa => VisitPointerFieldAccess(pfa, q),
             RefType rt => VisitRefType(rt, q),
+            AnonymousObjectCreationExpression aoce => VisitAnonymousObjectCreationExpression(aoce, q),
+            WithExpression we => VisitWithExpression(we, q),
+            SpreadExpression se => VisitSpreadExpression(se, q),
+            FunctionPointerType fpt => VisitFunctionPointerType(fpt, q),
             // LINQ
             QueryExpression qe => VisitQueryExpression(qe, q),
             QueryBody qb => VisitQueryBody(qb, q),
@@ -302,8 +292,8 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     // ---- DeclarationExpression ----
     public override J VisitDeclarationExpression(DeclarationExpression de, RpcSendQueue q)
     {
-        q.GetAndSend(de, d => (J)d.Type, el => Visit(el, q));
-        q.GetAndSend(de, d => (J)d.Variable.Element, el => Visit(el, q));
+        q.GetAndSend(de, d => (J?)d.TypeExpression, el => Visit(el!, q));
+        q.GetAndSend(de, d => (J)d.Variables, el => Visit(el, q));
         return de;
     }
 
@@ -895,28 +885,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         return iea;
     }
 
-    public override J VisitUnaryPattern(UnaryPattern up, RpcSendQueue q)
-    {
-        q.GetAndSend(up, u => (J)u.Operator, el => Visit(el, q));
-        q.GetAndSend(up, u => (J)u.PatternValue, el => Visit(el, q));
-        return up;
-    }
-
-    public override J VisitTypePattern(TypePattern tp, RpcSendQueue q)
-    {
-        q.GetAndSend(tp, t => (J)t.TypeIdentifier, el => Visit(el, q));
-        q.GetAndSend(tp, t => (J?)t.Designation, el => Visit(el!, q));
-        return tp;
-    }
-
-    public override J VisitBinaryPattern(BinaryPattern bp, RpcSendQueue q)
-    {
-        q.GetAndSend(bp, b => (J)b.Left, el => Visit(el, q));
-        q.GetAndSend(bp, b => b.Operator, lp => VisitLeftPadded(lp, q));
-        q.GetAndSend(bp, b => (J)b.Right, el => Visit(el, q));
-        return bp;
-    }
-
     public override J VisitConstantPattern(ConstantPattern cp, RpcSendQueue q)
     {
         q.GetAndSend(cp, c => (J)c.Value, el => Visit(el, q));
@@ -936,48 +904,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         return lp;
     }
 
-    public override J VisitParenthesizedPattern(ParenthesizedPattern pap, RpcSendQueue q)
-    {
-        q.GetAndSend(pap, p => p.PatternValue, c => VisitContainer(c, q));
-        return pap;
-    }
-
-    public override J VisitRecursivePattern(RecursivePattern rcp, RpcSendQueue q)
-    {
-        q.GetAndSend(rcp, r => (J?)r.TypeQualifier, el => Visit(el!, q));
-        q.GetAndSend(rcp, r => (J?)r.PositionalPattern, el => Visit(el!, q));
-        q.GetAndSend(rcp, r => (J?)r.PropertyPatternValue, el => Visit(el!, q));
-        q.GetAndSend(rcp, r => (J?)r.Designation, el => Visit(el!, q));
-        return rcp;
-    }
-
-    public override J VisitVarPattern(VarPattern vp, RpcSendQueue q)
-    {
-        q.GetAndSend(vp, v => (J)v.Designation, el => Visit(el, q));
-        return vp;
-    }
-
-    public override J VisitPositionalPatternClause(PositionalPatternClause ppc, RpcSendQueue q)
-    {
-        q.GetAndSend(ppc, p => p.Subpatterns, c => VisitContainer(c, q));
-        return ppc;
-    }
-
-    public override J VisitSlicePattern(SlicePattern sp, RpcSendQueue q) => sp;
-
-    public override J VisitPropertyPatternClause(PropertyPatternClause ppc, RpcSendQueue q)
-    {
-        q.GetAndSend(ppc, p => p.Subpatterns, c => VisitContainer(c, q));
-        return ppc;
-    }
-
-    public override J VisitSubpattern(Subpattern sub, RpcSendQueue q)
-    {
-        q.GetAndSend(sub, s => (J?)s.Name, el => Visit(el!, q));
-        q.GetAndSend(sub, s => s.PatternValue, lp => VisitLeftPadded(lp, q));
-        return sub;
-    }
-
     public override J VisitSwitchExpression(SwitchExpression swe, RpcSendQueue q)
     {
         q.GetAndSend(swe, s => s.ExpressionPadded, rp => VisitRightPadded(rp, q));
@@ -991,43 +917,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(swea, s => s.WhenExpression, lp => VisitLeftPadded(lp!, q));
         q.GetAndSend(swea, s => s.ExpressionPadded, lp => VisitLeftPadded(lp, q));
         return swea;
-    }
-
-    public override J VisitSwitchSection(SwitchSection ss, RpcSendQueue q)
-    {
-        q.GetAndSendList(ss, s => (IList<SwitchLabel>)s.Labels,
-            l => (object)l.Id, l => Visit(l, q));
-        q.GetAndSendList(ss, s => s.Statements,
-            rp => (object)rp.Element.Id, rp => VisitRightPadded(rp, q));
-        return ss;
-    }
-
-    public override J VisitDefaultSwitchLabel(DefaultSwitchLabel dsl, RpcSendQueue q)
-    {
-        q.GetAndSend(dsl, d => d.ColonToken, space => VisitSpace(space, q));
-        return dsl;
-    }
-
-    public override J VisitCasePatternSwitchLabel(CasePatternSwitchLabel cpsl, RpcSendQueue q)
-    {
-        q.GetAndSend(cpsl, c => (J)c.Pattern, el => Visit(el, q));
-        q.GetAndSend(cpsl, c => c.WhenClause, lp => VisitLeftPadded(lp!, q));
-        q.GetAndSend(cpsl, c => c.ColonToken, space => VisitSpace(space, q));
-        return cpsl;
-    }
-
-    public override J VisitSwitchStatement(SwitchStatement sws, RpcSendQueue q)
-    {
-        q.GetAndSend(sws, s => s.ExpressionPadded, c => VisitContainer(c, q));
-        q.GetAndSend(sws, s => s.Sections, c => VisitContainer(c, q));
-        return sws;
-    }
-
-    public override J VisitLockStatement(LockStatement ls, RpcSendQueue q)
-    {
-        q.GetAndSend(ls, l => (J)l.ExpressionValue, el => Visit(el, q));
-        q.GetAndSend(ls, l => l.StatementPadded, rp => VisitRightPadded(rp, q));
-        return ls;
     }
 
     public override J VisitCheckedExpression(CheckedExpression che, RpcSendQueue q)
@@ -1174,6 +1063,37 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(rt, r => (J)r.TypeIdentifier, el => Visit(el, q));
         q.GetAndSend(rt, r => AsRef(r.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
         return rt;
+    }
+
+    public override J VisitAnonymousObjectCreationExpression(AnonymousObjectCreationExpression aoce, RpcSendQueue q)
+    {
+        q.GetAndSend(aoce, a => a.Initializers, el => VisitContainer(el, q));
+        q.GetAndSend(aoce, a => AsRef(a.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
+        return aoce;
+    }
+
+    public override J VisitWithExpression(WithExpression we, RpcSendQueue q)
+    {
+        q.GetAndSend(we, w => (J)w.Target, el => Visit(el, q));
+        q.GetAndSend(we, w => w.InitializerPadded, lp => VisitLeftPadded(lp, q));
+        q.GetAndSend(we, w => AsRef(w.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
+        return we;
+    }
+
+    public override J VisitSpreadExpression(SpreadExpression se, RpcSendQueue q)
+    {
+        q.GetAndSend(se, s => (J)s.Expression, el => Visit(el, q));
+        q.GetAndSend(se, s => AsRef(s.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
+        return se;
+    }
+
+    public override J VisitFunctionPointerType(FunctionPointerType fpt, RpcSendQueue q)
+    {
+        q.GetAndSend(fpt, f => f.CallingConvention, lp => VisitLeftPadded(lp!, q));
+        q.GetAndSend(fpt, f => f.UnmanagedCallingConventionTypes, el => VisitContainer(el!, q));
+        q.GetAndSend(fpt, f => f.ParameterTypes, el => VisitContainer(el, q));
+        q.GetAndSend(fpt, f => AsRef(f.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
+        return fpt;
     }
 
     // ---- Helper delegation to JavaSender ----
