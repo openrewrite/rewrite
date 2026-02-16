@@ -144,6 +144,21 @@ class UpgradePluginVersionTest implements RewriteTest {
     }
 
     @Test
+    void dontDowngradeKotlinPluginLocalVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("kotlin", "1.9.0", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  val kotlinVersion = "1.9.25"
+                  kotlin("jvm") version kotlinVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void upgradeGradleSettingsPlugin() {
         rewriteRun(
           spec -> spec.recipe(new UpgradePluginVersion("com.gradle.enterprise", "3.10.x", null)),
