@@ -208,6 +208,18 @@ class AssignmentTest implements RewriteTest {
           ));
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4756")
+    @Test
+    void multipleAssignments() {
+        rewriteRun(
+          groovy(
+            """
+              def (a, b) = ['1', '2']
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/moderneinc/customer-requests/issues/1478")
     @Test
     void destructuringAssignment() {
