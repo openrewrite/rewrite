@@ -792,6 +792,7 @@ class ParserVisitor(ast.NodeVisitor):
         if len(node.names) == 1:
             prefix = self.__source_before('import')
             imp = self.__convert(node.names[0])
+            assert imp is not None
             return imp.replace(prefix=prefix, qualid=imp.qualid.replace(prefix=imp.prefix))
 
         prefix = self.__source_before('import')
@@ -1705,6 +1706,7 @@ class ParserVisitor(ast.NodeVisitor):
     def visit_BoolOp(self, node):
         prefix = self.__whitespace()
         left = self.__convert(node.values[0])
+        assert left is not None
         for right_expr in node.values[1:]:
             left = j.Binary(
                 random_id(),
@@ -2246,7 +2248,7 @@ class ParserVisitor(ast.NodeVisitor):
         # Wrap name in extra parentheses if present
         if extra_parens:
             # Set the inner prefix on the name
-            name = name.replace(prefix=extra_parens[-1][1])  # ty: ignore[possibly-missing-attribute]  # recursive call returns unknown
+            name = name.replace(prefix=extra_parens[-1][1])  # ty: ignore[unresolved-attribute]  # recursive call returns unknown
 
             # Wrap in extra parentheses (innermost to outermost)
             wrapped: Expression = name
@@ -2731,7 +2733,7 @@ class ParserVisitor(ast.NodeVisitor):
             extra_parens[0][1] if extra_parens else prefix,
             Markers.EMPTY,
             py.CollectionLiteral.Kind.TUPLE,
-            elements.replace(markers=  # ty: ignore[possibly-missing-attribute]  # complex union type
+            elements.replace(markers=  # ty: ignore[unresolved-attribute]  # complex union type
                 Markers.build(random_id(), [OmitParentheses(random_id())])) if omit_parens else elements,
             self._type_mapping.type(node)
         )
@@ -3322,6 +3324,7 @@ class ParserVisitor(ast.NodeVisitor):
                     self._type_mapping.type(node)
                 )
             is_first = False
+        assert res is not None
         return res
 
     def __map_fstring(self, node, prefix: Space, tok: TokenInfo, value_idx: int = 0, *,

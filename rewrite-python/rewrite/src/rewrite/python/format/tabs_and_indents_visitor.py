@@ -269,7 +269,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
 
     def visit_container(self, container: Optional[JContainer], p: P) -> Optional[JContainer]:
         if container is None:
-            return container  # type: ignore
+            return container
 
         self._cursor = Cursor(self._cursor, container)
 
@@ -407,7 +407,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         else_ = else_.padding.replace(body=self.visit_right_padded(else_.padding.body, p))
         return else_
 
-    def visit_compilation_unit(self, cu, p: P) -> J:  # ty: ignore[invalid-method-override]
+    def visit_compilation_unit(self, cu, p: P) -> J:
         self.cursor.put_message("space_context", "compilation_unit_prefix")
         cu = cu.replace(prefix=self.visit_space(cu.prefix, p))
         self.cursor.put_message("space_context", None)
@@ -589,6 +589,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         # Build initial cursor with proper J parent so context-dependent
         # printing (e.g., = vs :=) works correctly
         initial = Cursor(None, Cursor.ROOT_VALUE)
+        assert line_start_cursor is not None
         for c in line_start_cursor.get_path_as_cursors():
             v = c.value
             if v is line_start:
@@ -660,16 +661,16 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             (expr.value_source.startswith("'''") and expr.value_source.endswith("'''"))) and \
             cursor.first_enclosing(Block) is not None
 
-    def visit_expression_statement(self, expression_statement: ExpressionStatement, p: P) -> J:
-        if self._is_doc_comment(expression_statement, self.cursor):
-            prefix_before = len(expression_statement.prefix.last_whitespace.split("\n")[-1])
-            stm = cast(ExpressionStatement, super().visit_expression_statement(expression_statement, p))
+    def visit_expression_statement(self, expr_stmt: ExpressionStatement, p: P) -> J:
+        if self._is_doc_comment(expr_stmt, self.cursor):
+            prefix_before = len(expr_stmt.prefix.last_whitespace.split("\n")[-1])
+            stm = cast(ExpressionStatement, super().visit_expression_statement(expr_stmt, p))
             literal = cast(Literal, stm.expression)
             shift = len(stm.prefix.last_whitespace.split("\n")[-1]) - prefix_before
             return stm.replace(expression=
                 literal.replace(value_source=textwrap.indent(str(literal.value_source), shift * " ")[shift:]))
 
-        return super().visit_expression_statement(expression_statement, p)
+        return super().visit_expression_statement(expr_stmt, p)
 
     # -------------------------------------------------------------------------
     # First parameter offset calculation
@@ -699,6 +700,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     self.cursor.parent_or_throw.put_message("last_indent", indent + self._style.continuation_indent)
 
         elem = self.visit_and_cast(elem, J, p)
+        assert elem is not None
         after = self._indent_to(right.after, indent)
         if after.comments or "\n" in after.last_whitespace:
             parent = self.cursor.parent_tree_cursor()

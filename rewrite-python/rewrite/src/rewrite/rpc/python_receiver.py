@@ -1492,7 +1492,7 @@ def _register_core_marker_codecs():
 
 def _register_markup_marker_codecs():
     """Register codecs for Markup marker types (Warn, Error, Info, Debug)."""
-    from rewrite.markers import MarkupWarn, MarkupError, MarkupInfo, MarkupDebug
+    from rewrite.markers import MarkupWarn, MarkupError, MarkupInfo, MarkupDebug  # ty: ignore[unresolved-import]
     from rewrite.rpc.receive_queue import register_codec_with_both_names
     from uuid import uuid4
 

@@ -411,7 +411,7 @@ public class MavenPomDownloader {
         int start = responseBody.indexOf("<a href=\"");
         while (start > 0) {
             start += 9;
-            int end = responseBody.indexOf("\">", start);
+            int end = responseBody.indexOf("\"", start);
             if (end < 0) {
                 break;
             }

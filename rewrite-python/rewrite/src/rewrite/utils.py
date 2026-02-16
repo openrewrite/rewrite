@@ -83,13 +83,19 @@ def list_find(lst: List[T], t: T) -> int:
     return -1  # or raise ValueError to match list.index() behavior
 
 
+def _callable_arg_count(fn: Any) -> int:
+    """Get the number of expected arguments for a callable (function or bound method)."""
+    arg_count: int = fn.__code__.co_argcount
+    if hasattr(fn, '__self__'):  # bound method — co_argcount includes self
+        arg_count -= 1
+    return arg_count
+
+
 def list_map(fn: FnType[T], lst: List[T]) -> List[T]:
     changed = False
     mapped_lst = None
 
-    arg_count = fn.__code__.co_argcount
-    if hasattr(fn, '__self__'):  # bound method — co_argcount includes self
-        arg_count -= 1
+    arg_count = _callable_arg_count(fn)
     with_index = arg_count == 2
     for index, original in enumerate(lst):
         new = fn(original, index) if with_index else fn(original)  # type: ignore
@@ -115,9 +121,7 @@ def list_flat_map(fn: FlatMapFnType[T], lst: List[T]) -> List[T]:
     changed = False
     result: List[T] = []
 
-    arg_count = fn.__code__.co_argcount
-    if hasattr(fn, '__self__'):  # bound method — co_argcount includes self
-        arg_count -= 1
+    arg_count = _callable_arg_count(fn)
     with_index = arg_count == 2
     for index, item in enumerate(lst):
         new_items = fn(item, index) if with_index else fn(item)  # type: ignore

@@ -34,7 +34,7 @@ class NormalizeLineBreaksVisitor(PythonVisitor[P]):
 
         return s.replace(comments=list_map(process_comment, s.comments))
 
-    def post_visit(self, tree: T, _: object) -> Optional[T]:
+    def post_visit(self, tree: T, p: P) -> Optional[T]:
         if self._stop_after and tree == self._stop_after:
             self._stop = True
         return tree
