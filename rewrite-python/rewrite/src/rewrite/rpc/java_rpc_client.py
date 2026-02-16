@@ -356,7 +356,7 @@ def install_java_rpc_hooks() -> None:
             return client.send_request(method, params)
         return original_send_request(method, params, timeout_seconds)
 
-    server.send_request = hooked_send_request
+    server.send_request = hooked_send_request  # ty: ignore[invalid-assignment]
 
 
 def uninstall_java_rpc_hooks() -> None:

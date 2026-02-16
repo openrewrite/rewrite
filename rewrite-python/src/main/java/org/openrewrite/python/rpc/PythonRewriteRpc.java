@@ -27,6 +27,9 @@ import org.openrewrite.rpc.RewriteRpcProcessManager;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import org.openrewrite.Parser;
+import org.openrewrite.python.PyProjectTomlParser;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -175,7 +178,7 @@ public class PythonRewriteRpc extends RewriteRpc {
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
-        return StreamSupport.stream(new Spliterator<SourceFile>() {
+        Stream<SourceFile> rpcStream = StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
             private @Nullable ParseProjectResponse response;
 
@@ -214,6 +217,17 @@ public class PythonRewriteRpc extends RewriteRpc {
                 return response == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
             }
         }, false);
+
+        // Parse pyproject.toml if present
+        Path pyprojectPath = projectPath.resolve("pyproject.toml");
+        if (Files.exists(pyprojectPath)) {
+            Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
+            Parser.Input input = Parser.Input.fromFile(pyprojectPath);
+            Stream<SourceFile> pyprojectStream = new PyProjectTomlParser().parseInputs(
+                    Collections.singletonList(input), effectiveRelativeTo, ctx);
+            return Stream.concat(rpcStream, pyprojectStream);
+        }
+        return rpcStream;
     }
 
     public static Builder builder() {
@@ -256,6 +270,12 @@ public class PythonRewriteRpc extends RewriteRpc {
         private @Nullable Path debugRewriteSourcePath;
 
         private @Nullable Path workingDirectory;
+
+        /**
+         * The Python language version to parse. Defaults to "3" (Python 3).
+         * Set to "2" or "2.7" to parse Python 2 code.
+         */
+        private String pythonVersion = "3";
 
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
@@ -339,6 +359,23 @@ public class PythonRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        /**
+         * Set the Python language version to parse.
+         * <p>
+         * Supported values:
+         * <ul>
+         *   <li>"2" or "2.7" - Parse Python 2.7 code using parso</li>
+         *   <li>"3" (default) - Parse Python 3 code using the standard ast module</li>
+         * </ul>
+         *
+         * @param pythonVersion The Python version to parse (e.g., "2", "2.7", "3")
+         * @return This builder
+         */
+        public Builder pythonVersion(String pythonVersion) {
+            this.pythonVersion = pythonVersion;
+            return this;
+        }
+
         @Override
         public PythonRewriteRpc get() {
             // Bootstrap openrewrite package if pip packages path is set
@@ -365,6 +402,9 @@ public class PythonRewriteRpc extends RewriteRpc {
             }
 
             process.environment().putAll(environment);
+
+            // Set the Python version for the parser
+            process.environment().put("REWRITE_PYTHON_VERSION", pythonVersion);
 
             // Set up PYTHONPATH for the rewrite package
             List<String> pythonPathParts = new ArrayList<>();

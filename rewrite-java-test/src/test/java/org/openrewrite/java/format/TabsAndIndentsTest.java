@@ -2627,6 +2627,21 @@ class TabsAndIndentsTest implements RewriteTest {
                       ""\";
                   private final String singleLine = ""\"
                     noEndLine""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                        indent me!
+                        ""\", ""\"
+                        indent me too!
+                        ""\");
+                      method(
+                        ""\"
+                        indent me!
+                        ""\",
+                        ""\"
+                        indent me too!
+                        ""\"
+                      );
+                  }
               }
               """,
             """
@@ -2640,6 +2655,21 @@ class TabsAndIndentsTest implements RewriteTest {
                           ""\";
                   private final String singleLine = ""\"
                                                     noEndLine""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                             indent me!
+                             ""\", ""\"
+                                   indent me too!
+                                   ""\");
+                      method(
+                              ""\"
+                              indent me!
+                              ""\",
+                              ""\"
+                              indent me too!
+                              ""\"
+                      );
+                  }
               }
               """
           )
@@ -2663,17 +2693,81 @@ class TabsAndIndentsTest implements RewriteTest {
                     ""\"
                       NO
                       ""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                        indent me!
+                        ""\", ""\"
+                              indent me too!
+                              ""\");
+                      method(
+                        ""\"
+                        indent me!
+                        ""\",
+                        ""\"
+                        indent me too!
+                        ""\"
+                      );
+                  }
               }
               """,
             """
               class Test {
                   private final String foo = ""\"
-                    YES
-                    ""\";
+                          YES
+                          ""\";
                   private final String bar =
                           ""\"
-                            NO
-                            ""\";
+                                  NO
+                                  ""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                              indent me!
+                              ""\", ""\"
+                              indent me too!
+                              ""\");
+                      method(
+                              ""\"
+                                      indent me!
+                                      ""\",
+                              ""\"
+                                      indent me too!
+                                      ""\"
+                      );
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void textBlocksNotAlignedTabs() {
+        rewriteRun(
+          autoFormat(
+            spaces -> spaces.withUseTabCharacter(true),
+            wrap -> wrap
+          ),
+          java(
+            """
+              class Test {
+                  private final String foo = ""\"
+              YES
+              ""\";
+                  private final String bar =
+              ""\"
+              NO
+              ""\";
+              }
+              """,
+            """
+              class Test { 
+                  private final String foo = ""\"
+              \t\t\tYES
+              \t\t\t""\";
+                  private final String bar =
+              \t\t\t""\"
+              \t\t\t\t\tNO
+              \t\t\t\t\t""\";
               }
               """
           )

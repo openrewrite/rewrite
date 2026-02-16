@@ -17,7 +17,8 @@ ReorderMethodArguments recipe for Python that delegates to Java's ReorderMethodA
 
 This recipe reorders arguments in method invocations matching a pattern.
 """
-
+from dataclasses import field
+from importlib.metadata import metadata
 from typing import Any, List, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor, option
@@ -38,29 +39,29 @@ class ReorderMethodArguments(Recipe):
         )
     """
 
-    method_pattern: str = option(
+    method_pattern: str = field(metadata=option(
         display_name="Method pattern",
         description="A method pattern that matches method invocations to reorder.",
         example="datetime.datetime replace(..)"
-    )
+    ))
 
-    new_parameter_names: List[str] = option(
+    new_parameter_names: List[str] = field(metadata=option(
         display_name="New parameter names",
         description="The parameter names in the desired order.",
         example='["year", "month", "day"]'
-    )
+    ))
 
-    old_parameter_names: List[str] = option(
+    old_parameter_names: Optional[List[str]] = field(metadata=option(
         display_name="Old parameter names",
         description="The current parameter names (optional if using positional reordering).",
         required=False
-    )
+    ))
 
     def __init__(
-        self,
-        method_pattern: str,
-        new_parameter_names: List[str],
-        old_parameter_names: Optional[List[str]] = None
+            self,
+            method_pattern: str,
+            new_parameter_names: List[str],
+            old_parameter_names: Optional[List[str]] = None
     ):
         self.method_pattern = method_pattern
         self.new_parameter_names = new_parameter_names

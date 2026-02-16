@@ -19,11 +19,10 @@ from __future__ import annotations
 import ast
 import textwrap
 from dataclasses import dataclass
-from functools import lru_cache
-from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING, cast
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
-from rewrite import Markers, random_id
-from rewrite.java import J, Space, Expression, Statement, JRightPadded
+from rewrite import random_id
+from rewrite.java import J, Expression, Statement
 from rewrite.java import tree as j
 
 if TYPE_CHECKING:
@@ -31,7 +30,7 @@ if TYPE_CHECKING:
     from rewrite.visitor import Cursor
 
 from .capture import Capture
-from .placeholder import substitute_placeholders, to_placeholder, from_placeholder
+from .placeholder import substitute_placeholders
 from .coordinates import PythonCoordinates, CoordinateMode
 
 # Wrapper function name used to make template code parseable
@@ -119,7 +118,7 @@ class TemplateEngine:
         values: Dict[str, J],
         cursor: 'Cursor',
         coordinates: Optional[PythonCoordinates] = None
-    ) -> J:
+    ) -> Optional[J]:
         """
         Substitute placeholder identifiers with actual values.
 
@@ -273,7 +272,7 @@ class TemplateEngine:
             # If it's a return statement AND the original was an expression,
             # extract the expression from the return wrapper
             if is_expression and isinstance(single, j.Return):
-                return_stmt = cast(j.Return, single)
+                return_stmt = single
                 if return_stmt.expression is not None:
                     return return_stmt.expression
 
@@ -314,7 +313,7 @@ class TemplateEngine:
             original = coordinates.tree
             if hasattr(original, 'prefix') and hasattr(result, 'prefix'):
                 # Replace the prefix to match original
-                result = result.replace(prefix=original.prefix)
+                result = result.replace(prefix=original.prefix)  # ty: ignore[unresolved-attribute]
 
         # Check if we need to wrap expression in statement
         # This happens when inserting an expression where a statement is expected
@@ -325,6 +324,18 @@ class TemplateEngine:
                 random_id(),
                 result,
             )
+
+        # Auto-format the result
+        try:
+            from ..format import maybe_auto_format
+            original = coordinates.tree
+            result = maybe_auto_format(
+                original, result, None, None,
+                cursor.parent if cursor.parent is not None else None
+            )
+        except (ValueError, AttributeError):
+            # No CompilationUnit in cursor ancestry — skip formatting
+            pass
 
         return result
 

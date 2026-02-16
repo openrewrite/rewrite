@@ -21,10 +21,12 @@ import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.python.tree.Py;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.python;
 
 @DisabledIfEnvironmentVariable(named = "CI", matches = "true", disabledReason = "No remote client/server available")
@@ -66,6 +68,26 @@ class PythonParserTest implements RewriteTest {
                   }.visitNonNull(cu, 0)).printAll()).isEqualTo("import sys # comment\nprint(sys.path)");
               })
             )
+          )
+        );
+    }
+
+    @Test
+    void unicodeEscapes() {
+        rewriteRun(
+          python(
+            """
+              s = "\\uD83D\\uDE00"
+              print(s)
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Assignment s = (J.Assignment) cu.getStatements().get(0);
+                J.Literal str = (J.Literal) s.getAssignment();
+                assertThat(str.getUnicodeEscapes()).satisfiesExactly(
+                  esc -> assertThat(esc.getCodePoint()).isEqualTo("D83D"),
+                  esc -> assertThat(esc.getCodePoint()).isEqualTo("DE00")
+                );
+            })
           )
         );
     }
