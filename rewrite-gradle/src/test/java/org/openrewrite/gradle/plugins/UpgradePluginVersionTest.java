@@ -99,6 +99,51 @@ class UpgradePluginVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradeKotlinPluginLocalVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("kotlin", "2.1.0", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  val kotlinVersion = "1.9.25"
+                  kotlin("jvm") version kotlinVersion
+                  kotlin("plugin.allopen") version kotlinVersion
+                  kotlin("plugin.spring") version kotlinVersion
+              }
+              """,
+            """
+              plugins {
+                  val kotlinVersion = "2.1.0"
+                  kotlin("jvm") version kotlinVersion
+                  kotlin("plugin.allopen") version kotlinVersion
+                  kotlin("plugin.spring") version kotlinVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradeKotlinPluginLocalVariableWithSemverSelector() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("kotlin", "latest.minor", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  val kotlinVersion = "2.0.0"
+                  kotlin("jvm") version kotlinVersion
+              }
+              """,
+            spec -> spec.after(s -> {
+                assertThat(s).doesNotContain("2.0.0");
+                assertThat(s).containsPattern("val kotlinVersion = \"2.\\d+.\\d+\"");
+                return s;
+            })
+          )
+        );
+    }
+
+    @Test
     void upgradeGradleSettingsPlugin() {
         rewriteRun(
           spec -> spec.recipe(new UpgradePluginVersion("com.gradle.enterprise", "3.10.x", null)),
