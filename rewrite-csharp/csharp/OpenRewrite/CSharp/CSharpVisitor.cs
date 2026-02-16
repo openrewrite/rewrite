@@ -86,26 +86,12 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             TupleElement tel => VisitTupleElement(tel, p),
             CsNewClass csnc => VisitCsNewClass(csnc, p),
             ImplicitElementAccess iea => VisitImplicitElementAccess(iea, p),
-            UnaryPattern up => VisitUnaryPattern(up, p),
-            TypePattern tp => VisitTypePattern(tp, p),
-            BinaryPattern bp => VisitBinaryPattern(bp, p),
             ConstantPattern cp => VisitConstantPattern(cp, p),
             DiscardPattern dp => VisitDiscardPattern(dp, p),
             ListPattern lp => VisitListPattern(lp, p),
-            ParenthesizedPattern pap => VisitParenthesizedPattern(pap, p),
-            RecursivePattern rcp => VisitRecursivePattern(rcp, p),
-            VarPattern vp => VisitVarPattern(vp, p),
-            PositionalPatternClause ppc => VisitPositionalPatternClause(ppc, p),
             SlicePattern sp => VisitSlicePattern(sp, p),
-            PropertyPatternClause ppclause => VisitPropertyPatternClause(ppclause, p),
-            Subpattern sub => VisitSubpattern(sub, p),
             SwitchExpression swe => VisitSwitchExpression(swe, p),
             SwitchExpressionArm swea => VisitSwitchExpressionArm(swea, p),
-            SwitchSection ss => VisitSwitchSection(ss, p),
-            DefaultSwitchLabel dsl => VisitDefaultSwitchLabel(dsl, p),
-            CasePatternSwitchLabel cpsl => VisitCasePatternSwitchLabel(cpsl, p),
-            SwitchStatement sws => VisitSwitchStatement(sws, p),
-            LockStatement ls => VisitLockStatement(ls, p),
             CheckedExpression che => VisitCheckedExpression(che, p),
             CheckedStatement chs => VisitCheckedStatement(chs, p),
             RangeExpression rang => VisitRangeExpression(rang, p),
@@ -121,6 +107,10 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             CsTry cstry => VisitCsTry(cstry, p),
             PointerFieldAccess pfa => VisitPointerFieldAccess(pfa, p),
             RefType rt => VisitRefType(rt, p),
+            AnonymousObjectCreationExpression aoce => VisitAnonymousObjectCreationExpression(aoce, p),
+            WithExpression we => VisitWithExpression(we, p),
+            SpreadExpression se => VisitSpreadExpression(se, p),
+            FunctionPointerType fpt => VisitFunctionPointerType(fpt, p),
             // LINQ
             QueryExpression qe => VisitQueryExpression(qe, p),
             QueryBody qb => VisitQueryBody(qb, p),
@@ -219,7 +209,9 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
     public virtual J VisitDeclarationExpression(DeclarationExpression de, P p)
     {
-        Visit(de.Type, p);
+        if (de.TypeExpression != null)
+            Visit(de.TypeExpression, p);
+        Visit(de.Variables, p);
         return de;
     }
 
@@ -794,29 +786,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         return csNewClass;
     }
 
-    public virtual J VisitImplicitElementAccess(ImplicitElementAccess implicitElementAccess, P p) => implicitElementAccess;
-
-    public virtual J VisitUnaryPattern(UnaryPattern unaryPattern, P p)
-    {
-        Visit(unaryPattern.Operator, p);
-        Visit(unaryPattern.PatternValue, p);
-        return unaryPattern;
-    }
-
-    public virtual J VisitTypePattern(TypePattern typePattern, P p)
-    {
-        Visit(typePattern.TypeIdentifier, p);
-        if (typePattern.Designation != null) Visit(typePattern.Designation, p);
-        return typePattern;
-    }
-
-    public virtual J VisitBinaryPattern(BinaryPattern binaryPattern, P p)
-    {
-        Visit(binaryPattern.Left, p);
-        Visit(binaryPattern.Right, p);
-        return binaryPattern;
-    }
-
     public virtual J VisitConstantPattern(ConstantPattern constantPattern, P p)
     {
         Visit(constantPattern.Value, p);
@@ -825,38 +794,19 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
     public virtual J VisitDiscardPattern(DiscardPattern discardPattern, P p) => discardPattern;
 
+    public virtual J VisitImplicitElementAccess(ImplicitElementAccess implicitElementAccess, P p)
+    {
+        foreach (var arg in implicitElementAccess.ArgumentList.Elements)
+            Visit(arg.Element, p);
+        return implicitElementAccess;
+    }
+
+    public virtual J VisitSlicePattern(SlicePattern slicePattern, P p) => slicePattern;
+
     public virtual J VisitListPattern(ListPattern listPattern, P p)
     {
         if (listPattern.Designation != null) Visit(listPattern.Designation, p);
         return listPattern;
-    }
-
-    public virtual J VisitParenthesizedPattern(ParenthesizedPattern parenthesizedPattern, P p) => parenthesizedPattern;
-
-    public virtual J VisitRecursivePattern(RecursivePattern recursivePattern, P p)
-    {
-        if (recursivePattern.TypeQualifier != null) Visit(recursivePattern.TypeQualifier, p);
-        if (recursivePattern.PositionalPattern != null) Visit(recursivePattern.PositionalPattern, p);
-        if (recursivePattern.PropertyPatternValue != null) Visit(recursivePattern.PropertyPatternValue, p);
-        if (recursivePattern.Designation != null) Visit(recursivePattern.Designation, p);
-        return recursivePattern;
-    }
-
-    public virtual J VisitVarPattern(VarPattern varPattern, P p)
-    {
-        Visit(varPattern.Designation, p);
-        return varPattern;
-    }
-
-    public virtual J VisitPositionalPatternClause(PositionalPatternClause clause, P p) => clause;
-    public virtual J VisitSlicePattern(SlicePattern slicePattern, P p) => slicePattern;
-    public virtual J VisitPropertyPatternClause(PropertyPatternClause clause, P p) => clause;
-
-    public virtual J VisitSubpattern(Subpattern subpattern, P p)
-    {
-        if (subpattern.Name != null) Visit(subpattern.Name, p);
-        Visit(subpattern.PatternValue.Element, p);
-        return subpattern;
     }
 
     public virtual J VisitSwitchExpression(SwitchExpression switchExpression, P p)
@@ -872,24 +822,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         Visit(arm.Pattern, p);
         Visit(arm.ExpressionPadded.Element, p);
         return arm;
-    }
-
-    public virtual J VisitSwitchSection(SwitchSection switchSection, P p) => switchSection;
-    public virtual J VisitDefaultSwitchLabel(DefaultSwitchLabel label, P p) => label;
-
-    public virtual J VisitCasePatternSwitchLabel(CasePatternSwitchLabel label, P p)
-    {
-        Visit(label.Pattern, p);
-        return label;
-    }
-
-    public virtual J VisitSwitchStatement(SwitchStatement switchStatement, P p) => switchStatement;
-
-    public virtual J VisitLockStatement(LockStatement lockStatement, P p)
-    {
-        Visit(lockStatement.ExpressionValue, p);
-        Visit(lockStatement.StatementPadded.Element, p);
-        return lockStatement;
     }
 
     public virtual J VisitCheckedExpression(CheckedExpression checkedExpression, P p)
@@ -1103,5 +1035,28 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (!ReferenceEquals(body, queryContinuation.Body))
             return queryContinuation with { Body = body };
         return queryContinuation;
+    }
+
+    public virtual J VisitAnonymousObjectCreationExpression(AnonymousObjectCreationExpression anonymousObject, P p)
+    {
+        return anonymousObject;
+    }
+
+    public virtual J VisitWithExpression(WithExpression withExpression, P p)
+    {
+        Visit(withExpression.Target, p);
+        Visit(withExpression.Initializer, p);
+        return withExpression;
+    }
+
+    public virtual J VisitSpreadExpression(SpreadExpression spreadExpression, P p)
+    {
+        Visit(spreadExpression.Expression, p);
+        return spreadExpression;
+    }
+
+    public virtual J VisitFunctionPointerType(FunctionPointerType functionPointerType, P p)
+    {
+        return functionPointerType;
     }
 }

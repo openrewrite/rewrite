@@ -452,11 +452,53 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitDeclarationExpression(DeclarationExpression de, PrintOutputCapture<P> p)
     {
         BeforeSyntax(de, p);
-        Visit(de.Type, p);
-        VisitSpace(de.Variable.Before, p);
-        Visit(de.Variable.Element, p);
+        if (de.TypeExpression != null)
+        {
+            Visit(de.TypeExpression, p);
+        }
+        Visit(de.Variables, p);
         AfterSyntax(de, p);
         return de;
+    }
+
+    public override J VisitSingleVariableDesignation(SingleVariableDesignation svd, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(svd, p);
+        Visit(svd.Name, p);
+        AfterSyntax(svd, p);
+        return svd;
+    }
+
+    public override J VisitParenthesizedVariableDesignation(ParenthesizedVariableDesignation pvd, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(pvd, p);
+        VisitContainer("(", pvd.Variables, ",", ")", p);
+        AfterSyntax(pvd, p);
+        return pvd;
+    }
+
+    public override J VisitDiscardVariableDesignation(DiscardVariableDesignation dvd, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(dvd, p);
+        Visit(dvd.Discard, p);
+        AfterSyntax(dvd, p);
+        return dvd;
+    }
+
+    public override J VisitTypeParameter(TypeParameter typeParameter, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(typeParameter, p);
+        if (typeParameter.Bounds?.Elements.Count > 0 &&
+            typeParameter.Bounds.Elements[0].Element is ConstrainedTypeParameter ctp)
+        {
+            PrintConstrainedTypeParameterDecl(ctp, p);
+        }
+        else
+        {
+            Visit(typeParameter.Name, p);
+        }
+        AfterSyntax(typeParameter, p);
+        return typeParameter;
     }
 
     public override J VisitConstrainedTypeParameter(ConstrainedTypeParameter ctp, PrintOutputCapture<P> p)
@@ -1996,7 +2038,14 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
     public override J VisitLambda(Lambda lambda, PrintOutputCapture<P> p)
     {
+        var isAnonymousMethod = lambda.Markers.FindFirst<AnonymousMethod>() != null;
+
         BeforeSyntax(lambda, p);
+
+        if (isAnonymousMethod)
+        {
+            p.Append("delegate");
+        }
 
         // Print parameters
         var @params = lambda.Params;
@@ -2030,9 +2079,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             }
             p.Append(')');
         }
-        else
+        else if (!isAnonymousMethod)
         {
-            // Single unparenthesized parameter
+            // Single unparenthesized parameter (not for anonymous methods)
             VisitSpace(@params.Prefix, p);
             foreach (var paddedParam in @params.Elements)
             {
@@ -2048,9 +2097,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             }
         }
 
-        // Print arrow
-        VisitSpace(lambda.Arrow, p);
-        p.Append("=>");
+        if (!isAnonymousMethod)
+        {
+            // Print arrow (not for anonymous methods)
+            VisitSpace(lambda.Arrow, p);
+            p.Append("=>");
+        }
 
         // Print body
         Visit(lambda.Body, p);
@@ -2246,6 +2298,40 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             p.Append(';');
         AfterSyntax(varDecl, p);
         return varDecl;
+    }
+
+    /// <summary>
+    /// Prints a parameter list container (JContainer of Statement or Expression) with given delimiters,
+    /// using VisitVariableDeclarationsWithoutSemicolon for VariableDeclarations elements.
+    /// </summary>
+    private void PrintParameterList<T>(string open, JContainer<T>? container, string close, PrintOutputCapture<P> p) where T : J
+    {
+        if (container == null) return;
+        VisitSpace(container.Before, p);
+        p.Append(open);
+        for (int i = 0; i < container.Elements.Count; i++)
+        {
+            var padded = container.Elements[i];
+            if (padded.Element is VariableDeclarations vd)
+            {
+                VisitVariableDeclarationsWithoutSemicolon(vd, p);
+            }
+            else if (padded.Element is StatementExpression { Statement: VariableDeclarations svd })
+            {
+                VisitVariableDeclarationsWithoutSemicolon(svd, p);
+            }
+            else
+            {
+                Visit(padded.Element, p);
+            }
+
+            if (i < container.Elements.Count - 1)
+            {
+                VisitSpace(padded.After, p);
+                p.Append(',');
+            }
+        }
+        p.Append(close);
     }
 
     private void VisitVariableDeclarationsWithoutSemicolon(VariableDeclarations varDecl, PrintOutputCapture<P> p)
@@ -2698,6 +2784,453 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         p.Append(before);
         VisitRightPadded(container.Elements, suffixBetween, p);
         p.Append(after ?? "");
+    }
+
+    public override J VisitGotoStatement(GotoStatement gotoStatement, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(gotoStatement, p);
+        p.Append("goto");
+
+        if (gotoStatement.CaseOrDefaultKeyword != null)
+        {
+            VisitSpace(gotoStatement.CaseOrDefaultKeyword.Prefix, p);
+            p.Append(gotoStatement.CaseOrDefaultKeyword.Kind == KeywordKind.Case ? "case" : "default");
+        }
+
+        if (gotoStatement.Target != null)
+        {
+            Visit(gotoStatement.Target, p);
+        }
+
+        p.Append(';');
+        AfterSyntax(gotoStatement, p);
+        return gotoStatement;
+    }
+
+    public override J VisitUsingStatement(UsingStatement usingStatement, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(usingStatement, p);
+
+        if (usingStatement.AwaitKeyword != null)
+        {
+            VisitSpace(usingStatement.AwaitKeyword.Prefix, p);
+            p.Append("await");
+        }
+
+        p.Append("using");
+
+        // Print parenthesized expression (left-padding = open paren prefix)
+        VisitSpace(usingStatement.ExpressionPadded.Before, p);
+        p.Append('(');
+
+        if (usingStatement.ExpressionPadded.Element is StatementExpression { Statement: VariableDeclarations varDecl })
+        {
+            VisitVariableDeclarationsWithoutSemicolon(varDecl, p);
+        }
+        else
+        {
+            Visit(usingStatement.ExpressionPadded.Element, p);
+        }
+
+        p.Append(')');
+
+        Visit(usingStatement.Statement, p);
+        AfterSyntax(usingStatement, p);
+        return usingStatement;
+    }
+
+    public override J VisitImplicitElementAccess(ImplicitElementAccess implicitElementAccess, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(implicitElementAccess, p);
+        VisitContainer("[", implicitElementAccess.ArgumentList, ",", "]", p);
+        AfterSyntax(implicitElementAccess, p);
+        return implicitElementAccess;
+    }
+
+    public override J VisitSlicePattern(SlicePattern slicePattern, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(slicePattern, p);
+        p.Append("..");
+        AfterSyntax(slicePattern, p);
+        return slicePattern;
+    }
+
+    public override J VisitListPattern(ListPattern listPattern, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(listPattern, p);
+        VisitContainer("[", listPattern.Patterns, ",", "]", p);
+
+        if (listPattern.Designation != null)
+        {
+            Visit(listPattern.Designation, p);
+        }
+
+        AfterSyntax(listPattern, p);
+        return listPattern;
+    }
+
+    public override J VisitAliasQualifiedName(AliasQualifiedName aliasQualifiedName, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(aliasQualifiedName, p);
+        Visit(aliasQualifiedName.Alias.Element, p);
+        VisitSpace(aliasQualifiedName.Alias.After, p);
+        p.Append("::");
+        Visit(aliasQualifiedName.Name, p);
+        AfterSyntax(aliasQualifiedName, p);
+        return aliasQualifiedName;
+    }
+
+    public override J VisitRefType(RefType refType, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(refType, p);
+        p.Append("ref");
+
+        if (refType.ReadonlyKeyword != null)
+        {
+            VisitSpace(refType.ReadonlyKeyword.Prefix, p);
+            p.Append("readonly");
+        }
+
+        Visit(refType.TypeIdentifier, p);
+        AfterSyntax(refType, p);
+        return refType;
+    }
+
+    public override J VisitAnonymousObjectCreationExpression(AnonymousObjectCreationExpression anonymousObject, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(anonymousObject, p);
+        p.Append("new");
+        VisitContainer("{", anonymousObject.Initializers, ",", "}", p);
+        AfterSyntax(anonymousObject, p);
+        return anonymousObject;
+    }
+
+    public override J VisitWithExpression(WithExpression withExpression, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(withExpression, p);
+        Visit(withExpression.Target, p);
+        VisitSpace(withExpression.InitializerPadded.Before, p);
+        p.Append("with");
+        Visit(withExpression.Initializer, p);
+        AfterSyntax(withExpression, p);
+        return withExpression;
+    }
+
+    public override J VisitSpreadExpression(SpreadExpression spreadExpression, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(spreadExpression, p);
+        p.Append("..");
+        Visit(spreadExpression.Expression, p);
+        AfterSyntax(spreadExpression, p);
+        return spreadExpression;
+    }
+
+    public override J VisitFunctionPointerType(FunctionPointerType functionPointerType, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(functionPointerType, p);
+        p.Append("delegate*");
+
+        if (functionPointerType.CallingConvention != null)
+        {
+            VisitSpace(functionPointerType.CallingConvention.Before, p);
+            p.Append(functionPointerType.CallingConvention.Element == CallingConventionKind.Managed ? "managed" : "unmanaged");
+        }
+
+        if (functionPointerType.UnmanagedCallingConventionTypes != null)
+        {
+            VisitContainer("[", functionPointerType.UnmanagedCallingConventionTypes, ",", "]", p);
+        }
+
+        VisitContainer("<", functionPointerType.ParameterTypes, ",", ">", p);
+        AfterSyntax(functionPointerType, p);
+        return functionPointerType;
+    }
+
+    public override J VisitDelegateDeclaration(DelegateDeclaration delegateDeclaration, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(delegateDeclaration, p);
+
+        foreach (var attr in delegateDeclaration.Attributes)
+        {
+            Visit(attr, p);
+        }
+
+        foreach (var mod in delegateDeclaration.Modifiers)
+        {
+            VisitSpace(mod.Prefix, p);
+            p.Append(GetModifierString(mod));
+        }
+
+        // ReturnType is JLeftPadded — the before space holds 'delegate' keyword prefix
+        VisitSpace(delegateDeclaration.ReturnType.Before, p);
+        p.Append("delegate");
+        Visit(delegateDeclaration.ReturnType.Element, p);
+
+        // Identifier (name)
+        Visit(delegateDeclaration.IdentifierName, p);
+
+        // Type parameters
+        VisitContainer("<", delegateDeclaration.TypeParameters, ",", ">", p);
+
+        // Parameters (without semicolons after each VariableDeclarations)
+        PrintParameterList("(", delegateDeclaration.Parameters, ")", p);
+
+        // Type parameter constraints (where clauses)
+        if (delegateDeclaration.TypeParameters != null)
+        {
+            foreach (var typeParam in delegateDeclaration.TypeParameters.Elements)
+            {
+                if (typeParam.Element.Bounds?.Elements.Count > 0 &&
+                    typeParam.Element.Bounds.Elements[0].Element is ConstrainedTypeParameter ctp2 &&
+                    ctp2.WhereConstraint != null)
+                {
+                    PrintConstrainedTypeParameterConstraints(ctp2, p);
+                }
+            }
+        }
+
+        p.Append(';');
+        AfterSyntax(delegateDeclaration, p);
+        return delegateDeclaration;
+    }
+
+    public override J VisitEventDeclaration(EventDeclaration eventDeclaration, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(eventDeclaration, p);
+
+        foreach (var attr in eventDeclaration.AttributeLists)
+        {
+            Visit(attr, p);
+        }
+
+        foreach (var mod in eventDeclaration.Modifiers)
+        {
+            VisitSpace(mod.Prefix, p);
+            p.Append(GetModifierString(mod));
+        }
+
+        // TypeExpression is JLeftPadded — before space holds 'event' keyword prefix
+        VisitSpace(eventDeclaration.TypeExpressionPadded.Before, p);
+        p.Append("event");
+        Visit(eventDeclaration.TypeExpressionPadded.Element, p);
+
+        // Explicit interface specifier (e.g., IFoo.)
+        if (eventDeclaration.InterfaceSpecifier != null)
+        {
+            Visit(eventDeclaration.InterfaceSpecifier.Element, p);
+            VisitSpace(eventDeclaration.InterfaceSpecifier.After, p);
+            p.Append('.');
+        }
+
+        // Name
+        Visit(eventDeclaration.Name, p);
+
+        // Accessors block
+        if (eventDeclaration.Accessors != null)
+        {
+            VisitContainer("{", eventDeclaration.Accessors, "", "}", p);
+        }
+
+        AfterSyntax(eventDeclaration, p);
+        return eventDeclaration;
+    }
+
+    public override J VisitIndexerDeclaration(IndexerDeclaration indexerDeclaration, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(indexerDeclaration, p);
+
+        foreach (var mod in indexerDeclaration.Modifiers)
+        {
+            VisitSpace(mod.Prefix, p);
+            p.Append(GetModifierString(mod));
+        }
+
+        // Type
+        Visit(indexerDeclaration.TypeExpression, p);
+
+        // Explicit interface specifier
+        if (indexerDeclaration.ExplicitInterfaceSpecifier != null)
+        {
+            Visit(indexerDeclaration.ExplicitInterfaceSpecifier.Element, p);
+            VisitSpace(indexerDeclaration.ExplicitInterfaceSpecifier.After, p);
+            p.Append('.');
+        }
+
+        // 'this' keyword
+        Visit(indexerDeclaration.Indexer, p);
+
+        // Parameters in brackets (without semicolons)
+        PrintParameterList("[", indexerDeclaration.Parameters, "]", p);
+
+        // Expression body or accessor block
+        if (indexerDeclaration.ExpressionBody != null)
+        {
+            VisitSpace(indexerDeclaration.ExpressionBody.Before, p);
+            p.Append("=>");
+            Visit(indexerDeclaration.ExpressionBody.Element, p);
+            p.Append(';');
+        }
+        else if (indexerDeclaration.Accessors != null)
+        {
+            VisitBlock(indexerDeclaration.Accessors, p);
+        }
+
+        AfterSyntax(indexerDeclaration, p);
+        return indexerDeclaration;
+    }
+
+    public override J VisitOperatorDeclaration(OperatorDeclaration operatorDeclaration, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(operatorDeclaration, p);
+
+        foreach (var attr in operatorDeclaration.AttributeLists)
+        {
+            Visit(attr, p);
+        }
+
+        foreach (var mod in operatorDeclaration.Modifiers)
+        {
+            VisitSpace(mod.Prefix, p);
+            p.Append(GetModifierString(mod));
+        }
+
+        // Return type
+        Visit(operatorDeclaration.ReturnType, p);
+
+        // Explicit interface specifier
+        if (operatorDeclaration.ExplicitInterfaceSpecifier != null)
+        {
+            Visit(operatorDeclaration.ExplicitInterfaceSpecifier.Element, p);
+            VisitSpace(operatorDeclaration.ExplicitInterfaceSpecifier.After, p);
+            p.Append('.');
+        }
+
+        // 'operator' keyword
+        VisitSpace(operatorDeclaration.OperatorKeyword.Prefix, p);
+        p.Append("operator");
+
+        // Optional 'checked' keyword
+        if (operatorDeclaration.CheckedKeyword != null)
+        {
+            VisitSpace(operatorDeclaration.CheckedKeyword.Prefix, p);
+            p.Append("checked");
+        }
+
+        // Operator token
+        VisitSpace(operatorDeclaration.OperatorToken.Before, p);
+        p.Append(GetOperatorTokenString(operatorDeclaration.OperatorToken.Element));
+
+        // Parameters (without semicolons)
+        PrintParameterList("(", operatorDeclaration.Parameters, ")", p);
+
+        // Body
+        VisitBlock(operatorDeclaration.Body, p);
+
+        AfterSyntax(operatorDeclaration, p);
+        return operatorDeclaration;
+    }
+
+    private static string GetOperatorTokenString(OperatorDeclaration.OperatorKind kind)
+    {
+        return kind switch
+        {
+            OperatorDeclaration.OperatorKind.Plus => "+",
+            OperatorDeclaration.OperatorKind.Minus => "-",
+            OperatorDeclaration.OperatorKind.Bang => "!",
+            OperatorDeclaration.OperatorKind.Tilde => "~",
+            OperatorDeclaration.OperatorKind.PlusPlus => "++",
+            OperatorDeclaration.OperatorKind.MinusMinus => "--",
+            OperatorDeclaration.OperatorKind.Star => "*",
+            OperatorDeclaration.OperatorKind.Division => "/",
+            OperatorDeclaration.OperatorKind.Percent => "%",
+            OperatorDeclaration.OperatorKind.LeftShift => "<<",
+            OperatorDeclaration.OperatorKind.RightShift => ">>",
+            OperatorDeclaration.OperatorKind.LessThan => "<",
+            OperatorDeclaration.OperatorKind.GreaterThan => ">",
+            OperatorDeclaration.OperatorKind.LessThanEquals => "<=",
+            OperatorDeclaration.OperatorKind.GreaterThanEquals => ">=",
+            OperatorDeclaration.OperatorKind.Equals => "==",
+            OperatorDeclaration.OperatorKind.NotEquals => "!=",
+            OperatorDeclaration.OperatorKind.Ampersand => "&",
+            OperatorDeclaration.OperatorKind.Bar => "|",
+            OperatorDeclaration.OperatorKind.Caret => "^",
+            OperatorDeclaration.OperatorKind.True => "true",
+            OperatorDeclaration.OperatorKind.False => "false",
+            _ => throw new InvalidOperationException($"Unknown operator kind: {kind}")
+        };
+    }
+
+    public override J VisitConversionOperatorDeclaration(ConversionOperatorDeclaration conversion, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(conversion, p);
+
+        foreach (var mod in conversion.Modifiers)
+        {
+            VisitSpace(mod.Prefix, p);
+            p.Append(GetModifierString(mod));
+        }
+
+        // implicit/explicit kind
+        VisitSpace(conversion.Kind.Before, p);
+        p.Append(conversion.Kind.Element == ConversionOperatorDeclaration.ExplicitImplicit.Implicit ? "implicit" : "explicit");
+
+        // 'operator' keyword + return type
+        VisitSpace(conversion.ReturnType.Before, p);
+        p.Append("operator");
+        Visit(conversion.ReturnType.Element, p);
+
+        // Parameters (without semicolons)
+        PrintParameterList("(", conversion.Parameters, ")", p);
+
+        // Expression body or block body
+        if (conversion.ExpressionBody != null)
+        {
+            VisitSpace(conversion.ExpressionBody.Before, p);
+            p.Append("=>");
+            Visit(conversion.ExpressionBody.Element, p);
+            p.Append(';');
+        }
+        else if (conversion.Body != null)
+        {
+            VisitBlock(conversion.Body, p);
+        }
+
+        AfterSyntax(conversion, p);
+        return conversion;
+    }
+
+    public override J VisitForEachVariableLoop(ForEachVariableLoop forEachVariableLoop, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(forEachVariableLoop, p);
+        p.Append("foreach");
+
+        // Control: open paren, variable, 'in', iterable, close paren
+        VisitSpace(forEachVariableLoop.ControlElement.Prefix, p);
+        p.Append('(');
+
+        Visit(forEachVariableLoop.ControlElement.Variable.Element, p);
+        VisitSpace(forEachVariableLoop.ControlElement.Variable.After, p);
+        p.Append("in");
+
+        Visit(forEachVariableLoop.ControlElement.Iterable.Element, p);
+        VisitSpace(forEachVariableLoop.ControlElement.Iterable.After, p);
+
+        p.Append(')');
+
+        Visit(forEachVariableLoop.Body.Element, p);
+        AfterSyntax(forEachVariableLoop, p);
+        return forEachVariableLoop;
+    }
+
+    public override J VisitPointerFieldAccess(PointerFieldAccess pointerFieldAccess, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(pointerFieldAccess, p);
+        Visit(pointerFieldAccess.Target, p);
+        VisitSpace(pointerFieldAccess.NamePadded.Before, p);
+        p.Append("->");
+        Visit(pointerFieldAccess.NamePadded.Element, p);
+        AfterSyntax(pointerFieldAccess, p);
+        return pointerFieldAccess;
     }
 
     #endregion
