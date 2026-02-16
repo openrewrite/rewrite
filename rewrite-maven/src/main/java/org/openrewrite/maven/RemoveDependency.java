@@ -54,12 +54,8 @@ public class RemoveDependency extends Recipe {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    String description = "Removes a single dependency from the <dependencies> section of the pom.xml.";
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RemoveDependencyVisitor();
-    }
+    String description = "Removes a single dependency from the <dependencies> section of the pom.xml. " +
+            "Does not remove usage of the dependency classes, nor guard against the resulting compilation errors.";
 
     @Override
     public Validated<Object> validate() {
@@ -67,19 +63,23 @@ public class RemoveDependency extends Recipe {
                 scope, s -> Scope.Invalid != Scope.fromName(s)));
     }
 
-    private class RemoveDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
-        @Override
-        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (isDependencyTag(groupId, artifactId)) {
-                Scope checkScope = scope != null ? Scope.fromName(scope) : null;
-                ResolvedDependency dependency = findDependency(tag, checkScope);
-                if (dependency != null) {
-                    doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
-                    maybeUpdateModel();
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (isDependencyTag(groupId, artifactId)) {
+                    Scope checkScope = scope != null ? Scope.fromName(scope) : null;
+                    ResolvedDependency dependency = findDependency(tag, checkScope);
+                    if (dependency != null) {
+                        doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
+                        maybeUpdateModel();
+                    }
                 }
-            }
 
-            return super.visitTag(tag, ctx);
-        }
+                return super.visitTag(tag, ctx);
+            }
+        };
     }
+
 }
