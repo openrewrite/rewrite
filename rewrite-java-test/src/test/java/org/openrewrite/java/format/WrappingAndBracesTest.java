@@ -28,7 +28,6 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -46,7 +45,7 @@ class WrappingAndBracesTest implements RewriteTest {
         autoFormat(
           spaces -> spaces,
           wrapping -> wrapping
-            .withChainedMethodCalls(wrapping.getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(Arrays.asList("builder", "newBuilder")))
+            .withChainedMethodCalls(wrapping.getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(List.of("builder", "newBuilder")))
             .withMethodDeclarationParameters(wrapping.getMethodDeclarationParameters().withWrap(WrapAlways))).accept(spec);
     }
 
@@ -1135,18 +1134,20 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void doNotWrapImplementsList() {
         rewriteRun(
-          java("""
-            public class Interfaces {
-                public interface I1 {
-                }
-
-                public interface I2 {
-                }
-
-                public interface I3 {
-                }
-            }
-            """),
+          java(
+              """
+                  public class Interfaces {
+                      public interface I1 {
+                      }
+                  
+                      public interface I2 {
+                      }
+                  
+                      public interface I3 {
+                      }
+                  }
+                  """
+          ),
           java(
             """
               public class Test implements Interfaces.I1, Interfaces.I2, Interfaces.I3 {
@@ -1163,16 +1164,18 @@ class WrappingAndBracesTest implements RewriteTest {
             spaces -> spaces,
             wrapping -> wrapping.withExtendsImplementsPermitsList(wrapping.getExtendsImplementsPermitsList().withWrap(WrapAlways))
           ),
-          java("""
-            public class Interfaces {
-                public interface I1 {
-                }
-                public interface I2 {
-                }
-                public interface I3 {
-                }
-            }
-            """, SourceSpec::skip),
+          java(
+              """
+                  public class Interfaces {
+                      public interface I1 {
+                      }
+                      public interface I2 {
+                      }
+                      public interface I3 {
+                      }
+                  }
+                  """,
+              SourceSpec::skip),
           java(
             """
               public class Test implements Interfaces.I1, Interfaces.I2, Interfaces.I3 {
@@ -1195,16 +1198,18 @@ class WrappingAndBracesTest implements RewriteTest {
             spaces -> spaces,
             wrapping -> wrapping.withExtendsImplementsPermitsList(wrapping.getExtendsImplementsPermitsList().withWrap(WrapAlways).withAlignWhenMultiline(true))
           ),
-          java("""
-            public class Interfaces {
-                public interface I1 {
-                }
-                public interface I2 {
-                }
-                public interface I3 {
-                }
-            }
-            """, SourceSpec::skip),
+          java(
+              """
+                  public class Interfaces {
+                      public interface I1 {
+                      }
+                      public interface I2 {
+                      }
+                      public interface I3 {
+                      }
+                  }
+                  """,
+              SourceSpec::skip),
           java(
             """
               public class Test implements Interfaces.I1, Interfaces.I2, Interfaces.I3 {

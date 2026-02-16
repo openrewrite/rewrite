@@ -81,8 +81,8 @@ class PythonParserTest implements RewriteTest {
               print(s)
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.Assignment s = (J.Assignment) cu.getStatements().get(0);
-                J.Literal str = (J.Literal) s.getAssignment();
+                var s = (J.Assignment) cu.getStatements().get(0);
+                var str = (J.Literal) s.getAssignment();
                 assertThat(str.getUnicodeEscapes()).satisfiesExactly(
                   esc -> assertThat(esc.getCodePoint()).isEqualTo("D83D"),
                   esc -> assertThat(esc.getCodePoint()).isEqualTo("DE00")

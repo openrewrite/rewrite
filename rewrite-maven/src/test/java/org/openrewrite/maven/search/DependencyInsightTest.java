@@ -522,8 +522,8 @@ class DependencyInsightTest implements RewriteTest {
         );
     }
 
-    @Test
     @Disabled("Test is logically correct, but the MavenResolutionResult's dependency graph is not")
+    @Test
     void jacksonIsFoundInternally() {
         rewriteRun(
           spec -> spec.recipe(new DependencyInsight("com.fasterxml.jackson.*", "*", null, null, null))
