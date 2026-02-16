@@ -32,9 +32,9 @@ class EntrypointTest implements RewriteTest {
               ENTRYPOINT ["./app"]
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Entrypoint entrypoint = (Docker.Entrypoint) doc.getStages().getFirst().getInstructions().getLast();
+                var entrypoint = (Docker.Entrypoint) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(entrypoint.getCommand()).isInstanceOf(Docker.ExecForm.class);
-                Docker.ExecForm execForm = (Docker.ExecForm) entrypoint.getCommand();
+                var execForm = (Docker.ExecForm) entrypoint.getCommand();
                 assertThat(execForm.getArguments()).hasSize(1);
             })
           )
@@ -50,9 +50,9 @@ class EntrypointTest implements RewriteTest {
               ENTRYPOINT /bin/sh -c 'echo hello'
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Entrypoint entrypoint = (Docker.Entrypoint) doc.getStages().getFirst().getInstructions().getLast();
+                var entrypoint = (Docker.Entrypoint) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(entrypoint.getCommand()).isInstanceOf(Docker.ShellForm.class);
-                Docker.ShellForm shellForm = (Docker.ShellForm) entrypoint.getCommand();
+                var shellForm = (Docker.ShellForm) entrypoint.getCommand();
                 assertThat(shellForm.getArgument()).isNotNull();
             })
           )

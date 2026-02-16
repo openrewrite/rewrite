@@ -558,8 +558,8 @@ class GradleParserTest implements RewriteTest {
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
     }
 
-    @ParameterizedTest
     @MethodSource("escapedBackslashesAndInterpolationInGStringParams")
+    @ParameterizedTest
     void escapedBackslashesAndInterpolationInGString(@Language("groovy") String groovy) {
         GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(

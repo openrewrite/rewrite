@@ -43,8 +43,8 @@ class YieldTest implements RewriteTest {
         ));
     }
 
-    @Python3Only
     @ParameterizedTest
+    @Python3Only
     @ValueSource(strings = {
       "yield from x",
       "yield  from x",
@@ -77,8 +77,8 @@ class YieldTest implements RewriteTest {
         ));
     }
 
-    @Python3Only
     @ParameterizedTest
+    @Python3Only
     @ValueSource(strings = {
       "yield from x",
       "yield  from x",

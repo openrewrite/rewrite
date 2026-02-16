@@ -36,7 +36,7 @@ class EnvTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 List<Docker.Instruction> instructions = doc.getStages().getFirst().getInstructions();
-                Docker.Env env1 = (Docker.Env) instructions.getFirst();
+                var env1 = (Docker.Env) instructions.getFirst();
                 assertThat(env1.getPairs()).hasSize(1);
                 assertThat(env1.getPairs().getFirst().getKey().getText()).isEqualTo("NODE_VERSION");
                 assertThat(((Docker.Literal) env1.getPairs().getFirst().getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
@@ -54,7 +54,7 @@ class EnvTest implements RewriteTest {
               ENV NODE_VERSION=18.0.0 NPM_VERSION=9.0.0
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Env env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
+                var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(env.getPairs()).hasSize(2);
                 assertThat(env.getPairs().get(0).getKey().getText()).isEqualTo("NODE_VERSION");
                 assertThat(((Docker.Literal) env.getPairs().get(0).getValue().getContents().getFirst()).getText()).isEqualTo("18.0.0");
@@ -75,7 +75,7 @@ class EnvTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 List<Docker.Instruction> instructions = doc.getStages().getFirst().getInstructions();
-                Docker.Env env1 = (Docker.Env) instructions.getFirst();
+                var env1 = (Docker.Env) instructions.getFirst();
                 assertThat(env1.getPairs()).hasSize(1);
                 assertThat(env1.getPairs().getFirst().isHasEquals()).isFalse();
                 assertThat(env1.getPairs().getFirst().getKey().getText()).isEqualTo("NODE_VERSION");

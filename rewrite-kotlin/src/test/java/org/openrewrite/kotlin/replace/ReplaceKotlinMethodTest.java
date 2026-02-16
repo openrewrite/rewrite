@@ -153,7 +153,8 @@ class ReplaceKotlinMethodTest implements RewriteTest {
           kotlin(
             """
               class Holder(val value: Int)
-              """),
+              """
+          ),
           kotlin(
             """
               val h = Holder(42)
