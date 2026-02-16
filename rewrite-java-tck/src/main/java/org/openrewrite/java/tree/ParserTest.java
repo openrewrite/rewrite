@@ -26,6 +26,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
+import static java.util.stream.Collectors.toList;
+
 class ParserTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/pull/4914")
@@ -36,6 +38,6 @@ class ParserTest implements RewriteTest {
         @SuppressWarnings("SimplifyStreamApiCallChains") List<SourceFile> ignore = JavaParser.fromJavaVersion()
           .build()
           .parse(new String(Files.readAllBytes(targetFile)))
-          .toList();
+          .collect(toList());
     }
 }
