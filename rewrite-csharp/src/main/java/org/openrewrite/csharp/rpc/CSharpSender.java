@@ -129,14 +129,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitArgument(Cs.Argument argument, RpcSendQueue q) {
-        q.getAndSend(argument, a -> a.getPadding().getNameColumn(), el -> visitRightPadded(el, q));
-        q.getAndSend(argument, Cs.Argument::getRefKindKeyword, el -> visit(el, q));
-        q.getAndSend(argument, Cs.Argument::getExpression, el -> visit(el, q));
-        return argument;
-    }
-
-    @Override
     public J visitAnnotatedStatement(Cs.AnnotatedStatement annotatedStatement, RpcSendQueue q) {
         q.getAndSendList(annotatedStatement, Cs.AnnotatedStatement::getAttributeLists, Tree::getId, el -> visit(el, q));
         q.getAndSend(annotatedStatement, Cs.AnnotatedStatement::getStatement, el -> visit(el, q));
@@ -294,7 +286,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         return propertyDeclaration;
     }
 
-
     @Override
     public J visitLambda(Cs.Lambda lambda, RpcSendQueue q) {
         q.getAndSend(lambda, Cs.Lambda::getLambdaExpression, el -> visit(el, q));
@@ -398,7 +389,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         return tupleExpression;
     }
 
-
     @Override
     public J visitDestructorDeclaration(Cs.DestructorDeclaration destructorDeclaration, RpcSendQueue q) {
         q.getAndSend(destructorDeclaration, Cs.DestructorDeclaration::getMethodCore, el -> visit(el, q));
@@ -412,7 +402,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(unary, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return unary;
     }
-
 
     @Override
     public J visitTupleType(Cs.TupleType tupleType, RpcSendQueue q) {
@@ -475,28 +464,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitUnaryPattern(Cs.UnaryPattern unaryPattern, RpcSendQueue q) {
-        q.getAndSend(unaryPattern, Cs.UnaryPattern::getOperator, el -> visit(el, q));
-        q.getAndSend(unaryPattern, Cs.UnaryPattern::getPattern, el -> visit(el, q));
-        return unaryPattern;
-    }
-
-    @Override
-    public J visitTypePattern(Cs.TypePattern typePattern, RpcSendQueue q) {
-        q.getAndSend(typePattern, Cs.TypePattern::getTypeIdentifier, el -> visit(el, q));
-        q.getAndSend(typePattern, Cs.TypePattern::getDesignation, el -> visit(el, q));
-        return typePattern;
-    }
-
-    @Override
-    public J visitBinaryPattern(Cs.BinaryPattern binaryPattern, RpcSendQueue q) {
-        q.getAndSend(binaryPattern, Cs.BinaryPattern::getLeft, el -> visit(el, q));
-        q.getAndSend(binaryPattern, b -> b.getPadding().getOperator(), el -> visitLeftPadded(el, q));
-        q.getAndSend(binaryPattern, Cs.BinaryPattern::getRight, el -> visit(el, q));
-        return binaryPattern;
-    }
-
-    @Override
     public J visitConstantPattern(Cs.ConstantPattern constantPattern, RpcSendQueue q) {
         q.getAndSend(constantPattern, Cs.ConstantPattern::getValue, el -> visit(el, q));
         return constantPattern;
@@ -516,33 +483,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitParenthesizedPattern(Cs.ParenthesizedPattern parenthesizedPattern, RpcSendQueue q) {
-        q.getAndSend(parenthesizedPattern, p -> p.getPadding().getPattern(), el -> visitContainer(el, q));
-        return parenthesizedPattern;
-    }
-
-    @Override
-    public J visitRecursivePattern(Cs.RecursivePattern recursivePattern, RpcSendQueue q) {
-        q.getAndSend(recursivePattern, Cs.RecursivePattern::getTypeQualifier, el -> visit(el, q));
-        q.getAndSend(recursivePattern, Cs.RecursivePattern::getPositionalPattern, el -> visit(el, q));
-        q.getAndSend(recursivePattern, Cs.RecursivePattern::getPropertyPattern, el -> visit(el, q));
-        q.getAndSend(recursivePattern, Cs.RecursivePattern::getDesignation, el -> visit(el, q));
-        return recursivePattern;
-    }
-
-    @Override
-    public J visitVarPattern(Cs.VarPattern varPattern, RpcSendQueue q) {
-        q.getAndSend(varPattern, Cs.VarPattern::getDesignation, el -> visit(el, q));
-        return varPattern;
-    }
-
-    @Override
-    public J visitPositionalPatternClause(Cs.PositionalPatternClause positionalPatternClause, RpcSendQueue q) {
-        q.getAndSend(positionalPatternClause, p -> p.getPadding().getSubpatterns(), el -> visitContainer(el, q));
-        return positionalPatternClause;
-    }
-
-    @Override
     public J visitRelationalPattern(Cs.RelationalPattern relationalPattern, RpcSendQueue q) {
         q.getAndSend(relationalPattern, r -> r.getPadding().getOperator(), el -> visitLeftPadded(el, q));
         q.getAndSend(relationalPattern, Cs.RelationalPattern::getValue, el -> visit(el, q));
@@ -553,19 +493,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     public J visitSlicePattern(Cs.SlicePattern slicePattern, RpcSendQueue q) {
         // No additional fields
         return slicePattern;
-    }
-
-    @Override
-    public J visitPropertyPatternClause(Cs.PropertyPatternClause propertyPatternClause, RpcSendQueue q) {
-        q.getAndSend(propertyPatternClause, p -> p.getPadding().getSubpatterns(), el -> visitContainer(el, q));
-        return propertyPatternClause;
-    }
-
-    @Override
-    public J visitSubpattern(Cs.Subpattern subpattern, RpcSendQueue q) {
-        q.getAndSend(subpattern, Cs.Subpattern::getName, el -> visit(el, q));
-        q.getAndSend(subpattern, s -> s.getPadding().getPattern(), el -> visitLeftPadded(el, q));
-        return subpattern;
     }
 
     @Override
@@ -581,41 +508,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(switchExpressionArm, s -> s.getPadding().getWhenExpression(), el -> visitLeftPadded(el, q));
         q.getAndSend(switchExpressionArm, s -> s.getPadding().getExpression(), el -> visitLeftPadded(el, q));
         return switchExpressionArm;
-    }
-
-    @Override
-    public J visitSwitchSection(Cs.SwitchSection switchSection, RpcSendQueue q) {
-        q.getAndSendList(switchSection, Cs.SwitchSection::getLabels, Tree::getId, el -> visit(el, q));
-        q.getAndSendList(switchSection, s -> s.getPadding().getStatements(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
-        return switchSection;
-    }
-
-    @Override
-    public J visitDefaultSwitchLabel(Cs.DefaultSwitchLabel defaultSwitchLabel, RpcSendQueue q) {
-        q.getAndSend(defaultSwitchLabel, Cs.DefaultSwitchLabel::getColonToken, space -> visitSpace(space, q));
-        return defaultSwitchLabel;
-    }
-
-    @Override
-    public J visitCasePatternSwitchLabel(Cs.CasePatternSwitchLabel casePatternSwitchLabel, RpcSendQueue q) {
-        q.getAndSend(casePatternSwitchLabel, Cs.CasePatternSwitchLabel::getPattern, el -> visit(el, q));
-        q.getAndSend(casePatternSwitchLabel, c -> c.getPadding().getWhenClause(), el -> visitLeftPadded(el, q));
-        q.getAndSend(casePatternSwitchLabel, Cs.CasePatternSwitchLabel::getColonToken, space -> visitSpace(space, q));
-        return casePatternSwitchLabel;
-    }
-
-    @Override
-    public J visitSwitchStatement(Cs.SwitchStatement switchStatement, RpcSendQueue q) {
-        q.getAndSend(switchStatement, s -> s.getPadding().getExpression(), el -> visitContainer(el, q));
-        q.getAndSend(switchStatement, s -> s.getPadding().getSections(), el -> visitContainer(el, q));
-        return switchStatement;
-    }
-
-    @Override
-    public J visitLockStatement(Cs.LockStatement lockStatement, RpcSendQueue q) {
-        q.getAndSend(lockStatement, Cs.LockStatement::getExpression, el -> visit(el, q));
-        q.getAndSend(lockStatement, l -> l.getPadding().getStatement(), el -> visitRightPadded(el, q));
-        return lockStatement;
     }
 
     @Override
@@ -838,6 +730,37 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(pointerFieldAccess, p -> p.getPadding().getName(), el -> visitLeftPadded(el, q));
         q.getAndSend(pointerFieldAccess, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return pointerFieldAccess;
+    }
+
+    @Override
+    public J visitAnonymousObjectCreationExpression(Cs.AnonymousObjectCreationExpression anonymousObject, RpcSendQueue q) {
+        q.getAndSend(anonymousObject, a -> a.getPadding().getInitializers(), el -> visitContainer(el, q));
+        q.getAndSend(anonymousObject, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
+        return anonymousObject;
+    }
+
+    @Override
+    public J visitWithExpression(Cs.WithExpression withExpression, RpcSendQueue q) {
+        q.getAndSend(withExpression, Cs.WithExpression::getExpression, el -> visit(el, q));
+        q.getAndSend(withExpression, w -> w.getPadding().getInitializer(), el -> visitLeftPadded(el, q));
+        q.getAndSend(withExpression, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
+        return withExpression;
+    }
+
+    @Override
+    public J visitSpreadExpression(Cs.SpreadExpression spreadExpression, RpcSendQueue q) {
+        q.getAndSend(spreadExpression, Cs.SpreadExpression::getExpression, el -> visit(el, q));
+        q.getAndSend(spreadExpression, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
+        return spreadExpression;
+    }
+
+    @Override
+    public J visitFunctionPointerType(Cs.FunctionPointerType functionPointerType, RpcSendQueue q) {
+        q.getAndSend(functionPointerType, f -> f.getPadding().getCallingConvention(), el -> visitLeftPadded(el, q));
+        q.getAndSend(functionPointerType, f -> f.getPadding().getUnmanagedCallingConventionTypes(), el -> visitContainer(el, q));
+        q.getAndSend(functionPointerType, f -> f.getPadding().getParameterTypes(), el -> visitContainer(el, q));
+        q.getAndSend(functionPointerType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
+        return functionPointerType;
     }
 
     // Delegate methods to JavaSender

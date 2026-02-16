@@ -59,6 +59,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             Label lbl => VisitLabel(lbl, p),
             Synchronized sync => VisitSynchronized(sync, p),
             TypeCast tc => VisitTypeCast(tc, p),
+            TypeParameter tp => VisitTypeParameter(tp, p),
             Package pkg => VisitPackage(pkg, p),
             _ => throw new InvalidOperationException($"Unknown J tree type: {tree.GetType().Name}")
         };
@@ -764,6 +765,19 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         return cast;
+    }
+
+    public virtual J VisitTypeParameter(TypeParameter typeParameter, P p)
+    {
+        Visit(typeParameter.Name, p);
+        if (typeParameter.Bounds != null)
+        {
+            foreach (var paddedBound in typeParameter.Bounds.Elements)
+            {
+                Visit(paddedBound.Element, p);
+            }
+        }
+        return typeParameter;
     }
 
     public virtual J VisitPackage(Package pkg, P p)
