@@ -220,6 +220,20 @@ class AssignmentTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5283")
+    @Test
+    void destructuringWithFollowingStatements() {
+        rewriteRun(
+          groovy(
+            """
+              def (key, value) = "a1:b2".split(":")
+              println(key)
+              println(value)
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/moderneinc/customer-requests/issues/1478")
     @Test
     void destructuringAssignment() {
