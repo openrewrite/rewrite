@@ -18,7 +18,10 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.RemoveContentVisitor;
@@ -56,12 +59,6 @@ public class RemoveDependency extends Recipe {
 
     String description = "Removes a single dependency from the <dependencies> section of the pom.xml. " +
             "Does not remove usage of the dependency classes, nor guard against the resulting compilation errors.";
-
-    @Override
-    public Validated<Object> validate() {
-        return super.validate().and(Validated.test("scope", "Scope must be one of compile, runtime, test, or provided",
-                scope, s -> Scope.Invalid != Scope.fromName(s)));
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
