@@ -485,7 +485,9 @@ class UpgradePluginVersionTest implements RewriteTest {
                   val kotlinVersion = "1.8.21"
                   id("org.jetbrains.kotlin.jvm") version kotlinVersion
                   id("org.jetbrains.kotlin.plugin.allopen") version kotlinVersion
+                  id("org.jetbrains.kotlin.plugin.noarg") version kotlinVersion
                   id("org.jetbrains.kotlin.plugin.spring") version kotlinVersion
+                  id("org.jetbrains.kotlin.plugin.jpa") version kotlinVersion
               }
               """
           )
