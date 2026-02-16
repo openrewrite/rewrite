@@ -47,8 +47,8 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
-    @Python3Only
     @ParameterizedTest
+    @Python3Only
     @ValueSource(strings = {
       "a, b, *, c=1"
     })

@@ -88,13 +88,13 @@ class RenameVariableTest implements RewriteTest {
 
                     if (includeMethodParameters) {
                         variableDecls.addAll(
-                          classDecl.getBody().getStatements().stream()
+                            classDecl.getBody().getStatements().stream()
                             .filter(J.MethodDeclaration.class::isInstance)
                             .map(J.MethodDeclaration.class::cast)
                             .flatMap(it -> it.getParameters().stream())
                             .filter(J.VariableDeclarations.class::isInstance)
                             .map(J.VariableDeclarations.class::cast)
-                            .collect(toList())
+                            .toList()
                         );
                     }
 
