@@ -158,10 +158,10 @@ export class RecipeSpec {
                     return !!matchingSpec;
                 }
             });
-            const after = result && result.after !== result.before ? result.after : undefined;
+            const after = result?.after;
 
             if (!spec.after) {
-                if (after) {
+                if (after && after !== result?.before) {
                     expect(await TreePrinters.print(after)).toEqual(dedent(spec.before!));
                     // TODO: Consider throwing an error, as there should typically have been no change to the LST
                     // fail("Expected after to be undefined.");
