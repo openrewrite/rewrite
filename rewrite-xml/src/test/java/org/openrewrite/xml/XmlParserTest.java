@@ -648,4 +648,122 @@ class XmlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/857")
+    @Test
+    void commentInPrologFollowedByBlankLinesThenRootElement() {
+        rewriteRun(
+          xml(
+            """
+              <!--
+                Copyright (c) 2022 Example Corp. All rights reserved.
+              -->
+
+              <root>
+                  <child/>
+              </root>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/857")
+    @Test
+    void xmlDeclWithStandaloneNo() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+              <root>
+                  <child/>
+              </root>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/857")
+    @Test
+    void xmlDeclFollowedByCommentThenBlankLinesThenRoot() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <!--
+                License header
+              -->
+
+              <Definitions>
+                  <child/>
+              </Definitions>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/857")
+    @Test
+    void commentWithTripleDashInsideElement() {
+        rewriteRun(
+          xml(
+            """
+              <!-- header -->
+
+              <root>
+              \t<!---
+              \t\tAttribute Dictionary description
+              \t-->
+              \t<child/>
+              </root>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/857")
+    @Test
+    void xmlDeclAfterCommentIsParseError() {
+        XmlParser parser = XmlParser.builder().build();
+        String input = """
+              <!--
+                Copyright (c) 2022 Example Corp. All rights reserved.
+              -->
+              <?xml version="1.0" encoding="UTF-8"?>
+              <root/>
+              """;
+        SourceFile sf = parser.parse(input).findFirst().orElseThrow();
+        assertThat(sf).isInstanceOf(ParseError.class);
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/857")
+    @Test
+    void xmlDeclFollowedByCommentThenRoot() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <!-- comment -->
+
+              <Definitions>
+                  <child/>
+              </Definitions>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/857")
+    @Test
+    void wsdlStyleXmlDeclStandaloneNo() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+              <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+                  <wsdl:types/>
+              </wsdl:definitions>
+              """
+          )
+        );
+    }
 }
