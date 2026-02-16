@@ -307,4 +307,40 @@ class AssignmentTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/5293")
+    @Test
+    void destructuringAssignmentWithFullyQualifiedType() {
+        rewriteRun(
+          groovy(
+            """
+              def (String key, java.lang.String value) = "a1:b2".split(":")
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/5293")
+    @Test
+    void destructuringAssignmentWithMixedTypedAndUntyped() {
+        rewriteRun(
+          groovy(
+            """
+              def  (first,  int           second,   third)   =     [1, 2, 3]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/5293")
+    @Test
+    void destructuringAssignmentNoSpacesAroundEquals() {
+        rewriteRun(
+          groovy(
+            """
+              def(key,value)="a1:b2".split(":")
+              """
+          )
+        );
+    }
+
 }
