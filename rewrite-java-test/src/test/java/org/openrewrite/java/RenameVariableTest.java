@@ -27,6 +27,7 @@ import org.openrewrite.test.RewriteTest;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -83,7 +84,7 @@ class RenameVariableTest implements RewriteTest {
                     List<J.VariableDeclarations> variableDecls = classDecl.getBody().getStatements().stream()
                       .filter(J.VariableDeclarations.class::isInstance)
                       .map(J.VariableDeclarations.class::cast)
-                      .toList();
+                      .collect(toList());
 
                     if (includeMethodParameters) {
                         variableDecls.addAll(
