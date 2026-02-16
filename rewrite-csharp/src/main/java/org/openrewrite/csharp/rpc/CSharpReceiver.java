@@ -130,14 +130,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitArgument(Cs.Argument argument, RpcReceiveQueue q) {
-        return argument
-                .getPadding().withNameColumn(q.receive(argument.getPadding().getNameColumn(), el -> visitRightPadded(el, q)))
-                .withRefKindKeyword(q.receive(argument.getRefKindKeyword(), el -> (Cs.Keyword) visitNonNull(el, q)))
-                .withExpression(q.receive(argument.getExpression(), el -> (Expression) visitNonNull(el, q)));
-    }
-
-    @Override
     public J visitAnnotatedStatement(Cs.AnnotatedStatement annotatedStatement, RpcReceiveQueue q) {
         return annotatedStatement
                 .withAttributeLists(q.receiveList(annotatedStatement.getAttributeLists(), el -> (Cs.AttributeList) visitNonNull(el, q)))
@@ -295,7 +287,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .getPadding().withInitializer(q.receive(propertyDeclaration.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
     }
 
-
     @Override
     public J visitLambda(Cs.Lambda lambda, RpcReceiveQueue q) {
         return lambda
@@ -396,7 +387,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .getPadding().withArguments(q.receive(tupleExpression.getPadding().getArguments(), el -> visitContainer(el, q)));
     }
 
-
     @Override
     public J visitDestructorDeclaration(Cs.DestructorDeclaration destructorDeclaration, RpcReceiveQueue q) {
         return destructorDeclaration
@@ -410,7 +400,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withExpression(q.receive(unary.getExpression(), el -> (Expression) visitNonNull(el, q)))
                 .withType(q.receive(unary.getType(), type -> visitType(type, q)));
     }
-
 
     @Override
     public J visitTupleType(Cs.TupleType tupleType, RpcReceiveQueue q) {
@@ -473,28 +462,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitUnaryPattern(Cs.UnaryPattern unaryPattern, RpcReceiveQueue q) {
-        return unaryPattern
-                .withOperator(q.receive(unaryPattern.getOperator(), el -> (Cs.Keyword) visitNonNull(el, q)))
-                .withPattern(q.receive(unaryPattern.getPattern(), el -> (Cs.Pattern) visitNonNull(el, q)));
-    }
-
-    @Override
-    public J visitTypePattern(Cs.TypePattern typePattern, RpcReceiveQueue q) {
-        return typePattern
-                .withTypeIdentifier(q.receive(typePattern.getTypeIdentifier(), el -> (TypeTree) visitNonNull(el, q)))
-                .withDesignation(q.receive(typePattern.getDesignation(), el -> (Cs.VariableDesignation) visitNonNull(el, q)));
-    }
-
-    @Override
-    public J visitBinaryPattern(Cs.BinaryPattern binaryPattern, RpcReceiveQueue q) {
-        return binaryPattern
-                .withLeft(q.receive(binaryPattern.getLeft(), el -> (Cs.Pattern) visitNonNull(el, q)))
-                .getPadding().withOperator(q.receive(binaryPattern.getPadding().getOperator(), el -> visitLeftPadded(el, q, toEnum(Cs.BinaryPattern.OperatorType.class))))
-                .withRight(q.receive(binaryPattern.getRight(), el -> (Cs.Pattern) visitNonNull(el, q)));
-    }
-
-    @Override
     public J visitConstantPattern(Cs.ConstantPattern constantPattern, RpcReceiveQueue q) {
         return constantPattern
                 .withValue(q.receive(constantPattern.getValue(), el -> (Expression) visitNonNull(el, q)));
@@ -514,33 +481,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitParenthesizedPattern(Cs.ParenthesizedPattern parenthesizedPattern, RpcReceiveQueue q) {
-        return parenthesizedPattern
-                .getPadding().withPattern(q.receive(parenthesizedPattern.getPadding().getPattern(), el -> visitContainer(el, q)));
-    }
-
-    @Override
-    public J visitRecursivePattern(Cs.RecursivePattern recursivePattern, RpcReceiveQueue q) {
-        return recursivePattern
-                .withTypeQualifier(q.receive(recursivePattern.getTypeQualifier(), el -> (TypeTree) visitNonNull(el, q)))
-                .withPositionalPattern(q.receive(recursivePattern.getPositionalPattern(), el -> (Cs.PositionalPatternClause) visitNonNull(el, q)))
-                .withPropertyPattern(q.receive(recursivePattern.getPropertyPattern(), el -> (Cs.PropertyPatternClause) visitNonNull(el, q)))
-                .withDesignation(q.receive(recursivePattern.getDesignation(), el -> (Cs.VariableDesignation) visitNonNull(el, q)));
-    }
-
-    @Override
-    public J visitVarPattern(Cs.VarPattern varPattern, RpcReceiveQueue q) {
-        return varPattern
-                .withDesignation(q.receive(varPattern.getDesignation(), el -> (Cs.VariableDesignation) visitNonNull(el, q)));
-    }
-
-    @Override
-    public J visitPositionalPatternClause(Cs.PositionalPatternClause positionalPatternClause, RpcReceiveQueue q) {
-        return positionalPatternClause
-                .getPadding().withSubpatterns(q.receive(positionalPatternClause.getPadding().getSubpatterns(), el -> visitContainer(el, q)));
-    }
-
-    @Override
     public J visitRelationalPattern(Cs.RelationalPattern relationalPattern, RpcReceiveQueue q) {
         return relationalPattern
                 .getPadding().withOperator(q.receive(relationalPattern.getPadding().getOperator(), el -> visitLeftPadded(el, q, toEnum(Cs.RelationalPattern.OperatorType.class))))
@@ -550,19 +490,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     @Override
     public J visitSlicePattern(Cs.SlicePattern slicePattern, RpcReceiveQueue q) {
         return slicePattern;
-    }
-
-    @Override
-    public J visitPropertyPatternClause(Cs.PropertyPatternClause propertyPatternClause, RpcReceiveQueue q) {
-        return propertyPatternClause
-                .getPadding().withSubpatterns(q.receive(propertyPatternClause.getPadding().getSubpatterns(), el -> visitContainer(el, q)));
-    }
-
-    @Override
-    public J visitSubpattern(Cs.Subpattern subpattern, RpcReceiveQueue q) {
-        return subpattern
-                .withName(q.receive(subpattern.getName(), el -> (Expression) visitNonNull(el, q)))
-                .getPadding().withPattern(q.receive(subpattern.getPadding().getPattern(), el -> visitLeftPadded(el, q)));
     }
 
     @Override
@@ -578,41 +505,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withPattern(q.receive(switchExpressionArm.getPattern(), el -> (Cs.Pattern) visitNonNull(el, q)))
                 .getPadding().withWhenExpression(q.receive(switchExpressionArm.getPadding().getWhenExpression(), el -> visitLeftPadded(el, q)))
                 .getPadding().withExpression(q.receive(switchExpressionArm.getPadding().getExpression(), el -> visitLeftPadded(el, q)));
-    }
-
-    @Override
-    public J visitSwitchSection(Cs.SwitchSection switchSection, RpcReceiveQueue q) {
-        return switchSection
-                .withLabels(q.receiveList(switchSection.getLabels(), el -> (Cs.SwitchLabel) visitNonNull(el, q)))
-                .getPadding().withStatements(q.receiveList(switchSection.getPadding().getStatements(), el -> visitRightPadded(el, q)));
-    }
-
-    @Override
-    public J visitDefaultSwitchLabel(Cs.DefaultSwitchLabel defaultSwitchLabel, RpcReceiveQueue q) {
-        return defaultSwitchLabel
-                .withColonToken(q.receive(defaultSwitchLabel.getColonToken(), space -> visitSpace(space, q)));
-    }
-
-    @Override
-    public J visitCasePatternSwitchLabel(Cs.CasePatternSwitchLabel casePatternSwitchLabel, RpcReceiveQueue q) {
-        return casePatternSwitchLabel
-                .withPattern(q.receive(casePatternSwitchLabel.getPattern(), el -> (Cs.Pattern) visitNonNull(el, q)))
-                .getPadding().withWhenClause(q.receive(casePatternSwitchLabel.getPadding().getWhenClause(), el -> visitLeftPadded(el, q)))
-                .withColonToken(q.receive(casePatternSwitchLabel.getColonToken(), space -> visitSpace(space, q)));
-    }
-
-    @Override
-    public J visitSwitchStatement(Cs.SwitchStatement switchStatement, RpcReceiveQueue q) {
-        return switchStatement
-                .getPadding().withExpression(q.receive(switchStatement.getPadding().getExpression(), el -> visitContainer(el, q)))
-                .getPadding().withSections(q.receive(switchStatement.getPadding().getSections(), el -> visitContainer(el, q)));
-    }
-
-    @Override
-    public J visitLockStatement(Cs.LockStatement lockStatement, RpcReceiveQueue q) {
-        return lockStatement
-                .withExpression(q.receive(lockStatement.getExpression(), el -> (J.ControlParentheses<Expression>) visitNonNull(el, q)))
-                .getPadding().withStatement(q.receive(lockStatement.getPadding().getStatement(), el -> visitRightPadded(el, q)));
     }
 
     @Override
@@ -924,6 +816,37 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withKind(q.receiveAndGet(lineDirective.getKind(), toEnum(Cs.LineDirective.LineKind.class)))
                 .withLine(q.receive(lineDirective.getLine(), el -> (Expression) visitNonNull(el, q)))
                 .withFile(q.receive(lineDirective.getFile(), el -> (Expression) visitNonNull(el, q)));
+    }
+
+    @Override
+    public J visitAnonymousObjectCreationExpression(Cs.AnonymousObjectCreationExpression anonymousObject, RpcReceiveQueue q) {
+        return anonymousObject
+                .getPadding().withInitializers(q.receive(anonymousObject.getPadding().getInitializers(), el -> visitContainer(el, q)))
+                .withType(q.receive(anonymousObject.getType(), el -> visitType(el, q)));
+    }
+
+    @Override
+    public J visitWithExpression(Cs.WithExpression withExpression, RpcReceiveQueue q) {
+        return withExpression
+                .withExpression(q.receive(withExpression.getExpression(), el -> (Expression) visitNonNull(el, q)))
+                .getPadding().withInitializer(q.receive(withExpression.getPadding().getInitializer(), el -> visitLeftPadded(el, q)))
+                .withType(q.receive(withExpression.getType(), el -> visitType(el, q)));
+    }
+
+    @Override
+    public J visitSpreadExpression(Cs.SpreadExpression spreadExpression, RpcReceiveQueue q) {
+        return spreadExpression
+                .withExpression(q.receive(spreadExpression.getExpression(), el -> (Expression) visitNonNull(el, q)))
+                .withType(q.receive(spreadExpression.getType(), el -> visitType(el, q)));
+    }
+
+    @Override
+    public J visitFunctionPointerType(Cs.FunctionPointerType functionPointerType, RpcReceiveQueue q) {
+        return functionPointerType
+                .getPadding().withCallingConvention(q.receive(functionPointerType.getPadding().getCallingConvention(), el -> visitLeftPadded(el, q, toEnum(Cs.FunctionPointerType.CallingConvention.class))))
+                .getPadding().withUnmanagedCallingConventionTypes(q.receive(functionPointerType.getPadding().getUnmanagedCallingConventionTypes(), el -> visitContainer(el, q)))
+                .getPadding().withParameterTypes(q.receive(functionPointerType.getPadding().getParameterTypes(), el -> visitContainer(el, q)))
+                .withType(q.receive(functionPointerType.getType(), el -> visitType(el, q)));
     }
 
     // Delegate methods to JavaReceiver

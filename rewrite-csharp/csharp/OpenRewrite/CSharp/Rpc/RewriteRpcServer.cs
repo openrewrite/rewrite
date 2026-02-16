@@ -89,6 +89,10 @@ public class RewriteRpcServer
             "org.openrewrite.csharp.marker.ExpressionBodied");
         RpcSendQueue.RegisterJavaTypeName(typeof(OmitParentheses),
             "org.openrewrite.java.marker.OmitParentheses");
+        RpcSendQueue.RegisterJavaTypeName(typeof(AnonymousMethod),
+            "org.openrewrite.csharp.marker.AnonymousMethod");
+        RpcSendQueue.RegisterJavaTypeName(typeof(ForEachVariableLoopControl),
+            "org.openrewrite.csharp.tree.Cs$ForEachVariableLoop$Control");
 
         // LINQ types live in Linq$ not Cs$ on the Java side
         RpcSendQueue.RegisterJavaTypeName(typeof(QueryExpression),

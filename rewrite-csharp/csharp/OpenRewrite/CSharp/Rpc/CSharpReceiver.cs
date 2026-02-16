@@ -119,26 +119,12 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             TupleElement tel => VisitTupleElement(tel, q),
             CsNewClass csnc => VisitCsNewClass(csnc, q),
             ImplicitElementAccess iea => VisitImplicitElementAccess(iea, q),
-            UnaryPattern up => VisitUnaryPattern(up, q),
-            TypePattern tp => VisitTypePattern(tp, q),
-            BinaryPattern bp => VisitBinaryPattern(bp, q),
             ConstantPattern cp => VisitConstantPattern(cp, q),
             DiscardPattern dp => VisitDiscardPattern(dp, q),
             ListPattern lp => VisitListPattern(lp, q),
-            ParenthesizedPattern pap => VisitParenthesizedPattern(pap, q),
-            RecursivePattern rcp => VisitRecursivePattern(rcp, q),
-            VarPattern vp => VisitVarPattern(vp, q),
-            PositionalPatternClause ppc => VisitPositionalPatternClause(ppc, q),
             SlicePattern sp => VisitSlicePattern(sp, q),
-            PropertyPatternClause ppclause => VisitPropertyPatternClause(ppclause, q),
-            Subpattern sub => VisitSubpattern(sub, q),
             SwitchExpression swe => VisitSwitchExpression(swe, q),
             SwitchExpressionArm swea => VisitSwitchExpressionArm(swea, q),
-            SwitchSection ss => VisitSwitchSection(ss, q),
-            DefaultSwitchLabel dsl => VisitDefaultSwitchLabel(dsl, q),
-            CasePatternSwitchLabel cpsl => VisitCasePatternSwitchLabel(cpsl, q),
-            SwitchStatement sws => VisitSwitchStatement(sws, q),
-            LockStatement ls => VisitLockStatement(ls, q),
             CheckedExpression che => VisitCheckedExpression(che, q),
             CheckedStatement chs => VisitCheckedStatement(chs, q),
             RangeExpression rang => VisitRangeExpression(rang, q),
@@ -154,6 +140,10 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             CsTry cstry => VisitCsTry(cstry, q),
             PointerFieldAccess pfa => VisitPointerFieldAccess(pfa, q),
             RefType rt => VisitRefType(rt, q),
+            AnonymousObjectCreationExpression aoce => VisitAnonymousObjectCreationExpression(aoce, q),
+            WithExpression we => VisitWithExpression(we, q),
+            SpreadExpression se => VisitSpreadExpression(se, q),
+            FunctionPointerType fpt => VisitFunctionPointerType(fpt, q),
             // LINQ
             QueryExpression qe => VisitQueryExpression(qe, q),
             QueryBody qb => VisitQueryBody(qb, q),
@@ -318,13 +308,13 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- DeclarationExpression ----
     public override J VisitDeclarationExpression(DeclarationExpression de, RpcReceiveQueue q)
     {
-        var type = q.Receive((J)de.Type, el => (J)VisitNonNull(el, q));
-        var variable = q.Receive((J)de.Variable.Element, el => (J)VisitNonNull(el, q));
+        var typeExpression = q.Receive((J?)de.TypeExpression, el => (J)VisitNonNull(el!, q));
+        var variables = q.Receive((J)de.Variables, el => (J)VisitNonNull(el, q));
         return de with
         {
             Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Type = (TypeTree)type!,
-            Variable = de.Variable with { Element = (Identifier)variable! }
+            TypeExpression = (TypeTree?)typeExpression,
+            Variables = (Expression)variables!
         };
     }
 
@@ -975,31 +965,6 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             ArgumentList = argList! };
     }
 
-    public override J VisitUnaryPattern(UnaryPattern up, RpcReceiveQueue q)
-    {
-        var op = q.Receive((J)up.Operator, el => (J)VisitNonNull(el, q));
-        var pattern = q.Receive((J)up.PatternValue, el => (J)VisitNonNull(el, q));
-        return up with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Operator = (Keyword)op!, PatternValue = (Pattern)pattern! };
-    }
-
-    public override J VisitTypePattern(TypePattern tp, RpcReceiveQueue q)
-    {
-        var typeId = q.Receive((J)tp.TypeIdentifier, el => (J)VisitNonNull(el, q));
-        var designation = q.Receive((J?)tp.Designation, el => (J)VisitNonNull(el!, q));
-        return tp with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            TypeIdentifier = (TypeTree)typeId!, Designation = (VariableDesignation?)designation };
-    }
-
-    public override J VisitBinaryPattern(BinaryPattern bp, RpcReceiveQueue q)
-    {
-        var left = q.Receive((J)bp.Left, el => (J)VisitNonNull(el, q));
-        var op = q.Receive(bp.Operator, lp => _delegate.VisitLeftPadded(lp, q));
-        var right = q.Receive((J)bp.Right, el => (J)VisitNonNull(el, q));
-        return bp with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Left = (Pattern)left!, Operator = op!, Right = (Pattern)right! };
-    }
-
     public override J VisitConstantPattern(ConstantPattern cp, RpcReceiveQueue q)
     {
         var value = q.Receive((J)cp.Value, el => (J)VisitNonNull(el, q));
@@ -1022,58 +987,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             Patterns = patterns!, Designation = (VariableDesignation?)designation };
     }
 
-    public override J VisitParenthesizedPattern(ParenthesizedPattern pap, RpcReceiveQueue q)
-    {
-        var patternValue = q.Receive(pap.PatternValue, c => VisitContainer(c, q));
-        return pap with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            PatternValue = patternValue! };
-    }
-
-    public override J VisitRecursivePattern(RecursivePattern rcp, RpcReceiveQueue q)
-    {
-        var typeQualifier = q.Receive((J?)rcp.TypeQualifier, el => (J)VisitNonNull(el!, q));
-        var positionalPattern = q.Receive((J?)rcp.PositionalPattern, el => (J)VisitNonNull(el!, q));
-        var propertyPattern = q.Receive((J?)rcp.PropertyPatternValue, el => (J)VisitNonNull(el!, q));
-        var designation = q.Receive((J?)rcp.Designation, el => (J)VisitNonNull(el!, q));
-        return rcp with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            TypeQualifier = (TypeTree?)typeQualifier,
-            PositionalPattern = (PositionalPatternClause?)positionalPattern,
-            PropertyPatternValue = (PropertyPatternClause?)propertyPattern,
-            Designation = (VariableDesignation?)designation };
-    }
-
-    public override J VisitVarPattern(VarPattern vp, RpcReceiveQueue q)
-    {
-        var designation = q.Receive((J)vp.Designation, el => (J)VisitNonNull(el, q));
-        return vp with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Designation = (VariableDesignation)designation! };
-    }
-
-    public override J VisitPositionalPatternClause(PositionalPatternClause ppc, RpcReceiveQueue q)
-    {
-        var subpatterns = q.Receive(ppc.Subpatterns, c => VisitContainer(c, q));
-        return ppc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Subpatterns = subpatterns! };
-    }
-
     public override J VisitSlicePattern(SlicePattern sp, RpcReceiveQueue q)
     {
         return sp with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers };
-    }
-
-    public override J VisitPropertyPatternClause(PropertyPatternClause ppclause, RpcReceiveQueue q)
-    {
-        var subpatterns = q.Receive(ppclause.Subpatterns, c => VisitContainer(c, q));
-        return ppclause with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Subpatterns = subpatterns! };
-    }
-
-    public override J VisitSubpattern(Subpattern sub, RpcReceiveQueue q)
-    {
-        var name = q.Receive((J?)sub.Name, el => (J)VisitNonNull(el!, q));
-        var patternValue = q.Receive(sub.PatternValue, lp => _delegate.VisitLeftPadded(lp, q));
-        return sub with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Name = (Expression?)name, PatternValue = patternValue! };
     }
 
     public override J VisitSwitchExpression(SwitchExpression swe, RpcReceiveQueue q)
@@ -1092,47 +1008,6 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         return swea with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
             Pattern = (Pattern)pattern!, WhenExpression = whenExpr,
             ExpressionPadded = exprPadded! };
-    }
-
-    public override J VisitSwitchSection(SwitchSection ss, RpcReceiveQueue q)
-    {
-        var labels = q.ReceiveList(ss.Labels, l => (SwitchLabel)VisitNonNull(l, q));
-        var statements = q.ReceiveList(ss.Statements, rp => _delegate.VisitRightPadded(rp, q));
-        return ss with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Labels = labels!, Statements = statements! };
-    }
-
-    public override J VisitDefaultSwitchLabel(DefaultSwitchLabel dsl, RpcReceiveQueue q)
-    {
-        var colonToken = q.Receive(dsl.ColonToken, space => VisitSpace(space, q));
-        return dsl with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            ColonToken = colonToken! };
-    }
-
-    public override J VisitCasePatternSwitchLabel(CasePatternSwitchLabel cpsl, RpcReceiveQueue q)
-    {
-        var pattern = q.Receive((J)cpsl.Pattern, el => (J)VisitNonNull(el, q));
-        var whenClause = q.Receive(cpsl.WhenClause, lp => _delegate.VisitLeftPadded(lp!, q));
-        var colonToken = q.Receive(cpsl.ColonToken, space => VisitSpace(space, q));
-        return cpsl with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Pattern = (Pattern)pattern!, WhenClause = whenClause, ColonToken = colonToken! };
-    }
-
-    public override J VisitSwitchStatement(SwitchStatement sws, RpcReceiveQueue q)
-    {
-        var exprPadded = q.Receive(sws.ExpressionPadded, c => VisitContainer(c, q));
-        var sections = q.Receive(sws.Sections, c => VisitContainer(c, q));
-        return sws with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            ExpressionPadded = exprPadded!, Sections = sections! };
-    }
-
-    public override J VisitLockStatement(LockStatement ls, RpcReceiveQueue q)
-    {
-        var exprValue = q.Receive((J)ls.ExpressionValue, el => (J)VisitNonNull(el, q));
-        var stmtPadded = q.Receive(ls.StatementPadded, rp => _delegate.VisitRightPadded(rp, q));
-        return ls with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            ExpressionValue = (ControlParentheses<Expression>)exprValue!,
-            StatementPadded = stmtPadded! };
     }
 
     public override J VisitCheckedExpression(CheckedExpression che, RpcReceiveQueue q)
@@ -1303,6 +1178,42 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         return rt with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
             ReadonlyKeyword = (Modifier?)readonlyKw, TypeIdentifier = (TypeTree)typeIdentifier!,
             Type = type };
+    }
+
+    public override J VisitAnonymousObjectCreationExpression(AnonymousObjectCreationExpression aoce, RpcReceiveQueue q)
+    {
+        var initializers = q.Receive(aoce.Initializers, el => _delegate.VisitContainer(el, q));
+        var type = q.Receive(aoce.Type, t => VisitType(t, q)!);
+        return aoce with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
+            Initializers = initializers!, Type = type };
+    }
+
+    public override J VisitWithExpression(WithExpression we, RpcReceiveQueue q)
+    {
+        var target = q.Receive((J)we.Target, el => (J)VisitNonNull(el, q));
+        var initializer = q.Receive(we.InitializerPadded, lp => _delegate.VisitLeftPadded(lp, q));
+        var type = q.Receive(we.Type, t => VisitType(t, q)!);
+        return we with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
+            Target = (Expression)target!, InitializerPadded = initializer!, Type = type };
+    }
+
+    public override J VisitSpreadExpression(SpreadExpression se, RpcReceiveQueue q)
+    {
+        var expression = q.Receive((J)se.Expression, el => (J)VisitNonNull(el, q));
+        var type = q.Receive(se.Type, t => VisitType(t, q)!);
+        return se with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
+            Expression = (Expression)expression!, Type = type };
+    }
+
+    public override J VisitFunctionPointerType(FunctionPointerType fpt, RpcReceiveQueue q)
+    {
+        var callingConvention = q.Receive(fpt.CallingConvention, lp => _delegate.VisitLeftPadded(lp!, q));
+        var unmanagedConventionTypes = q.Receive(fpt.UnmanagedCallingConventionTypes, el => _delegate.VisitContainer(el!, q));
+        var parameterTypes = q.Receive(fpt.ParameterTypes, el => _delegate.VisitContainer(el, q));
+        var type = q.Receive(fpt.Type, t => VisitType(t, q)!);
+        return fpt with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
+            CallingConvention = callingConvention, UnmanagedCallingConventionTypes = unmanagedConventionTypes,
+            ParameterTypes = parameterTypes!, Type = type };
     }
 
     // ---- LINQ ----

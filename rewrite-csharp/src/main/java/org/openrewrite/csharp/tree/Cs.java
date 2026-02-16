@@ -392,7 +392,6 @@ public interface Cs extends J {
         @Nullable
         JRightPadded<TypeTree> explicitInterfaceSpecifier;
 
-
         /**
          * <pre>
          * public static Vector operator +(Vector a)
@@ -650,7 +649,6 @@ public interface Cs extends J {
         }
     }
 
-
     /**
      * Represents a C# ref expression used to pass variables by reference.
      * <p>
@@ -893,7 +891,6 @@ public interface Cs extends J {
             return new CoordinateBuilder.Expression(this);
         }
     }
-
 
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1191,107 +1188,6 @@ public interface Cs extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Argument implements Cs, Expression {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @Nullable
-        JRightPadded<Identifier> nameColumn;
-
-
-        @Nullable
-        @Getter
-        @With
-        Keyword refKindKeyword;
-
-        public @Nullable Identifier getNameColumn() {
-            return nameColumn == null ? null : nameColumn.getElement();
-        }
-
-        public Argument withNameColumn(@Nullable Identifier nameColumn) {
-            return getPadding().withNameColumn(JRightPadded.withElement(this.nameColumn, nameColumn));
-        }
-
-        @With
-        Expression expression;
-
-        @Override
-        public @Nullable JavaType getType() {
-            return expression.getType();
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public Argument withType(@Nullable JavaType type) {
-            return expression.getType() == type ? this : new Argument(id, prefix, markers, nameColumn, refKindKeyword, expression.withType(type));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitArgument(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-
-        @Override
-        public String toString() {
-            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Argument t;
-
-            public @Nullable JRightPadded<Identifier> getNameColumn() {
-                return t.nameColumn;
-            }
-
-            public Argument withNameColumn(@Nullable JRightPadded<Identifier> target) {
-                return t.nameColumn == target ? t : new Argument(t.id, t.prefix, t.markers, target, t.refKindKeyword, t.expression);
-            }
-
-        }
-    }
-
-
-    @Getter
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
     final class AnnotatedStatement implements Cs, Statement {
         @With
         @EqualsAndHashCode.Include
@@ -1471,7 +1367,19 @@ public interface Cs extends J {
         }
 
         public enum OperatorType {
-            NullCoalescing
+            Addition,
+            Subtraction,
+            Multiplication,
+            Division,
+            Modulo,
+            BitAnd,
+            BitOr,
+            BitXor,
+            LeftShift,
+            RightShift,
+            UnsignedRightShift,
+            NullCoalescing,
+            Coalesce
         }
 
         public Padding getPadding() {
@@ -1532,7 +1440,6 @@ public interface Cs extends J {
 
         @Nullable
         JRightPadded<Identifier> target;
-
 
         public @Nullable Identifier getTarget() {
             return target == null ? null : target.getElement();
@@ -1647,7 +1554,6 @@ public interface Cs extends J {
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
             return v.visitStackAllocExpression(this, p);
         }
-
 
         @Override
         public @Nullable JavaType getType() {
@@ -1925,7 +1831,6 @@ public interface Cs extends J {
             }
         }
     }
-
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2885,7 +2790,6 @@ public interface Cs extends J {
         @Nullable
         JRightPadded<Identifier> alias;
 
-
         public @Nullable Identifier getAlias() {
             return alias != null ? alias.getElement() : null;
         }
@@ -2961,7 +2865,6 @@ public interface Cs extends J {
         }
     }
 
-
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -3013,7 +2916,6 @@ public interface Cs extends J {
 
         @Nullable
         JLeftPadded<Expression> initializer;
-
 
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
@@ -3152,7 +3054,6 @@ public interface Cs extends J {
         }
     }
 
-
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -3270,7 +3171,6 @@ public interface Cs extends J {
             return getPadding().withExplicitInterfaceSpecifier(this.explicitInterfaceSpecifier.withElement(explicitInterfaceSpecifier));
         }
 
-
         @With
         @Getter
         Identifier name;
@@ -3284,7 +3184,6 @@ public interface Cs extends J {
         public Cs.MethodDeclaration withParameters(List<Statement> parameters) {
             return getPadding().withParameters(JContainer.withElements(this.parameters, parameters));
         }
-
 
         /**
          * Null for abstract method declarations and interface method declarations.
@@ -3360,7 +3259,6 @@ public interface Cs extends J {
             public Cs.MethodDeclaration withExplicitInterfaceSpecifier(JRightPadded<TypeTree> explicitInterfaceSpecifier) {
                 return t.explicitInterfaceSpecifier == explicitInterfaceSpecifier ? t : new Cs.MethodDeclaration(t.id, t.prefix, t.markers, t.attributes, t.modifiers, t.typeParameters, t.returnTypeExpression, explicitInterfaceSpecifier, t.name, t.parameters, t.body, t.methodType);
             }
-
 
             public @Nullable JContainer<J.TypeParameter> getTypeParameters() {
                 return t.typeParameters;
@@ -3590,7 +3488,6 @@ public interface Cs extends J {
         }
     }
 
-
     /**
      * Represents a class/struct constraint in a where clause.
      * Example: where T : class, where T : struct
@@ -3779,7 +3676,6 @@ public interface Cs extends J {
         @Getter
         Markers markers;
 
-
         @With
         @Getter
         @Nullable
@@ -3788,7 +3684,6 @@ public interface Cs extends J {
         @With
         @Getter
         VariableDesignation variables;
-
 
         @Override
         public @Nullable JavaType getType() {
@@ -4067,13 +3962,13 @@ public interface Cs extends J {
         @Getter
         Markers markers;
 
-        JContainer<Argument> arguments;
+        JContainer<Expression> arguments;
 
-        public List<Argument> getArguments() {
+        public List<Expression> getArguments() {
             return arguments.getElements();
         }
 
-        public TupleExpression withArguments(List<Argument> arguments) {
+        public TupleExpression withArguments(List<Expression> arguments) {
             return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
         }
 
@@ -4117,16 +4012,15 @@ public interface Cs extends J {
         public static class Padding {
             private final TupleExpression t;
 
-            public JContainer<Argument> getArguments() {
+            public JContainer<Expression> getArguments() {
                 return t.arguments;
             }
 
-            public TupleExpression withArguments(JContainer<Argument> arguments) {
+            public TupleExpression withArguments(JContainer<Expression> arguments) {
                 return t.arguments == arguments ? t : new TupleExpression(t.id, t.prefix, t.markers, arguments);
             }
         }
     }
-
 
     /**
      * Represents a C# destructor which is a method called before an object is destroyed by the garbage collector.
@@ -4329,8 +4223,6 @@ public interface Cs extends J {
         }
     }
 
-
-
     /**
      * Represents a C# tuple type specification, which allows grouping multiple types into a single type.
      * Can be used in method returns, variable declarations, etc.
@@ -4460,14 +4352,12 @@ public interface Cs extends J {
         @Nullable
         Identifier name;
 
-
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
             return v.visitTupleElement(this, p);
         }
 
     }
-
 
     /**
      * Represents a C# new class instantiation expression, which can optionally include an object/collection initializer.
@@ -4676,13 +4566,13 @@ public interface Cs extends J {
         @Getter
         Markers markers;
 
-        JContainer<Argument> argumentList;
+        JContainer<Expression> argumentList;
 
-        public List<Argument> getArgumentList() {
+        public List<Expression> getArgumentList() {
             return argumentList.getElements();
         }
 
-        public ImplicitElementAccess withArgumentList(List<Argument> argumentList) {
+        public ImplicitElementAccess withArgumentList(List<Expression> argumentList) {
             return getPadding().withArgumentList(JContainer.withElements(this.argumentList, argumentList));
         }
 
@@ -4725,11 +4615,11 @@ public interface Cs extends J {
         public static class Padding {
             private final ImplicitElementAccess t;
 
-            public JContainer<Argument> getArgumentList() {
+            public JContainer<Expression> getArgumentList() {
                 return t.argumentList;
             }
 
-            public ImplicitElementAccess withArgumentList(JContainer<Argument> argumentList) {
+            public ImplicitElementAccess withArgumentList(JContainer<Expression> argumentList) {
                 return t.argumentList == argumentList ? t : new ImplicitElementAccess(t.id, t.prefix, t.markers, argumentList);
             }
         }
@@ -5047,281 +4937,6 @@ public interface Cs extends J {
     }
 
     /**
-     * Represents a unary pattern in C#, which negates another pattern using the "not" keyword.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Using "not" pattern to negate a type pattern
-     *     if (obj is not string) { }
-     *
-     *     // Using "not" pattern with constant pattern
-     *     if (value is not 0) { }
-     *
-     *     // Using "not" pattern with other patterns
-     *     switch (obj) {
-     *         case not null: // Negates null constant pattern
-     *             break;
-     *         case not int: // Negates type pattern
-     *             break;
-     *     }
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PUBLIC)
-    final class UnaryPattern implements Cs, Pattern, Expression {
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * a is not b
-         *      ^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        Keyword operator;
-
-        @With
-        @Getter
-        Pattern pattern;
-
-        @Override
-        public @Nullable JavaType getType() {
-            return JavaType.Primitive.Boolean;
-        }
-
-        @Override
-        public UnaryPattern withType(@Nullable JavaType type) {
-            return this;
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitUnaryPattern(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-    }
-
-    /**
-     * Represents a C# type pattern, which matches a value against a type and optionally assigns it to a new variable.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Simple type pattern
-     *     if (obj is string)
-     *
-     *     // Type pattern with variable declaration
-     *     if (obj is string str)
-     *
-     *     // Type pattern with array type
-     *     if (obj is int[])
-     *
-     *     // Type pattern with generic type
-     *     if (obj is List&lt;string&gt; stringList)
-     *
-     *     // Type pattern with nullable type
-     *     if (obj is string? nullableStr)
-     *
-     *     // Switch expression with type pattern
-     *     object value = someValue switch {
-     *         string s => s.Length,
-     *         int n => n * 2,
-     *         _ => 0
-     *     };
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PUBLIC)
-    final class TypePattern implements Pattern {
-
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Getter
-        TypeTree typeIdentifier;
-
-        @Nullable
-        @With
-        @Getter
-        VariableDesignation designation;
-
-        @Override
-        public JavaType getType() {
-            return typeIdentifier.getType();
-        }
-
-        @Override
-        public TypePattern withType(@Nullable JavaType type) {
-            return withType(this.typeIdentifier.withType(type));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitTypePattern(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-
-    }
-
-    /**
-     * Represents a C# binary pattern that combines two patterns with a logical operator.
-     * The binary pattern is used in pattern matching to create compound pattern tests.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Using 'and' to combine patterns
-     *     if (obj is string { Length: &gt; 0 } and not null)
-     *
-     *     // Using 'or' to combine patterns
-     *     if (number is &gt; 0 or &lt; -10)
-     *
-     *     // Combining type patterns
-     *     if (obj is IList and not string)
-     *
-     *     // Complex combinations
-     *     if (value is &gt;= 0 and &lt;= 100)
-     *
-     *     // Multiple binary patterns
-     *     if (obj is IEnumerable and not string and not int[])
-     *
-     *     // In switch expressions
-     *     return size switch {
-     *         &lt; 0 or &gt; 100 =&gt; "Invalid",
-     *         &gt;= 0 and &lt;= 50 =&gt; "Small",
-     *         _ =&gt; "Large"
-     *     };
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class BinaryPattern implements Pattern {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Getter
-        Pattern left;
-
-        JLeftPadded<OperatorType> operator;
-
-        @With
-        @Getter
-        Pattern right;
-
-        public OperatorType getOperator() {
-            return operator.getElement();
-        }
-
-        public BinaryPattern withOperator(OperatorType operator) {
-            return getPadding().withOperator(this.operator.withElement(operator));
-        }
-
-        public enum OperatorType {
-            And,
-            Or
-        }
-
-        @Override
-        public JavaType getType() {
-            return JavaType.Primitive.Boolean;
-        }
-
-        @Override
-        public BinaryPattern withType(@Nullable JavaType type) {
-            return this;
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitBinaryPattern(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final BinaryPattern t;
-
-            public JLeftPadded<OperatorType> getOperator() {
-                return t.operator;
-            }
-
-            public BinaryPattern withOperator(JLeftPadded<OperatorType> operator) {
-                return t.operator == operator ? t : new BinaryPattern(t.id, t.prefix, t.markers, t.left, operator, t.right);
-            }
-        }
-    }
-
-    /**
      * Represents a C# constant pattern that matches against literal values or constant expressions.
      * <p>
      * For example:
@@ -5540,7 +5155,6 @@ public interface Cs extends J {
             return getPadding().withPatterns(JContainer.withElements(this.patterns, patterns));
         }
 
-
         @Override
         public JavaType getType() {
             return JavaType.Primitive.Boolean;
@@ -5589,377 +5203,6 @@ public interface Cs extends J {
                 return t.patterns == patterns ? t : new ListPattern(t.id, t.prefix, t.markers, patterns, t.designation);
             }
 
-        }
-    }
-
-    /**
-     * Represents a C# parenthesized pattern expression that groups a nested pattern.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Simple parenthesized pattern
-     *     if (obj is (string or int))
-     *
-     *     // With nested patterns
-     *     if (obj is not (null or ""))
-     *
-     *     // In complex pattern combinations
-     *     if (value is > 0 and (int or double))
-     *
-     *     // In switch expressions
-     *     return value switch {
-     *         (> 0 and < 10) => "single digit",
-     *         (string or int) => "basic type",
-     *         _ => "other"
-     *     };
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ParenthesizedPattern implements Pattern {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * if (obj is (string or int))
-         *            ^^^^^^^^^^^^^^^
-         * </pre>
-         */
-        JContainer<Pattern> pattern;
-
-        public List<Pattern> getPattern() {
-            return pattern.getElements();
-        }
-
-        public ParenthesizedPattern withPattern(List<Pattern> pattern) {
-            return getPadding().withPattern(JContainer.withElements(this.pattern, pattern));
-        }
-
-        @Override
-        public JavaType getType() {
-            return JavaType.Primitive.Boolean;
-        }
-
-        @Override
-        public ParenthesizedPattern withType(@Nullable JavaType type) {
-            return this;
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitParenthesizedPattern(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ParenthesizedPattern t;
-
-            public JContainer<Pattern> getPattern() {
-                return t.pattern;
-            }
-
-            public ParenthesizedPattern withPattern(JContainer<Pattern> pattern) {
-                return t.pattern == pattern ? t : new ParenthesizedPattern(t.id, t.prefix, t.markers, pattern);
-            }
-        }
-    }
-
-    /**
-     * Represents a C# recursive pattern that can match nested object structures, including property patterns and positional patterns.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Simple property pattern
-     *     if (obj is { Name: "test", Age: > 18 })
-     *
-     *     // With type pattern
-     *     if (obj is Person { Name: "test" } p)
-     *
-     *     // With nested patterns
-     *     if (obj is { Address: { City: "NY" } })
-     *
-     *     // Positional patterns (deconstructions)
-     *     if (point is (int x, int y) { x: > 0, y: > 0 })
-     *
-     *     // With variable designation
-     *     if (obj is { Id: int id, Name: string name } result)
-     *
-     *     // In switch expressions
-     *     return shape switch {
-     *         Circle { Radius: var r } => Math.PI * r * r,
-     *         Rectangle { Width: var w, Height: var h } => w * h,
-     *         _ => 0
-     *     };
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PUBLIC)
-    final class RecursivePattern implements Pattern {
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * if (obj is Person { Name: "test" })
-         *            ^^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        @Nullable
-        TypeTree typeQualifier;
-
-        /**
-         * <pre>
-         * if (point is (int x, int y))
-         *              ^^^^^^^^^^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        @Nullable
-        PositionalPatternClause positionalPattern;
-
-        /**
-         * <pre>
-         * if (obj is { Name: "test", Age: 18 })
-         *            ^^^^^^^^^^^^^^^^^^^^^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        @Nullable
-        PropertyPatternClause propertyPattern;
-
-        /**
-         * <pre>
-         * if (obj is Person { Name: "test" } p)
-         *                                    ^
-         * </pre>
-         */
-        @With
-        @Getter
-        @Nullable
-        VariableDesignation designation;
-
-        @Override
-        public JavaType getType() {
-            return JavaType.Primitive.Boolean;
-        }
-
-        @Override
-        public RecursivePattern withType(@Nullable JavaType type) {
-            return this;
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitRecursivePattern(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-    }
-
-    /**
-     * Represents a var pattern that is used in switch statement pattern matching.
-     * <pre>
-     * case var (x, y):
-     *      ^^^
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PUBLIC)
-    final class VarPattern implements Cs, Pattern {
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * case var (x, y):
-         *          ^^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        VariableDesignation designation;
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitVarPattern(this, p);
-        }
-
-        @Override
-        public @Nullable JavaType getType() {
-            return designation.getType();
-        }
-
-        @Override
-        public VarPattern withType(@Nullable JavaType type) {
-            return withDesignation(designation.withType(type));
-        }
-
-        @Override
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-    }
-
-    /**
-     * Represents a positional pattern clause in C# pattern matching, which matches the deconstructed parts of an object.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Simple positional pattern
-     *     if (point is (0, 0))
-     *
-     *     // With variable declarations
-     *     if (point is (int x, int y))
-     *
-     *     // With nested patterns
-     *     if (point is (> 0, < 100))
-     *
-     *     // In switch expressions
-     *     return point switch {
-     *         (0, 0) => "origin",
-     *         (var x, var y) when x == y => "on diagonal",
-     *         _ => "other"
-     *     };
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class PositionalPatternClause implements Cs {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * if (point is (0, 0))
-         *              ^^^^^^
-         * </pre>
-         */
-        JContainer<Subpattern> subpatterns;
-
-        public List<Subpattern> getSubpatterns() {
-            return subpatterns.getElements();
-        }
-
-        public PositionalPatternClause withSubpatterns(List<Subpattern> subpatterns) {
-            return getPadding().withSubpatterns(JContainer.withElements(this.subpatterns, subpatterns));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitPositionalPatternClause(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final PositionalPatternClause t;
-
-            public JContainer<Subpattern> getSubpatterns() {
-                return t.subpatterns;
-            }
-
-            public PositionalPatternClause withSubpatterns(JContainer<Subpattern> subpatterns) {
-                return t.subpatterns == subpatterns ? t : new PositionalPatternClause(t.id, t.prefix, t.markers, subpatterns);
-            }
         }
     }
 
@@ -6133,7 +5376,6 @@ public interface Cs extends J {
         @Getter
         Markers markers;
 
-
         @Override
         public JavaType getType() {
             return JavaType.Primitive.Boolean;
@@ -6157,238 +5399,6 @@ public interface Cs extends J {
 
     }
 
-    /**
-     * Represents a property pattern clause in C# pattern matching, which matches against object properties.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Simple property pattern
-     *     if (obj is { Name: "test" })
-     *
-     *     // Multiple properties
-     *     if (person is { Name: "John", Age: > 18 })
-     *
-     *     // Nested property patterns
-     *     if (order is { Customer: { Name: "test" } })
-     *
-     *     // With variable declarations
-     *     if (person is { Id: int id, Name: string name })
-     *
-     *     // In switch expressions
-     *     return shape switch {
-     *         { Type: "circle", Radius: var r } => Math.PI * r * r,
-     *         { Type: "square", Side: var s } => s * s,
-     *         _ => 0
-     *     };
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class PropertyPatternClause implements Cs {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * if (obj is { Name: "test", Age: 18 })
-         *            ^^^^^^^^^^^^^^^^^^^^^^^^^
-         * </pre>
-         */
-        JContainer<Expression> subpatterns;
-
-        public List<Expression> getSubpatterns() {
-            return subpatterns.getElements();
-        }
-
-        public PropertyPatternClause withSubpatterns(List<Expression> subpatterns) {
-            return getPadding().withSubpatterns(JContainer.withElements(this.subpatterns, subpatterns));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitPropertyPatternClause(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final PropertyPatternClause t;
-
-            public JContainer<Expression> getSubpatterns() {
-                return t.subpatterns;
-            }
-
-            public PropertyPatternClause withSubpatterns(JContainer<Expression> subpatterns) {
-                return t.subpatterns == subpatterns ? t : new PropertyPatternClause(t.id, t.prefix, t.markers, subpatterns);
-            }
-        }
-    }
-
-
-    /**
-     * Represents a subpattern in C# pattern matching, which can appear in property patterns or positional patterns.
-     * Each subpattern consists of an optional name with a corresponding pattern.
-     * <p>
-     * For example:
-     * <pre>
-     *     // In property patterns
-     *     if (obj is { Name: "test", Age: > 18 })
-     *                  ^^^^^^^^^^^^  ^^^^^^^^^
-     *
-     *     // In positional patterns
-     *     if (point is (x: > 0, y: > 0))
-     *                   ^^^^^^  ^^^^^^
-     *
-     *     // With variable declarations
-     *     if (person is { Id: var id, Name: string name })
-     *                     ^^^^^^^^^^  ^^^^^^^^^^^^^^^^^
-     *
-     *     // Nested patterns
-     *     if (obj is { Address: { City: "NY" } })
-     *                  ^^^^^^^^^^^^^^^^^^^^^^^
-     *
-     *     // In switch expressions
-     *     return shape switch {
-     *         { Radius: var r } => Math.PI * r * r,
-     *           ^^^^^^^^^^^
-     *         { Width: var w, Height: var h } => w * h,
-     *           ^^^^^^^^^^^^  ^^^^^^^^^^^^^
-     *         _ => 0
-     *     };
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Subpattern implements Cs, Expression {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * if (obj is { Name: "test" })
-         *               ^^^^
-         * if (point is (x: > 0))
-         *               ^
-         * </pre>
-         */
-        @With
-        @Getter
-        @Nullable
-        Expression name;
-
-        /**
-         * <pre>
-         * if (obj is { Name: "test" })
-         *                    ^^^^^
-         * if (point is (x: > 0))
-         *                  ^^
-         * </pre>
-         */
-        JLeftPadded<Pattern> pattern;
-
-        public Pattern getPattern() {
-            return pattern.getElement();
-        }
-
-        public Subpattern withPattern(Pattern pattern) {
-            return getPadding().withPattern(this.pattern.withElement(pattern));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitSubpattern(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @Override
-        public @Nullable JavaType getType() {
-            return pattern.getElement().getType();
-        }
-
-        @Override
-        public <T extends J> @Nullable T withType(@Nullable JavaType type) {
-            return null;
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Subpattern t;
-
-            public JLeftPadded<Pattern> getPattern() {
-                return t.pattern;
-            }
-
-            public Subpattern withPattern(JLeftPadded<Pattern> pattern) {
-                return t.pattern == pattern ? t : new Subpattern(t.id, t.prefix, t.markers, t.name, pattern);
-            }
-        }
-    }
     //endregion
 
     /**
@@ -6641,563 +5651,6 @@ public interface Cs extends J {
 
             public SwitchExpressionArm withExpression(JLeftPadded<Expression> expression) {
                 return t.expression == expression ? t : new SwitchExpressionArm(t.id, t.prefix, t.markers, t.pattern, t.whenExpression, expression);
-            }
-        }
-    }
-
-    /**
-     * Represents a switch statement section containing one or more case labels followed by a list of statements.
-     * <p>
-     * For example:
-     * <pre>
-     * switch(value) {
-     *     case 1:                    // single case label
-     *     case 2:                    // multiple case labels
-     *         Console.WriteLine("1 or 2");
-     *         break;
-     *
-     *     case int n when n > 0:     // pattern case with when clause
-     *         Console.WriteLine("positive");
-     *         break;
-     *
-     *     case Person { Age: > 18 }: // recursive pattern
-     *         Console.WriteLine("adult");
-     *         break;
-     *
-     *     default:                   // default label
-     *         Console.WriteLine("default");
-     *         break;
-     * }
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class SwitchSection implements Cs, Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * case 1:
-         * case 2:
-         * ^^^^^^^
-         * </pre>
-         */
-        @Getter
-        @With
-        List<SwitchLabel> labels;
-
-        /**
-         * <pre>
-         * case 1:
-         *     Console.WriteLine("1");
-         *     break;
-         *     ^^^^^^^^^^^^^^^^^^^^
-         * </pre>
-         */
-        List<JRightPadded<Statement>> statements;
-
-        public List<Statement> getStatements() {
-            return JRightPadded.getElements(statements);
-        }
-
-        public SwitchSection withStatements(List<Statement> statements) {
-            return getPadding().withStatements(JRightPadded.withElements(this.statements, statements));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitSwitchSection(this, p);
-        }
-
-        @Override
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final SwitchSection t;
-
-            public List<JRightPadded<Statement>> getStatements() {
-                return t.statements;
-            }
-
-            public SwitchSection withStatements(List<JRightPadded<Statement>> statements) {
-                return t.statements == statements ? t : new SwitchSection(t.id, t.prefix, t.markers, t.labels, statements);
-            }
-        }
-    }
-
-    public interface SwitchLabel extends Expression {
-
-    }
-
-    /**
-     * Represents a default case label in a switch statement.
-     * <p>
-     * For example:
-     * <pre>
-     * switch(value) {
-     *     case 1:
-     *         break;
-     *     default:      // default label
-     *         Console.WriteLine("default");
-     *         break;
-     * }
-     *
-     * // Also used in switch expressions
-     * var result = value switch {
-     *     1 => "one",
-     *     default => "other"
-     * };
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PUBLIC)
-    final class DefaultSwitchLabel implements Cs, SwitchLabel, Expression {
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * default:
-         *        ^
-         * </pre>
-         */
-        @With
-        @Getter
-        Space colonToken;
-
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public DefaultSwitchLabel withType(@Nullable JavaType type) {
-            return this;
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitDefaultSwitchLabel(this, p);
-        }
-
-        @Override
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-    }
-
-    /**
-     * Represents a pattern-based case label in a switch statement, optionally including a when clause.
-     * <p>
-     * For example:
-     * <pre>
-     * switch(obj) {
-     *     case int n when n > 0:
-     *     case string s when s.Length > 0:
-     *     case [] when IsValid():
-     *     case Person { Age: > 18 }:
-     *     case not null:
-     *     case > 100:
-     * }
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class CasePatternSwitchLabel implements Cs, SwitchLabel {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * case int n when n > 0:
-         *      ^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        Pattern pattern;
-
-
-        /**
-         * <pre>
-         * case int n when n > 0:
-         *            ^^^^^^^^^^
-         * </pre>
-         */
-        @Nullable
-        JLeftPadded<Expression> whenClause;
-
-        public @Nullable Expression getWhenClause() {
-            return whenClause == null ? null : whenClause.getElement();
-        }
-
-        public CasePatternSwitchLabel withWhenClause(@Nullable Expression whenClause) {
-            return getPadding().withWhenClause(JLeftPadded.withElement(this.whenClause, whenClause));
-        }
-
-        /**
-         * <pre>
-         * case int n when n > 0 :
-         *                      ^
-         * </pre>
-         */
-        @With
-        @Getter
-        Space colonToken;
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitCasePatternSwitchLabel(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @Override
-        public @Nullable JavaType getType() {
-            return pattern.getType();
-        }
-
-        @Override
-        public <T extends J> @Nullable T withType(@Nullable JavaType type) {
-            return null;
-        }
-
-        @Override
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final CasePatternSwitchLabel t;
-
-            public @Nullable JLeftPadded<Expression> getWhenClause() {
-                return t.whenClause;
-            }
-
-            public CasePatternSwitchLabel withWhenClause(@Nullable JLeftPadded<Expression> whenClause) {
-                return t.whenClause == whenClause ? t : new CasePatternSwitchLabel(t.id, t.prefix, t.markers, t.pattern, whenClause, t.colonToken);
-            }
-        }
-    }
-
-    /**
-     * Represents a C# switch statement for control flow based on pattern matching and case labels.
-     * <p>
-     * For example:
-     * <pre>
-     * switch(value) {
-     *     case 1:
-     *         Console.WriteLine("one");
-     *         break;
-     *
-     *     case int n when n > 0:
-     *         Console.WriteLine("positive");
-     *         break;
-     *
-     *     case Person { Age: > 18 }:
-     *         Console.WriteLine("adult");
-     *         break;
-     *
-     *     case string s:
-     *         Console.WriteLine($"string: {s}");
-     *         break;
-     *
-     *     default:
-     *         Console.WriteLine("default");
-     *         break;
-     * }
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class SwitchStatement implements Cs, Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * switch(value) {
-         *       ^^^^^^
-         * </pre>
-         */
-        JContainer<Expression> expression;
-
-        public List<Expression> getExpression() {
-            return expression.getElements();
-        }
-
-        public SwitchStatement withExpression(List<Expression> expression) {
-            return getPadding().withExpression(JContainer.withElements(this.expression, expression));
-        }
-
-        /**
-         * <pre>
-         * switch(value) {
-         *     case 1:
-         *         Console.WriteLine("one");
-         *         break;
-         *     default:
-         *         Console.WriteLine("default");
-         *         break;
-         * }
-         * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-         * </pre>
-         */
-        JContainer<SwitchSection> sections;
-
-        public List<SwitchSection> getSections() {
-            return sections.getElements();
-        }
-
-        public SwitchStatement withSections(List<SwitchSection> sections) {
-            return getPadding().withSections(JContainer.withElements(this.sections, sections));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitSwitchStatement(this, p);
-        }
-
-        @Override
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final SwitchStatement t;
-
-            public JContainer<Expression> getExpression() {
-                return t.expression;
-            }
-
-            public SwitchStatement withExpression(JContainer<Expression> expression) {
-                return t.expression == expression ? t : new SwitchStatement(t.id, t.prefix, t.markers, expression, t.sections);
-            }
-
-            public JContainer<SwitchSection> getSections() {
-                return t.sections;
-            }
-
-            public SwitchStatement withSections(JContainer<SwitchSection> sections) {
-                return t.sections == sections ? t : new SwitchStatement(t.id, t.prefix, t.markers, t.expression, sections);
-            }
-        }
-    }
-
-    /**
-     * Represents a C# lock statement which provides thread synchronization.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Simple lock statement
-     *     lock (syncObject) {
-     *         // protected code
-     *     }
-     *
-     *     // Lock with local variable
-     *     lock (this.lockObj) {
-     *         sharedResource.Modify();
-     *     }
-     *
-     *     // Lock with property
-     *     lock (SyncRoot) {
-     *         // thread-safe operations
-     *     }
-     * </pre>
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class LockStatement implements Cs, Statement {
-
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * <pre>
-         * lock (syncObject) { }
-         *      ^^^^^^^^^^
-         * </pre>
-         */
-        @With
-        @Getter
-        J.ControlParentheses<Expression> expression;
-
-        /**
-         * <pre>
-         * lock (syncObject) { }
-         *                  ^^^^^
-         * </pre>
-         */
-        JRightPadded<Statement> statement;
-
-        public Statement getStatement() {
-            return statement.getElement();
-        }
-
-        public LockStatement withStatement(Statement statement) {
-            return getPadding().withStatement(this.statement.withElement(statement));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitLockStatement(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final LockStatement t;
-
-            public JRightPadded<Statement> getStatement() {
-                return t.statement;
-            }
-
-            public LockStatement withStatement(JRightPadded<Statement> statement) {
-                return t.statement == statement ? t : new LockStatement(t.id, t.prefix, t.markers, t.expression, statement);
             }
         }
     }
@@ -7632,7 +6085,6 @@ public interface Cs extends J {
         }
     }
 
-
     /**
      * Represents a C# indexer declaration which allows objects to be indexed like arrays.
      * <pre>
@@ -7831,7 +6283,6 @@ public interface Cs extends J {
             }
         }
     }
-
 
     /**
      * Represents a C# delegate declaration which defines a type that can reference methods.
@@ -8776,7 +7227,6 @@ public interface Cs extends J {
         @Getter
         List<ArrayDimension> dimensions;
 
-
         @With
         @Nullable
         @Getter
@@ -8818,7 +7268,6 @@ public interface Cs extends J {
         @Getter
         Markers markers;
 
-
         @With
         @Getter
         Block body;
@@ -8848,7 +7297,6 @@ public interface Cs extends J {
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
-
 
         /**
          * Represents a C# catch clause in a try/catch statement, which optionally includes a filter expression.
@@ -9204,7 +7652,6 @@ public interface Cs extends J {
         public List<J> getSideEffects() {
             return target.getSideEffects();
         }
-
 
         public Padding getPadding() {
             Padding p;
@@ -10006,6 +8453,318 @@ public interface Cs extends J {
         @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class AnonymousObjectCreationExpression implements Cs, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JContainer<Expression> initializers;
+
+        public List<Expression> getInitializers() {
+            return initializers.getElements();
+        }
+
+        public AnonymousObjectCreationExpression withInitializers(List<Expression> initializers) {
+            return getPadding().withInitializers(JContainer.withElements(this.initializers, initializers));
+        }
+
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitAnonymousObjectCreationExpression(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final AnonymousObjectCreationExpression t;
+
+            public JContainer<Expression> getInitializers() {
+                return t.initializers;
+            }
+
+            public AnonymousObjectCreationExpression withInitializers(JContainer<Expression> initializers) {
+                return t.initializers == initializers ? t : new AnonymousObjectCreationExpression(t.id, t.prefix, t.markers, initializers, t.type);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class WithExpression implements Cs, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression expression;
+
+        JLeftPadded<Expression> initializer;
+
+        public Expression getInitializer() {
+            return initializer.getElement();
+        }
+
+        public WithExpression withInitializer(Expression initializer) {
+            return getPadding().withInitializer(this.initializer.withElement(initializer));
+        }
+
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitWithExpression(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final WithExpression t;
+
+            public JLeftPadded<Expression> getInitializer() {
+                return t.initializer;
+            }
+
+            public WithExpression withInitializer(JLeftPadded<Expression> initializer) {
+                return t.initializer == initializer ? t : new WithExpression(t.id, t.prefix, t.markers, t.expression, initializer, t.type);
+            }
+        }
+    }
+
+    @Getter
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(access = AccessLevel.PUBLIC)
+    final class SpreadExpression implements Cs, Expression {
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        Expression expression;
+
+        @With
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitSpreadExpression(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class FunctionPointerType implements Cs, TypeTree, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @Nullable
+        JLeftPadded<CallingConvention> callingConvention;
+
+        public @Nullable CallingConvention getCallingConvention() {
+            return callingConvention == null ? null : callingConvention.getElement();
+        }
+
+        public FunctionPointerType withCallingConvention(@Nullable CallingConvention callingConvention) {
+            return getPadding().withCallingConvention(JLeftPadded.withElement(this.callingConvention, callingConvention));
+        }
+
+        @Nullable
+        JContainer<J.Identifier> unmanagedCallingConventionTypes;
+
+        public @Nullable List<J.Identifier> getUnmanagedCallingConventionTypes() {
+            return unmanagedCallingConventionTypes == null ? null : unmanagedCallingConventionTypes.getElements();
+        }
+
+        public FunctionPointerType withUnmanagedCallingConventionTypes(@Nullable List<J.Identifier> types) {
+            return getPadding().withUnmanagedCallingConventionTypes(JContainer.withElementsNullable(this.unmanagedCallingConventionTypes, types));
+        }
+
+        JContainer<TypeTree> parameterTypes;
+
+        public List<TypeTree> getParameterTypes() {
+            return parameterTypes.getElements();
+        }
+
+        public FunctionPointerType withParameterTypes(List<TypeTree> parameterTypes) {
+            return getPadding().withParameterTypes(JContainer.withElements(this.parameterTypes, parameterTypes));
+        }
+
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
+        public enum CallingConvention {
+            Managed,
+            Unmanaged
+        }
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitFunctionPointerType(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final FunctionPointerType t;
+
+            public @Nullable JLeftPadded<CallingConvention> getCallingConvention() {
+                return t.callingConvention;
+            }
+
+            public FunctionPointerType withCallingConvention(@Nullable JLeftPadded<CallingConvention> callingConvention) {
+                return t.callingConvention == callingConvention ? t : new FunctionPointerType(t.id, t.prefix, t.markers, callingConvention, t.unmanagedCallingConventionTypes, t.parameterTypes, t.type);
+            }
+
+            public @Nullable JContainer<J.Identifier> getUnmanagedCallingConventionTypes() {
+                return t.unmanagedCallingConventionTypes;
+            }
+
+            public FunctionPointerType withUnmanagedCallingConventionTypes(@Nullable JContainer<J.Identifier> types) {
+                return t.unmanagedCallingConventionTypes == types ? t : new FunctionPointerType(t.id, t.prefix, t.markers, t.callingConvention, types, t.parameterTypes, t.type);
+            }
+
+            public JContainer<TypeTree> getParameterTypes() {
+                return t.parameterTypes;
+            }
+
+            public FunctionPointerType withParameterTypes(JContainer<TypeTree> parameterTypes) {
+                return t.parameterTypes == parameterTypes ? t : new FunctionPointerType(t.id, t.prefix, t.markers, t.callingConvention, t.unmanagedCallingConventionTypes, parameterTypes, t.type);
+            }
         }
     }
 }

@@ -193,6 +193,13 @@ public sealed record ExpressionBodied(Guid Id) : Marker, IRpcCodec<ExpressionBod
         before with { Id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse) };
 }
 
+public sealed record AnonymousMethod(Guid Id) : Marker, IRpcCodec<AnonymousMethod>
+{
+    public void RpcSend(AnonymousMethod after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public AnonymousMethod RpcReceive(AnonymousMethod before, RpcReceiveQueue q) =>
+        before with { Id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse) };
+}
+
 // TypeParameterBound DELETED — replaced by ConstrainedTypeParameter
 
 /// <summary>
@@ -294,15 +301,13 @@ public sealed record DeclarationExpression(
     Guid Id,
     Space Prefix,
     Markers Markers,
-    TypeTree Type,                    // "var" or explicit type like "int"
-    JLeftPadded<Identifier> Variable  // The variable name with space before
+    TypeTree? TypeExpression,         // "var" or explicit type like "int", nullable
+    Expression Variables              // VariableDesignation (SingleVariableDesignation, ParenthesizedVariableDesignation, etc.)
 ) : Cs, Expression
 {
     public DeclarationExpression WithId(Guid id) => this with { Id = id };
     public DeclarationExpression WithPrefix(Space prefix) => this with { Prefix = prefix };
     public DeclarationExpression WithMarkers(Markers markers) => this with { Markers = markers };
-    public DeclarationExpression WithType(TypeTree type) => this with { Type = type };
-    public DeclarationExpression WithVariable(JLeftPadded<Identifier> variable) => this with { Variable = variable };
 
     Tree Tree.WithId(Guid id) => WithId(id);
 }
@@ -1146,10 +1151,21 @@ public sealed record AssignmentOperation(
 {
     public enum OperatorType
     {
-        NullCoalescing, Addition, Subtraction, Multiplication, Division,
-        Modulo, BitAnd, BitOr, BitXor, LeftShift, RightShift,
-        UnsignedRightShift, Coalesce
+        Addition,
+        Subtraction,
+        Multiplication,
+        Division,
+        Modulo,
+        BitAnd,
+        BitOr,
+        BitXor,
+        LeftShift,
+        RightShift,
+        UnsignedRightShift,
+        NullCoalescing,
+        Coalesce
     }
+
     public AssignmentOperation WithId(Guid id) => this with { Id = id };
     public AssignmentOperation WithPrefix(Space prefix) => this with { Prefix = prefix };
     public AssignmentOperation WithMarkers(Markers markers) => this with { Markers = markers };
@@ -1212,7 +1228,12 @@ public sealed record CsBinary(
     JavaType? Type
 ) : Cs, Expression
 {
-    public enum OperatorType { As, NullCoalescing }
+    public enum OperatorType
+    {
+        As,
+        NullCoalescing
+    }
+
     public CsBinary WithId(Guid id) => this with { Id = id };
     public CsBinary WithPrefix(Space prefix) => this with { Prefix = prefix };
     public CsBinary WithMarkers(Markers markers) => this with { Markers = markers };
@@ -1469,46 +1490,6 @@ public sealed record ImplicitElementAccess(
     Tree Tree.WithId(Guid id) => WithId(id);
 }
 
-// ---- Pattern types ----
-
-public sealed record UnaryPattern(
-    Guid Id, Space Prefix, Markers Markers,
-    Keyword Operator,
-    Pattern PatternValue
-) : Cs, Pattern, Expression
-{
-    public UnaryPattern WithId(Guid id) => this with { Id = id };
-    public UnaryPattern WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public UnaryPattern WithMarkers(Markers markers) => this with { Markers = markers };
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
-public sealed record TypePattern(
-    Guid Id, Space Prefix, Markers Markers,
-    TypeTree TypeIdentifier,
-    VariableDesignation? Designation
-) : Cs, Pattern
-{
-    public TypePattern WithId(Guid id) => this with { Id = id };
-    public TypePattern WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public TypePattern WithMarkers(Markers markers) => this with { Markers = markers };
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
-public sealed record BinaryPattern(
-    Guid Id, Space Prefix, Markers Markers,
-    Pattern Left,
-    JLeftPadded<BinaryPattern.OperatorType> Operator,
-    Pattern Right
-) : Cs, Pattern
-{
-    public enum OperatorType { And, Or }
-    public BinaryPattern WithId(Guid id) => this with { Id = id };
-    public BinaryPattern WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public BinaryPattern WithMarkers(Markers markers) => this with { Markers = markers };
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
 public sealed record ConstantPattern(
     Guid Id, Space Prefix, Markers Markers,
     Expression Value
@@ -1543,53 +1524,6 @@ public sealed record ListPattern(
     Tree Tree.WithId(Guid id) => WithId(id);
 }
 
-public sealed record ParenthesizedPattern(
-    Guid Id, Space Prefix, Markers Markers,
-    JContainer<Pattern> PatternValue
-) : Cs, Pattern
-{
-    public ParenthesizedPattern WithId(Guid id) => this with { Id = id };
-    public ParenthesizedPattern WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public ParenthesizedPattern WithMarkers(Markers markers) => this with { Markers = markers };
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
-public sealed record RecursivePattern(
-    Guid Id, Space Prefix, Markers Markers,
-    TypeTree? TypeQualifier,
-    PositionalPatternClause? PositionalPattern,
-    PropertyPatternClause? PropertyPatternValue,
-    VariableDesignation? Designation
-) : Cs, Pattern
-{
-    public RecursivePattern WithId(Guid id) => this with { Id = id };
-    public RecursivePattern WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public RecursivePattern WithMarkers(Markers markers) => this with { Markers = markers };
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
-public sealed record VarPattern(
-    Guid Id, Space Prefix, Markers Markers,
-    VariableDesignation Designation
-) : Cs, Pattern
-{
-    public VarPattern WithId(Guid id) => this with { Id = id };
-    public VarPattern WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public VarPattern WithMarkers(Markers markers) => this with { Markers = markers };
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
-public sealed record PositionalPatternClause(
-    Guid Id, Space Prefix, Markers Markers,
-    JContainer<Subpattern> Subpatterns
-) : Cs
-{
-    public PositionalPatternClause WithId(Guid id) => this with { Id = id };
-    public PositionalPatternClause WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public PositionalPatternClause WithMarkers(Markers markers) => this with { Markers = markers };
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
 public sealed record SlicePattern(
     Guid Id, Space Prefix, Markers Markers
 ) : Cs, Pattern
@@ -1597,29 +1531,6 @@ public sealed record SlicePattern(
     public SlicePattern WithId(Guid id) => this with { Id = id };
     public SlicePattern WithPrefix(Space prefix) => this with { Prefix = prefix };
     public SlicePattern WithMarkers(Markers markers) => this with { Markers = markers };
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
-public sealed record PropertyPatternClause(
-    Guid Id, Space Prefix, Markers Markers,
-    JContainer<Expression> Subpatterns
-) : Cs
-{
-    public PropertyPatternClause WithId(Guid id) => this with { Id = id };
-    public PropertyPatternClause WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public PropertyPatternClause WithMarkers(Markers markers) => this with { Markers = markers };
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
-public sealed record Subpattern(
-    Guid Id, Space Prefix, Markers Markers,
-    Expression? Name,
-    JLeftPadded<Pattern> PatternValue
-) : Cs, Expression
-{
-    public Subpattern WithId(Guid id) => this with { Id = id };
-    public Subpattern WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Subpattern WithMarkers(Markers markers) => this with { Markers = markers };
     Tree Tree.WithId(Guid id) => WithId(id);
 }
 
@@ -1650,68 +1561,6 @@ public sealed record SwitchExpressionArm(
     public SwitchExpressionArm WithId(Guid id) => this with { Id = id };
     public SwitchExpressionArm WithPrefix(Space prefix) => this with { Prefix = prefix };
     public SwitchExpressionArm WithMarkers(Markers markers) => this with { Markers = markers };
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
-public sealed record SwitchSection(
-    Guid Id, Space Prefix, Markers Markers,
-    IList<SwitchLabel> Labels,
-    IList<JRightPadded<Statement>> Statements
-) : Cs, Statement
-{
-    public SwitchSection WithId(Guid id) => this with { Id = id };
-    public SwitchSection WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public SwitchSection WithMarkers(Markers markers) => this with { Markers = markers };
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
-public sealed record DefaultSwitchLabel(
-    Guid Id, Space Prefix, Markers Markers,
-    Space ColonToken
-) : Cs, SwitchLabel, Expression
-{
-    public DefaultSwitchLabel WithId(Guid id) => this with { Id = id };
-    public DefaultSwitchLabel WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public DefaultSwitchLabel WithMarkers(Markers markers) => this with { Markers = markers };
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
-public sealed record CasePatternSwitchLabel(
-    Guid Id, Space Prefix, Markers Markers,
-    Pattern Pattern,
-    JLeftPadded<Expression>? WhenClause,
-    Space ColonToken
-) : Cs, SwitchLabel
-{
-    public CasePatternSwitchLabel WithId(Guid id) => this with { Id = id };
-    public CasePatternSwitchLabel WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public CasePatternSwitchLabel WithMarkers(Markers markers) => this with { Markers = markers };
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
-public sealed record SwitchStatement(
-    Guid Id, Space Prefix, Markers Markers,
-    JContainer<Expression> ExpressionPadded,
-    JContainer<SwitchSection> Sections
-) : Cs, Statement
-{
-    public SwitchStatement WithId(Guid id) => this with { Id = id };
-    public SwitchStatement WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public SwitchStatement WithMarkers(Markers markers) => this with { Markers = markers };
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
-// ---- LockStatement ----
-
-public sealed record LockStatement(
-    Guid Id, Space Prefix, Markers Markers,
-    ControlParentheses<Expression> ExpressionValue,
-    JRightPadded<Statement> StatementPadded
-) : Cs, Statement
-{
-    public LockStatement WithId(Guid id) => this with { Id = id };
-    public LockStatement WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public LockStatement WithMarkers(Markers markers) => this with { Markers = markers };
     Tree Tree.WithId(Guid id) => WithId(id);
 }
 
@@ -1973,6 +1822,72 @@ public sealed record RefType(
     public RefType WithId(Guid id) => this with { Id = id };
     public RefType WithPrefix(Space prefix) => this with { Prefix = prefix };
     public RefType WithMarkers(Markers markers) => this with { Markers = markers };
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+// ---- AnonymousObjectCreationExpression ----
+
+public sealed record AnonymousObjectCreationExpression(
+    Guid Id, Space Prefix, Markers Markers,
+    JContainer<Expression> Initializers,
+    JavaType? Type
+) : Cs, Expression
+{
+    public AnonymousObjectCreationExpression WithId(Guid id) => this with { Id = id };
+    public AnonymousObjectCreationExpression WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public AnonymousObjectCreationExpression WithMarkers(Markers markers) => this with { Markers = markers };
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+// ---- WithExpression ----
+
+public sealed record WithExpression(
+    Guid Id, Space Prefix, Markers Markers,
+    Expression Target,
+    JLeftPadded<Expression> InitializerPadded,
+    JavaType? Type
+) : Cs, Expression
+{
+    public Expression Initializer => InitializerPadded.Element;
+    public WithExpression WithId(Guid id) => this with { Id = id };
+    public WithExpression WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public WithExpression WithMarkers(Markers markers) => this with { Markers = markers };
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+// ---- SpreadExpression ----
+
+public sealed record SpreadExpression(
+    Guid Id, Space Prefix, Markers Markers,
+    Expression Expression,
+    JavaType? Type
+) : Cs, Expression
+{
+    public SpreadExpression WithId(Guid id) => this with { Id = id };
+    public SpreadExpression WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public SpreadExpression WithMarkers(Markers markers) => this with { Markers = markers };
+    Tree Tree.WithId(Guid id) => WithId(id);
+}
+
+// ---- FunctionPointerType ----
+
+public enum CallingConventionKind
+{
+    Managed,
+    Unmanaged
+}
+
+public sealed record FunctionPointerType(
+    Guid Id, Space Prefix, Markers Markers,
+    JLeftPadded<CallingConventionKind>? CallingConvention,
+    JContainer<Identifier>? UnmanagedCallingConventionTypes,
+    JContainer<TypeTree> ParameterTypes,
+    JavaType? Type
+) : Cs, TypeTree, Expression
+{
+    public FunctionPointerType WithId(Guid id) => this with { Id = id };
+    public FunctionPointerType WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public FunctionPointerType WithMarkers(Markers markers) => this with { Markers = markers };
     Tree Tree.WithId(Guid id) => WithId(id);
 }
 
