@@ -89,7 +89,18 @@ public class PropertyPlaceholderHelper {
     }
 
     public String replacePlaceholders(String value, Function<String, @Nullable String> placeholderResolver) {
-        return parseStringValue(value, placeholderResolver, null);
+        // Support escaping: doubling the first character of the placeholder prefix
+        // produces a literal prefix. E.g., for prefix "${", writing "$${" produces literal "${".
+        String escapePrefix = placeholderPrefix.charAt(0) + placeholderPrefix;
+        boolean hasEscaped = value.contains(escapePrefix);
+        if (hasEscaped) {
+            value = value.replace(escapePrefix, "\u0000\u0001\u0002");
+        }
+        String result = parseStringValue(value, placeholderResolver, null);
+        if (hasEscaped) {
+            result = result.replace("\u0000\u0001\u0002", placeholderPrefix);
+        }
+        return result;
     }
 
     protected String parseStringValue(String value, Function<String, @Nullable String> placeholderResolver,
