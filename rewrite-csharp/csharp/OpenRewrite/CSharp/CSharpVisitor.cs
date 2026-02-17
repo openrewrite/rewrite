@@ -43,10 +43,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             NamespaceDeclaration ns => VisitNamespaceDeclaration(ns, p),
             TupleType tt => VisitTupleType(tt, p),
             TupleExpression te => VisitTupleExpression(te, p),
-            ConditionalBlock cb => VisitConditionalBlock(cb, p),
-            IfDirective ifd => VisitIfDirective(ifd, p),
-            ElifDirective elif => VisitElifDirective(elif, p),
-            ElseDirective elsed => VisitElseDirective(elsed, p),
+            ConditionalDirective cd => VisitConditionalDirective(cd, p),
             PragmaWarningDirective pwd => VisitPragmaWarningDirective(pwd, p),
             NullableDirective nd => VisitNullableDirective(nd, p),
             RegionDirective rd => VisitRegionDirective(rd, p),
@@ -572,41 +569,16 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         return tupleExpr;
     }
 
-    public virtual J VisitConditionalBlock(ConditionalBlock conditionalBlock, P p)
+    public virtual J VisitConditionalDirective(ConditionalDirective conditionalDirective, P p)
     {
-        var ifBranch = (IfDirective?)Visit(conditionalBlock.IfBranch, p);
-        var elifBranches = new List<ElifDirective>();
-        foreach (var elif in conditionalBlock.ElifBranches)
+        var branches = new List<JRightPadded<CompilationUnit>>();
+        foreach (var branch in conditionalDirective.Branches)
         {
-            var visited = Visit(elif, p);
-            if (visited is ElifDirective ed) elifBranches.Add(ed);
+            var visited = (CompilationUnit?)Visit(branch.Element, p);
+            if (visited != null)
+                branches.Add(branch with { Element = visited });
         }
-        var elseBranch = conditionalBlock.ElseBranch != null
-            ? (ElseDirective?)Visit(conditionalBlock.ElseBranch, p)
-            : null;
-        return conditionalBlock with
-        {
-            IfBranch = ifBranch!,
-            ElifBranches = elifBranches,
-            ElseBranch = elseBranch
-        };
-    }
-
-    public virtual J VisitIfDirective(IfDirective ifDirective, P p)
-    {
-        var condition = (Expression?)Visit(ifDirective.Condition, p);
-        return ifDirective with { Condition = condition! };
-    }
-
-    public virtual J VisitElifDirective(ElifDirective elifDirective, P p)
-    {
-        var condition = (Expression?)Visit(elifDirective.Condition, p);
-        return elifDirective with { Condition = condition! };
-    }
-
-    public virtual J VisitElseDirective(ElseDirective elseDirective, P p)
-    {
-        return elseDirective;
+        return conditionalDirective with { Branches = branches };
     }
 
     public virtual J VisitPragmaWarningDirective(PragmaWarningDirective pragmaWarningDirective, P p)

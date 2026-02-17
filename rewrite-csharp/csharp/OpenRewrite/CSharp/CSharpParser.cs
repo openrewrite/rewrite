@@ -14,9 +14,17 @@ public class CSharpParser
     public CompilationUnit Parse(string source, string sourcePath = "source.cs",
         SemanticModel? semanticModel = null)
     {
+        var symbols = PreprocessorSourceTransformer.ExtractSymbols(source);
+        if (symbols.Count == 0)
+            return ParseSingle(source, sourcePath, semanticModel);
+
+        return ParseMulti(source, sourcePath, semanticModel, symbols);
+    }
+
+    private CompilationUnit ParseSingle(string source, string sourcePath, SemanticModel? semanticModel)
+    {
         if (semanticModel != null)
         {
-            // Use the syntax tree from the semantic model's compilation
             var root = semanticModel.SyntaxTree.GetCompilationUnitRoot();
             var visitor = new CSharpParserVisitor(source, semanticModel);
             return visitor.VisitCompilationUnit(root);
@@ -28,6 +36,65 @@ public class CSharpParser
             var visitor = new CSharpParserVisitor(source);
             return visitor.VisitCompilationUnit(root);
         }
+    }
+
+    private CompilationUnit ParseMulti(string source, string sourcePath,
+        SemanticModel? semanticModel, HashSet<string> symbols)
+    {
+        var directiveLines = PreprocessorSourceTransformer.GetDirectivePositions(source);
+        var permutations = PreprocessorSourceTransformer.GenerateUniquePermutations(source, symbols);
+        PreprocessorSourceTransformer.ComputeActiveBranchIndices(directiveLines, permutations);
+
+        var branches = new List<JRightPadded<CompilationUnit>>();
+        for (int i = 0; i < permutations.Count; i++)
+        {
+            var (cleanSource, definedSymbols) = permutations[i];
+            bool isPrimary = i == 0;
+
+            CompilationUnit cu;
+            if (isPrimary && semanticModel != null)
+            {
+                // Re-parse with the clean source but preserve semantic model capability
+                var syntaxTree = CSharpSyntaxTree.ParseText(cleanSource, path: sourcePath);
+                var compilation = semanticModel.Compilation.ReplaceSyntaxTree(
+                    semanticModel.SyntaxTree, syntaxTree);
+                var newSemanticModel = compilation.GetSemanticModel(syntaxTree);
+                cu = ParseSingle(cleanSource, sourcePath, newSemanticModel);
+            }
+            else
+            {
+                cu = ParseSingle(cleanSource, sourcePath, null);
+            }
+
+            // Add ConditionalBranchMarker to identify this as a branch
+            cu = cu with
+            {
+                Markers = cu.Markers.Add(new ConditionalBranchMarker(
+                    Guid.NewGuid(), definedSymbols.ToList()))
+            };
+            branches.Add(new JRightPadded<CompilationUnit>(cu, Space.Empty, Markers.Empty));
+        }
+
+        var directive = new ConditionalDirective(
+            Guid.NewGuid(),
+            Space.Empty,
+            Markers.Empty,
+            directiveLines,
+            branches
+        );
+
+        // Outer shell CompilationUnit wrapping the ConditionalDirective.
+        // EOF is Space.Empty because the ConditionalDirective printer handles
+        // everything including the trailing content from branch outputs.
+        var primaryCu = branches[0].Element;
+        return new CompilationUnit(
+            Guid.NewGuid(),
+            Space.Empty,
+            Markers.Empty,
+            primaryCu.SourcePath,
+            new List<Statement> { directive },
+            Space.Empty
+        );
     }
 }
 

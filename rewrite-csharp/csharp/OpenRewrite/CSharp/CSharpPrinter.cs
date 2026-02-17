@@ -2455,63 +2455,73 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
     #region Preprocessor Directives
 
-    public override J VisitConditionalBlock(ConditionalBlock conditionalBlock, PrintOutputCapture<P> p)
+    public override J VisitConditionalDirective(ConditionalDirective cd, PrintOutputCapture<P> p)
     {
-        BeforeSyntax(conditionalBlock, p);
-        Visit(conditionalBlock.IfBranch, p);
-        foreach (var elif in conditionalBlock.ElifBranches)
+        // Print each branch to a separate buffer
+        var branchOutputs = new string[cd.Branches.Count];
+        for (int i = 0; i < cd.Branches.Count; i++)
         {
-            Visit(elif, p);
+            var capture = new PrintOutputCapture<P>(p.Context);
+            Visit(cd.Branches[i].Element, capture);
+            branchOutputs[i] = capture.ToString();
         }
-        if (conditionalBlock.ElseBranch != null)
-        {
-            Visit(conditionalBlock.ElseBranch, p);
-        }
-        VisitSpace(conditionalBlock.BeforeEndif, p);
-        p.Append("#endif");
-        AfterSyntax(conditionalBlock, p);
-        return conditionalBlock;
-    }
 
-    public override J VisitIfDirective(IfDirective ifDirective, PrintOutputCapture<P> p)
-    {
-        BeforeSyntax(ifDirective, p);
-        p.Append("#if");
-        Visit(ifDirective.Condition, p);
-        foreach (var stmt in ifDirective.Body)
+        // Split each into lines
+        var branchLines = new string[branchOutputs.Length][];
+        for (int i = 0; i < branchOutputs.Length; i++)
         {
-            Visit(stmt.Element, p);
-            VisitSpace(stmt.After, p);
+            branchLines[i] = branchOutputs[i].Split('\n');
         }
-        AfterSyntax(ifDirective, p);
-        return ifDirective;
-    }
 
-    public override J VisitElifDirective(ElifDirective elifDirective, PrintOutputCapture<P> p)
-    {
-        BeforeSyntax(elifDirective, p);
-        p.Append("#elif");
-        Visit(elifDirective.Condition, p);
-        foreach (var stmt in elifDirective.Body)
+        // Build directive line lookup
+        var directiveLookup = new Dictionary<int, DirectiveLine>();
+        foreach (var dl in cd.DirectiveLines)
         {
-            Visit(stmt.Element, p);
-            VisitSpace(stmt.After, p);
+            directiveLookup[dl.LineNumber] = dl;
         }
-        AfterSyntax(elifDirective, p);
-        return elifDirective;
-    }
 
-    public override J VisitElseDirective(ElseDirective elseDirective, PrintOutputCapture<P> p)
-    {
-        BeforeSyntax(elseDirective, p);
-        p.Append("#else");
-        foreach (var stmt in elseDirective.Body)
+        // Line-level interleaving using stack-based algorithm
+        var stack = new Stack<int>();
+        stack.Push(0); // start with primary branch
+        int totalLines = branchLines[0].Length;
+
+        for (int lineNum = 0; lineNum < totalLines; lineNum++)
         {
-            Visit(stmt.Element, p);
-            VisitSpace(stmt.After, p);
+            if (lineNum > 0) p.Append("\n");
+
+            if (directiveLookup.TryGetValue(lineNum, out var directive))
+            {
+                // Emit directive text
+                p.Append(directive.Text);
+
+                switch (directive.Kind)
+                {
+                    case PreprocessorDirectiveKind.If:
+                        stack.Push(directive.ActiveBranchIndex);
+                        break;
+                    case PreprocessorDirectiveKind.Elif:
+                    case PreprocessorDirectiveKind.Else:
+                        stack.Pop();
+                        stack.Push(directive.ActiveBranchIndex);
+                        break;
+                    case PreprocessorDirectiveKind.Endif:
+                        stack.Pop();
+                        break;
+                }
+            }
+            else
+            {
+                // Emit code from active branch
+                int activeBranch = stack.Peek();
+                if (activeBranch >= 0 && activeBranch < branchLines.Length &&
+                    lineNum < branchLines[activeBranch].Length)
+                {
+                    p.Append(branchLines[activeBranch][lineNum]);
+                }
+            }
         }
-        AfterSyntax(elseDirective, p);
-        return elseDirective;
+
+        return cd;
     }
 
     public override J VisitPragmaWarningDirective(PragmaWarningDirective pragmaWarningDirective, PrintOutputCapture<P> p)

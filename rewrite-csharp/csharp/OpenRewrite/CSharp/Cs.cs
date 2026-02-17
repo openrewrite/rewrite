@@ -581,79 +581,69 @@ public enum LineKind
 }
 
 /// <summary>
-/// A conditional compilation block containing #if, optional #elif/#else, and #endif.
+/// Wraps multiple parsed branches of a file containing #if/#elif/#else/#endif directives.
+/// Each branch is a complete CompilationUnit parsed from a clean source (directives stripped).
+/// The printer reconstructs the original source using line-level interleaving.
 /// </summary>
-public sealed record ConditionalBlock(
+public sealed record ConditionalDirective(
     Guid Id,
     Space Prefix,
     Markers Markers,
-    IfDirective IfBranch,
-    IList<ElifDirective> ElifBranches,
-    ElseDirective? ElseBranch,
-    Space BeforeEndif
+    IList<DirectiveLine> DirectiveLines,
+    IList<JRightPadded<CompilationUnit>> Branches
 ) : Cs, Statement
 {
-    public ConditionalBlock WithId(Guid id) => this with { Id = id };
-    public ConditionalBlock WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public ConditionalBlock WithMarkers(Markers markers) => this with { Markers = markers };
+    public ConditionalDirective WithId(Guid id) => this with { Id = id };
+    public ConditionalDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
+    public ConditionalDirective WithMarkers(Markers markers) => this with { Markers = markers };
 
     Tree Tree.WithId(Guid id) => WithId(id);
 }
 
 /// <summary>
-/// An #if directive branch within a ConditionalBlock.
+/// Metadata about a single preprocessor directive line in the original source.
 /// </summary>
-public sealed record IfDirective(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Expression Condition,
-    bool BranchTaken,
-    IList<JRightPadded<Statement>> Body
-) : Cs
-{
-    public IfDirective WithId(Guid id) => this with { Id = id };
-    public IfDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public IfDirective WithMarkers(Markers markers) => this with { Markers = markers };
+public sealed record DirectiveLine(
+    int LineNumber,
+    string Text,
+    PreprocessorDirectiveKind Kind,
+    int GroupId,
+    int ActiveBranchIndex
+);
 
-    Tree Tree.WithId(Guid id) => WithId(id);
+public enum PreprocessorDirectiveKind
+{
+    If,
+    Elif,
+    Else,
+    Endif
 }
 
 /// <summary>
-/// An #elif directive branch within a ConditionalBlock.
+/// Marker attached to inner CompilationUnit branches within a ConditionalDirective
+/// to distinguish them from top-level source files and record which symbols were defined.
 /// </summary>
-public sealed record ElifDirective(
+public sealed record ConditionalBranchMarker(
     Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Expression Condition,
-    bool BranchTaken,
-    IList<JRightPadded<Statement>> Body
-) : Cs
+    IList<string> DefinedSymbols
+) : Marker, IRpcCodec<ConditionalBranchMarker>
 {
-    public ElifDirective WithId(Guid id) => this with { Id = id };
-    public ElifDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public ElifDirective WithMarkers(Markers markers) => this with { Markers = markers };
+    public void RpcSend(ConditionalBranchMarker after, RpcSendQueue q)
+    {
+        q.GetAndSend(after, m => m.Id);
+        q.GetAndSendList(after, m => m.DefinedSymbols, s => s, s =>
+            q.GetAndSend(s, x => x));
+    }
 
-    Tree Tree.WithId(Guid id) => WithId(id);
-}
-
-/// <summary>
-/// An #else directive branch within a ConditionalBlock.
-/// </summary>
-public sealed record ElseDirective(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    bool BranchTaken,
-    IList<JRightPadded<Statement>> Body
-) : Cs
-{
-    public ElseDirective WithId(Guid id) => this with { Id = id };
-    public ElseDirective WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public ElseDirective WithMarkers(Markers markers) => this with { Markers = markers };
-
-    Tree Tree.WithId(Guid id) => WithId(id);
+    public ConditionalBranchMarker RpcReceive(ConditionalBranchMarker before, RpcReceiveQueue q)
+    {
+        return before with
+        {
+            Id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse),
+            DefinedSymbols = q.ReceiveList(before.DefinedSymbols,
+                s => q.ReceiveAndGet<string, string>(s, x => x))!
+        };
+    }
 }
 
 /// <summary>

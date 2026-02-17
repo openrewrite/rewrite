@@ -7698,25 +7698,20 @@ public interface Cs extends J {
     // =====================
 
     /**
-     * Represents a conditional compilation block: {@code #if ... #elif ... #else ... #endif}.
-     * Can appear anywhere a Statement can appear (compilation unit members, class members, method bodies).
-     * <p>
-     * Example:
-     * <pre>
-     *     #if DEBUG
-     *     using System.Diagnostics;
-     *     #elif TRACE
-     *     using System.Tracing;
-     *     #else
-     *     using System.Logging;
-     *     #endif
-     * </pre>
+     * Wraps multiple parsed branches of a file containing {@code #if}/{@code #elif}/{@code #else}/{@code #endif} directives.
+     * Each branch is a complete {@link CompilationUnit} parsed from a clean source (directives stripped).
+     * The printer reconstructs the original source using line-level interleaving.
      */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor
-    final class ConditionalBlock implements Cs, Statement {
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class ConditionalDirective implements Cs, Statement {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
 
         @With
         @Getter
@@ -7733,24 +7728,21 @@ public interface Cs extends J {
 
         @With
         @Getter
-        IfDirective ifBranch;
+        List<DirectiveLine> directiveLines;
 
-        @With
-        @Getter
-        List<ElifDirective> elifBranches;
+        List<JRightPadded<Cs.CompilationUnit>> branches;
 
-        @With
-        @Getter
-        @Nullable
-        ElseDirective elseBranch;
+        public List<Cs.CompilationUnit> getBranches() {
+            return JRightPadded.getElements(branches);
+        }
 
-        @With
-        @Getter
-        Space beforeEndif;
+        public ConditionalDirective withBranches(List<Cs.CompilationUnit> branches) {
+            return getPadding().withBranches(JRightPadded.withElements(this.branches, branches));
+        }
 
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitConditionalBlock(this, p);
+            return v.visitConditionalDirective(this, p);
         }
 
         @Override
@@ -7758,61 +7750,6 @@ public interface Cs extends J {
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
-    }
-
-    /**
-     * An {@code #if CONDITION} branch within a {@link ConditionalBlock}.
-     */
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class IfDirective implements Cs {
-
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        /**
-         * The condition expression, e.g. {@code DEBUG}, {@code DEBUG && !RELEASE}.
-         * Composed of {@link J.Identifier}, {@link J.Binary}, {@link J.Unary}, {@link J.Literal}, {@link J.Parentheses}.
-         */
-        @With
-        @Getter
-        Expression condition;
-
-        @With
-        @Getter
-        boolean branchTaken;
-
-        List<JRightPadded<Statement>> body;
-
-        public List<Statement> getBody() {
-            return JRightPadded.getElements(body);
-        }
-
-        public IfDirective withBody(List<Statement> body) {
-            return getPadding().withBody(JRightPadded.withElements(this.body, body));
-        }
-
-        @Override
-        public <P> @Nullable J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitIfDirective(this, p);
-        }
 
         public Padding getPadding() {
             Padding p;
@@ -7831,170 +7768,36 @@ public interface Cs extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final IfDirective t;
+            private final ConditionalDirective t;
 
-            public List<JRightPadded<Statement>> getBody() {
-                return t.body;
+            public List<JRightPadded<Cs.CompilationUnit>> getBranches() {
+                return t.branches;
             }
 
-            public IfDirective withBody(List<JRightPadded<Statement>> body) {
-                return t.body == body ? t : new IfDirective(t.id, t.prefix, t.markers, t.condition, t.branchTaken, body);
-            }
-        }
-    }
-
-    /**
-     * An {@code #elif CONDITION} branch within a {@link ConditionalBlock}.
-     */
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ElifDirective implements Cs {
-
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Getter
-        Expression condition;
-
-        @With
-        @Getter
-        boolean branchTaken;
-
-        List<JRightPadded<Statement>> body;
-
-        public List<Statement> getBody() {
-            return JRightPadded.getElements(body);
-        }
-
-        public ElifDirective withBody(List<Statement> body) {
-            return getPadding().withBody(JRightPadded.withElements(this.body, body));
-        }
-
-        @Override
-        public <P> @Nullable J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitElifDirective(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ElifDirective t;
-
-            public List<JRightPadded<Statement>> getBody() {
-                return t.body;
-            }
-
-            public ElifDirective withBody(List<JRightPadded<Statement>> body) {
-                return t.body == body ? t : new ElifDirective(t.id, t.prefix, t.markers, t.condition, t.branchTaken, body);
+            public ConditionalDirective withBranches(List<JRightPadded<Cs.CompilationUnit>> branches) {
+                return t.branches == branches ? t : new ConditionalDirective(t.id, t.prefix, t.markers, t.directiveLines, branches);
             }
         }
     }
 
     /**
-     * An {@code #else} branch within a {@link ConditionalBlock}.
+     * Metadata about a single preprocessor directive line in the original source.
      */
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ElseDirective implements Cs {
+    @Value
+    @With
+    final class DirectiveLine {
+        int lineNumber;
+        String text;
+        PreprocessorDirectiveKind kind;
+        int groupId;
+        int activeBranchIndex;
+    }
 
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Getter
-        boolean branchTaken;
-
-        List<JRightPadded<Statement>> body;
-
-        public List<Statement> getBody() {
-            return JRightPadded.getElements(body);
-        }
-
-        public ElseDirective withBody(List<Statement> body) {
-            return getPadding().withBody(JRightPadded.withElements(this.body, body));
-        }
-
-        @Override
-        public <P> @Nullable J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitElseDirective(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ElseDirective t;
-
-            public List<JRightPadded<Statement>> getBody() {
-                return t.body;
-            }
-
-            public ElseDirective withBody(List<JRightPadded<Statement>> body) {
-                return t.body == body ? t : new ElseDirective(t.id, t.prefix, t.markers, t.branchTaken, body);
-            }
-        }
+    enum PreprocessorDirectiveKind {
+        If,
+        Elif,
+        Else,
+        Endif
     }
 
     /**
