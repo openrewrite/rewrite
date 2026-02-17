@@ -27,6 +27,8 @@ import org.openrewrite.rpc.RpcReceiveQueue;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
@@ -730,35 +732,24 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitConditionalBlock(Cs.ConditionalBlock conditionalBlock, RpcReceiveQueue q) {
-        return conditionalBlock
-                .withIfBranch(q.receive(conditionalBlock.getIfBranch(), el -> (Cs.IfDirective) visitNonNull(el, q)))
-                .withElifBranches(q.receiveList(conditionalBlock.getElifBranches(), el -> (Cs.ElifDirective) visitNonNull(el, q)))
-                .withElseBranch(q.receive(conditionalBlock.getElseBranch(), el -> (Cs.ElseDirective) visitNonNull(el, q)))
-                .withBeforeEndif(q.receive(conditionalBlock.getBeforeEndif(), space -> visitSpace(space, q)));
-    }
-
-    @Override
-    public J visitIfDirective(Cs.IfDirective ifDirective, RpcReceiveQueue q) {
-        return ifDirective
-                .withCondition(q.receive(ifDirective.getCondition(), el -> (Expression) visitNonNull(el, q)))
-                .withBranchTaken(q.receive(ifDirective.isBranchTaken()))
-                .getPadding().withBody(q.receiveList(ifDirective.getPadding().getBody(), el -> visitRightPadded(el, q)));
-    }
-
-    @Override
-    public J visitElifDirective(Cs.ElifDirective elifDirective, RpcReceiveQueue q) {
-        return elifDirective
-                .withCondition(q.receive(elifDirective.getCondition(), el -> (Expression) visitNonNull(el, q)))
-                .withBranchTaken(q.receive(elifDirective.isBranchTaken()))
-                .getPadding().withBody(q.receiveList(elifDirective.getPadding().getBody(), el -> visitRightPadded(el, q)));
-    }
-
-    @Override
-    public J visitElseDirective(Cs.ElseDirective elseDirective, RpcReceiveQueue q) {
-        return elseDirective
-                .withBranchTaken(q.receive(elseDirective.isBranchTaken()))
-                .getPadding().withBody(q.receiveList(elseDirective.getPadding().getBody(), el -> visitRightPadded(el, q)));
+    public J visitConditionalDirective(Cs.ConditionalDirective conditionalDirective, RpcReceiveQueue q) {
+        // Receive DirectiveLines
+        List<Cs.DirectiveLine> existingLines = conditionalDirective.getDirectiveLines();
+        int count = q.receive(existingLines != null ? existingLines.size() : 0);
+        List<Cs.DirectiveLine> directiveLines = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            Cs.DirectiveLine existing = existingLines != null && i < existingLines.size()
+                    ? existingLines.get(i) : null;
+            int lineNumber = q.receive(existing != null ? existing.getLineNumber() : 0);
+            String text = q.receive(existing != null ? existing.getText() : "");
+            Cs.PreprocessorDirectiveKind kind = Cs.PreprocessorDirectiveKind.values()[q.receive(existing != null ? existing.getKind().ordinal() : 0)];
+            int groupId = q.receive(existing != null ? existing.getGroupId() : 0);
+            int activeBranchIndex = q.receive(existing != null ? existing.getActiveBranchIndex() : -1);
+            directiveLines.add(new Cs.DirectiveLine(lineNumber, text, kind, groupId, activeBranchIndex));
+        }
+        return conditionalDirective
+                .withDirectiveLines(directiveLines)
+                .getPadding().withBranches(q.receiveList(conditionalDirective.getPadding().getBranches(), el -> visitRightPadded(el, q)));
     }
 
     @Override
