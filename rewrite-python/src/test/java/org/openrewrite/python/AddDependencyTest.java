@@ -17,13 +17,17 @@ package org.openrewrite.python;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.python.Assertions.pyproject;
-import static org.openrewrite.python.Assertions.uv;
+import static org.openrewrite.python.Assertions.*;
 
 class AddDependencyTest implements RewriteTest {
 
@@ -48,6 +52,48 @@ class AddDependencyTest implements RewriteTest {
                 dependencies = [
                     "requests>=2.28.0",
                     "flask>=2.0",
+                ]
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void twoAddDependenciesInSequence(@TempDir Path tempDir) {
+        String pyprojectBefore = """
+          [project]
+          name = "myapp"
+          version = "1.0.0"
+          dependencies = [
+              "requests>=2.28.0",
+          ]
+          """;
+
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        rewriteRun(
+          spec -> spec.executionContext(ctx).recipe(new CompositeRecipe(List.of(
+            new AddDependency("flask", ">=2.0", null, null),
+            new AddDependency("click", ">=8.0", null, null)
+          ))).afterRecipe(run -> {
+              // Verify lock was regenerated with both new dependencies
+              Map<String, String> updatedLocks = PythonDependencyExecutionContextView.view(ctx).getUpdatedLockFiles();
+              assertThat(updatedLocks).isNotEmpty();
+              String lockContent = updatedLocks.values().iterator().next();
+              assertThat(lockContent).contains("name = \"flask\"");
+              assertThat(lockContent).contains("name = \"click\"");
+          }),
+          uv(tempDir,
+            pyproject(
+              pyprojectBefore,
+              """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = [
+                    "requests>=2.28.0",
+                    "flask>=2.0",
+                    "click>=8.0",
                 ]
                 """
             )

@@ -23,6 +23,7 @@ import org.openrewrite.Option;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.tree.Toml;
@@ -74,8 +75,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
     static class Accumulator {
         final Set<String> projectsToUpdate = new HashSet<>();
-        final Map<String, String> updatedLockFiles = new HashMap<>();
-        final Map<String, String> existingLockContents = new HashMap<>();
     }
 
     @Override
@@ -91,7 +90,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 String sourcePath = document.getSourcePath().toString();
 
                 if (sourcePath.endsWith("uv.lock")) {
-                    acc.existingLockContents.put(
+                    PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
                             PyProjectHelper.correspondingPyprojectPath(sourcePath),
                             document.printAll());
                     return document;
@@ -127,10 +126,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 }
 
                 if (sourcePath.endsWith("uv.lock")) {
-                    String pyprojectPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
-                    String newContent = acc.updatedLockFiles.get(pyprojectPath);
-                    if (newContent != null) {
-                        return PyProjectHelper.reparseToml(document, newContent);
+                    Toml.Document updatedLock = PyProjectHelper.maybeUpdateUvLock(document, ctx);
+                    if (updatedLock != null) {
+                        return updatedLock;
                     }
                 }
 
@@ -188,7 +186,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         }.visitNonNull(document, ctx);
 
         if (updated != document) {
-            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, acc.updatedLockFiles, acc.existingLockContents);
+            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, ctx);
         }
 
         return updated;
