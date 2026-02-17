@@ -808,6 +808,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     public override J VisitClassOrStructConstraint(ClassOrStructConstraint cosc, RpcSendQueue q)
     {
         q.GetAndSend(cosc, c => (object)c.Kind);
+        q.GetAndSend(cosc, c => c.Nullable);
         return cosc;
     }
 
