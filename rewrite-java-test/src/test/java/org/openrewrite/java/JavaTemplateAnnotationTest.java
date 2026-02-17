@@ -187,11 +187,11 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                 if ("NestedAnnotation".equals(annotation.getSimpleName()) &&
                   !annotation.getArguments().isEmpty()) {
                     // Check if this annotation still has the 'a' attribute that needs to be replaced
-                    J.Assignment arg = (J.Assignment) annotation.getArguments().get(0);
+                    var arg = (J.Assignment) annotation.getArguments().get(0);
                     if (arg.getVariable() instanceof J.Identifier &&
                       "a".equals(((J.Identifier) arg.getVariable()).getSimpleName())) {
                         // Only apply the template if we haven't already transformed this annotation
-                        J.Literal value = (J.Literal) arg.getAssignment();
+                        var value = (J.Literal) arg.getAssignment();
 
                         // Replace 'a' with 'b' in the annotation
                         return JavaTemplate.builder("@NestedAnnotation(b = \"#{}\")")

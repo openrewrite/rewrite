@@ -35,7 +35,6 @@ declare module "./tree" {
             readonly Generator: "org.openrewrite.javascript.marker.Generator";
             readonly Optional: "org.openrewrite.javascript.marker.Optional";
             readonly NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion";
-            readonly Spread: "org.openrewrite.javascript.marker.Spread";
             readonly DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield";
             readonly FunctionDeclaration: "org.openrewrite.javascript.marker.FunctionDeclaration";
         };
@@ -48,7 +47,6 @@ declare module "./tree" {
     DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield",
     Optional: "org.openrewrite.javascript.marker.Optional",
     NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion",
-    Spread: "org.openrewrite.javascript.marker.Spread",
     FunctionDeclaration: "org.openrewrite.javascript.marker.FunctionDeclaration",
 } as const;
 
@@ -74,11 +72,6 @@ export interface Generator extends Marker {
 
 export interface NonNullAssertion extends Marker {
     readonly kind: typeof JS.Markers.NonNullAssertion;
-    readonly prefix: J.Space;
-}
-
-export interface Spread extends Marker {
-    readonly kind: typeof JS.Markers.Spread;
     readonly prefix: J.Space;
 }
 
@@ -112,7 +105,6 @@ registerPrefixedMarkerCodec<DelegatedYield>(JS.Markers.DelegatedYield);
 registerPrefixedMarkerCodec<Optional>(JS.Markers.Optional);
 registerPrefixedMarkerCodec<Generator>(JS.Markers.Generator);
 registerPrefixedMarkerCodec<NonNullAssertion>(JS.Markers.NonNullAssertion);
-registerPrefixedMarkerCodec<Spread>(JS.Markers.Spread);
 registerPrefixedMarkerCodec<FunctionDeclaration>(JS.Markers.FunctionDeclaration);
 
 // Register codec for PrettierStyle (a NamedStyles that contains Prettier configuration)

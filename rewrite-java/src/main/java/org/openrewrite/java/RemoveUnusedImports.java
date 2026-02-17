@@ -45,27 +45,14 @@ import static org.openrewrite.java.tree.TypeUtils.toFullyQualifiedName;
 @EqualsAndHashCode(callSuper = false)
 public class RemoveUnusedImports extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Remove unused imports";
-    }
+    String displayName = "Remove unused imports";
 
-    @Override
-    public String getDescription() {
-        return "Remove imports for types that are not referenced. As a precaution against incorrect changes no imports " +
-               "will be removed from any source where unknown types are referenced. The most common cause of unknown " +
-               "types is the use of annotation processors not supported by OpenRewrite, such as lombok.";
-    }
+    String description = "Remove imports for types that are not referenced. As a precaution against incorrect changes no imports " +
+               "will be removed from any source where unknown types are referenced.";
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("RSPEC-S1128");
-    }
+    Set<String> tags = singleton("RSPEC-S1128");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(5);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

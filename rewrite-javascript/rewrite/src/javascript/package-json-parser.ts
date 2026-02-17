@@ -29,6 +29,8 @@ import * as fsp from "fs/promises";
 import * as path from "path";
 import * as YAML from "yaml";
 import {getLockFileDetectionConfig, runList} from "./package-manager";
+import picomatch from "picomatch";
+import {DEFAULT_DIR_EXCLUSIONS, walkDirs} from "../path-utils";
 
 /**
  * Bun.lock package entry metadata.
@@ -140,52 +142,42 @@ export class PackageJsonParser extends Parser {
     }
 
     async *parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
-        // Group inputs by directory to share NodeResolutionResult markers
-        const inputsByDir = new Map<string, ParserInput[]>();
+        // Cache markers by directory to share NodeResolutionResult markers
+        // but maintain input order for output
+        const markersByDir = new Map<string, NodeResolutionResult | null>();
 
+        // Process each input in order, caching markers per directory
         for (const input of inputs) {
             const filePath = parserInputFile(input);
             const dir = path.dirname(filePath);
 
-            if (!inputsByDir.has(dir)) {
-                inputsByDir.set(dir, []);
+            // Parse as JSON first
+            const jsonGenerator = this.jsonParser.parse(input);
+            const jsonResult = await jsonGenerator.next();
+
+            if (jsonResult.done || !jsonResult.value) {
+                continue;
             }
-            inputsByDir.get(dir)!.push(input);
-        }
 
-        // Process each directory's package.json files
-        for (const [dir, dirInputs] of inputsByDir) {
-            // Create a shared marker for this directory
-            let marker: NodeResolutionResult | null = null;
+            const jsonDoc = jsonResult.value as Json.Document;
 
-            for (const input of dirInputs) {
-                // Parse as JSON first
-                const jsonGenerator = this.jsonParser.parse(input);
-                const jsonResult = await jsonGenerator.next();
+            // Create NodeResolutionResult marker if not already created for this directory
+            if (!markersByDir.has(dir)) {
+                markersByDir.set(dir, await this.createMarker(input, dir));
+            }
+            const marker = markersByDir.get(dir)!;
 
-                if (jsonResult.done || !jsonResult.value) {
-                    continue;
-                }
-
-                const jsonDoc = jsonResult.value as Json.Document;
-
-                // Create NodeResolutionResult marker if not already created for this directory
-                if (!marker) {
-                    marker = await this.createMarker(input, dir);
-                }
-
-                // Attach the marker to the JSON document
-                if (marker) {
-                    yield {
-                        ...jsonDoc,
-                        markers: {
-                            ...jsonDoc.markers,
-                            markers: [...jsonDoc.markers.markers, marker]
-                        }
-                    };
-                } else {
-                    yield jsonDoc;
-                }
+            // Attach the marker to the JSON document
+            if (marker) {
+                yield {
+                    ...jsonDoc,
+                    markers: {
+                        ...jsonDoc.markers,
+                        markers: [...jsonDoc.markers.markers, marker]
+                    }
+                };
+            } else {
+                yield jsonDoc;
             }
         }
     }
@@ -222,17 +214,200 @@ export class PackageJsonParser extends Parser {
             const projectDir = this.relativeTo || dir;
             const npmrcConfigs = await readNpmrcConfigs(projectDir);
 
+            // Detect workspace member paths if this is a workspace root
+            // Check both package.json workspaces (npm/yarn) and pnpm-workspace.yaml (pnpm)
+            let workspacePackagePaths: string[] | undefined;
+            const absoluteDir = this.relativeTo && !path.isAbsolute(dir)
+                ? path.resolve(this.relativeTo, dir)
+                : dir;
+
+            if (packageJson.workspaces) {
+                // npm/yarn style workspaces defined in package.json
+                workspacePackagePaths = await this.resolveWorkspacePackagePaths(
+                    packageJson.workspaces,
+                    absoluteDir,
+                    this.relativeTo
+                );
+            } else if (packageManager === PackageManager.Pnpm) {
+                // pnpm workspaces defined in pnpm-workspace.yaml
+                const pnpmWorkspacePatterns = await this.readPnpmWorkspacePatterns(absoluteDir);
+                if (pnpmWorkspacePatterns && pnpmWorkspacePatterns.length > 0) {
+                    workspacePackagePaths = await this.resolveWorkspacePackagePaths(
+                        pnpmWorkspacePatterns,
+                        absoluteDir,
+                        this.relativeTo
+                    );
+                }
+            }
+
             return createNodeResolutionResultMarker(
                 relativePath,
                 packageJson,
                 lockContent,
-                undefined,
+                workspacePackagePaths,
                 packageManager,
                 npmrcConfigs.length > 0 ? npmrcConfigs : undefined
             );
         } catch (error) {
             console.warn(`Failed to create NodeResolutionResult marker: ${error}`);
             return null;
+        }
+    }
+
+    /**
+     * Resolves workspace glob patterns to actual package.json paths.
+     *
+     * Workspaces can be specified as:
+     * - Array of globs: ["packages/*", "apps/*", "packages/**", "{apps,libs}/*"]
+     * - Object with packages array: { packages: ["packages/*"] }
+     * - Negation patterns: ["packages/*", "!packages/internal"]
+     *
+     * @param workspaces The workspaces field from package.json
+     * @param projectDir The absolute path to the project directory
+     * @param relativeTo Optional base path for creating relative paths
+     * @returns Array of relative paths to workspace member package.json files
+     */
+    private async resolveWorkspacePackagePaths(
+        workspaces: string[] | { packages?: string[] },
+        projectDir: string,
+        relativeTo?: string
+    ): Promise<string[] | undefined> {
+        // Normalize workspaces to array format
+        const patterns = Array.isArray(workspaces)
+            ? workspaces
+            : workspaces.packages;
+
+        if (!patterns || patterns.length === 0) {
+            return undefined;
+        }
+
+        // Separate include and exclude patterns
+        const includePatterns = patterns.filter(p => !p.startsWith('!'));
+        const excludePatterns = patterns.filter(p => p.startsWith('!')).map(p => p.slice(1));
+
+        // Create picomatch matchers
+        const isIncluded = includePatterns.length > 0
+            ? picomatch(includePatterns, { dot: false })
+            : () => false;
+        const isExcluded = excludePatterns.length > 0
+            ? picomatch(excludePatterns, { dot: false })
+            : () => false;
+
+        // Collect all candidate directories by walking the project
+        const candidateDirs = await this.collectCandidateWorkspaceDirs(projectDir, includePatterns);
+
+        const memberPaths: string[] = [];
+        const basePath = relativeTo || projectDir;
+
+        for (const candidateDir of candidateDirs) {
+            // Get relative path from project root for pattern matching
+            const relativeDir = path.relative(projectDir, candidateDir);
+
+            // Check if directory matches include patterns and not exclude patterns
+            if (isIncluded(relativeDir) && !isExcluded(relativeDir)) {
+                const packageJsonPath = path.join(candidateDir, 'package.json');
+                if (fs.existsSync(packageJsonPath)) {
+                    const relativePath = path.relative(basePath, packageJsonPath);
+                    memberPaths.push(relativePath);
+                }
+            }
+        }
+
+        return memberPaths.length > 0 ? memberPaths : undefined;
+    }
+
+    /**
+     * Collects candidate directories that might match workspace patterns.
+     * Uses the patterns to determine how deep to scan.
+     */
+    private async collectCandidateWorkspaceDirs(
+        projectDir: string,
+        patterns: string[]
+    ): Promise<string[]> {
+        const candidates: string[] = [];
+
+        // Determine the maximum depth we need to scan based on patterns
+        // "packages/*" -> depth 1 under packages/
+        // "packages/**" -> unlimited depth under packages/
+        // "{apps,libs}/*" -> depth 1 under apps/ and libs/
+
+        for (const pattern of patterns) {
+            // Extract base directories from pattern (before any wildcards)
+            const baseDirs = this.extractBaseDirs(pattern);
+            const hasRecursive = pattern.includes('**');
+
+            for (const baseDir of baseDirs) {
+                const absoluteBaseDir = path.join(projectDir, baseDir);
+
+                if (!fs.existsSync(absoluteBaseDir)) {
+                    continue;
+                }
+
+                // Use walkDirs with appropriate depth limit
+                const dirs = await walkDirs(absoluteBaseDir, {
+                    maxDepth: hasRecursive ? undefined : 0,
+                    excludeDirs: DEFAULT_DIR_EXCLUSIONS
+                });
+
+                candidates.push(...dirs);
+            }
+        }
+
+        return candidates;
+    }
+
+    /**
+     * Extracts base directory paths from a glob pattern.
+     * Handles brace expansion like "{apps,libs}/*" -> ["apps", "libs"]
+     */
+    private extractBaseDirs(pattern: string): string[] {
+        // Find the first wildcard character
+        const wildcardIndex = pattern.search(/[*?]/);
+        const beforeWildcard = wildcardIndex >= 0 ? pattern.slice(0, wildcardIndex) : pattern;
+
+        // Remove trailing slash if present
+        const basePath = beforeWildcard.replace(/\/$/, '');
+
+        // Handle brace expansion at the end of basePath: "dir/{a,b}" or "{a,b}"
+        const braceMatch = basePath.match(/^(.*?)(?:\{([^}]+)\})?$/);
+        if (braceMatch && braceMatch[2]) {
+            const prefix = braceMatch[1];
+            const options = braceMatch[2].split(',').map(s => s.trim());
+            return options.map(opt => prefix + opt);
+        }
+
+        return basePath ? [basePath] : ['.'];
+    }
+
+    /**
+     * Reads workspace patterns from pnpm-workspace.yaml file.
+     *
+     * pnpm-workspace.yaml format:
+     * ```yaml
+     * packages:
+     *   - 'packages/*'
+     *   - 'apps/*'
+     *   - '!packages/excluded'
+     * ```
+     *
+     * @param projectDir The absolute path to the project directory
+     * @returns Array of workspace patterns, or undefined if file doesn't exist
+     */
+    private async readPnpmWorkspacePatterns(projectDir: string): Promise<string[] | undefined> {
+        const pnpmWorkspacePath = path.join(projectDir, 'pnpm-workspace.yaml');
+
+        try {
+            const content = await fsp.readFile(pnpmWorkspacePath, 'utf-8');
+            const parsed = YAML.parse(content);
+
+            if (parsed && Array.isArray(parsed.packages)) {
+                return parsed.packages;
+            }
+
+            return undefined;
+        } catch {
+            // File doesn't exist or couldn't be parsed
+            return undefined;
         }
     }
 
@@ -294,6 +469,8 @@ export class PackageJsonParser extends Parser {
                 continue;
             }
 
+            // Lock file exists - determine package manager
+            // Once we find a lock file, we commit to this package manager even if parsing fails
             try {
                 const fileContent = await fsp.readFile(lockPath, 'utf-8');
                 const packageManager = typeof config.packageManager === 'function'
@@ -313,8 +490,17 @@ export class PackageJsonParser extends Parser {
                 if (content) {
                     return { content, packageManager };
                 }
+
+                // Lock file exists but couldn't be parsed - still return the package manager
+                // This ensures we use the correct package manager even without resolved dependencies
+                return { content: { lockfileVersion: 0, packages: {} }, packageManager };
             } catch (error) {
                 console.debug?.(`Failed to parse ${config.filename}: ${error}`);
+                // Even on error, we found this lock file - return the package manager with empty content
+                const packageManager = typeof config.packageManager === 'function'
+                    ? PackageManager.YarnClassic // Default for yarn.lock if we can't read content
+                    : config.packageManager;
+                return { content: { lockfileVersion: 0, packages: {} }, packageManager };
             }
         }
 
@@ -412,12 +598,21 @@ export class PackageJsonParser extends Parser {
             }
 
             // Parse name@version from directory name
+            // pnpm directory format: <name>@<version> or <name>@<version>_<peer-deps-context>
             // Handle scoped packages: @scope+name@version
-            const atIndex = entry.name.lastIndexOf('@');
+            // Example: @babel+helper-module-transforms@7.28.3_@babel+core@7.28.5
+            //   -> name: @babel/helper-module-transforms, version: 7.28.3
+
+            // First, strip peer dependency context (everything after first _)
+            const underscoreIndex = entry.name.indexOf('_');
+            const mainPart = underscoreIndex > 0 ? entry.name.substring(0, underscoreIndex) : entry.name;
+
+            // Now parse name@version from the main part
+            const atIndex = mainPart.lastIndexOf('@');
             if (atIndex <= 0) return;
 
-            let name = entry.name.substring(0, atIndex);
-            const version = entry.name.substring(atIndex + 1);
+            let name = mainPart.substring(0, atIndex);
+            const version = mainPart.substring(atIndex + 1);
 
             // pnpm encodes @ as + in scoped packages: @scope+name -> @scope/name
             if (name.startsWith('@') && name.includes('+')) {

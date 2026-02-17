@@ -54,21 +54,15 @@ public class DoesNotIncludeDependency extends Recipe {
     @Nullable
     String configuration;
 
-    @Override
-    public String getDisplayName() {
-        return "Does not include Gradle dependency";
-    }
+    String displayName = "Does not include Gradle dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "A precondition which returns false if visiting a Gradle file which includes the specified dependency in the classpath of some scope. " +
+    String description = "A precondition which returns false if visiting a Gradle file which includes the specified dependency in the classpath of some scope. " +
                 "For compatibility with multimodule projects, this should most often be applied as a precondition.";
-    }
 
     @Override
     public Validated<Object> validate() {

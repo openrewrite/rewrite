@@ -20,6 +20,7 @@ import * as os from 'os';
 import {spawnSync} from 'child_process';
 import {prettierStyle, PrettierStyle} from '../style';
 import {randomId} from '../../uuid';
+import {getPlatformCommand} from '../../shell-utils';
 
 /**
  * Cache of loaded Prettier modules by version.
@@ -97,11 +98,12 @@ async function installPrettierToCache(version: string): Promise<void> {
     );
 
     // Run npm install
-    const result = spawnSync('npm', ['install', '--silent'], {
+    const result = spawnSync(getPlatformCommand('npm'), ['install', '--silent'], {
         cwd: cacheDir,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: 120000 // 2 minutes
+        timeout: 120000, // 2 minutes
+        ...(os.platform() === 'win32' ? { shell: true } : {})
     });
 
     if (result.error) {

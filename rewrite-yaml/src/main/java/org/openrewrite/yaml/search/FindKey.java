@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.yaml.JsonPathMatcher;
 import org.openrewrite.yaml.YamlVisitor;
@@ -37,14 +38,13 @@ public class FindKey extends Recipe {
             example = "$.subjects.kind")
     String key;
 
-    @Override
-    public String getDisplayName() {
-        return "Find YAML entries";
-    }
+    String displayName = "Find YAML entries";
+
+    String description = "Find YAML entries that match the specified [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression.";
 
     @Override
-    public String getDescription() {
-        return "Find YAML entries that match the specified [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression.";
+    public Validated<Object> validate() {
+        return super.validate().and(JsonPathMatcher.validate("key", key));
     }
 
     @Override
@@ -73,7 +73,7 @@ public class FindKey extends Recipe {
 
     public static Set<Yaml> find(Yaml y, String jsonPath) {
         JsonPathMatcher matcher = new JsonPathMatcher(jsonPath);
-        YamlVisitor<Set<Yaml>> findVisitor = new YamlVisitor<Set<Yaml>>() {
+        return new YamlVisitor<Set<Yaml>>() {
             @Override
             public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, Set<Yaml> es) {
                 Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, es);
@@ -91,10 +91,6 @@ public class FindKey extends Recipe {
                 }
                 return m;
             }
-        };
-
-        Set<Yaml> es = new HashSet<>();
-        findVisitor.visit(y, es);
-        return es;
+        }.reduce(y, new HashSet<>());
     }
 }

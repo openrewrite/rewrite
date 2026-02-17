@@ -170,20 +170,14 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
         return validated;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Add managed Maven dependency";
-    }
+    String displayName = "Add managed Maven dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, version);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add a managed Maven dependency to a `pom.xml` file.";
-    }
+    String description = "Add a managed Maven dependency to a `pom.xml` file.";
 
     public static class Scanned {
         boolean usingType;

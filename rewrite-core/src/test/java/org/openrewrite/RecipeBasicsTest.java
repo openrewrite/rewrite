@@ -21,6 +21,8 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.text.ChangeText;
 
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -104,5 +106,40 @@ class RecipeBasicsTest {
     void optionExposedViaConstructorParameter() {
         RecipeDescriptor d = new RecipeWithConstructorParameter("option").createRecipeDescriptor();
         assertThat(d.getOptions().getFirst().getDisplayName()).isEqualTo("Option");
+    }
+
+    static class RecipeWithListOption extends Recipe {
+        @Option(displayName = "Field names", description = "Field names.", example = "firstName,lastName")
+        List<String> fieldNames;
+
+        public RecipeWithListOption(List<String> fieldNames) {
+            this.fieldNames = fieldNames;
+        }
+
+        @Override
+        public String getDisplayName() {
+            return "Recipe with list option";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Recipe with list option.";
+        }
+    }
+
+    @Test
+    void withOptionsDeserializesCommaSeparatedStringToList() {
+        // given
+        RecipeWithListOption recipe = new RecipeWithListOption(List.of());
+        Map<String, Object> options = new HashMap<>();
+        options.put("fieldNames", "firstName,lastName,email,emailAddress");
+
+        // when
+        Recipe result = recipe.withOptions(options);
+
+        // then
+        assertThat(result).isInstanceOf(RecipeWithListOption.class);
+        assertThat(((RecipeWithListOption) result).fieldNames)
+                .containsExactly("firstName", "lastName", "email", "emailAddress");
     }
 }

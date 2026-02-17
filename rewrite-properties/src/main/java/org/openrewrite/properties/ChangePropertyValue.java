@@ -58,15 +58,9 @@ public class ChangePropertyValue extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
-    @Override
-    public String getDisplayName() {
-        return "Change property value";
-    }
+    String displayName = "Change property value";
 
-    @Override
-    public String getDescription() {
-        return "Change a property value leaving the key intact.";
-    }
+    String description = "Change a property value leaving the key intact.";
 
     @Override
     public Validated validate() {
@@ -77,17 +71,26 @@ public class ChangePropertyValue extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ChangePropertyValueVisitor<>();
+        return new ChangePropertyValueVisitor<>((!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(propertyKey));
     }
 
     public class ChangePropertyValueVisitor<P> extends PropertiesVisitor<P> {
+        private final NameCaseConvention.Compiled keyMatcher;
+
         public ChangePropertyValueVisitor() {
+            this(NameCaseConvention.EXACT.compile(propertyKey));
+        }
+
+        public ChangePropertyValueVisitor(NameCaseConvention.Compiled keyMatcher) {
+            this.keyMatcher = keyMatcher;
         }
 
         @Override
         public Properties visitEntry(Properties.Entry entry, P p) {
             Properties.Entry e = (Properties.Entry) super.visitEntry(entry, p);
-            if (matchesPropertyKey(e.getKey()) && matchesOldValue(e.getValue())) {
+            if (keyMatcher.matchesGlob(e.getKey()) && matchesOldValue(e.getValue())) {
                 Properties.Value updatedValue = updateValue(e.getValue());
                 if (updatedValue != null) {
                     e = e.withValue(updatedValue);
@@ -102,12 +105,6 @@ public class ChangePropertyValue extends Recipe {
                     value.getText().replaceAll(oldValue, newValue) :
                     newValue);
             return updatedValue.getText().equals(value.getText()) ? null : updatedValue;
-        }
-
-        private boolean matchesPropertyKey(String prop) {
-            return !Boolean.FALSE.equals(relaxedBinding) ?
-                    NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey) :
-                    StringUtils.matchesGlob(prop, propertyKey);
         }
 
         private boolean matchesOldValue(Properties.Value value) {

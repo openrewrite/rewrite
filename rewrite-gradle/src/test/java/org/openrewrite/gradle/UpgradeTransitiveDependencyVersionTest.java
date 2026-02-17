@@ -692,8 +692,52 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/382")
     @Test
-    void removeOtherVersionConstraint() {
+    void updateStrictlyVersionConstraint() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.0') {
+                          version {
+                              strictly('2.12.0')
+                          }
+                          because 'security'
+                      }
+                  }
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          version {
+                              strictly('2.12.5')
+                          }
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/382")
+    @Test
+    void updateStrictlyVersionConstraintWithoutVersionInString() {
         rewriteRun(
           buildGradle(
             """
@@ -723,6 +767,9 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
+                          version {
+                              strictly('2.12.5')
+                          }
                       }
                   }
               }
@@ -961,6 +1008,97 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
                   implementation('com.fasterxml.jackson.core:jackson-core:2.12.0')
                   implementation('com.fasterxml.jackson.core:jackson-databind:2.12.0')
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Makes no changes when a Gradle plugin (like the Kotlin JVM plugin) provides a direct dependency.
+     */
+    @Test
+    void doesNotAddConstraintForPluginProvidedDirectDependency() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null, "CVE-2022-24329", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+              """
+          )
+        );
+    }
+
+    /**
+     * When a Gradle plugin (like the Kotlin JVM plugin) provides transitive dependencies directly without user declaration,
+     * we can still add constraints for those dependencies.
+     */
+    @Test
+    void groovyDslAddConstraintForPluginProvidedTransitiveDependency() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "org.jetbrains.kotlin", "kotlin-stdlib", "2.1.0", null, "CVE-2022-24329", List.of("implementation"))),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+              """,
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  constraints {
+                      implementation('org.jetbrains.kotlin:kotlin-stdlib:2.1.0') {
+                          because 'CVE-2022-24329'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * When a Gradle plugin (like the Kotlin JVM plugin) provides dependencies directly without user declaration,
+     * we can still add constraints for those dependencies.
+     */
+    @Test
+    void kotlinDslAddConstraintForPluginProvidedDependency() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "org.jetbrains.kotlin", "kotlin-stdlib", "2.1.0", null, "CVE-2022-24329", List.of("implementation"))),
+          buildGradleKts(
+            """
+              plugins {
+                  kotlin("jvm") version "1.7.21"
+              }
+              repositories { mavenCentral() }
+              """,
+            """
+              plugins {
+                  kotlin("jvm") version "1.7.21"
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+
+                  constraints {
+                      implementation("org.jetbrains.kotlin:kotlin-stdlib:2.1.0") {
+                          because("CVE-2022-24329")
+                      }
+                  }
               }
               """
           )
@@ -1379,15 +1517,9 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     @EqualsAndHashCode(callSuper = false)
     @Value
     public static class ScanningAccumulatedUpgradeRecipe extends ScanningRecipe<UpgradeTransitiveDependencyVersion.DependencyVersionState> {
-        @Override
-        public String getDisplayName() {
-            return "Accumulation-scanned recipe";
-        }
+        String displayName = "Accumulation-scanned recipe";
 
-        @Override
-        public String getDescription() {
-            return "Some recipes hava loop to determine all updates and add them to the scanner. This cycle/recipe only can update for the provided dependency.";
-        }
+        String description = "Some recipes hava loop to determine all updates and add them to the scanner. This cycle/recipe only can update for the provided dependency.";
 
         private final UpgradeTransitiveDependencyVersion scanAlsoFor;
         private final UpgradeTransitiveDependencyVersion upgradeDependency;

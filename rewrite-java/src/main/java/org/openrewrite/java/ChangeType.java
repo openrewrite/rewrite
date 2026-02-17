@@ -54,10 +54,7 @@ public class ChangeType extends Recipe {
     @Nullable
     Boolean ignoreDefinition;
 
-    @Override
-    public String getDisplayName() {
-        return "Change type";
-    }
+    String displayName = "Change type";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -81,10 +78,7 @@ public class ChangeType extends Recipe {
         }
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a given type to another.";
-    }
+    String description = "Change a given type to another.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -511,6 +505,13 @@ public class ChangeType extends Recipe {
                     JavaType.FullyQualified updatedNestedType = updateNestedType(original);
                     oldNameToChangedType.put(oldType, updatedNestedType);
                     return updatedNestedType;
+                } else if (oldType instanceof JavaType.Class) {
+                    JavaType.Class clazz = ((JavaType.Class) oldType)
+                            .withInterfaces(ListUtils.map(original.getInterfaces(), t -> (JavaType.FullyQualified) updateType(t)))
+                            .withSupertype((JavaType.FullyQualified) updateType(original.getSupertype()));
+                    oldNameToChangedType.put(oldType, clazz);
+                    oldNameToChangedType.put(clazz, clazz);
+                    return clazz;
                 }
             } else if (oldType instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) oldType;

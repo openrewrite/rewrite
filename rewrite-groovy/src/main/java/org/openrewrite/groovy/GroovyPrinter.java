@@ -359,6 +359,21 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitMemberReference(J.MemberReference memberRef, PrintOutputCapture<P> p) {
+            beforeSyntax(memberRef, Space.Location.MEMBER_REFERENCE_PREFIX, p);
+            visitRightPadded(memberRef.getPadding().getContaining(), JRightPadded.Location.MEMBER_REFERENCE_CONTAINING, p);
+            if (memberRef.getMarkers().findFirst(MethodPointer.class).isPresent()) {
+                p.append(".&");
+            } else {
+                p.append("::");
+            }
+            visitContainer("<", memberRef.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+            visitLeftPadded("", memberRef.getPadding().getReference(), JLeftPadded.Location.MEMBER_REFERENCE_NAME, p);
+            afterSyntax(memberRef, p);
+            return memberRef;
+        }
+
+        @Override
         public J visitFieldAccess(J.FieldAccess fieldAccess, PrintOutputCapture<P> p) {
             beforeSyntax(fieldAccess, Space.Location.FIELD_ACCESS_PREFIX, p);
             visit(fieldAccess.getTarget(), p);
@@ -502,6 +517,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             if (ternary.getMarkers().findFirst(Elvis.class).isPresent()) {
                 visitSpace(ternary.getPadding().getTruePart().getBefore(), Space.Location.TERNARY_TRUE, p);
                 p.append("?:");
+                visitSpace(ternary.getPadding().getFalsePart().getBefore(), Space.Location.TERNARY_FALSE, p);
                 visit(ternary.getFalsePart(), p);
             } else {
                 visitLeftPadded("?", ternary.getPadding().getTruePart(), JLeftPadded.Location.TERNARY_TRUE, p);

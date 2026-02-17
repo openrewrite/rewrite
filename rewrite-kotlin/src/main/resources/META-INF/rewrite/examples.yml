@@ -1,4 +1,3 @@
-#
 # Copyright 2025 the original author or authors.
 # <p>
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangeAnnotationAttributeName
@@ -369,5 +366,25 @@ examples:
       package com.intellij.samples
 
       class Test {
+      }
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.kotlin.replace.ReplaceKotlinMethod
+examples:
+- description: '`ReplaceKotlinMethodTest#replaceCharToIntWithCode`'
+  parameters:
+  - kotlin.Char toInt()
+  - code
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      fun test(c: Char): Int {
+          return c.toInt()
+      }
+    after: |
+      fun test(c: Char): Int {
+          return c.code
       }
     language: kotlin

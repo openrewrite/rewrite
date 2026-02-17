@@ -35,6 +35,7 @@ import org.openrewrite.quark.Quark;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
@@ -243,7 +244,8 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
                 new PrintOutputCapture<>(0) :
                 new PrintOutputCapture<>(0, markerPrinter);
 
-        return sourceFile.printAllAsBytes(out);
+        Charset charset = sourceFile.getCharset() == null ? StandardCharsets.UTF_8 : sourceFile.getCharset();
+        return sourceFile.printAll(out).getBytes(charset);
     }
 
     @Value

@@ -131,20 +131,14 @@ public class ChangeDependency extends Recipe {
         this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, overrideManagedVersion, true);
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Change Gradle dependency";
-    }
+    String displayName = "Change Gradle dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", oldGroupId, oldArtifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a Gradle dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before.";
-    }
+    String description = "Change a Gradle dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before.";
 
     @Override
     public Validated<Object> validate() {
@@ -192,7 +186,7 @@ public class ChangeDependency extends Recipe {
 
                     sourceFile = (JavaSourceFile) super.visit(sourceFile, ctx);
                     if (sourceFile != null && sourceFile != tree) {
-                        sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(updateGradleModel(gradleProject)));
+                        sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(updateGradleModel(gradleProject, ctx)));
                         if (changeManagedDependency == null || changeManagedDependency) {
                             doAfterVisit(new ChangeManagedDependency(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern).getVisitor());
                         }
@@ -626,7 +620,7 @@ public class ChangeDependency extends Recipe {
                 return m;
             }
 
-            private GradleProject updateGradleModel(GradleProject gp) {
+            private GradleProject updateGradleModel(GradleProject gp, ExecutionContext ctx) {
                 Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
                 Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
                 boolean anyChanged = false;
@@ -641,6 +635,17 @@ public class ChangeDependency extends Recipe {
                                 }
                                 if (newArtifactId != null) {
                                     gav = gav.withArtifactId(newArtifactId);
+                                }
+                                if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(gav.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
+                                    try {
+                                        String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                                .select(new GroupArtifact(gav.getGroupId(), gav.getArtifactId()), gdc.getName(), newVersion, versionPattern, ctx);
+                                        if (resolvedVersion != null && !resolvedVersion.equals(gav.getVersion())) {
+                                            gav = gav.withVersion(resolvedVersion);
+                                        }
+                                    } catch (MavenDownloadingException e) {
+                                        // Failure already in `metadataFailures`
+                                    }
                                 }
                                 if (gav != r.getGav()) {
                                     r = r.withGav(gav);
@@ -660,6 +665,17 @@ public class ChangeDependency extends Recipe {
                                 }
                                 if (newArtifactId != null) {
                                     gav = gav.withArtifactId(newArtifactId);
+                                }
+                                if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(gav.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
+                                    try {
+                                        String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                                .select(new GroupArtifact(gav.getGroupId(), gav.getArtifactId()), gdc.getName(), newVersion, versionPattern, ctx);
+                                        if (resolvedVersion != null && !resolvedVersion.equals(gav.getVersion())) {
+                                            gav = gav.withVersion(resolvedVersion);
+                                        }
+                                    } catch (MavenDownloadingException e) {
+                                        // Failure already in `metadataFailures`
+                                    }
                                 }
                                 if (gav != r.getGav()) {
                                     r = r.withGav(gav);

@@ -82,10 +82,10 @@ class GradleParserTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements()).hasSize(4);
                 assertThat(cu.getStatements().getFirst()).isInstanceOf(J.Import.class);
-                J.Import i = (J.Import) cu.getStatements().getFirst();
+                var i = (J.Import) cu.getStatements().getFirst();
                 assertThat(i.getTypeName()).isEqualTo("org.gradle.api.Project");
                 assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodInvocation.class);
-                J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(3);
+                var m = (J.MethodInvocation) cu.getStatements().get(3);
                 assertThat(m.getMethodType()).isNotNull();
                 assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName()).isNotNull();
             })
@@ -117,11 +117,11 @@ class GradleParserTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements()).hasSize(4);
                 assertThat(cu.getStatements().get(2)).isInstanceOf(J.MethodInvocation.class);
-                J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(2);
+                var m = (J.MethodInvocation) cu.getStatements().get(2);
                 assertThat(m.getMethodType()).isNotNull();
                 assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName()).isNotNull();
                 assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodDeclaration.class);
-                J.MethodDeclaration d = (J.MethodDeclaration) cu.getStatements().get(3);
+                var d = (J.MethodDeclaration) cu.getStatements().get(3);
                 assertThat(d.getSimpleName()).isEqualTo("greet");
             })
           )
@@ -558,8 +558,8 @@ class GradleParserTest implements RewriteTest {
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
     }
 
-    @ParameterizedTest
     @MethodSource("escapedBackslashesAndInterpolationInGStringParams")
+    @ParameterizedTest
     void escapedBackslashesAndInterpolationInGString(@Language("groovy") String groovy) {
         GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(

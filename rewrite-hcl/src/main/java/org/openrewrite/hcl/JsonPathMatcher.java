@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.openrewrite.hcl.internal.ThrowingErrorListener;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
@@ -72,7 +73,10 @@ public class JsonPathMatcher {
         }
         JsonPathParser.JsonPathContext ctx = parse();
         // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
-        JsonPathParser.ExpressionContext stop = (JsonPathParser.ExpressionContext) ctx.children.get(ctx.children.size() - 1);
+        ParseTree lastChild = ctx.children.get(ctx.children.size() - 1);
+        JsonPathParser.ExpressionContext stop = lastChild instanceof JsonPathParser.ExpressionContext ?
+                (JsonPathParser.ExpressionContext) lastChild :
+                null;
         @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathParserHclVisitor(cursorPath, start, stop, false);
         Object result = v.visit(ctx);
 
@@ -104,13 +108,28 @@ public class JsonPathMatcher {
 
     private JsonPathParser.JsonPathContext parse() {
         if (parsed == null) {
-            parsed = jsonPath().jsonPath();
+            JsonPathParser parser = jsonPath(jsonPath);
+            parsed = parser.jsonPath();
+            // Ensure all input was consumed
+            if (parser.getCurrentToken().getType() != org.antlr.v4.runtime.Token.EOF) {
+                throw new IllegalArgumentException(
+                        "Syntax error at line 1:" + parser.getCurrentToken().getCharPositionInLine() +
+                        " extraneous input '" + parser.getCurrentToken().getText() +
+                        "' expecting EOF. Original input: '" + jsonPath + "'");
+            }
         }
         return parsed;
     }
 
-    private JsonPathParser jsonPath() {
-        return new JsonPathParser(new CommonTokenStream(new JsonPathLexer(CharStreams.fromString(this.jsonPath))));
+    private JsonPathParser jsonPath(String path) {
+        ThrowingErrorListener errorListener = new ThrowingErrorListener(this.jsonPath);
+        JsonPathLexer lexer = new JsonPathLexer(CharStreams.fromString(path));
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(errorListener);
+        JsonPathParser parser = new JsonPathParser(new CommonTokenStream(lexer));
+        parser.removeErrorListeners();
+        parser.addErrorListener(errorListener);
+        return parser;
     }
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})

@@ -288,6 +288,82 @@ class RecipeMarketplaceReaderTest {
         assertThat(authorIndex).isLessThan(zebraIndex);
     }
 
+    @Test
+    void recipeInMultipleCategoriesHasSeparateBundleInstances() {
+        // This tests the scenario where a recipe appears in multiple categories
+        // (e.g., Java recipes that also work for JavaScript). Each listing should
+        // have its own RecipeBundle instance that needs to be updated independently.
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,category1,category2,ecosystem,packageName
+          org.openrewrite.java.ChangeMethodName,Change method name,ChangeMethodName,Java,maven,org.openrewrite:rewrite-java
+          org.openrewrite.java.ChangeMethodName,Change method name,ChangeMethodName,JavaScript,maven,org.openrewrite:rewrite-java
+          """);
+
+        // getAllRecipes() returns a deduplicated set (by recipe name)
+        assertThat(marketplace.getAllRecipes()).hasSize(1);
+
+        // But the recipe exists in both Java and JavaScript categories
+        RecipeMarketplace.Category java = findCategory(marketplace.getRoot(), "Java");
+        RecipeMarketplace.Category javascript = findCategory(marketplace.getRoot(), "JavaScript");
+
+        assertThat(java.getCategories()).extracting("displayName").containsExactly("ChangeMethodName");
+        assertThat(javascript.getCategories()).extracting("displayName").containsExactly("ChangeMethodName");
+
+        RecipeListing javaListing = findCategory(java, "ChangeMethodName").getRecipes().getFirst();
+        RecipeListing jsListing = findCategory(javascript, "ChangeMethodName").getRecipes().getFirst();
+
+        // These are DIFFERENT RecipeListing instances with DIFFERENT RecipeBundle instances
+        assertThat(javaListing).isNotSameAs(jsListing);
+        assertThat(javaListing.getBundle()).isNotSameAs(jsListing.getBundle());
+
+        // Simulate what MavenRecipeBundleReader needs to do - update version on ALL bundles.
+        // If we only use getAllRecipes(), we'd only update one of them.
+        // The fix uses setVersionRecursive to walk the full tree.
+        String resolvedVersion = "8.70.0";
+        String requestedVersion = "LATEST";
+
+        // Walk the full tree and update all bundles matching the package
+        setVersionRecursive(marketplace.getRoot(), "org.openrewrite:rewrite-java", requestedVersion, resolvedVersion);
+
+        // Both listings should now have the version set
+        assertThat(javaListing.getBundle().getVersion()).isEqualTo(resolvedVersion);
+        assertThat(javaListing.getBundle().getRequestedVersion()).isEqualTo(requestedVersion);
+        assertThat(jsListing.getBundle().getVersion()).isEqualTo(resolvedVersion);
+        assertThat(jsListing.getBundle().getRequestedVersion()).isEqualTo(requestedVersion);
+
+        // Round-trip through CSV writer to verify versions are preserved
+        String writtenCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
+        assertThat(writtenCsv).contains("LATEST");
+        assertThat(writtenCsv).contains("8.70.0");
+
+        // Verify the written CSV has versions for ALL rows, not just some
+        RecipeMarketplace roundTripped = new RecipeMarketplaceReader().fromCsv(writtenCsv);
+        RecipeMarketplace.Category rtJava = findCategory(roundTripped.getRoot(), "Java");
+        RecipeMarketplace.Category rtJs = findCategory(roundTripped.getRoot(), "JavaScript");
+
+        RecipeListing rtJavaListing = findCategory(rtJava, "ChangeMethodName").getRecipes().getFirst();
+        RecipeListing rtJsListing = findCategory(rtJs, "ChangeMethodName").getRecipes().getFirst();
+
+        assertThat(rtJavaListing.getBundle().getVersion()).isEqualTo(resolvedVersion);
+        assertThat(rtJavaListing.getBundle().getRequestedVersion()).isEqualTo(requestedVersion);
+        assertThat(rtJsListing.getBundle().getVersion()).isEqualTo(resolvedVersion);
+        assertThat(rtJsListing.getBundle().getRequestedVersion()).isEqualTo(requestedVersion);
+    }
+
+    private void setVersionRecursive(RecipeMarketplace.Category category, String packageName,
+                                     String requestedVersion, String version) {
+        for (RecipeListing recipe : category.getRecipes()) {
+            RecipeBundle bundle = recipe.getBundle();
+            if (packageName.equals(bundle.getPackageName())) {
+                bundle.setVersion(version);
+                bundle.setRequestedVersion(requestedVersion);
+            }
+        }
+        for (RecipeMarketplace.Category child : category.getCategories()) {
+            setVersionRecursive(child, packageName, requestedVersion, version);
+        }
+    }
+
     private static RecipeMarketplace.Category findCategory(RecipeMarketplace.Category category, String name) {
         return category.getCategories().stream()
           .filter(c -> c.getDisplayName().equals(name))

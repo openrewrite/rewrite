@@ -33,15 +33,9 @@ public class DeleteKey extends Recipe {
             example = "$.subjects.kind")
     String keyPath;
 
-    @Override
-    public String getDisplayName() {
-        return "Delete key";
-    }
+    String displayName = "Delete key";
 
-    @Override
-    public String getDescription() {
-        return "Delete a JSON mapping entry key.";
-    }
+    String description = "Delete a JSON mapping entry key.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

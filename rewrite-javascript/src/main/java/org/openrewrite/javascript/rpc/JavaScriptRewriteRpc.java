@@ -18,15 +18,14 @@ package org.openrewrite.javascript.rpc;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
-import org.openrewrite.rpc.request.PrepareRecipe;
-
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -117,7 +116,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
      * @return Stream of parsed source files
      */
     public Stream<SourceFile> parseProject(Path projectPath, ExecutionContext ctx) {
-        return parseProject(projectPath, null, ctx);
+        return parseProject(projectPath, null, null, ctx);
     }
 
     /**
@@ -130,6 +129,22 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
      * @return Stream of parsed source files
      */
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, ExecutionContext ctx) {
+        return parseProject(projectPath, exclusions, null, ctx);
+    }
+
+    /**
+     * Parses an entire JavaScript/TypeScript project directory.
+     * Discovers and parses all relevant source files, package.json files, and lock files.
+     *
+     * @param projectPath Path to the project directory to parse
+     * @param exclusions  Optional glob patterns to exclude from parsing
+     * @param relativeTo  Optional path to make source file paths relative to. If not specified,
+     *                    paths are relative to projectPath. Use this when parsing a subdirectory
+     *                    but wanting paths relative to the repository root.
+     * @param ctx         Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
@@ -140,7 +155,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo), ParseProjectResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
@@ -152,6 +167,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 index++;
 
                 SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
+                // for status update messages
+                parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
                 action.accept(sourceFile);
                 return true;
             }
@@ -183,11 +200,11 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     public static class Builder implements Supplier<JavaScriptRewriteRpc> {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
         private final Map<String, String> environment = new HashMap<>();
-        private Path npxPath = Paths.get("npx");
+        private Path npxPath = System.getProperty("os.name").toLowerCase().contains("windows") ? Paths.get("npx.cmd") : Paths.get("npx");
         private @Nullable Path log;
         private @Nullable Path metricsCsv;
         private @Nullable Path recipeInstallDir;
-        private Duration timeout = Duration.ofSeconds(30);
+        private Duration timeout = Duration.ofSeconds(60);
         private boolean traceRpcMessages;
 
         private @Nullable Integer inspectBrk;
@@ -195,7 +212,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         private @Nullable Integer maxHeapSize;
         private @Nullable Path workingDirectory;
-        private PrepareRecipe.@Nullable Loader recipeLoader;
 
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
@@ -304,11 +320,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
-        public Builder recipeLoader(PrepareRecipe.Loader recipeLoader) {
-            this.recipeLoader = recipeLoader;
-            return this;
-        }
-
         @Override
         public JavaScriptRewriteRpc get() {
             Stream<@Nullable String> cmd;
@@ -375,8 +386,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
-                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)))
-                        .recipeLoader(recipeLoader);
+                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }

@@ -15,9 +15,9 @@
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.AddCommentToXmlTag
 examples:
-- description: ''
+- description: '`AddCommentToXmlTagTest#addCommentToDependencyBlock`'
   parameters:
-  - /project/dependencies/
+  - /project/dependencies
   - ' Comment text '
   sources:
   - before: |
@@ -64,9 +64,30 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.AddTagAttribute
+examples:
+- description: '`AddTagAttributeTest#addsAttributeWhenMissing`'
+  parameters:
+  - bean
+  - scope
+  - singleton
+  sources:
+  - before: |
+      <beans>
+          <bean id="myBean"/>
+          <bean id="anotherBean" scope="prototype"/>
+      </beans>
+    after: |
+      <beans>
+          <bean id="myBean" scope="singleton"/>
+          <bean id="anotherBean" scope="prototype"/>
+      </beans>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.ChangeNamespaceValue
 examples:
-- description: ''
+- description: '`ChangeNamespaceValueTest#replaceVersion24Test`'
   parameters:
   - web-app
   - 'null'
@@ -95,7 +116,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.ChangeTagAttribute
 examples:
-- description: ''
+- description: '`ChangeTagAttributeTest#alterAttributeWhenElementAndAttributeMatch`'
   parameters:
   - bean
   - id
@@ -116,30 +137,35 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
-recipeName: org.openrewrite.xml.AddTagAttribute
+recipeName: org.openrewrite.xml.ChangeTagAttributeKey
 examples:
-  - description: Add an attribute to a tag if it doesn't already exist
-    parameters:
-      - bean
-      - scope
-      - singleton
-    sources:
-      - before: |
-          <beans>
-              <bean id="myBean"/>
-              <bean id="anotherBean" scope="prototype"/>
-          </beans>
-        after: |
-          <beans>
-              <bean id="myBean" scope="singleton"/>
-              <bean id="anotherBean" scope="prototype"/>
-          </beans>
-        language: xml
+- description: '`ChangeTagAttributeKeyTest#renameReRenderToRender`'
+  parameters:
+  - /html/body/a4j:ajax/@reRender
+  - render
+  sources:
+  - before: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <html xmlns="http://www.w3.org/1999/xhtml"
+            xmlns:a4j="http://richfaces.org/a4j">
+          <body>
+              <a4j:ajax reRender="form:output" event="change"/>
+          </body>
+      </html>
+    after: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <html xmlns="http://www.w3.org/1999/xhtml"
+            xmlns:a4j="http://richfaces.org/a4j">
+          <body>
+              <a4j:ajax render="form:output" event="change"/>
+          </body>
+      </html>
+    language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.ChangeTagName
 examples:
-- description: ''
+- description: '`ChangeTagNameTest#renamesWhitelistToAllowlist`'
   parameters:
   - /virtual-patches/enhanced-virtual-patch/whitelist-pattern
   - allowlist-pattern
@@ -161,7 +187,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.ChangeTagValue
 examples:
-- description: ''
+- description: '`ChangeTagValueTest#rewriteEmptyTagValue`'
   parameters:
   - /dependency/version
   - 'null'
@@ -179,23 +205,9 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
-recipeName: org.openrewrite.xml.CreateXmlFile
-examples:
-- description: ''
-  parameters:
-  - test/test.xml
-  - fileContents
-  - 'true'
-  sources:
-  - before: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <before/>
-    language: xml
----
-type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.RemoveEmptyXmlTags
 examples:
-- description: ''
+- description: '`RemoveEmptyXmlTagsTest#removeEmptyPluginRepositories`'
   sources:
   - before: |
       <project>
@@ -218,7 +230,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.RemoveXmlTag
 examples:
-- description: ''
+- description: '`RemoveXmlTagTest#removeMatchingElementInMatchingFile`'
   parameters:
   - //bean
   - '**/beans.xml'
@@ -232,12 +244,13 @@ examples:
       <beans>
           <other id='myBean.subpackage.subpackage2'/>
       </beans>
+    path: my/project/beans.xml
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.XsltTransformation
 examples:
-- description: ''
+- description: '`XsltTransformationTest#transformFromParameter`'
   parameters:
   - xslt
   - 'null'
@@ -260,7 +273,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.format.AutoFormat
 examples:
-- description: ''
+- description: '`AutoFormatTest#autoFormatTag`'
   sources:
   - before: |
       <project>
@@ -299,7 +312,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.format.LineBreaks
 examples:
-- description: ''
+- description: '`LineBreaksTest#tags`'
   sources:
   - before: |
       <project>
@@ -318,7 +331,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.search.DoesNotUseNamespaceUri
 examples:
-- description: ''
+- description: '`DoesNotUseNamespaceUriTest#doesNotContain`'
   parameters:
   - http://example.com/dummy
   sources:
@@ -340,7 +353,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.search.FindNamespacePrefix
 examples:
-- description: ''
+- description: '`FindNamespacePrefixTest#rootElement`'
   parameters:
   - xsi
   - 'null'
@@ -363,7 +376,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.search.FindTags
 examples:
-- description: ''
+- description: '`FindTagsTest#simpleElement`'
   parameters:
   - /dependencies/dependency
   sources:
@@ -384,7 +397,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.search.HasNamespaceUri
 examples:
-- description: ''
+- description: '`HasNamespaceUriTest#rootElement`'
   parameters:
   - http://www.w3.org/2001/XMLSchema-instance
   - 'null'
@@ -407,7 +420,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.security.AddOwaspDateBoundSuppressions
 examples:
-- description: ''
+- description: '`AddOwaspDateBoundSuppressionsTest#addsUntilIfNotPresent`'
   parameters:
   - '2020-01-01'
   sources:
@@ -427,12 +440,13 @@ examples:
               </notes>
           </suppress>
       </suppressions>
+    path: suppressions.xml
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.security.IsOwaspSuppressionsFile
 examples:
-- description: ''
+- description: '`IsOwaspSuppressionsFileTest#addsMarkerToFilesWithCorrectXmlns`'
   sources:
   - before: |-
       <?xml version="1.0" encoding="UTF-8" ?>
@@ -450,12 +464,13 @@ examples:
               </notes>
           </suppress>
       </suppressions>
+    path: suppressions.xml
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.security.RemoveOwaspSuppressions
 examples:
-- description: ''
+- description: '`RemoveOwaspSuppressionsTest#provideExplicitDateRange`'
   parameters:
   - '2023-02-01'
   sources:
@@ -471,14 +486,15 @@ examples:
       <?xml version="1.0" encoding="UTF-8" ?>
       <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
       </suppressions>
+    path: suppressions.xml
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.security.UpdateOwaspSuppressionDate
 examples:
-- description: ''
+- description: '`UpdateOwaspSuppressionDateTest#updatesUntilIfCveExists`'
   parameters:
-  - Collections.singletonList("CVE-2022-1234")
+  - singletonList("CVE-2022-1234")
   - '2020-02-01'
   sources:
   - before: |-
@@ -501,4 +517,5 @@ examples:
               <cve>CVE-2022-1234</cve>
           </suppress>
       </suppressions>
+    path: suppressions.xml
     language: xml

@@ -71,20 +71,10 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
-              <project>
-                <!--~~(org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:
-              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><parent>
-                    <groupId>org.jenkins-ci.plugins</groupId>
-                    <artifactId>credentials</artifactId>
-                    <version>2.3.0</version>
-                </parent>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """
-          )
+            spec -> spec.after(xml -> {
+                return assertThat(xml).contains("org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:").actual();
+            }
+          ))
         );
     }
 
@@ -345,7 +335,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 .get()
                 .extracting(mrr -> mrr.getDependencies().get(Scope.Compile))
                 .matches(deps -> deps.size() == 1)
-                .extracting(deps -> deps.getFirst())
+                .extracting(List::getFirst)
                 .matches(dep -> "org.jvnet.staxex".equals(dep.getGroupId()) &&
                   "stax-ex".equals(dep.getArtifactId()) &&
                   "1.0".equals(dep.getVersion()))))

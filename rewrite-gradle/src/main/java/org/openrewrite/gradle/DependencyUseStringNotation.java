@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
@@ -42,18 +43,15 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 public class DependencyUseStringNotation extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Use `String` notation for Gradle dependency declarations";
-    }
+    @Getter
+    final String displayName = "Use `String` notation for Gradle dependency declarations";
 
-    @Override
-    public String getDescription() {
-        return "In Gradle, dependencies can be expressed as a `String` like `\"groupId:artifactId:version\"`, " +
-                "or equivalently as a `Map` like `group: 'groupId', name: 'artifactId', version: 'version'`. " +
-                "This recipe replaces dependencies represented as `Maps` with an equivalent dependency represented as a `String`, " +
-                "as recommended per the [Gradle best practices for dependencies to use a single GAV](https://docs.gradle.org/8.14.2/userguide/best_practices_dependencies.html#single-gav-string).";
-    }
+    @Getter
+    final String description = "In Gradle, dependencies can be expressed as a `String` like `\"groupId:artifactId:version\"`, " +
+        "or equivalently as a `Map` like `group: 'groupId', name: 'artifactId', version: 'version'`, " +
+        "or as positional parameters like `(\"groupId\", \"artifactId\", \"version\")`. " +
+        "This recipe replaces dependencies represented as `Maps` or positional parameters with an equivalent dependency represented as a `String`, " +
+        "as recommended per the [Gradle best practices for dependencies to use a single GAV](https://docs.gradle.org/8.14.2/userguide/best_practices_dependencies.html#single-gav-string).";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -150,6 +148,21 @@ public class DependencyUseStringNotation extends Recipe {
                     } else {
                         m = m.withArguments(singletonList(stringNotation));
                     }
+                } else if (isMultiComponentLiterals(m.getArguments())) {
+                    J.Literal firstArg = (J.Literal) m.getArguments().get(0);
+                    mapNotation.put("group", firstArg);
+                    mapNotation.put("name", m.getArguments().get(1));
+                    if (m.getArguments().size() >= 3) {
+                        mapNotation.put("version", m.getArguments().get(2));
+                    }
+                    if (m.getArguments().size() >= 4) {
+                        mapNotation.put("classifier", m.getArguments().get(3));
+                    }
+
+                    J.Literal stringNotation = toLiteral(firstArg.getPrefix(), firstArg.getMarkers(), mapNotation);
+                    if (stringNotation != null) {
+                        m = m.withArguments(singletonList(stringNotation));
+                    }
                 }
 
                 return m;
@@ -175,6 +188,19 @@ public class DependencyUseStringNotation extends Recipe {
                 }
 
                 return null;
+            }
+
+            private boolean isMultiComponentLiterals(List<Expression> arguments) {
+                if (arguments.size() < 2 || arguments.size() > 4) {
+                    return false;
+                }
+                for (Expression arg : arguments) {
+                    if (!(arg instanceof J.Literal) || !(((J.Literal) arg).getValue() instanceof String)) {
+                        return false;
+                    }
+                }
+                String first = (String) ((J.Literal) arguments.get(0)).getValue();
+                return first != null && !first.contains(":");
             }
 
             private @Nullable String coerceToStringNotation(Expression expression) {

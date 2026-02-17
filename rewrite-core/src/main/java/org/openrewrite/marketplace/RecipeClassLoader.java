@@ -17,14 +17,14 @@ package org.openrewrite.marketplace;
 
 import org.jspecify.annotations.Nullable;
 
+import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -66,8 +66,10 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.template",
             "org.openrewrite.trait",
             "org.openrewrite.FileAttributes",
+            "org.openrewrite.ParseErrorVisitor",
             "org.openrewrite.PrintOutputCapture",
             "org.openrewrite.ipc.http.HttpSender",
+            "org.openrewrite.java.JavadocVisitor",
             "org.openrewrite.java.internal.TypesInUse",
             "org.openrewrite.maven.MavenDownloadingException",
             "org.openrewrite.maven.MavenDownloadingExceptions",
@@ -104,7 +106,15 @@ public class RecipeClassLoader extends URLClassLoader {
             // Determine delegation strategy
             try {
                 if (shouldDelegateToParent(name)) {
-                    foundClass = parent.loadClass(name);
+                    try {
+                        foundClass = parent.loadClass(name);
+                    } catch (ClassNotFoundException e) {
+                        // Fall back to child if parent doesn't have the class.
+                        // This handles marker/tree/style types from language-specific modules
+                        // (e.g., org.openrewrite.gradle.marker.GradlePluginDescriptor)
+                        // that aren't on the parent classloader.
+                        foundClass = findClass(name);
+                    }
                 } else {
                     // Try child-first for non-delegated classes
                     foundClass = findClass(name);
@@ -119,6 +129,27 @@ public class RecipeClassLoader extends URLClassLoader {
             }
             return foundClass;
         }
+    }
+
+    @Override
+    public @Nullable URL getResource(String name) {
+        Objects.requireNonNull(name);
+        URL url = findResource(name);
+        if (url == null) {
+            return parent.getResource(name);
+        }
+        return url;
+    }
+
+    @Override
+    public Enumeration<URL> getResources(String name) throws IOException {
+        Objects.requireNonNull(name);
+        @SuppressWarnings("unchecked")
+        Enumeration<URL>[] tmp = (Enumeration<URL>[]) new Enumeration<?>[2];
+        tmp[0] = findResources(name);
+        tmp[1] = parent.getResources(name);
+
+        return new CompoundEnumeration<>(tmp);
     }
 
     private boolean shouldDelegateToParent(String className) {
@@ -185,18 +216,63 @@ public class RecipeClassLoader extends URLClassLoader {
 
     /**
      * Convert paths to URL array for URLClassLoader.
+     * Directories must have URLs ending with '/' for URLClassLoader to recognize them.
      */
     public static URL[] getUrls(@Nullable Path recipeJar, List<Path> classpath) {
         return Stream.concat(classpath.stream(), Stream.of(recipeJar))
                 .filter(Objects::nonNull)
-                .map(Path::toUri)
-                .map(uri -> {
+                .map(path -> {
                     try {
-                        return uri.toURL();
+                        if (Files.isDirectory(path)) {
+                            // For directories, ensure URL ends with '/'
+                            String urlString = path.toUri().toURL().toString();
+                            if (!urlString.endsWith("/")) {
+                                urlString += "/";
+                            }
+                            return new URL(urlString);
+                        } else {
+                            return path.toUri().toURL();
+                        }
                     } catch (MalformedURLException e) {
                         throw new UncheckedIOException(e);
                     }
                 })
                 .toArray(URL[]::new);
+    }
+}
+
+/*
+ * A utility class that will enumerate over an array of enumerations.
+ * @see java.lang.CompoundEnumeration
+ */
+final class CompoundEnumeration<E> implements Enumeration<E> {
+    private final Enumeration<E>[] enums;
+    private int index;
+
+    public CompoundEnumeration(Enumeration<E>[] enums) {
+        this.enums = enums;
+    }
+
+    private boolean next() {
+        while (index < enums.length) {
+            if (enums[index] != null && enums[index].hasMoreElements()) {
+                return true;
+            }
+            index++;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean hasMoreElements() {
+        return next();
+    }
+
+    @Override
+    public E nextElement() {
+        if (!next()) {
+            throw new NoSuchElementException();
+        }
+        return enums[index].nextElement();
     }
 }

@@ -1,0 +1,65 @@
+#
+# Copyright 2026 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.docker.DockerBestPractices
+displayName: Apply Docker best practices
+description: >-
+  Apply a set of Docker best practices to Dockerfiles. This recipe applies security hardening,
+  build optimization, and maintainability improvements based on CIS Docker Benchmark and
+  industry best practices.
+tags:
+  - docker
+  - security
+  - best-practices
+recipeList:
+  - org.openrewrite.docker.DockerSecurityBestPractices
+  - org.openrewrite.docker.DockerBuildOptimization
+  - org.openrewrite.docker.NormalizeDockerHubImageName
+  - org.openrewrite.docker.UseExecFormEntrypoint
+
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.docker.DockerSecurityBestPractices
+displayName: Apply Docker security best practices
+description: >-
+  Apply security-focused Docker best practices to Dockerfiles. This includes running as
+  a non-root user (CIS 4.1) and using COPY instead of ADD where appropriate (CIS 4.9).
+tags:
+  - docker
+  - security
+recipeList:
+  - org.openrewrite.docker.AddUserInstruction:
+      userName: appuser
+  - org.openrewrite.docker.ReplaceAddWithCopy
+  - org.openrewrite.docker.search.FindRootUser
+  - org.openrewrite.docker.search.FindUnpinnedBaseImages
+  - org.openrewrite.docker.search.FindEndOfLifeImages
+  - org.openrewrite.docker.search.FindMissingHealthcheck
+
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.docker.DockerBuildOptimization
+displayName: Optimize Docker builds
+description: >-
+  Apply build optimization best practices to Dockerfiles. This includes combining RUN
+  instructions to reduce layers and adding cleanup commands to reduce image size.
+tags:
+  - docker
+  - optimization
+recipeList:
+  - org.openrewrite.docker.CombineRunInstructions
+  - org.openrewrite.docker.AddAptGetCleanup

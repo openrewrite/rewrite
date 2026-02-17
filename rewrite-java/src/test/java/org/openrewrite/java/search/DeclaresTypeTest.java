@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -65,6 +66,35 @@ class DeclaresTypeTest implements RewriteTest {
             """
               import com.sample.Foo;
               /*~~>*/class A implements Foo{}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/pull/961")
+    @Test
+    void detectSubtypeWhenEnabledOnAnonymousClass() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new DeclaresType<>("com.sample.Foo", true))),
+          java(
+            """
+              package com.sample;
+              public class Foo{}
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import com.sample.Foo;
+              class A {
+                  Foo foo = new Foo(){};
+              }
+              """,
+            """
+              import com.sample.Foo;
+              class A {
+                  Foo foo = /*~~>*/new Foo(){};
+              }
               """
           )
         );

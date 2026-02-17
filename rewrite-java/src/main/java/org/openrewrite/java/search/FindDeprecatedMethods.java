@@ -53,10 +53,7 @@ public class FindDeprecatedMethods extends Recipe {
     @Nullable
     Boolean ignoreDeprecatedScopes;
 
-    @Override
-    public String getDisplayName() {
-        return "Find uses of deprecated methods";
-    }
+    String displayName = "Find uses of deprecated methods";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -66,10 +63,7 @@ public class FindDeprecatedMethods extends Recipe {
         return super.getInstanceNameSuffix();
     }
 
-    @Override
-    public String getDescription() {
-        return "Find uses of deprecated methods in any API.";
-    }
+    String description = "Find uses of deprecated methods in any API.";
 
     @Override
     public Validated<Object> validate() {

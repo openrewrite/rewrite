@@ -45,7 +45,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
           buildGradleKts(
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               configurations.all {
@@ -63,7 +63,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
               """,
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               dependencies {
@@ -87,7 +87,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
           buildGradleKts(
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               configurations.all {
@@ -113,7 +113,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
           buildGradleKts(
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               configurations.all {
@@ -140,7 +140,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
           buildGradleKts(
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               configurations.all {
@@ -158,7 +158,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
               """,
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               dependencies {
@@ -170,14 +170,14 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
         );
     }
 
-    @Test
     @Disabled("Gradle tooling API seems to return an empty marker")
+    @Test
     void removeMultipleRulesFromElseIfChain() {
         rewriteRun(
           buildGradleKts(
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               configurations.all {
@@ -199,7 +199,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
               """,
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               dependencies {
@@ -229,7 +229,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
                   }
               }
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               dependencies {
@@ -268,7 +268,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
                   }
               }
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               dependencies {
@@ -284,7 +284,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
                   }
               }
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               dependencies {
@@ -301,7 +301,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
           buildGradleKts(
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               configurations.all {
@@ -332,7 +332,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
           buildGradleKts(
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               configurations.all {
@@ -349,7 +349,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
               """,
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               dependencies {
@@ -366,7 +366,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
           buildGradleKts(
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               configurations {
@@ -387,7 +387,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
               """,
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               configurations {
@@ -412,7 +412,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
           buildGradleKts(
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               configurations {
@@ -438,7 +438,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
           buildGradleKts(
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               configurations.named("compileClasspath") {
@@ -456,7 +456,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
               """,
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               dependencies {
@@ -474,7 +474,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
           buildGradleKts(
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               configurations {
@@ -496,7 +496,7 @@ class RemoveRedundantSecurityResolutionRulesKotlinTest implements RewriteTest {
               """,
             """
               plugins {
-                  java
+                  id("java")
               }
               repositories { mavenCentral() }
               dependencies {

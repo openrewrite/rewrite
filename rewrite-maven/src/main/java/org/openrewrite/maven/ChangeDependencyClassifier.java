@@ -61,20 +61,14 @@ public class ChangeDependencyClassifier extends Recipe {
     @Nullable
     Boolean changeManagedDependency;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven dependency classifier";
-    }
+    String displayName = "Change Maven dependency classifier";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("for `%s:%s` to `%s`", groupId, artifactId, newClassifier);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add or alter the classifier of the specified dependency.";
-    }
+    String description = "Add or alter the classifier of the specified dependency.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

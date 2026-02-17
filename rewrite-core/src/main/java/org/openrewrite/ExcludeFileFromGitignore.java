@@ -44,17 +44,11 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
     @Option(displayName = "Paths", description = "The paths to find and remove from the gitignore files.", example = "/folder/file.txt")
     List<String> paths;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove ignoral of files or directories from .gitignore";
-    }
+    String displayName = "Remove ignoral of files or directories from .gitignore";
 
-    @Override
-    public String getDescription() {
-        return "This recipe will remove a file or directory from the .gitignore file. " +
+    String description = "This recipe will remove a file or directory from the .gitignore file. " +
                "If the file or directory is already in the .gitignore file, it will be removed or negated. " +
                "If the file or directory is not in the .gitignore file, no action will be taken.";
-    }
 
     @Override
     public Repository getInitialValue(ExecutionContext ctx) {

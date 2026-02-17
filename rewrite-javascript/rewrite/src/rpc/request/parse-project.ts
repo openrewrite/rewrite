@@ -20,7 +20,6 @@ import {randomId, UUID} from "../../uuid";
 import {SourceFile} from "../../tree";
 import {Parsers} from "../../parser";
 import {withMetrics} from "./metrics";
-import {DEFAULT_EXCLUSIONS, ProjectParser} from "../../javascript";
 import {replaceMarkerByKind} from "../../markers";
 
 /**
@@ -43,7 +42,13 @@ export interface ParseProjectResponseItem {
 export class ParseProject {
     constructor(
         private readonly projectPath: string,
-        private readonly exclusions?: string[]
+        private readonly exclusions?: string[],
+        /**
+         * Optional path to make source file paths relative to.
+         * If not specified, paths are relative to projectPath.
+         * Use this when parsing a subdirectory but wanting paths relative to the repository root.
+         */
+        private readonly relativeTo?: string
     ) {}
 
     static handle(
@@ -59,8 +64,13 @@ export class ParseProject {
                 (context) => async (request) => {
                     context.target = request.projectPath;
 
+                    // Dynamic import to break circular dependency
+                    const {DEFAULT_EXCLUSIONS, ProjectParser} = await import("../../javascript/index.js");
+
                     const projectPath = path.resolve(request.projectPath);
                     const exclusions = request.exclusions ?? DEFAULT_EXCLUSIONS;
+                    // Use relativeTo if specified, otherwise default to projectPath
+                    const relativeTo = request.relativeTo ? path.resolve(request.relativeTo) : projectPath;
 
                     // Use ProjectParser for file discovery and Prettier detection
                     const projectParser = new ProjectParser(projectPath, {exclusions});
@@ -74,7 +84,7 @@ export class ParseProject {
                     if (discovered.packageJsonFiles.length > 0) {
                         const parser = Parsers.createParser("packageJson", {
                             ctx,
-                            relativeTo: projectPath
+                            relativeTo
                         });
                         const generator = parser.parse(...discovered.packageJsonFiles);
 
@@ -93,7 +103,7 @@ export class ParseProject {
 
                     // Parse JSON lock files
                     if (discovered.lockFiles.json.length > 0) {
-                        const parser = Parsers.createParser("json", {ctx, relativeTo: projectPath});
+                        const parser = Parsers.createParser("json", {ctx, relativeTo});
                         const generator = parser.parse(...discovered.lockFiles.json);
 
                         for (const _ of discovered.lockFiles.json) {
@@ -111,7 +121,7 @@ export class ParseProject {
 
                     // Parse YAML lock files
                     if (discovered.lockFiles.yaml.length > 0) {
-                        const parser = Parsers.createParser("yaml", {ctx, relativeTo: projectPath});
+                        const parser = Parsers.createParser("yaml", {ctx, relativeTo});
                         const generator = parser.parse(...discovered.lockFiles.yaml);
 
                         for (const _ of discovered.lockFiles.yaml) {
@@ -129,7 +139,7 @@ export class ParseProject {
 
                     // Parse text lock files (yarn.lock Classic)
                     if (discovered.lockFiles.text.length > 0) {
-                        const parser = Parsers.createParser("plainText", {ctx, relativeTo: projectPath});
+                        const parser = Parsers.createParser("plainText", {ctx, relativeTo});
                         const generator = parser.parse(...discovered.lockFiles.text);
 
                         for (const _ of discovered.lockFiles.text) {
@@ -149,7 +159,7 @@ export class ParseProject {
                     if (discovered.jsFiles.length > 0) {
                         const parser = Parsers.createParser("javascript", {
                             ctx,
-                            relativeTo: projectPath
+                            relativeTo
                         });
 
                         // Check if Prettier is available
@@ -211,7 +221,7 @@ export class ParseProject {
 
                     // Parse other YAML files
                     if (discovered.yamlFiles.length > 0) {
-                        const parser = Parsers.createParser("yaml", {ctx, relativeTo: projectPath});
+                        const parser = Parsers.createParser("yaml", {ctx, relativeTo});
                         const generator = parser.parse(...discovered.yamlFiles);
 
                         for (const _ of discovered.yamlFiles) {
@@ -229,7 +239,7 @@ export class ParseProject {
 
                     // Parse other JSON files
                     if (discovered.jsonFiles.length > 0) {
-                        const parser = Parsers.createParser("json", {ctx, relativeTo: projectPath});
+                        const parser = Parsers.createParser("json", {ctx, relativeTo});
                         const generator = parser.parse(...discovered.jsonFiles);
 
                         for (const _ of discovered.jsonFiles) {
@@ -247,7 +257,7 @@ export class ParseProject {
 
                     // Parse text config files (.prettierignore, .gitignore, etc.)
                     if (discovered.textFiles.length > 0) {
-                        const parser = Parsers.createParser("plainText", {ctx, relativeTo: projectPath});
+                        const parser = Parsers.createParser("plainText", {ctx, relativeTo});
                         const generator = parser.parse(...discovered.textFiles);
 
                         for (const _ of discovered.textFiles) {

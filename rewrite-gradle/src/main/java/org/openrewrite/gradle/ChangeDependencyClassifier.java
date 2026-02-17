@@ -64,20 +64,14 @@ public class ChangeDependencyClassifier extends Recipe {
     @Nullable
     String configuration;
 
-    @Override
-    public String getDisplayName() {
-        return "Change a Gradle dependency classifier";
-    }
+    String displayName = "Change a Gradle dependency classifier";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s` to `%s`", groupId, artifactId, newClassifier);
     }
 
-    @Override
-    public String getDescription() {
-        return "Changes classifier of an existing dependency declared in `build.gradle` files.";
-    }
+    String description = "Changes classifier of an existing dependency declared in `build.gradle` files.";
 
     @Override
     public Validated<Object> validate() {

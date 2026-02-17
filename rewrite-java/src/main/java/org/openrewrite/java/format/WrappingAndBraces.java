@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -29,25 +30,17 @@ import java.util.Set;
 import static java.util.Objects.requireNonNull;
 
 public class WrappingAndBraces extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Wrapping and braces";
-    }
+    @Getter
+    final String displayName = "Wrapping and braces";
 
-    @Override
-    public String getDescription() {
-        return "Format line wraps and braces in Java code.";
-    }
+    @Getter
+    final String description = "Format line wraps and braces in Java code.";
 
-    @Override
-    public Set<String> getTags() {
-        return new LinkedHashSet<>(Arrays.asList("RSPEC-S121", "RSPEC-S2681", "RSPEC-S3972", "RSPEC-S3973"));
-    }
+    @Getter
+    final Set<String> tags = new LinkedHashSet<>(Arrays.asList("RSPEC-S121", "RSPEC-S2681", "RSPEC-S3972", "RSPEC-S3973"));
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(10);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(10);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

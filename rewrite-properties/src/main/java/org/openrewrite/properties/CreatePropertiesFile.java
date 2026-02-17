@@ -55,15 +55,9 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
     @Nullable
     Boolean overwriteExisting;
 
-    @Override
-    public String getDisplayName() {
-        return "Create Properties file";
-    }
+    String displayName = "Create Properties file";
 
-    @Override
-    public String getDescription() {
-        return "Create a new Properties file.";
-    }
+    String description = "Create a new Properties file.";
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {

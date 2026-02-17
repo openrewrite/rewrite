@@ -77,7 +77,7 @@ class MappingTest implements RewriteTest {
                       name: org.openrewrite.text.ChangeTextToJon
               """,
             spec -> spec.afterRecipe(y -> {
-                Yaml.Mapping mapping = (Yaml.Mapping) y.getDocuments().getFirst().getBlock();
+                var mapping = (Yaml.Mapping) y.getDocuments().getFirst().getBlock();
                 assertThat(mapping.getEntries().stream()
                   .map(e -> (Scalar) e.getKey())
                   .map(Scalar::getValue)).containsExactly("type");
@@ -142,7 +142,7 @@ class MappingTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(documents -> {
                 var doc = documents.getDocuments().getFirst();
-                Yaml.Mapping mapping = (Yaml.Mapping) doc.getBlock();
+                var mapping = (Yaml.Mapping) doc.getBlock();
                 assertThat(mapping.getEntries().size()).isEqualTo(2);
 
                 var bazFooEntry = mapping.getEntries().get(1);
