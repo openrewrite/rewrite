@@ -2356,7 +2356,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>parent-project</artifactId>
                   <version>1</version>
                   <properties>
-                    <version.swagger>2.2.42</version.swagger>
+                    <version.swagger>2.2.43</version.swagger>
                   </properties>
                   <modules>
                     <module>sub-project</module>
@@ -2493,7 +2493,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                       <dependency>
                         <groupId>io.swagger.core.v3</groupId>
                         <artifactId>swagger-annotations</artifactId>
-                        <version>2.2.42</version>
+                        <version>2.2.43</version>
                       </dependency>
                       <dependency>
                         <groupId>io.swagger</groupId>
@@ -2583,7 +2583,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                       <dependency>
                         <groupId>io.swagger.core.v3</groupId>
                         <artifactId>swagger-annotations</artifactId>
-                        <version>2.2.42</version>
+                        <version>2.2.43</version>
                       </dependency>
                     </dependencies>
                   </project>
@@ -2678,7 +2678,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     <dependency>
                       <groupId>io.swagger.core.v3</groupId>
                       <artifactId>swagger-annotations</artifactId>
-                      <version>2.2.42</version>
+                      <version>2.2.43</version>
                     </dependency>
                   </dependencies>
                 </project>
@@ -2913,7 +2913,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "swagger-*",
             "io.swagger.core.v3",
             null,
-            "2.2.42",
+            "2.2.43",
             null
           )),
           //language=xml
@@ -2951,7 +2951,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                 <artifactId>demo-child</artifactId>
                 <version>0.0.1-SNAPSHOT</version>
                 <properties>
-                  <version.swagger>2.2.42</version.swagger>
+                  <version.swagger>2.2.43</version.swagger>
                 </properties>
                 <dependencies>
                   <dependency>

@@ -151,20 +151,25 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+        if (newVersion == null) {
+            return TreeVisitor.noop();
+        }
+        final VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
+        if (versionComparator == null) {
+            return TreeVisitor.noop();
+        }
         return new MavenIsoVisitor<ExecutionContext>() {
-            final @Nullable VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
             final boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency;
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (!isDependencyTag(oldGroupId, oldArtifactId) && !isPluginDependencyTag(oldGroupId, oldArtifactId) && !isAnnotationProcessorPathTag(oldGroupId, oldArtifactId)) {
-                    return super.visitTag(tag, ctx);
-                }
-                if (newVersion == null || versionComparator == null) {
+                if (!isDependencyTag(oldGroupId, oldArtifactId) &&
+                        !isPluginDependencyTag(oldGroupId, oldArtifactId) &&
+                        !isAnnotationProcessorPathTag(oldGroupId, oldArtifactId)) {
                     return super.visitTag(tag, ctx);
                 }
                 String currentVersion = tag.getChildValue("version").orElse(null);
-                if (currentVersion == null || !isProperty(currentVersion)) {
+                if (!isProperty(currentVersion)) {
                     return super.visitTag(tag, ctx);
                 }
                 String propertyName = currentVersion.substring(2, currentVersion.length() - 1);
