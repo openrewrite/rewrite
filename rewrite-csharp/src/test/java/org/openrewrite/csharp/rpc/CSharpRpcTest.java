@@ -2185,4 +2185,259 @@ class CSharpRpcTest {
     }
 
     // Cs.ClassDeclaration overload removed — now using J.ClassDeclaration everywhere
+
+    @Test
+    void parseSimpleIfEndif(@TempDir Path tempDir) throws IOException {
+        String source = """
+                #if DEBUG
+                using System.Diagnostics;
+                #endif
+                namespace Test
+                {
+                    public class Foo
+                    {
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("IfEndif.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseSimpleIfElse(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Test
+                {
+                #if DEBUG
+                    public class DebugFoo
+                    {
+                    }
+                #else
+                    public class ReleaseFoo
+                    {
+                    }
+                #endif
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("IfElse.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseKeywordSplittingDirective(@TempDir Path tempDir) throws IOException {
+        String source = """
+                public
+                #if SOMETHING
+                record
+                #else
+                class
+                #endif
+                MyObject { }
+                """;
+
+        Path sourceFile = tempDir.resolve("KeywordSplit.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseNestedDirectives(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Test
+                {
+                #if A
+                    public class Outer
+                    {
+                #if B
+                        public void InnerMethod() { }
+                #endif
+                    }
+                #endif
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Nested.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseElifDirective(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Test
+                {
+                    public class Foo
+                    {
+                #if PLATFORM_A
+                        public void PlatformA() { }
+                #elif PLATFORM_B
+                        public void PlatformB() { }
+                #else
+                        public void Default() { }
+                #endif
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Elif.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseDirectiveWithComplexCondition(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Test
+                {
+                    public class Foo
+                    {
+                #if DEBUG && !TRACE
+                        public void DebugOnly() { }
+                #endif
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Complex.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseDirectiveChangingBaseClass(@TempDir Path tempDir) throws IOException {
+        // From PR #6678 comment — directives slicing a class declaration at the base class
+        String source = """
+                #if(IsSupplyBuildpack)
+                public partial class MyBuildpack : SupplyBuildpack
+                #elif(IsFinalBuildpack)
+                public partial class MyBuildpack : FinalBuildpack
+                #elif(IsHttpModuleBuildpack || IsHostedServiceBuildpack)
+                public partial class MyBuildpack : PluginInjectorBuildpack
+                #endif
+                {
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("BaseClass.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parsePolyfillConditionalClass(@TempDir Path tempDir) throws IOException {
+        // From PR #6678 comment — entire class conditionally included as polyfill
+        String source = """
+                using System;
+
+                namespace Polyfills
+                {
+                #if !NET6_0_OR_GREATER
+                    internal static class ArgumentNullException
+                    {
+                        public static void ThrowIfNull(object? argument, string? paramName = null)
+                        {
+                            if (argument is null)
+                                throw new System.ArgumentNullException(paramName);
+                        }
+                    }
+                #endif
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Polyfill.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
 }
