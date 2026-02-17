@@ -2026,6 +2026,10 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(cosc, p);
         p.Append(cosc.Kind == ClassOrStructConstraint.TypeKind.Class ? "class" : "struct");
+        if (cosc.Nullable)
+        {
+            p.Append("?");
+        }
         AfterSyntax(cosc, p);
         return cosc;
     }

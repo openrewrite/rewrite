@@ -405,13 +405,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(),
-                modPrefix,
-                Markers.Empty,
-                MapModifier(mod.Kind()),
-                []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // 'enum' keyword prefix stored as left padding of name
@@ -538,13 +532,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(),
-                modPrefix,
-                Markers.Empty,
-                MapModifier(mod.Kind()),
-                []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // Parse the 'class'/'interface'/'struct'/'record' keyword
@@ -578,11 +566,11 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null
         );
 
-        // Parse type parameters (generics)
+        // Parse type parameters (generics) - just the <T, U> angle brackets
         JContainer<TypeParameter>? typeParameters = null;
         if (node.TypeParameterList != null)
         {
-            typeParameters = ParseTypeParameterList(node.TypeParameterList, node.ConstraintClauses);
+            typeParameters = ParseTypeParameterList(node.TypeParameterList);
         }
 
         // Parse primary constructor (C# 12)
@@ -645,10 +633,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             }
         }
 
-        // Constraint clauses are now integrated into type parameters via ConstrainedTypeParameter
-        // (handled in ParseTypeParameterList above). Parse any remaining constraint text for
-        // type declarations without type parameters.
-        if (node.TypeParameterList == null && node.ConstraintClauses.Count > 0)
+        // Now merge constraint clauses into type parameters (after base list + primary constructor
+        // so cursor is in correct position since constraints appear last in source text)
+        if (typeParameters != null && node.ConstraintClauses.Count > 0)
+        {
+            typeParameters = MergeConstraintClauses(typeParameters, node.ConstraintClauses);
+        }
+        else if (node.TypeParameterList == null && node.ConstraintClauses.Count > 0)
         {
             // Skip constraint clause text if type has no type parameters
             // (shouldn't happen in valid C#, but handle gracefully)
@@ -874,13 +865,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(),
-                modPrefix,
-                Markers.Empty,
-                MapModifier(mod.Kind()),
-                []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // Parse return type
@@ -995,9 +980,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(), modPrefix, Markers.Empty, MapModifier(mod.Kind()), []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // Constructor has no return type
@@ -1126,10 +1109,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(), modPrefix, Markers.Empty,
-                MapModifier(mod.Kind()), []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // Parse ~Name: tilde is part of the name
@@ -1200,7 +1180,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(Guid.NewGuid(), modPrefix, Markers.Empty, MapModifier(mod.Kind()), []));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // 'delegate' keyword — its before-space becomes the JLeftPadded.Before for return type
@@ -1217,7 +1197,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         JContainer<TypeParameter>? typeParameters = null;
         if (node.TypeParameterList != null)
         {
-            typeParameters = ParseTypeParameterList(node.TypeParameterList, node.ConstraintClauses);
+            typeParameters = ParseTypeParameterList(node.TypeParameterList);
         }
 
         // Parse parameters
@@ -1252,6 +1232,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var paramsContainer = new JContainer<Statement>(paramsPrefix, parameters, Markers.Empty);
 
+        // Merge constraint clauses into type parameters (constraints appear after params in source)
+        if (typeParameters != null && node.ConstraintClauses.Count > 0)
+        {
+            typeParameters = MergeConstraintClauses(typeParameters, node.ConstraintClauses);
+        }
+
         _cursor = node.SemicolonToken.Span.End;
 
         return new DelegateDeclaration(Guid.NewGuid(), prefix, Markers.Empty,
@@ -1273,7 +1259,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(Guid.NewGuid(), modPrefix, Markers.Empty, MapModifier(mod.Kind()), []));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // 'event' keyword — its before-space becomes the JLeftPadded.Before for type
@@ -1339,7 +1325,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(Guid.NewGuid(), modPrefix, Markers.Empty, MapModifier(mod.Kind()), []));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         var typeExpr = VisitType(node.Type)!;
@@ -1420,7 +1406,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(Guid.NewGuid(), modPrefix, Markers.Empty, MapModifier(mod.Kind()), []));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         var returnType = VisitType(node.ReturnType)!;
@@ -1518,7 +1504,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(Guid.NewGuid(), modPrefix, Markers.Empty, MapModifier(mod.Kind()), []));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         var implicitExplicitPrefix = ExtractSpaceBefore(node.ImplicitOrExplicitKeyword);
@@ -1596,13 +1582,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(),
-                modPrefix,
-                Markers.Empty,
-                MapModifier(mod.Kind()),
-                []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // Parse the type
@@ -1687,13 +1667,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(),
-                modPrefix,
-                Markers.Empty,
-                MapModifier(mod.Kind()),
-                []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // Parse the keyword (get/set/init)
@@ -1763,13 +1737,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(),
-                modPrefix,
-                Markers.Empty,
-                MapModifier(mod.Kind()),
-                []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // Parse the type
@@ -4608,13 +4576,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(),
-                modPrefix,
-                Markers.Empty,
-                MapModifier(mod.Kind()),
-                []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // Single parameter without parentheses: x => ...
@@ -4676,13 +4638,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(),
-                modPrefix,
-                Markers.Empty,
-                MapModifier(mod.Kind()),
-                []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // Parse optional return type (C# 10+)
@@ -4808,13 +4764,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(),
-                modPrefix,
-                Markers.Empty,
-                MapModifier(mod.Kind()),
-                []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // Parse the type
@@ -5753,19 +5703,10 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     /// into ConstrainedTypeParameter objects stored in J.TypeParameter.Bounds[0].
     /// Example: &lt;T, U&gt; where T : class, IDisposable where U : new()
     /// </summary>
-    private JContainer<TypeParameter> ParseTypeParameterList(
-        TypeParameterListSyntax typeParamList,
-        SyntaxList<TypeParameterConstraintClauseSyntax> constraintClauses)
+    private JContainer<TypeParameter> ParseTypeParameterList(TypeParameterListSyntax typeParamList)
     {
         var containerPrefix = ExtractSpaceBefore(typeParamList.LessThanToken);
         _cursor = typeParamList.LessThanToken.Span.End;
-
-        // Build a lookup from type parameter name to its constraint clause
-        var constraintsByName = new Dictionary<string, TypeParameterConstraintClauseSyntax>();
-        foreach (var clause in constraintClauses)
-        {
-            constraintsByName[clause.Name.Identifier.Text] = clause;
-        }
 
         var typeParams = new List<JRightPadded<TypeParameter>>();
         for (var i = 0; i < typeParamList.Parameters.Count; i++)
@@ -5820,8 +5761,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 afterSpace = ExtractSpaceBefore(typeParamList.GreaterThanToken);
             }
 
-            // Create a ConstrainedTypeParameter without constraint data for now
-            // (constraints will be merged after parsing the constraint clauses)
+            // Create a ConstrainedTypeParameter without constraint data
+            // (constraints will be merged later via MergeConstraintClauses)
             var ctp = new ConstrainedTypeParameter(
                 Guid.NewGuid(),
                 Space.Empty,
@@ -5829,8 +5770,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 attrLists,
                 variance,
                 name,
-                null, // WhereConstraint (populated below if constraint clause exists)
-                null, // Constraints (populated below if constraint clause exists)
+                null, // WhereConstraint
+                null, // Constraints
                 null  // Type
             );
 
@@ -5856,7 +5797,21 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         _cursor = typeParamList.GreaterThanToken.Span.End;
 
-        // Now parse constraint clauses and merge them into the corresponding type parameters
+        return new JContainer<TypeParameter>(containerPrefix, typeParams, Markers.Empty);
+    }
+
+    /// <summary>
+    /// Parses constraint clauses (where T : ...) and merges them into the corresponding type parameters.
+    /// Must be called after primary constructor and base list parsing to maintain correct cursor position.
+    /// </summary>
+    private JContainer<TypeParameter> MergeConstraintClauses(
+        JContainer<TypeParameter> typeParameters,
+        SyntaxList<TypeParameterConstraintClauseSyntax> constraintClauses)
+    {
+        if (constraintClauses.Count == 0) return typeParameters;
+
+        var typeParams = typeParameters.Elements.Select(e => e).ToList();
+
         foreach (var clause in constraintClauses)
         {
             // Space before "where" keyword
@@ -5878,9 +5833,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var beforeColon = ExtractSpaceBefore(clause.ColonToken);
             _cursor = clause.ColonToken.Span.End;
 
-            // The WhereConstraint is a JLeftPadded<Identifier> where:
-            // - Left padding = space before "where" keyword
-            // - Identifier = the type param name in the constraint, right-padded with space before ":"
             var whereConstraint = new JLeftPadded<Identifier>(wherePrefix, whereIdentifier);
 
             // Parse individual constraints
@@ -5930,7 +5882,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             }
         }
 
-        return new JContainer<TypeParameter>(containerPrefix, typeParams, Markers.Empty);
+        return new JContainer<TypeParameter>(typeParameters.Before, typeParams, typeParameters.Markers);
     }
 
     /// <summary>
@@ -5952,7 +5904,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             {
                 var prefix = ExtractSpaceBefore(classOrStruct.ClassOrStructKeyword);
                 _cursor = classOrStruct.ClassOrStructKeyword.Span.End;
-                if (classOrStruct.QuestionToken != default)
+                bool nullable = classOrStruct.QuestionToken != default;
+                if (nullable)
                 {
                     _cursor = classOrStruct.QuestionToken.Span.End;
                 }
@@ -5963,7 +5916,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     Guid.NewGuid(),
                     prefix,
                     Markers.Empty,
-                    kind
+                    kind,
+                    nullable
                 );
             }
 
@@ -6351,13 +6305,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(),
-                modPrefix,
-                Markers.Empty,
-                MapModifier(mod.Kind()),
-                []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // Parse the variable declaration (type + variables)
@@ -6382,13 +6330,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(),
-                modPrefix,
-                Markers.Empty,
-                MapModifier(mod.Kind()),
-                []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // Parse the variable declaration
@@ -6478,13 +6420,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(),
-                modPrefix,
-                Markers.Empty,
-                MapModifier(mod.Kind()),
-                []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // Parse the 'event' keyword as a modifier
@@ -6582,13 +6518,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(),
-                modPrefix,
-                Markers.Empty,
-                MapModifier(mod.Kind()),
-                []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // Parse return type
@@ -7087,6 +7017,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             SyntaxKind.InKeyword => Modifier.ModifierType.In,
             _ => Modifier.ModifierType.LanguageExtension
         };
+    }
+
+    private static Modifier CreateModifier(Space prefix, SyntaxToken modToken)
+    {
+        var type = MapModifier(modToken.Kind());
+        string? keyword = type == Modifier.ModifierType.LanguageExtension ? modToken.Text : null;
+        return new Modifier(Guid.NewGuid(), prefix, Markers.Empty, type, [], keyword);
     }
 
     #region Preprocessor Directive Processing
@@ -7975,13 +7912,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var modPrefix = ExtractSpaceBefore(mod);
             _cursor = mod.Span.End;
-            modifiers.Add(new Modifier(
-                Guid.NewGuid(),
-                modPrefix,
-                Markers.Empty,
-                MapModifier(mod.Kind()),
-                []
-            ));
+            modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
         // 'delegate' keyword
