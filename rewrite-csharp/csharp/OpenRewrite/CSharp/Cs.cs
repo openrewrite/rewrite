@@ -2487,22 +2487,26 @@ public sealed class ClassOrStructConstraint(
     Guid id,
     Space prefix,
     Markers markers,
-    ClassOrStructConstraint.TypeKind kind
+    ClassOrStructConstraint.TypeKind kind,
+    bool nullable = false
 ) : Cs, Expression, IEquatable<ClassOrStructConstraint>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public ClassOrStructConstraint.TypeKind Kind { get; } = kind;
+    public bool Nullable { get; } = nullable;
 
     public ClassOrStructConstraint WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Kind);
+        id == Id ? this : new(id, Prefix, Markers, Kind, Nullable);
     public ClassOrStructConstraint WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Kind);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Kind, Nullable);
     public ClassOrStructConstraint WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Kind);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Kind, Nullable);
     public ClassOrStructConstraint WithKind(ClassOrStructConstraint.TypeKind kind) =>
-        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, kind);
+        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, kind, Nullable);
+    public ClassOrStructConstraint WithNullable(bool nullable) =>
+        nullable == Nullable ? this : new(Id, Prefix, Markers, Kind, nullable);
 
     public enum TypeKind { Class, Struct }
     Tree Tree.WithId(Guid id) => WithId(id);
