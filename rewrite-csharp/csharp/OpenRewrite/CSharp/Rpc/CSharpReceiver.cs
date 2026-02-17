@@ -695,7 +695,8 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitClassOrStructConstraint(ClassOrStructConstraint cosc, RpcReceiveQueue q)
     {
         var kind = q.Receive<object>(cosc.Kind);
-        return cosc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithKind((ClassOrStructConstraint.TypeKind)kind!);
+        var nullable = q.Receive<bool>(cosc.Nullable);
+        return cosc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithKind((ClassOrStructConstraint.TypeKind)kind!).WithNullable(nullable);
     }
 
     public override J VisitConstructorConstraint(ConstructorConstraint cc, RpcReceiveQueue q)
