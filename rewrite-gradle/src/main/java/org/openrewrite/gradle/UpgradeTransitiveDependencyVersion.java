@@ -520,7 +520,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
                 GradleProject gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElse(null);
-                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> projectRequiredUpdates = gradleProject != null ? acc.updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap()) : emptyMap();
+                // Only add constraints to primary build files, not to applied scripts like dependencies.gradle
+                String fileName = cu.getSourcePath().getFileName().toString();
+                boolean isPrimaryBuildFile = "build.gradle".equals(fileName) || "build.gradle.kts".equals(fileName);
+                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> projectRequiredUpdates = gradleProject != null && isPrimaryBuildFile ? acc.updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap()) : emptyMap();
                 if (projectRequiredUpdates.keySet().stream().anyMatch(ga -> dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()))) {
                     cu = (JavaSourceFile) Preconditions.check(
                             not(new JavaIsoVisitor<ExecutionContext>() {

@@ -460,6 +460,9 @@ public class DependencyConstraintToRule extends Recipe {
         J.Lambda l = (J.Lambda) m.getArguments().get(0);
         if (l.getBody() instanceof J.Block) {
             J.Block b = (J.Block) l.getBody();
+            if (b.getStatements().isEmpty()) {
+                return true;
+            }
             if (b.getStatements().size() == 1) {
                 return b.getStatements().get(0) instanceof J.Return && ((J.Return) b.getStatements().get(0)).getExpression() == null;
             }
