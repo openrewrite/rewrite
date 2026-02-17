@@ -452,8 +452,11 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         if (space.getComments().isEmpty()) {
             if (StringUtils.hasLineBreak(whitespace)) {
                 if (StringUtils.hasLineBreak(space.getWhitespace())) {
-                    //Keep existing amount of new lines
-                    return space.withWhitespace(space.getWhitespace().substring(0, space.getWhitespace().lastIndexOf("\n") + 1));
+                    // Preserve existing whitespace including indentation.
+                    // WrappingAndBraces only ensures newlines exist; TabsAndIndents handles indentation.
+                    // When running standalone (not through AutoFormat), stripping indentation causes
+                    // all code to collapse to column 0.
+                    return space;
                 }
             }
             return space.withWhitespace(whitespace);
@@ -471,12 +474,15 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     if (comment.isMultiline()) {
                         Object parent = getCursor().getParentTreeCursor().getValue();
                         if (!(parent instanceof J.Block || parent instanceof J.Case)) {
+                            if (StringUtils.hasLineBreak(comment.getSuffix())) {
+                                return comment;
+                            }
                             return comment.withSuffix(whitespace);
                         }
                     }
                     if (StringUtils.hasLineBreak(comment.getSuffix())) {
-                        //Keep existing amount of new lines
-                        return comment.withSuffix(comment.getSuffix().substring(0, comment.getSuffix().lastIndexOf("\n") + 1));
+                        // Preserve existing whitespace including indentation
+                        return comment;
                     }
                     //Reduce to single new line
                     return comment.withSuffix(whitespace);
