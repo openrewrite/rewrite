@@ -288,6 +288,8 @@ public class PythonRewriteRpc extends RewriteRpc {
                 deps,
                 Collections.emptyMap(),
                 Collections.emptyMap(),
+                Collections.emptyList(),
+                Collections.emptyList(),
                 resolvedDeps,
                 PythonResolutionResult.PackageManager.Uv,
                 null

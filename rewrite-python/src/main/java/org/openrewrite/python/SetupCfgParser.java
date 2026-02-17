@@ -81,6 +81,8 @@ public class SetupCfgParser implements Parser {
                     deps,
                     Collections.emptyMap(),
                     Collections.emptyMap(),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
                     resolvedDeps,
                     PackageManager.Uv,
                     null
