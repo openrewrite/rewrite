@@ -117,6 +117,31 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void bareVersionNormalized() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("requests", "httpx", "0.24.0")),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "httpx>=0.24.0",
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
     void renameAcrossScopes() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("pytest", "pytest-ng", null)),
