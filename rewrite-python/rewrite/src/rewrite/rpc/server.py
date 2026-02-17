@@ -385,7 +385,7 @@ def handle_get_object(params: dict) -> List[dict]:
     if obj_id is None:
         return [{'state': 'DELETE'}, {'state': 'END_OF_OBJECT'}]
     obj = local_objects.get(obj_id)
-    logger.info(f"handle_get_object: id={obj_id}, type={type(obj).__name__ if obj else 'None'}")
+    logger.debug(f"handle_get_object: id={obj_id}, type={type(obj).__name__ if obj else 'None'}")
 
     if obj is None:
         return [
@@ -446,7 +446,7 @@ def handle_print(params: dict) -> str:
     obj_id = params.get('treeId') or params.get('id')
     source_file_type = params.get('sourceFileType')
 
-    logger.info(f"handle_print: treeId={obj_id}, sourceFileType={source_file_type}")
+    logger.debug(f"handle_print: treeId={obj_id}, sourceFileType={source_file_type}")
 
     if obj_id is None:
         logger.warning("No treeId or id provided")
@@ -555,7 +555,7 @@ def handle_install_recipes(params: dict) -> dict:
         # For local paths, we look for the package name from setup.py/pyproject.toml
         package_name = _find_package_name(local_path)
         if package_name:
-            _import_and_activate_package(package_name, marketplace)
+            _import_and_activate_package(package_name, marketplace, local_path)
 
     elif isinstance(recipes, dict):
         # Package spec with name and optional version - package should already be installed
@@ -586,6 +586,43 @@ def handle_install_recipes(params: dict) -> dict:
         'recipesInstalled': recipes_installed,
         'version': installed_version
     }
+
+
+def _add_source_to_path(local_path: Path) -> None:
+    """Add the package source directory to sys.path so it can be imported.
+
+    Reads [tool.setuptools.packages.find] 'where' from pyproject.toml to
+    determine the source directory. Falls back to adding the local_path itself.
+    """
+    import sys
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        try:
+            import tomli as tomllib  # type: ignore[import-not-found]
+        except ModuleNotFoundError:
+            src_dir = str(local_path)
+            if src_dir not in sys.path:
+                sys.path.insert(0, src_dir)
+            return
+
+    source_dir = local_path
+    pyproject_path = local_path / 'pyproject.toml'
+    if pyproject_path.exists():
+        try:
+            with open(pyproject_path, 'rb') as f:
+                data = tomllib.load(f)
+                where = (data.get('tool', {}).get('setuptools', {})
+                         .get('packages', {}).get('find', {}).get('where'))
+                if where and isinstance(where, list) and len(where) > 0:
+                    source_dir = local_path / where[0]
+        except Exception as e:
+            logger.warning(f"Failed to read source layout from pyproject.toml: {e}")
+
+    src_str = str(source_dir)
+    if src_str not in sys.path:
+        logger.info(f"Adding to sys.path: {src_str}")
+        sys.path.insert(0, src_str)
 
 
 def _find_package_name(local_path: Path) -> Optional[str]:
@@ -630,7 +667,7 @@ def _find_package_name(local_path: Path) -> Optional[str]:
     return None
 
 
-def _import_and_activate_package(package_name: str, marketplace):
+def _import_and_activate_package(package_name: str, marketplace, local_path: Optional[Path] = None):
     """Import a package and call its activate function using entry points.
 
     Uses importlib.metadata to discover entry points registered under
@@ -638,6 +675,10 @@ def _import_and_activate_package(package_name: str, marketplace):
     Since matching package names to entry points is unreliable (hyphens vs
     underscores, different naming conventions), we activate ALL entry points
     but the marketplace handles deduplication.
+
+    If entry points aren't found (e.g., package not pip-installed) and a
+    local_path is provided, the source directory is added to sys.path
+    as a fallback so the module can be imported directly.
     """
     from importlib.metadata import entry_points
 
@@ -681,6 +722,10 @@ def _import_and_activate_package(package_name: str, marketplace):
 
     if not activated:
         # Fallback: try direct module import (for packages without entry points)
+        # If a local path was provided, add its source directory to sys.path
+        if local_path is not None:
+            _add_source_to_path(local_path)
+
         import importlib
         module_name = package_name.replace('-', '_')
         try:
@@ -826,7 +871,7 @@ def handle_prepare_recipe(params: dict) -> dict:
         _data_table_output_dir = params['dataTableOutputDir']
         logger.info(f"Data table output directory set to: {_data_table_output_dir}")
 
-    logger.info(f"PrepareRecipe: id={recipe_name}, options={options}")
+    logger.debug(f"PrepareRecipe: id={recipe_name}, options={options}")
 
     marketplace = _get_marketplace()
 
@@ -865,7 +910,7 @@ def handle_prepare_recipe(params: dict) -> dict:
         'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
     }
 
-    logger.info(f"PrepareRecipe response: {response}")
+    logger.debug(f"PrepareRecipe response: {response}")
     return response
 
 
@@ -903,7 +948,7 @@ def handle_visit(params: dict) -> dict:
     if tree_id is None:
         raise ValueError("'treeId' is required")
 
-    logger.info(f"Visit: visitor={visitor_name}, treeId={tree_id}, p={p_id}")
+    logger.debug(f"Visit: visitor={visitor_name}, treeId={tree_id}, p={p_id}")
 
     # Get or create execution context
     if p_id and p_id in _execution_contexts:
@@ -954,7 +999,7 @@ def handle_visit(params: dict) -> dict:
     else:
         modified = False
 
-    logger.info(f"Visit result: modified={modified}, tree_id={tree_id}, before.id={before.id}, after.id={after.id if after else None}")
+    logger.debug(f"Visit result: modified={modified}, tree_id={tree_id}, before.id={before.id}, after.id={after.id if after else None}")
     return {'modified': modified}
 
 
@@ -1036,7 +1081,7 @@ def handle_generate(params: dict) -> dict:
     if recipe_id is None:
         raise ValueError("'id' is required")
 
-    logger.info(f"Generate: id={recipe_id}, p={p_id}")
+    logger.debug(f"Generate: id={recipe_id}, p={p_id}")
 
     recipe = _prepared_recipes.get(recipe_id)
     if recipe is None:

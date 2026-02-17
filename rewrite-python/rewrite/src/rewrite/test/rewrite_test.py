@@ -131,9 +131,18 @@ class RecipeSpec:
     # Whether to validate parse/print idempotence
     check_parse_print_idempotence: bool = True
 
+    # Whether to allow empty diffs (recipe modifies AST but printed output unchanged)
+    allow_empty_diff: bool = False
+
     def with_recipe(self, recipe: Recipe) -> "RecipeSpec":
         return RecipeSpec(recipe=recipe, execution_context=self.execution_context,
-                          check_parse_print_idempotence=self.check_parse_print_idempotence)
+                          check_parse_print_idempotence=self.check_parse_print_idempotence,
+                          allow_empty_diff=self.allow_empty_diff)
+
+    def with_allow_empty_diff(self, value: bool) -> "RecipeSpec":
+        return RecipeSpec(recipe=self.recipe, execution_context=self.execution_context,
+                          check_parse_print_idempotence=self.check_parse_print_idempotence,
+                          allow_empty_diff=value)
 
     def with_recipes(self, *recipes: Recipe) -> "RecipeSpec":
         if len(recipes) == 1:
@@ -168,6 +177,12 @@ class RecipeSpec:
             if self.check_parse_print_idempotence:
                 self._expect_parse_print_idempotence(parsed)
             all_parsed.extend(parsed)
+
+        # Apply before_recipe hooks (after idempotence check, before recipe execution)
+        all_parsed = [
+            (spec, spec.before_recipe(sf) or sf) if spec.before_recipe else (spec, sf)
+            for spec, sf in all_parsed
+        ]
 
         # Run the recipe
         source_files = [sf for _, sf in all_parsed]
@@ -211,12 +226,6 @@ class RecipeSpec:
             # Parse the source
             source = dedent(spec.before)
             parsed = self._parse_python(source, source_path)
-
-            # Call before_recipe hook if provided
-            if spec.before_recipe:
-                modified = spec.before_recipe(parsed)
-                if modified is not None:
-                    parsed = modified
 
             result.append((spec, parsed))
 
@@ -282,10 +291,17 @@ class RecipeSpec:
                 if after_sf is not None:
                     actual = after_sf.print_all()
                     expected = dedent(spec.before)
-                    assert actual == expected, (
-                        f"Expected no change but recipe modified the file.\n"
-                        f"Before:\n{repr(expected)}\n\nAfter:\n{repr(actual)}"
-                    )
+                    if actual == expected:
+                        if not self.allow_empty_diff:
+                            raise AssertionError(
+                                "An empty diff was generated. The recipe incorrectly "
+                                "changed the AST without changing the printed output."
+                            )
+                    else:
+                        raise AssertionError(
+                            f"Expected no change but recipe modified the file.\n"
+                            f"Before:\n{repr(expected)}\n\nAfter:\n{repr(actual)}"
+                        )
             else:
                 # Change expected
                 if after_sf is None:

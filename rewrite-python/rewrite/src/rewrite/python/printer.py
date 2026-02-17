@@ -312,7 +312,7 @@ class PythonPrinter:
 
     def _visit_markers(self, markers: Markers, p: PrintOutputCapture) -> Markers:
         """Visit markers that need printing (like TrailingComma, Semicolon)."""
-        for marker in markers.markers:
+        for marker in markers._markers:
             if isinstance(marker, Semicolon):
                 p.append(';')
             elif isinstance(marker, TrailingComma):
@@ -519,7 +519,7 @@ class PythonPrinter:
         self._before_syntax(clause, p)
         if clause.async_:
             p.append("async")
-            self._visit_space(clause.padding.async_.after, p)  # ty: ignore[possibly-missing-attribute]  # guarded by if clause.async_
+            self._visit_space(clause.padding.async_.after, p)  # ty: ignore[unresolved-attribute]  # guarded by if clause.async_
         p.append("for")
         self.visit(clause.iterator_variable, p)
         self._visit_space(clause.padding.iterated_list.before, p)
@@ -1064,7 +1064,7 @@ class PythonJavaPrinter:
 
     def _visit_markers(self, markers: Markers, p: PrintOutputCapture) -> Markers:
         """Visit markers that need printing (like TrailingComma, Semicolon)."""
-        for marker in markers.markers:
+        for marker in markers._markers:
             self._visit_marker(marker, p)
         return markers
 
@@ -1199,6 +1199,7 @@ class PythonJavaPrinter:
         is_regular_assignment = (
             isinstance(parent_value, j.Block) or
             isinstance(parent_value, py.CompilationUnit) or
+            isinstance(parent_value, py.ExpressionStatement) or  # J.Assignment is both Expression and Statement, so the wrapping ExpressionStatement is redundant here, but template-generated replacements can produce this nesting
             (isinstance(parent_value, j.If) and parent_value.then_part == assignment) or
             (isinstance(parent_value, j.If.Else) and parent_value.body == assignment) or
             (isinstance(parent_value, Loop) and parent_value.body == assignment)  # ty: ignore[unresolved-attribute]  # Loop base class doesn't have body
@@ -1474,7 +1475,14 @@ class PythonJavaPrinter:
 
         self._before_syntax(import_, p)
 
+        from rewrite.python import tree as _py
+        is_standalone = not self.get_cursor().first_enclosing(_py.MultiImport)
+        if is_standalone:
+            p.append("import")
+
         if isinstance(import_.qualid.target, j.Empty):
+            if is_standalone:
+                self._visit_space(import_.qualid.prefix, p)
             self.visit(import_.qualid.name, p)
         else:
             self.visit(import_.qualid, p)
@@ -1690,14 +1698,34 @@ class PythonJavaPrinter:
         return throw
 
     def visit_type_parameter(self, type_param: 'j.TypeParameter', p: PrintOutputCapture) -> J:
-        """Visit a type parameter (Python 3.12+ PEP 695)."""
+        """Visit a type parameter (Python 3.12+ PEP 695, 3.13+ PEP 696 defaults)."""
+        from rewrite.java import tree as j
         self._before_syntax(type_param, p)
         # Visit modifiers (for * and ** prefixes)
         for mod in type_param.modifiers:
             self.visit(mod, p)
         self.visit(type_param.name, p)
-        # Visit bounds (for T: int style bounds in Python)
-        self._visit_container(":", type_param.padding.bounds, ",", "", p)
+        # Visit bounds: 1-element = constraint only, 2-element = [constraint, default]
+        bounds = type_param.padding.bounds
+        if bounds is not None:
+            elements = bounds.padding.elements
+            if len(elements) == 1:
+                # Legacy: only constraint, no default
+                self._visit_space(bounds.before, p)
+                p.append(":")
+                self._visit_right_padded(elements[0], p)
+            elif len(elements) == 2:
+                constraint = elements[0]
+                default = elements[1]
+                if not isinstance(constraint.element, j.Empty):
+                    self._visit_space(bounds.before, p)
+                    p.append(":")
+                    self._visit_right_padded(constraint, p)
+                if not isinstance(default.element, j.Empty):
+                    if isinstance(constraint.element, j.Empty):
+                        self._visit_space(bounds.before, p)
+                    p.append("=")
+                    self._visit_right_padded(default, p)
         self._after_syntax(type_param, p)
         return type_param
 

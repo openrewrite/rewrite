@@ -249,6 +249,7 @@ class ParseProjectIntegTest {
                 .doesNotContain("requirements.txt");
     }
 
+
     private PythonRewriteRpc client() {
         return PythonRewriteRpc.getOrStart();
     }

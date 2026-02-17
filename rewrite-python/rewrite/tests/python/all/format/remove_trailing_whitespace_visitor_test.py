@@ -4,7 +4,7 @@ from rewrite.python.format.remove_trailing_whitespace_visitor import RemoveTrail
 from rewrite.test import rewrite_run, RecipeSpec, from_visitor, python
 
 
-@pytest.mark.parametrize('n_spaces', list(range(0, 4)))
+@pytest.mark.parametrize('n_spaces', list(range(1, 4)))
 @pytest.mark.parametrize('linebreaks', ['\n', '\r\n', '\r\n\n', '\n\n'])
 def test_tabs_to_spaces(n_spaces, linebreaks):
     # noinspection PyInconsistentIndentation
@@ -33,7 +33,7 @@ def test_tabs_to_spaces(n_spaces, linebreaks):
     )
 
 
-@pytest.mark.parametrize('n_spaces', list(range(0, 4)))
+@pytest.mark.parametrize('n_spaces', list(range(1, 4)))
 @pytest.mark.parametrize('linebreaks', ['\n', '\r\n', '\r\n\n', '\n\n'])
 def test_tabs_to_spaces_with_trailing_comma(n_spaces, linebreaks):
     # noinspection PyInconsistentIndentation

@@ -31,8 +31,12 @@ import org.openrewrite.rpc.RewriteRpcProcessManager;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import org.openrewrite.Parser;
+import org.openrewrite.python.PyProjectTomlParser;
+
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -578,8 +582,26 @@ public class PythonRewriteRpc extends RewriteRpc {
                         "--target=" + pipPackagesPath.toAbsolutePath().normalize(),
                         "openrewrite"
                 );
-                pb.inheritIO();
+                pb.redirectErrorStream(true);
+                if (log != null) {
+                    File logFile = log.toAbsolutePath().normalize().toFile();
+                    pb.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile));
+                }
                 Process process = pb.start();
+                if (log == null) {
+                    // Drain stdout+stderr to prevent pipe buffer from filling and blocking
+                    Thread drainer = new Thread(() -> {
+                        try (InputStream is = process.getInputStream()) {
+                            byte[] buf = new byte[4096];
+                            //noinspection StatementWithEmptyBody
+                            while (is.read(buf) != -1) {
+                            }
+                        } catch (IOException ignored) {
+                        }
+                    });
+                    drainer.setDaemon(true);
+                    drainer.start();
+                }
                 boolean completed = process.waitFor(2, TimeUnit.MINUTES);
 
                 if (!completed) {

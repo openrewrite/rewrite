@@ -131,7 +131,13 @@ class ChangeImport(Recipe):
                 self.old_alias = None
 
                 for stmt in cu.statements:
-                    if isinstance(stmt, MultiImport):
+                    if isinstance(stmt, Import) and not isinstance(stmt, MultiImport):
+                        alias = self._check_for_old_single_import(stmt)
+                        if alias is not None:
+                            self.has_old_import = True
+                            self.old_alias = alias if alias != "" else None
+                            break
+                    elif isinstance(stmt, MultiImport):
                         alias = self._check_for_old_import(stmt)
                         if alias is not None:
                             self.has_old_import = True
@@ -164,6 +170,16 @@ class ChangeImport(Recipe):
 
                 return result
 
+            def visit_import(self, import_: Import, p: ExecutionContext) -> Optional[J]:  # ty: ignore[invalid-method-override]
+                if not self.has_old_import or old_name:
+                    return import_
+                if self.cursor.first_enclosing(MultiImport):
+                    return import_
+                alias = self._check_for_old_single_import(import_)
+                if alias is None:
+                    return import_
+                return None
+
             def visit_multi_import(self, multi: MultiImport, p: ExecutionContext) -> Optional[J]:  # ty: ignore[invalid-method-override]
                 if not self.has_old_import:
                     return multi
@@ -179,6 +195,15 @@ class ChangeImport(Recipe):
                 else:
                     # import X - remove entire import
                     return self._remove_module_from_import(multi, old_module)
+
+            def _check_for_old_single_import(self, imp: Import) -> Optional[str]:
+                """Check if a standalone J.Import matches the old import."""
+                if old_name:
+                    return None
+                name = self._get_qualid_name(imp.qualid)
+                if name == old_module:
+                    return self._get_alias_name(imp) or ""
+                return None
 
             def _check_for_old_import(self, multi: MultiImport) -> Optional[str]:
                 """Check if this MultiImport matches the old import.

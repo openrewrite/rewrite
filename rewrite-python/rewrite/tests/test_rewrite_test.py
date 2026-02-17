@@ -216,7 +216,6 @@ class TestRecipeSpecHooks:
         assert len(called) == 1
         assert called[0][0] == "after"
 
-    @pytest.mark.skip(reason="The test has been failing for unknown reason, disabling on 2026-02-10")
     def test_before_recipe_can_modify_ast(self):
         """Test that before_recipe can modify the parsed AST."""
         from rewrite import random_id

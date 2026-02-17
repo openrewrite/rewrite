@@ -994,7 +994,6 @@ def test_top_level_string():
     )
 
 
-@pytest.mark.xfail
 def test_method_select_suffix_new_line_already_correct():
     style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4)
     rewrite_run(
@@ -1008,7 +1007,6 @@ def test_method_select_suffix_new_line_already_correct():
     )
 
 
-@pytest.mark.xfail
 def test_method_select_suffix():
     style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4)
     rewrite_run(
