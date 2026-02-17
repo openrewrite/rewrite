@@ -3505,4 +3505,163 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1873")
+    @Test
+    void mergeIntoNestedMappingPreservesInlineComments() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              services:
+                server:
+                  build:
+                    args:
+                      - ARTIFACTORY_USERNAME: ${ARTIFACTORY_USERNAME}
+                      - ARTIFACTORY_IDENTITY_TOKEN: ${ARTIFACTORY_IDENTITY_TOKEN}
+                  environment:
+                    JDK_JAVA_OPTIONS: "@argFiles/dev"
+                    MQC_CLIENT_ID: ${CLIENT_ID}
+                    MQC_CLIENT_SECRET: ${CLIENT_SECRET}
+                    TURING_CLIENT_ID: ${CLIENT_ID}
+                    TURING_CLIENT_SECRET: ${CLIENT_SECRET}
+                    REFERENCE_DATA_CLIENT_ID: ${CLIENT_ID}
+                    REFERENCE_DATA_CLIENT_SECRET: ${CLIENT_SECRET}
+                    SERVER_SSL_ADDITIONAL_KEYSTORE_PASSWORD: ${keyStorePassword}
+                  expose:
+                    - 8443
+                  ports:
+                    - "8443:8443"
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              services:
+                server:
+                  container_name: TS2AcctFeeWaiverIS-Fargate
+                  build:
+                    context: .
+                    dockerfile: Dockerfile
+                  extra_hosts:
+                    - "host.docker.internal:host-gateway"
+                  environment:
+                    OTEL_SDK_DISABLED: false # set to true to turn of otel integration, which you might not always want
+                    OTEL_EXPORTER_OTLP_ENDPOINT: "http://host.docker.internal:4317"
+                    OTEL_SERVICE_NAME: "ts2acctfeewaiveris"
+                    OTEL_TRACES_EXPORTER: otlp
+                    OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+                    OTEL_TRACES_SAMPLER: always_on
+                    OTEL_RESOURCE_ATTRIBUTES: asv=ASVCARDCORETRANSACTIONS,ba=BACARDCORETRANSACTIONS,component=BAPPRTS2ACCTFEEWAIVERISPAN,owner_contact=card_combats@capitalone.com
+                    ## These are default sizes and timeouts just for your reference.
+                    ## Adjust if needed (like spans being dropped because queue is full)
+                    # OTEL_BSP_SCHEDULE_DELAY: 5000
+                    # OTEL_BSP_EXPORT_TIMEOUT: 30000
+                    # OTEL_BSP_MAX_QUEUE_SIZE: 2048
+                    # OTEL_BSP_MAX_EXPORT_BATCH_SIZE: 512
+                    # OTEL_METRIC_EXPORT_INTERVAL: 60000
+                    # OTEL_METRIC_EXPORT_TIMEOUT: 30000
+
+                    ENVIRONMENT_NAME: qa
+                    SERVICE_NAME: ts2acctfeewaiveris
+                    ASV: ASVCARDCORETRANSACTIONS
+                    COF_SM_ENVIRONMENT: nonprod
+                    CHASSIS_CONFIG_ENV: local
+                    HTTP_PROXY: http://aws-proxy-precde.cloud.capitalone.com:8099
+                    HTTPS_PROXY: http://aws-proxy-precde.cloud.capitalone.com:8099
+                    NO_PROXY: 127.0.0.1,localhost,169.254.170.2,169.254.169.254,s3.amazonaws.com,.s3.amazonaws.com
+                    no_proxy: 127.0.0.1,localhost,169.254.170.2,169.254.169.254,s3.amazonaws.com,.s3.amazonaws.com
+                    JAVA_OPTS: -Xms1024m -Xmx1024m -Dlog4j2.formatMsgNoLookups=true
+                    KMS_KEY_LOGS: None
+                    PCI_CATEGORY: "1"
+                    SERVER_KEYSTORE_FILE: /opt/apache-tomcat/accerts/asvcardcoretransactions-nonprod.json
+                    SERVICE_LOGLEVEL: debug
+                    #Region specific properties
+                    EC2_REGION: us-east-1
+                    AWS_REGION: us-east-1
+                    CHASSIS_OPTS: -DmqConnector.url=https://ts2mqconnector-qa.example.com:8443
+                    CLIENT_ID: ${CLIENT_ID}
+                    CLIENT_SECRET: ${CLIENT_SECRET}
+                    SERVER_KEYSTORE_PASSWORD: ${SERVER_KEYSTORE_PASSWORD}
+                    TRUST_STORE_PASSWORD: ${TRUST_STORE_PASSWORD}
+                  expose:
+                    - 8080
+                  ports:
+                    - "8080:8080"
+              """,
+            """
+              services:
+                server:
+                  container_name: TS2AcctFeeWaiverIS-Fargate
+                  build:
+                    context: .
+                    dockerfile: Dockerfile
+                    args:
+                      - ARTIFACTORY_USERNAME: ${ARTIFACTORY_USERNAME}
+                      - ARTIFACTORY_IDENTITY_TOKEN: ${ARTIFACTORY_IDENTITY_TOKEN}
+                  extra_hosts:
+                    - "host.docker.internal:host-gateway"
+                  environment:
+                    OTEL_SDK_DISABLED: false # set to true to turn of otel integration, which you might not always want
+                    OTEL_EXPORTER_OTLP_ENDPOINT: "http://host.docker.internal:4317"
+                    OTEL_SERVICE_NAME: "ts2acctfeewaiveris"
+                    OTEL_TRACES_EXPORTER: otlp
+                    OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+                    OTEL_TRACES_SAMPLER: always_on
+                    OTEL_RESOURCE_ATTRIBUTES: asv=ASVCARDCORETRANSACTIONS,ba=BACARDCORETRANSACTIONS,component=BAPPRTS2ACCTFEEWAIVERISPAN,owner_contact=card_combats@capitalone.com
+                    ## These are default sizes and timeouts just for your reference.
+                    ## Adjust if needed (like spans being dropped because queue is full)
+                    # OTEL_BSP_SCHEDULE_DELAY: 5000
+                    # OTEL_BSP_EXPORT_TIMEOUT: 30000
+                    # OTEL_BSP_MAX_QUEUE_SIZE: 2048
+                    # OTEL_BSP_MAX_EXPORT_BATCH_SIZE: 512
+                    # OTEL_METRIC_EXPORT_INTERVAL: 60000
+                    # OTEL_METRIC_EXPORT_TIMEOUT: 30000
+
+                    ENVIRONMENT_NAME: qa
+                    SERVICE_NAME: ts2acctfeewaiveris
+                    ASV: ASVCARDCORETRANSACTIONS
+                    COF_SM_ENVIRONMENT: nonprod
+                    CHASSIS_CONFIG_ENV: local
+                    HTTP_PROXY: http://aws-proxy-precde.cloud.capitalone.com:8099
+                    HTTPS_PROXY: http://aws-proxy-precde.cloud.capitalone.com:8099
+                    NO_PROXY: 127.0.0.1,localhost,169.254.170.2,169.254.169.254,s3.amazonaws.com,.s3.amazonaws.com
+                    no_proxy: 127.0.0.1,localhost,169.254.170.2,169.254.169.254,s3.amazonaws.com,.s3.amazonaws.com
+                    JAVA_OPTS: -Xms1024m -Xmx1024m -Dlog4j2.formatMsgNoLookups=true
+                    KMS_KEY_LOGS: None
+                    PCI_CATEGORY: "1"
+                    SERVER_KEYSTORE_FILE: /opt/apache-tomcat/accerts/asvcardcoretransactions-nonprod.json
+                    SERVICE_LOGLEVEL: debug
+                    #Region specific properties
+                    EC2_REGION: us-east-1
+                    AWS_REGION: us-east-1
+                    CHASSIS_OPTS: -DmqConnector.url=https://ts2mqconnector-qa.example.com:8443
+                    CLIENT_ID: ${CLIENT_ID}
+                    CLIENT_SECRET: ${CLIENT_SECRET}
+                    SERVER_KEYSTORE_PASSWORD: ${SERVER_KEYSTORE_PASSWORD}
+                    TRUST_STORE_PASSWORD: ${TRUST_STORE_PASSWORD}
+                    JDK_JAVA_OPTIONS: "@argFiles/dev"
+                    MQC_CLIENT_ID: ${CLIENT_ID}
+                    MQC_CLIENT_SECRET: ${CLIENT_SECRET}
+                    TURING_CLIENT_ID: ${CLIENT_ID}
+                    TURING_CLIENT_SECRET: ${CLIENT_SECRET}
+                    REFERENCE_DATA_CLIENT_ID: ${CLIENT_ID}
+                    REFERENCE_DATA_CLIENT_SECRET: ${CLIENT_SECRET}
+                    SERVER_SSL_ADDITIONAL_KEYSTORE_PASSWORD: ${keyStorePassword}
+                  expose:
+                    - 8080
+                    - 8443
+                  ports:
+                    - "8080:8080"
+                    - "8443:8443"
+              """
+          )
+        );
+    }
 }
