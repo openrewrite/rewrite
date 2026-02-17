@@ -1052,6 +1052,43 @@ public sealed class ConditionalBranchMarker(
 }
 
 /// <summary>
+/// Marks a tree node adjacent to one or more conditional preprocessor directive boundaries.
+/// Each directive index references a position in the <see cref="ConditionalDirective.DirectiveLines"/> list.
+/// </summary>
+public sealed class DirectiveBoundaryMarker(
+    Guid id,
+    IList<int> directiveIndices
+) : Marker, IRpcCodec<DirectiveBoundaryMarker>, IEquatable<DirectiveBoundaryMarker>
+{
+    public Guid Id { get; } = id;
+    public IList<int> DirectiveIndices { get; } = directiveIndices;
+
+    public DirectiveBoundaryMarker WithId(Guid id) =>
+        id == Id ? this : new(id, DirectiveIndices);
+    public DirectiveBoundaryMarker WithDirectiveIndices(IList<int> directiveIndices) =>
+        ReferenceEquals(directiveIndices, DirectiveIndices) ? this : new(Id, directiveIndices);
+
+    public void RpcSend(DirectiveBoundaryMarker after, RpcSendQueue q)
+    {
+        q.GetAndSend(after, m => m.Id);
+        q.GetAndSendList(after, m => m.DirectiveIndices, i => i.ToString(), i =>
+            q.GetAndSend(i, x => x.ToString()));
+    }
+
+    public DirectiveBoundaryMarker RpcReceive(DirectiveBoundaryMarker before, RpcReceiveQueue q)
+    {
+        return before
+            .WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse))
+            .WithDirectiveIndices(q.ReceiveList(before.DirectiveIndices, idx =>
+                q.ReceiveAndGet<int, string>(idx, int.Parse))!);
+    }
+
+    public bool Equals(DirectiveBoundaryMarker? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as DirectiveBoundaryMarker);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
 /// A #pragma warning disable/restore directive.
 /// </summary>
 public sealed class PragmaWarningDirective(
