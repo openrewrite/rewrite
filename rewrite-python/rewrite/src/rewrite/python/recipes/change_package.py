@@ -17,7 +17,7 @@ ChangePackage recipe for Python that delegates to Java's ChangePackage.
 
 This recipe changes package/module references from one name to another.
 """
-
+from dataclasses import field
 from typing import Any, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor, option
@@ -38,23 +38,23 @@ class ChangePackage(Recipe):
         )
     """
 
-    old_package_name: str = option(
+    old_package_name: str = field(metadata=option(
         display_name="Old package name",
         description="The package/module name to change from.",
         example="collections"
-    )
+    ))
 
-    new_package_name: str = option(
+    new_package_name: str = field(metadata=option(
         display_name="New package name",
         description="The package/module name to change to.",
         example="collections.abc"
-    )
+    ))
 
-    recursive: bool = option(
+    recursive: bool = field(metadata=option(
         display_name="Recursive",
         description="When enabled, also rename subpackages.",
         required=False
-    )
+    ))
 
     def __init__(
         self,

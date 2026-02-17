@@ -626,6 +626,42 @@ class MavenPomDownloaderTest implements RewriteTest {
               new MavenPomDownloader(emptyMap(), ctx).downloadMetadata(new GroupArtifact("does.definitely.not", "exist"), null, List.of(repository)));
         }
 
+        @Issue("https://github.com/openrewrite/rewrite/issues/6739")
+        @Test
+        void deriveMetaDataFromHtmlWithTitleAttributes() throws Exception {
+            try (MockWebServer server = new MockWebServer()) {
+                server.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        if (request.getPath() != null && request.getPath().endsWith("maven-metadata.xml")) {
+                            return new MockResponse().setResponseCode(404);
+                        }
+                        return new MockResponse().setResponseCode(200).setBody(
+                          """
+                            <html><body>
+                            <a href="../" title="../">../</a>
+                            <a href="1.0.0/" title="1.0.0/">1.0.0/</a>
+                            <a href="1.1.0/" title="1.1.0/">1.1.0/</a>
+                            <a href="2.0.0/" title="2.0.0/">2.0.0/</a>
+                            </body></html>
+                            """
+                        );
+                    }
+                });
+                server.start();
+
+                MavenRepository repository = MavenRepository.builder()
+                  .id("html-with-title")
+                  .uri("http://%s:%d/".formatted(server.getHostName(), server.getPort()))
+                  .knownToExist(true)
+                  .deriveMetadataIfMissing(true)
+                  .build();
+                MavenMetadata metaData = new MavenPomDownloader(emptyMap(), ctx)
+                  .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
+                assertThat(metaData.getVersioning().getVersions()).containsExactlyInAnyOrder("1.0.0", "1.1.0", "2.0.0");
+            }
+        }
+
         @SuppressWarnings("ConstantConditions")
         @Test
         void mergeMetadata() throws Exception {

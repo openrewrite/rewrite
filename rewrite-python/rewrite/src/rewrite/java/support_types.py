@@ -3,7 +3,7 @@ from __future__ import annotations
 import weakref
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, Union, cast
 from uuid import UUID
 

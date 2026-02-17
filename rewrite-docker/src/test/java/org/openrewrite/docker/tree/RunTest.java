@@ -32,9 +32,9 @@ class RunTest implements RewriteTest {
               RUN apt-get update
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                var run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(run.getCommand()).isInstanceOf(Docker.ShellForm.class);
-                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
+                var shellForm = (Docker.ShellForm) run.getCommand();
                 assertThat(shellForm.getArgument().getText()).isEqualTo("apt-get update");
             })
           )
@@ -50,9 +50,9 @@ class RunTest implements RewriteTest {
               RUN ["apt-get", "update"]
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                var run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(run.getCommand()).isInstanceOf(Docker.ExecForm.class);
-                Docker.ExecForm execForm = (Docker.ExecForm) run.getCommand();
+                var execForm = (Docker.ExecForm) run.getCommand();
                 assertThat(execForm.getArguments()).hasSize(2)
                   .satisfiesExactly(
                     arg -> assertThat(arg.getText()).isEqualTo("apt-get"),
@@ -72,10 +72,10 @@ class RunTest implements RewriteTest {
               RUN CGO_ENABLED=0 go build -o app
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Run run = (Docker.Run) doc.getStages().getLast().getInstructions().getFirst();
+                var run = (Docker.Run) doc.getStages().getLast().getInstructions().getFirst();
                 assertThat(run.getFlags()).isNull();
                 assertThat(run.getCommand()).isInstanceOf(Docker.ShellForm.class);
-                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
+                var shellForm = (Docker.ShellForm) run.getCommand();
                 assertThat(shellForm.getArgument().getText()).isEqualTo("CGO_ENABLED=0 go build -o app");
             })
           )
@@ -151,7 +151,7 @@ class RunTest implements RewriteTest {
               RUN --network=none apt-get update
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                var run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(run.getFlags()).hasSize(1);
                 assertThat(run.getFlags().getFirst().getName()).isEqualTo("network");
                 assertThat(((Docker.Literal) run.getFlags().getFirst().getValue().getContents().getFirst()).getText()).contains("none");
@@ -169,7 +169,7 @@ class RunTest implements RewriteTest {
               RUN --network=none --mount=type=cache,target=/cache apt-get update
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                var run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(run.getFlags()).hasSize(2);
                 assertThat(run.getFlags().get(0).getName()).isEqualTo("network");
                 assertThat(((Docker.Literal) run.getFlags().get(0).getValue().getContents().getFirst()).getText()).isEqualTo("none");
@@ -417,8 +417,8 @@ class RunTest implements RewriteTest {
               RUN useradd user && su - user -c "whoami" as user
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
-                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
+                var run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                var shellForm = (Docker.ShellForm) run.getCommand();
                 // The entire command including 'as user' should be preserved
                 assertThat(shellForm.getArgument().getText()).isEqualTo("useradd user && su - user -c \"whoami\" as user");
             })
@@ -436,8 +436,8 @@ class RunTest implements RewriteTest {
               RUN ./install-as-root.sh
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
-                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
+                var run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                var shellForm = (Docker.ShellForm) run.getCommand();
                 assertThat(shellForm.getArgument().getText()).isEqualTo("./install-as-root.sh");
             })
           )
@@ -454,8 +454,8 @@ class RunTest implements RewriteTest {
               RUN cmd /c echo Hello World
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
-                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
+                var run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                var shellForm = (Docker.ShellForm) run.getCommand();
                 assertThat(shellForm.getArgument().getText()).isEqualTo("cmd /c echo Hello World");
             })
           )
@@ -472,8 +472,8 @@ class RunTest implements RewriteTest {
               RUN echo "Setting value to none" && export VAL=none
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
-                Docker.ShellForm shellForm = (Docker.ShellForm) run.getCommand();
+                var run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                var shellForm = (Docker.ShellForm) run.getCommand();
                 assertThat(shellForm.getArgument().getText()).isEqualTo("echo \"Setting value to none\" && export VAL=none");
             })
           )
@@ -490,9 +490,9 @@ class RunTest implements RewriteTest {
               RUN ["apt-get", "update", "-y"]
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                var run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(run.getCommand()).isInstanceOf(Docker.ExecForm.class);
-                Docker.ExecForm execForm = (Docker.ExecForm) run.getCommand();
+                var execForm = (Docker.ExecForm) run.getCommand();
                 assertThat(execForm.getArguments()).hasSize(3);
 
                 // First argument has no comma in its prefix (it's after the opening bracket)
@@ -526,8 +526,8 @@ class RunTest implements RewriteTest {
               RUN ["apt-get",  "update"]
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Run run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
-                Docker.ExecForm execForm = (Docker.ExecForm) run.getCommand();
+                var run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+                var execForm = (Docker.ExecForm) run.getCommand();
                 assertThat(execForm.getArguments()).hasSize(2);
 
                 // Second argument has two spaces in its prefix (comma is printed separately)
@@ -541,14 +541,16 @@ class RunTest implements RewriteTest {
     @Test
     void commentLineWithoutBacktick() {
         rewriteRun(
-          docker("""
-             FROM mcr.microsoft.com/windows/servercore:ltsc2022
-             RUN powershell -Command " `
-                 $var = 'value'; `
-                 # Comment with no trailing backtick   <-- this line breaks parsing
-                 $next = 'value'; `
-                 ..."
-             """)
+          docker(
+              """
+                  FROM mcr.microsoft.com/windows/servercore:ltsc2022
+                  RUN powershell -Command " `
+                      $var = 'value'; `
+                      # Comment with no trailing backtick   <-- this line breaks parsing
+                      $next = 'value'; `
+                      ..."
+                  """
+          )
         );
     }
 }

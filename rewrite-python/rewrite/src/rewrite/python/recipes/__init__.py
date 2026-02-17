@@ -33,6 +33,7 @@ from .add_literal_method_argument import AddLiteralMethodArgument
 # Note: Also defined in remove_pass.py to avoid circular imports
 Cleanup = [*Python, CategoryDescriptor(display_name="Cleanup")]
 Imports = [*Python, CategoryDescriptor(display_name="Imports")]
+Migration = [*Python, CategoryDescriptor(display_name="Migration")]
 
 __all__ = [
     # Native Python recipes
@@ -49,4 +50,5 @@ __all__ = [
     "Python",
     "Cleanup",
     "Imports",
+    "Migration",
 ]

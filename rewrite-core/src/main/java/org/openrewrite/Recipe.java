@@ -553,6 +553,10 @@ public abstract class Recipe implements Cloneable {
                         Map<String, Object> option = new HashMap<>();
                         option.put("value", value);
                         objectMapper.updateValue(optionDescriptor, option);
+
+                        if (optionDescriptor.getType().equals("List")) {
+                            m.put(optionDescriptor.getName(), Arrays.asList(((String) value).split(",")));
+                        }
                     }
                 }
             }

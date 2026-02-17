@@ -16,12 +16,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Union, TYPE_CHECKING
+from typing import Dict, List, Optional, Union, TYPE_CHECKING, cast
 
 from rewrite.java import J
-
-from .capture import Capture, RawCode, capture
+from .capture import Capture
 from .coordinates import PythonCoordinates
 from .engine import TemplateEngine, TemplateOptions
 
@@ -106,7 +104,7 @@ class Template:
         *,
         values: Optional[Union['MatchResult', Dict[str, J]]] = None,
         coordinates: Optional[PythonCoordinates] = None,
-    ) -> J:
+    ) -> Optional[J]:
         """
         Apply this template, returning the generated AST node.
 
@@ -135,7 +133,7 @@ class Template:
         values_dict: Dict[str, J] = {}
         if values is not None:
             if isinstance(values, dict):
-                values_dict = values
+                values_dict = cast(Dict[str, J], values)
             else:
                 # Assume it's a MatchResult
                 values_dict = values.as_dict()
@@ -153,7 +151,7 @@ class Template:
 
         # If no explicit coordinates, create default replacement coordinates
         if coordinates is None and cursor is not None:
-            tree = cursor.get_value()
+            tree = cursor.value
             if tree is not None:
                 result = TemplateEngine.apply_substitutions(
                     result if values_dict else template_tree,
@@ -288,7 +286,7 @@ class TemplateBuilder:
 
 
 def template(
-    code: str,
+    code,
     *,
     imports: Optional[List[str]] = None,
     **captures: Capture
@@ -299,9 +297,10 @@ def template(
     This is the primary factory function for creating templates.
 
     Args:
-        code: Python code with {name} placeholders.
+        code: Python code with {name} placeholders, or a t-string
+              (Python 3.14+) with Capture/RawCode interpolations.
         imports: Optional import statements for type resolution.
-        **captures: Named capture specifications.
+        **captures: Named capture specifications (not allowed with t-strings).
 
     Returns:
         A Template instance.
@@ -314,12 +313,26 @@ def template(
         expr = capture('expr')
         tmpl = template("print({expr})", expr=expr)
 
+        # With t-string (Python 3.14+)
+        expr = capture('expr')
+        tmpl = template(t"print({expr})")
+
         # With imports
         tmpl = template(
             "datetime.now()",
             imports=["from datetime import datetime"]
         )
     """
+    from ._tstring_support import is_tstring, convert_tstring
+
+    if is_tstring(code):
+        if captures:
+            raise TypeError(
+                "Cannot pass keyword captures when using a t-string; "
+                "interpolate Capture objects directly in the t-string instead"
+            )
+        code, captures = convert_tstring(code)
+
     return Template(
         code=code,
         captures=captures,

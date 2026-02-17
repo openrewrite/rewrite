@@ -24,11 +24,14 @@ requires-python = ">=3.10"
 dependencies = [
     "cbor2>=5.6.5",
     "more_itertools>=10.0.0",
+    "parso>=0.7.1,<0.8",  # Python 2/3 parser with CST support (0.8+ dropped Python 2.7 grammar)
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "pytest-timeout>=2.0.0",
+    "tox>=4.0.0",
     "black>=24.0.0",
     "ruff>=0.1.0",
 ]
@@ -88,3 +91,13 @@ unresolved-reference = "ignore"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_functions = ["test_*"]
+
+[tool.tox]
+# Run version-specific tests: `tox -e py313`
+# Runs all tests; version-gated tests (e.g. tests/python/py313/) are
+# automatically skipped on incompatible Python versions via conftest.py.
+env_list = ["py311", "py312", "py313"]
+
+[tool.tox.env_run_base]
+deps = ["pytest>=8.0.0", "pytest-timeout>=2.0.0"]
+commands = [["pytest", "tests/", "-v", "--timeout=60"]]

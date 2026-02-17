@@ -13,6 +13,7 @@ plugins {
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
+    api(project(":rewrite-toml"))
 
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
@@ -97,11 +98,10 @@ val pythonInstall by tasks.registering(Exec::class) {
     dependsOn(pythonUpgradePip)
 
     workingDir = pythonDir
-    commandLine(pipExe.absolutePath, "install", "-e", ".")
+    commandLine(pipExe.absolutePath, "install", "-e", ".[dev]")
 
     // Re-run if pyproject.toml changes
     inputs.file(pythonDir.resolve("pyproject.toml"))
-    outputs.file(venvDir.resolve("pyvenv.cfg"))
 
     doFirst {
         logger.lifecycle("Installing Python package with pip")
@@ -122,7 +122,56 @@ testing {
                 runtimeOnly("org.junit.platform:junit-platform-suite-engine")
             }
         }
+
+        register<JvmTestSuite>("py2CompatibilityTest") {
+            useJUnitJupiter()
+
+            dependencies {
+                implementation(project())
+                implementation(project(":rewrite-test"))
+                implementation(project(":rewrite-java-21"))
+                implementation("org.assertj:assertj-core:latest.release")
+                implementation("io.moderne:jsonrpc:latest.integration")
+            }
+
+            targets {
+                all {
+                    testTask.configure {
+                        // Include the main test classes so common tests run with the Python 2 parser
+                        testClassesDirs += sourceSets["test"].output.classesDirs
+                        classpath += sourceSets["test"].runtimeClasspath
+
+                        systemProperty("rewrite.python.version", "2")
+
+                        useJUnitPlatform {
+                            excludeTags("python3")
+                        }
+
+                        shouldRunAfter(tasks.named("test"))
+                    }
+                }
+            }
+        }
     }
+}
+
+val pytestTest by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Run Python pytest tests"
+
+    dependsOn(pythonInstall)
+
+    workingDir = pythonDir
+    commandLine(pythonExe.absolutePath, "-m", "pytest", "tests/", "-v")
+
+    inputs.dir(pythonDir.resolve("src"))
+    inputs.dir(pythonDir.resolve("tests"))
+    inputs.file(pythonDir.resolve("pyproject.toml"))
+}
+
+tasks.named("check") {
+    dependsOn(testing.suites.named("py2CompatibilityTest"))
+    dependsOn(pytestTest)
 }
 
 // Run tests serially to avoid issues with concurrent Python RPC processes
@@ -291,6 +340,8 @@ val generateTestClasspath by tasks.registering {
          .joinToString(File.pathSeparator) { it.absolutePath }
         outputFile.writeText(classpath)
         logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
+
+
     }
 }
 

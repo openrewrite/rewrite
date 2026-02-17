@@ -147,3 +147,98 @@ class TestMatchResult:
         """Test that MatchResult is truthy."""
         result = MatchResult({})
         assert bool(result) is True
+
+
+class TestPatternMatching:
+    """Tests for pattern matching against target trees."""
+
+    def setup_method(self):
+        from rewrite.python.template.engine import TemplateEngine
+        TemplateEngine.clear_cache()
+
+    @staticmethod
+    def _cursor_for(tree):
+        from rewrite.visitor import Cursor
+        return Cursor(parent=Cursor(None, Cursor.ROOT_VALUE), value=tree)
+
+    def test_match_identifier(self):
+        """Test matching an identifier pattern."""
+        from rewrite.python.template.engine import TemplateEngine
+
+        pat = pattern("x")
+        target_x = TemplateEngine.get_template_tree("x", {})
+        target_y = TemplateEngine.get_template_tree("y", {})
+
+        assert pat.match(target_x, self._cursor_for(target_x)) is not None
+        assert pat.match(target_y, self._cursor_for(target_y)) is None
+
+    def test_match_literal(self):
+        """Test matching a literal pattern."""
+        from rewrite.python.template.engine import TemplateEngine
+
+        pat = pattern("42")
+        target_42 = TemplateEngine.get_template_tree("42", {})
+        target_43 = TemplateEngine.get_template_tree("43", {})
+
+        assert pat.match(target_42, self._cursor_for(target_42)) is not None
+        assert pat.match(target_43, self._cursor_for(target_43)) is None
+
+    def test_match_with_capture(self):
+        """Test matching a pattern with a capture."""
+        from rewrite.python.template.engine import TemplateEngine
+
+        x = capture('x')
+        pat = pattern("print({x})", x=x)
+        target = TemplateEngine.get_template_tree("print(hello)", {})
+
+        match = pat.match(target, self._cursor_for(target))
+        assert match is not None
+        captured = match.get('x')
+        assert isinstance(captured, j.Identifier)
+        assert captured.simple_name == "hello"
+
+    def test_match_binary_with_captures(self):
+        """Test matching a binary expression with captures."""
+        from rewrite.python.template.engine import TemplateEngine
+
+        a, b = capture('a'), capture('b')
+        pat = pattern("{a} + {b}", a=a, b=b)
+        target = TemplateEngine.get_template_tree("x + y", {})
+
+        match = pat.match(target, self._cursor_for(target))
+        assert match is not None
+        assert isinstance(match.get('a'), j.Identifier)
+        assert match.get('a').simple_name == "x"
+        assert isinstance(match.get('b'), j.Identifier)
+        assert match.get('b').simple_name == "y"
+
+    def test_match_fails_wrong_structure(self):
+        """Test that matching fails with wrong structure."""
+        from rewrite.python.template.engine import TemplateEngine
+
+        x = capture('x')
+        pat = pattern("print({x})", x=x)
+        target = TemplateEngine.get_template_tree("len(y)", {})
+
+        assert pat.match(target, self._cursor_for(target)) is None
+
+    def test_match_fails_wrong_operator(self):
+        """Test that matching fails with wrong operator."""
+        from rewrite.python.template.engine import TemplateEngine
+
+        a, b = capture('a'), capture('b')
+        pat = pattern("{a} + {b}", a=a, b=b)
+        target = TemplateEngine.get_template_tree("x - y", {})
+
+        assert pat.match(target, self._cursor_for(target)) is None
+
+    def test_matches_convenience(self):
+        """Test the matches() convenience method."""
+        from rewrite.python.template.engine import TemplateEngine
+
+        pat = pattern("x")
+        target_x = TemplateEngine.get_template_tree("x", {})
+        target_y = TemplateEngine.get_template_tree("y", {})
+
+        assert pat.matches(target_x, self._cursor_for(target_x)) is True
+        assert pat.matches(target_y, self._cursor_for(target_y)) is False

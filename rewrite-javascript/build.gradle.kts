@@ -107,6 +107,7 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
     inputs.files(fileTree("rewrite/test"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.files("rewrite/build/test-results/jest/junit.xml")
+    outputs.cacheIf { true }
 
     args = listOf("run", "ci:test")
 }

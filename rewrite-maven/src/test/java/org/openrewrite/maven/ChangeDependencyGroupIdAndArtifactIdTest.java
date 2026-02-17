@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.java.Assertions.mavenProject;
@@ -3123,6 +3124,47 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void shouldNotChangeDependencyWithImplicitlyDefinedVersionProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.junit.jupiter", "junit-jupiter-api",
+            "org.junit.jupiter", "junit-jupiter-engine",
+            "5.x", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>5.7.2</version>
+              </project>
+              """,
+            SourceSpec::skip
+          ),
+          mavenProject("my-child",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>5.7.2</version>
+                    </parent>
+                    <artifactId>my-child</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-api</artifactId>
+                            <version>${project.parent.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
           )
         );
     }
