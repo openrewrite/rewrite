@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Rewrite.Core;
 using Rewrite.Java;
 
@@ -2464,9 +2465,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
     #region Preprocessor Directives
 
+    private static readonly Regex GhostCommentPattern = new(@"//DIRECTIVE:(\d+)\r?\n?", RegexOptions.Compiled);
+
     public override J VisitConditionalDirective(ConditionalDirective cd, PrintOutputCapture<P> p)
     {
-        // Print each branch to a separate buffer
+        // 1. Print each branch to a separate buffer.
+        //    Ghost comments (//DIRECTIVE:N) in whitespace appear verbatim in the output.
         var branchOutputs = new string[cd.Branches.Count];
         for (int i = 0; i < cd.Branches.Count; i++)
         {
@@ -2475,58 +2479,84 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             branchOutputs[i] = capture.ToString();
         }
 
-        // Split each into lines
-        var branchLines = new string[branchOutputs.Length][];
-        for (int i = 0; i < branchOutputs.Length; i++)
+        // 2. Split each branch output by ghost comment sentinels into sections.
+        //    Each branch produces N+1 sections for N directives, with matching directive indices.
+        var branchSections = new List<string>[branchOutputs.Length];
+        var branchTrailingNewlines = new List<bool>[branchOutputs.Length];
+        int[]? directiveOrder = null;
+
+        for (int b = 0; b < branchOutputs.Length; b++)
         {
-            branchLines[i] = branchOutputs[i].Split('\n');
-        }
+            var sections = new List<string>();
+            var trailingNewlines = new List<bool>();
+            var dirIndices = new List<int>();
+            var matches = GhostCommentPattern.Matches(branchOutputs[b]);
 
-        // Build directive line lookup
-        var directiveLookup = new Dictionary<int, DirectiveLine>();
-        foreach (var dl in cd.DirectiveLines)
-        {
-            directiveLookup[dl.LineNumber] = dl;
-        }
-
-        // Line-level interleaving using stack-based algorithm
-        var stack = new Stack<int>();
-        stack.Push(0); // start with primary branch
-        int totalLines = branchLines[0].Length;
-
-        for (int lineNum = 0; lineNum < totalLines; lineNum++)
-        {
-            if (lineNum > 0) p.Append("\n");
-
-            if (directiveLookup.TryGetValue(lineNum, out var directive))
+            int lastEnd = 0;
+            foreach (Match m in matches)
             {
-                // Emit directive text
-                p.Append(directive.Text);
-
-                switch (directive.Kind)
-                {
-                    case PreprocessorDirectiveKind.If:
-                        stack.Push(directive.ActiveBranchIndex);
-                        break;
-                    case PreprocessorDirectiveKind.Elif:
-                    case PreprocessorDirectiveKind.Else:
-                        stack.Pop();
-                        stack.Push(directive.ActiveBranchIndex);
-                        break;
-                    case PreprocessorDirectiveKind.Endif:
-                        stack.Pop();
-                        break;
-                }
+                sections.Add(branchOutputs[b][lastEnd..m.Index]);
+                dirIndices.Add(int.Parse(m.Groups[1].Value));
+                trailingNewlines.Add(m.Value.EndsWith('\n'));
+                lastEnd = m.Index + m.Length;
             }
-            else
+            sections.Add(branchOutputs[b][lastEnd..]);
+
+            branchSections[b] = sections;
+            branchTrailingNewlines[b] = trailingNewlines;
+            directiveOrder ??= dirIndices.ToArray();
+        }
+
+        // If no ghost comments found (shouldn't happen), fall back to primary branch output
+        if (directiveOrder == null || directiveOrder.Length == 0)
+        {
+            p.Append(branchOutputs[0]);
+            return cd;
+        }
+
+        // 3. Assemble output by interleaving sections with directive text.
+        //    Stack tracks the active branch index (starts with primary branch).
+        var stack = new Stack<int>();
+        stack.Push(0);
+
+        // Section before the first directive — always from primary branch
+        p.Append(branchSections[0][0]);
+
+        for (int d = 0; d < directiveOrder.Length; d++)
+        {
+            int directiveIndex = directiveOrder[d];
+            var directive = cd.DirectiveLines[directiveIndex];
+
+            // Emit original directive text (e.g., "#if DEBUG")
+            p.Append(directive.Text);
+
+            // Restore the newline that the ghost comment occupied
+            if (branchTrailingNewlines[0][d])
+                p.Append('\n');
+
+            // Update the active branch stack
+            switch (directive.Kind)
             {
-                // Emit code from active branch
-                int activeBranch = stack.Peek();
-                if (activeBranch >= 0 && activeBranch < branchLines.Length &&
-                    lineNum < branchLines[activeBranch].Length)
-                {
-                    p.Append(branchLines[activeBranch][lineNum]);
-                }
+                case PreprocessorDirectiveKind.If:
+                    stack.Push(directive.ActiveBranchIndex);
+                    break;
+                case PreprocessorDirectiveKind.Elif:
+                case PreprocessorDirectiveKind.Else:
+                    stack.Pop();
+                    stack.Push(directive.ActiveBranchIndex);
+                    break;
+                case PreprocessorDirectiveKind.Endif:
+                    stack.Pop();
+                    break;
+            }
+
+            // Emit next section from the active branch
+            int activeBranch = stack.Peek();
+            int sectionIndex = d + 1;
+            if (activeBranch < branchSections.Length &&
+                sectionIndex < branchSections[activeBranch].Count)
+            {
+                p.Append(branchSections[activeBranch][sectionIndex]);
             }
         }
 

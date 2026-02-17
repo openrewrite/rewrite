@@ -42,7 +42,14 @@ public class CSharpParser
         SemanticModel? semanticModel, HashSet<string> symbols)
     {
         var directiveLines = PreprocessorSourceTransformer.GetDirectivePositions(source);
-        var permutations = PreprocessorSourceTransformer.GenerateUniquePermutations(source, symbols);
+
+        // Build mapping from line number to directive index for ghost comment emission
+        var directiveLineToIndex = new Dictionary<int, int>();
+        for (int idx = 0; idx < directiveLines.Count; idx++)
+            directiveLineToIndex[directiveLines[idx].LineNumber] = idx;
+
+        var permutations = PreprocessorSourceTransformer.GenerateUniquePermutations(
+            source, symbols, directiveLineToIndex);
         PreprocessorSourceTransformer.ComputeActiveBranchIndices(directiveLines, permutations);
 
         var branches = new List<JRightPadded<CompilationUnit>>();
@@ -66,8 +73,11 @@ public class CSharpParser
                 cu = ParseSingle(cleanSource, sourcePath, null);
             }
 
+            // Convert ghost comments in whitespace to DirectiveBoundaryMarker markers
+            cu = (CompilationUnit)DirectiveBoundaryInjector.Inject(cu);
+
             // Add ConditionalBranchMarker to identify this as a branch
-            cu = cu.WithMarkers(cu.Markers.Add(new ConditionalBranchMarker( Guid.NewGuid(), definedSymbols.ToList())));
+            cu = cu.WithMarkers(cu.Markers.Add(new ConditionalBranchMarker(Guid.NewGuid(), definedSymbols.ToList())));
             branches.Add(new JRightPadded<CompilationUnit>(cu, Space.Empty, Markers.Empty));
         }
 

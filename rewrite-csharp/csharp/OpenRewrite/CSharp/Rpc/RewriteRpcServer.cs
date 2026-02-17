@@ -93,6 +93,8 @@ public class RewriteRpcServer
             "org.openrewrite.csharp.marker.AnonymousMethod");
         RpcSendQueue.RegisterJavaTypeName(typeof(ConditionalBranchMarker),
             "org.openrewrite.csharp.marker.ConditionalBranchMarker");
+        RpcSendQueue.RegisterJavaTypeName(typeof(DirectiveBoundaryMarker),
+            "org.openrewrite.csharp.marker.DirectiveBoundaryMarker");
         RpcSendQueue.RegisterJavaTypeName(typeof(ForEachVariableLoopControl),
             "org.openrewrite.csharp.tree.Cs$ForEachVariableLoop$Control");
 
