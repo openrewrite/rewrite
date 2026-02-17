@@ -33,6 +33,7 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import org.openrewrite.Parser;
 import org.openrewrite.python.PyProjectTomlParser;
+import org.openrewrite.toml.TomlParser;
 
 import java.io.File;
 import java.io.IOException;
@@ -304,9 +305,18 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         Path pyprojectPath = projectPath.resolve("pyproject.toml");
         if (Files.exists(pyprojectPath)) {
-            Parser.Input input = Parser.Input.fromFile(pyprojectPath);
-            return new PyProjectTomlParser().parseInputs(
-                    Collections.singletonList(input), effectiveRelativeTo, ctx);
+            Parser.Input pyprojectInput = Parser.Input.fromFile(pyprojectPath);
+            Stream<SourceFile> result = new PyProjectTomlParser().parseInputs(
+                    Collections.singletonList(pyprojectInput), effectiveRelativeTo, ctx);
+
+            Path uvLockPath = projectPath.resolve("uv.lock");
+            if (Files.exists(uvLockPath)) {
+                Parser.Input uvLockInput = Parser.Input.fromFile(uvLockPath);
+                Stream<SourceFile> uvLockStream = new TomlParser().parseInputs(
+                        Collections.singletonList(uvLockInput), effectiveRelativeTo, ctx);
+                result = Stream.concat(result, uvLockStream);
+            }
+            return result;
         }
 
         Path setupCfgPath = projectPath.resolve("setup.cfg");

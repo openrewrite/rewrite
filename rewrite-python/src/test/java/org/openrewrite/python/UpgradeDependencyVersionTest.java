@@ -133,6 +133,31 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void bareVersionNormalized() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", "2.31.0", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.31.0",
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
     void skipWhenNotPresent() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("nonexistent", ">=1.0", null, null)),

@@ -113,6 +113,10 @@ class ParseProjectIntegTest {
                 .collect(Collectors.toList());
 
         assertThat(sources).hasSize(2);
+        // Source paths must be relative to the project directory
+        assertThat(sources)
+                .extracting(sf -> sf.getSourcePath().toString())
+                .containsExactlyInAnyOrder("top.py", "subpackage/nested.py");
     }
 
     @Test
