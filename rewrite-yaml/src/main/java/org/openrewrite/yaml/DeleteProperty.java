@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
+import org.openrewrite.internal.NameCaseConvention.Compiled;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -37,8 +38,8 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = false)
 public class DeleteProperty extends Recipe {
     @Option(displayName = "Property key",
-            description = "The key to be deleted.",
-            example = "management.metrics.binders.files.enabled")
+            description = "The key to be deleted. Supports glob patterns.",
+            example = "management.metrics.binders.files.*")
     String propertyKey;
 
     @Deprecated
@@ -71,11 +72,14 @@ public class DeleteProperty extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(propertyKey);
+
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
 
             @Override
             public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                // TODO: Update DeleteProperty to support documents having Anchor / Alias Pairs
                 if (documents != new ReplaceAliasWithAnchorValueVisitor<ExecutionContext>().visit(documents, ctx)) {
                     return documents;
                 }
@@ -95,8 +99,8 @@ public class DeleteProperty extends Recipe {
                         .map(e2 -> e2.getKey().getValue())
                         .collect(joining("."));
 
-                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
-                    doAfterVisit(new DeletePropertyVisitor<>(entry));
+                if (keyMatcher.matchesGlob(prop)) {
+                    e = ToBeRemoved.withMarker(e);
                     if (Boolean.TRUE.equals(coalesce)) {
                         maybeCoalesceProperties();
                     }
@@ -104,85 +108,119 @@ public class DeleteProperty extends Recipe {
 
                 return e;
             }
-        });
-    }
 
-    private static class DeletePropertyVisitor<P> extends YamlVisitor<P> {
-        private final Yaml.Mapping.Entry scope;
-
-        private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
-            this.scope = scope;
-        }
-
-        @Override
-        public Yaml visitSequence(Yaml.Sequence sequence, P p) {
-            sequence = (Yaml.Sequence) super.visitSequence(sequence, p);
-            List<Yaml.Sequence.Entry> entries = sequence.getEntries();
-            if (entries.isEmpty()) {
-                return sequence;
-            }
-
-            entries = ListUtils.map(entries, entry -> ToBeRemoved.hasMarker(entry) ? null : entry);
-            return entries.isEmpty() ? ToBeRemoved.withMarker(sequence) : sequence.withEntries(entries);
-        }
-
-        @Override
-        public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
-            entry = (Yaml.Sequence.Entry) super.visitSequenceEntry(entry, p);
-            if (entry.getBlock() instanceof Yaml.Mapping) {
-                Yaml.Mapping m = (Yaml.Mapping) entry.getBlock();
-                if (ToBeRemoved.hasMarker(m)) {
-                    return ToBeRemoved.withMarker(entry);
-                }
-            }
-            return entry;
-        }
-
-        @Override
-        public Yaml visitMapping(Yaml.Mapping mapping, P p) {
-            Yaml.Mapping m = (Yaml.Mapping) super.visitMapping(mapping, p);
-
-            boolean changed = false;
-            List<Yaml.Mapping.Entry> entries = new ArrayList<>();
-            String deletedPrefix = null;
-            int count = 0;
-            for (Yaml.Mapping.Entry entry : m.getEntries()) {
-                if (ToBeRemoved.hasMarker(entry.getValue())) {
-                    changed = true;
-                    continue;
-                }
-
-                if (entry == scope || (entry.getValue() instanceof Yaml.Mapping && ((Yaml.Mapping) entry.getValue()).getEntries().isEmpty())) {
-                    deletedPrefix = entry.getPrefix();
-                    changed = true;
-                } else {
-                    if (deletedPrefix != null) {
-                        if (count == 0 && containsOnlyWhitespace(entry.getPrefix())) {
-                            // do this only if the entry will be the first element
-                            entry = entry.withPrefix(deletedPrefix);
-                        }
-                        deletedPrefix = null;
-                    }
-                    entries.add(entry);
-                    count++;
-                }
-            }
-
-            if (changed) {
-                m = m.withEntries(entries);
+            @Override
+            public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
+                Yaml.Sequence s = super.visitSequence(sequence, ctx);
+                boolean childModified = (s != sequence);
+                List<Yaml.Sequence.Entry> entries = s.getEntries();
                 if (entries.isEmpty()) {
-                    m = ToBeRemoved.withMarker(m);
+                    return s;
                 }
 
-                if (getCursor().getParentOrThrow().getValue() instanceof Yaml.Document) {
-                    Yaml.Document document = getCursor().getParentOrThrow().getValue();
-                    if (!document.isExplicit()) {
-                        m = m.withEntries(m.getEntries());
+                boolean changed = false;
+                entries = ListUtils.map(entries, entry -> ToBeRemoved.hasMarker(entry) ? null : entry);
+                if (entries.size() != s.getEntries().size()) {
+                    changed = true;
+                }
+
+                if ((changed || childModified) && s.getOpeningBracketPrefix() == null) {
+                    List<Yaml.Sequence.Entry> fixedEntries = null;
+                    for (int i = 1; i < entries.size(); i++) {
+                        Yaml.Sequence.Entry entry = entries.get(i);
+                        Yaml.Sequence.Entry prevEntry = entries.get(i - 1);
+                        if (!startsWithNewline(entry.getPrefix()) && !endsWithBlockScalar(prevEntry.getBlock())) {
+                            if (fixedEntries == null) {
+                                fixedEntries = new ArrayList<>(entries);
+                            }
+                            fixedEntries.set(i, entry.withPrefix("\n" + entry.getPrefix()));
+                        }
+                    }
+                    if (fixedEntries != null) {
+                        entries = fixedEntries;
                     }
                 }
+
+                return entries.isEmpty() ? ToBeRemoved.withMarker(s) : s.withEntries(entries);
             }
-            return m;
-        }
+
+            @Override
+            public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
+                Yaml.Sequence.Entry e = super.visitSequenceEntry(entry, ctx);
+                if (e.getBlock() instanceof Yaml.Mapping) {
+                    Yaml.Mapping m = (Yaml.Mapping) e.getBlock();
+                    if (ToBeRemoved.hasMarker(m)) {
+                        return ToBeRemoved.withMarker(e);
+                    }
+                }
+                return e;
+            }
+
+            @Override
+            public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
+                Yaml.Mapping m = super.visitMapping(mapping, ctx);
+                boolean childModified = (m != mapping);
+
+                boolean changed = false;
+                List<Yaml.Mapping.Entry> entries = new ArrayList<>();
+                String firstDeletedPrefix = null;
+                boolean previousWasDeleted = false;
+                for (Yaml.Mapping.Entry entry : m.getEntries()) {
+                    if (ToBeRemoved.hasMarker(entry.getValue()) ||
+                        ToBeRemoved.hasMarker(entry) ||
+                        (entry.getValue() instanceof Yaml.Mapping && ((Yaml.Mapping) entry.getValue()).getEntries().isEmpty())) {
+                        // Entry is being deleted - capture prefix from the first deleted entry before any kept entries
+                        if (entries.isEmpty() && firstDeletedPrefix == null) {
+                            firstDeletedPrefix = entry.getPrefix();
+                        }
+                        changed = true;
+                        previousWasDeleted = true;
+                    } else {
+                        if (entries.isEmpty() && firstDeletedPrefix != null && containsOnlyWhitespace(entry.getPrefix())) {
+                            entry = entry.withPrefix(firstDeletedPrefix);
+                        } else if (previousWasDeleted && !entries.isEmpty() && !startsWithNewline(entry.getPrefix())) {
+                            entry = entry.withPrefix("\n" + entry.getPrefix());
+                        }
+                        entries.add(entry);
+                        previousWasDeleted = false;
+                    }
+                }
+
+                if (changed) {
+                    m = m.withEntries(entries);
+                    if (entries.isEmpty()) {
+                        m = ToBeRemoved.withMarker(m);
+                    }
+
+                    if (getCursor().getParentOrThrow().getValue() instanceof Yaml.Document) {
+                        Yaml.Document document = getCursor().getParentOrThrow().getValue();
+                        if (!document.isExplicit()) {
+                            m = m.withEntries(m.getEntries());
+                        }
+                    }
+                }
+
+                if ((changed || childModified) && m.getOpeningBracePrefix() == null) {
+                    List<Yaml.Mapping.Entry> currentEntries = m.getEntries();
+                    List<Yaml.Mapping.Entry> fixedEntries = null;
+                    for (int i = 1; i < currentEntries.size(); i++) {
+                        Yaml.Mapping.Entry entry = currentEntries.get(i);
+                        Yaml.Mapping.Entry prevEntry = currentEntries.get(i - 1);
+                        if (!startsWithNewline(entry.getPrefix()) && !endsWithBlockScalar(prevEntry)) {
+                            if (fixedEntries == null) {
+                                fixedEntries = new ArrayList<>(currentEntries);
+                            }
+                            fixedEntries.set(i, entry.withPrefix("\n" + entry.getPrefix()));
+                        }
+                    }
+                    if (fixedEntries != null) {
+                        m = m.withEntries(fixedEntries);
+                    }
+                }
+
+                return m;
+            }
+        });
     }
 
     private static boolean containsOnlyWhitespace(@Nullable String str) {
@@ -198,6 +236,32 @@ public class DeleteProperty extends Recipe {
         }
 
         return true;
+    }
+
+    private static boolean startsWithNewline(@Nullable String str) {
+        return str != null && !str.isEmpty() && str.charAt(0) == '\n';
+    }
+
+    private static boolean endsWithBlockScalar(Yaml.Mapping.Entry entry) {
+        return endsWithBlockScalar(entry.getValue());
+    }
+
+    private static boolean endsWithBlockScalar(Yaml.Block block) {
+        if (block instanceof Yaml.Scalar) {
+            Yaml.Scalar.Style style = ((Yaml.Scalar) block).getStyle();
+            return style == Yaml.Scalar.Style.FOLDED || style == Yaml.Scalar.Style.LITERAL;
+        } else if (block instanceof Yaml.Mapping) {
+            List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) block).getEntries();
+            if (!entries.isEmpty()) {
+                return endsWithBlockScalar(entries.get(entries.size() - 1));
+            }
+        } else if (block instanceof Yaml.Sequence) {
+            List<Yaml.Sequence.Entry> entries = ((Yaml.Sequence) block).getEntries();
+            if (!entries.isEmpty()) {
+                return endsWithBlockScalar(entries.get(entries.size() - 1).getBlock());
+            }
+        }
+        return false;
     }
 
     @Value

@@ -3063,7 +3063,7 @@ class MergeYamlTest implements RewriteTest {
           spec -> spec
             .recipe(new MergeYaml(
               "$.some.object",
-              // language=yaml
+              //language=text
               """
                 script: |-ParseError
                 """,
@@ -3141,6 +3141,7 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("DataFlowIssue")
     @Test
     void sourceNull() {
         assertThrows(AssertionError.class, () ->
@@ -3281,6 +3282,225 @@ class MergeYamlTest implements RewriteTest {
                 new-key: 123
                d2:
                 e2: text
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeRecipePreconditionsInsertBefore() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              preconditions:
+                - org.openrewrite.Singleton
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "recipeList",
+            true
+          )),
+          yaml(
+            """
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.MyRecipe
+              displayName: My Recipe
+              description: Does something useful
+              preconditions:
+                - org.openrewrite.java.search.FindTypes:
+                    fullyQualifiedTypeName: org.openrewrite.Recipe
+              recipeList:
+                - org.openrewrite.java.OrderImports
+              """,
+            """
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.MyRecipe
+              displayName: My Recipe
+              description: Does something useful
+              preconditions:
+                - org.openrewrite.java.search.FindTypes:
+                    fullyQualifiedTypeName: org.openrewrite.Recipe
+                - org.openrewrite.Singleton
+              recipeList:
+                - org.openrewrite.java.OrderImports
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeRecipePreconditionsInsertBeforeWithFoldedString() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              preconditions:
+                - org.openrewrite.Singleton
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "recipeList",
+            true
+          )),
+          yaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.FoldedStrip
+              displayName: Folded Strip
+              description: >-
+                Folded with strip.
+              recipeList:
+                - org.openrewrite.java.OrderImports
+              """,
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.FoldedStrip
+              displayName: Folded Strip
+              description: >-
+                Folded with strip.
+              preconditions:
+                - org.openrewrite.Singleton
+              recipeList:
+                - org.openrewrite.java.OrderImports
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeAfterLiteralString() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              newKey: newValue
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "nextKey",
+            true
+          )),
+          yaml(
+            """
+              description: |-
+                Literal with strip.
+              nextKey: value
+              """,
+            """
+              description: |-
+                Literal with strip.
+              newKey: newValue
+              nextKey: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeAfterNestedMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              newKey: newValue
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "nextKey",
+            true
+          )),
+          yaml(
+            """
+              config:
+                nested:
+                  deep: value
+              nextKey: value
+              """,
+            """
+              config:
+                nested:
+                  deep: value
+              newKey: newValue
+              nextKey: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeAfterSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              newKey: newValue
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "nextKey",
+            true
+          )),
+          yaml(
+            """
+              items:
+                - item1
+                - item2
+              nextKey: value
+              """,
+            """
+              items:
+                - item1
+                - item2
+              newKey: newValue
+              nextKey: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeAfterPlainScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              newKey: newValue
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "nextKey",
+            true
+          )),
+          yaml(
+            """
+              description: Plain scalar value
+              nextKey: value
+              """,
+            """
+              description: Plain scalar value
+              newKey: newValue
+              nextKey: value
               """
           )
         );

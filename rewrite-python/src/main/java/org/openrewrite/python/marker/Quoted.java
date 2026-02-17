@@ -19,15 +19,20 @@ import lombok.Getter;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
+
+import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
 /**
  * Used for `J.Identifier` nodes that are quoted in the source.
  */
 @Value
 @With
-public class Quoted implements Marker {
+public class Quoted implements Marker, RpcCodec<Quoted> {
     UUID id;
     Style style;
 
@@ -37,6 +42,10 @@ public class Quoted implements Marker {
         DOUBLE("\""),
         TRIPLE_SINGLE("'''"),
         TRIPLE_DOUBLE("\"\"\""),
+        /**
+         * Backtick quoting used for repr() in Python 2: {@code `x`}
+         */
+        BACKTICK("`"),
         ;
 
         final String quote;
@@ -44,5 +53,18 @@ public class Quoted implements Marker {
         Style(String quote) {
             this.quote = quote;
         }
+    }
+
+    @Override
+    public void rpcSend(Quoted after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, Quoted::getStyle);
+    }
+
+    @Override
+    public Quoted rpcReceive(Quoted before, RpcReceiveQueue q) {
+        return before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                .withStyle(q.receiveAndGet(before.getStyle(), toEnum(Style.class)));
     }
 }

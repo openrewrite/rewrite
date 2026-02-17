@@ -25,6 +25,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.javascript.Assertions.javascript;
+import static org.openrewrite.javascript.Assertions.npm;
+import static org.openrewrite.javascript.Assertions.packageJson;
 
 class DependencyWorkspaceTest implements RewriteTest {
 
@@ -109,8 +112,8 @@ class DependencyWorkspaceTest implements RewriteTest {
     void npmIntegrationWithSymlink(@TempDir Path tempDir) throws Exception {
         rewriteRun(
                 spec -> spec.recipe(new NoOpRecipe()),
-                Assertions.npm(tempDir,
-                        Assertions.packageJson("""
+                npm(tempDir,
+                        packageJson("""
                                 {
                                   "name": "test-project",
                                   "dependencies": {
@@ -118,7 +121,7 @@ class DependencyWorkspaceTest implements RewriteTest {
                                   }
                                 }
                                 """),
-                        Assertions.javascript("""
+                        javascript("""
                                 import _ from 'lodash';
                                 console.log(_.VERSION);
                                 """)

@@ -22,7 +22,9 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
+import org.openrewrite.toml.tree.Toml;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -57,6 +59,9 @@ class ParseProjectIntegTest {
     @AfterEach
     void after() throws IOException {
         PythonRewriteRpc.shutdownCurrent();
+        // Reset factory to default so other tests don't inherit a log path
+        // pointing at this test's (soon-to-be-deleted) temp directory
+        PythonRewriteRpc.setFactory(PythonRewriteRpc.builder());
         if (Files.exists(tempDir.resolve("python-rpc.log"))) {
             System.out.println("=== Python RPC Log ===");
             System.out.println(Files.readString(tempDir.resolve("python-rpc.log")));
@@ -107,6 +112,10 @@ class ParseProjectIntegTest {
                 .collect(Collectors.toList());
 
         assertThat(sources).hasSize(2);
+        // Source paths must be relative to the project directory
+        assertThat(sources)
+                .extracting(sf -> sf.getSourcePath().toString())
+                .containsExactlyInAnyOrder("top.py", "subpackage/nested.py");
     }
 
     @Test
@@ -155,6 +164,36 @@ class ParseProjectIntegTest {
                 .collect(Collectors.toList());
 
         assertThat(sources).hasSize(1);
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void includesPyprojectToml() throws IOException {
+        Path projectDir = tempDir.resolve("with_pyproject");
+        Files.createDirectories(projectDir);
+
+        Files.writeString(projectDir.resolve("main.py"), "x = 1");
+        Files.writeString(projectDir.resolve("pyproject.toml"), """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = ["requests>=2.28.0"]
+                """);
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(Collectors.toList());
+
+        assertThat(sources)
+                .extracting(sf -> sf.getSourcePath().getFileName().toString())
+                .contains("main.py", "pyproject.toml");
+
+        SourceFile pyproject = sources.stream()
+                .filter(sf -> sf.getSourcePath().getFileName().toString().equals("pyproject.toml"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(pyproject).isInstanceOf(Toml.Document.class);
+        assertThat(pyproject.getMarkers().findFirst(PythonResolutionResult.class)).isPresent();
     }
 
     private PythonRewriteRpc client() {

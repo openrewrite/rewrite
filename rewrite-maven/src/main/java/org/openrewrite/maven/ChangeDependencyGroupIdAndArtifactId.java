@@ -309,6 +309,13 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 boolean isAnnotationProcessorPath = isAnnotationProcessorPathTag(oldGroupId, oldArtifactId);
                 boolean deferUpdate = false;
                 if (isOldDependencyTag || isPluginDependency || isAnnotationProcessorPath) {
+                    if (newVersion != null) {
+                        String currentVersionValue = t.getChildValue("version").orElse(null);
+                        if (isImplicitlyDefinedVersionProperty(currentVersionValue)) {
+                            return t;
+                        }
+                    }
+
                     String groupId = newGroupId;
                     if (groupId != null) {
                         t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("groupId").orElse(null), groupId).visitNonNull(t, ctx);
@@ -339,7 +346,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                                 if (!configuredToOverrideManagedVersion && newDependencyManaged || (oldDependencyDefinedManaged && configuredToChangeManagedDependency)) {
                                     t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false, true).visit(t, ctx);
                                 } else {
-                                    // Otherwise, change the version to the new value.
                                     String versionTagValue = t.getChildValue("version").orElse(null);
                                     if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
                                         t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
