@@ -35,7 +35,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
                 rp2 => _delegate.VisitRightPadded(rp2, q));
             _delegate.PopPreVisit();
             Cursor = Cursor.Parent!;
-            return es with { Id = pvId, Expression = rp!.Element };
+            return es.WithId(pvId).WithExpression(rp!.Element);
         }
 
         if (tree is not Cs)
@@ -202,13 +202,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         if (attrLists != null) allMembers.AddRange(attrLists);
         if (members != null) allMembers.AddRange(members.Select(rp => rp.Element));
 
-        return cu with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            SourcePath = sourcePath!,
-            Members = allMembers,
-            Eof = eof!
-        };
+        return cu.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithSourcePath(sourcePath!).WithMembers(allMembers).WithEof(eof!);
     }
 
     // ---- UsingDirective ----
@@ -220,12 +214,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         q.Receive<object?>(null);
         var alias = q.Receive(ud.Alias, rp => _delegate.VisitRightPadded(rp!, q));
         var namespaceOrType = q.Receive((J)ud.NamespaceOrType, el => (J)VisitNonNull(el, q));
-        return ud with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Alias = alias,
-            NamespaceOrType = (TypeTree)namespaceOrType!
-        };
+        return ud.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAlias(alias).WithNamespaceOrType((TypeTree)namespaceOrType!);
     }
 
     // ---- PropertyDeclaration ----
@@ -239,15 +228,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var accessors = q.Receive((J?)pd.Accessors, el => (J)VisitNonNull(el!, q));
         var expressionBody = q.Receive(pd.ExpressionBody, lp => _delegate.VisitLeftPadded(lp!, q));
         q.Receive<object?>(null); // Initializer
-        return pd with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Modifiers = modifiers!,
-            TypeExpression = (TypeTree)typeExpression!,
-            Name = (Identifier)name!,
-            Accessors = (Block?)accessors,
-            ExpressionBody = expressionBody
-        };
+        return pd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithModifiers(modifiers!).WithTypeExpression((TypeTree)typeExpression!).WithName((Identifier)name!).WithAccessors((Block?)accessors).WithExpressionBody(expressionBody);
     }
 
     // ---- AccessorDeclaration ----
@@ -258,14 +239,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var kind = q.Receive(ad.Kind, lp => _delegate.VisitLeftPadded(lp, q));
         var expressionBody = q.Receive(ad.ExpressionBody, lp => _delegate.VisitLeftPadded(lp!, q));
         var body = q.Receive((J?)ad.Body, el => (J)VisitNonNull(el!, q));
-        return ad with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Modifiers = modifiers!,
-            Kind = kind,
-            ExpressionBody = expressionBody,
-            Body = (Block?)body
-        };
+        return ad.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithModifiers(modifiers!).WithKind(kind).WithExpressionBody(expressionBody).WithBody((Block?)body);
     }
 
     // ---- AttributeList ----
@@ -273,12 +247,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var target = q.Receive(al.Target, rp => _delegate.VisitRightPadded(rp!, q));
         var attributes = q.ReceiveList(al.Attributes, rp => _delegate.VisitRightPadded(rp, q));
-        return al with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Target = target,
-            Attributes = attributes!
-        };
+        return al.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTarget(target).WithAttributes(attributes!);
     }
 
     // ---- NamedExpression ----
@@ -286,20 +255,14 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var name = q.Receive(ne.Name, rp => _delegate.VisitRightPadded(rp, q));
         var expression = q.Receive((J)ne.Expression, el => (J)VisitNonNull(el, q));
-        return ne with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Name = name,
-            Expression = (Expression)expression!
-        };
+        return ne.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name).WithExpression((Expression)expression!);
     }
 
     // ---- RefExpression ----
     public override J VisitRefExpression(RefExpression re, RpcReceiveQueue q)
     {
         var expression = q.Receive((J)re.Expression, el => (J)VisitNonNull(el, q));
-        return re with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Expression = (Expression)expression! };
+        return re.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((Expression)expression!);
     }
 
     // ---- DeclarationExpression ----
@@ -307,12 +270,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var typeExpression = q.Receive((J?)de.TypeExpression, el => (J)VisitNonNull(el!, q));
         var variables = q.Receive((J)de.Variables, el => (J)VisitNonNull(el, q));
-        return de with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            TypeExpression = (TypeTree?)typeExpression,
-            Variables = (Expression)variables!
-        };
+        return de.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTypeExpression((TypeTree?)typeExpression).WithVariables((Expression)variables!);
     }
 
     // ---- CsLambda ----
@@ -321,13 +279,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var lambdaExpression = q.Receive((J)csl.LambdaExpression, el => (J)VisitNonNull(el, q));
         var returnType = q.Receive((J?)csl.ReturnType, el => (J)VisitNonNull(el!, q));
         var modifiers = q.ReceiveList(csl.Modifiers, m => (Modifier)VisitNonNull(m, q));
-        return csl with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            LambdaExpression = (Lambda)lambdaExpression!,
-            ReturnType = (TypeTree?)returnType,
-            Modifiers = modifiers!
-        };
+        return csl.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithLambdaExpression((Lambda)lambdaExpression!).WithReturnType((TypeTree?)returnType).WithModifiers(modifiers!);
     }
 
     // ---- IsPattern ----
@@ -335,20 +287,14 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var expression = q.Receive((J)ip.Expression, el => (J)VisitNonNull(el, q));
         var pattern = q.Receive(ip.Pattern, lp => _delegate.VisitLeftPadded(lp, q));
-        return ip with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Expression = (Expression)expression!,
-            Pattern = pattern
-        };
+        return ip.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((Expression)expression!).WithPattern(pattern);
     }
 
     // ---- StatementExpression ----
     public override J VisitStatementExpression(StatementExpression se, RpcReceiveQueue q)
     {
         var statement = q.Receive((J)se.Statement, el => (J)VisitNonNull(el, q));
-        return se with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Statement = (Statement)statement! };
+        return se.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithStatement((Statement)statement!);
     }
 
     // ---- SizeOf ----
@@ -356,24 +302,21 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var expression = q.Receive((J)sizeOf.Expression, el => (J)VisitNonNull(el, q));
         var type = q.Receive(sizeOf.Type, t => VisitType(t, q)!);
-        return sizeOf with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Expression = (Expression)expression!, Type = type };
+        return sizeOf.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((Expression)expression!).WithType(type);
     }
 
     // ---- UnsafeStatement ----
     public override J VisitUnsafeStatement(UnsafeStatement unsafeStatement, RpcReceiveQueue q)
     {
         var block = q.Receive((J)unsafeStatement.Block, el => (J)VisitNonNull(el, q));
-        return unsafeStatement with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Block = (Block)block! };
+        return unsafeStatement.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithBlock((Block)block!);
     }
 
     // ---- PointerType ----
     public override J VisitPointerType(PointerType pointerType, RpcReceiveQueue q)
     {
         var elementType = q.Receive(pointerType.ElementType, rp => VisitRightPadded(rp, q));
-        return pointerType with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            ElementType = elementType! };
+        return pointerType.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithElementType(elementType!);
     }
 
     // ---- FixedStatement ----
@@ -381,37 +324,32 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var declarations = q.Receive((J)fixedStatement.Declarations, el => (J)VisitNonNull(el, q));
         var block = q.Receive((J)fixedStatement.Block, el => (J)VisitNonNull(el, q));
-        return fixedStatement with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Declarations = (ControlParentheses<VariableDeclarations>)declarations!, Block = (Block)block! };
+        return fixedStatement.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithDeclarations((ControlParentheses<VariableDeclarations>)declarations!).WithBlock((Block)block!);
     }
 
     // ---- DefaultExpression ----
     public override J VisitDefaultExpression(DefaultExpression defaultExpression, RpcReceiveQueue q)
     {
         var typeOperator = q.Receive(defaultExpression.TypeOperator, c => VisitContainer(c, q));
-        return defaultExpression with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            TypeOperator = typeOperator };
+        return defaultExpression.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTypeOperator(typeOperator);
     }
 
     public override J VisitExternAlias(ExternAlias externAlias, RpcReceiveQueue q)
     {
         var identifier = q.Receive(externAlias.Identifier, lp => _delegate.VisitLeftPadded(lp, q));
-        return externAlias with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Identifier = identifier! };
+        return externAlias.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithIdentifier(identifier!);
     }
 
     public override J VisitInitializerExpression(InitializerExpression initializerExpression, RpcReceiveQueue q)
     {
         var expressions = q.Receive(initializerExpression.Expressions, c => VisitContainer(c, q));
-        return initializerExpression with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Expressions = expressions! };
+        return initializerExpression.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpressions(expressions!);
     }
 
     public override J VisitNullSafeExpression(NullSafeExpression nullSafeExpression, RpcReceiveQueue q)
     {
         var expression = q.Receive(nullSafeExpression.ExpressionPadded, el => VisitRightPadded(el, q));
-        return nullSafeExpression with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            ExpressionPadded = expression! };
+        return nullSafeExpression.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpressionPadded(expression!);
     }
 
     // ---- RelationalPattern ----
@@ -419,12 +357,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var op = q.Receive(rp.Operator, lp => _delegate.VisitLeftPadded(lp, q));
         var value = q.Receive((J)rp.Value, el => (J)VisitNonNull(el, q));
-        return rp with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Operator = op,
-            Value = (Expression)value!
-        };
+        return rp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithOperator(op).WithValue((Expression)value!);
     }
 
     // ---- PropertyPattern ----
@@ -432,12 +365,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var typeQualifier = q.Receive((J?)pp.TypeQualifier, el => (J)VisitNonNull(el!, q));
         var subpatterns = q.Receive(pp.Subpatterns, c => _delegate.VisitContainer(c, q));
-        return pp with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            TypeQualifier = (TypeTree?)typeQualifier,
-            Subpatterns = subpatterns
-        };
+        return pp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTypeQualifier((TypeTree?)typeQualifier).WithSubpatterns(subpatterns);
     }
 
     // ---- ConstrainedTypeParameter ----
@@ -449,16 +377,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var whereConstraint = q.Receive(ctp.WhereConstraint, lp => _delegate.VisitLeftPadded(lp!, q));
         var constraints = q.Receive(ctp.Constraints, c => VisitContainer(c!, q));
         var type = q.Receive((JavaType?)ctp.Type, t => VisitType(t, q)!);
-        return ctp with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            AttributeLists = attrLists!,
-            Variance = variance,
-            Name = (Identifier)name!,
-            WhereConstraint = whereConstraint,
-            Constraints = constraints,
-            Type = type
-        };
+        return ctp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAttributeLists(attrLists!).WithVariance(variance).WithName((Identifier)name!).WithWhereConstraint(whereConstraint).WithConstraints(constraints).WithType(type);
     }
 
     // ---- InterpolatedString ----
@@ -471,12 +390,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
                 .ToList(),
             rp => _delegate.VisitRightPadded(rp, q));
         q.Receive(DeriveEndDelimiter(istr.Delimiter));
-        return istr with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Delimiter = delimiter!,
-            Parts = parts?.Select(rp => rp.Element).ToList() ?? new List<J>()
-        };
+        return istr.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithDelimiter(delimiter!).WithParts(parts?.Select(rp => rp.Element).ToList() ?? new List<J>());
     }
 
     // ---- Interpolation ----
@@ -497,18 +411,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
                     interp.Format.Element, Space.Empty, Markers.Empty)
                 : null,
             rp => _delegate.VisitRightPadded(rp!, q));
-        return interp with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Expression = expressionRp!.Element,
-            After = expressionRp!.After,
-            Alignment = alignmentRp != null
-                ? new JLeftPadded<Expression>(Space.Empty, alignmentRp.Element)
-                : null,
-            Format = formatRp != null
-                ? new JLeftPadded<Identifier>(Space.Empty, (Identifier)formatRp.Element)
-                : null
-        };
+        return interp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression(expressionRp!.Element).WithAfter(expressionRp!.After).WithAlignment(alignmentRp != null ? new JLeftPadded<Expression>(Space.Empty, alignmentRp.Element) : null).WithFormat(formatRp != null ? new JLeftPadded<Identifier>(Space.Empty, (Identifier)formatRp.Element) : null);
     }
 
     // ---- AwaitExpression ----
@@ -516,8 +419,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var expression = q.Receive((J)ae.Expression, el => (J)VisitNonNull(el, q));
         q.Receive<object?>(null); // type attribution
-        return ae with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Expression = (Expression)expression! };
+        return ae.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((Expression)expression!);
     }
 
     // ---- Yield ----
@@ -525,12 +427,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var returnOrBreakKeyword = q.Receive((J)ys.ReturnOrBreakKeyword, el => (J)VisitNonNull(el, q));
         var expression = q.Receive((J?)ys.Expression, el => (J)VisitNonNull(el!, q));
-        return ys with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            ReturnOrBreakKeyword = (Keyword)returnOrBreakKeyword!,
-            Expression = (Expression?)expression
-        };
+        return ys.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithReturnOrBreakKeyword((Keyword)returnOrBreakKeyword!).WithExpression((Expression?)expression);
     }
 
     // ---- NamespaceDeclaration ----
@@ -553,13 +450,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         if (usings != null) allMembers.AddRange(usings);
         if (members != null) allMembers.AddRange(members);
 
-        return ns with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Name = name,
-            Members = allMembers,
-            End = end!
-        };
+        return ns.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name).WithMembers(allMembers).WithEnd(end!);
     }
 
     // ---- TupleType ----
@@ -567,16 +458,14 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var elements = q.Receive(tt.Elements, c => _delegate.VisitContainer(c, q));
         q.Receive<object?>(null); // type attribution
-        return tt with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Elements = elements };
+        return tt.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithElements(elements);
     }
 
     // ---- TupleExpression ----
     public override J VisitTupleExpression(TupleExpression te, RpcReceiveQueue q)
     {
         var arguments = q.Receive(te.Arguments, c => _delegate.VisitContainer(c, q));
-        return te with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Arguments = arguments };
+        return te.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithArguments(arguments);
     }
 
     // ---- ConditionalDirective ----
@@ -597,12 +486,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         }
         // Receive Branches
         var branches = q.ReceiveList(cd.Branches, rp => _delegate.VisitRightPadded(rp, q));
-        return cd with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            DirectiveLines = directiveLines,
-            Branches = branches!
-        };
+        return cd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithDirectiveLines(directiveLines).WithBranches(branches!);
     }
 
     // ---- PragmaWarningDirective ----
@@ -610,12 +494,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var action = q.Receive<object>(pwd.Action);
         var warningCodes = q.ReceiveList(pwd.WarningCodes, rp => _delegate.VisitRightPadded(rp, q));
-        return pwd with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Action = (PragmaWarningAction)action!,
-            WarningCodes = warningCodes!
-        };
+        return pwd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAction((PragmaWarningAction)action!).WithWarningCodes(warningCodes!);
     }
 
     // ---- NullableDirective ----
@@ -623,58 +502,48 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var setting = q.Receive<object>(nd.Setting);
         var target = q.Receive<object?>(nd.Target);
-        return nd with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Setting = (NullableSetting)setting!,
-            Target = target != null ? (NullableTarget)target : null
-        };
+        return nd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithSetting((NullableSetting)setting!).WithTarget(target != null ? (NullableTarget)target : null);
     }
 
     // ---- RegionDirective ----
     public override J VisitRegionDirective(RegionDirective rd, RpcReceiveQueue q)
     {
         var name = q.Receive<string?>(rd.Name);
-        return rd with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Name = name };
+        return rd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name);
     }
 
     // ---- EndRegionDirective ----
     public override J VisitEndRegionDirective(EndRegionDirective erd, RpcReceiveQueue q)
     {
-        return erd with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers };
+        return erd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers);
     }
 
     // ---- DefineDirective ----
     public override J VisitDefineDirective(DefineDirective dd, RpcReceiveQueue q)
     {
         var symbol = q.Receive((J)dd.Symbol, el => (J)VisitNonNull(el, q));
-        return dd with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Symbol = (Identifier)symbol! };
+        return dd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithSymbol((Identifier)symbol!);
     }
 
     // ---- UndefDirective ----
     public override J VisitUndefDirective(UndefDirective ud, RpcReceiveQueue q)
     {
         var symbol = q.Receive((J)ud.Symbol, el => (J)VisitNonNull(el, q));
-        return ud with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Symbol = (Identifier)symbol! };
+        return ud.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithSymbol((Identifier)symbol!);
     }
 
     // ---- ErrorDirective ----
     public override J VisitErrorDirective(ErrorDirective ed, RpcReceiveQueue q)
     {
         var message = q.Receive<string>(ed.Message);
-        return ed with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Message = message! };
+        return ed.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithMessage(message!);
     }
 
     // ---- WarningDirective ----
     public override J VisitWarningDirective(WarningDirective wd, RpcReceiveQueue q)
     {
         var message = q.Receive<string>(wd.Message);
-        return wd with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Message = message! };
+        return wd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithMessage(message!);
     }
 
     // ---- LineDirective ----
@@ -683,13 +552,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var kind = q.Receive<object>(ld.Kind);
         var line = q.Receive((J?)ld.Line, el => (J)VisitNonNull(el!, q));
         var file = q.Receive((J?)ld.File, el => (J)VisitNonNull(el!, q));
-        return ld with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Kind = (LineKind)kind!,
-            Line = (Expression?)line,
-            File = (Expression?)file
-        };
+        return ld.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithKind((LineKind)kind!).WithLine((Expression?)line).WithFile((Expression?)file);
     }
 
     // ---- New types ----
@@ -697,8 +560,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitKeyword(Keyword kw, RpcReceiveQueue q)
     {
         var kind = q.Receive<object>(kw.Kind);
-        return kw with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Kind = (KeywordKind)kind! };
+        return kw.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithKind((KeywordKind)kind!);
     }
 
     public override J VisitCsArgument(CsArgument arg, RpcReceiveQueue q)
@@ -706,31 +568,26 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var nameColumn = q.Receive(arg.NameColumn, rp => _delegate.VisitRightPadded(rp!, q));
         var refKindKeyword = q.Receive((J?)arg.RefKindKeyword, el => (J)VisitNonNull(el!, q));
         var expression = q.Receive((J)arg.Expression, el => (J)VisitNonNull(el, q));
-        return arg with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            NameColumn = nameColumn, RefKindKeyword = (Keyword?)refKindKeyword,
-            Expression = (Expression)expression! };
+        return arg.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithNameColumn(nameColumn).WithRefKindKeyword((Keyword?)refKindKeyword).WithExpression((Expression)expression!);
     }
 
     public override J VisitNameColon(NameColon nc, RpcReceiveQueue q)
     {
         var name = q.Receive(nc.Name, rp => _delegate.VisitRightPadded(rp, q));
-        return nc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Name = name! };
+        return nc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name!);
     }
 
     public override J VisitAnnotatedStatement(AnnotatedStatement ans, RpcReceiveQueue q)
     {
         var attrLists = q.ReceiveList(ans.AttributeLists, t => (AttributeList)VisitNonNull(t, q));
         var statement = q.Receive((J)ans.Statement, el => (J)VisitNonNull(el, q));
-        return ans with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            AttributeLists = attrLists!, Statement = (Statement)statement! };
+        return ans.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAttributeLists(attrLists!).WithStatement((Statement)statement!);
     }
 
     public override J VisitArrayRankSpecifier(ArrayRankSpecifier ars, RpcReceiveQueue q)
     {
         var sizes = q.Receive(ars.Sizes, c => VisitContainer(c, q));
-        return ars with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Sizes = sizes! };
+        return ars.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithSizes(sizes!);
     }
 
     public override J VisitAssignmentOperation(AssignmentOperation ao, RpcReceiveQueue q)
@@ -739,24 +596,20 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var op = q.Receive(ao.Operator, lp => _delegate.VisitLeftPadded(lp, q));
         var assignmentValue = q.Receive((J)ao.AssignmentValue, el => (J)VisitNonNull(el, q));
         var type = q.Receive(ao.Type, t => VisitType(t, q)!);
-        return ao with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Variable = (Expression)variable!, Operator = op!,
-            AssignmentValue = (Expression)assignmentValue!, Type = type };
+        return ao.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithVariable((Expression)variable!).WithOperator(op!).WithAssignmentValue((Expression)assignmentValue!).WithType(type);
     }
 
     public override J VisitStackAllocExpression(StackAllocExpression sae, RpcReceiveQueue q)
     {
         var expression = q.Receive((J)sae.Expression, el => (J)VisitNonNull(el, q));
-        return sae with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Expression = (NewArray)expression! };
+        return sae.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((NewArray)expression!);
     }
 
     public override J VisitGotoStatement(GotoStatement gs, RpcReceiveQueue q)
     {
         var caseOrDefault = q.Receive((J?)gs.CaseOrDefaultKeyword, el => (J)VisitNonNull(el!, q));
         var target = q.Receive((J?)gs.Target, el => (J)VisitNonNull(el!, q));
-        return gs with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            CaseOrDefaultKeyword = (Keyword?)caseOrDefault, Target = (Expression?)target };
+        return gs.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithCaseOrDefaultKeyword((Keyword?)caseOrDefault).WithTarget((Expression?)target);
     }
 
     public override J VisitEventDeclaration(EventDeclaration evd, RpcReceiveQueue q)
@@ -767,10 +620,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var interfaceSpec = q.Receive(evd.InterfaceSpecifier, rp => _delegate.VisitRightPadded(rp!, q));
         var name = q.Receive((J)evd.Name, el => (J)VisitNonNull(el, q));
         var accessors = q.Receive(evd.Accessors, c => VisitContainer(c!, q));
-        return evd with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            AttributeLists = attrLists!, Modifiers = modifiers!,
-            TypeExpressionPadded = typeExpr!, InterfaceSpecifier = interfaceSpec,
-            Name = (Identifier)name!, Accessors = accessors };
+        return evd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAttributeLists(attrLists!).WithModifiers(modifiers!).WithTypeExpressionPadded(typeExpr!).WithInterfaceSpecifier(interfaceSpec).WithName((Identifier)name!).WithAccessors(accessors);
     }
 
     public override J VisitCsBinary(CsBinary csb, RpcReceiveQueue q)
@@ -779,39 +629,34 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var op = q.Receive(csb.Operator, lp => _delegate.VisitLeftPadded(lp, q));
         var right = q.Receive((J)csb.Right, el => (J)VisitNonNull(el, q));
         var type = q.Receive(csb.Type, t => VisitType(t, q)!);
-        return csb with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Left = (Expression)left!, Operator = op!, Right = (Expression)right!, Type = type };
+        return csb.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithLeft((Expression)left!).WithOperator(op!).WithRight((Expression)right!).WithType(type);
     }
 
     public override J VisitCollectionExpression(CollectionExpression ce, RpcReceiveQueue q)
     {
         var elements = q.ReceiveList(ce.Elements, rp => _delegate.VisitRightPadded(rp, q));
         var type = q.Receive(ce.Type, t => VisitType(t, q)!);
-        return ce with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Elements = elements!, Type = type };
+        return ce.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithElements(elements!).WithType(type);
     }
 
     public override J VisitCsExpressionStatement(CsExpressionStatement ces, RpcReceiveQueue q)
     {
         var exprPadded = q.Receive(ces.ExpressionPadded, rp => _delegate.VisitRightPadded(rp, q));
-        return ces with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            ExpressionPadded = exprPadded! };
+        return ces.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpressionPadded(exprPadded!);
     }
 
     public override J VisitForEachVariableLoop(ForEachVariableLoop fevl, RpcReceiveQueue q)
     {
         var controlElement = q.Receive((J)fevl.ControlElement, el => (J)VisitNonNull(el, q));
         var body = q.Receive(fevl.Body, rp => _delegate.VisitRightPadded(rp, q));
-        return fevl with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            ControlElement = (ForEachVariableLoopControl)controlElement!, Body = body! };
+        return fevl.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithControlElement((ForEachVariableLoopControl)controlElement!).WithBody(body!);
     }
 
     public override J VisitForEachVariableLoopControl(ForEachVariableLoopControl ctrl, RpcReceiveQueue q)
     {
         var variable = q.Receive(ctrl.Variable, rp => _delegate.VisitRightPadded(rp, q));
         var iterable = q.Receive(ctrl.Iterable, rp => _delegate.VisitRightPadded(rp, q));
-        return ctrl with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Variable = variable!, Iterable = iterable! };
+        return ctrl.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithVariable(variable!).WithIterable(iterable!);
     }
 
     public override J VisitCsMethodDeclaration(CsMethodDeclaration cmd, RpcReceiveQueue q)
@@ -825,12 +670,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var parameters = q.Receive(cmd.Parameters, c => VisitContainer(c, q));
         var body = q.Receive((J?)cmd.Body, el => (J)VisitNonNull(el!, q));
         var methodType = q.Receive((JavaType?)cmd.MethodType, t => VisitType(t, q)!);
-        return cmd with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Attributes = attrs!, Modifiers = modifiers!,
-            TypeParameters = typeParams, ReturnTypeExpression = (TypeTree)returnType!,
-            ExplicitInterfaceSpecifier = explIntSpec, Name = (Identifier)name!,
-            Parameters = parameters!, Body = (Statement?)body,
-            MethodType = (JavaType.Method?)methodType };
+        return cmd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAttributes(attrs!).WithModifiers(modifiers!).WithTypeParameters(typeParams).WithReturnTypeExpression((TypeTree)returnType!).WithExplicitInterfaceSpecifier(explIntSpec).WithName((Identifier)name!).WithParameters(parameters!).WithBody((Statement?)body).WithMethodType((JavaType.Method?)methodType);
     }
 
     public override J VisitUsingStatement(UsingStatement ust, RpcReceiveQueue q)
@@ -838,60 +678,53 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var awaitKw = q.Receive((J?)ust.AwaitKeyword, el => (J)VisitNonNull(el!, q));
         var exprPadded = q.Receive(ust.ExpressionPadded, lp => _delegate.VisitLeftPadded(lp, q));
         var statement = q.Receive((J)ust.Statement, el => (J)VisitNonNull(el, q));
-        return ust with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            AwaitKeyword = (Keyword?)awaitKw, ExpressionPadded = exprPadded!,
-            Statement = (Statement)statement! };
+        return ust.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAwaitKeyword((Keyword?)awaitKw).WithExpressionPadded(exprPadded!).WithStatement((Statement)statement!);
     }
 
     public override J VisitAllowsConstraintClause(AllowsConstraintClause acc, RpcReceiveQueue q)
     {
         var expressions = q.Receive(acc.Expressions, c => VisitContainer(c, q));
-        return acc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Expressions = expressions! };
+        return acc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpressions(expressions!);
     }
 
     public override J VisitRefStructConstraint(RefStructConstraint rsc, RpcReceiveQueue q)
     {
-        return rsc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers };
+        return rsc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers);
     }
 
     public override J VisitClassOrStructConstraint(ClassOrStructConstraint cosc, RpcReceiveQueue q)
     {
         var kind = q.Receive<object>(cosc.Kind);
-        return cosc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Kind = (ClassOrStructConstraint.TypeKind)kind! };
+        return cosc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithKind((ClassOrStructConstraint.TypeKind)kind!);
     }
 
     public override J VisitConstructorConstraint(ConstructorConstraint cc, RpcReceiveQueue q)
     {
-        return cc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers };
+        return cc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers);
     }
 
     public override J VisitDefaultConstraint(DefaultConstraint dc, RpcReceiveQueue q)
     {
-        return dc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers };
+        return dc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers);
     }
 
     public override J VisitSingleVariableDesignation(SingleVariableDesignation svd, RpcReceiveQueue q)
     {
         var name = q.Receive((J)svd.Name, el => (J)VisitNonNull(el, q));
-        return svd with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Name = (Identifier)name! };
+        return svd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName((Identifier)name!);
     }
 
     public override J VisitParenthesizedVariableDesignation(ParenthesizedVariableDesignation pvd, RpcReceiveQueue q)
     {
         var variables = q.Receive(pvd.Variables, c => VisitContainer(c, q));
         var type = q.Receive(pvd.Type, t => VisitType(t, q)!);
-        return pvd with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Variables = variables!, Type = type };
+        return pvd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithVariables(variables!).WithType(type);
     }
 
     public override J VisitDiscardVariableDesignation(DiscardVariableDesignation dvd, RpcReceiveQueue q)
     {
         var discard = q.Receive((J)dvd.Discard, el => (J)VisitNonNull(el, q));
-        return dvd with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Discard = (Identifier)discard! };
+        return dvd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithDiscard((Identifier)discard!);
     }
 
     public override J VisitCsUnary(CsUnary csu, RpcReceiveQueue q)
@@ -899,66 +732,58 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var op = q.Receive(csu.Operator, lp => _delegate.VisitLeftPadded(lp, q));
         var expression = q.Receive((J)csu.Expression, el => (J)VisitNonNull(el, q));
         var type = q.Receive(csu.Type, t => VisitType(t, q)!);
-        return csu with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Operator = op!, Expression = (Expression)expression!, Type = type };
+        return csu.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithOperator(op!).WithExpression((Expression)expression!).WithType(type);
     }
 
     public override J VisitTupleElement(TupleElement tel, RpcReceiveQueue q)
     {
         var elementType = q.Receive((J)tel.ElementType, el => (J)VisitNonNull(el, q));
         var name = q.Receive((J?)tel.Name, el => (J)VisitNonNull(el!, q));
-        return tel with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            ElementType = (TypeTree)elementType!, Name = (Identifier?)name };
+        return tel.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithElementType((TypeTree)elementType!).WithName((Identifier?)name);
     }
 
     public override J VisitCsNewClass(CsNewClass csnc, RpcReceiveQueue q)
     {
         var newClassCore = q.Receive((J)csnc.NewClassCore, el => (J)VisitNonNull(el, q));
         var initializer = q.Receive((J?)csnc.Initializer, el => (J)VisitNonNull(el!, q));
-        return csnc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            NewClassCore = (NewClass)newClassCore!, Initializer = (InitializerExpression?)initializer };
+        return csnc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithNewClassCore((NewClass)newClassCore!).WithInitializer((InitializerExpression?)initializer);
     }
 
     public override J VisitImplicitElementAccess(ImplicitElementAccess iea, RpcReceiveQueue q)
     {
         var argList = q.Receive(iea.ArgumentList, c => VisitContainer(c, q));
-        return iea with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            ArgumentList = argList! };
+        return iea.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithArgumentList(argList!);
     }
 
     public override J VisitConstantPattern(ConstantPattern cp, RpcReceiveQueue q)
     {
         var value = q.Receive((J)cp.Value, el => (J)VisitNonNull(el, q));
-        return cp with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Value = (Expression)value! };
+        return cp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithValue((Expression)value!);
     }
 
     public override J VisitDiscardPattern(DiscardPattern dp, RpcReceiveQueue q)
     {
         var type = q.Receive(dp.Type, t => VisitType(t, q)!);
-        return dp with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Type = type };
+        return dp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithType(type);
     }
 
     public override J VisitListPattern(ListPattern lp, RpcReceiveQueue q)
     {
         var patterns = q.Receive(lp.Patterns, c => VisitContainer(c, q));
         var designation = q.Receive((J?)lp.Designation, el => (J)VisitNonNull(el!, q));
-        return lp with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Patterns = patterns!, Designation = (VariableDesignation?)designation };
+        return lp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithPatterns(patterns!).WithDesignation((VariableDesignation?)designation);
     }
 
     public override J VisitSlicePattern(SlicePattern sp, RpcReceiveQueue q)
     {
-        return sp with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers };
+        return sp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers);
     }
 
     public override J VisitSwitchExpression(SwitchExpression swe, RpcReceiveQueue q)
     {
         var expr = q.Receive(swe.ExpressionPadded, rp => _delegate.VisitRightPadded(rp, q));
         var arms = q.Receive(swe.Arms, c => VisitContainer(c, q));
-        return swe with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            ExpressionPadded = expr!, Arms = arms! };
+        return swe.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpressionPadded(expr!).WithArms(arms!);
     }
 
     public override J VisitSwitchExpressionArm(SwitchExpressionArm swea, RpcReceiveQueue q)
@@ -966,34 +791,28 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var pattern = q.Receive((J)swea.Pattern, el => (J)VisitNonNull(el, q));
         var whenExpr = q.Receive(swea.WhenExpression, lp => _delegate.VisitLeftPadded(lp!, q));
         var exprPadded = q.Receive(swea.ExpressionPadded, lp => _delegate.VisitLeftPadded(lp, q));
-        return swea with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Pattern = (Pattern)pattern!, WhenExpression = whenExpr,
-            ExpressionPadded = exprPadded! };
+        return swea.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithPattern((J)pattern!).WithWhenExpression(whenExpr).WithExpressionPadded(exprPadded!);
     }
 
     public override J VisitCheckedExpression(CheckedExpression che, RpcReceiveQueue q)
     {
         var keyword = q.Receive((J)che.CheckedOrUncheckedKeyword, el => (J)VisitNonNull(el, q));
         var exprValue = q.Receive((J)che.ExpressionValue, el => (J)VisitNonNull(el, q));
-        return che with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            CheckedOrUncheckedKeyword = (Keyword)keyword!,
-            ExpressionValue = (ControlParentheses<Expression>)exprValue! };
+        return che.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithCheckedOrUncheckedKeyword((Keyword)keyword!).WithExpressionValue((ControlParentheses<Expression>)exprValue!);
     }
 
     public override J VisitCheckedStatement(CheckedStatement chs, RpcReceiveQueue q)
     {
         var keyword = q.Receive((J)chs.KeywordValue, el => (J)VisitNonNull(el, q));
         var block = q.Receive((J)chs.Block, el => (J)VisitNonNull(el, q));
-        return chs with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            KeywordValue = (Keyword)keyword!, Block = (Block)block! };
+        return chs.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithKeywordValue((Keyword)keyword!).WithBlock((Block)block!);
     }
 
     public override J VisitRangeExpression(RangeExpression rang, RpcReceiveQueue q)
     {
         var start = q.Receive(rang.Start, rp => _delegate.VisitRightPadded(rp!, q));
         var end = q.Receive((J?)rang.End, el => (J)VisitNonNull(el!, q));
-        return rang with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Start = start, End = (Expression?)end };
+        return rang.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithStart(start).WithEnd((Expression?)end);
     }
 
     public override J VisitIndexerDeclaration(IndexerDeclaration idxd, RpcReceiveQueue q)
@@ -1005,11 +824,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var parameters = q.Receive(idxd.Parameters, c => VisitContainer(c, q));
         var exprBody = q.Receive(idxd.ExpressionBody, lp => _delegate.VisitLeftPadded(lp!, q));
         var accessors = q.Receive((J?)idxd.Accessors, el => (J)VisitNonNull(el!, q));
-        return idxd with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Modifiers = modifiers!, TypeExpression = (TypeTree)typeExpr!,
-            ExplicitInterfaceSpecifier = explIntSpec, Indexer = (Expression)indexer!,
-            Parameters = parameters!, ExpressionBody = exprBody,
-            Accessors = (Block?)accessors };
+        return idxd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithModifiers(modifiers!).WithTypeExpression((TypeTree)typeExpr!).WithExplicitInterfaceSpecifier(explIntSpec).WithIndexer((Expression)indexer!).WithParameters(parameters!).WithExpressionBody(exprBody).WithAccessors((Block?)accessors);
     }
 
     public override J VisitDelegateDeclaration(DelegateDeclaration deld, RpcReceiveQueue q)
@@ -1020,10 +835,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var name = q.Receive((J)deld.IdentifierName, el => (J)VisitNonNull(el, q));
         var typeParams = q.Receive(deld.TypeParameters, c => VisitContainer(c!, q));
         var parameters = q.Receive(deld.Parameters, c => VisitContainer(c, q));
-        return deld with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Attributes = attrs!, Modifiers = modifiers!, ReturnType = returnType!,
-            IdentifierName = (Identifier)name!, TypeParameters = typeParams,
-            Parameters = parameters! };
+        return deld.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAttributes(attrs!).WithModifiers(modifiers!).WithReturnType(returnType!).WithIdentifierName((Identifier)name!).WithTypeParameters(typeParams).WithParameters(parameters!);
     }
 
     public override J VisitConversionOperatorDeclaration(ConversionOperatorDeclaration cod, RpcReceiveQueue q)
@@ -1034,9 +846,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var parameters = q.Receive(cod.Parameters, c => VisitContainer(c, q));
         var exprBody = q.Receive(cod.ExpressionBody, lp => _delegate.VisitLeftPadded(lp!, q));
         var body = q.Receive((J?)cod.Body, el => (J)VisitNonNull(el!, q));
-        return cod with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Modifiers = modifiers!, Kind = kind!, ReturnType = returnType!,
-            Parameters = parameters!, ExpressionBody = exprBody, Body = (Block?)body };
+        return cod.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithModifiers(modifiers!).WithKind(kind!).WithReturnType(returnType!).WithParameters(parameters!).WithExpressionBody(exprBody).WithBody((Block?)body);
     }
 
     public override J VisitOperatorDeclaration(OperatorDeclaration opd, RpcReceiveQueue q)
@@ -1051,13 +861,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var parameters = q.Receive(opd.Parameters, c => VisitContainer(c, q));
         var body = q.Receive((J)opd.Body, el => (J)VisitNonNull(el, q));
         var methodType = q.Receive((JavaType?)opd.MethodType, t => VisitType(t, q)!);
-        return opd with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            AttributeLists = attrLists!, Modifiers = modifiers!,
-            ExplicitInterfaceSpecifier = explIntSpec,
-            OperatorKeyword = (Keyword)operatorKw!, CheckedKeyword = (Keyword?)checkedKw,
-            OperatorToken = operatorToken!, ReturnType = (TypeTree)returnType!,
-            Parameters = parameters!, Body = (Block)body!,
-            MethodType = (JavaType.Method?)methodType };
+        return opd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAttributeLists(attrLists!).WithModifiers(modifiers!).WithExplicitInterfaceSpecifier(explIntSpec).WithOperatorKeyword((Keyword)operatorKw!).WithCheckedKeyword((Keyword?)checkedKw).WithOperatorToken(operatorToken!).WithReturnType((TypeTree)returnType!).WithParameters(parameters!).WithBody((Block)body!).WithMethodType((JavaType.Method?)methodType);
     }
 
     public override J VisitEnumDeclaration(EnumDeclaration enumd, RpcReceiveQueue q)
@@ -1068,9 +872,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var namePadded = q.Receive(enumd.NamePadded, lp => _delegate.VisitLeftPadded(lp, q));
         var baseType = q.Receive(enumd.BaseType, lp => _delegate.VisitLeftPadded(lp!, q));
         var members = q.Receive(enumd.Members, c => VisitContainer(c!, q));
-        return enumd with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            AttributeLists = attrLists, Modifiers = modifiers!,
-            NamePadded = namePadded!, BaseType = baseType, Members = members };
+        return enumd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAttributeLists(attrLists).WithModifiers(modifiers!).WithNamePadded(namePadded!).WithBaseType(baseType).WithMembers(members);
     }
 
     public override J VisitEnumMemberDeclaration(EnumMemberDeclaration enummd, RpcReceiveQueue q)
@@ -1078,17 +880,14 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var attrLists = q.ReceiveList(enummd.AttributeLists, t => (AttributeList)VisitNonNull(t, q));
         var name = q.Receive((J)enummd.Name, el => (J)VisitNonNull(el, q));
         var initializer = q.Receive(enummd.Initializer, lp => _delegate.VisitLeftPadded(lp!, q));
-        return enummd with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            AttributeLists = attrLists!, Name = (Identifier)name!,
-            Initializer = initializer };
+        return enummd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAttributeLists(attrLists!).WithName((Identifier)name!).WithInitializer(initializer);
     }
 
     public override J VisitAliasQualifiedName(AliasQualifiedName aqn, RpcReceiveQueue q)
     {
         var alias = q.Receive(aqn.Alias, rp => _delegate.VisitRightPadded(rp, q));
         var name = q.Receive((J)aqn.Name, el => (J)VisitNonNull(el, q));
-        return aqn with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Alias = alias!, Name = (Expression)name! };
+        return aqn.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAlias(alias!).WithName((Expression)name!);
     }
 
     public override J VisitCsArrayType(CsArrayType csat, RpcReceiveQueue q)
@@ -1097,9 +896,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var dimensions = q.ReceiveList(csat.Dimensions,
             d => (ArrayDimension)VisitNonNull(d, q));
         var type = q.Receive(csat.Type, t => VisitType(t, q)!);
-        return csat with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            TypeExpression = (TypeTree?)typeExpr, Dimensions = dimensions!,
-            Type = type };
+        return csat.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTypeExpression((TypeTree?)typeExpr).WithDimensions(dimensions!).WithType(type);
     }
 
     public override J VisitCsTry(CsTry cstry, RpcReceiveQueue q)
@@ -1107,9 +904,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var body = q.Receive((J)cstry.Body, el => (J)VisitNonNull(el, q));
         var catches = q.ReceiveList(cstry.Catches, c => (CsTryCatch)VisitNonNull(c, q));
         var finallyBlock = q.Receive(cstry.Finally, lp => _delegate.VisitLeftPadded(lp!, q));
-        return cstry with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Body = (Block)body!, Catches = catches!,
-            Finally = finallyBlock };
+        return cstry.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithBody((Block)body!).WithCatches(catches!).WithFinally(finallyBlock);
     }
 
     public override J VisitCsTryCatch(CsTryCatch cstc, RpcReceiveQueue q)
@@ -1117,9 +912,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var parameter = q.Receive((J)cstc.Parameter, el => (J)VisitNonNull(el, q));
         var filterExpr = q.Receive(cstc.FilterExpression, lp => _delegate.VisitLeftPadded(lp!, q));
         var body = q.Receive((J)cstc.Body, el => (J)VisitNonNull(el, q));
-        return cstc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Parameter = (ControlParentheses<VariableDeclarations>)parameter!,
-            FilterExpression = filterExpr, Body = (Block)body! };
+        return cstc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithParameter((ControlParentheses<VariableDeclarations>)parameter!).WithFilterExpression(filterExpr).WithBody((Block)body!);
     }
 
     public override J VisitPointerFieldAccess(PointerFieldAccess pfa, RpcReceiveQueue q)
@@ -1127,8 +920,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var target = q.Receive((J)pfa.Target, el => (J)VisitNonNull(el, q));
         var namePadded = q.Receive(pfa.NamePadded, lp => _delegate.VisitLeftPadded(lp, q));
         var type = q.Receive(pfa.Type, t => VisitType(t, q)!);
-        return pfa with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Target = (Expression)target!, NamePadded = namePadded!, Type = type };
+        return pfa.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTarget((Expression)target!).WithNamePadded(namePadded!).WithType(type);
     }
 
     public override J VisitRefType(RefType rt, RpcReceiveQueue q)
@@ -1136,17 +928,14 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var readonlyKw = q.Receive((J?)rt.ReadonlyKeyword, el => (J)VisitNonNull(el!, q));
         var typeIdentifier = q.Receive((J)rt.TypeIdentifier, el => (J)VisitNonNull(el, q));
         var type = q.Receive(rt.Type, t => VisitType(t, q)!);
-        return rt with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            ReadonlyKeyword = (Modifier?)readonlyKw, TypeIdentifier = (TypeTree)typeIdentifier!,
-            Type = type };
+        return rt.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithReadonlyKeyword((Modifier?)readonlyKw).WithTypeIdentifier((TypeTree)typeIdentifier!).WithType(type);
     }
 
     public override J VisitAnonymousObjectCreationExpression(AnonymousObjectCreationExpression aoce, RpcReceiveQueue q)
     {
         var initializers = q.Receive(aoce.Initializers, el => _delegate.VisitContainer(el, q));
         var type = q.Receive(aoce.Type, t => VisitType(t, q)!);
-        return aoce with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Initializers = initializers!, Type = type };
+        return aoce.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithInitializers(initializers!).WithType(type);
     }
 
     public override J VisitWithExpression(WithExpression we, RpcReceiveQueue q)
@@ -1154,16 +943,14 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var target = q.Receive((J)we.Target, el => (J)VisitNonNull(el, q));
         var initializer = q.Receive(we.InitializerPadded, lp => _delegate.VisitLeftPadded(lp, q));
         var type = q.Receive(we.Type, t => VisitType(t, q)!);
-        return we with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Target = (Expression)target!, InitializerPadded = initializer!, Type = type };
+        return we.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTarget((Expression)target!).WithInitializerPadded(initializer!).WithType(type);
     }
 
     public override J VisitSpreadExpression(SpreadExpression se, RpcReceiveQueue q)
     {
         var expression = q.Receive((J)se.Expression, el => (J)VisitNonNull(el, q));
         var type = q.Receive(se.Type, t => VisitType(t, q)!);
-        return se with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Expression = (Expression)expression!, Type = type };
+        return se.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((Expression)expression!).WithType(type);
     }
 
     public override J VisitFunctionPointerType(FunctionPointerType fpt, RpcReceiveQueue q)
@@ -1172,9 +959,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var unmanagedConventionTypes = q.Receive(fpt.UnmanagedCallingConventionTypes, el => _delegate.VisitContainer(el!, q));
         var parameterTypes = q.Receive(fpt.ParameterTypes, el => _delegate.VisitContainer(el, q));
         var type = q.Receive(fpt.Type, t => VisitType(t, q)!);
-        return fpt with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            CallingConvention = callingConvention, UnmanagedCallingConventionTypes = unmanagedConventionTypes,
-            ParameterTypes = parameterTypes!, Type = type };
+        return fpt.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithCallingConvention(callingConvention).WithUnmanagedCallingConventionTypes(unmanagedConventionTypes).WithParameterTypes(parameterTypes!).WithType(type);
     }
 
     // ---- LINQ ----
@@ -1183,8 +968,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var fromClause = q.Receive((J)qe.FromClause, el => (J)VisitNonNull(el, q));
         var body = q.Receive((J)qe.Body, el => (J)VisitNonNull(el, q));
-        return qe with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            FromClause = (FromClause)fromClause!, Body = (QueryBody)body! };
+        return qe.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithFromClause((FromClause)fromClause!).WithBody((QueryBody)body!);
     }
 
     public override J VisitQueryBody(QueryBody qb, RpcReceiveQueue q)
@@ -1193,10 +977,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             el => (QueryClause)VisitNonNull(el, q));
         var selectOrGroup = q.Receive((J?)qb.SelectOrGroup, el => (J)VisitNonNull(el!, q));
         var continuation = q.Receive((J?)qb.Continuation, el => (J)VisitNonNull(el!, q));
-        return qb with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Clauses = clauses?.Cast<QueryClause>().ToList() ?? new List<QueryClause>(),
-            SelectOrGroup = (SelectOrGroupClause?)selectOrGroup,
-            Continuation = (QueryContinuation?)continuation };
+        return qb.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithClauses(clauses?.Cast<QueryClause>().ToList() ?? new List<QueryClause>()).WithSelectOrGroup((SelectOrGroupClause?)selectOrGroup).WithContinuation((QueryContinuation?)continuation);
     }
 
     public override J VisitFromClause(FromClause fc, RpcReceiveQueue q)
@@ -1204,19 +985,14 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var typeIdentifier = q.Receive((J?)fc.TypeIdentifier, el => (J)VisitNonNull(el!, q));
         var identifier = q.Receive(fc.IdentifierPadded, rp => _delegate.VisitRightPadded(rp, q));
         var expression = q.Receive((J)fc.Expression, el => (J)VisitNonNull(el, q));
-        return fc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            TypeIdentifier = (TypeTree?)typeIdentifier,
-            IdentifierPadded = identifier!,
-            Expression = (Expression)expression! };
+        return fc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTypeIdentifier((TypeTree?)typeIdentifier).WithIdentifierPadded(identifier!).WithExpression((Expression)expression!);
     }
 
     public override J VisitLetClause(LetClause lc, RpcReceiveQueue q)
     {
         var identifier = q.Receive(lc.IdentifierPadded, rp => _delegate.VisitRightPadded(rp, q));
         var expression = q.Receive((J)lc.Expression, el => (J)VisitNonNull(el, q));
-        return lc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            IdentifierPadded = identifier!,
-            Expression = (Expression)expression! };
+        return lc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithIdentifierPadded(identifier!).WithExpression((Expression)expression!);
     }
 
     public override J VisitJoinClause(JoinClause jc, RpcReceiveQueue q)
@@ -1226,67 +1002,52 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var leftExpression = q.Receive(jc.LeftExpression, rp => _delegate.VisitRightPadded(rp, q));
         var rightExpression = q.Receive((J)jc.RightExpression, el => (J)VisitNonNull(el, q));
         var into = q.Receive(jc.Into, lp => _delegate.VisitLeftPadded(lp!, q));
-        return jc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            IdentifierPadded = identifier!,
-            InExpression = inExpression!,
-            LeftExpression = leftExpression!,
-            RightExpression = (Expression)rightExpression!,
-            Into = into };
+        return jc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithIdentifierPadded(identifier!).WithInExpression(inExpression!).WithLeftExpression(leftExpression!).WithRightExpression((Expression)rightExpression!).WithInto(into);
     }
 
     public override J VisitJoinIntoClause(JoinIntoClause jic, RpcReceiveQueue q)
     {
         var identifier = q.Receive((J)jic.Identifier, el => (J)VisitNonNull(el, q));
-        return jic with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Identifier = (Identifier)identifier! };
+        return jic.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithIdentifier((Identifier)identifier!);
     }
 
     public override J VisitWhereClause(WhereClause wc, RpcReceiveQueue q)
     {
         var condition = q.Receive((J)wc.Condition, el => (J)VisitNonNull(el, q));
-        return wc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Condition = (Expression)condition! };
+        return wc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithCondition((Expression)condition!);
     }
 
     public override J VisitOrderByClause(OrderByClause obc, RpcReceiveQueue q)
     {
         var orderings = q.ReceiveList(obc.Orderings, rp => _delegate.VisitRightPadded(rp, q));
-        return obc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Orderings = orderings! };
+        return obc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithOrderings(orderings!);
     }
 
     public override J VisitOrdering(Ordering ord, RpcReceiveQueue q)
     {
         var expression = q.Receive(ord.ExpressionPadded, rp => _delegate.VisitRightPadded(rp, q));
         var direction = q.Receive<object?>(ord.Direction);
-        return ord with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            ExpressionPadded = expression!,
-            Direction = direction != null ? (DirectionKind)direction : null };
+        return ord.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpressionPadded(expression!).WithDirection(direction != null ? (DirectionKind)direction : null);
     }
 
     public override J VisitSelectClause(SelectClause sc, RpcReceiveQueue q)
     {
         var expression = q.Receive((J)sc.Expression, el => (J)VisitNonNull(el, q));
-        return sc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Expression = (Expression)expression! };
+        return sc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((Expression)expression!);
     }
 
     public override J VisitGroupClause(GroupClause gc, RpcReceiveQueue q)
     {
         var groupExpression = q.Receive(gc.GroupExpression, rp => _delegate.VisitRightPadded(rp, q));
         var key = q.Receive((J)gc.Key, el => (J)VisitNonNull(el, q));
-        return gc with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            GroupExpression = groupExpression!,
-            Key = (Expression)key! };
+        return gc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithGroupExpression(groupExpression!).WithKey((Expression)key!);
     }
 
     public override J VisitQueryContinuation(QueryContinuation qcont, RpcReceiveQueue q)
     {
         var identifier = q.Receive((J)qcont.Identifier, el => (J)VisitNonNull(el, q));
         var body = q.Receive((J)qcont.Body, el => (J)VisitNonNull(el, q));
-        return qcont with { Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Identifier = (Identifier)identifier!,
-            Body = (QueryBody)body! };
+        return qcont.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithIdentifier((Identifier)identifier!).WithBody((QueryBody)body!);
     }
 
     // ---- Helper delegation to JavaReceiver ----

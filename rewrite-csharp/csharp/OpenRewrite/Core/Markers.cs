@@ -14,8 +14,11 @@ public interface Marker
 /// A collection of markers attached to an LST element.
 /// Markers allow attaching metadata without modifying the tree structure.
 /// </summary>
-public sealed record Markers(Guid Id, IList<Marker> MarkerList) : IRpcCodec<Markers>
+public sealed class Markers(Guid id, IList<Marker> markerList) : IRpcCodec<Markers>, IEquatable<Markers>
 {
+    public Guid Id { get; } = id;
+    public IList<Marker> MarkerList { get; } = markerList;
+
     public void RpcSend(Markers after, RpcSendQueue q)
     {
         q.GetAndSend(after, m => m.Id);
@@ -32,7 +35,7 @@ public sealed record Markers(Guid Id, IList<Marker> MarkerList) : IRpcCodec<Mark
                 return (Marker)codec.RpcReceive(marker, q);
             return marker;
         });
-        return before with { Id = id, MarkerList = markerList! };
+        return new Markers(id, markerList!);
     }
 
     public static readonly Markers Empty = new(Guid.Empty, []);
@@ -47,8 +50,18 @@ public sealed record Markers(Guid Id, IList<Marker> MarkerList) : IRpcCodec<Mark
         MarkerList.OfType<T>().FirstOrDefault();
 
     public Markers Add(Marker marker) =>
-        this with { MarkerList = [..MarkerList, marker] };
+        new(Id, [..MarkerList, marker]);
 
     public Markers Remove<T>() where T : Marker =>
-        this with { MarkerList = MarkerList.Where(m => m is not T).ToList() };
+        new(Id, MarkerList.Where(m => m is not T).ToList());
+
+    public Markers WithId(Guid id) =>
+        id == Id ? this : new(id, MarkerList);
+
+    public Markers WithMarkerList(IList<Marker> markerList) =>
+        ReferenceEquals(markerList, MarkerList) ? this : new(Id, markerList);
+
+    public bool Equals(Markers? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Markers);
+    public override int GetHashCode() => Id.GetHashCode();
 }

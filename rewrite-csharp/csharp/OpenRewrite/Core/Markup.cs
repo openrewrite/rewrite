@@ -5,9 +5,17 @@ namespace Rewrite.Core;
 /// <summary>
 /// Markers for annotating LST nodes with error, warning, info, or debug messages.
 /// </summary>
-public abstract record Markup(Guid Id, string Message, string? Detail) : Marker
+public abstract class Markup(Guid id, string message, string? detail) : Marker, IEquatable<Markup>
 {
-    public sealed record Error(Guid Id, string Message, string? Detail) : Markup(Id, Message, Detail), IRpcCodec<Error>
+    public Guid Id { get; } = id;
+    public string Message { get; } = message;
+    public string? Detail { get; } = detail;
+
+    public bool Equals(Markup? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Markup);
+    public override int GetHashCode() => Id.GetHashCode();
+
+    public sealed class Error(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Error>
     {
         public void RpcSend(Error after, RpcSendQueue q)
         {
@@ -21,11 +29,11 @@ public abstract record Markup(Guid Id, string Message, string? Detail) : Marker
             var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
             var message = q.Receive(before.Message);
             var detail = q.Receive(before.Detail);
-            return before with { Id = id, Message = message!, Detail = detail };
+            return new Error(id, message!, detail);
         }
     }
 
-    public sealed record Warn(Guid Id, string Message, string? Detail) : Markup(Id, Message, Detail), IRpcCodec<Warn>
+    public sealed class Warn(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Warn>
     {
         public void RpcSend(Warn after, RpcSendQueue q)
         {
@@ -39,11 +47,11 @@ public abstract record Markup(Guid Id, string Message, string? Detail) : Marker
             var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
             var message = q.Receive(before.Message);
             var detail = q.Receive(before.Detail);
-            return before with { Id = id, Message = message!, Detail = detail };
+            return new Warn(id, message!, detail);
         }
     }
 
-    public sealed record Info(Guid Id, string Message, string? Detail) : Markup(Id, Message, Detail), IRpcCodec<Info>
+    public sealed class Info(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Info>
     {
         public void RpcSend(Info after, RpcSendQueue q)
         {
@@ -57,11 +65,11 @@ public abstract record Markup(Guid Id, string Message, string? Detail) : Marker
             var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
             var message = q.Receive(before.Message);
             var detail = q.Receive(before.Detail);
-            return before with { Id = id, Message = message!, Detail = detail };
+            return new Info(id, message!, detail);
         }
     }
 
-    public sealed record Debug(Guid Id, string Message, string? Detail) : Markup(Id, Message, Detail), IRpcCodec<Debug>
+    public sealed class Debug(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Debug>
     {
         public void RpcSend(Debug after, RpcSendQueue q)
         {
@@ -75,7 +83,7 @@ public abstract record Markup(Guid Id, string Message, string? Detail) : Marker
             var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
             var message = q.Receive(before.Message);
             var detail = q.Receive(before.Detail);
-            return before with { Id = id, Message = message!, Detail = detail };
+            return new Debug(id, message!, detail);
         }
     }
 }

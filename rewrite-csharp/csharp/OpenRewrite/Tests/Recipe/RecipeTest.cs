@@ -101,7 +101,7 @@ class RenameClassRecipe : Recipe
             cd = (ClassDeclaration)base.VisitClassDeclaration(cd, ctx);
             if (cd.Name.SimpleName == _from)
             {
-                return cd with { Name = cd.Name with { SimpleName = _to } };
+                return cd.WithName(cd.Name.WithSimpleName(_to));
             }
 
             return cd;
