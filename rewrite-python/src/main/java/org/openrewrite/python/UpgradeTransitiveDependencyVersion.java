@@ -85,6 +85,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     static class Accumulator {
         final Set<String> projectsToUpdate = new HashSet<>();
         final Map<String, String> updatedLockFiles = new HashMap<>();
+        final Map<String, String> existingLockContents = new HashMap<>();
         final Map<String, Action> actions = new HashMap<>();
     }
 
@@ -98,7 +99,16 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         return new TomlIsoVisitor<ExecutionContext>() {
             @Override
             public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
-                if (!document.getSourcePath().toString().endsWith("pyproject.toml")) {
+                String sourcePath = document.getSourcePath().toString();
+
+                if (sourcePath.endsWith("uv.lock")) {
+                    acc.existingLockContents.put(
+                            PyProjectHelper.correspondingPyprojectPath(sourcePath),
+                            document.printAll());
+                    return document;
+                }
+
+                if (!sourcePath.endsWith("pyproject.toml")) {
                     return document;
                 }
                 Optional<PythonResolutionResult> resolution = document.getMarkers()
@@ -108,7 +118,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 }
 
                 PythonResolutionResult marker = resolution.get();
-                String sourcePath = document.getSourcePath().toString();
 
                 // Skip if this is a direct dependency
                 if (marker.findDependency(packageName) != null) {
@@ -253,7 +262,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         }.visitNonNull(document, ctx);
 
         if (updated != document) {
-            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, acc.updatedLockFiles);
+            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, acc.updatedLockFiles, acc.existingLockContents);
         }
 
         return updated;
@@ -315,7 +324,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         }.visitNonNull(document, ctx);
 
         if (updated != document) {
-            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, acc.updatedLockFiles);
+            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, acc.updatedLockFiles, acc.existingLockContents);
         }
 
         return updated;
@@ -359,7 +368,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         }.visitNonNull(document, ctx);
 
         if (updated != document) {
-            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, acc.updatedLockFiles);
+            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, acc.updatedLockFiles, acc.existingLockContents);
         }
 
         return updated;
@@ -396,7 +405,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         }.visitNonNull(document, ctx);
 
         if (updated != document) {
-            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, acc.updatedLockFiles);
+            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, acc.updatedLockFiles, acc.existingLockContents);
         }
 
         return updated;

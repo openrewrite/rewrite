@@ -27,6 +27,7 @@ import org.openrewrite.toml.tree.Toml;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Shared utilities for Python dependency recipes operating on pyproject.toml files.
@@ -110,7 +111,25 @@ public class PyProjectHelper {
      */
     public static Toml.Document regenerateLockAndRefreshMarker(
             Toml.Document updated,
-            java.util.Map<String, String> updatedLockFiles) {
+            Map<String, String> updatedLockFiles) {
+        return regenerateLockAndRefreshMarker(updated, updatedLockFiles, null);
+    }
+
+    /**
+     * After modifying a pyproject.toml document, regenerate the uv.lock file and
+     * refresh the {@link PythonResolutionResult} marker. Returns the updated document.
+     *
+     * @param updated              the modified pyproject.toml document
+     * @param updatedLockFiles     map to store regenerated lock content keyed by pyproject path
+     * @param existingLockContents map of existing uv.lock contents keyed by pyproject path,
+     *                             used to seed the lock regeneration so only changed
+     *                             dependencies are updated (may be {@code null})
+     * @return the document with refreshed marker (and possibly a warning markup)
+     */
+    public static Toml.Document regenerateLockAndRefreshMarker(
+            Toml.Document updated,
+            Map<String, String> updatedLockFiles,
+            @Nullable Map<String, String> existingLockContents) {
         PythonResolutionResult marker = updated.getMarkers()
                 .findFirst(PythonResolutionResult.class).orElse(null);
 
@@ -119,8 +138,9 @@ public class PyProjectHelper {
         if (marker != null && !marker.getResolvedDependencies().isEmpty()) {
             String sourcePath = updated.getSourcePath().toString();
             String pyprojectContent = updated.printAll();
+            String existingLock = existingLockContents != null ? existingLockContents.get(sourcePath) : null;
 
-            UvLockRegeneration.Result lockResult = UvLockRegeneration.regenerate(pyprojectContent);
+            UvLockRegeneration.Result lockResult = UvLockRegeneration.regenerate(pyprojectContent, existingLock);
             if (lockResult.isSuccess()) {
                 updatedLockFiles.put(sourcePath, lockResult.getLockFileContent());
             } else {

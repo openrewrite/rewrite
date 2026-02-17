@@ -75,6 +75,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     static class Accumulator {
         final Set<String> projectsToUpdate = new HashSet<>();
         final Map<String, String> updatedLockFiles = new HashMap<>();
+        final Map<String, String> existingLockContents = new HashMap<>();
     }
 
     @Override
@@ -87,7 +88,16 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         return new TomlIsoVisitor<ExecutionContext>() {
             @Override
             public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
-                if (!document.getSourcePath().toString().endsWith("pyproject.toml")) {
+                String sourcePath = document.getSourcePath().toString();
+
+                if (sourcePath.endsWith("uv.lock")) {
+                    acc.existingLockContents.put(
+                            PyProjectHelper.correspondingPyprojectPath(sourcePath),
+                            document.printAll());
+                    return document;
+                }
+
+                if (!sourcePath.endsWith("pyproject.toml")) {
                     return document;
                 }
                 Optional<PythonResolutionResult> resolution = document.getMarkers()
@@ -98,7 +108,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
                 PythonResolutionResult marker = resolution.get();
                 if (marker.findDependencyInAnyScope(oldPackageName) != null) {
-                    acc.projectsToUpdate.add(document.getSourcePath().toString());
+                    acc.projectsToUpdate.add(sourcePath);
                 }
                 return document;
             }
@@ -178,7 +188,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         }.visitNonNull(document, ctx);
 
         if (updated != document) {
-            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, acc.updatedLockFiles);
+            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, acc.updatedLockFiles, acc.existingLockContents);
         }
 
         return updated;
