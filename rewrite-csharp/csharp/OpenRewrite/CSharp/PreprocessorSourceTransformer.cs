@@ -69,8 +69,11 @@ public static class PreprocessorSourceTransformer
     /// <summary>
     /// Transforms source text by evaluating conditional directives against the given defined symbols.
     /// Directive lines and excluded code lines are replaced with empty lines to preserve line count.
+    /// When <paramref name="directiveLineToIndex"/> is provided, directive lines are replaced with
+    /// ghost comments (<c>//DIRECTIVE:N</c>) instead of empty lines, enabling structural tracking.
     /// </summary>
-    public static string Transform(string source, HashSet<string> definedSymbols)
+    public static string Transform(string source, HashSet<string> definedSymbols,
+        Dictionary<int, int>? directiveLineToIndex = null)
     {
         var lines = SplitLines(source);
         var result = new string[lines.Length];
@@ -101,7 +104,7 @@ public static class PreprocessorSourceTransformer
                 bool groupActive = stack.Count == 0 || stack.Peek().branchActive;
                 bool branchActive = groupActive && EvaluateCondition(condition, localDefines);
                 stack.Push((groupActive, branchActive, branchActive));
-                result[i] = "";
+                result[i] = GhostForDirective(i, directiveLineToIndex);
             }
             else if (afterHash.StartsWith("elif ") || afterHash.StartsWith("elif("))
             {
@@ -109,19 +112,19 @@ public static class PreprocessorSourceTransformer
                 var (groupActive, _, anyTaken) = stack.Pop();
                 bool branchActive = groupActive && !anyTaken && EvaluateCondition(condition, localDefines);
                 stack.Push((groupActive, branchActive, anyTaken || branchActive));
-                result[i] = "";
+                result[i] = GhostForDirective(i, directiveLineToIndex);
             }
             else if (afterHash.StartsWith("else") && !IsLongerDirectiveKeyword(afterHash, "else"))
             {
                 var (groupActive, _, anyTaken) = stack.Pop();
                 bool branchActive = groupActive && !anyTaken;
                 stack.Push((groupActive, branchActive, true));
-                result[i] = "";
+                result[i] = GhostForDirective(i, directiveLineToIndex);
             }
             else if (afterHash.StartsWith("endif"))
             {
                 stack.Pop();
-                result[i] = "";
+                result[i] = GhostForDirective(i, directiveLineToIndex);
             }
             else if (afterHash.StartsWith("define "))
             {
@@ -152,6 +155,13 @@ public static class PreprocessorSourceTransformer
         }
 
         return string.Join("\n", result);
+    }
+
+    private static string GhostForDirective(int lineNumber, Dictionary<int, int>? directiveLineToIndex)
+    {
+        if (directiveLineToIndex != null && directiveLineToIndex.TryGetValue(lineNumber, out var index))
+            return $"//DIRECTIVE:{index}";
+        return "";
     }
 
     private static bool IsLongerDirectiveKeyword(string afterHash, string keyword)
@@ -209,11 +219,14 @@ public static class PreprocessorSourceTransformer
 
     /// <summary>
     /// Generates unique clean source permutations with deduplication.
-    /// Returns list of (cleanSource, definedSymbols, originalPermutationIndex).
+    /// Returns list of (cleanSource, definedSymbols).
     /// The primary branch (all symbols defined) is always first.
+    /// When <paramref name="directiveLineToIndex"/> is provided, directive lines are replaced with
+    /// ghost comments (<c>//DIRECTIVE:N</c>) for structural tracking.
     /// </summary>
     public static List<(string CleanSource, HashSet<string> DefinedSymbols)> GenerateUniquePermutations(
-        string source, HashSet<string> symbols)
+        string source, HashSet<string> symbols,
+        Dictionary<int, int>? directiveLineToIndex = null)
     {
         var symbolList = symbols.OrderBy(s => s).ToList();
         int permCount = 1 << symbolList.Count;
@@ -225,13 +238,11 @@ public static class PreprocessorSourceTransformer
 
         // Generate "all defined" first (primary branch)
         var allDefined = new HashSet<string>(symbolList);
-        var primaryClean = Transform(source, allDefined);
+        var primaryClean = Transform(source, allDefined, directiveLineToIndex);
         seen[primaryClean] = 0;
         result.Add((primaryClean, allDefined));
 
         // Generate remaining permutations
-        // permIndex 0 = all bits set (already done as primary), so start from (permCount-2) down to 0
-        // Actually, let's iterate 0..(permCount-1) but skip the "all defined" case
         for (int bits = 0; bits < permCount; bits++)
         {
             var defined = new HashSet<string>();
@@ -245,7 +256,7 @@ public static class PreprocessorSourceTransformer
             if (defined.SetEquals(allDefined))
                 continue;
 
-            var clean = Transform(source, defined);
+            var clean = Transform(source, defined, directiveLineToIndex);
             if (!seen.ContainsKey(clean))
             {
                 seen[clean] = result.Count;
