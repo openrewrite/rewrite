@@ -1377,7 +1377,7 @@ public class GroovyParserVisitor {
                         paramName = paramName.withElement(paramName.getElement().getPadding()
                                 .withInitializer(new JLeftPadded<>(
                                         sourceBefore("="),
-                                        visit(defaultValue),
+                                        doVisit(defaultValue),
                                         Markers.EMPTY)));
                     }
                     J expr = new J.VariableDeclarations(randomId(), varDeclPrefix, Markers.EMPTY,
