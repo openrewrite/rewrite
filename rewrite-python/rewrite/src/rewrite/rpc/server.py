@@ -350,7 +350,7 @@ def handle_parse_project(params: dict) -> List[dict]:
 
     project_path = params.get('projectPath', '.')
     exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info'])
-    relative_to = params.get('relativeTo')
+    relative_to = params.get('relativeTo') or project_path
 
     results = []
 
@@ -362,7 +362,7 @@ def handle_parse_project(params: dict) -> List[dict]:
             if file.endswith('.py'):
                 path = os.path.join(root, file)
                 try:
-                    result = parse_python_file(path)
+                    result = parse_python_file(path, relative_to)
                     results.append(result)
                 except Exception as e:
                     logger.error(f"Error parsing {path}: {e}")
