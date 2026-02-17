@@ -22,6 +22,7 @@ import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Stream;
@@ -222,7 +223,7 @@ public class RecipeClassLoader extends URLClassLoader {
                 .filter(Objects::nonNull)
                 .map(path -> {
                     try {
-                        if (java.nio.file.Files.isDirectory(path)) {
+                        if (Files.isDirectory(path)) {
                             // For directories, ensure URL ends with '/'
                             String urlString = path.toUri().toURL().toString();
                             if (!urlString.endsWith("/")) {

@@ -110,46 +110,28 @@ public class ClasspathScanningLoader implements ResourceLoader {
         this.recipeLoader = new RecipeLoader(classLoader);
 
         this.performScan = () -> {
-            ClassGraph classGraph;
-            ClassGraph yamlGraph;
-
+            Path jarPath;
             if (isDirectory(jar)) {
-                // For directories, create a temporary jar to scan
-                // ClassGraph will find classes in the temp jar, but we use the original
-                // classloader (which has the directory URL) for class loading.
-                // This works because the classes are identical in both locations.
-                Path tempJar;
                 try {
-                    tempJar = createTempJarFromDirectory(jar);
+                    jarPath = createTempJarFromDirectory(jar);
                 } catch (IOException e) {
                     throw new UncheckedIOException("Failed to create temporary jar from directory: " + jar, e);
                 }
-
-                String tempJarName = tempJar.toFile().getName();
-                classGraph = new ClassGraph()
-                        .overrideClasspath(tempJar.toString())
-                        .acceptJars(tempJarName)
-                        .overrideClassLoaders(classLoader);
-
-                yamlGraph = new ClassGraph()
-                        .overrideClasspath(tempJar.toString())
-                        .acceptJars(tempJarName)
-                        .overrideClassLoaders(classLoader)
-                        .acceptPaths("META-INF/rewrite");
             } else {
-                // For jar files, use acceptJars with the jar name
-                String jarName = jar.toFile().getName();
-                classGraph = new ClassGraph()
-                        .acceptJars(jarName)
-                        .ignoreParentClassLoaders()
-                        .overrideClassLoaders(classLoader);
-
-                yamlGraph = new ClassGraph()
-                        .acceptJars(jarName)
-                        .ignoreParentClassLoaders()
-                        .overrideClassLoaders(classLoader)
-                        .acceptPaths("META-INF/rewrite");
+                jarPath = jar;
             }
+
+            String jarName = jarPath.toFile().getName();
+            ClassGraph classGraph = new ClassGraph()
+                    .overrideClasspath(jarPath.toString())
+                    .acceptJars(jarName)
+                    .overrideClassLoaders(classLoader);
+
+            ClassGraph yamlGraph = new ClassGraph()
+                    .overrideClasspath(jarPath.toString())
+                    .acceptJars(jarName)
+                    .overrideClassLoaders(classLoader)
+                    .acceptPaths("META-INF/rewrite");
 
             scanClasses(classGraph, classLoader);
             scanYaml(yamlGraph, properties, dependencyResourceLoaders, classLoader);
