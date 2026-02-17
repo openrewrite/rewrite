@@ -1121,39 +1121,16 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
     // Preprocessor Directives
     // =====================
 
-    public J visitConditionalBlock(Cs.ConditionalBlock conditionalBlock, P p) {
-        conditionalBlock = conditionalBlock.withPrefix(visitSpace(conditionalBlock.getPrefix(), CsSpace.Location.CONDITIONAL_BLOCK_PREFIX, p));
-        Statement tempStatement = (Statement) visitStatement(conditionalBlock, p);
-        if (!(tempStatement instanceof Cs.ConditionalBlock))
+    public J visitConditionalDirective(Cs.ConditionalDirective conditionalDirective, P p) {
+        conditionalDirective = conditionalDirective.withPrefix(visitSpace(conditionalDirective.getPrefix(), CsSpace.Location.CONDITIONAL_DIRECTIVE_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(conditionalDirective, p);
+        if (!(tempStatement instanceof Cs.ConditionalDirective))
         {
             return tempStatement;
         }
-        conditionalBlock = (Cs.ConditionalBlock) tempStatement;
-        conditionalBlock = conditionalBlock.withMarkers(visitMarkers(conditionalBlock.getMarkers(), p));
-        conditionalBlock = conditionalBlock.withIfBranch((Cs.IfDirective) visit(conditionalBlock.getIfBranch(), p));
-        conditionalBlock = conditionalBlock.withElifBranches(ListUtils.map(conditionalBlock.getElifBranches(), el -> (Cs.ElifDirective) visit(el, p)));
-        conditionalBlock = conditionalBlock.withElseBranch(visitAndCast(conditionalBlock.getElseBranch(), p));
-        return conditionalBlock.withBeforeEndif(visitSpace(conditionalBlock.getBeforeEndif(), CsSpace.Location.CONDITIONAL_BLOCK_BEFORE_ENDIF, p));
-    }
-
-    public J visitIfDirective(Cs.IfDirective ifDirective, P p) {
-        ifDirective = ifDirective.withPrefix(visitSpace(ifDirective.getPrefix(), CsSpace.Location.IF_DIRECTIVE_PREFIX, p));
-        ifDirective = ifDirective.withMarkers(visitMarkers(ifDirective.getMarkers(), p));
-        ifDirective = ifDirective.withCondition(visitAndCast(ifDirective.getCondition(), p));
-        return ifDirective.getPadding().withBody(ListUtils.map(ifDirective.getPadding().getBody(), el -> visitRightPadded(el, CsRightPadded.Location.IF_DIRECTIVE_BODY, p)));
-    }
-
-    public J visitElifDirective(Cs.ElifDirective elifDirective, P p) {
-        elifDirective = elifDirective.withPrefix(visitSpace(elifDirective.getPrefix(), CsSpace.Location.ELIF_DIRECTIVE_PREFIX, p));
-        elifDirective = elifDirective.withMarkers(visitMarkers(elifDirective.getMarkers(), p));
-        elifDirective = elifDirective.withCondition(visitAndCast(elifDirective.getCondition(), p));
-        return elifDirective.getPadding().withBody(ListUtils.map(elifDirective.getPadding().getBody(), el -> visitRightPadded(el, CsRightPadded.Location.ELIF_DIRECTIVE_BODY, p)));
-    }
-
-    public J visitElseDirective(Cs.ElseDirective elseDirective, P p) {
-        elseDirective = elseDirective.withPrefix(visitSpace(elseDirective.getPrefix(), CsSpace.Location.ELSE_DIRECTIVE_PREFIX, p));
-        elseDirective = elseDirective.withMarkers(visitMarkers(elseDirective.getMarkers(), p));
-        return elseDirective.getPadding().withBody(ListUtils.map(elseDirective.getPadding().getBody(), el -> visitRightPadded(el, CsRightPadded.Location.ELSE_DIRECTIVE_BODY, p)));
+        conditionalDirective = (Cs.ConditionalDirective) tempStatement;
+        conditionalDirective = conditionalDirective.withMarkers(visitMarkers(conditionalDirective.getMarkers(), p));
+        return conditionalDirective.getPadding().withBranches(ListUtils.map(conditionalDirective.getPadding().getBranches(), el -> visitRightPadded(el, CsRightPadded.Location.CONDITIONAL_DIRECTIVE_BRANCHES, p)));
     }
 
     public J visitPragmaWarningDirective(Cs.PragmaWarningDirective pragmaWarningDirective, P p) {

@@ -76,10 +76,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             NamespaceDeclaration ns => VisitNamespaceDeclaration(ns, q),
             TupleType tt => VisitTupleType(tt, q),
             TupleExpression te => VisitTupleExpression(te, q),
-            ConditionalBlock cb => VisitConditionalBlock(cb, q),
-            IfDirective ifd => VisitIfDirective(ifd, q),
-            ElifDirective elif => VisitElifDirective(elif, q),
-            ElseDirective elsed => VisitElseDirective(elsed, q),
+            ConditionalDirective cd => VisitConditionalDirective(cd, q),
             PragmaWarningDirective pwd => VisitPragmaWarningDirective(pwd, q),
             NullableDirective nd => VisitNullableDirective(nd, q),
             RegionDirective rd => VisitRegionDirective(rd, q),
@@ -582,65 +579,29 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             Arguments = arguments };
     }
 
-    // ---- ConditionalBlock ----
-    public override J VisitConditionalBlock(ConditionalBlock cb, RpcReceiveQueue q)
+    // ---- ConditionalDirective ----
+    public override J VisitConditionalDirective(ConditionalDirective cd, RpcReceiveQueue q)
     {
-        var ifBranch = q.Receive((J)cb.IfBranch, el => (J)VisitNonNull(el, q));
-        var elifBranches = q.ReceiveList(
-            cb.ElifBranches.Cast<ElifDirective>().ToList(),
-            e => (ElifDirective)VisitNonNull(e, q));
-        var elseBranch = q.Receive((J?)cb.ElseBranch, el => (J)VisitNonNull(el!, q));
-        var beforeEndif = q.Receive(cb.BeforeEndif, space => VisitSpace(space, q));
-        return cb with
+        // Receive DirectiveLines
+        var count = q.Receive<int>(cd.DirectiveLines.Count);
+        var directiveLines = new List<DirectiveLine>();
+        for (int i = 0; i < count; i++)
+        {
+            var existing = i < cd.DirectiveLines.Count ? cd.DirectiveLines[i] : null;
+            var lineNumber = q.Receive<int>(existing?.LineNumber ?? 0);
+            var text = q.Receive<string>(existing?.Text ?? "");
+            var kind = (PreprocessorDirectiveKind)q.Receive<int>((int)(existing?.Kind ?? 0));
+            var groupId = q.Receive<int>(existing?.GroupId ?? 0);
+            var activeBranchIndex = q.Receive<int>(existing?.ActiveBranchIndex ?? -1);
+            directiveLines.Add(new DirectiveLine(lineNumber, text, kind, groupId, activeBranchIndex));
+        }
+        // Receive Branches
+        var branches = q.ReceiveList(cd.Branches, rp => _delegate.VisitRightPadded(rp, q));
+        return cd with
         {
             Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            IfBranch = (IfDirective)ifBranch!,
-            ElifBranches = elifBranches?.Cast<ElifDirective>().ToList() ?? new List<ElifDirective>(),
-            ElseBranch = (ElseDirective?)elseBranch,
-            BeforeEndif = beforeEndif!
-        };
-    }
-
-    // ---- IfDirective ----
-    public override J VisitIfDirective(IfDirective ifd, RpcReceiveQueue q)
-    {
-        var condition = q.Receive((J)ifd.Condition, el => (J)VisitNonNull(el, q));
-        var branchTaken = q.Receive<bool>(ifd.BranchTaken);
-        var body = q.ReceiveList(ifd.Body, rp => _delegate.VisitRightPadded(rp, q));
-        return ifd with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Condition = (Expression)condition!,
-            BranchTaken = branchTaken,
-            Body = body!
-        };
-    }
-
-    // ---- ElifDirective ----
-    public override J VisitElifDirective(ElifDirective elif, RpcReceiveQueue q)
-    {
-        var condition = q.Receive((J)elif.Condition, el => (J)VisitNonNull(el, q));
-        var branchTaken = q.Receive<bool>(elif.BranchTaken);
-        var body = q.ReceiveList(elif.Body, rp => _delegate.VisitRightPadded(rp, q));
-        return elif with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            Condition = (Expression)condition!,
-            BranchTaken = branchTaken,
-            Body = body!
-        };
-    }
-
-    // ---- ElseDirective ----
-    public override J VisitElseDirective(ElseDirective elsed, RpcReceiveQueue q)
-    {
-        var branchTaken = q.Receive<bool>(elsed.BranchTaken);
-        var body = q.ReceiveList(elsed.Body, rp => _delegate.VisitRightPadded(rp, q));
-        return elsed with
-        {
-            Id = PvId, Prefix = PvPrefix, Markers = PvMarkers,
-            BranchTaken = branchTaken,
-            Body = body!
+            DirectiveLines = directiveLines,
+            Branches = branches!
         };
     }
 
