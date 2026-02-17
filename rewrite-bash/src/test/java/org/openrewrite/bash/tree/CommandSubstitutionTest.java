@@ -120,4 +120,76 @@ class CommandSubstitutionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commandSubWithPipelineCut() {
+        rewriteRun(
+          bash(
+            "if [ $(head -n 1 \"$TEST\" | cut -c -2) = \"#!\" ]\nthen\n  echo found\nfi\n"
+          )
+        );
+    }
+
+    @Test
+    void deeplyNestedCommandSub() {
+        rewriteRun(
+          bash(
+            "hash=\"$(nix hash convert \"$(nix-prefetch-url \"$url\")\")\"\n"
+          )
+        );
+    }
+
+    @Test
+    void deeplyNestedCommandSubMultiLine() {
+        rewriteRun(
+          bash(
+            "hash=\"$(\nnix \"$(\ncmd \"url\"\n)\"\n)\"\n"
+          )
+        );
+    }
+
+    @Test
+    void commandSubThatLooksLikeArithmetic() {
+        rewriteRun(
+          bash(
+            "ERRMSG=$((echo $$ > cgroup.procs) |& cat)\n"
+          )
+        );
+    }
+
+    @Test
+    void nestedBacktick() {
+        rewriteRun(
+          bash(
+            "driver=`basename \\`realpath /sys/class/net/eth0/device/driver\\``\n"
+          )
+        );
+    }
+
+    @Test
+    void arrayExpansionInCommandSub() {
+        rewriteRun(
+          bash(
+            "sizes=$(filesizes \"$FBZIMAGE\" \"${FDINITRDS[@]}\" \"$efishell\")\n"
+          )
+        );
+    }
+
+    @Test
+    void hereStringInCommandSub() {
+        rewriteRun(
+          bash(
+            "OS=$(cut -d'/' -f1 <<< \"${PLATFORM}\")\n"
+          )
+        );
+    }
+
+    @Test
+    void localWithCommandSub() {
+        rewriteRun(
+          bash(
+            "f() {\n  local dir=$(find /tmp -type d)\n  echo $dir\n}\n"
+          )
+        );
+    }
 }

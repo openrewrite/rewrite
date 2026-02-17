@@ -135,4 +135,13 @@ class WhileLoopTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void whileReadFromFile() {
+        rewriteRun(
+          bash(
+            "while IFS= read -r line; do\n  echo \"$line\"\ndone < /tmp/input\n"
+          )
+        );
+    }
 }

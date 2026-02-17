@@ -264,8 +264,10 @@ public class BashPrinter<P> extends BashVisitor<PrintOutputCapture<P>> {
         for (Bash.Statement s : subshell.getBody()) {
             visit(s, p);
         }
-        visitSpace(subshell.getClosingParen(), p);
-        p.append(")");
+        if (subshell.getClosingParen() != null) {
+            visitSpace(subshell.getClosingParen(), p);
+            p.append(")");
+        }
         afterSyntax(subshell, p);
         return subshell;
     }
@@ -277,8 +279,10 @@ public class BashPrinter<P> extends BashVisitor<PrintOutputCapture<P>> {
         for (Bash.Statement s : braceGroup.getBody()) {
             visit(s, p);
         }
-        visitSpace(braceGroup.getClosingBrace(), p);
-        p.append("}");
+        if (braceGroup.getClosingBrace() != null) {
+            visitSpace(braceGroup.getClosingBrace(), p);
+            p.append("}");
+        }
         afterSyntax(braceGroup, p);
         return braceGroup;
     }
@@ -388,7 +392,10 @@ public class BashPrinter<P> extends BashVisitor<PrintOutputCapture<P>> {
         for (Bash.Statement s : ps.getBody()) {
             visit(s, p);
         }
-        p.append(")");
+        if (ps.getClosingParen() != null) {
+            visitSpace(ps.getClosingParen(), p);
+            p.append(")");
+        }
         afterSyntax(ps, p);
         return ps;
     }

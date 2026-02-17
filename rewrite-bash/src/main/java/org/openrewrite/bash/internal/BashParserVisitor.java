@@ -73,7 +73,10 @@ public class BashParserVisitor {
     }
 
     private int toCharIndex(int codePointIndex) {
-        return cpToChar != null ? cpToChar[codePointIndex] : codePointIndex;
+        if (codePointIndex < 0) {
+            return codePointIndex;
+        }
+        return cpToChar != null ? cpToChar[Math.min(codePointIndex, cpToChar.length - 1)] : codePointIndex;
     }
 
     public Bash.Script parse() {
@@ -181,6 +184,9 @@ public class BashParserVisitor {
     }
 
     private Bash.Statement visitPipeline(BashParser.PipelineContext ctx) {
+        if (ctx.pipeSequence() == null) {
+            return fallbackCommand(ctx);
+        }
         boolean negated = ctx.bangOpt() != null;
         if (negated) {
             // Capture prefix before ! and skip the ! token itself
@@ -243,6 +249,13 @@ public class BashParserVisitor {
         }
         if (ctx.functionDefinition() != null) {
             return visitFunctionDefinition(ctx.functionDefinition());
+        }
+        if (ctx.simpleCommand() == null) {
+            // ANTLR error recovery produced no valid alternative
+            Bash.Literal literal = fallbackLiteral(ctx);
+            return new Bash.Command(randomId(), literal.getPrefix(), Markers.EMPTY,
+                    Collections.emptyList(),
+                    Collections.singletonList(literal.withPrefix(Space.EMPTY)));
         }
         return visitSimpleCommand(ctx.simpleCommand());
     }
@@ -380,10 +393,8 @@ public class BashParserVisitor {
     private Bash.Expression visitBraceWord(BashParser.WordPartContext ctx) {
         // {wordPart*} - capture as literal text from source
         Space prefix = prefix(ctx.getStart());
-        int start = toCharIndex(ctx.getStart().getStartIndex());
-        int stop = toCharIndex(ctx.getStop().getStopIndex() + 1);
-        String text = source.substring(start, stop);
-        advanceCursor(stop);
+        String text = sourceText(ctx);
+        skipContext(ctx);
         return new Bash.Literal(randomId(), prefix, Markers.EMPTY, text);
     }
 
@@ -392,6 +403,9 @@ public class BashParserVisitor {
     // ================================================================
 
     private Bash.Expression visitDoubleQuotedString(BashParser.DoubleQuotedStringContext ctx) {
+        if (ctx.DOUBLE_QUOTE(1) == null) {
+            return fallbackLiteral(ctx);
+        }
         Space prefix = prefix(ctx.getStart());
         skip(ctx.DOUBLE_QUOTE(0).getSymbol()); // opening "
 
@@ -454,7 +468,10 @@ public class BashParserVisitor {
         return new Bash.VariableExpansion(randomId(), prefix, Markers.EMPTY, text);
     }
 
-    private Bash.VariableExpansion visitBraceExpansionInDQ(BashParser.DoubleQuotedPartContext ctx) {
+    private Bash.Expression visitBraceExpansionInDQ(BashParser.DoubleQuotedPartContext ctx) {
+        if (ctx.RBRACE() == null) {
+            return fallbackLiteral(ctx);
+        }
         // ${...} inside double quotes
         Space prefix = prefix(ctx.DOLLAR_LBRACE().getSymbol());
         int start = toCharIndex(ctx.DOLLAR_LBRACE().getSymbol().getStartIndex());
@@ -468,7 +485,10 @@ public class BashParserVisitor {
     // Command substitution: $(...) and `...`
     // ================================================================
 
-    private Bash.CommandSubstitution visitCommandSubstitution(BashParser.CommandSubstitutionContext ctx) {
+    private Bash.Expression visitCommandSubstitution(BashParser.CommandSubstitutionContext ctx) {
+        if (ctx.RPAREN() == null) {
+            return fallbackLiteral(ctx);
+        }
         Space prefix = prefix(ctx.DOLLAR_LPAREN().getSymbol());
         skip(ctx.DOLLAR_LPAREN().getSymbol());
 
@@ -508,14 +528,21 @@ public class BashParserVisitor {
     // Arithmetic: $((...))
     // ================================================================
 
-    private Bash.ArithmeticExpansion visitArithmeticSubstitution(BashParser.ArithmeticSubstitutionContext ctx) {
+    private Bash.Expression visitArithmeticSubstitution(BashParser.ArithmeticSubstitutionContext ctx) {
+        if (ctx.DOUBLE_RPAREN() == null) {
+            return fallbackLiteral(ctx);
+        }
+        int closeStart = toCharIndex(ctx.DOUBLE_RPAREN().getSymbol().getStartIndex());
+        if (closeStart < 0 || closeStart < cursor) {
+            // DOUBLE_RPAREN is a synthetic/missing token from error recovery
+            return fallbackLiteral(ctx);
+        }
         Space prefix = prefix(ctx.DOLLAR_DPAREN().getSymbol());
         skip(ctx.DOLLAR_DPAREN().getSymbol());
 
         // Capture all text between $(( and )) including leading/trailing whitespace
-        int exprEnd = toCharIndex(ctx.DOUBLE_RPAREN().getSymbol().getStartIndex());
-        String expr = source.substring(cursor, exprEnd);
-        advanceCursor(exprEnd);
+        String expr = source.substring(cursor, closeStart);
+        advanceCursor(closeStart);
 
         skip(ctx.DOUBLE_RPAREN().getSymbol());
         return new Bash.ArithmeticExpansion(randomId(), prefix, Markers.EMPTY, true, expr);
@@ -525,7 +552,10 @@ public class BashParserVisitor {
     // Process substitution: <(...) or >(...)
     // ================================================================
 
-    private Bash.ProcessSubstitution visitProcessSubstitution(BashParser.ProcessSubstitutionContext ctx) {
+    private Bash.Expression visitProcessSubstitution(BashParser.ProcessSubstitutionContext ctx) {
+        if (ctx.RPAREN() == null) {
+            return fallbackLiteral(ctx);
+        }
         boolean isInput = ctx.PROC_SUBST_IN() != null;
         TerminalNode opener = isInput ? ctx.PROC_SUBST_IN() : ctx.PROC_SUBST_OUT();
         Space prefix = prefix(opener.getSymbol());
@@ -536,8 +566,13 @@ public class BashParserVisitor {
             body = visitCompleteCommands(ctx.commandSubstitutionContent().completeCommands());
         }
 
+        // Check for synthetic RPAREN (ANTLR error recovery)
+        if (ctx.RPAREN().getSymbol().getStartIndex() < 0) {
+            return new Bash.ProcessSubstitution(randomId(), prefix, Markers.EMPTY, isInput, body, null);
+        }
+        Space closingParen = prefix(ctx.RPAREN().getSymbol());
         skip(ctx.RPAREN().getSymbol());
-        return new Bash.ProcessSubstitution(randomId(), prefix, Markers.EMPTY, isInput, body);
+        return new Bash.ProcessSubstitution(randomId(), prefix, Markers.EMPTY, isInput, body, closingParen);
     }
 
     // ================================================================
@@ -554,14 +589,13 @@ public class BashParserVisitor {
         Bash.Literal name = new Bash.Literal(randomId(), namePrefix, Markers.EMPTY, nameText);
 
         // Operator (= or +=)
-        String operator;
-        if (ctx.PLUS_EQUALS() != null) {
-            operator = "+=";
-            skip(ctx.PLUS_EQUALS().getSymbol());
-        } else {
-            operator = "=";
-            skip(ctx.EQUALS().getSymbol());
-        }
+        // Include any whitespace between WORD and operator in the operator text
+        // (in valid bash, there's no space, but the parser allows it)
+        Token opToken = ctx.PLUS_EQUALS() != null ?
+                ctx.PLUS_EQUALS().getSymbol() : ctx.EQUALS().getSymbol();
+        int opStart = toCharIndex(opToken.getStartIndex());
+        String operator = source.substring(cursor, toCharIndex(opToken.getStopIndex() + 1));
+        skip(opToken);
 
         // Value
         Bash.@Nullable Expression value = null;
@@ -575,6 +609,9 @@ public class BashParserVisitor {
     private Bash.Expression visitAssignmentValue(BashParser.AssignmentValueContext ctx) {
         if (ctx.word() != null) {
             return visitWord(ctx.word());
+        }
+        if (ctx.RPAREN() == null) {
+            return fallbackLiteral(ctx);
         }
         // Array: (elements)
         Space prefix = prefix(ctx.LPAREN().getSymbol());
@@ -611,7 +648,8 @@ public class BashParserVisitor {
 
         // Regular redirection: capture as opaque text
         int start = toCharIndex(ctx.getStart().getStartIndex());
-        int stop = toCharIndex(ctx.getStop().getStopIndex() + 1);
+        int stop = ctx.getStop() != null ? toCharIndex(ctx.getStop().getStopIndex() + 1) : source.length();
+        if (stop < start) stop = start;
         String text = source.substring(start, stop);
         advanceCursor(stop);
 
@@ -627,7 +665,8 @@ public class BashParserVisitor {
     private Bash.HereDoc visitHeredoc(BashParser.RedirectionContext rctx, Space prefix) {
         BashParser.HeredocContext ctx = rctx.heredoc();
 
-        // Capture opening including trailing newline (<<EOF\n, <<-'EOF'\n, etc.)
+        // Capture opening including trailing tokens and newline
+        // (<<EOF\n, <<-'EOF'\n, <<EOF >"file"\n, etc.)
         int openStart = toCharIndex(ctx.getStart().getStartIndex());
 
         // Include fd number if present
@@ -635,10 +674,11 @@ public class BashParserVisitor {
             openStart = toCharIndex(rctx.NUMBER().getSymbol().getStartIndex());
         }
 
-        // Include the NEWLINE after the delimiter in the opening
+        // Include the NEWLINE after the delimiter (and any trailing tokens) in the opening
         int openEnd;
-        if (ctx.NEWLINE() != null) {
-            openEnd = toCharIndex(ctx.NEWLINE().getSymbol().getStopIndex() + 1);
+        List<TerminalNode> newlines = ctx.NEWLINE();
+        if (newlines != null && !newlines.isEmpty()) {
+            openEnd = toCharIndex(newlines.get(0).getSymbol().getStopIndex() + 1);
         } else {
             openEnd = toCharIndex(ctx.heredocDelimiter().getStop().getStopIndex() + 1);
         }
@@ -654,14 +694,18 @@ public class BashParserVisitor {
             BashParser.HeredocLineContext line = lines.get(i);
             // Use cursor as line start — WS tokens are on the hidden channel
             // so line.getStart() skips leading whitespace
-            int lineStop = toCharIndex(line.getStop().getStopIndex() + 1);
+            int lineStop = line.getStop() != null ? toCharIndex(line.getStop().getStopIndex() + 1) : cursor;
+            if (lineStop < cursor) lineStop = cursor;
+            if (lineStop > source.length()) lineStop = source.length();
             contentLines.add(source.substring(cursor, lineStop));
             advanceCursor(lineStop);
         }
 
         // Last line is the closing delimiter
         BashParser.HeredocLineContext lastLine = lines.get(lines.size() - 1);
-        int closeEnd = toCharIndex(lastLine.getStop().getStopIndex() + 1);
+        int closeEnd = lastLine.getStop() != null ? toCharIndex(lastLine.getStop().getStopIndex() + 1) : cursor;
+        if (closeEnd < cursor) closeEnd = cursor;
+        if (closeEnd > source.length()) closeEnd = source.length();
         String closing = source.substring(cursor, closeEnd);
         advanceCursor(closeEnd);
 
@@ -713,6 +757,9 @@ public class BashParserVisitor {
         if (ctx.doubleBracketExpr() != null) {
             return visitDoubleBracketExpr(ctx.doubleBracketExpr());
         }
+        if (ctx.selectClause() != null) {
+            return visitSelectClause(ctx.selectClause());
+        }
         throw new IllegalStateException("Unknown compound command type");
     }
 
@@ -720,7 +767,10 @@ public class BashParserVisitor {
     // If/elif/else/fi
     // ================================================================
 
-    private Bash.IfStatement visitIfClause(BashParser.IfClauseContext ctx) {
+    private Bash.Statement visitIfClause(BashParser.IfClauseContext ctx) {
+        if (ctx.THEN() == null || ctx.FI() == null) {
+            return fallbackCommand(ctx);
+        }
         Space prefix = prefix(ctx.IF().getSymbol());
 
         Bash.Literal ifKeyword = visitKeyword(ctx.IF().getSymbol());
@@ -745,6 +795,17 @@ public class BashParserVisitor {
     }
 
     private Bash.Elif visitElifClause(BashParser.ElifClauseContext ctx) {
+        if (ctx.THEN() == null) {
+            // Fallback: capture entire elif clause as opaque text
+            Space prefix = prefix(ctx.getStart());
+            String text = sourceText(ctx);
+            skipContext(ctx);
+            Bash.Literal elifKeyword = new Bash.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text);
+            return new Bash.Elif(randomId(), prefix, Markers.EMPTY, elifKeyword,
+                    Collections.emptyList(),
+                    new Bash.Literal(randomId(), Space.EMPTY, Markers.EMPTY, ""),
+                    Collections.emptyList());
+        }
         Space prefix = prefix(ctx.ELIF().getSymbol());
         Bash.Literal elifKeyword = visitKeyword(ctx.ELIF().getSymbol());
         List<Bash.Statement> condition = visitCompoundList(ctx.compoundList(0));
@@ -801,10 +862,44 @@ public class BashParserVisitor {
     }
 
     // ================================================================
+    // Select clause (reuses ForLoop LST since structure is identical)
+    // ================================================================
+
+    private Bash.ForLoop visitSelectClause(BashParser.SelectClauseContext ctx) {
+        Space prefix = prefix(ctx.SELECT().getSymbol());
+        Bash.Literal selectKeyword = visitKeyword(ctx.SELECT().getSymbol());
+
+        Space varPrefix = prefix(ctx.WORD().getSymbol());
+        String varName = ctx.WORD().getText();
+        skip(ctx.WORD().getSymbol());
+        Bash.Literal variable = new Bash.Literal(randomId(), varPrefix, Markers.EMPTY, varName);
+
+        BashParser.InClauseContext inCtx = ctx.inClause();
+        Bash.Literal inKeyword = visitKeyword(inCtx.IN().getSymbol());
+        List<Bash.Expression> iterables = new ArrayList<>();
+        for (BashParser.WordContext w : inCtx.word()) {
+            iterables.add(visitWord(w));
+        }
+        Bash.Literal separator = visitSequentialSep(inCtx.sequentialSep());
+
+        BashParser.DoGroupContext doGroup = ctx.doGroup();
+        Bash.Literal doKeyword = visitKeyword(doGroup.DO().getSymbol());
+        List<Bash.Statement> body = visitCompoundList(doGroup.compoundList());
+        Bash.Literal doneKeyword = visitKeyword(doGroup.DONE().getSymbol());
+
+        return new Bash.ForLoop(randomId(), prefix, Markers.EMPTY,
+                selectKeyword, variable, inKeyword, iterables, separator, doKeyword, body, doneKeyword);
+    }
+
+    // ================================================================
     // C-style for loops: for ((init; cond; update))
     // ================================================================
 
-    private Bash.CStyleForLoop visitCStyleForClause(BashParser.CStyleForClauseContext ctx) {
+    private Bash.Statement visitCStyleForClause(BashParser.CStyleForClauseContext ctx) {
+        BashParser.DoGroupContext doGroup = ctx.doGroup();
+        if (ctx.DOUBLE_RPAREN() == null || doGroup == null || doGroup.DO() == null || doGroup.DONE() == null) {
+            return fallbackCommand(ctx);
+        }
         Space prefix = prefix(ctx.FOR().getSymbol());
 
         // Capture the entire "for ((...))' header as opaque text including the for keyword
@@ -822,7 +917,6 @@ public class BashParserVisitor {
             separator = new Bash.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "");
         }
 
-        BashParser.DoGroupContext doGroup = ctx.doGroup();
         Bash.Literal doKeyword = visitKeyword(doGroup.DO().getSymbol());
         List<Bash.Statement> body = visitCompoundList(doGroup.compoundList());
         Bash.Literal doneKeyword = visitKeyword(doGroup.DONE().getSymbol());
@@ -835,9 +929,14 @@ public class BashParserVisitor {
     // While/Until loops
     // ================================================================
 
-    private Bash.WhileLoop visitWhileUntil(TerminalNode keywordNode,
+    private Bash.Statement visitWhileUntil(TerminalNode keywordNode,
                                            BashParser.CompoundListContext condCtx,
                                            BashParser.DoGroupContext doGroup) {
+        if (doGroup == null || doGroup.DO() == null || doGroup.DONE() == null) {
+            // Fallback: capture the whole while/until clause parent as opaque text
+            return fallbackCommand(keywordNode.getParent() instanceof ParserRuleContext ?
+                    (ParserRuleContext) keywordNode.getParent() : condCtx);
+        }
         Space prefix = prefix(keywordNode.getSymbol());
         Bash.Literal keyword = visitKeyword(keywordNode.getSymbol());
         List<Bash.Statement> condition = visitCompoundList(condCtx);
@@ -955,19 +1054,39 @@ public class BashParserVisitor {
     // Brace group and subshell
     // ================================================================
 
-    private Bash.BraceGroup visitBraceGroup(BashParser.BraceGroupContext ctx) {
+    private Bash.Statement visitBraceGroup(BashParser.BraceGroupContext ctx) {
+        if (ctx.RBRACE() == null) {
+            return fallbackCommand(ctx);
+        }
         Space prefix = prefix(ctx.LBRACE().getSymbol());
         skip(ctx.LBRACE().getSymbol());
         List<Bash.Statement> body = visitCompoundList(ctx.compoundList());
+        // Check for synthetic RBRACE (ANTLR error recovery inserted a fake })
+        // In this case, don't emit } — it will be captured naturally by
+        // subsequent cursor tracking as the real } appears later in the source.
+        if (ctx.RBRACE().getSymbol().getStartIndex() < 0) {
+            return new Bash.BraceGroup(randomId(), prefix, Markers.EMPTY, body, null);
+        }
         Space closingBrace = prefix(ctx.RBRACE().getSymbol());
         skip(ctx.RBRACE().getSymbol());
         return new Bash.BraceGroup(randomId(), prefix, Markers.EMPTY, body, closingBrace);
     }
 
     private Bash.Subshell visitSubshell(BashParser.SubshellContext ctx) {
+        if (ctx.RPAREN() == null) {
+            // ANTLR error recovery — missing RPAREN, fall back
+            Space prefix = prefix(ctx.LPAREN().getSymbol());
+            skip(ctx.LPAREN().getSymbol());
+            List<Bash.Statement> body = visitCompoundList(ctx.compoundList());
+            return new Bash.Subshell(randomId(), prefix, Markers.EMPTY, body, null);
+        }
         Space prefix = prefix(ctx.LPAREN().getSymbol());
         skip(ctx.LPAREN().getSymbol());
         List<Bash.Statement> body = visitCompoundList(ctx.compoundList());
+        // Check for synthetic RPAREN
+        if (ctx.RPAREN().getSymbol().getStartIndex() < 0) {
+            return new Bash.Subshell(randomId(), prefix, Markers.EMPTY, body, null);
+        }
         Space closingParen = prefix(ctx.RPAREN().getSymbol());
         skip(ctx.RPAREN().getSymbol());
         return new Bash.Subshell(randomId(), prefix, Markers.EMPTY, body, closingParen);
@@ -977,20 +1096,29 @@ public class BashParserVisitor {
     // (( expr )) and [[ expr ]]
     // ================================================================
 
-    private Bash.ArithmeticExpansion visitDoubleParenExpr(BashParser.DoubleParenExprContext ctx) {
+    private Bash.Statement visitDoubleParenExpr(BashParser.DoubleParenExprContext ctx) {
+        if (ctx.DOUBLE_RPAREN() == null) {
+            return fallbackCommand(ctx);
+        }
+        int closeStart = toCharIndex(ctx.DOUBLE_RPAREN().getSymbol().getStartIndex());
+        if (closeStart < 0 || closeStart < cursor) {
+            return fallbackCommand(ctx);
+        }
         Space prefix = prefix(ctx.DOUBLE_LPAREN().getSymbol());
         skip(ctx.DOUBLE_LPAREN().getSymbol());
 
         // Capture all text between (( and )) including leading/trailing whitespace
-        int exprEnd = toCharIndex(ctx.DOUBLE_RPAREN().getSymbol().getStartIndex());
-        String expr = source.substring(cursor, exprEnd);
-        advanceCursor(exprEnd);
+        String expr = source.substring(cursor, closeStart);
+        advanceCursor(closeStart);
 
         skip(ctx.DOUBLE_RPAREN().getSymbol());
         return new Bash.ArithmeticExpansion(randomId(), prefix, Markers.EMPTY, false, expr);
     }
 
-    private Bash.ConditionalExpression visitDoubleBracketExpr(BashParser.DoubleBracketExprContext ctx) {
+    private Bash.Statement visitDoubleBracketExpr(BashParser.DoubleBracketExprContext ctx) {
+        if (ctx.DOUBLE_RBRACKET() == null) {
+            return fallbackCommand(ctx);
+        }
         Space prefix = prefix(ctx.DOUBLE_LBRACKET().getSymbol());
         skip(ctx.DOUBLE_LBRACKET().getSymbol());
 
@@ -1024,14 +1152,18 @@ public class BashParserVisitor {
 
     private Bash.Literal visitKeyword(Token token) {
         Space prefix = prefix(token);
-        String text = token.getText();
+        // Synthetic tokens from ANTLR error recovery have startIndex < 0
+        // and getText() returns "<missing 'TYPE'>" — suppress that text
+        String text = token.getStartIndex() >= 0 ? token.getText() : "";
         skip(token);
         return new Bash.Literal(randomId(), prefix, Markers.EMPTY, text);
     }
 
     private Bash.Literal visitTerminal(TerminalNode node) {
         Space prefix = prefix(node.getSymbol());
-        String text = node.getText();
+        // Synthetic tokens from ANTLR error recovery have startIndex < 0
+        // and getText() returns "<missing 'TYPE'>" — suppress that text
+        String text = node.getSymbol().getStartIndex() >= 0 ? node.getText() : "";
         skip(node.getSymbol());
         return new Bash.Literal(randomId(), prefix, Markers.EMPTY, text);
     }
@@ -1090,9 +1222,44 @@ public class BashParserVisitor {
     }
 
     private String sourceText(ParserRuleContext ctx) {
+        if (ctx.getStop() == null) {
+            int start = toCharIndex(ctx.getStart().getStartIndex());
+            if (start < source.length()) {
+                return source.substring(start, source.length());
+            }
+            return "";
+        }
         int start = toCharIndex(ctx.getStart().getStartIndex());
         int stop = toCharIndex(ctx.getStop().getStopIndex() + 1);
+        if (stop > source.length()) {
+            stop = source.length();
+        }
+        if (start > stop || start < 0 || stop < 0) {
+            return "";
+        }
         return source.substring(start, stop);
+    }
+
+    /**
+     * Fallback for when ANTLR error recovery produces incomplete parse trees.
+     * Captures the entire context as opaque literal text (Expression).
+     */
+    private Bash.Literal fallbackLiteral(ParserRuleContext ctx) {
+        Space prefix = prefix(ctx.getStart());
+        String text = sourceText(ctx);
+        skipContext(ctx);
+        return new Bash.Literal(randomId(), prefix, Markers.EMPTY, text);
+    }
+
+    /**
+     * Fallback for when ANTLR error recovery produces incomplete parse trees.
+     * Wraps in a Command so it can be used where Statement is needed.
+     */
+    private Bash.Command fallbackCommand(ParserRuleContext ctx) {
+        Bash.Literal literal = fallbackLiteral(ctx);
+        return new Bash.Command(randomId(), literal.getPrefix(), Markers.EMPTY,
+                Collections.emptyList(),
+                Collections.singletonList(literal.withPrefix(Space.EMPTY)));
     }
 
     // ================================================================
@@ -1100,8 +1267,12 @@ public class BashParserVisitor {
     // ================================================================
 
     private Space prefix(Token token) {
-        int start = toCharIndex(token.getStartIndex());
-        if (start < cursor) {
+        int startIndex = token.getStartIndex();
+        if (startIndex < 0) {
+            return Space.EMPTY;
+        }
+        int start = toCharIndex(startIndex);
+        if (start < cursor || start > source.length()) {
             return Space.EMPTY;
         }
         String prefixText = source.substring(cursor, start);

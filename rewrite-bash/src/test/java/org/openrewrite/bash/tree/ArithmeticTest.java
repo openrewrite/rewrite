@@ -120,4 +120,49 @@ class ArithmeticTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void arithmeticWithSpecialVar() {
+        rewriteRun(
+          bash(
+            "(( TEST_RESULT += $? ))\n"
+          )
+        );
+    }
+
+    @Test
+    void tripleParenExpansion() {
+        rewriteRun(
+          bash(
+            "echo $(((t1 - t0) / interval))\n"
+          )
+        );
+    }
+
+    @Test
+    void tripleParenDivision() {
+        rewriteRun(
+          bash(
+            "megs=$(((sizes + 2*1024 - 1)/(1024)))\n"
+          )
+        );
+    }
+
+    @Test
+    void arithmeticBitwiseShift() {
+        rewriteRun(
+          bash(
+            "result=$(( (1 << ($1 - 1)) - (1 << (64 - $2)) ))\n"
+          )
+        );
+    }
+
+    @Test
+    void arithmeticInArrayIndex() {
+        rewriteRun(
+          bash(
+            "arr[$((i+1))]=\"value\"\n"
+          )
+        );
+    }
 }

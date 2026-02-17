@@ -84,4 +84,13 @@ class CommandListTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void conditionalAndBraceGroup() {
+        rewriteRun(
+          bash(
+            "[[ \"$x\" == \"y\" ]] && { echo yes; exit 0; }\n"
+          )
+        );
+    }
 }

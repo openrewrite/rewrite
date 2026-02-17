@@ -147,4 +147,31 @@ class QuotingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dollarSingleQuoteEscapes() {
+        rewriteRun(
+          bash(
+            "echo $'line1\\nline2\\ttab'\n"
+          )
+        );
+    }
+
+    @Test
+    void evalWithComplexQuoting() {
+        rewriteRun(
+          bash(
+            "eval \"$(printf '%s=(${%s[@]+\"${%s[@]}\"})' dst src src)\"\n"
+          )
+        );
+    }
+
+    @Test
+    void regexEscapesInDoubleQuotes() {
+        rewriteRun(
+          bash(
+            "export REGEX=\"^v(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)\\\\.(0|[1-9][0-9]*)(-([a-zA-Z0-9]+)\\\\.(0|[1-9][0-9]*))?$\"\n"
+          )
+        );
+    }
 }

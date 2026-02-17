@@ -129,6 +129,7 @@ compoundCommand
     | whileClause
     | untilClause
     | caseClause
+    | selectClause
     | doubleParenExpr
     | doubleBracketExpr
     ;
@@ -199,6 +200,13 @@ doGroup
     ;
 
 // ==========================================
+// Select clause (similar to for)
+// ==========================================
+selectClause
+    : SELECT WORD inClause doGroup
+    ;
+
+// ==========================================
 // Case clause
 // ==========================================
 caseClause
@@ -246,6 +254,8 @@ arithmeticPart
     | BANG
     | LESS
     | GREAT
+    | DLESS       // << left-shift in arithmetic
+    | DGREAT      // >> right-shift in arithmetic
     | STAR
     | QUESTION
     | AND
@@ -286,8 +296,7 @@ conditionPart
     | LBRACE
     | RBRACE
     | DOLLAR
-    | DOUBLE_LBRACKET  // POSIX character classes [[:space:]] lex [[ as this
-    | DOUBLE_RBRACKET  // closing ]] of POSIX character classes
+    | DOUBLE_LBRACKET conditionExpr DOUBLE_RBRACKET  // nested [[ ]] for POSIX character classes
     | DOUBLE_LPAREN    // \( in regex lexes as (( when escaped
     | DOUBLE_RPAREN    // \) in regex
     | NEWLINE
@@ -360,7 +369,7 @@ redirectionOp
 // Here documents
 // ==========================================
 heredoc
-    : ( DLESS | DLESSDASH ) heredocDelimiter NEWLINE heredocBody
+    : ( DLESS | DLESSDASH ) heredocDelimiter ~NEWLINE* NEWLINE heredocBody
     ;
 
 heredocDelimiter
@@ -438,7 +447,7 @@ commandSubstitution
     ;
 
 commandSubstitutionContent
-    : completeCommands? linebreak
+    : linebreak completeCommands? linebreak
     ;
 
 // Backtick command substitution: `...`
@@ -497,6 +506,8 @@ braceExpansionPart
     | DOLLAR_DPAREN arithmeticExpr DOUBLE_RPAREN
     | DOLLAR_NAME
     | SPECIAL_VAR
+    | DOLLAR_SINGLE_QUOTED
+    | DOLLAR
     | DOUBLE_QUOTE doubleQuotedPart* DOUBLE_QUOTE
     | SINGLE_QUOTED_STRING
     | WS

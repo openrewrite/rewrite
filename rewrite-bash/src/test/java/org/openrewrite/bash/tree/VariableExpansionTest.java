@@ -228,4 +228,103 @@ class VariableExpansionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void arraySubscriptInDoubleQuotes() {
+        rewriteRun(
+          bash(
+            "echo \"${FUNCNAME[0]}\"\n"
+          )
+        );
+    }
+
+    @Test
+    void dollarSingleQuoteInExpansion() {
+        rewriteRun(
+          bash(
+            "short_sha=\"${repo_info##*$'\\n'}\"\n"
+          )
+        );
+    }
+
+    @Test
+    void dollarSingleQuoteInSubstitution() {
+        rewriteRun(
+          bash(
+            "message=\"${message//$'\\n'/ }\"\n"
+          )
+        );
+    }
+
+    @Test
+    void dollarSingleQuoteSuffixRemoval() {
+        rewriteRun(
+          bash(
+            "line=\"${line%$'\\r'}\"\n"
+          )
+        );
+    }
+
+    @Test
+    void quotedPatternInSubstitution() {
+        rewriteRun(
+          bash(
+            "pkg_body=\"${pkg_body//\"$OLD\"/\"$NEW\"}\"\n"
+          )
+        );
+    }
+
+    @Test
+    void indirectWithSubstitution() {
+        rewriteRun(
+          bash(
+            "_value=\"${!var//$'\\n'/' '}\"\n"
+          )
+        );
+    }
+
+    @Test
+    void escapedDollarExpansion() {
+        rewriteRun(
+          bash(
+            "eval x=\"\\$${ref:-}\"\n"
+          )
+        );
+    }
+
+    @Test
+    void indirectPrefixExpansion() {
+        rewriteRun(
+          bash(
+            "echo \"${!prefix@}\"\n"
+          )
+        );
+    }
+
+    @Test
+    void parameterExpansionDoubleHash() {
+        rewriteRun(
+          bash(
+            "if [ -z \"${i##*/liblto*}\" ]; then continue; fi\n"
+          )
+        );
+    }
+
+    @Test
+    void printfWithArrayExpansion() {
+        rewriteRun(
+          bash(
+            "printf \"Running ${FUNCNAME[0]}\\n\"\n"
+          )
+        );
+    }
+
+    @Test
+    void arrayLengthInConditional() {
+        rewriteRun(
+          bash(
+            "if [[ ${#FDINITRDS[@]} -gt 0 ]]; then\n  echo found\nfi\n"
+          )
+        );
+    }
 }

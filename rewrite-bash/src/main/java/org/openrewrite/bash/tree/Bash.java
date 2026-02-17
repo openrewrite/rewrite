@@ -520,6 +520,7 @@ public interface Bash extends Tree {
         Markers markers;
 
         List<Statement> body;
+        @Nullable
         Space closingParen;
 
         @Override
@@ -530,6 +531,8 @@ public interface Bash extends Tree {
 
     /**
      * Brace group: { commands; }
+     * When closingBrace is null, the closing } was synthetic (ANTLR error recovery)
+     * and should not be emitted by the printer.
      */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -542,6 +545,7 @@ public interface Bash extends Tree {
         Markers markers;
 
         List<Statement> body;
+        @Nullable
         Space closingBrace;
 
         @Override
@@ -854,6 +858,13 @@ public interface Bash extends Tree {
         boolean input;
 
         List<Statement> body;
+
+        /**
+         * Whitespace before closing paren. Null when ANTLR error recovery
+         * inserted a synthetic RPAREN (skip ) emission in printer).
+         */
+        @Nullable
+        Space closingParen;
 
         @Override
         public <P> Bash acceptBash(BashVisitor<P> v, P p) {

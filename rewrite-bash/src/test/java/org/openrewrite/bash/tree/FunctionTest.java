@@ -156,4 +156,82 @@ class FunctionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void functionWithSubshellBody() {
+        rewriteRun(
+          bash(
+            "f() (\n  echo subshell\n)\n"
+          )
+        );
+    }
+
+    @Test
+    void functionWithArithmetic() {
+        rewriteRun(
+          bash(
+            "f() {\n  x=$((1+2))\n}\n"
+          )
+        );
+    }
+
+    @Test
+    void functionWithTripleParenArithmetic() {
+        rewriteRun(
+          bash(
+            "f() {\n  x=$(((1)))\n}\n"
+          )
+        );
+    }
+
+    @Test
+    void functionWithDeeplyNestedSubshells() {
+        rewriteRun(
+          bash(
+            "f() {\n\t((((( cmd 2>&1; echo $? >&3) | cat >&4) 3>&1) | (read xs; exit $xs)) 4>>log && echo ok) || echo fail\n}\n"
+          )
+        );
+    }
+
+    @Test
+    void functionWithComplexCommandSub() {
+        rewriteRun(
+          bash(
+            "f() {\n\t[[ true ]] && {\n\t\texit 1\n\t}\n}\ng() {\n\tERRMSG=$((echo $$ > cgroup.procs) |& cat)\n}\n"
+          )
+        );
+    }
+
+    @Test
+    void functionWithArithmeticAfterTripleParens() {
+        rewriteRun(
+          bash(
+            """
+            f() {
+              echo $(((t1 - t0) / interval))
+            }
+            g() {
+              local order="$((1 << 40))"
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void functionWithEvalIfAndSubshells() {
+        rewriteRun(
+          bash(
+            """
+            f() {
+              eval x="\\$${ref:-}"
+              if [ $(head -n 1 "$f") = "#!" ]; then
+                echo found
+              fi
+              ((((( cmd 2>&1; echo $? >&3) | cat >&4) 3>&1) | (read xs; exit $xs)) 4>>log && echo ok) || echo fail
+            }
+            """
+          )
+        );
+    }
 }

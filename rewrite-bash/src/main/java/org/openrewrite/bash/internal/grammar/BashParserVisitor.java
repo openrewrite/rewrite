@@ -212,6 +212,12 @@ public interface BashParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitDoGroup(BashParser.DoGroupContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link BashParser#selectClause}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitSelectClause(BashParser.SelectClauseContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link BashParser#caseClause}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

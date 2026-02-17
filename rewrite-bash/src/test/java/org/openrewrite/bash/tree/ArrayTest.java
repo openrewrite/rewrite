@@ -102,4 +102,13 @@ class ArrayTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void associativeArrayDeclaration() {
+        rewriteRun(
+          bash(
+            "declare -A map=([key1]=val1 [key2]=val2)\n"
+          )
+        );
+    }
 }

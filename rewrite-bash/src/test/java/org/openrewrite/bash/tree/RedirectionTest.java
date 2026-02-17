@@ -173,4 +173,40 @@ class RedirectionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void hereStringWithPrefixAssignment() {
+        rewriteRun(
+          bash(
+            "IFS=: read -r sys platform <<< \"$pair\"\n"
+          )
+        );
+    }
+
+    @Test
+    void inputRedirectBeforeCommand() {
+        rewriteRun(
+          bash(
+            "< input.txt cat | head\n"
+          )
+        );
+    }
+
+    @Test
+    void multipleHeredocsInScript() {
+        rewriteRun(
+          bash(
+            "cat > /tmp/a <<EOF\nfirst\nEOF\ncat > /tmp/b <<EOF\nsecond\nEOF\n"
+          )
+        );
+    }
+
+    @Test
+    void perfRecordWithRedirects() {
+        rewriteRun(
+          bash(
+            "perf record -e arm_spe/period=65536/ -vvv -- prog > log 2>&1 &\n"
+          )
+        );
+    }
 }

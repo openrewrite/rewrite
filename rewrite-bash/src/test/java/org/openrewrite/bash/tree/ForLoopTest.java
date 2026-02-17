@@ -120,4 +120,48 @@ class ForLoopTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void forLoopInBackground() {
+        rewriteRun(
+          bash(
+            "for i in 1 2 3; do\n  echo $i\ndone &\n"
+          )
+        );
+    }
+
+    @Test
+    void selectStatement() {
+        rewriteRun(
+          bash(
+            "select opt in a b c; do\n  echo \"$opt\"\n  break\ndone\n"
+          )
+        );
+    }
+
+    @Test
+    void braceRangeInsideIfBody() {
+        rewriteRun(
+          bash(
+            """
+            if [[ -d "${dir}" ]]; then
+              for i in {1..10}; do
+                if try_restore; then
+                  break
+                fi
+              done
+            fi
+            """
+          )
+        );
+    }
+
+    @Test
+    void backtickInForLoop() {
+        rewriteRun(
+          bash(
+            "for i in `seq 1 10`; do\n  echo $i\ndone\n"
+          )
+        );
+    }
 }

@@ -227,4 +227,40 @@ class CommandTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void echoWithEqualsSign() {
+        rewriteRun(
+          bash(
+            "echo Log lines = $log0\n"
+          )
+        );
+    }
+
+    @Test
+    void commandWithGlobAndBackground() {
+        rewriteRun(
+          bash(
+            "echo ondemand | sudo tee /sys/policy*/scaling_governor &\n"
+          )
+        );
+    }
+
+    @Test
+    void jqComplexArgs() {
+        rewriteRun(
+          bash(
+            "jq -n --arg v \"$VERSION\" '{version: $v}' > out.json\n"
+          )
+        );
+    }
+
+    @Test
+    void escapedParensInArgs() {
+        rewriteRun(
+          bash(
+            "find -L /usr/share \\( -name \"*.bin\" -or -iname \"*.efi\" \\) -type f -print\n"
+          )
+        );
+    }
 }

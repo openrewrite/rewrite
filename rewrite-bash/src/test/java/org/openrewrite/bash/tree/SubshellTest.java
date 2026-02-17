@@ -48,4 +48,13 @@ class SubshellTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deeplyNestedSubshells() {
+        rewriteRun(
+          bash(
+            "((((( cmd 2>&1; echo $? >&3) | cat >&4) 3>&1) | (read xs; exit $xs)) 4>>log &&\necho ok) ||\necho fail\n"
+          )
+        );
+    }
 }

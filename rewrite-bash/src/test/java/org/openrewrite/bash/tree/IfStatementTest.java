@@ -177,4 +177,48 @@ class IfStatementTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void ifWithNewlineBeforeThen() {
+        rewriteRun(
+          bash(
+            "if [ \"$log0\" = \"$log1\" ];\nthen\n\techo fail\n\texit 1\nelse\n\techo pass\nfi\n"
+          )
+        );
+    }
+
+    @Test
+    void ifWithGlobTest() {
+        rewriteRun(
+          bash(
+            "if test -f $out/lib/ld.so.?; then\n  echo found\nfi\n"
+          )
+        );
+    }
+
+    @Test
+    void nestedIfInFunction() {
+        rewriteRun(
+          bash(
+            """
+            check() {
+              if [[ -z "$1" ]]; then
+                echo "empty"
+                return 1
+              fi
+              echo "ok"
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void ifWithSymlinkContinue() {
+        rewriteRun(
+          bash(
+            "for i in /usr/bin/*; do\n    if [ -L \"$i\" ]; then continue; fi\n    echo \"$i\"\ndone\n"
+          )
+        );
+    }
 }

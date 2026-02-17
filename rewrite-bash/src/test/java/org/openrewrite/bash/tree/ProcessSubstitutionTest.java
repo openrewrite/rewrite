@@ -48,4 +48,22 @@ class ProcessSubstitutionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void braceGroupWithProcessSubRedirection() {
+        rewriteRun(
+          bash(
+            "{ read -r hash; read -r path; } < <(echo test)\n"
+          )
+        );
+    }
+
+    @Test
+    void processSubWithSpaceBeforeClose() {
+        rewriteRun(
+          bash(
+            "diff <( sort file1 ) <( sort file2 )\n"
+          )
+        );
+    }
 }

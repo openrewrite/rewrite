@@ -333,6 +333,16 @@ public interface BashParserListener extends ParseTreeListener {
 	 */
 	void exitDoGroup(BashParser.DoGroupContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link BashParser#selectClause}.
+	 * @param ctx the parse tree
+	 */
+	void enterSelectClause(BashParser.SelectClauseContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link BashParser#selectClause}.
+	 * @param ctx the parse tree
+	 */
+	void exitSelectClause(BashParser.SelectClauseContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link BashParser#caseClause}.
 	 * @param ctx the parse tree
 	 */

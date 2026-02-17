@@ -132,4 +132,34 @@ class CaseStatementTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void caseWithLeadingParen() {
+        rewriteRun(
+          bash(
+            "case \"$1\" in\n  (yes) echo y ;;\n  (no) echo n ;;\nesac\n"
+          )
+        );
+    }
+
+    @Test
+    void complexCaseWithMultiLineBody() {
+        rewriteRun(
+          bash(
+            """
+            case "$1" in
+              -h|--help)
+                echo "Usage: script [options]"
+                ;;
+              -v|--verbose)
+                VERBOSE=1
+                ;;
+              *)
+                echo "Unknown option: $1"
+                ;;
+            esac
+            """
+          )
+        );
+    }
 }
