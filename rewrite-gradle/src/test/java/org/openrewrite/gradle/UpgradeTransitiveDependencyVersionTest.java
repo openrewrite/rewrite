@@ -996,6 +996,46 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void useResolutionStrategyWithApplyFromWhenSpringDependencyManagementPluginIsPresent() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.5'
+              }
+              repositories { mavenCentral() }
+              apply from: 'dependencies.gradle'
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.5'
+              }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-core') {
+                          details.useVersion('2.12.5')
+                          details.because('CVE-2024-BAD')
+                      }
+                  }
+              }
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
+
+    @Test
     void noChangesIfDependencyIsAlsoPresentOnProject() {
         rewriteRun(
           buildGradle(
