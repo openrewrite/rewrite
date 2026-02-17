@@ -17,7 +17,7 @@ recipeName: org.openrewrite.json.AddKeyValue
 examples:
 - description: '`AddKeyValueTest#shouldAppendSimpleValue`'
   parameters:
-  - $.
+  - $
   - key
   - '"val"'
   - 'false'
@@ -90,7 +90,7 @@ examples:
   parameters:
   - $.source
   - 'null'
-  - $.
+  - $
   - copiedValue
   - 'null'
   sources:

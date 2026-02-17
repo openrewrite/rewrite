@@ -1017,7 +1017,8 @@ class BlankLinesTest implements RewriteTest {
 
 
             }
-            """)
+            """
+          )
         );
     }
 }

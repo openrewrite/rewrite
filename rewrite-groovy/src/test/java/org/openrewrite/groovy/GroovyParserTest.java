@@ -230,8 +230,8 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @MethodSource("escapedBackslashesAndInterpolationInGStringParams")
+    @ParameterizedTest
     void escapedBackslashesAndInterpolationInGString(@Language("groovy") String groovy) {
         rewriteRun(groovy(groovy));
     }
