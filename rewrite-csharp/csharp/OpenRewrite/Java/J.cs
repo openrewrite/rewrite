@@ -32,21 +32,43 @@ public interface Statement : J
 /// Used by languages with safe navigation: C#, Kotlin, Groovy.
 /// When present on a MethodInvocation.Name or FieldAccess.Name, prints ?. instead of .
 /// </summary>
-public sealed record NullSafe(Guid Id) : Marker
+public sealed class NullSafe(
+    Guid id
+) : Marker, IEquatable<NullSafe>
 {
+    public Guid Id { get; } = id;
+
+    public NullSafe WithId(Guid id) =>
+        id == Id ? this : new(id);
+
     public static NullSafe Instance { get; } = new(Guid.Empty);
+
+    public bool Equals(NullSafe? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as NullSafe);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// Marker indicating parentheses should be omitted in NewClass.
 /// Used for object initializers without constructor arguments: new Foo { X = 1 }
 /// </summary>
-public sealed record OmitParentheses(Guid Id) : Marker, IRpcCodec<OmitParentheses>
+public sealed class OmitParentheses(
+    Guid id
+) : Marker, IRpcCodec<OmitParentheses>, IEquatable<OmitParentheses>
 {
+    public Guid Id { get; } = id;
+
+    public OmitParentheses WithId(Guid id) =>
+        id == Id ? this : new(id);
+
     public static OmitParentheses Instance { get; } = new(Guid.Empty);
     public void RpcSend(OmitParentheses after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
     public OmitParentheses RpcReceive(OmitParentheses before, RpcReceiveQueue q) =>
-        before with { Id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse) };
+        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
+
+    public bool Equals(OmitParentheses? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as OmitParentheses);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -54,11 +76,22 @@ public sealed record OmitParentheses(Guid Id) : Marker, IRpcCodec<OmitParenthese
 /// Used for positional records (record Person(string Name);) and other contexts
 /// where a semicolon replaces the expected body/braces.
 /// </summary>
-public sealed record Semicolon(Guid Id) : Marker, IRpcCodec<Semicolon>
+public sealed class Semicolon(
+    Guid id
+) : Marker, IRpcCodec<Semicolon>, IEquatable<Semicolon>
 {
+    public Guid Id { get; } = id;
+
+    public Semicolon WithId(Guid id) =>
+        id == Id ? this : new(id);
+
     public void RpcSend(Semicolon after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
     public Semicolon RpcReceive(Semicolon before, RpcReceiveQueue q) =>
-        before with { Id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse) };
+        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
+
+    public bool Equals(Semicolon? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Semicolon);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -66,262 +99,489 @@ public sealed record Semicolon(Guid Id) : Marker, IRpcCodec<Semicolon>
 /// Java: package com.example;
 /// C#: namespace MyApp.Services; (file-scoped)
 /// </summary>
-public sealed record Package(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    JRightPadded<Expression> Expression,  // The package/namespace name with trailing space before ;
-    IList<Annotation> Annotations         // Annotations before the package keyword
-) : J, Statement
+public sealed class Package(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JRightPadded<Expression> expression,
+    IList<Annotation> annotations
+) : J, Statement, IEquatable<Package>
 {
-    public Package WithId(Guid id) => this with { Id = id };
-    public Package WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Package WithMarkers(Markers markers) => this with { Markers = markers };
-    public Package WithExpression(JRightPadded<Expression> expression) => this with { Expression = expression };
-    public Package WithAnnotations(IList<Annotation> annotations) => this with { Annotations = annotations };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public JRightPadded<Expression> Expression { get; } = expression;
+    public IList<Annotation> Annotations { get; } = annotations;
+
+    public Package WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Expression, Annotations);
+    public Package WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Expression, Annotations);
+    public Package WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression, Annotations);
+    public Package WithExpression(JRightPadded<Expression> expression) =>
+        ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression, Annotations);
+    public Package WithAnnotations(IList<Annotation> annotations) =>
+        ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, Expression, annotations);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Package? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Package);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A literal value (string, number, boolean, char, null).
 /// </summary>
-public sealed record Literal(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    object? Value,
-    string? ValueSource,
-    IList<Literal.UnicodeEscape>? UnicodeEscapes,
-    JavaType.Primitive? Type
-) : J, Expression
+public sealed class Literal(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    object? value,
+    string? valueSource,
+    IList<Literal.UnicodeEscape>? unicodeEscapes,
+    JavaType.Primitive? type
+) : J, Expression, IEquatable<Literal>
 {
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public object? Value { get; } = value;
+    public string? ValueSource { get; } = valueSource;
+    public IList<Literal.UnicodeEscape>? UnicodeEscapes { get; } = unicodeEscapes;
+    public JavaType.Primitive? Type { get; } = type;
+
+    public Literal WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Value, ValueSource, UnicodeEscapes, Type);
+    public Literal WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Value, ValueSource, UnicodeEscapes, Type);
+    public Literal WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Value, ValueSource, UnicodeEscapes, Type);
+    public Literal WithValue(object? value) =>
+        ReferenceEquals(value, Value) ? this : new(Id, Prefix, Markers, value, ValueSource, UnicodeEscapes, Type);
+    public Literal WithValueSource(string? valueSource) =>
+        string.Equals(valueSource, ValueSource, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Value, valueSource, UnicodeEscapes, Type);
+    public Literal WithUnicodeEscapes(IList<Literal.UnicodeEscape>? unicodeEscapes) =>
+        ReferenceEquals(unicodeEscapes, UnicodeEscapes) ? this : new(Id, Prefix, Markers, Value, ValueSource, unicodeEscapes, Type);
+    public Literal WithType(JavaType.Primitive? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Value, ValueSource, UnicodeEscapes, type);
+
     public record UnicodeEscape(int ValueSourceIndex, string CodePoint);
 
-    public Literal WithId(Guid id) => this with { Id = id };
-    public Literal WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Literal WithMarkers(Markers markers) => this with { Markers = markers };
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Literal? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Literal);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// An expression used as a statement.
 /// </summary>
-public sealed record ExpressionStatement(
-    Guid Id,
-    Expression Expression
-) : J, Statement
+public sealed class ExpressionStatement(
+    Guid id,
+    Expression expression
+) : J, Statement, IEquatable<ExpressionStatement>
 {
+    public Guid Id { get; } = id;
+    public Expression Expression { get; } = expression;
+
+    public ExpressionStatement WithId(Guid id) =>
+        id == Id ? this : new(id, Expression);
+    public ExpressionStatement WithExpression(Expression expression) =>
+        ReferenceEquals(expression, Expression) ? this : new(Id, expression);
+
     // ExpressionStatement delegates prefix/markers to its expression
     public Space Prefix => Expression.Prefix;
     public Markers Markers => Expression.Markers;
 
-    public ExpressionStatement WithId(Guid id) => this with { Id = id };
-    public ExpressionStatement WithExpression(Expression expression) => this with { Expression = expression };
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(ExpressionStatement? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ExpressionStatement);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A block of statements enclosed in braces { }.
 /// </summary>
-public sealed record Block(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    JRightPadded<bool> Static,
-    IList<JRightPadded<Statement>> Statements,
-    Space End
-) : J, Statement
+public sealed class Block(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JRightPadded<bool> @static,
+    IList<JRightPadded<Statement>> statements,
+    Space end
+) : J, Statement, IEquatable<Block>
 {
-    public Block WithId(Guid id) => this with { Id = id };
-    public Block WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Block WithMarkers(Markers markers) => this with { Markers = markers };
-    public Block WithStatements(IList<JRightPadded<Statement>> statements) => this with { Statements = statements };
-    public Block WithEnd(Space end) => this with { End = end };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public JRightPadded<bool> Static { get; } = @static;
+    public IList<JRightPadded<Statement>> Statements { get; } = statements;
+    public Space End { get; } = end;
+
+    public Block WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Static, Statements, End);
+    public Block WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Static, Statements, End);
+    public Block WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Static, Statements, End);
+    public Block WithStatic(JRightPadded<bool> @static) =>
+        ReferenceEquals(@static, Static) ? this : new(Id, Prefix, Markers, @static, Statements, End);
+    public Block WithStatements(IList<JRightPadded<Statement>> statements) =>
+        ReferenceEquals(statements, Statements) ? this : new(Id, Prefix, Markers, Static, statements, End);
+    public Block WithEnd(Space end) =>
+        ReferenceEquals(end, End) ? this : new(Id, Prefix, Markers, Static, Statements, end);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Block? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Block);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A return statement (e.g., return 1;).
 /// </summary>
-public sealed record Return(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Expression? Expression
-) : J, Statement
+public sealed class Return(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Expression? expression
+) : J, Statement, IEquatable<Return>
 {
-    public Return WithId(Guid id) => this with { Id = id };
-    public Return WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Return WithMarkers(Markers markers) => this with { Markers = markers };
-    public Return WithExpression(Expression? expression) => this with { Expression = expression };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Expression? Expression { get; } = expression;
+
+    public Return WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Expression);
+    public Return WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Expression);
+    public Return WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression);
+    public Return WithExpression(Expression? expression) =>
+        ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Return? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Return);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// An if statement (e.g., if (condition) { } else { }).
 /// </summary>
-public sealed record If(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    ControlParentheses<Expression> Condition,
-    JRightPadded<Statement> ThenPart,
-    If.Else? ElsePart
-) : J, Statement
+public sealed class If(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    ControlParentheses<Expression> condition,
+    JRightPadded<Statement> thenPart,
+    If.Else? elsePart
+) : J, Statement, IEquatable<If>
 {
-    public sealed record Else(
-        Guid Id,
-        Space Prefix,
-        Markers Markers,
-        JRightPadded<Statement> Body
-    ) : J
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public ControlParentheses<Expression> Condition { get; } = condition;
+    public JRightPadded<Statement> ThenPart { get; } = thenPart;
+    public If.Else? ElsePart { get; } = elsePart;
+
+    public If WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Condition, ThenPart, ElsePart);
+    public If WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Condition, ThenPart, ElsePart);
+    public If WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Condition, ThenPart, ElsePart);
+    public If WithCondition(ControlParentheses<Expression> condition) =>
+        ReferenceEquals(condition, Condition) ? this : new(Id, Prefix, Markers, condition, ThenPart, ElsePart);
+    public If WithThenPart(JRightPadded<Statement> thenPart) =>
+        ReferenceEquals(thenPart, ThenPart) ? this : new(Id, Prefix, Markers, Condition, thenPart, ElsePart);
+    public If WithElsePart(If.Else? elsePart) =>
+        ReferenceEquals(elsePart, ElsePart) ? this : new(Id, Prefix, Markers, Condition, ThenPart, elsePart);
+
+        public sealed class Else(
+        Guid id,
+        Space prefix,
+        Markers markers,
+        JRightPadded<Statement> body
+    ) : J, IEquatable<Else>
     {
-        public Else WithId(Guid id) => this with { Id = id };
-        public Else WithPrefix(Space prefix) => this with { Prefix = prefix };
-        public Else WithMarkers(Markers markers) => this with { Markers = markers };
-        public Else WithBody(JRightPadded<Statement> body) => this with { Body = body };
+        public Guid Id { get; } = id;
+        public Space Prefix { get; } = prefix;
+        public Markers Markers { get; } = markers;
+        public JRightPadded<Statement> Body { get; } = body;
+
+        public Else WithId(Guid id) =>
+            id == Id ? this : new(id, Prefix, Markers, Body);
+        public Else WithPrefix(Space prefix) =>
+            ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Body);
+        public Else WithMarkers(Markers markers) =>
+            ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Body);
+        public Else WithBody(JRightPadded<Statement> body) =>
+            ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, body);
 
         Tree Tree.WithId(Guid id) => WithId(id);
+
+        public bool Equals(Else? other) => other is not null && Id == other.Id;
+        public override bool Equals(object? obj) => Equals(obj as Else);
+        public override int GetHashCode() => Id.GetHashCode();
     }
 
-    public If WithId(Guid id) => this with { Id = id };
-    public If WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public If WithMarkers(Markers markers) => this with { Markers = markers };
-    public If WithCondition(ControlParentheses<Expression> condition) => this with { Condition = condition };
-    public If WithThenPart(JRightPadded<Statement> thenPart) => this with { ThenPart = thenPart };
-    public If WithElsePart(Else? elsePart) => this with { ElsePart = elsePart };
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(If? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as If);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// Parentheses used in control structures (if, while, etc.).
 /// </summary>
-public sealed record ControlParentheses<T>(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    JRightPadded<T> Tree
-) : J, Expression where T : J
+public sealed class ControlParentheses<T>(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JRightPadded<T> tree
+) : J, Expression, IEquatable<ControlParentheses<T>> where T : J
 {
-    public ControlParentheses<T> WithId(Guid id) => this with { Id = id };
-    public ControlParentheses<T> WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public ControlParentheses<T> WithMarkers(Markers markers) => this with { Markers = markers };
-    public ControlParentheses<T> WithTree(JRightPadded<T> tree) => this with { Tree = tree };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public JRightPadded<T> Tree { get; } = tree;
+
+    public ControlParentheses<T> WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Tree);
+    public ControlParentheses<T> WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Tree);
+    public ControlParentheses<T> WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Tree);
+    public ControlParentheses<T> WithTree(JRightPadded<T> tree) =>
+        ReferenceEquals(tree, Tree) ? this : new(Id, Prefix, Markers, tree);
 
     Tree Core.Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(ControlParentheses<T>? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ControlParentheses<T>);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A for loop (e.g., for (int i = 0; i &lt; 10; i++) { }).
 /// </summary>
-public sealed record ForLoop(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    ForLoop.Control LoopControl,
-    JRightPadded<Statement> Body
-) : J, Statement
+public sealed class ForLoop(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    ForLoop.Control loopControl,
+    JRightPadded<Statement> body
+) : J, Statement, IEquatable<ForLoop>
 {
-    public sealed record Control(
-        Guid Id,
-        Space Prefix,
-        Markers Markers,
-        IList<JRightPadded<Statement>> Init,
-        JRightPadded<Expression> Condition,
-        IList<JRightPadded<Statement>> Update
-    ) : J
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public ForLoop.Control LoopControl { get; } = loopControl;
+    public JRightPadded<Statement> Body { get; } = body;
+
+    public ForLoop WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, LoopControl, Body);
+    public ForLoop WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, LoopControl, Body);
+    public ForLoop WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, LoopControl, Body);
+    public ForLoop WithLoopControl(ForLoop.Control loopControl) =>
+        ReferenceEquals(loopControl, LoopControl) ? this : new(Id, Prefix, Markers, loopControl, Body);
+    public ForLoop WithBody(JRightPadded<Statement> body) =>
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, LoopControl, body);
+
+        public sealed class Control(
+        Guid id,
+        Space prefix,
+        Markers markers,
+        IList<JRightPadded<Statement>> init,
+        JRightPadded<Expression> condition,
+        IList<JRightPadded<Statement>> update
+    ) : J, IEquatable<Control>
     {
-        public Control WithId(Guid id) => this with { Id = id };
-        public Control WithPrefix(Space prefix) => this with { Prefix = prefix };
-        public Control WithMarkers(Markers markers) => this with { Markers = markers };
+        public Guid Id { get; } = id;
+        public Space Prefix { get; } = prefix;
+        public Markers Markers { get; } = markers;
+        public IList<JRightPadded<Statement>> Init { get; } = init;
+        public JRightPadded<Expression> Condition { get; } = condition;
+        public IList<JRightPadded<Statement>> Update { get; } = update;
+
+        public Control WithId(Guid id) =>
+            id == Id ? this : new(id, Prefix, Markers, Init, Condition, Update);
+        public Control WithPrefix(Space prefix) =>
+            ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Init, Condition, Update);
+        public Control WithMarkers(Markers markers) =>
+            ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Init, Condition, Update);
+        public Control WithInit(IList<JRightPadded<Statement>> init) =>
+            ReferenceEquals(init, Init) ? this : new(Id, Prefix, Markers, init, Condition, Update);
+        public Control WithCondition(JRightPadded<Expression> condition) =>
+            ReferenceEquals(condition, Condition) ? this : new(Id, Prefix, Markers, Init, condition, Update);
+        public Control WithUpdate(IList<JRightPadded<Statement>> update) =>
+            ReferenceEquals(update, Update) ? this : new(Id, Prefix, Markers, Init, Condition, update);
 
         Tree Tree.WithId(Guid id) => WithId(id);
+
+        public bool Equals(Control? other) => other is not null && Id == other.Id;
+        public override bool Equals(object? obj) => Equals(obj as Control);
+        public override int GetHashCode() => Id.GetHashCode();
     }
 
-    public ForLoop WithId(Guid id) => this with { Id = id };
-    public ForLoop WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public ForLoop WithMarkers(Markers markers) => this with { Markers = markers };
-    public ForLoop WithBody(JRightPadded<Statement> body) => this with { Body = body };
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(ForLoop? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ForLoop);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A foreach loop (e.g., foreach (var x in items) { }).
 /// </summary>
-public sealed record ForEachLoop(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    ForEachLoop.Control LoopControl,
-    JRightPadded<Statement> Body
-) : J, Statement
+public sealed class ForEachLoop(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    ForEachLoop.Control loopControl,
+    JRightPadded<Statement> body
+) : J, Statement, IEquatable<ForEachLoop>
 {
-    public sealed record Control(
-        Guid Id,
-        Space Prefix,
-        Markers Markers,
-        JRightPadded<VariableDeclarations> Variable,
-        JRightPadded<Expression> Iterable
-    ) : J
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public ForEachLoop.Control LoopControl { get; } = loopControl;
+    public JRightPadded<Statement> Body { get; } = body;
+
+    public ForEachLoop WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, LoopControl, Body);
+    public ForEachLoop WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, LoopControl, Body);
+    public ForEachLoop WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, LoopControl, Body);
+    public ForEachLoop WithLoopControl(ForEachLoop.Control loopControl) =>
+        ReferenceEquals(loopControl, LoopControl) ? this : new(Id, Prefix, Markers, loopControl, Body);
+    public ForEachLoop WithBody(JRightPadded<Statement> body) =>
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, LoopControl, body);
+
+        public sealed class Control(
+        Guid id,
+        Space prefix,
+        Markers markers,
+        JRightPadded<VariableDeclarations> variable,
+        JRightPadded<Expression> iterable
+    ) : J, IEquatable<Control>
     {
-        public Control WithId(Guid id) => this with { Id = id };
-        public Control WithPrefix(Space prefix) => this with { Prefix = prefix };
-        public Control WithMarkers(Markers markers) => this with { Markers = markers };
+        public Guid Id { get; } = id;
+        public Space Prefix { get; } = prefix;
+        public Markers Markers { get; } = markers;
+        public JRightPadded<VariableDeclarations> Variable { get; } = variable;
+        public JRightPadded<Expression> Iterable { get; } = iterable;
+
+        public Control WithId(Guid id) =>
+            id == Id ? this : new(id, Prefix, Markers, Variable, Iterable);
+        public Control WithPrefix(Space prefix) =>
+            ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Variable, Iterable);
+        public Control WithMarkers(Markers markers) =>
+            ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Variable, Iterable);
+        public Control WithVariable(JRightPadded<VariableDeclarations> variable) =>
+            ReferenceEquals(variable, Variable) ? this : new(Id, Prefix, Markers, variable, Iterable);
+        public Control WithIterable(JRightPadded<Expression> iterable) =>
+            ReferenceEquals(iterable, Iterable) ? this : new(Id, Prefix, Markers, Variable, iterable);
 
         Tree Tree.WithId(Guid id) => WithId(id);
+
+        public bool Equals(Control? other) => other is not null && Id == other.Id;
+        public override bool Equals(object? obj) => Equals(obj as Control);
+        public override int GetHashCode() => Id.GetHashCode();
     }
 
-    public ForEachLoop WithId(Guid id) => this with { Id = id };
-    public ForEachLoop WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public ForEachLoop WithMarkers(Markers markers) => this with { Markers = markers };
-    public ForEachLoop WithBody(JRightPadded<Statement> body) => this with { Body = body };
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(ForEachLoop? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ForEachLoop);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A while loop (e.g., while (condition) { }).
 /// </summary>
-public sealed record WhileLoop(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    ControlParentheses<Expression> Condition,
-    JRightPadded<Statement> Body
-) : J, Statement
+public sealed class WhileLoop(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    ControlParentheses<Expression> condition,
+    JRightPadded<Statement> body
+) : J, Statement, IEquatable<WhileLoop>
 {
-    public WhileLoop WithId(Guid id) => this with { Id = id };
-    public WhileLoop WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public WhileLoop WithMarkers(Markers markers) => this with { Markers = markers };
-    public WhileLoop WithBody(JRightPadded<Statement> body) => this with { Body = body };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public ControlParentheses<Expression> Condition { get; } = condition;
+    public JRightPadded<Statement> Body { get; } = body;
+
+    public WhileLoop WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Condition, Body);
+    public WhileLoop WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Condition, Body);
+    public WhileLoop WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Condition, Body);
+    public WhileLoop WithCondition(ControlParentheses<Expression> condition) =>
+        ReferenceEquals(condition, Condition) ? this : new(Id, Prefix, Markers, condition, Body);
+    public WhileLoop WithBody(JRightPadded<Statement> body) =>
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Condition, body);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(WhileLoop? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as WhileLoop);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A do-while loop (e.g., do { } while (condition);).
 /// </summary>
-public sealed record DoWhileLoop(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    JRightPadded<Statement> Body,
-    JLeftPadded<ControlParentheses<Expression>> Condition
-) : J, Statement
+public sealed class DoWhileLoop(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JRightPadded<Statement> body,
+    JLeftPadded<ControlParentheses<Expression>> condition
+) : J, Statement, IEquatable<DoWhileLoop>
 {
-    public DoWhileLoop WithId(Guid id) => this with { Id = id };
-    public DoWhileLoop WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public DoWhileLoop WithMarkers(Markers markers) => this with { Markers = markers };
-    public DoWhileLoop WithBody(JRightPadded<Statement> body) => this with { Body = body };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public JRightPadded<Statement> Body { get; } = body;
+    public JLeftPadded<ControlParentheses<Expression>> Condition { get; } = condition;
+
+    public DoWhileLoop WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Body, Condition);
+    public DoWhileLoop WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Body, Condition);
+    public DoWhileLoop WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Body, Condition);
+    public DoWhileLoop WithBody(JRightPadded<Statement> body) =>
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, body, Condition);
+    public DoWhileLoop WithCondition(JLeftPadded<ControlParentheses<Expression>> condition) =>
+        ReferenceEquals(condition, Condition) ? this : new(Id, Prefix, Markers, Body, condition);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(DoWhileLoop? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as DoWhileLoop);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -329,173 +589,338 @@ public sealed record DoWhileLoop(
 /// In Java: synchronized (lock) { body }
 /// In C#: lock (lock) { body }
 /// </summary>
-public sealed record Synchronized(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    ControlParentheses<Expression> Lock,
-    Block Body
-) : J, Statement
+public sealed class Synchronized(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    ControlParentheses<Expression> @lock,
+    Block body
+) : J, Statement, IEquatable<Synchronized>
 {
-    public Synchronized WithId(Guid id) => this with { Id = id };
-    public Synchronized WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Synchronized WithMarkers(Markers markers) => this with { Markers = markers };
-    public Synchronized WithLock(ControlParentheses<Expression> @lock) => this with { Lock = @lock };
-    public Synchronized WithBody(Block body) => this with { Body = body };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public ControlParentheses<Expression> Lock { get; } = @lock;
+    public Block Body { get; } = body;
+
+    public Synchronized WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Lock, Body);
+    public Synchronized WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Lock, Body);
+    public Synchronized WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Lock, Body);
+    public Synchronized WithLock(ControlParentheses<Expression> @lock) =>
+        ReferenceEquals(@lock, Lock) ? this : new(Id, Prefix, Markers, @lock, Body);
+    public Synchronized WithBody(Block body) =>
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Lock, body);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Synchronized? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Synchronized);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A try statement (e.g., try { } catch { } finally { }).
 /// </summary>
-public sealed record Try(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    JContainer<NameTree>? Resources,
-    Block Body,
-    IList<Try.Catch> Catches,
-    JLeftPadded<Block>? Finally
-) : J, Statement
+public sealed class Try(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JContainer<NameTree>? resources,
+    Block body,
+    IList<Try.Catch> catches,
+    JLeftPadded<Block>? @finally
+) : J, Statement, IEquatable<Try>
 {
-    public sealed record Catch(
-        Guid Id,
-        Space Prefix,
-        Markers Markers,
-        ControlParentheses<VariableDeclarations> Parameter,
-        Block Body
-    ) : J
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public JContainer<NameTree>? Resources { get; } = resources;
+    public Block Body { get; } = body;
+    public IList<Try.Catch> Catches { get; } = catches;
+    public JLeftPadded<Block>? Finally { get; } = @finally;
+
+    public Try WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Resources, Body, Catches, Finally);
+    public Try WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Resources, Body, Catches, Finally);
+    public Try WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Resources, Body, Catches, Finally);
+    public Try WithResources(JContainer<NameTree>? resources) =>
+        ReferenceEquals(resources, Resources) ? this : new(Id, Prefix, Markers, resources, Body, Catches, Finally);
+    public Try WithBody(Block body) =>
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Resources, body, Catches, Finally);
+    public Try WithCatches(IList<Try.Catch> catches) =>
+        ReferenceEquals(catches, Catches) ? this : new(Id, Prefix, Markers, Resources, Body, catches, Finally);
+    public Try WithFinally(JLeftPadded<Block>? @finally) =>
+        ReferenceEquals(@finally, Finally) ? this : new(Id, Prefix, Markers, Resources, Body, Catches, @finally);
+
+        public sealed class Catch(
+        Guid id,
+        Space prefix,
+        Markers markers,
+        ControlParentheses<VariableDeclarations> parameter,
+        Block body
+    ) : J, IEquatable<Catch>
     {
-        public Catch WithId(Guid id) => this with { Id = id };
-        public Catch WithPrefix(Space prefix) => this with { Prefix = prefix };
-        public Catch WithMarkers(Markers markers) => this with { Markers = markers };
+        public Guid Id { get; } = id;
+        public Space Prefix { get; } = prefix;
+        public Markers Markers { get; } = markers;
+        public ControlParentheses<VariableDeclarations> Parameter { get; } = parameter;
+        public Block Body { get; } = body;
+
+        public Catch WithId(Guid id) =>
+            id == Id ? this : new(id, Prefix, Markers, Parameter, Body);
+        public Catch WithPrefix(Space prefix) =>
+            ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Parameter, Body);
+        public Catch WithMarkers(Markers markers) =>
+            ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Parameter, Body);
+        public Catch WithParameter(ControlParentheses<VariableDeclarations> parameter) =>
+            ReferenceEquals(parameter, Parameter) ? this : new(Id, Prefix, Markers, parameter, Body);
+        public Catch WithBody(Block body) =>
+            ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Parameter, body);
 
         Tree Tree.WithId(Guid id) => WithId(id);
+
+        public bool Equals(Catch? other) => other is not null && Id == other.Id;
+        public override bool Equals(object? obj) => Equals(obj as Catch);
+        public override int GetHashCode() => Id.GetHashCode();
     }
 
-    public Try WithId(Guid id) => this with { Id = id };
-    public Try WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Try WithMarkers(Markers markers) => this with { Markers = markers };
-    public Try WithBody(Block body) => this with { Body = body };
-    public Try WithCatches(IList<Catch> catches) => this with { Catches = catches };
-    public Try WithFinally(JLeftPadded<Block>? finallyBlock) => this with { Finally = finallyBlock };
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Try? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Try);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A throw statement (e.g., throw new Exception();).
 /// </summary>
-public sealed record Throw(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Expression Exception
-) : J, Statement
+public sealed class Throw(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Expression exception
+) : J, Statement, IEquatable<Throw>
 {
-    public Throw WithId(Guid id) => this with { Id = id };
-    public Throw WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Throw WithMarkers(Markers markers) => this with { Markers = markers };
-    public Throw WithException(Expression exception) => this with { Exception = exception };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Expression Exception { get; } = exception;
+
+    public Throw WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Exception);
+    public Throw WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Exception);
+    public Throw WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Exception);
+    public Throw WithException(Expression exception) =>
+        ReferenceEquals(exception, Exception) ? this : new(Id, Prefix, Markers, exception);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Throw? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Throw);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A break statement.
 /// </summary>
-public sealed record Break(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Identifier? Label
-) : J, Statement
+public sealed class Break(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Identifier? label
+) : J, Statement, IEquatable<Break>
 {
-    public Break WithId(Guid id) => this with { Id = id };
-    public Break WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Break WithMarkers(Markers markers) => this with { Markers = markers };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Identifier? Label { get; } = label;
+
+    public Break WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Label);
+    public Break WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Label);
+    public Break WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Label);
+    public Break WithLabel(Identifier? label) =>
+        ReferenceEquals(label, Label) ? this : new(Id, Prefix, Markers, label);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Break? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Break);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A continue statement.
 /// </summary>
-public sealed record Continue(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Identifier? Label
-) : J, Statement
+public sealed class Continue(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Identifier? label
+) : J, Statement, IEquatable<Continue>
 {
-    public Continue WithId(Guid id) => this with { Id = id };
-    public Continue WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Continue WithMarkers(Markers markers) => this with { Markers = markers };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Identifier? Label { get; } = label;
+
+    public Continue WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Label);
+    public Continue WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Label);
+    public Continue WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Label);
+    public Continue WithLabel(Identifier? label) =>
+        ReferenceEquals(label, Label) ? this : new(Id, Prefix, Markers, label);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Continue? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Continue);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// An empty statement (just a semicolon).
 /// </summary>
-public sealed record Empty(
-    Guid Id,
-    Space Prefix,
-    Markers Markers
-) : J, Statement, Expression
+public sealed class Empty(
+    Guid id,
+    Space prefix,
+    Markers markers
+) : J, Statement, Expression, IEquatable<Empty>
 {
-    public Empty WithId(Guid id) => this with { Id = id };
-    public Empty WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Empty WithMarkers(Markers markers) => this with { Markers = markers };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+
+    public Empty WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers);
+    public Empty WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers);
+    public Empty WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Empty? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Empty);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A class, struct, interface, or record declaration.
 /// </summary>
-public sealed record ClassDeclaration(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    IList<Annotation> LeadingAnnotations,
-    IList<Modifier> Modifiers,
-    ClassDeclaration.Kind ClassKind,
-    Identifier Name,
-    JContainer<TypeParameter>? TypeParameters,
-    JContainer<TypeTree>? PrimaryConstructor,
-    JLeftPadded<TypeTree>? Extends,
-    JContainer<TypeTree>? Implements,
-    JContainer<TypeTree>? Permits,
-    Block Body,
-    JavaType.FullyQualified? Type
-) : J, Statement
+public sealed class ClassDeclaration(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    IList<Annotation> leadingAnnotations,
+    IList<Modifier> modifiers,
+    ClassDeclaration.Kind classKind,
+    Identifier name,
+    JContainer<TypeParameter>? typeParameters,
+    JContainer<TypeTree>? primaryConstructor,
+    JLeftPadded<TypeTree>? extends,
+    JContainer<TypeTree>? implements,
+    JContainer<TypeTree>? permits,
+    Block body,
+    JavaType.FullyQualified? type
+) : J, Statement, IEquatable<ClassDeclaration>
 {
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public IList<Annotation> LeadingAnnotations { get; } = leadingAnnotations;
+    public IList<Modifier> Modifiers { get; } = modifiers;
+    public ClassDeclaration.Kind ClassKind { get; } = classKind;
+    public Identifier Name { get; } = name;
+    public JContainer<TypeParameter>? TypeParameters { get; } = typeParameters;
+    public JContainer<TypeTree>? PrimaryConstructor { get; } = primaryConstructor;
+    public JLeftPadded<TypeTree>? Extends { get; } = extends;
+    public JContainer<TypeTree>? Implements { get; } = implements;
+    public JContainer<TypeTree>? Permits { get; } = permits;
+    public Block Body { get; } = body;
+    public JavaType.FullyQualified? Type { get; } = type;
+
+    public ClassDeclaration WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, LeadingAnnotations, Modifiers, ClassKind, Name, TypeParameters, PrimaryConstructor, Extends, Implements, Permits, Body, Type);
+    public ClassDeclaration WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, LeadingAnnotations, Modifiers, ClassKind, Name, TypeParameters, PrimaryConstructor, Extends, Implements, Permits, Body, Type);
+    public ClassDeclaration WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, LeadingAnnotations, Modifiers, ClassKind, Name, TypeParameters, PrimaryConstructor, Extends, Implements, Permits, Body, Type);
+    public ClassDeclaration WithLeadingAnnotations(IList<Annotation> leadingAnnotations) =>
+        ReferenceEquals(leadingAnnotations, LeadingAnnotations) ? this : new(Id, Prefix, Markers, leadingAnnotations, Modifiers, ClassKind, Name, TypeParameters, PrimaryConstructor, Extends, Implements, Permits, Body, Type);
+    public ClassDeclaration WithModifiers(IList<Modifier> modifiers) =>
+        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, LeadingAnnotations, modifiers, ClassKind, Name, TypeParameters, PrimaryConstructor, Extends, Implements, Permits, Body, Type);
+    public ClassDeclaration WithClassKind(ClassDeclaration.Kind classKind) =>
+        ReferenceEquals(classKind, ClassKind) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, classKind, Name, TypeParameters, PrimaryConstructor, Extends, Implements, Permits, Body, Type);
+    public ClassDeclaration WithName(Identifier name) =>
+        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, ClassKind, name, TypeParameters, PrimaryConstructor, Extends, Implements, Permits, Body, Type);
+    public ClassDeclaration WithTypeParameters(JContainer<TypeParameter>? typeParameters) =>
+        ReferenceEquals(typeParameters, TypeParameters) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, ClassKind, Name, typeParameters, PrimaryConstructor, Extends, Implements, Permits, Body, Type);
+    public ClassDeclaration WithPrimaryConstructor(JContainer<TypeTree>? primaryConstructor) =>
+        ReferenceEquals(primaryConstructor, PrimaryConstructor) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, ClassKind, Name, TypeParameters, primaryConstructor, Extends, Implements, Permits, Body, Type);
+    public ClassDeclaration WithExtends(JLeftPadded<TypeTree>? extends) =>
+        ReferenceEquals(extends, Extends) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, ClassKind, Name, TypeParameters, PrimaryConstructor, extends, Implements, Permits, Body, Type);
+    public ClassDeclaration WithImplements(JContainer<TypeTree>? implements) =>
+        ReferenceEquals(implements, Implements) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, ClassKind, Name, TypeParameters, PrimaryConstructor, Extends, implements, Permits, Body, Type);
+    public ClassDeclaration WithPermits(JContainer<TypeTree>? permits) =>
+        ReferenceEquals(permits, Permits) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, ClassKind, Name, TypeParameters, PrimaryConstructor, Extends, Implements, permits, Body, Type);
+    public ClassDeclaration WithBody(Block body) =>
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, ClassKind, Name, TypeParameters, PrimaryConstructor, Extends, Implements, Permits, body, Type);
+    public ClassDeclaration WithType(JavaType.FullyQualified? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, ClassKind, Name, TypeParameters, PrimaryConstructor, Extends, Implements, Permits, Body, type);
+
     public enum KindType { Class, Enum, Interface, Annotation, Record, Value }
 
-    public sealed record Kind(
-        Guid Id,
-        Space Prefix,
-        Markers Markers,
-        IList<Annotation> Annotations,
-        KindType Type
-    ) : J
+        public sealed class Kind(
+        Guid id,
+        Space prefix,
+        Markers markers,
+        IList<Annotation> annotations,
+        KindType type
+    ) : J, IEquatable<Kind>
     {
-        public Kind WithId(Guid id) => this with { Id = id };
-        public Kind WithPrefix(Space prefix) => this with { Prefix = prefix };
-        public Kind WithMarkers(Markers markers) => this with { Markers = markers };
+        public Guid Id { get; } = id;
+        public Space Prefix { get; } = prefix;
+        public Markers Markers { get; } = markers;
+        public IList<Annotation> Annotations { get; } = annotations;
+        public KindType Type { get; } = type;
+
+        public Kind WithId(Guid id) =>
+            id == Id ? this : new(id, Prefix, Markers, Annotations, Type);
+        public Kind WithPrefix(Space prefix) =>
+            ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Annotations, Type);
+        public Kind WithMarkers(Markers markers) =>
+            ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Annotations, Type);
+        public Kind WithAnnotations(IList<Annotation> annotations) =>
+            ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, annotations, Type);
+        public Kind WithType(KindType type) =>
+            type == Type ? this : new(Id, Prefix, Markers, Annotations, type);
 
         Tree Tree.WithId(Guid id) => WithId(id);
+
+        public bool Equals(Kind? other) => other is not null && Id == other.Id;
+        public override bool Equals(object? obj) => Equals(obj as Kind);
+        public override int GetHashCode() => Id.GetHashCode();
     }
 
-    public ClassDeclaration WithId(Guid id) => this with { Id = id };
-    public ClassDeclaration WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public ClassDeclaration WithMarkers(Markers markers) => this with { Markers = markers };
-    public ClassDeclaration WithName(Identifier name) => this with { Name = name };
-    public ClassDeclaration WithBody(Block body) => this with { Body = body };
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(ClassDeclaration? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ClassDeclaration);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -505,23 +930,40 @@ public sealed record ClassDeclaration(
 ///   Green = 1
 ///   Blue = 2
 /// </summary>
-public sealed record EnumValue(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    IList<Annotation> Annotations,
-    Identifier Name,
-    JLeftPadded<Expression>? Initializer  // For = value
-) : J
+public sealed class EnumValue(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    IList<Annotation> annotations,
+    Identifier name,
+    JLeftPadded<Expression>? initializer
+) : J, IEquatable<EnumValue>
 {
-    public EnumValue WithId(Guid id) => this with { Id = id };
-    public EnumValue WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public EnumValue WithMarkers(Markers markers) => this with { Markers = markers };
-    public EnumValue WithAnnotations(IList<Annotation> annotations) => this with { Annotations = annotations };
-    public EnumValue WithName(Identifier name) => this with { Name = name };
-    public EnumValue WithInitializer(JLeftPadded<Expression>? initializer) => this with { Initializer = initializer };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public IList<Annotation> Annotations { get; } = annotations;
+    public Identifier Name { get; } = name;
+    public JLeftPadded<Expression>? Initializer { get; } = initializer;
+
+    public EnumValue WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Annotations, Name, Initializer);
+    public EnumValue WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Annotations, Name, Initializer);
+    public EnumValue WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Annotations, Name, Initializer);
+    public EnumValue WithAnnotations(IList<Annotation> annotations) =>
+        ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, annotations, Name, Initializer);
+    public EnumValue WithName(Identifier name) =>
+        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, Annotations, name, Initializer);
+    public EnumValue WithInitializer(JLeftPadded<Expression>? initializer) =>
+        ReferenceEquals(initializer, Initializer) ? this : new(Id, Prefix, Markers, Annotations, Name, initializer);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(EnumValue? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as EnumValue);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -529,150 +971,300 @@ public sealed record EnumValue(
 /// Example:
 ///   Red, Green = 1, Blue
 /// </summary>
-public sealed record EnumValueSet(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    IList<JRightPadded<EnumValue>> Enums,
-    bool TerminatedWithSemicolon
-) : J, Statement
+public sealed class EnumValueSet(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    IList<JRightPadded<EnumValue>> enums,
+    bool terminatedWithSemicolon
+) : J, Statement, IEquatable<EnumValueSet>
 {
-    public EnumValueSet WithId(Guid id) => this with { Id = id };
-    public EnumValueSet WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public EnumValueSet WithMarkers(Markers markers) => this with { Markers = markers };
-    public EnumValueSet WithEnums(IList<JRightPadded<EnumValue>> enums) => this with { Enums = enums };
-    public EnumValueSet WithTerminatedWithSemicolon(bool terminated) => this with { TerminatedWithSemicolon = terminated };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public IList<JRightPadded<EnumValue>> Enums { get; } = enums;
+    public bool TerminatedWithSemicolon { get; } = terminatedWithSemicolon;
+
+    public EnumValueSet WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Enums, TerminatedWithSemicolon);
+    public EnumValueSet WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Enums, TerminatedWithSemicolon);
+    public EnumValueSet WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Enums, TerminatedWithSemicolon);
+    public EnumValueSet WithEnums(IList<JRightPadded<EnumValue>> enums) =>
+        ReferenceEquals(enums, Enums) ? this : new(Id, Prefix, Markers, enums, TerminatedWithSemicolon);
+    public EnumValueSet WithTerminatedWithSemicolon(bool terminatedWithSemicolon) =>
+        terminatedWithSemicolon == TerminatedWithSemicolon ? this : new(Id, Prefix, Markers, Enums, terminatedWithSemicolon);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(EnumValueSet? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as EnumValueSet);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A method declaration (e.g., void Bar() { }).
 /// </summary>
-public sealed record MethodDeclaration(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    IList<Annotation> LeadingAnnotations,
-    IList<Modifier> Modifiers,
-    JContainer<TypeParameter>? TypeParameters,
-    TypeTree? ReturnTypeExpression,
-    Identifier Name,
-    JContainer<Statement> Parameters,
-    JContainer<NameTree>? Throws,
-    Block? Body,
-    JLeftPadded<Expression>? DefaultValue,
-    JavaType.Method? MethodType
-) : J, Statement
+public sealed class MethodDeclaration(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    IList<Annotation> leadingAnnotations,
+    IList<Modifier> modifiers,
+    JContainer<TypeParameter>? typeParameters,
+    TypeTree? returnTypeExpression,
+    Identifier name,
+    JContainer<Statement> parameters,
+    JContainer<NameTree>? throws,
+    Block? body,
+    JLeftPadded<Expression>? defaultValue,
+    JavaType.Method? methodType
+) : J, Statement, IEquatable<MethodDeclaration>
 {
-    public MethodDeclaration WithId(Guid id) => this with { Id = id };
-    public MethodDeclaration WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public MethodDeclaration WithMarkers(Markers markers) => this with { Markers = markers };
-    public MethodDeclaration WithName(Identifier name) => this with { Name = name };
-    public MethodDeclaration WithBody(Block? body) => this with { Body = body };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public IList<Annotation> LeadingAnnotations { get; } = leadingAnnotations;
+    public IList<Modifier> Modifiers { get; } = modifiers;
+    public JContainer<TypeParameter>? TypeParameters { get; } = typeParameters;
+    public TypeTree? ReturnTypeExpression { get; } = returnTypeExpression;
+    public Identifier Name { get; } = name;
+    public JContainer<Statement> Parameters { get; } = parameters;
+    public JContainer<NameTree>? Throws { get; } = throws;
+    public Block? Body { get; } = body;
+    public JLeftPadded<Expression>? DefaultValue { get; } = defaultValue;
+    public JavaType.Method? MethodType { get; } = methodType;
+
+    public MethodDeclaration WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, MethodType);
+    public MethodDeclaration WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, MethodType);
+    public MethodDeclaration WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, MethodType);
+    public MethodDeclaration WithLeadingAnnotations(IList<Annotation> leadingAnnotations) =>
+        ReferenceEquals(leadingAnnotations, LeadingAnnotations) ? this : new(Id, Prefix, Markers, leadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, MethodType);
+    public MethodDeclaration WithModifiers(IList<Modifier> modifiers) =>
+        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, LeadingAnnotations, modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, MethodType);
+    public MethodDeclaration WithTypeParameters(JContainer<TypeParameter>? typeParameters) =>
+        ReferenceEquals(typeParameters, TypeParameters) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, typeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, MethodType);
+    public MethodDeclaration WithReturnTypeExpression(TypeTree? returnTypeExpression) =>
+        ReferenceEquals(returnTypeExpression, ReturnTypeExpression) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, returnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, MethodType);
+    public MethodDeclaration WithName(Identifier name) =>
+        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, name, Parameters, Throws, Body, DefaultValue, MethodType);
+    public MethodDeclaration WithParameters(JContainer<Statement> parameters) =>
+        ReferenceEquals(parameters, Parameters) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, parameters, Throws, Body, DefaultValue, MethodType);
+    public MethodDeclaration WithThrows(JContainer<NameTree>? throws) =>
+        ReferenceEquals(throws, Throws) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, throws, Body, DefaultValue, MethodType);
+    public MethodDeclaration WithBody(Block? body) =>
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, body, DefaultValue, MethodType);
+    public MethodDeclaration WithDefaultValue(JLeftPadded<Expression>? defaultValue) =>
+        ReferenceEquals(defaultValue, DefaultValue) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, defaultValue, MethodType);
+    public MethodDeclaration WithMethodType(JavaType.Method? methodType) =>
+        ReferenceEquals(methodType, MethodType) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, methodType);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(MethodDeclaration? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as MethodDeclaration);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A type parameter in a generic declaration (e.g., T in class Foo&lt;T&gt;).
 /// </summary>
-public sealed record TypeParameter(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    IList<Annotation> Annotations,
-    IList<Modifier> Modifiers,
-    Expression Name,
-    JContainer<TypeTree>? Bounds
-) : J
+public sealed class TypeParameter(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    IList<Annotation> annotations,
+    IList<Modifier> modifiers,
+    Expression name,
+    JContainer<TypeTree>? bounds
+) : J, IEquatable<TypeParameter>
 {
-    public TypeParameter WithId(Guid id) => this with { Id = id };
-    public TypeParameter WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public TypeParameter WithMarkers(Markers markers) => this with { Markers = markers };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public IList<Annotation> Annotations { get; } = annotations;
+    public IList<Modifier> Modifiers { get; } = modifiers;
+    public Expression Name { get; } = name;
+    public JContainer<TypeTree>? Bounds { get; } = bounds;
+
+    public TypeParameter WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Annotations, Modifiers, Name, Bounds);
+    public TypeParameter WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Annotations, Modifiers, Name, Bounds);
+    public TypeParameter WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Annotations, Modifiers, Name, Bounds);
+    public TypeParameter WithAnnotations(IList<Annotation> annotations) =>
+        ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, annotations, Modifiers, Name, Bounds);
+    public TypeParameter WithModifiers(IList<Modifier> modifiers) =>
+        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, Annotations, modifiers, Name, Bounds);
+    public TypeParameter WithName(Expression name) =>
+        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, Annotations, Modifiers, name, Bounds);
+    public TypeParameter WithBounds(JContainer<TypeTree>? bounds) =>
+        ReferenceEquals(bounds, Bounds) ? this : new(Id, Prefix, Markers, Annotations, Modifiers, Name, bounds);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(TypeParameter? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as TypeParameter);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// An identifier (variable name, type name, etc.).
 /// </summary>
-public sealed record Identifier(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    string SimpleName,
-    JavaType? Type
-) : J, Expression, NameTree
+public sealed class Identifier(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    string simpleName,
+    JavaType? type
+) : J, Expression, NameTree, IEquatable<Identifier>
 {
-    public Identifier WithId(Guid id) => this with { Id = id };
-    public Identifier WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Identifier WithMarkers(Markers markers) => this with { Markers = markers };
-    public Identifier WithSimpleName(string simpleName) => this with { SimpleName = simpleName };
-    public Identifier WithType(JavaType? type) => this with { Type = type };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public string SimpleName { get; } = simpleName;
+    public JavaType? Type { get; } = type;
+
+    public Identifier WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, SimpleName, Type);
+    public Identifier WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, SimpleName, Type);
+    public Identifier WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, SimpleName, Type);
+    public Identifier WithSimpleName(string simpleName) =>
+        string.Equals(simpleName, SimpleName, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, simpleName, Type);
+    public Identifier WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, SimpleName, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Identifier? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Identifier);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A field access (qualified name), e.g., System.Console or obj.field.
 /// </summary>
-public sealed record FieldAccess(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Expression Target,
-    JLeftPadded<Identifier> Name,
-    JavaType? Type
-) : J, TypeTree, Expression, Statement
+public sealed class FieldAccess(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Expression target,
+    JLeftPadded<Identifier> name,
+    JavaType? type
+) : J, TypeTree, Expression, Statement, IEquatable<FieldAccess>
 {
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Expression Target { get; } = target;
+    public JLeftPadded<Identifier> Name { get; } = name;
+    public JavaType? Type { get; } = type;
+
+    public FieldAccess WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Target, Name, Type);
+    public FieldAccess WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Target, Name, Type);
+    public FieldAccess WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Target, Name, Type);
+    public FieldAccess WithTarget(Expression target) =>
+        ReferenceEquals(target, Target) ? this : new(Id, Prefix, Markers, target, Name, Type);
+    public FieldAccess WithName(JLeftPadded<Identifier> name) =>
+        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, Target, name, Type);
+    public FieldAccess WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Target, Name, type);
+
     public Identifier GetName() => Name.Element;
 
-    public FieldAccess WithId(Guid id) => this with { Id = id };
-    public FieldAccess WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public FieldAccess WithMarkers(Markers markers) => this with { Markers = markers };
-    public FieldAccess WithTarget(Expression target) => this with { Target = target };
-    public FieldAccess WithName(Identifier name) => this with { Name = Name with { Element = name } };
-    public FieldAccess WithType(JavaType? type) => this with { Type = type };
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(FieldAccess? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as FieldAccess);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// An assignment expression (e.g., x = 1, x += 2).
 /// </summary>
-public sealed record Assignment(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Expression Variable,
-    JLeftPadded<Expression> AssignmentValue,
-    JavaType? Type
-) : J, Statement, Expression
+public sealed class Assignment(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Expression variable,
+    JLeftPadded<Expression> assignmentValue,
+    JavaType? type
+) : J, Statement, Expression, IEquatable<Assignment>
 {
-    public Assignment WithId(Guid id) => this with { Id = id };
-    public Assignment WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Assignment WithMarkers(Markers markers) => this with { Markers = markers };
-    public Assignment WithVariable(Expression variable) => this with { Variable = variable };
-    public Assignment WithAssignmentValue(JLeftPadded<Expression> value) => this with { AssignmentValue = value };
-    public Assignment WithType(JavaType? type) => this with { Type = type };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Expression Variable { get; } = variable;
+    public JLeftPadded<Expression> AssignmentValue { get; } = assignmentValue;
+    public JavaType? Type { get; } = type;
+
+    public Assignment WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Variable, AssignmentValue, Type);
+    public Assignment WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Variable, AssignmentValue, Type);
+    public Assignment WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Variable, AssignmentValue, Type);
+    public Assignment WithVariable(Expression variable) =>
+        ReferenceEquals(variable, Variable) ? this : new(Id, Prefix, Markers, variable, AssignmentValue, Type);
+    public Assignment WithAssignmentValue(JLeftPadded<Expression> assignmentValue) =>
+        ReferenceEquals(assignmentValue, AssignmentValue) ? this : new(Id, Prefix, Markers, Variable, assignmentValue, Type);
+    public Assignment WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Variable, AssignmentValue, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Assignment? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Assignment);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A compound assignment expression with operator (e.g., x += 1, x -= 2).
 /// </summary>
-public sealed record AssignmentOperation(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Expression Variable,
-    JLeftPadded<AssignmentOperation.OperatorType> Operator,
-    Expression AssignmentValue,
-    JavaType? Type
-) : J, Statement, Expression
+public sealed class AssignmentOperation(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Expression variable,
+    JLeftPadded<AssignmentOperation.OperatorType> @operator,
+    Expression assignmentValue,
+    JavaType? type
+) : J, Statement, Expression, IEquatable<AssignmentOperation>
 {
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Expression Variable { get; } = variable;
+    public JLeftPadded<AssignmentOperation.OperatorType> Operator { get; } = @operator;
+    public Expression AssignmentValue { get; } = assignmentValue;
+    public JavaType? Type { get; } = type;
+
+    public AssignmentOperation WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Variable, Operator, AssignmentValue, Type);
+    public AssignmentOperation WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Variable, Operator, AssignmentValue, Type);
+    public AssignmentOperation WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Variable, Operator, AssignmentValue, Type);
+    public AssignmentOperation WithVariable(Expression variable) =>
+        ReferenceEquals(variable, Variable) ? this : new(Id, Prefix, Markers, variable, Operator, AssignmentValue, Type);
+    public AssignmentOperation WithOperator(JLeftPadded<AssignmentOperation.OperatorType> @operator) =>
+        ReferenceEquals(@operator, Operator) ? this : new(Id, Prefix, Markers, Variable, @operator, AssignmentValue, Type);
+    public AssignmentOperation WithAssignmentValue(Expression assignmentValue) =>
+        ReferenceEquals(assignmentValue, AssignmentValue) ? this : new(Id, Prefix, Markers, Variable, Operator, assignmentValue, Type);
+    public AssignmentOperation WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Variable, Operator, AssignmentValue, type);
+
     public enum OperatorType
     {
         Addition,
@@ -689,100 +1281,179 @@ public sealed record AssignmentOperation(
         Coalesce  // ??= in C#
     }
 
-    public AssignmentOperation WithId(Guid id) => this with { Id = id };
-    public AssignmentOperation WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public AssignmentOperation WithMarkers(Markers markers) => this with { Markers = markers };
-    public AssignmentOperation WithVariable(Expression variable) => this with { Variable = variable };
-    public AssignmentOperation WithOperator(JLeftPadded<OperatorType> op) => this with { Operator = op };
-    public AssignmentOperation WithAssignmentValue(Expression value) => this with { AssignmentValue = value };
-    public AssignmentOperation WithType(JavaType? type) => this with { Type = type };
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(AssignmentOperation? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as AssignmentOperation);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A labeled statement (e.g., myLabel: statement).
 /// </summary>
-public sealed record Label(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    JRightPadded<Identifier> LabelName,
-    Statement Statement
-) : J, Statement
+public sealed class Label(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JRightPadded<Identifier> labelName,
+    Statement statement
+) : J, Statement, IEquatable<Label>
 {
-    public Label WithId(Guid id) => this with { Id = id };
-    public Label WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Label WithMarkers(Markers markers) => this with { Markers = markers };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public JRightPadded<Identifier> LabelName { get; } = labelName;
+    public Statement Statement { get; } = statement;
+
+    public Label WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, LabelName, Statement);
+    public Label WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, LabelName, Statement);
+    public Label WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, LabelName, Statement);
+    public Label WithLabelName(JRightPadded<Identifier> labelName) =>
+        ReferenceEquals(labelName, LabelName) ? this : new(Id, Prefix, Markers, labelName, Statement);
+    public Label WithStatement(Statement statement) =>
+        ReferenceEquals(statement, Statement) ? this : new(Id, Prefix, Markers, LabelName, statement);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Label? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Label);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// An instanceof expression. Also used for C# typeof(T) where expression is J.Empty.
 /// </summary>
-public sealed record InstanceOf(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    JRightPadded<Expression> Expression,
-    J Clazz,
-    J? Pattern,
-    JavaType? Type,
-    Modifier? InstanceOfModifier
-) : J, Expression
+public sealed class InstanceOf(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JRightPadded<Expression> expression,
+    J clazz,
+    J? pattern,
+    JavaType? type,
+    Modifier? instanceOfModifier
+) : J, Expression, IEquatable<InstanceOf>
 {
-    public InstanceOf WithId(Guid id) => this with { Id = id };
-    public InstanceOf WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public InstanceOf WithMarkers(Markers markers) => this with { Markers = markers };
-    public InstanceOf WithExpression(JRightPadded<Expression> expression) => this with { Expression = expression };
-    public InstanceOf WithClazz(J clazz) => this with { Clazz = clazz };
-    public InstanceOf WithPattern(J? pattern) => this with { Pattern = pattern };
-    public InstanceOf WithType(JavaType? type) => this with { Type = type };
-    public InstanceOf WithModifier(Modifier? modifier) => this with { InstanceOfModifier = modifier };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public JRightPadded<Expression> Expression { get; } = expression;
+    public J Clazz { get; } = clazz;
+    public J? Pattern { get; } = pattern;
+    public JavaType? Type { get; } = type;
+    public Modifier? InstanceOfModifier { get; } = instanceOfModifier;
+
+    public InstanceOf WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Expression, Clazz, Pattern, Type, InstanceOfModifier);
+    public InstanceOf WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Expression, Clazz, Pattern, Type, InstanceOfModifier);
+    public InstanceOf WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression, Clazz, Pattern, Type, InstanceOfModifier);
+    public InstanceOf WithExpression(JRightPadded<Expression> expression) =>
+        ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression, Clazz, Pattern, Type, InstanceOfModifier);
+    public InstanceOf WithClazz(J clazz) =>
+        ReferenceEquals(clazz, Clazz) ? this : new(Id, Prefix, Markers, Expression, clazz, Pattern, Type, InstanceOfModifier);
+    public InstanceOf WithPattern(J? pattern) =>
+        ReferenceEquals(pattern, Pattern) ? this : new(Id, Prefix, Markers, Expression, Clazz, pattern, Type, InstanceOfModifier);
+    public InstanceOf WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Expression, Clazz, Pattern, type, InstanceOfModifier);
+    public InstanceOf WithInstanceOfModifier(Modifier? instanceOfModifier) =>
+        ReferenceEquals(instanceOfModifier, InstanceOfModifier) ? this : new(Id, Prefix, Markers, Expression, Clazz, Pattern, Type, instanceOfModifier);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(InstanceOf? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as InstanceOf);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A method invocation (e.g., foo.Bar(), Console.WriteLine("hello"), Bar&lt;T&gt;(x)).
 /// </summary>
-public sealed record MethodInvocation(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    JRightPadded<Expression>? Select,        // target with After = space before dot (null if unqualified)
-    Identifier Name,                          // method name with Prefix = space after dot
-    JContainer<Expression>? TypeParameters,   // <T> generic type arguments (C# puts these after name)
-    JContainer<Expression> Arguments,         // (args) with Before = space before (
-    JavaType.Method? MethodType
-) : J, Statement, Expression
+public sealed class MethodInvocation(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JRightPadded<Expression>? select,
+    Identifier name,
+    JContainer<Expression>? typeParameters,
+    JContainer<Expression> arguments,
+    JavaType.Method? methodType
+) : J, Statement, Expression, IEquatable<MethodInvocation>
 {
-    public MethodInvocation WithId(Guid id) => this with { Id = id };
-    public MethodInvocation WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public MethodInvocation WithMarkers(Markers markers) => this with { Markers = markers };
-    public MethodInvocation WithSelect(JRightPadded<Expression>? select) => this with { Select = select };
-    public MethodInvocation WithName(Identifier name) => this with { Name = name };
-    public MethodInvocation WithTypeParameters(JContainer<Expression>? typeParameters) => this with { TypeParameters = typeParameters };
-    public MethodInvocation WithArguments(JContainer<Expression> arguments) => this with { Arguments = arguments };
-    public MethodInvocation WithMethodType(JavaType.Method? methodType) => this with { MethodType = methodType };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public JRightPadded<Expression>? Select { get; } = select;
+    public Identifier Name { get; } = name;
+    public JContainer<Expression>? TypeParameters { get; } = typeParameters;
+    public JContainer<Expression> Arguments { get; } = arguments;
+    public JavaType.Method? MethodType { get; } = methodType;
+
+    public MethodInvocation WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Select, Name, TypeParameters, Arguments, MethodType);
+    public MethodInvocation WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Select, Name, TypeParameters, Arguments, MethodType);
+    public MethodInvocation WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Select, Name, TypeParameters, Arguments, MethodType);
+    public MethodInvocation WithSelect(JRightPadded<Expression>? select) =>
+        ReferenceEquals(select, Select) ? this : new(Id, Prefix, Markers, select, Name, TypeParameters, Arguments, MethodType);
+    public MethodInvocation WithName(Identifier name) =>
+        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, Select, name, TypeParameters, Arguments, MethodType);
+    public MethodInvocation WithTypeParameters(JContainer<Expression>? typeParameters) =>
+        ReferenceEquals(typeParameters, TypeParameters) ? this : new(Id, Prefix, Markers, Select, Name, typeParameters, Arguments, MethodType);
+    public MethodInvocation WithArguments(JContainer<Expression> arguments) =>
+        ReferenceEquals(arguments, Arguments) ? this : new(Id, Prefix, Markers, Select, Name, TypeParameters, arguments, MethodType);
+    public MethodInvocation WithMethodType(JavaType.Method? methodType) =>
+        ReferenceEquals(methodType, MethodType) ? this : new(Id, Prefix, Markers, Select, Name, TypeParameters, Arguments, methodType);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(MethodInvocation? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as MethodInvocation);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A binary expression (e.g., a + b, x == y).
 /// </summary>
-public sealed record Binary(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Expression Left,
-    JLeftPadded<Binary.OperatorType> Operator,
-    Expression Right,
-    JavaType? Type
-) : J, Expression
+public sealed class Binary(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Expression left,
+    JLeftPadded<Binary.OperatorType> @operator,
+    Expression right,
+    JavaType? type
+) : J, Expression, IEquatable<Binary>
 {
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Expression Left { get; } = left;
+    public JLeftPadded<Binary.OperatorType> Operator { get; } = @operator;
+    public Expression Right { get; } = right;
+    public JavaType? Type { get; } = type;
+
+    public Binary WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Left, Operator, Right, Type);
+    public Binary WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Left, Operator, Right, Type);
+    public Binary WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Left, Operator, Right, Type);
+    public Binary WithLeft(Expression left) =>
+        ReferenceEquals(left, Left) ? this : new(Id, Prefix, Markers, left, Operator, Right, Type);
+    public Binary WithOperator(JLeftPadded<Binary.OperatorType> @operator) =>
+        ReferenceEquals(@operator, Operator) ? this : new(Id, Prefix, Markers, Left, @operator, Right, Type);
+    public Binary WithRight(Expression right) =>
+        ReferenceEquals(right, Right) ? this : new(Id, Prefix, Markers, Left, Operator, right, Type);
+    public Binary WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Left, Operator, Right, type);
+
     public enum OperatorType
     {
         Addition,
@@ -806,29 +1477,46 @@ public sealed record Binary(
         And
     }
 
-    public Binary WithId(Guid id) => this with { Id = id };
-    public Binary WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Binary WithMarkers(Markers markers) => this with { Markers = markers };
-    public Binary WithLeft(Expression left) => this with { Left = left };
-    public Binary WithOperator(JLeftPadded<OperatorType> op) => this with { Operator = op };
-    public Binary WithRight(Expression right) => this with { Right = right };
-    public Binary WithType(JavaType? type) => this with { Type = type };
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Binary? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Binary);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A unary expression (e.g., !x, -y, ++i, i--).
 /// </summary>
-public sealed record Unary(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    JLeftPadded<Unary.OperatorType> Operator,
-    Expression Expression,
-    JavaType? Type
-) : J, Statement, Expression
+public sealed class Unary(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JLeftPadded<Unary.OperatorType> @operator,
+    Expression expression,
+    JavaType? type
+) : J, Statement, Expression, IEquatable<Unary>
 {
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public JLeftPadded<Unary.OperatorType> Operator { get; } = @operator;
+    public Expression Expression { get; } = expression;
+    public JavaType? Type { get; } = type;
+
+    public Unary WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Operator, Expression, Type);
+    public Unary WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Operator, Expression, Type);
+    public Unary WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Operator, Expression, Type);
+    public Unary WithOperator(JLeftPadded<Unary.OperatorType> @operator) =>
+        ReferenceEquals(@operator, Operator) ? this : new(Id, Prefix, Markers, @operator, Expression, Type);
+    public Unary WithExpression(Expression expression) =>
+        ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, Operator, expression, Type);
+    public Unary WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Operator, Expression, type);
+
     public enum OperatorType
     {
         PreIncrement,
@@ -841,97 +1529,172 @@ public sealed record Unary(
         Not
     }
 
-    public Unary WithId(Guid id) => this with { Id = id };
-    public Unary WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Unary WithMarkers(Markers markers) => this with { Markers = markers };
-    public Unary WithOperator(JLeftPadded<OperatorType> op) => this with { Operator = op };
-    public Unary WithExpression(Expression expression) => this with { Expression = expression };
-    public Unary WithType(JavaType? type) => this with { Type = type };
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Unary? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Unary);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A type cast expression (e.g., (int)x, (string)obj).
 /// </summary>
-public sealed record TypeCast(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    ControlParentheses<TypeTree> Clazz,  // The (type) part
-    Expression Expression                 // The expression being cast
-) : J, Expression
+public sealed class TypeCast(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    ControlParentheses<TypeTree> clazz,
+    Expression expression
+) : J, Expression, IEquatable<TypeCast>
 {
-    public TypeCast WithId(Guid id) => this with { Id = id };
-    public TypeCast WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public TypeCast WithMarkers(Markers markers) => this with { Markers = markers };
-    public TypeCast WithClazz(ControlParentheses<TypeTree> clazz) => this with { Clazz = clazz };
-    public TypeCast WithExpression(Expression expression) => this with { Expression = expression };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public ControlParentheses<TypeTree> Clazz { get; } = clazz;
+    public Expression Expression { get; } = expression;
+
+    public TypeCast WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Clazz, Expression);
+    public TypeCast WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Clazz, Expression);
+    public TypeCast WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Clazz, Expression);
+    public TypeCast WithClazz(ControlParentheses<TypeTree> clazz) =>
+        ReferenceEquals(clazz, Clazz) ? this : new(Id, Prefix, Markers, clazz, Expression);
+    public TypeCast WithExpression(Expression expression) =>
+        ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, Clazz, expression);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(TypeCast? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as TypeCast);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A parenthesized expression.
 /// </summary>
-public sealed record Parentheses<T>(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    JRightPadded<T> Tree
-) : J, Expression where T : J
+public sealed class Parentheses<T>(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JRightPadded<T> tree
+) : J, Expression, IEquatable<Parentheses<T>> where T : J
 {
-    public Parentheses<T> WithId(Guid id) => this with { Id = id };
-    public Parentheses<T> WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Parentheses<T> WithMarkers(Markers markers) => this with { Markers = markers };
-    public Parentheses<T> WithTree(JRightPadded<T> tree) => this with { Tree = tree };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public JRightPadded<T> Tree { get; } = tree;
+
+    public Parentheses<T> WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Tree);
+    public Parentheses<T> WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Tree);
+    public Parentheses<T> WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Tree);
+    public Parentheses<T> WithTree(JRightPadded<T> tree) =>
+        ReferenceEquals(tree, Tree) ? this : new(Id, Prefix, Markers, tree);
 
     Tree Core.Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Parentheses<T>? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Parentheses<T>);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A variable declaration statement (e.g., var x = 1; or int x = 1, y = 2;).
 /// </summary>
-public sealed record VariableDeclarations(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    IList<Modifier> LeadingAnnotations,
-    IList<Modifier> Modifiers,
-    TypeTree? TypeExpression,
-    Space? Varargs,
-    IList<JLeftPadded<Space>> DimensionsBeforeName,
-    IList<JRightPadded<NamedVariable>> Variables
-) : J, Statement
+public sealed class VariableDeclarations(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    IList<Modifier> leadingAnnotations,
+    IList<Modifier> modifiers,
+    TypeTree? typeExpression,
+    Space? varargs,
+    IList<JLeftPadded<Space>> dimensionsBeforeName,
+    IList<JRightPadded<NamedVariable>> variables
+) : J, Statement, IEquatable<VariableDeclarations>
 {
-    public VariableDeclarations WithId(Guid id) => this with { Id = id };
-    public VariableDeclarations WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public VariableDeclarations WithMarkers(Markers markers) => this with { Markers = markers };
-    public VariableDeclarations WithVariables(IList<JRightPadded<NamedVariable>> variables) => this with { Variables = variables };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public IList<Modifier> LeadingAnnotations { get; } = leadingAnnotations;
+    public IList<Modifier> Modifiers { get; } = modifiers;
+    public TypeTree? TypeExpression { get; } = typeExpression;
+    public Space? Varargs { get; } = varargs;
+    public IList<JLeftPadded<Space>> DimensionsBeforeName { get; } = dimensionsBeforeName;
+    public IList<JRightPadded<NamedVariable>> Variables { get; } = variables;
+
+    public VariableDeclarations WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeExpression, Varargs, DimensionsBeforeName, Variables);
+    public VariableDeclarations WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, LeadingAnnotations, Modifiers, TypeExpression, Varargs, DimensionsBeforeName, Variables);
+    public VariableDeclarations WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, LeadingAnnotations, Modifiers, TypeExpression, Varargs, DimensionsBeforeName, Variables);
+    public VariableDeclarations WithLeadingAnnotations(IList<Modifier> leadingAnnotations) =>
+        ReferenceEquals(leadingAnnotations, LeadingAnnotations) ? this : new(Id, Prefix, Markers, leadingAnnotations, Modifiers, TypeExpression, Varargs, DimensionsBeforeName, Variables);
+    public VariableDeclarations WithModifiers(IList<Modifier> modifiers) =>
+        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, LeadingAnnotations, modifiers, TypeExpression, Varargs, DimensionsBeforeName, Variables);
+    public VariableDeclarations WithTypeExpression(TypeTree? typeExpression) =>
+        ReferenceEquals(typeExpression, TypeExpression) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, typeExpression, Varargs, DimensionsBeforeName, Variables);
+    public VariableDeclarations WithVarargs(Space? varargs) =>
+        ReferenceEquals(varargs, Varargs) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeExpression, varargs, DimensionsBeforeName, Variables);
+    public VariableDeclarations WithDimensionsBeforeName(IList<JLeftPadded<Space>> dimensionsBeforeName) =>
+        ReferenceEquals(dimensionsBeforeName, DimensionsBeforeName) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeExpression, Varargs, dimensionsBeforeName, Variables);
+    public VariableDeclarations WithVariables(IList<JRightPadded<NamedVariable>> variables) =>
+        ReferenceEquals(variables, Variables) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeExpression, Varargs, DimensionsBeforeName, variables);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(VariableDeclarations? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as VariableDeclarations);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A single variable in a variable declaration (e.g., x = 1).
 /// </summary>
-public sealed record NamedVariable(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Identifier Name,
-    IList<JLeftPadded<Space>> DimensionsAfterName,
-    JLeftPadded<Expression>? Initializer,
-    JavaType? Type
-) : J
+public sealed class NamedVariable(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Identifier name,
+    IList<JLeftPadded<Space>> dimensionsAfterName,
+    JLeftPadded<Expression>? initializer,
+    JavaType? type
+) : J, IEquatable<NamedVariable>
 {
-    public NamedVariable WithId(Guid id) => this with { Id = id };
-    public NamedVariable WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public NamedVariable WithMarkers(Markers markers) => this with { Markers = markers };
-    public NamedVariable WithName(Identifier name) => this with { Name = name };
-    public NamedVariable WithInitializer(JLeftPadded<Expression>? initializer) => this with { Initializer = initializer };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Identifier Name { get; } = name;
+    public IList<JLeftPadded<Space>> DimensionsAfterName { get; } = dimensionsAfterName;
+    public JLeftPadded<Expression>? Initializer { get; } = initializer;
+    public JavaType? Type { get; } = type;
+
+    public NamedVariable WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Name, DimensionsAfterName, Initializer, Type);
+    public NamedVariable WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Name, DimensionsAfterName, Initializer, Type);
+    public NamedVariable WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name, DimensionsAfterName, Initializer, Type);
+    public NamedVariable WithName(Identifier name) =>
+        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, name, DimensionsAfterName, Initializer, Type);
+    public NamedVariable WithDimensionsAfterName(IList<JLeftPadded<Space>> dimensionsAfterName) =>
+        ReferenceEquals(dimensionsAfterName, DimensionsAfterName) ? this : new(Id, Prefix, Markers, Name, dimensionsAfterName, Initializer, Type);
+    public NamedVariable WithInitializer(JLeftPadded<Expression>? initializer) =>
+        ReferenceEquals(initializer, Initializer) ? this : new(Id, Prefix, Markers, Name, DimensionsAfterName, initializer, Type);
+    public NamedVariable WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Name, DimensionsAfterName, Initializer, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(NamedVariable? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as NamedVariable);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -944,32 +1707,66 @@ public interface TypeTree : J
 /// <summary>
 /// A primitive type (int, long, etc.) or the var keyword.
 /// </summary>
-public sealed record Primitive(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    JavaType.PrimitiveKind Kind
-) : J, TypeTree, Expression
+public sealed class Primitive(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JavaType.PrimitiveKind kind
+) : J, TypeTree, Expression, IEquatable<Primitive>
 {
-    public Primitive WithId(Guid id) => this with { Id = id };
-    public Primitive WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Primitive WithMarkers(Markers markers) => this with { Markers = markers };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public JavaType.PrimitiveKind Kind { get; } = kind;
+
+    public Primitive WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Kind);
+    public Primitive WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Kind);
+    public Primitive WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Kind);
+    public Primitive WithKind(JavaType.PrimitiveKind kind) =>
+        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, kind);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Primitive? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Primitive);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A modifier (public, static, etc.).
 /// </summary>
-public sealed record Modifier(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Modifier.ModifierType Type,
-    IList<Annotation> Annotations,
-    string? Keyword = null
-) : J
+public sealed class Modifier(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Modifier.ModifierType type,
+    IList<Annotation> annotations,
+    string? keyword = null
+) : J, IEquatable<Modifier>
 {
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Modifier.ModifierType Type { get; } = type;
+    public IList<Annotation> Annotations { get; } = annotations;
+    public string? Keyword { get; } = keyword;
+
+    public Modifier WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Type, Annotations, Keyword);
+    public Modifier WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Type, Annotations, Keyword);
+    public Modifier WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Type, Annotations, Keyword);
+    public Modifier WithType(Modifier.ModifierType type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, type, Annotations, Keyword);
+    public Modifier WithAnnotations(IList<Annotation> annotations) =>
+        ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, Type, annotations, Keyword);
+    public Modifier WithKeyword(string? keyword) =>
+        string.Equals(keyword, Keyword, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Type, Annotations, keyword);
+
     public enum ModifierType
     {
         Default,
@@ -1001,29 +1798,47 @@ public sealed record Modifier(
         LanguageExtension
     }
 
-    public Modifier WithId(Guid id) => this with { Id = id };
-    public Modifier WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Modifier WithMarkers(Markers markers) => this with { Markers = markers };
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Modifier? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Modifier);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// An annotation/attribute.
 /// </summary>
-public sealed record Annotation(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    NameTree AnnotationType,
-    JContainer<Expression>? Arguments
-) : J, Expression
+public sealed class Annotation(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    NameTree annotationType,
+    JContainer<Expression>? arguments
+) : J, Expression, IEquatable<Annotation>
 {
-    public Annotation WithId(Guid id) => this with { Id = id };
-    public Annotation WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Annotation WithMarkers(Markers markers) => this with { Markers = markers };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public NameTree AnnotationType { get; } = annotationType;
+    public JContainer<Expression>? Arguments { get; } = arguments;
+
+    public Annotation WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, AnnotationType, Arguments);
+    public Annotation WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, AnnotationType, Arguments);
+    public Annotation WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, AnnotationType, Arguments);
+    public Annotation WithAnnotationType(NameTree annotationType) =>
+        ReferenceEquals(annotationType, AnnotationType) ? this : new(Id, Prefix, Markers, annotationType, Arguments);
+    public Annotation WithArguments(JContainer<Expression>? arguments) =>
+        ReferenceEquals(arguments, Arguments) ? this : new(Id, Prefix, Markers, AnnotationType, arguments);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Annotation? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Annotation);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -1036,112 +1851,196 @@ public interface NameTree : TypeTree
 /// <summary>
 /// Array/indexer access expression (e.g., arr[0], dict["key"]).
 /// </summary>
-public sealed record ArrayAccess(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Expression Indexed,      // The expression being indexed (e.g., "arr" in arr[0])
-    ArrayDimension Dimension, // The [index] part
-    JavaType? Type
-) : J, Expression
+public sealed class ArrayAccess(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Expression indexed,
+    ArrayDimension dimension,
+    JavaType? type
+) : J, Expression, IEquatable<ArrayAccess>
 {
-    public ArrayAccess WithId(Guid id) => this with { Id = id };
-    public ArrayAccess WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public ArrayAccess WithMarkers(Markers markers) => this with { Markers = markers };
-    public ArrayAccess WithIndexed(Expression indexed) => this with { Indexed = indexed };
-    public ArrayAccess WithDimension(ArrayDimension dimension) => this with { Dimension = dimension };
-    public ArrayAccess WithType(JavaType? type) => this with { Type = type };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Expression Indexed { get; } = indexed;
+    public ArrayDimension Dimension { get; } = dimension;
+    public JavaType? Type { get; } = type;
+
+    public ArrayAccess WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Indexed, Dimension, Type);
+    public ArrayAccess WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Indexed, Dimension, Type);
+    public ArrayAccess WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Indexed, Dimension, Type);
+    public ArrayAccess WithIndexed(Expression indexed) =>
+        ReferenceEquals(indexed, Indexed) ? this : new(Id, Prefix, Markers, indexed, Dimension, Type);
+    public ArrayAccess WithDimension(ArrayDimension dimension) =>
+        ReferenceEquals(dimension, Dimension) ? this : new(Id, Prefix, Markers, Indexed, dimension, Type);
+    public ArrayAccess WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Indexed, Dimension, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(ArrayAccess? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ArrayAccess);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A single dimension in an array access (the [index] part).
 /// </summary>
-public sealed record ArrayDimension(
-    Guid Id,
-    Space Prefix,           // Space before '['
-    Markers Markers,
-    JRightPadded<Expression> Index  // The index expression, After = space before ']'
-) : J
+public sealed class ArrayDimension(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JRightPadded<Expression> index
+) : J, IEquatable<ArrayDimension>
 {
-    public ArrayDimension WithId(Guid id) => this with { Id = id };
-    public ArrayDimension WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public ArrayDimension WithMarkers(Markers markers) => this with { Markers = markers };
-    public ArrayDimension WithIndex(JRightPadded<Expression> index) => this with { Index = index };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public JRightPadded<Expression> Index { get; } = index;
+
+    public ArrayDimension WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Index);
+    public ArrayDimension WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Index);
+    public ArrayDimension WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Index);
+    public ArrayDimension WithIndex(JRightPadded<Expression> index) =>
+        ReferenceEquals(index, Index) ? this : new(Id, Prefix, Markers, index);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(ArrayDimension? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ArrayDimension);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A parameterized type expression (e.g., List&lt;int&gt;, Dictionary&lt;string, int&gt;).
 /// </summary>
-public sealed record ParameterizedType(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    NameTree Clazz,                         // The raw type name (e.g., List, Dictionary)
-    JContainer<Expression>? TypeParameters, // The type arguments: <int>, <string, int>
-    JavaType? Type
-) : J, TypeTree, Expression
+public sealed class ParameterizedType(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    NameTree clazz,
+    JContainer<Expression>? typeParameters,
+    JavaType? type
+) : J, TypeTree, Expression, IEquatable<ParameterizedType>
 {
-    public ParameterizedType WithId(Guid id) => this with { Id = id };
-    public ParameterizedType WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public ParameterizedType WithMarkers(Markers markers) => this with { Markers = markers };
-    public ParameterizedType WithClazz(NameTree clazz) => this with { Clazz = clazz };
-    public ParameterizedType WithTypeParameters(JContainer<Expression>? typeParameters) => this with { TypeParameters = typeParameters };
-    public ParameterizedType WithType(JavaType? type) => this with { Type = type };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public NameTree Clazz { get; } = clazz;
+    public JContainer<Expression>? TypeParameters { get; } = typeParameters;
+    public JavaType? Type { get; } = type;
+
+    public ParameterizedType WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Clazz, TypeParameters, Type);
+    public ParameterizedType WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Clazz, TypeParameters, Type);
+    public ParameterizedType WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Clazz, TypeParameters, Type);
+    public ParameterizedType WithClazz(NameTree clazz) =>
+        ReferenceEquals(clazz, Clazz) ? this : new(Id, Prefix, Markers, clazz, TypeParameters, Type);
+    public ParameterizedType WithTypeParameters(JContainer<Expression>? typeParameters) =>
+        ReferenceEquals(typeParameters, TypeParameters) ? this : new(Id, Prefix, Markers, Clazz, typeParameters, Type);
+    public ParameterizedType WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Clazz, TypeParameters, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(ParameterizedType? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ParameterizedType);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A nullable type expression (e.g., int?, string?).
 /// The typeTree holds the base type and the right padding holds any space before the '?'.
 /// </summary>
-public sealed record NullableType(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    IList<Annotation> Annotations,
-    JRightPadded<TypeTree> TypeTreePadded,
-    JavaType? Type
-) : J, TypeTree, Expression
+public sealed class NullableType(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    IList<Annotation> annotations,
+    JRightPadded<TypeTree> typeTreePadded,
+    JavaType? type
+) : J, TypeTree, Expression, IEquatable<NullableType>
 {
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public IList<Annotation> Annotations { get; } = annotations;
+    public JRightPadded<TypeTree> TypeTreePadded { get; } = typeTreePadded;
+    public JavaType? Type { get; } = type;
+
+    public NullableType WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Annotations, TypeTreePadded, Type);
+    public NullableType WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Annotations, TypeTreePadded, Type);
+    public NullableType WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Annotations, TypeTreePadded, Type);
+    public NullableType WithAnnotations(IList<Annotation> annotations) =>
+        ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, annotations, TypeTreePadded, Type);
+    public NullableType WithTypeTreePadded(JRightPadded<TypeTree> typeTreePadded) =>
+        ReferenceEquals(typeTreePadded, TypeTreePadded) ? this : new(Id, Prefix, Markers, Annotations, typeTreePadded, Type);
+    public NullableType WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Annotations, TypeTreePadded, type);
+
     public TypeTree TypeTree => TypeTreePadded.Element;
-    public NullableType WithId(Guid id) => this with { Id = id };
-    public NullableType WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public NullableType WithMarkers(Markers markers) => this with { Markers = markers };
-    public NullableType WithAnnotations(IList<Annotation> annotations) => this with { Annotations = annotations };
-    public NullableType WithTypeTreePadded(JRightPadded<TypeTree> typeTreePadded) => this with { TypeTreePadded = typeTreePadded };
-    public NullableType WithType(JavaType? type) => this with { Type = type };
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(NullableType? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as NullableType);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// An array type expression (e.g., int[], string[,]).
 /// For multi-dimensional arrays like int[,], each dimension is nested.
 /// </summary>
-public sealed record ArrayType(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    TypeTree ElementType,                  // The element type (int, string, etc.)
-    IList<Annotation>? Annotations,        // Type annotations (rare in C#)
-    JLeftPadded<Space>? Dimension,         // The [] part: Before = space before [, Element = space before ]
-    JavaType? Type
-) : J, TypeTree, Expression
+public sealed class ArrayType(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    TypeTree elementType,
+    IList<Annotation>? annotations,
+    JLeftPadded<Space>? dimension,
+    JavaType? type
+) : J, TypeTree, Expression, IEquatable<ArrayType>
 {
-    public ArrayType WithId(Guid id) => this with { Id = id };
-    public ArrayType WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public ArrayType WithMarkers(Markers markers) => this with { Markers = markers };
-    public ArrayType WithElementType(TypeTree elementType) => this with { ElementType = elementType };
-    public ArrayType WithAnnotations(IList<Annotation>? annotations) => this with { Annotations = annotations };
-    public ArrayType WithDimension(JLeftPadded<Space>? dimension) => this with { Dimension = dimension };
-    public ArrayType WithType(JavaType? type) => this with { Type = type };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public TypeTree ElementType { get; } = elementType;
+    public IList<Annotation>? Annotations { get; } = annotations;
+    public JLeftPadded<Space>? Dimension { get; } = dimension;
+    public JavaType? Type { get; } = type;
+
+    public ArrayType WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, ElementType, Annotations, Dimension, Type);
+    public ArrayType WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, ElementType, Annotations, Dimension, Type);
+    public ArrayType WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, ElementType, Annotations, Dimension, Type);
+    public ArrayType WithElementType(TypeTree elementType) =>
+        ReferenceEquals(elementType, ElementType) ? this : new(Id, Prefix, Markers, elementType, Annotations, Dimension, Type);
+    public ArrayType WithAnnotations(IList<Annotation>? annotations) =>
+        ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, ElementType, annotations, Dimension, Type);
+    public ArrayType WithDimension(JLeftPadded<Space>? dimension) =>
+        ReferenceEquals(dimension, Dimension) ? this : new(Id, Prefix, Markers, ElementType, Annotations, dimension, Type);
+    public ArrayType WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, ElementType, Annotations, Dimension, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(ArrayType? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ArrayType);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -1152,25 +2051,44 @@ public sealed record ArrayType(
 ///   new[] { 1, 2, 3 }
 ///   new int[2, 3]
 /// </summary>
-public sealed record NewArray(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    TypeTree? TypeExpression,              // The element type (null for implicitly typed new[])
-    IList<ArrayDimension> Dimensions,      // The [size] parts
-    JContainer<Expression>? Initializer,   // The { elements } part
-    JavaType? Type
-) : J, Expression
+public sealed class NewArray(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    TypeTree? typeExpression,
+    IList<ArrayDimension> dimensions,
+    JContainer<Expression>? initializer,
+    JavaType? type
+) : J, Expression, IEquatable<NewArray>
 {
-    public NewArray WithId(Guid id) => this with { Id = id };
-    public NewArray WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public NewArray WithMarkers(Markers markers) => this with { Markers = markers };
-    public NewArray WithTypeExpression(TypeTree? typeExpression) => this with { TypeExpression = typeExpression };
-    public NewArray WithDimensions(IList<ArrayDimension> dimensions) => this with { Dimensions = dimensions };
-    public NewArray WithInitializer(JContainer<Expression>? initializer) => this with { Initializer = initializer };
-    public NewArray WithType(JavaType? type) => this with { Type = type };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public TypeTree? TypeExpression { get; } = typeExpression;
+    public IList<ArrayDimension> Dimensions { get; } = dimensions;
+    public JContainer<Expression>? Initializer { get; } = initializer;
+    public JavaType? Type { get; } = type;
+
+    public NewArray WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, TypeExpression, Dimensions, Initializer, Type);
+    public NewArray WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, TypeExpression, Dimensions, Initializer, Type);
+    public NewArray WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, TypeExpression, Dimensions, Initializer, Type);
+    public NewArray WithTypeExpression(TypeTree? typeExpression) =>
+        ReferenceEquals(typeExpression, TypeExpression) ? this : new(Id, Prefix, Markers, typeExpression, Dimensions, Initializer, Type);
+    public NewArray WithDimensions(IList<ArrayDimension> dimensions) =>
+        ReferenceEquals(dimensions, Dimensions) ? this : new(Id, Prefix, Markers, TypeExpression, dimensions, Initializer, Type);
+    public NewArray WithInitializer(JContainer<Expression>? initializer) =>
+        ReferenceEquals(initializer, Initializer) ? this : new(Id, Prefix, Markers, TypeExpression, Dimensions, initializer, Type);
+    public NewArray WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, TypeExpression, Dimensions, Initializer, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(NewArray? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as NewArray);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -1180,29 +2098,52 @@ public sealed record NewArray(
 ///   new Foo(arg1, arg2)
 ///   new List&lt;int&gt;()
 /// </summary>
-public sealed record NewClass(
-    Guid Id,
-    Space Prefix,                          // Space before entire expression
-    Markers Markers,
-    JRightPadded<Expression>? Enclosing,   // For outer.new Inner() style (rare in C#)
-    Space New,                             // Space after 'new' keyword
-    TypeTree? Clazz,                       // The type being constructed
-    JContainer<Expression> Arguments,      // Constructor arguments (includes parens)
-    Block? Body,                           // For anonymous classes/initializers
-    JavaType.Method? ConstructorType       // Type attribution
-) : J, Expression, Statement
+public sealed class NewClass(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JRightPadded<Expression>? enclosing,
+    Space @new,
+    TypeTree? clazz,
+    JContainer<Expression> arguments,
+    Block? body,
+    JavaType.Method? constructorType
+) : J, Expression, Statement, IEquatable<NewClass>
 {
-    public NewClass WithId(Guid id) => this with { Id = id };
-    public NewClass WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public NewClass WithMarkers(Markers markers) => this with { Markers = markers };
-    public NewClass WithEnclosing(JRightPadded<Expression>? enclosing) => this with { Enclosing = enclosing };
-    public NewClass WithNew(Space @new) => this with { New = @new };
-    public NewClass WithClazz(TypeTree? clazz) => this with { Clazz = clazz };
-    public NewClass WithArguments(JContainer<Expression> arguments) => this with { Arguments = arguments };
-    public NewClass WithBody(Block? body) => this with { Body = body };
-    public NewClass WithConstructorType(JavaType.Method? constructorType) => this with { ConstructorType = constructorType };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public JRightPadded<Expression>? Enclosing { get; } = enclosing;
+    public Space New { get; } = @new;
+    public TypeTree? Clazz { get; } = clazz;
+    public JContainer<Expression> Arguments { get; } = arguments;
+    public Block? Body { get; } = body;
+    public JavaType.Method? ConstructorType { get; } = constructorType;
+
+    public NewClass WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Enclosing, New, Clazz, Arguments, Body, ConstructorType);
+    public NewClass WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Enclosing, New, Clazz, Arguments, Body, ConstructorType);
+    public NewClass WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Enclosing, New, Clazz, Arguments, Body, ConstructorType);
+    public NewClass WithEnclosing(JRightPadded<Expression>? enclosing) =>
+        ReferenceEquals(enclosing, Enclosing) ? this : new(Id, Prefix, Markers, enclosing, New, Clazz, Arguments, Body, ConstructorType);
+    public NewClass WithNew(Space @new) =>
+        ReferenceEquals(@new, New) ? this : new(Id, Prefix, Markers, Enclosing, @new, Clazz, Arguments, Body, ConstructorType);
+    public NewClass WithClazz(TypeTree? clazz) =>
+        ReferenceEquals(clazz, Clazz) ? this : new(Id, Prefix, Markers, Enclosing, New, clazz, Arguments, Body, ConstructorType);
+    public NewClass WithArguments(JContainer<Expression> arguments) =>
+        ReferenceEquals(arguments, Arguments) ? this : new(Id, Prefix, Markers, Enclosing, New, Clazz, arguments, Body, ConstructorType);
+    public NewClass WithBody(Block? body) =>
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Enclosing, New, Clazz, Arguments, body, ConstructorType);
+    public NewClass WithConstructorType(JavaType.Method? constructorType) =>
+        ReferenceEquals(constructorType, ConstructorType) ? this : new(Id, Prefix, Markers, Enclosing, New, Clazz, Arguments, Body, constructorType);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(NewClass? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as NewClass);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -1212,25 +2153,44 @@ public sealed record NewClass(
 /// For regular ternary: condition ? truePart : falsePart
 /// For null-coalescing: condition ?? falsePart (truePart is empty, has NullCoalescing marker)
 /// </summary>
-public sealed record Ternary(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Expression Condition,           // The condition expression
-    JLeftPadded<Expression> TruePart,  // Space before ? and true expression (empty for ??)
-    JLeftPadded<Expression> FalsePart, // Space before : (or ??) and false expression
-    JavaType? Type
-) : J, Expression, Statement
+public sealed class Ternary(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Expression condition,
+    JLeftPadded<Expression> truePart,
+    JLeftPadded<Expression> falsePart,
+    JavaType? type
+) : J, Expression, Statement, IEquatable<Ternary>
 {
-    public Ternary WithId(Guid id) => this with { Id = id };
-    public Ternary WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Ternary WithMarkers(Markers markers) => this with { Markers = markers };
-    public Ternary WithCondition(Expression condition) => this with { Condition = condition };
-    public Ternary WithTruePart(JLeftPadded<Expression> truePart) => this with { TruePart = truePart };
-    public Ternary WithFalsePart(JLeftPadded<Expression> falsePart) => this with { FalsePart = falsePart };
-    public Ternary WithType(JavaType? type) => this with { Type = type };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Expression Condition { get; } = condition;
+    public JLeftPadded<Expression> TruePart { get; } = truePart;
+    public JLeftPadded<Expression> FalsePart { get; } = falsePart;
+    public JavaType? Type { get; } = type;
+
+    public Ternary WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Condition, TruePart, FalsePart, Type);
+    public Ternary WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Condition, TruePart, FalsePart, Type);
+    public Ternary WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Condition, TruePart, FalsePart, Type);
+    public Ternary WithCondition(Expression condition) =>
+        ReferenceEquals(condition, Condition) ? this : new(Id, Prefix, Markers, condition, TruePart, FalsePart, Type);
+    public Ternary WithTruePart(JLeftPadded<Expression> truePart) =>
+        ReferenceEquals(truePart, TruePart) ? this : new(Id, Prefix, Markers, Condition, truePart, FalsePart, Type);
+    public Ternary WithFalsePart(JLeftPadded<Expression> falsePart) =>
+        ReferenceEquals(falsePart, FalsePart) ? this : new(Id, Prefix, Markers, Condition, TruePart, falsePart, Type);
+    public Ternary WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Condition, TruePart, FalsePart, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Ternary? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Ternary);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -1245,21 +2205,36 @@ public sealed record Ternary(
 ///           break;
 ///   }
 /// </summary>
-public sealed record Switch(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    ControlParentheses<Expression> Selector,  // The (expression) being switched
-    Block Cases                                // Block containing Case elements
-) : J, Statement
+public sealed class Switch(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    ControlParentheses<Expression> selector,
+    Block cases
+) : J, Statement, IEquatable<Switch>
 {
-    public Switch WithId(Guid id) => this with { Id = id };
-    public Switch WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Switch WithMarkers(Markers markers) => this with { Markers = markers };
-    public Switch WithSelector(ControlParentheses<Expression> selector) => this with { Selector = selector };
-    public Switch WithCases(Block cases) => this with { Cases = cases };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public ControlParentheses<Expression> Selector { get; } = selector;
+    public Block Cases { get; } = cases;
+
+    public Switch WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Selector, Cases);
+    public Switch WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Selector, Cases);
+    public Switch WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Selector, Cases);
+    public Switch WithSelector(ControlParentheses<Expression> selector) =>
+        ReferenceEquals(selector, Selector) ? this : new(Id, Prefix, Markers, selector, Cases);
+    public Switch WithCases(Block cases) =>
+        ReferenceEquals(cases, Cases) ? this : new(Id, Prefix, Markers, Selector, cases);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Switch? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Switch);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -1269,23 +2244,40 @@ public sealed record Switch(
 /// For C#, the Selector stores the expression and space before 'switch' keyword
 /// (Selector.Prefix = space before selector for C#, Selector.Tree.After = space before 'switch').
 /// </summary>
-public sealed record SwitchExpression(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    ControlParentheses<Expression> Selector,  // For C#: no parens, just selector + space before 'switch'
-    Block Cases,                               // Block containing Case elements
-    JavaType? Type
-) : J, Expression
+public sealed class SwitchExpression(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    ControlParentheses<Expression> selector,
+    Block cases,
+    JavaType? type
+) : J, Expression, IEquatable<SwitchExpression>
 {
-    public SwitchExpression WithId(Guid id) => this with { Id = id };
-    public SwitchExpression WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public SwitchExpression WithMarkers(Markers markers) => this with { Markers = markers };
-    public SwitchExpression WithSelector(ControlParentheses<Expression> selector) => this with { Selector = selector };
-    public SwitchExpression WithCases(Block cases) => this with { Cases = cases };
-    public SwitchExpression WithType(JavaType? type) => this with { Type = type };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public ControlParentheses<Expression> Selector { get; } = selector;
+    public Block Cases { get; } = cases;
+    public JavaType? Type { get; } = type;
+
+    public SwitchExpression WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Selector, Cases, Type);
+    public SwitchExpression WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Selector, Cases, Type);
+    public SwitchExpression WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Selector, Cases, Type);
+    public SwitchExpression WithSelector(ControlParentheses<Expression> selector) =>
+        ReferenceEquals(selector, Selector) ? this : new(Id, Prefix, Markers, selector, Cases, Type);
+    public SwitchExpression WithCases(Block cases) =>
+        ReferenceEquals(cases, Cases) ? this : new(Id, Prefix, Markers, Selector, cases, Type);
+    public SwitchExpression WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Selector, Cases, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(SwitchExpression? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as SwitchExpression);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -1312,27 +2304,48 @@ public enum CaseType
 ///   case 1 => expr             (Rule type, switch expression)
 ///   case > 5 when x < 10:      (pattern with guard)
 /// </summary>
-public sealed record Case(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    CaseType CaseKind,                         // Statement (colon) or Rule (arrow)
-    JContainer<J> CaseLabels,                  // The case labels/patterns (includes 'case' keyword space)
-    Expression? Guard,                         // Optional 'when' guard expression
-    JContainer<Statement> Statements,          // For Statement type: statements after colon
-    JRightPadded<J>? Body                      // For Rule type: expression after arrow
-) : J, Statement
+public sealed class Case(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    CaseType caseKind,
+    JContainer<J> caseLabels,
+    Expression? guard,
+    JContainer<Statement> statements,
+    JRightPadded<J>? body
+) : J, Statement, IEquatable<Case>
 {
-    public Case WithId(Guid id) => this with { Id = id };
-    public Case WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Case WithMarkers(Markers markers) => this with { Markers = markers };
-    public Case WithCaseKind(CaseType caseKind) => this with { CaseKind = caseKind };
-    public Case WithCaseLabels(JContainer<J> caseLabels) => this with { CaseLabels = caseLabels };
-    public Case WithGuard(Expression? guard) => this with { Guard = guard };
-    public Case WithStatements(JContainer<Statement> statements) => this with { Statements = statements };
-    public Case WithBody(JRightPadded<J>? body) => this with { Body = body };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public CaseType CaseKind { get; } = caseKind;
+    public JContainer<J> CaseLabels { get; } = caseLabels;
+    public Expression? Guard { get; } = guard;
+    public JContainer<Statement> Statements { get; } = statements;
+    public JRightPadded<J>? Body { get; } = body;
+
+    public Case WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, CaseKind, CaseLabels, Guard, Statements, Body);
+    public Case WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, CaseKind, CaseLabels, Guard, Statements, Body);
+    public Case WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, CaseKind, CaseLabels, Guard, Statements, Body);
+    public Case WithCaseKind(CaseType caseKind) =>
+        caseKind == CaseKind ? this : new(Id, Prefix, Markers, caseKind, CaseLabels, Guard, Statements, Body);
+    public Case WithCaseLabels(JContainer<J> caseLabels) =>
+        ReferenceEquals(caseLabels, CaseLabels) ? this : new(Id, Prefix, Markers, CaseKind, caseLabels, Guard, Statements, Body);
+    public Case WithGuard(Expression? guard) =>
+        ReferenceEquals(guard, Guard) ? this : new(Id, Prefix, Markers, CaseKind, CaseLabels, guard, Statements, Body);
+    public Case WithStatements(JContainer<Statement> statements) =>
+        ReferenceEquals(statements, Statements) ? this : new(Id, Prefix, Markers, CaseKind, CaseLabels, Guard, statements, Body);
+    public Case WithBody(JRightPadded<J>? body) =>
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, CaseKind, CaseLabels, Guard, Statements, body);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Case? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Case);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -1343,23 +2356,38 @@ public sealed record Case(
 ///   (int x) => { return x; }
 ///   () => Console.WriteLine()
 /// </summary>
-public sealed record Lambda(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Lambda.Parameters Params,      // Lambda parameters
-    Space Arrow,                    // Space before =>
-    J Body,                         // Expression or Block
-    JavaType? Type
-) : J, Expression, Statement
+public sealed class Lambda(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Lambda.Parameters @params,
+    Space arrow,
+    J body,
+    JavaType? type
+) : J, Expression, Statement, IEquatable<Lambda>
 {
-    public Lambda WithId(Guid id) => this with { Id = id };
-    public Lambda WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public Lambda WithMarkers(Markers markers) => this with { Markers = markers };
-    public Lambda WithParams(Parameters @params) => this with { Params = @params };
-    public Lambda WithArrow(Space arrow) => this with { Arrow = arrow };
-    public Lambda WithBody(J body) => this with { Body = body };
-    public Lambda WithType(JavaType? type) => this with { Type = type };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Lambda.Parameters Params { get; } = @params;
+    public Space Arrow { get; } = arrow;
+    public J Body { get; } = body;
+    public JavaType? Type { get; } = type;
+
+    public Lambda WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Params, Arrow, Body, Type);
+    public Lambda WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Params, Arrow, Body, Type);
+    public Lambda WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Params, Arrow, Body, Type);
+    public Lambda WithParams(Lambda.Parameters @params) =>
+        ReferenceEquals(@params, Params) ? this : new(Id, Prefix, Markers, @params, Arrow, Body, Type);
+    public Lambda WithArrow(Space arrow) =>
+        ReferenceEquals(arrow, Arrow) ? this : new(Id, Prefix, Markers, Params, arrow, Body, Type);
+    public Lambda WithBody(J body) =>
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Params, Arrow, body, Type);
+    public Lambda WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Params, Arrow, Body, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1368,22 +2396,41 @@ public sealed record Lambda(
     /// For x => ..., Parenthesized is false.
     /// For (x) => ... or (x, y) => ..., Parenthesized is true.
     /// </summary>
-    public sealed record Parameters(
-        Guid Id,
-        Space Prefix,              // Space before ( if parenthesized, otherwise empty
-        Markers Markers,
-        bool Parenthesized,        // Whether wrapped in parentheses
-        IList<JRightPadded<J>> Elements  // The parameters (usually VariableDeclarations or Identifiers)
-    ) : J
+        public sealed class Parameters(
+        Guid id,
+        Space prefix,
+        Markers markers,
+        bool parenthesized,
+        IList<JRightPadded<J>> elements
+    ) : J, IEquatable<Parameters>
     {
-        public Parameters WithId(Guid id) => this with { Id = id };
-        public Parameters WithPrefix(Space prefix) => this with { Prefix = prefix };
-        public Parameters WithMarkers(Markers markers) => this with { Markers = markers };
-        public Parameters WithParenthesized(bool parenthesized) => this with { Parenthesized = parenthesized };
-        public Parameters WithElements(IList<JRightPadded<J>> elements) => this with { Elements = elements };
+        public Guid Id { get; } = id;
+        public Space Prefix { get; } = prefix;
+        public Markers Markers { get; } = markers;
+        public bool Parenthesized { get; } = parenthesized;
+        public IList<JRightPadded<J>> Elements { get; } = elements;
+
+        public Parameters WithId(Guid id) =>
+            id == Id ? this : new(id, Prefix, Markers, Parenthesized, Elements);
+        public Parameters WithPrefix(Space prefix) =>
+            ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Parenthesized, Elements);
+        public Parameters WithMarkers(Markers markers) =>
+            ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Parenthesized, Elements);
+        public Parameters WithParenthesized(bool parenthesized) =>
+            parenthesized == Parenthesized ? this : new(Id, Prefix, Markers, parenthesized, Elements);
+        public Parameters WithElements(IList<JRightPadded<J>> elements) =>
+            ReferenceEquals(elements, Elements) ? this : new(Id, Prefix, Markers, Parenthesized, elements);
 
         Tree Tree.WithId(Guid id) => WithId(id);
+
+        public bool Equals(Parameters? other) => other is not null && Id == other.Id;
+        public override bool Equals(object? obj) => Equals(obj as Parameters);
+        public override int GetHashCode() => Id.GetHashCode();
     }
+
+    public bool Equals(Lambda? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Lambda);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
@@ -1394,54 +2441,101 @@ public sealed record Lambda(
 ///   case (int x, int y):          // C# tuple deconstruction (Deconstructor = Empty)
 ///   case (> 0, > 0):              // Nested patterns
 /// </summary>
-public sealed record DeconstructionPattern(
-    Guid Id,
-    Space Prefix,
-    Markers Markers,
-    Expression Deconstructor,     // The type being deconstructed; J.Empty for tuple patterns without type
-    JContainer<J> Nested,         // The ( pattern, pattern, ... )
-    JavaType? Type
-) : J, Expression
+public sealed class DeconstructionPattern(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Expression deconstructor,
+    JContainer<J> nested,
+    JavaType? type
+) : J, Expression, IEquatable<DeconstructionPattern>
 {
-    public DeconstructionPattern WithId(Guid id) => this with { Id = id };
-    public DeconstructionPattern WithPrefix(Space prefix) => this with { Prefix = prefix };
-    public DeconstructionPattern WithMarkers(Markers markers) => this with { Markers = markers };
-    public DeconstructionPattern WithDeconstructor(Expression deconstructor) => this with { Deconstructor = deconstructor };
-    public DeconstructionPattern WithNested(JContainer<J> nested) => this with { Nested = nested };
-    public DeconstructionPattern WithType(JavaType? type) => this with { Type = type };
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Expression Deconstructor { get; } = deconstructor;
+    public JContainer<J> Nested { get; } = nested;
+    public JavaType? Type { get; } = type;
+
+    public DeconstructionPattern WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Deconstructor, Nested, Type);
+    public DeconstructionPattern WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Deconstructor, Nested, Type);
+    public DeconstructionPattern WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Deconstructor, Nested, Type);
+    public DeconstructionPattern WithDeconstructor(Expression deconstructor) =>
+        ReferenceEquals(deconstructor, Deconstructor) ? this : new(Id, Prefix, Markers, deconstructor, Nested, Type);
+    public DeconstructionPattern WithNested(JContainer<J> nested) =>
+        ReferenceEquals(nested, Nested) ? this : new(Id, Prefix, Markers, Deconstructor, nested, Type);
+    public DeconstructionPattern WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Deconstructor, Nested, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(DeconstructionPattern? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as DeconstructionPattern);
+    public override int GetHashCode() => Id.GetHashCode();
 }
 
 /// <summary>
 /// A container for a list of elements with shared prefix.
 /// </summary>
-public sealed record JContainer<T>(Space Before, IList<JRightPadded<T>> Elements, Markers Markers)
+public sealed class JContainer<T>(
+    Space before,
+    IList<JRightPadded<T>> elements,
+    Markers markers
+)
 {
-    public static JContainer<T> Empty() => new(Space.Empty, [], Core.Markers.Empty);
+    public Space Before { get; } = before;
+    public IList<JRightPadded<T>> Elements { get; } = elements;
+    public Markers Markers { get; } = markers;
 
-    public JContainer<T> WithBefore(Space before) => this with { Before = before };
-    public JContainer<T> WithElements(IList<JRightPadded<T>> elements) => this with { Elements = elements };
-    public JContainer<T> WithMarkers(Markers markers) => this with { Markers = markers };
+    public JContainer<T> WithBefore(Space before) =>
+        ReferenceEquals(before, Before) ? this : new(before, Elements, Markers);
+    public JContainer<T> WithElements(IList<JRightPadded<T>> elements) =>
+        ReferenceEquals(elements, Elements) ? this : new(Before, elements, Markers);
+    public JContainer<T> WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Before, Elements, markers);
+
+    public static JContainer<T> Empty() => new(Space.Empty, [], Core.Markers.Empty);
 }
 
 /// <summary>
 /// Left-padded element with space before it.
 /// </summary>
-public sealed record JLeftPadded<T>(Space Before, T Element)
+public sealed class JLeftPadded<T>(
+    Space before,
+    T element
+)
 {
-    public JLeftPadded<T> WithBefore(Space before) => this with { Before = before };
-    public JLeftPadded<T> WithElement(T element) => this with { Element = element };
+    public Space Before { get; } = before;
+    public T Element { get; } = element;
+
+    public JLeftPadded<T> WithBefore(Space before) =>
+        ReferenceEquals(before, Before) ? this : new(before, Element);
+    public JLeftPadded<T> WithElement(T element) =>
+        ReferenceEquals(element, Element) ? this : new(Before, element);
 }
 
 /// <summary>
 /// Right-padded element with space after it.
 /// </summary>
-public sealed record JRightPadded<T>(T Element, Space After, Markers Markers)
+public sealed class JRightPadded<T>(
+    T element,
+    Space after,
+    Markers markers
+)
 {
-    public static JRightPadded<T> Build(T element) => new(element, Space.Empty, Core.Markers.Empty);
+    public T Element { get; } = element;
+    public Space After { get; } = after;
+    public Markers Markers { get; } = markers;
 
-    public JRightPadded<T> WithElement(T element) => this with { Element = element };
-    public JRightPadded<T> WithAfter(Space after) => this with { After = after };
-    public JRightPadded<T> WithMarkers(Markers markers) => this with { Markers = markers };
+    public JRightPadded<T> WithElement(T element) =>
+        ReferenceEquals(element, Element) ? this : new(element, After, Markers);
+    public JRightPadded<T> WithAfter(Space after) =>
+        ReferenceEquals(after, After) ? this : new(Element, after, Markers);
+    public JRightPadded<T> WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Element, After, markers);
+
+    public static JRightPadded<T> Build(T element) => new(element, Space.Empty, Core.Markers.Empty);
 }

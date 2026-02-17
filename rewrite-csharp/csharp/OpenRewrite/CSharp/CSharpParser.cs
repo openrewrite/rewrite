@@ -67,11 +67,7 @@ public class CSharpParser
             }
 
             // Add ConditionalBranchMarker to identify this as a branch
-            cu = cu with
-            {
-                Markers = cu.Markers.Add(new ConditionalBranchMarker(
-                    Guid.NewGuid(), definedSymbols.ToList()))
-            };
+            cu = cu.WithMarkers(cu.Markers.Add(new ConditionalBranchMarker( Guid.NewGuid(), definedSymbols.ToList())));
             branches.Add(new JRightPadded<CompilationUnit>(cu, Space.Empty, Markers.Empty));
         }
 
@@ -367,10 +363,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     {
         var classDecl = (ClassDeclaration)VisitTypeDeclaration(node);
         // Add Struct marker to distinguish from regular class
-        return classDecl with
-        {
-            Markers = classDecl.Markers.Add(new Struct(Guid.NewGuid()))
-        };
+        return classDecl.WithMarkers(classDecl.Markers.Add(new Struct(Guid.NewGuid())));
     }
 
     public override J VisitRecordDeclaration(RecordDeclarationSyntax node)
@@ -380,19 +373,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // For record struct, add Struct marker (KindType is already Record)
         if (node.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword))
         {
-            return classDecl with
-            {
-                Markers = classDecl.Markers.Add(new Struct(Guid.NewGuid()))
-            };
+            return classDecl.WithMarkers(classDecl.Markers.Add(new Struct(Guid.NewGuid())));
         }
 
         // For "record class" (explicit class keyword), add RecordClass marker
         if (node.ClassOrStructKeyword.IsKind(SyntaxKind.ClassKeyword))
         {
-            return classDecl with
-            {
-                Markers = classDecl.Markers.Add(new RecordClass(Guid.NewGuid()))
-            };
+            return classDecl.WithMarkers(classDecl.Markers.Add(new RecordClass(Guid.NewGuid())));
         }
 
         return classDecl;
@@ -697,7 +684,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var bodyStatements = new List<JRightPadded<Statement>>();
             bodyStatements.Add(new JRightPadded<Statement>(primaryConstructorMethod, Space.Empty, Markers.Empty));
             bodyStatements.AddRange(body.Statements);
-            body = body with { Statements = bodyStatements };
+            body = body.WithStatements(bodyStatements);
         }
 
         return new ClassDeclaration(
@@ -2005,12 +1992,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var arm = node.Arms[i];
             var armPrefix = ExtractPrefix(arm);
 
-            // Parse the pattern
-            var pattern = Visit(arm.Pattern);
-            if (pattern is not Pattern patternNode)
-            {
-                throw new InvalidOperationException($"Expected Pattern but got {pattern?.GetType().Name}");
-            }
+            // Parse the pattern — may be a Pattern, VariableDeclarations (type pattern),
+            // Binary (and/or), Unary (not), or Parentheses (grouping)
+            var patternNode = Visit(arm.Pattern)!;
 
             // Parse when clause if present
             JLeftPadded<Expression>? whenExpression = null;
@@ -5923,17 +5907,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     var ctp = (ConstrainedTypeParameter)tp.Element.Bounds.Elements[0].Element;
                     if (ctp.Name.SimpleName == paramName)
                     {
-                        var updatedCtp = ctp with
-                        {
-                            WhereConstraint = whereConstraint,
-                            Constraints = constraintsContainer
-                        };
+                        var updatedCtp = ctp.WithWhereConstraint(whereConstraint).WithConstraints(constraintsContainer);
                         var updatedBounds = new JContainer<TypeTree>(
                             tp.Element.Bounds.Before,
                             [new JRightPadded<TypeTree>(updatedCtp, Space.Empty, Markers.Empty)],
                             tp.Element.Bounds.Markers
                         );
-                        typeParams[pi] = tp.WithElement(tp.Element with { Bounds = updatedBounds });
+                        typeParams[pi] = tp.WithElement(tp.Element.WithBounds(updatedBounds));
                         break;
                     }
                 }
@@ -6275,7 +6255,11 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     /// </summary>
     public override J VisitVariableDeclaration(VariableDeclarationSyntax node)
     {
-        var prefix = ExtractPrefix(node);
+        // Don't extract prefix here — let VisitType capture any space before the type
+        // as the type expression's prefix. This prevents the space between preceding
+        // modifiers (e.g. "const") and the type from being assigned to the
+        // VariableDeclarations prefix, which callers like VisitLocalDeclarationStatement
+        // overwrite with the statement-level prefix.
 
         // Parse the type
         var typeExpr = VisitType(node.Type);
@@ -6336,7 +6320,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         return new VariableDeclarations(
             Guid.NewGuid(),
-            prefix,
+            Space.Empty,
             Markers.Empty,
             [],
             [],
@@ -6374,7 +6358,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         SkipToken(node.SemicolonToken);
 
         // Merge modifiers and prefix from the statement level into the VariableDeclarations
-        return varDecl with { Prefix = prefix, Modifiers = modifiers };
+        return varDecl.WithPrefix(prefix).WithModifiers(modifiers);
     }
 
     public override J VisitFieldDeclaration(FieldDeclarationSyntax node)
@@ -6701,7 +6685,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Wrap InitializerExpression in a Block. The Block prefix gets the space before the initializer.
         // Move the InitializerExpression prefix to the Block prefix.
         var blockPrefix = initExpr.Prefix;
-        initExpr = initExpr with { Prefix = Space.Empty };
+        initExpr = initExpr.WithPrefix(Space.Empty);
         return new Block(
             Guid.NewGuid(),
             blockPrefix,
