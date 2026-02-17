@@ -120,7 +120,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }
 
                 // Skip if the version constraint already matches
-                if (newVersion.equals(dep.getVersionConstraint())) {
+                if (PyProjectHelper.normalizeVersionConstraint(newVersion).equals(dep.getVersionConstraint())) {
                     return document;
                 }
 
@@ -208,7 +208,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (extras != null) {
                     sb.append('[').append(extras).append(']');
                 }
-                sb.append(newVersion);
+                sb.append(PyProjectHelper.normalizeVersionConstraint(newVersion));
                 if (marker != null) {
                     sb.append("; ").append(marker);
                 }

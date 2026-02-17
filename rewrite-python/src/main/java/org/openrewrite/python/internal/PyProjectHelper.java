@@ -35,6 +35,23 @@ import java.util.List;
 public class PyProjectHelper {
 
     /**
+     * Normalize a version constraint so it is valid PEP 508. When the value
+     * does not start with a comparison operator ({@code >=}, {@code <=}, etc.)
+     * we default to {@code >=}.
+     */
+    public static String normalizeVersionConstraint(String version) {
+        String trimmed = version.trim();
+        if (trimmed.isEmpty()) {
+            return trimmed;
+        }
+        char first = trimmed.charAt(0);
+        if (first == '>' || first == '<' || first == '=' || first == '!' || first == '~') {
+            return trimmed;
+        }
+        return ">=" + trimmed;
+    }
+
+    /**
      * Extract the package name from a PEP 508 dependency spec string.
      * The name is the first token before any version specifier, extras, or marker.
      */

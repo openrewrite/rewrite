@@ -155,7 +155,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
     }
 
     private Toml.Document addDependencyToPyproject(Toml.Document document, ExecutionContext ctx, Accumulator acc) {
-        String pep508 = version != null ? packageName + version : packageName;
+        String pep508 = version != null ? packageName + PyProjectHelper.normalizeVersionConstraint(version) : packageName;
 
         Toml.Document updated = (Toml.Document) new TomlIsoVisitor<ExecutionContext>() {
             @Override

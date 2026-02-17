@@ -127,7 +127,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             marker, packageName, "tool.uv.constraint-dependencies", null);
                     if (existing == null) {
                         action = Action.ADD_CONSTRAINT;
-                    } else if (!version.equals(existing.getVersionConstraint())) {
+                    } else if (!PyProjectHelper.normalizeVersionConstraint(version).equals(existing.getVersionConstraint())) {
                         action = Action.UPGRADE_CONSTRAINT;
                     }
                 } else if (pm == PythonResolutionResult.PackageManager.Pdm) {
@@ -136,7 +136,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             marker, packageName, "tool.pdm.overrides", null);
                     if (existing == null) {
                         action = Action.ADD_PDM_OVERRIDE;
-                    } else if (!version.equals(existing.getVersionConstraint())) {
+                    } else if (!PyProjectHelper.normalizeVersionConstraint(version).equals(existing.getVersionConstraint())) {
                         action = Action.UPGRADE_PDM_OVERRIDE;
                     }
                 } else {
@@ -191,7 +191,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     }
 
     private Toml.Document addToArray(Toml.Document document, ExecutionContext ctx, Accumulator acc, @Nullable String scope) {
-        String pep508 = packageName + version;
+        String normalizedVersion = PyProjectHelper.normalizeVersionConstraint(version);
+        String pep508 = packageName + normalizedVersion;
 
         Toml.Document updated = (Toml.Document) new TomlIsoVisitor<ExecutionContext>() {
             @Override
@@ -292,7 +293,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 if (extras != null) {
                     sb.append('[').append(extras).append(']');
                 }
-                sb.append(version);
+                sb.append(PyProjectHelper.normalizeVersionConstraint(version));
                 if (marker != null) {
                     sb.append("; ").append(marker);
                 }
@@ -330,11 +331,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 }
 
                 // Build a new KeyValue: packageName = "version"
+                String normalizedVersion = PyProjectHelper.normalizeVersionConstraint(version);
                 Toml.Identifier key = new Toml.Identifier(
                         randomId(), Space.EMPTY, Markers.EMPTY, packageName, packageName);
                 Toml.Literal value = new Toml.Literal(
                         randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
-                        TomlType.Primitive.String, "\"" + version + "\"", version);
+                        TomlType.Primitive.String, "\"" + normalizedVersion + "\"", normalizedVersion);
                 Toml.KeyValue newKv = new Toml.KeyValue(
                         randomId(), Space.EMPTY, Markers.EMPTY,
                         new TomlRightPadded<>(key, Space.SINGLE_SPACE, Markers.EMPTY),
@@ -388,7 +390,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 }
 
                 Toml.Literal literal = (Toml.Literal) kv.getValue();
-                return kv.withValue(literal.withSource("\"" + version + "\"").withValue(version));
+                String normalizedVersion = PyProjectHelper.normalizeVersionConstraint(version);
+                return kv.withValue(literal.withSource("\"" + normalizedVersion + "\"").withValue(normalizedVersion));
             }
         }.visitNonNull(document, ctx);
 

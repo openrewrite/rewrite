@@ -160,7 +160,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     sb.append('[').append(extras).append(']');
                 }
                 if (newVersion != null) {
-                    sb.append(newVersion);
+                    sb.append(PyProjectHelper.normalizeVersionConstraint(newVersion));
                 } else {
                     // Preserve the original version constraint
                     String originalVersion = extractVersionConstraint(spec, depName);

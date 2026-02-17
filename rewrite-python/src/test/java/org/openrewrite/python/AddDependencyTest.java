@@ -253,6 +253,49 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void uvLockRegenerationWorks() {
+        String pyprojectWithFlask = """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+                  "flask>=2.0",
+              ]
+              """;
+        org.openrewrite.python.internal.UvLockRegeneration.Result result =
+                org.openrewrite.python.internal.UvLockRegeneration.regenerate(pyprojectWithFlask);
+        assertThat(result.isSuccess()).as("uv lock should succeed: " + result.getErrorMessage()).isTrue();
+        assertThat(result.getLockFileContent()).contains("name = \"flask\"");
+    }
+
+    @Test
+    void addDependencyWithBareVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("flask", "2.0", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+                  "flask>=2.0",
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
     void validateRequiresGroupName() {
         AddDependency recipe = new AddDependency("pytest", null, "project.optional-dependencies", null);
         assertThat(recipe.validate().isValid()).isFalse();
