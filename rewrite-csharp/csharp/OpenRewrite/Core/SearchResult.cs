@@ -7,8 +7,11 @@ namespace Rewrite.Core;
 /// <summary>
 /// Marks an LST node as a search result with an optional description.
 /// </summary>
-public sealed record SearchResult(Guid Id, string? Description) : Marker, IRpcCodec<SearchResult>
+public sealed class SearchResult(Guid id, string? description) : Marker, IRpcCodec<SearchResult>, IEquatable<SearchResult>
 {
+    public Guid Id { get; } = id;
+    public string? Description { get; } = description;
+
     /// <summary>
     /// Adds a SearchResult marker to the given tree node.
     /// Uses reflection to call WithMarkers on the concrete type.
@@ -30,6 +33,10 @@ public sealed record SearchResult(Guid Id, string? Description) : Marker, IRpcCo
     {
         var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
         var description = q.Receive(before.Description);
-        return before with { Id = id, Description = description };
+        return new SearchResult(id, description);
     }
+
+    public bool Equals(SearchResult? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as SearchResult);
+    public override int GetHashCode() => Id.GetHashCode();
 }

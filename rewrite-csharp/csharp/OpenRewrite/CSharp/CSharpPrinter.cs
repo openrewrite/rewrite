@@ -10,6 +10,7 @@ namespace Rewrite.CSharp;
 /// </summary>
 public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 {
+    private int _patternDepth;
     public string Print(Tree tree)
     {
         var capture = new PrintOutputCapture<P>(default!);
@@ -1615,6 +1616,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
     private bool IsInPatternContext()
     {
+        if (_patternDepth > 0)
+            return true;
         var c = Cursor;
         while (c != null)
         {
@@ -1688,6 +1691,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             {
                 // Switch expression arm: pattern => result (no 'case' keyword)
                 // Type patterns (like 'int i') are stored as VariableDeclarations
+                _patternDepth++;
                 if (label is VariableDeclarations vd)
                 {
                     VisitVariableDeclarationsWithoutSemicolon(vd, p);
@@ -1696,6 +1700,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                 {
                     Visit(label, p);
                 }
+                _patternDepth--;
 
                 // Space before 'when' or '=>' is in label's After
                 VisitSpace(labelPadded.After, p);
@@ -1729,6 +1734,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                     p.Append("case");
                     // Type patterns (like 'case int i:') are stored as VariableDeclarations
                     // but should NOT have a semicolon in case labels
+                    _patternDepth++;
                     if (label is VariableDeclarations vd)
                     {
                         VisitVariableDeclarationsWithoutSemicolon(vd, p);
@@ -1737,6 +1743,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                     {
                         Visit(label, p);
                     }
+                    _patternDepth--;
                 }
 
                 // Print colon for Statement type (After space comes before 'when' or colon)
@@ -1820,8 +1827,10 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(arm, p);
 
-        // Print pattern
+        // Print pattern (in pattern context for and/or/not keywords)
+        _patternDepth++;
         Visit(arm.Pattern, p);
+        _patternDepth--;
 
         // Print when clause if present
         if (arm.WhenExpression != null)

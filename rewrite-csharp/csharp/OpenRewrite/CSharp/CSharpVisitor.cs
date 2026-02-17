@@ -139,7 +139,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             }
         }
 
-        return changed ? compilationUnit with { Members = members } : compilationUnit;
+        return changed ? compilationUnit.WithMembers(members) : compilationUnit;
     }
 
     public virtual J VisitUsingDirective(UsingDirective usingDirective, P p)
@@ -189,7 +189,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var expr = Visit(ne.Expression, p);
         if (expr is Expression e && !ReferenceEquals(e, ne.Expression))
         {
-            return ne with { Expression = e };
+            return ne.WithExpression(e);
         }
         return ne;
     }
@@ -199,7 +199,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var expr = Visit(re.Expression, p);
         if (expr is Expression e && !ReferenceEquals(e, re.Expression))
         {
-            return re with { Expression = e };
+            return re.WithExpression(e);
         }
         return re;
     }
@@ -220,13 +220,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if ((expr is Expression e && !ReferenceEquals(e, isPattern.Expression)) ||
             (pattern is J pat && !ReferenceEquals(pat, isPattern.Pattern.Element)))
         {
-            return isPattern with
-            {
-                Expression = expr is Expression newExpr ? newExpr : isPattern.Expression,
-                Pattern = pattern is J newPat
-                    ? isPattern.Pattern with { Element = newPat }
-                    : isPattern.Pattern
-            };
+            return isPattern.WithExpression(expr is Expression newExpr ? newExpr : isPattern.Expression).WithPattern(pattern is J newPat ? isPattern.Pattern.WithElement(newPat) : isPattern.Pattern);
         }
 
         return isPattern;
@@ -237,7 +231,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var stmt = Visit(se.Statement, p);
         if (stmt is Statement s && !ReferenceEquals(s, se.Statement))
         {
-            return se with { Statement = s };
+            return se.WithStatement(s);
         }
         return se;
     }
@@ -317,11 +311,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (!ReferenceEquals(returnType, csLambda.ReturnType) ||
             (lambda is Lambda l && !ReferenceEquals(l, csLambda.LambdaExpression)))
         {
-            return csLambda with
-            {
-                ReturnType = returnType,
-                LambdaExpression = lambda is Lambda newLambda ? newLambda : csLambda.LambdaExpression
-            };
+            return csLambda.WithReturnType(returnType).WithLambdaExpression(lambda is Lambda newLambda ? newLambda : csLambda.LambdaExpression);
         }
 
         return csLambda;
@@ -332,7 +322,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var value = Visit(rp.Value, p);
         if (value is Expression v && !ReferenceEquals(v, rp.Value))
         {
-            return rp with { Value = v };
+            return rp.WithValue(v);
         }
         return rp;
     }
@@ -358,7 +348,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             if (visited is NamedExpression sub && !ReferenceEquals(sub, ne.Element))
             {
                 changed = true;
-                newElements.Add(ne with { Element = sub });
+                newElements.Add(ne.WithElement(sub));
             }
             else
             {
@@ -367,17 +357,13 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         }
 
         var subpatterns = changed
-            ? pp.Subpatterns with { Elements = newElements }
+            ? pp.Subpatterns.WithElements(newElements)
             : pp.Subpatterns;
 
         if (!ReferenceEquals(typeQualifier, pp.TypeQualifier) ||
             !ReferenceEquals(subpatterns, pp.Subpatterns))
         {
-            return pp with
-            {
-                TypeQualifier = typeQualifier,
-                Subpatterns = subpatterns
-            };
+            return pp.WithTypeQualifier(typeQualifier).WithSubpatterns(subpatterns);
         }
 
         return pp;
@@ -409,7 +395,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
         if (changed)
         {
-            return istr with { Parts = newParts };
+            return istr.WithParts(newParts);
         }
         return istr;
     }
@@ -441,16 +427,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if ((expr is Expression e && !ReferenceEquals(e, interp.Expression)) ||
             newAlignment != null || newFormat != null)
         {
-            return interp with
-            {
-                Expression = expr is Expression newExpr ? newExpr : interp.Expression,
-                Alignment = newAlignment != null && interp.Alignment != null
-                    ? interp.Alignment with { Element = newAlignment }
-                    : interp.Alignment,
-                Format = newFormat != null && interp.Format != null
-                    ? interp.Format with { Element = newFormat }
-                    : interp.Format
-            };
+            return interp.WithExpression(expr is Expression newExpr ? newExpr : interp.Expression).WithAlignment(newAlignment != null && interp.Alignment != null ? interp.Alignment.WithElement(newAlignment) : interp.Alignment).WithFormat(newFormat != null && interp.Format != null ? interp.Format.WithElement(newFormat) : interp.Format);
         }
 
         return interp;
@@ -461,7 +438,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var expr = Visit(ae.Expression, p);
         if (expr is Expression e && !ReferenceEquals(e, ae.Expression))
         {
-            return ae with { Expression = e };
+            return ae.WithExpression(e);
         }
         return ae;
     }
@@ -490,20 +467,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
                 {
                     membersChanged = true;
                 }
-                newMembers.Add(member with { Element = stmt });
+                newMembers.Add(member.WithElement(stmt));
             }
         }
 
         if ((name is Expression e && !ReferenceEquals(e, ns.Name.Element)) ||
             membersChanged)
         {
-            return ns with
-            {
-                Name = name is Expression newName
-                    ? ns.Name with { Element = newName }
-                    : ns.Name,
-                Members = membersChanged ? newMembers : ns.Members
-            };
+            return ns.WithName(name is Expression newName ? ns.Name.WithElement(newName) : ns.Name).WithMembers(membersChanged ? newMembers : ns.Members);
         }
 
         return ns;
@@ -524,16 +495,13 @@ public class CSharpVisitor<P> : JavaVisitor<P>
                 {
                     elementsChanged = true;
                 }
-                newElements.Add(element with { Element = vd });
+                newElements.Add(element.WithElement(vd));
             }
         }
 
         if (elementsChanged)
         {
-            return tupleType with
-            {
-                Elements = new JContainer<VariableDeclarations>(tupleType.Elements.Before, newElements, tupleType.Elements.Markers)
-            };
+            return tupleType.WithElements(new JContainer<VariableDeclarations>(tupleType.Elements.Before, newElements, tupleType.Elements.Markers));
         }
 
         return tupleType;
@@ -554,16 +522,13 @@ public class CSharpVisitor<P> : JavaVisitor<P>
                 {
                     argsChanged = true;
                 }
-                newArgs.Add(arg with { Element = expr });
+                newArgs.Add(arg.WithElement(expr));
             }
         }
 
         if (argsChanged)
         {
-            return tupleExpr with
-            {
-                Arguments = new JContainer<Expression>(tupleExpr.Arguments.Before, newArgs, tupleExpr.Arguments.Markers)
-            };
+            return tupleExpr.WithArguments(new JContainer<Expression>(tupleExpr.Arguments.Before, newArgs, tupleExpr.Arguments.Markers));
         }
 
         return tupleExpr;
@@ -576,9 +541,9 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         {
             var visited = (CompilationUnit?)Visit(branch.Element, p);
             if (visited != null)
-                branches.Add(branch with { Element = visited });
+                branches.Add(branch.WithElement(visited));
         }
-        return conditionalDirective with { Branches = branches };
+        return conditionalDirective.WithBranches(branches);
     }
 
     public virtual J VisitPragmaWarningDirective(PragmaWarningDirective pragmaWarningDirective, P p)
@@ -604,13 +569,13 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     public virtual J VisitDefineDirective(DefineDirective defineDirective, P p)
     {
         var symbol = (Identifier?)Visit(defineDirective.Symbol, p);
-        return defineDirective with { Symbol = symbol! };
+        return defineDirective.WithSymbol(symbol!);
     }
 
     public virtual J VisitUndefDirective(UndefDirective undefDirective, P p)
     {
         var symbol = (Identifier?)Visit(undefDirective.Symbol, p);
-        return undefDirective with { Symbol = symbol! };
+        return undefDirective.WithSymbol(symbol!);
     }
 
     public virtual J VisitErrorDirective(ErrorDirective errorDirective, P p)
@@ -898,7 +863,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     {
         var fromClause = (FromClause)VisitFromClause(queryExpression.FromClause, p);
         var body = (QueryBody)VisitQueryBody(queryExpression.Body, p);
-        return queryExpression with { FromClause = fromClause, Body = body };
+        return queryExpression.WithFromClause(fromClause).WithBody(body);
     }
 
     public virtual J VisitQueryBody(QueryBody queryBody, P p)
@@ -923,14 +888,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             var visited = (QueryContinuation)VisitQueryContinuation(continuation, p);
             if (!ReferenceEquals(visited, continuation)) { changed = true; continuation = visited; }
         }
-        return changed ? queryBody with { Clauses = clauses, SelectOrGroup = selectOrGroup, Continuation = continuation } : queryBody;
+        return changed ? queryBody.WithClauses(clauses).WithSelectOrGroup(selectOrGroup).WithContinuation(continuation) : queryBody;
     }
 
     public virtual J VisitFromClause(FromClause fromClause, P p)
     {
         var expr = Visit(fromClause.Expression, p);
         if (expr is Expression e && !ReferenceEquals(e, fromClause.Expression))
-            return fromClause with { Expression = e };
+            return fromClause.WithExpression(e);
         return fromClause;
     }
 
@@ -938,7 +903,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     {
         var expr = Visit(letClause.Expression, p);
         if (expr is Expression e && !ReferenceEquals(e, letClause.Expression))
-            return letClause with { Expression = e };
+            return letClause.WithExpression(e);
         return letClause;
     }
 
@@ -960,7 +925,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     {
         var condition = Visit(whereClause.Condition, p);
         if (condition is Expression e && !ReferenceEquals(e, whereClause.Condition))
-            return whereClause with { Condition = e };
+            return whereClause.WithCondition(e);
         return whereClause;
     }
 
@@ -972,16 +937,16 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         {
             var visited = (Ordering)VisitOrdering(rp.Element, p);
             if (!ReferenceEquals(visited, rp.Element)) changed = true;
-            orderings.Add(rp with { Element = visited });
+            orderings.Add(rp.WithElement(visited));
         }
-        return changed ? orderByClause with { Orderings = orderings } : orderByClause;
+        return changed ? orderByClause.WithOrderings(orderings) : orderByClause;
     }
 
     public virtual J VisitOrdering(Ordering ordering, P p)
     {
         var expr = Visit(ordering.Expression, p);
         if (expr is Expression e && !ReferenceEquals(e, ordering.Expression))
-            return ordering with { ExpressionPadded = ordering.ExpressionPadded with { Element = e } };
+            return ordering.WithExpressionPadded(ordering.ExpressionPadded.WithElement(e));
         return ordering;
     }
 
@@ -989,7 +954,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     {
         var expr = Visit(selectClause.Expression, p);
         if (expr is Expression e && !ReferenceEquals(e, selectClause.Expression))
-            return selectClause with { Expression = e };
+            return selectClause.WithExpression(e);
         return selectClause;
     }
 
@@ -1005,7 +970,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         Visit(queryContinuation.Identifier, p);
         var body = (QueryBody)VisitQueryBody(queryContinuation.Body, p);
         if (!ReferenceEquals(body, queryContinuation.Body))
-            return queryContinuation with { Body = body };
+            return queryContinuation.WithBody(body);
         return queryContinuation;
     }
 
