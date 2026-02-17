@@ -297,6 +297,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                         }
                         break;
                     }
+                    return t;
                 }
 
                 boolean isOldDependencyTag = isDependencyTag(oldGroupId, oldArtifactId);
