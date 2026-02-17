@@ -22,6 +22,7 @@ import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Stream;
@@ -215,14 +216,23 @@ public class RecipeClassLoader extends URLClassLoader {
 
     /**
      * Convert paths to URL array for URLClassLoader.
+     * Directories must have URLs ending with '/' for URLClassLoader to recognize them.
      */
     public static URL[] getUrls(@Nullable Path recipeJar, List<Path> classpath) {
         return Stream.concat(classpath.stream(), Stream.of(recipeJar))
                 .filter(Objects::nonNull)
-                .map(Path::toUri)
-                .map(uri -> {
+                .map(path -> {
                     try {
-                        return uri.toURL();
+                        if (Files.isDirectory(path)) {
+                            // For directories, ensure URL ends with '/'
+                            String urlString = path.toUri().toURL().toString();
+                            if (!urlString.endsWith("/")) {
+                                urlString += "/";
+                            }
+                            return new URL(urlString);
+                        } else {
+                            return path.toUri().toURL();
+                        }
                     } catch (MalformedURLException e) {
                         throw new UncheckedIOException(e);
                     }
