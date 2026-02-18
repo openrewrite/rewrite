@@ -1,5 +1,4 @@
-#
-# Copyright 2021 the original author or authors.
+# Copyright 2025 the original author or authors.
 # <p>
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +11,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 ---
-type: specs.openrewrite.org/v1beta/category
-name: Java
-packageName: org.openrewrite.java
-description: Basic building blocks for transforming Java code.
----
-type: specs.openrewrite.org/v1beta/category
-name: AI
-packageName: org.openrewrite.java.ai
-description: Recipes supporting AI code generation and analysis.
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.python.format.PythonSpaces
+examples:
+- description: '`PythonSpacesTest#formatAfterWithNewLines`'
+  sources:
+  - before: |
+      class Foo:
+          def foo(
+              a ,
+              b ,
+              c
+          ):
+              pass
+    after: |
+      class Foo:
+          def foo(
+              a,
+              b,
+              c
+          ):
+              pass
+    language: python

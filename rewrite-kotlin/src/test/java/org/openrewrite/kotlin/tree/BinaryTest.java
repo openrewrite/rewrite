@@ -389,7 +389,7 @@ class BinaryTest implements RewriteTest {
                 .findFirst();
         assertThat(sf).isPresent();
         assertThat(sf.get()).isInstanceOf(ParseError.class);
-        ParseError parseError = (ParseError) sf.get();
+        var parseError = (ParseError) sf.get();
         ParseExceptionResult ex = parseError.getMarkers()
                 .findFirst(ParseExceptionResult.class)
                 .orElseThrow();

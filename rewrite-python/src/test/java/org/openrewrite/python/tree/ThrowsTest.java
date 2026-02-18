@@ -46,8 +46,8 @@ class ThrowsTest implements RewriteTest {
         );
     }
 
-    @Python3Only
     @ParameterizedTest
+    @Python3Only
     @ValueSource(strings = {
       "x from None",
       " x from None",

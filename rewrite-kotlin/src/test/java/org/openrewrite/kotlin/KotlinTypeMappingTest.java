@@ -578,8 +578,8 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @Test
         @Issue("https://github.com/openrewrite/rewrite/issues/6140")
+        @Test
         void companionObject() {
             rewriteRun(
               kotlin(
