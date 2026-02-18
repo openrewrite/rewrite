@@ -452,10 +452,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         if (space.getComments().isEmpty()) {
             if (StringUtils.hasLineBreak(whitespace)) {
                 if (StringUtils.hasLineBreak(space.getWhitespace())) {
-                    // Preserve existing whitespace including indentation.
-                    // WrappingAndBraces only ensures newlines exist; TabsAndIndents handles indentation.
-                    // When running standalone (not through AutoFormat), stripping indentation causes
-                    // all code to collapse to column 0.
+                    // Preserve existing amount of new lines and their indents
                     return space;
                 }
             }
