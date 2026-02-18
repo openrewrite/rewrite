@@ -59,15 +59,9 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
             example = "11")
     Integer version;
 
-    @Override
-    public String getDisplayName() {
-        return "Update Maven Java project properties";
-    }
+    String displayName = "Update Maven Java project properties";
 
-    @Override
-    public String getDescription() {
-        //language=markdown
-        return "The Java version is determined by several project properties, including:\n\n" +
+    String description = "The Java version is determined by several project properties, including:\n\n" +
                " * `java.version`\n" +
                " * `jdk.version`\n" +
                " * `javaVersion`\n" +
@@ -77,7 +71,6 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                " * `maven.compiler.release`\n" +
                " * `release.version`\n\n" +
                "If none of these properties are in use and the maven compiler plugin is not otherwise configured, adds the `maven.compiler.release` property.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

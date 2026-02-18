@@ -70,17 +70,11 @@ public class AddProperty extends Recipe {
     @Nullable
     Boolean orderedInsertion;
 
-    @Override
-    public String getDisplayName() {
-        return "Add a new property";
-    }
+    String displayName = "Add a new property";
 
-    @Override
-    public String getDescription() {
-        return "Adds a new property to a property file. " +
+    String description = "Adds a new property to a property file. " +
                "Attempts to place the new property in alphabetical order by the property keys. " +
                "Whitespace before and after the `=` must be included in the property and value.";
-    }
 
     @Override
     public Validated<Object> validate() {

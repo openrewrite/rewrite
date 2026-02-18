@@ -52,15 +52,9 @@ public class ReplaceTableRow extends Recipe {
             example = "name")
     String identifyingKey;
 
-    @Override
-    public String getDisplayName() {
-        return "Replace TOML table row";
-    }
+    String displayName = "Replace TOML table row";
 
-    @Override
-    public String getDescription() {
-        return "Replace a TOML table row with new content. If a row with the same identifying property exists, replace it entirely.";
-    }
+    String description = "Replace a TOML table row with new content. If a row with the same identifying property exists, replace it entirely.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

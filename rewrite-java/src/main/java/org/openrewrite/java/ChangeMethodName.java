@@ -60,20 +60,14 @@ public class ChangeMethodName extends Recipe {
     @Nullable
     Boolean ignoreDefinition;
 
-    @Override
-    public String getDisplayName() {
-        return "Change method name";
-    }
+    String displayName = "Change method name";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s` to `%s`", methodPattern, newMethodName);
     }
 
-    @Override
-    public String getDescription() {
-        return "Rename a method.";
-    }
+    String description = "Rename a method.";
 
     @Override
     public Validated<Object> validate() {

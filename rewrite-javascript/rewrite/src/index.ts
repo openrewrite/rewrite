@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import {JavaScript, RecipeMarketplace} from "./marketplace";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
-import {createDraft, Draft, finishDraft} from "immer";
+import {updateIfChanged} from "./util";
 import {MarkersKind, ParseExceptionResult} from "./markers";
-import {RecipeRegistry} from "./recipe";
 
 export * from "./data-table";
 export * from "./execution";
@@ -32,24 +32,55 @@ export * from "./uuid";
 export * from "./util";
 export * from "./recipe";
 export * from "./run";
+export * from "./marketplace";
 
-// register all recipes in this package
-export async function activate(registry: RecipeRegistry): Promise<void> {
-    const {OrderImports} = await import("./recipe/index.js");
-    const {ModernizeOctalEscapeSequences, ModernizeOctalLiterals, RemoveDuplicateObjectKeys} = await import("./javascript/migrate/es6/index.js");
-    const {ExportAssignmentToExportDefault} = await import("./javascript/migrate/typescript/index.js");
-    const {UseObjectPropertyShorthand} = await import("./javascript/cleanup/index.js");
-    const {UpgradeDependencyVersion} = await import("./javascript/recipes/index.js");
-    const {FindDependency} = await import("./javascript/search/index.js");
+// Install all recipes in this package
+export async function activate(marketplace: RecipeMarketplace): Promise<void> {
+    const {
+        AddDependency,
+        AsyncCallbackInSyncArrayMethod,
+        AutoFormat,
+        UpgradeDependencyVersion,
+        UpgradeTransitiveDependencyVersion,
+        OrderImports,
+        ChangeImport
+    } = await import("./javascript/recipes/index.js");
+    await marketplace.install(AddDependency, JavaScript);
+    await marketplace.install(AsyncCallbackInSyncArrayMethod, JavaScript);
+    await marketplace.install(AutoFormat, JavaScript);
+    await marketplace.install(UpgradeDependencyVersion, JavaScript);
+    await marketplace.install(UpgradeTransitiveDependencyVersion, JavaScript);
+    await marketplace.install(OrderImports, JavaScript);
+    await marketplace.install(ChangeImport, JavaScript);
 
-    registry.register(ExportAssignmentToExportDefault);
-    registry.register(FindDependency);
-    registry.register(OrderImports);
-    registry.register(ModernizeOctalEscapeSequences);
-    registry.register(ModernizeOctalLiterals);
-    registry.register(RemoveDuplicateObjectKeys);
-    registry.register(UseObjectPropertyShorthand);
-    registry.register(UpgradeDependencyVersion);
+    const {FindDependency, Search} = await import("./javascript/search/index.js");
+    await marketplace.install(FindDependency, Search);
+
+    const {
+        UseObjectPropertyShorthand,
+        PreferOptionalChain,
+        AddParseIntRadix,
+        Cleanup
+    } = await import("./javascript/cleanup/index.js");
+    await marketplace.install(UseObjectPropertyShorthand, Cleanup);
+    await marketplace.install(PreferOptionalChain, Cleanup);
+    await marketplace.install(AddParseIntRadix, Cleanup);
+
+    const {
+        ExportAssignmentToExportDefault,
+        MigrateTypeScript
+    } = await import("./javascript/migrate/typescript/index.js");
+    await marketplace.install(ExportAssignmentToExportDefault, MigrateTypeScript);
+
+    const {
+        ModernizeOctalEscapeSequences,
+        ModernizeOctalLiterals,
+        RemoveDuplicateObjectKeys,
+        MigrateES6
+    } = await import("./javascript/migrate/es6/index.js");
+    await marketplace.install(ModernizeOctalEscapeSequences, MigrateES6);
+    await marketplace.install(ModernizeOctalLiterals, MigrateES6);
+    await marketplace.install(RemoveDuplicateObjectKeys, MigrateES6);
 }
 
 RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
@@ -61,12 +92,13 @@ RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
         await q.getAndSend(after, a => a.treeType);
     },
     async rpcReceive(before: ParseExceptionResult, q: RpcReceiveQueue): Promise<ParseExceptionResult> {
-        const draft: Draft<ParseExceptionResult> = createDraft(before);
-        draft.id = await q.receive(before.id);
-        draft.parserType = await q.receive(before.parserType);
-        draft.exceptionType = await q.receive(before.exceptionType);
-        draft.message = await q.receive(before.message);
-        draft.treeType = await q.receive(before.treeType);
-        return finishDraft(draft);
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            parserType: await q.receive(before.parserType),
+            exceptionType: await q.receive(before.exceptionType),
+            message: await q.receive(before.message),
+            treeType: await q.receive(before.treeType),
+        });
     }
 });
+

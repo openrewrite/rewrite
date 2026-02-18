@@ -37,7 +37,12 @@ public class MergeDuplicateSectionsVisitor<P> extends YamlIsoVisitor<P> {
         Yaml.Document d = super.visitDocument(document, p);
         String newRootComments = getCursor().getMessage("NEW_ROOT_COMMENTS", "");
         if (!newRootComments.isEmpty()) {
-            d = d.withPrefix(d.getPrefix() + newRootComments);
+            // Clean up extra leading newlines when adding root comments
+            String cleanComments = newRootComments;
+            if (cleanComments.startsWith("\n") && d.getPrefix().isEmpty()) {
+                cleanComments = cleanComments.substring(1);
+            }
+            d = d.withPrefix(d.getPrefix() + cleanComments);
         }
         return d;
     }

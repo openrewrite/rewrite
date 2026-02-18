@@ -20,9 +20,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
-import org.openrewrite.kotlin.marker.OmitBraces;
 import org.openrewrite.kotlin.marker.PrimaryConstructor;
 import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 
@@ -52,7 +52,8 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
 
         if (parentTree instanceof J.Block && !(j instanceof J.EnumValueSet)) {
             J.Block parentBlock = (J.Block) parentTree;
-            if (parentBlock.getMarkers().findFirst(OmitBraces.class).isPresent()) {
+            if (parentBlock.getMarkers().findFirst(OmitBraces.class).isPresent() ||
+                parentBlock.getMarkers().findFirst(org.openrewrite.kotlin.marker.OmitBraces.class).isPresent()) {
                 return j;
             }
 

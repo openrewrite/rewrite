@@ -105,7 +105,18 @@ public class JavaUnrestrictedClassLoader extends URLClassLoader {
                         Path classFile = path.resolve(internalName);
                         if (Files.exists(classFile)) {
                             byte[] bytes = Files.readAllBytes(classFile);
-                            return defineClass(name, bytes, 0, bytes.length);
+                            try {
+                                return defineClass(name, bytes, 0, bytes.length);
+                            } catch (LinkageError e) {
+                                // On JDK 25+, cross-module type references in DocCommentTable can cause the
+                                // app classloader to load jdk.compiler classes before this classloader does.
+                                // Fall back to parent delegation for the already-loaded class.
+                                try {
+                                    return super.loadClass(name);
+                                } catch (ClassNotFoundException cnfe) {
+                                    throw e;
+                                }
+                            }
                         }
                     }
                 } catch (IOException e) {

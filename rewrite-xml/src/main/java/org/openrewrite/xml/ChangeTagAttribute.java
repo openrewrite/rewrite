@@ -31,15 +31,9 @@ import java.util.regex.Pattern;
 @EqualsAndHashCode(callSuper = false)
 public class ChangeTagAttribute extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Change XML attribute";
-    }
+    String displayName = "Change XML attribute";
 
-    @Override
-    public String getDescription() {
-        return "Alters XML attribute value on a specified element.";
-    }
+    String description = "Alters XML attribute value on a specified element.";
 
     @Option(displayName = "Element name",
             description = "The name of the element whose attribute's value is to be changed. Interpreted as an XPath expression.",

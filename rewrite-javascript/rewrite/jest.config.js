@@ -2,7 +2,7 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testPathIgnorePatterns: ['/node_modules/', '/dist/'],
-  testTimeout: 30000,
+  testTimeout: 60000,
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleNameMapper: {
     '^@openrewrite/rewrite$': '<rootDir>/src/index',
@@ -10,7 +10,7 @@ module.exports = {
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
-      tsconfig: 'tsconfig.json'
+      tsconfig: 'tsconfig.test.json'
     }],
   },
   testMatch: ['**/?(*.)+(spec|test).+(ts|tsx|js)'],

@@ -98,21 +98,15 @@ public class UpgradePluginVersion extends Recipe {
         return validated;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Upgrade Maven plugin version";
-    }
+    String displayName = "Upgrade Maven plugin version";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, newVersion);
     }
 
-    @Override
-    public String getDescription() {
-        return "Upgrade the version of a plugin using Node Semver advanced range selectors, " +
+    String description = "Upgrade the version of a plugin using Node Semver advanced range selectors, " +
                "allowing more precise control over version updates to patch or minor releases.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

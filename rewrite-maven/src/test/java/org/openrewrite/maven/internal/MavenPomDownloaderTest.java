@@ -579,8 +579,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                   .sourcePath(pomPath)
                   .repository(snapshotRepo)
                   .properties(singletonMap("REPO_URL", snapshotRepo.getUri()))
-                  .gav(new ResolvedGroupArtifactVersion(
-                    "${REPO_URL}", gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null))
+                  .gav(gav.asResolved().withRepository("${REPO_URL}"))
                   .build();
                 var resolvedPom = ResolvedPom.builder()
                   .requested(pom)
@@ -616,7 +615,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
-        void deriveMetaDataFromHtmlBasedRepository() throws Exception {
+        void deriveMetaDataFromHtmlBasedRepository() {
             MavenRepository repository = MavenRepository.builder()
               .id("html-based")
               .uri("https://central.sonatype.com/repository/maven-snapshots")
@@ -625,6 +624,42 @@ class MavenPomDownloaderTest implements RewriteTest {
               .build();
             assertThrows(MavenDownloadingException.class, () ->
               new MavenPomDownloader(emptyMap(), ctx).downloadMetadata(new GroupArtifact("does.definitely.not", "exist"), null, List.of(repository)));
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/6739")
+        @Test
+        void deriveMetaDataFromHtmlWithTitleAttributes() throws Exception {
+            try (MockWebServer server = new MockWebServer()) {
+                server.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        if (request.getPath() != null && request.getPath().endsWith("maven-metadata.xml")) {
+                            return new MockResponse().setResponseCode(404);
+                        }
+                        return new MockResponse().setResponseCode(200).setBody(
+                          """
+                            <html><body>
+                            <a href="../" title="../">../</a>
+                            <a href="1.0.0/" title="1.0.0/">1.0.0/</a>
+                            <a href="1.1.0/" title="1.1.0/">1.1.0/</a>
+                            <a href="2.0.0/" title="2.0.0/">2.0.0/</a>
+                            </body></html>
+                            """
+                        );
+                    }
+                });
+                server.start();
+
+                MavenRepository repository = MavenRepository.builder()
+                  .id("html-with-title")
+                  .uri("http://%s:%d/".formatted(server.getHostName(), server.getPort()))
+                  .knownToExist(true)
+                  .deriveMetadataIfMissing(true)
+                  .build();
+                MavenMetadata metaData = new MavenPomDownloader(emptyMap(), ctx)
+                  .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
+                assertThat(metaData.getVersioning().getVersions()).containsExactlyInAnyOrder("1.0.0", "1.1.0", "2.0.0");
+            }
         }
 
         @SuppressWarnings("ConstantConditions")
@@ -800,7 +835,6 @@ class MavenPomDownloaderTest implements RewriteTest {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
 
             var result = downloader.download(gav, null, null, List.of());
-            //noinspection DataFlowIssue
             assertThat(result.getRepository()).isNotNull();
             assertThat(result.getRepository().getUri()).startsWith(tempDir.toUri().toString());
         }
@@ -1351,29 +1385,68 @@ class MavenPomDownloaderTest implements RewriteTest {
 
     @Test
     void resolveDependencies() throws Exception {
-        Xml.Document doc = (Xml.Document) MavenParser.builder().build().parse("""
-                  <project>
-                      <parent>
-                          <groupId>org.springframework.boot</groupId>
-                          <artifactId>spring-boot-starter-parent</artifactId>
-                          <version>3.2.0</version>
-                          <relativePath/>
-                      </parent>
-                      <groupId>com.example</groupId>
-                      <artifactId>demo</artifactId>
-                      <version>0.0.1-SNAPSHOT</version>
-                      <name>demo</name>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.springframework.boot</groupId>
-                              <artifactId>spring-boot-starter-web</artifactId>
-                          </dependency>
-                      </dependencies>
-                  </project>
-        """).toList().getFirst();
-        MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-        resolutionResult = resolutionResult.resolveDependencies(new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext(), null, null), new InMemoryExecutionContext());
+        var doc = (Xml.Document) MavenParser.builder().build().parse("""
+          <project>
+              <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.0</version>
+                  <relativePath/>
+              </parent>
+              <groupId>com.example</groupId>
+              <artifactId>demo</artifactId>
+              <version>0.0.1-SNAPSHOT</version>
+              <name>demo</name>
+              <dependencies>
+                  <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-web</artifactId>
+                  </dependency>
+              </dependencies>
+          </project>
+          """).toList().getFirst();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
+          .resolveDependencies(new MavenPomDownloader(emptyMap(), ctx, null, null), ctx);
         List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
-        assertThat(deps).hasSize(35);
+        assertThat(deps).hasSize(34);
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/6464")
+    @Test
+    void emptyClassifierPropertyInIntermediatePom() throws Exception {
+        // `azure-spring-data-cosmos` brings in `azure-core-http-netty`, which uses property `<boring-ssl-classifier/>`
+        // https://repo1.maven.org/maven2/com/azure/azure-spring-data-cosmos/3.45.0/azure-spring-data-cosmos-3.45.0.pom
+        // https://repo1.maven.org/maven2/com/azure/azure-core-http-netty/1.16.2/azure-core-http-netty-1.16.2.pom
+        var doc = (Xml.Document) MavenParser.builder().build().parse("""
+          <project>
+              <groupId>com.example</groupId>
+              <artifactId>demo</artifactId>
+              <version>1.0.0</version>
+              <properties>
+                  <boring-ssl-classifier>something-else</boring-ssl-classifier>
+              </properties>
+              <dependencies>
+                  <dependency>
+                      <groupId>com.azure</groupId>
+                      <artifactId>azure-spring-data-cosmos</artifactId>
+                      <version>3.45.0</version>
+                  </dependency>
+              </dependencies>
+          </project>
+          """).toList().getFirst();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
+          .resolveDependencies(new MavenPomDownloader(emptyMap(), ctx, null, null), ctx);
+        List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
+        assertThat(deps)
+          .filteredOn(rd -> "io.netty".equals(rd.getGroupId()))
+          .filteredOn(rd -> "netty-tcnative-boringssl-static".equals(rd.getArtifactId()))
+          .isNotEmpty()
+          .extracting(ResolvedDependency::getClassifier)
+          .doesNotContain("${boring-ssl-classifier}")
+          .doesNotContain("something-else")
+          .contains("")
+          .anyMatch(c -> !"".equals(c));
     }
 }

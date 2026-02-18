@@ -40,16 +40,10 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
     )
     Integer releaseVersion;
 
-    @Override
-    public String getDisplayName() {
-        return "Use Maven compiler plugin release configuration";
-    }
+    String displayName = "Use Maven compiler plugin release configuration";
 
-    @Override
-    public String getDescription() {
-        return "Replaces any explicit `source` or `target` configuration (if present) on the `maven-compiler-plugin` with " +
+    String description = "Replaces any explicit `source` or `target` configuration (if present) on the `maven-compiler-plugin` with " +
                 "`release`, and updates the `release` value if needed. Will not downgrade the Java version if the current version is higher.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

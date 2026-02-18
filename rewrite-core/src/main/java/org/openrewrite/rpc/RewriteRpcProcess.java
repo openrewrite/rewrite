@@ -63,6 +63,8 @@ public class RewriteRpcProcess extends Thread {
 
     private final Map<String, String> environment = new LinkedHashMap<>();
 
+    private final StringBuffer accumulatedStderr = new StringBuffer();
+
     public RewriteRpcProcess(String... command) {
         this.command = command;
         this.setName("JavaScriptRewriteRpcProcess");
@@ -93,20 +95,47 @@ public class RewriteRpcProcess extends Thread {
     }
 
     public @Nullable RuntimeException getLivenessCheck() {
-        if (process != null && !process.isAlive()) {
-            int exitCode = process.exitValue();
-            String errorOutput = "", stdOutput = "";
+        if (process == null) {
+            return null;
+        }
 
-            // Read any remaining output from the process
-            try (InputStream errorStream = process.getErrorStream();
-                 InputStream inputStream = process.getInputStream()) {
-                errorOutput = readFully(errorStream);
-                stdOutput = readFully(inputStream);
-            } catch (IOException | UnsupportedOperationException e) {
-                // Ignore errors reading final output
+        // Accumulate any available stderr
+        try {
+            InputStream errorStream = process.getErrorStream();
+            int available = errorStream.available();
+            if (available > 0) {
+                byte[] buffer = new byte[available];
+                int read = errorStream.read(buffer);
+                if (read > 0) {
+                    accumulatedStderr.append(new String(buffer, 0, read));
+                }
+            }
+        } catch (IOException | UnsupportedOperationException e) {
+            // Ignore errors reading stderr
+        }
+
+        if (!process.isAlive()) {
+            int exitCode = process.exitValue();
+
+            // Read any remaining stderr
+            try {
+                InputStream errorStream = process.getErrorStream();
+                accumulatedStderr.append(readFully(errorStream));
+            } catch (UnsupportedOperationException e) {
+                // Ignore errors reading final stderr
             }
 
-            String message = "JavaScript RPC process shut down early with exit code " + exitCode;
+            // Read any remaining stdout
+            String stdOutput = "";
+            try {
+                InputStream inputStream = process.getInputStream();
+                stdOutput = readFully(inputStream);
+            } catch (UnsupportedOperationException e) {
+                // Ignore errors reading final stdout
+            }
+
+            String message = "RPC process shut down early with exit code " + exitCode;
+            String errorOutput = accumulatedStderr.toString();
             if (!stdOutput.isEmpty()) {
                 message += "\nStandard output:\n  " + stdOutput.replace("\n", "\n  ");
             }
@@ -152,7 +181,7 @@ public class RewriteRpcProcess extends Thread {
                     process.waitFor(2, TimeUnit.SECONDS);
                 }
                 int exitCode = process.exitValue();
-                if (exitCode != 0 && exitCode != 143) { // 143 = SIGTERM
+                if (exitCode != 0 && exitCode != 1 && exitCode != 143) { // 143 = SIGTERM
                     throw new RuntimeException("JavaScript Rewrite RPC process crashed with exit code: " + exitCode);
                 }
             } catch (InterruptedException e) {

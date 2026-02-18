@@ -57,20 +57,14 @@ public class ChangeDependencyExtension extends Recipe {
     @Nullable
     String configuration;
 
-    @Override
-    public String getDisplayName() {
-        return "Change a Gradle dependency extension";
-    }
+    String displayName = "Change a Gradle dependency extension";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s` to `%s`", groupId, artifactId, newExtension);
     }
 
-    @Override
-    public String getDescription() {
-        return "Changes extension of an existing dependency declared in `build.gradle` files.";
-    }
+    String description = "Changes extension of an existing dependency declared in `build.gradle` files.";
 
     @Override
     public Validated<Object> validate() {

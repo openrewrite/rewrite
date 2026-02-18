@@ -4,7 +4,11 @@ build/
 out/
 */src/main/gen/
 */src/main/antlr/gen
-.idea/
+.idea/*
+# Exception: Include Python module for IntelliJ (needs parent dirs unignored first)
+!.idea/modules/
+.idea/modules/*
+!.idea/modules/rewrite-python-src/
 .project
 .classpath
 .settings/
@@ -18,3 +22,13 @@ IDE.properties
 /worktrees
 rewrite-gradle-tooling-model/model/src/main/resources/test-manifest.txt
 .nvmrc
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/

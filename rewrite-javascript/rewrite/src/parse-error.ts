@@ -17,7 +17,7 @@ import {Cursor, SourceFile, Tree} from "./tree";
 import {TreeVisitor} from "./visitor";
 import {PrintOutputCapture, TreePrinters} from "./print";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
-import {createDraft, Draft, finishDraft} from "immer";
+import {updateIfChanged} from "./util";
 
 export const ParseErrorKind = "org.openrewrite.tree.ParseError";
 
@@ -67,16 +67,16 @@ TreePrinters.register(ParseErrorKind, () => new class extends ParseErrorVisitor<
 
 RpcCodecs.registerCodec(ParseErrorKind, {
     async rpcReceive(before: ParseError, q: RpcReceiveQueue): Promise<ParseError> {
-        const draft: Draft<ParseError> = createDraft(before);
-        draft.id = await q.receive(before.id);
-        draft.markers = await q.receive(before.markers);
-        draft.sourcePath = await q.receive(before.sourcePath);
-        draft.charsetName = await q.receive(before.charsetName);
-        draft.charsetBomMarked = await q.receive(before.charsetBomMarked);
-        draft.checksum = await q.receive(before.checksum);
-        draft.fileAttributes = await q.receive(before.fileAttributes);
-        draft.text = await q.receive(before.text);
-        return finishDraft(draft);
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            markers: await q.receive(before.markers),
+            sourcePath: await q.receive(before.sourcePath),
+            charsetName: await q.receive(before.charsetName),
+            charsetBomMarked: await q.receive(before.charsetBomMarked),
+            checksum: await q.receive(before.checksum),
+            fileAttributes: await q.receive(before.fileAttributes),
+            text: await q.receive(before.text),
+        });
     },
 
     async rpcSend(after: ParseError, q: RpcSendQueue): Promise<void> {

@@ -3,6 +3,7 @@ import {emptySpace, J, rightPadded, singleSpace, space, Statement, Type} from ".
 import {JS} from "./tree";
 import {randomId} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
+import {getStyle, SpacesStyle, StyleKind} from "./style";
 
 export enum ImportStyle {
     ES6Named,      // import { x } from 'module'
@@ -37,6 +38,11 @@ export interface AddImportOptions {
     /** If true, adds a side-effect import without bindings (e.g., `import 'module'` or `require('module')`).
      * Cannot be combined with `member`, `alias`, or `onlyIfReferenced`. */
     sideEffectOnly?: boolean;
+
+    /** If true, adds a type-only import (e.g., `import type { Foo } from 'module'`).
+     * Type-only imports are erased at compile time and do not generate runtime code.
+     * Cannot be combined with `sideEffectOnly`. */
+    typeOnly?: boolean;
 
     /** Optional import style to use. If not specified, auto-detects from file and existing imports */
     style?: ImportStyle;
@@ -76,7 +82,8 @@ export function maybeAddImport(
             v.module === options.module &&
             v.member === options.member &&
             v.alias === options.alias &&
-            v.sideEffectOnly === (options.sideEffectOnly ?? false)) {
+            v.sideEffectOnly === (options.sideEffectOnly ?? false) &&
+            v.typeOnly === (options.typeOnly ?? false)) {
             return;
         }
     }
@@ -89,6 +96,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     readonly alias?: string;
     readonly onlyIfReferenced: boolean;
     readonly sideEffectOnly: boolean;
+    readonly typeOnly: boolean;
     readonly style?: ImportStyle;
 
     constructor(options: AddImportOptions) {
@@ -115,6 +123,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             if (options.onlyIfReferenced !== undefined) {
                 throw new Error("Cannot combine sideEffectOnly with onlyIfReferenced");
             }
+            if (options.typeOnly) {
+                throw new Error("Cannot combine sideEffectOnly with typeOnly");
+            }
         }
 
         this.module = options.module;
@@ -122,6 +133,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         this.alias = options.alias;
         this.onlyIfReferenced = options.onlyIfReferenced ?? true;
         this.sideEffectOnly = options.sideEffectOnly ?? false;
+        this.typeOnly = options.typeOnly ?? false;
         this.style = options.style;
     }
 
@@ -331,9 +343,12 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // Determine the appropriate import style
         const importStyle = this.determineImportStyle(compilationUnit);
 
-        // For ES6 named imports, check if we can merge into an existing import from the same module
+        // For named imports, check if we can merge into an existing import from the same module
+        // This handles both:
+        // - Case 1: Existing import has named bindings - merge into them
+        // - Case 2: Default import without named bindings - add named bindings
         // Don't try to merge default imports (member === 'default'), side-effect imports, or namespace imports (member === '*')
-        if (!this.sideEffectOnly && importStyle === ImportStyle.ES6Named && this.member !== undefined && this.member !== 'default' && this.member !== '*') {
+        if (!this.sideEffectOnly && this.member !== undefined && this.member !== 'default' && this.member !== '*') {
             const mergedCu = await this.tryMergeIntoExistingImport(compilationUnit, p);
             if (mergedCu !== compilationUnit) {
                 return mergedCu;
@@ -436,83 +451,153 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 }
 
                 const importClause = jsImport.importClause;
-                if (!importClause || !importClause.namedBindings) {
+                if (!importClause) {
                     continue;
                 }
 
-                // Only merge into NamedImports, not namespace imports
-                if (importClause.namedBindings.kind !== JS.Kind.NamedImports) {
+                // Only merge into imports with matching typeOnly - don't mix type and value imports
+                if (importClause.typeOnly !== this.typeOnly) {
                     continue;
                 }
 
-                // We found a matching import with named bindings - merge into it
-                return this.produceJavaScript(compilationUnit, p, async draft => {
-                    const namedImports = importClause.namedBindings as JS.NamedImports;
-                    const existingElements = namedImports.elements.elements;
+                // Case 1: Existing import has named bindings - merge into them
+                if (importClause.namedBindings) {
+                    // Only merge into NamedImports, not namespace imports
+                    if (importClause.namedBindings.kind !== JS.Kind.NamedImports) {
+                        continue;
+                    }
 
-                    // Find the correct insertion position (alphabetical, case-insensitive)
-                    const newName = (this.alias || this.member!).toLowerCase();
-                    let insertIndex = existingElements.findIndex(elem => {
-                        if (elem.element?.kind === JS.Kind.ImportSpecifier) {
-                            const name = this.getImportAlias(elem.element) || this.getImportName(elem.element);
-                            return newName.localeCompare(name.toLowerCase()) < 0;
-                        }
-                        return false;
-                    });
-                    if (insertIndex === -1) insertIndex = existingElements.length;
+                    // We found a matching import with named bindings - merge into it
+                    return this.produceJavaScript(compilationUnit, p, async draft => {
+                        const namedImports = importClause.namedBindings as JS.NamedImports;
+                        const existingElements = namedImports.elements.elements;
 
-                    // Build the new elements array with proper spacing
-                    const updatedNamedImports: JS.NamedImports = await this.produceJavaScript(
-                        namedImports, p, async namedDraft => {
-                            const lastIndex = existingElements.length - 1;
-                            const trailingSpace = existingElements[lastIndex].after;
-                            const newSpecifier = this.createImportSpecifier();
-
-                            const newElements = existingElements.flatMap((elem, j) => {
-                                const results: J.RightPadded<JS.ImportSpecifier>[] = [];
-                                if (j === insertIndex) {
-                                    // Insert new element here; first element gets no prefix, others get space
-                                    const prefix = j === 0 ? emptySpace : singleSpace;
-                                    results.push(rightPadded({...newSpecifier, prefix}, emptySpace));
-                                }
-                                // Adjust existing element: first after insertion gets space prefix
-                                let adjusted = elem;
-                                if (j === 0 && insertIndex === 0 && elem.element) {
-                                    adjusted = {...elem, element: {...elem.element, prefix: singleSpace}};
-                                }
-                                // Last element before a new trailing element loses its trailing space
-                                if (j === lastIndex && insertIndex > lastIndex) {
-                                    adjusted = {...adjusted, after: emptySpace};
-                                }
-                                results.push(adjusted);
-                                return results;
-                            });
-
-                            // Append at end if inserting after all existing elements
-                            if (insertIndex > lastIndex) {
-                                newElements.push(rightPadded({...newSpecifier, prefix: singleSpace}, trailingSpace));
+                        // Find the correct insertion position (alphabetical, case-insensitive)
+                        const newName = (this.alias || this.member!).toLowerCase();
+                        let insertIndex = existingElements.findIndex(elem => {
+                            if (elem.element?.kind === JS.Kind.ImportSpecifier) {
+                                const name = this.getImportAlias(elem.element) || this.getImportName(elem.element);
+                                return newName.localeCompare(name.toLowerCase()) < 0;
                             }
+                            return false;
+                        });
+                        if (insertIndex === -1) insertIndex = existingElements.length;
 
-                            namedDraft.elements = {...namedImports.elements, elements: newElements};
-                        }
-                    );
+                        // Detect spacing style from existing elements:
+                        // - firstElementPrefix: space after { (from first element's prefix)
+                        // - trailingSpace: space before } (from last element's after)
+                        const firstElementPrefix = existingElements[0]?.element?.prefix ?? emptySpace;
+                        const lastIndex = existingElements.length - 1;
+                        const trailingSpace = existingElements[lastIndex].after;
 
-                    // Update the import with the new named imports
-                    const updatedImport: JS.Import = await this.produceJavaScript(
-                        jsImport, p, async importDraft => {
-                            importDraft.importClause = await this.produceJavaScript(
-                                importClause, p, async clauseDraft => {
-                                    clauseDraft.namedBindings = updatedNamedImports;
+                        // Build the new elements array with proper spacing
+                        const updatedNamedImports: JS.NamedImports = await this.produceJavaScript(
+                            namedImports, p, async namedDraft => {
+                                const newSpecifier = this.createImportSpecifier();
+
+                                const newElements = existingElements.flatMap((elem, j) => {
+                                    const results: J.RightPadded<JS.ImportSpecifier>[] = [];
+                                    if (j === insertIndex) {
+                                        // Insert new element here
+                                        // First element gets the same prefix as the original first element
+                                        // Other positions get a single space (separator after comma)
+                                        const prefix = j === 0 ? firstElementPrefix : singleSpace;
+                                        results.push(rightPadded({...newSpecifier, prefix}, emptySpace));
+                                    }
+                                    // Adjust existing element: if inserting before first, give it space prefix
+                                    let adjusted = elem;
+                                    if (j === 0 && insertIndex === 0 && elem.element) {
+                                        adjusted = {...elem, element: {...elem.element, prefix: singleSpace}};
+                                    }
+                                    // Last element before a new trailing element loses its trailing space
+                                    if (j === lastIndex && insertIndex > lastIndex) {
+                                        adjusted = {...adjusted, after: emptySpace};
+                                    }
+                                    results.push(adjusted);
+                                    return results;
+                                });
+
+                                // Append at end if inserting after all existing elements
+                                if (insertIndex > lastIndex) {
+                                    newElements.push(rightPadded({...newSpecifier, prefix: singleSpace}, trailingSpace));
                                 }
-                            );
-                        }
-                    );
 
-                    // Replace the statement in the compilation unit
-                    draft.statements = compilationUnit.statements.map((s, idx) =>
-                        idx === i ? {...s, element: updatedImport} : s
-                    );
-                });
+                                namedDraft.elements = {...namedImports.elements, elements: newElements};
+                            }
+                        );
+
+                        // Update the import with the new named imports
+                        const updatedImport: JS.Import = await this.produceJavaScript(
+                            jsImport, p, async importDraft => {
+                                importDraft.importClause = await this.produceJavaScript(
+                                    importClause, p, async clauseDraft => {
+                                        clauseDraft.namedBindings = updatedNamedImports;
+                                    }
+                                );
+                            }
+                        );
+
+                        // Replace the statement in the compilation unit
+                        draft.statements = compilationUnit.statements.map((s, idx) =>
+                            idx === i ? {...s, element: updatedImport} : s
+                        );
+                    });
+                }
+
+                // Case 2: Default import without named bindings - add named bindings
+                // Transform: import React from 'react' -> import React, { useState } from 'react'
+                if (importClause.name && !importClause.namedBindings) {
+                    return this.produceJavaScript(compilationUnit, p, async draft => {
+                        const newSpecifier = this.createImportSpecifier();
+
+                        // Get the spaces style for brace spacing
+                        const spacesStyle = getStyle(StyleKind.SpacesStyle, compilationUnit) as SpacesStyle;
+                        const braceSpace = spacesStyle.within.es6ImportExportBraces ? singleSpace : emptySpace;
+
+                        // Create new NamedImports with a single element
+                        // Apply brace spacing: space after { is in specifier's prefix, space before } is in after
+                        const namedImports: JS.NamedImports = {
+                            id: randomId(),
+                            kind: JS.Kind.NamedImports,
+                            prefix: singleSpace,
+                            markers: emptyMarkers,
+                            elements: {
+                                kind: J.Kind.Container,
+                                before: emptySpace,
+                                elements: [rightPadded({...newSpecifier, prefix: braceSpace}, braceSpace)],
+                                markers: emptyMarkers
+                            }
+                        };
+
+                        // Update the import clause to include named bindings
+                        // Also update name.after to emptySpace since the comma goes right after the name
+                        const updatedImport: JS.Import = await this.produceJavaScript(
+                            jsImport, p, async importDraft => {
+                                importDraft.importClause = await this.produceJavaScript(
+                                    importClause, p, async clauseDraft => {
+                                        // Remove space after default name (comma goes right after)
+                                        if (clauseDraft.name) {
+                                            clauseDraft.name = {...clauseDraft.name, after: emptySpace};
+                                        }
+                                        clauseDraft.namedBindings = namedImports;
+                                    }
+                                );
+                                // Ensure moduleSpecifier has proper space before 'from'
+                                if (importDraft.moduleSpecifier) {
+                                    importDraft.moduleSpecifier = {
+                                        ...importDraft.moduleSpecifier,
+                                        before: singleSpace
+                                    };
+                                }
+                            }
+                        );
+
+                        // Replace the statement in the compilation unit
+                        draft.statements = compilationUnit.statements.map((s, idx) =>
+                            idx === i ? {...s, element: updatedImport} : s
+                        );
+                    });
+                }
             }
         }
 
@@ -571,6 +656,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // If we're adding a side-effect import but there's an existing import with bindings,
         // it's not a match (side-effect import should be separate)
         if (this.sideEffectOnly) {
+            return false;
+        }
+
+        // Check if the typeOnly flag matches - type-only and value imports are separate
+        if (importClause.typeOnly !== this.typeOnly) {
             return false;
         }
 
@@ -996,9 +1086,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             importClause = {
                 id: randomId(),
                 kind: JS.Kind.ImportClause,
-                prefix: emptySpace,
+                prefix: this.typeOnly ? singleSpace : emptySpace,
                 markers: emptyMarkers,
-                typeOnly: false,
+                typeOnly: this.typeOnly,
                 name: undefined,
                 namedBindings: namespaceBinding
             };
@@ -1019,15 +1109,23 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             importClause = {
                 id: randomId(),
                 kind: JS.Kind.ImportClause,
-                prefix: emptySpace,
+                prefix: this.typeOnly ? singleSpace : emptySpace,
                 markers: emptyMarkers,
-                typeOnly: false,
+                typeOnly: this.typeOnly,
                 name: rightPadded(defaultName, emptySpace),
                 namedBindings: undefined
             };
         } else {
             // Named import: import { member } from 'module'
+
+            // Get the spaces style for brace spacing
+            const spacesStyle = getStyle(StyleKind.SpacesStyle, compilationUnit) as SpacesStyle;
+            const braceSpace = spacesStyle.within.es6ImportExportBraces ? singleSpace : emptySpace;
+
             const importSpec = this.createImportSpecifier();
+            // Apply brace spacing: the space after { is in the specifier's prefix,
+            // and the space before } is in the rightPadded's after
+            const importSpecWithSpacing = {...importSpec, prefix: braceSpace};
 
             const namedImports: JS.NamedImports = {
                 id: randomId(),
@@ -1037,7 +1135,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 elements: {
                     kind: J.Kind.Container,
                     before: emptySpace,
-                    elements: [rightPadded(importSpec, emptySpace)],
+                    elements: [rightPadded(importSpecWithSpacing, braceSpace)],
                     markers: emptyMarkers
                 }
             };
@@ -1045,9 +1143,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             importClause = {
                 id: randomId(),
                 kind: JS.Kind.ImportClause,
-                prefix: emptySpace,
+                prefix: this.typeOnly ? singleSpace : emptySpace,
                 markers: emptyMarkers,
-                typeOnly: false,
+                typeOnly: this.typeOnly,
                 name: undefined,
                 namedBindings: namedImports
             };

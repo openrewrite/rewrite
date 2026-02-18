@@ -15,6 +15,7 @@
  */
 package org.openrewrite.rpc;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -135,5 +136,10 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
         if (id != null) {
             rpc.getObject(id, null);
         }
+    }
+
+    @Override
+    protected RecipeDescriptor createRecipeDescriptor() {
+        return this.descriptor != null ? this.descriptor : super.createRecipeDescriptor();
     }
 }

@@ -24,9 +24,12 @@ import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
-import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.RecipeLoader;
+import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeBundleResolver;
+import org.openrewrite.marketplace.RecipeListing;
+import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 import org.openrewrite.rpc.request.*;
 import org.openrewrite.tree.ParseError;
@@ -61,13 +64,12 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 @SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc {
     private final JsonRpc jsonRpc;
-    private final AtomicInteger batchSize = new AtomicInteger(200);
+    private final AtomicInteger batchSize = new AtomicInteger(1000);
     private Duration timeout = Duration.ofSeconds(30);
     private Supplier<? extends @Nullable RuntimeException> livenessCheck = () -> null;
-    private final AtomicReference<PrintStream> log = new AtomicReference<>();
+    private final AtomicReference<@Nullable PrintStream> log = new AtomicReference<>();
     private final AtomicReference<TraceGetObject> traceGetObject = new AtomicReference<>(
             new TraceGetObject(false, false));
-    private final AtomicReference<PrepareRecipe.Loader> recipeLoader = new AtomicReference<>();
 
     final PreparedRecipeCache preparedRecipes = new PreparedRecipeCache();
 
@@ -101,7 +103,19 @@ public class RewriteRpc {
      *                    marketplace allows the remote peer to discover what recipes
      *                    the host process has available for its use in composite recipes.
      */
-    public RewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
+    public RewriteRpc(JsonRpc jsonRpc, RecipeMarketplace marketplace) {
+        this(jsonRpc, marketplace, emptyList());
+    }
+
+    /**
+     * Creates a new RPC interface that can be used to communicate with a remote.
+     *
+     * @param marketplace The marketplace of recipes that this peer makes available.
+     *                    Even if this peer is the host process, configuring this
+     *                    marketplace allows the remote peer to discover what recipes
+     *                    the host process has available for its use in composite recipes.
+     */
+    public RewriteRpc(JsonRpc jsonRpc, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers) {
         this.jsonRpc = jsonRpc;
 
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
@@ -110,10 +124,10 @@ public class RewriteRpc {
                 this::getObject));
         jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects,
                 localRefs, log, () -> traceGetObject.get().isSend()));
-        jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
+        jsonRpc.rpc("GetMarketplace", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
-                return marketplace.listRecipeDescriptors();
+                return GetMarketplaceResponse.fromMarketplace(marketplace, resolvers);
             }
         });
         jsonRpc.rpc("TraceGetObject", new JsonRpcMethod<TraceGetObject>() {
@@ -143,7 +157,14 @@ public class RewriteRpc {
                 }
             }
         });
-        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, recipeLoader));
+        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, (id, opts) -> {
+            RecipeListing listing = marketplace.findRecipe(id);
+            if (listing != null) {
+                return listing.prepare(resolvers, opts);
+            }
+            // Fall back to loading by class name if not found in marketplace
+            return new RecipeLoader(null).load(id, opts);
+        }));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
 
         jsonRpc.bind();
@@ -165,23 +186,34 @@ public class RewriteRpc {
     }
 
     public RewriteRpc log(@Nullable PrintStream logFile) {
-        //noinspection DataFlowIssue
         this.log.set(logFile);
         return this;
     }
 
-    public RewriteRpc recipeLoader(PrepareRecipe.@Nullable Loader recipeLoader) {
-        //noinspection DataFlowIssue
-        this.recipeLoader.set(recipeLoader);
-        return this;
-    }
-
     public void shutdown() {
-        //noinspection ConstantValue
-        if (log.get() != null) {
-            log.get().close();
+        PrintStream logOut = log.get();
+        if (logOut != null) {
+            logOut.close();
         }
         jsonRpc.shutdown();
+    }
+
+    /**
+     * Resets all cached state in both the local and remote RPC processes.
+     * This should be called between operations that don't share state (e.g., between tests)
+     * to prevent unbounded memory growth from accumulated objects.
+     */
+    public void reset() {
+        // Send reset to remote process
+        send("Reset", null, Boolean.class);
+
+        // Clear local caches
+        remoteObjects.clear();
+        localObjects.clear();
+        localObjectIds.clear();
+        remoteRefs.clear();
+        localRefs.clear();
+        remoteLanguages = null;
     }
 
     public <P> @Nullable Tree visit(SourceFile sourceFile, String visitorName, P p) {
@@ -240,8 +272,9 @@ public class RewriteRpc {
         return pId;
     }
 
-    public List<RecipeDescriptor> getRecipes() {
-        return send("GetRecipes", null, GetRecipesResponse.class);
+    public RecipeMarketplace getMarketplace(RecipeBundle bundle) {
+        return send("GetMarketplace", null, GetMarketplaceResponse.class)
+                .toMarketplace(bundle);
     }
 
     public List<String> getLanguages() {
@@ -282,12 +315,12 @@ public class RewriteRpc {
 
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
                 Tree t = tree;
                 for (TreeVisitor<?, ExecutionContext> v : visitors) {
                     //noinspection unchecked
-                    t = ((TreeVisitor<Tree, ExecutionContext>) v).visit(tree, ctx);
+                    t = ((TreeVisitor<Tree, @NonNull ExecutionContext>) v).visit(tree, ctx);
                     if (t == tree) {
                         // One of the preconditions didn't match, so we fail the whole precondition
                         return tree;
@@ -387,14 +420,17 @@ public class RewriteRpc {
     }
 
     public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
-        localObjects.put(tree.getId().toString(), tree);
+        String treeId = tree.getId().toString();
+        localObjects.put(treeId, tree);
         SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : parent.firstEnclosingOrThrow(SourceFile.class);
+        String sourceFileType = sourceFile.getClass().getName();
+
         return send(
                 "Print",
                 new Print(
-                        tree.getId().toString(),
+                        treeId,
                         sourceFile.getSourcePath(),
-                        sourceFile.getClass().getName(),
+                        sourceFileType,
                         markerPrinter
                 ),
                 String.class

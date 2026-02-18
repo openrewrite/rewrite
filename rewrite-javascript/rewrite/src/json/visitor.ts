@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 import {mapAsync, updateIfChanged} from "../util";
-import {produceAsync, TreeVisitor, ValidImmerRecipeReturnType} from "../visitor";
+import {TreeVisitor, ValidRecipeReturnType} from "../visitor";
 import {SourceFile} from "../tree";
 import {isJson, Json} from "./tree";
-import {createDraft, Draft, finishDraft} from "immer";
+import {create, Draft} from "mutative";
 
 export class JsonVisitor<P> extends TreeVisitor<Json, P> {
     async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
@@ -103,19 +103,19 @@ export class JsonVisitor<P> extends TreeVisitor<Json, P> {
         before: Json | undefined,
         p: P,
         recipe?: (draft: Draft<J>) =>
-            ValidImmerRecipeReturnType<Draft<J>> |
-            PromiseLike<ValidImmerRecipeReturnType<Draft<J>>>
+            ValidRecipeReturnType<Draft<J>> |
+            PromiseLike<ValidRecipeReturnType<Draft<J>>>
     ): Promise<J | undefined> {
         if (before === undefined) {
             return undefined;
         }
-        const draft: Draft<J> = createDraft(before as J);
+        const [draft, finishDraft] = create(before as J);
         (draft as Draft<Json>).prefix = await this.visitSpace(before!.prefix, p);
         (draft as Draft<Json>).markers = await this.visitMarkers(before!.markers, p);
         if (recipe) {
             await recipe(draft);
         }
-        return finishDraft(draft) as J;
+        return finishDraft() as J;
     }
 
     protected accept(t: Json, p: P): Promise<Json | undefined> {

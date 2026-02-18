@@ -34,17 +34,11 @@ public class FindImplementations extends Recipe {
             example = "org.openrewrite.Recipe")
     String typeName;
 
-    @Override
-    public String getDisplayName() {
-        return "Find implementing classes";
-    }
+    String displayName = "Find implementing classes";
 
-    @Override
-    public String getDescription() {
-        return "Find class declarations which implement the specified type. " +
+    String description = "Find class declarations which implement the specified type. " +
                "If the specified type is a class, its subclasses will be matched. " +
                "If the specified type is an interface, classes which implement it will be matched.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

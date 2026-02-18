@@ -49,15 +49,9 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
     @Nullable
     Boolean overwriteExisting;
 
-    @Override
-    public String getDisplayName() {
-        return "Create text file";
-    }
+    String displayName = "Create text file";
 
-    @Override
-    public String getDescription() {
-        return "Creates a new plain text file.";
-    }
+    String description = "Creates a new plain text file.";
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {

@@ -17,14 +17,19 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.search.FindMissingTypes;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings("ClassInitializerMayBeStatic")
 class FindMissingTypesTest implements RewriteTest {
@@ -153,6 +158,29 @@ class FindMissingTypesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void packageAnnotationUnknownType() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion()/* No implied classpath entry for jspecify! */),
+          java(
+            """
+              @NullMarked
+              package org.openrewrite.java;
+              import org.jspecify.annotations.NullMarked;
+              """,
+            """
+              /*~~(Annotation type is missing or malformed)~~>*/@NullMarked
+              package org.openrewrite.java;
+              import org.jspecify.annotations.NullMarked;
+              """,
+            spec -> spec.path("src/main/java/org/openrewrite/java/package-info.java")
+              .afterRecipe(cu ->
+                assertThat(cu.getPackageDeclaration().getAnnotations().getFirst().getType())
+                  .isInstanceOf(JavaType.Unknown.class))
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4405")
     @Test
     void missingMethodReturnTypeNoMethodArguments() {
@@ -242,6 +270,7 @@ class FindMissingTypesTest implements RewriteTest {
         );
     }
 
+  
     // Groovy Kotlin DSL seems to be missing from the classpath
     @Test
     void repositoryByUrlAndPurposeProjectKts() {
@@ -276,6 +305,62 @@ class FindMissingTypesTest implements RewriteTest {
               tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
                   kotlinOptions.jvmTarget = "21"
               }
+              """
+          )
+        );
+    }
+  
+    @Test
+    void kotlinClassReference() {
+        rewriteRun(
+          spec -> spec.parser(
+            KotlinParser.builder().classpathFromResources(new InMemoryExecutionContext(), "jakarta.persistence-api")),
+          kotlin(
+            """
+              package com.some.other
+
+              class EventPublisher {
+              }
+              """
+          ),
+          kotlin(
+            """
+              package com.some.card
+
+              import com.some.other.EventPublisher
+              import jakarta.persistence.EntityListeners
+
+              @EntityListeners(EventPublisher::class)
+              data class Card(
+              )
+              """
+          )
+        );
+    }
+
+    @Test
+    void invalidKotlinClassReference() {
+        rewriteRun(
+          spec -> spec.parser(
+            KotlinParser.builder().classpathFromResources(new InMemoryExecutionContext(), "jakarta.persistence-api")),
+          kotlin(
+            """
+              package com.some.card
+
+              import jakarta.persistence.EntityListeners
+
+              @EntityListeners(EventPublisher::class)
+              data class Card(
+              )
+              """,
+            """
+              package com.some.card
+
+              import jakarta.persistence.EntityListeners
+
+              @EntityListeners(/*~~(MemberReference Parameterized type is missing or malformed)~~>*//*~~(Identifier type is missing or malformed)~~>*/EventPublisher::class)
+              data class Card(
+              )
               """
           )
         );

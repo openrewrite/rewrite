@@ -64,12 +64,6 @@ public class NormalizeFormatVisitor<P> extends KotlinIsoVisitor<P> {
             return c.getPadding().withKind(c.getPadding().getKind().withPrefix(Space.EMPTY));
         }
 
-        JContainer<J.TypeParameter> typeParameters = c.getPadding().getTypeParameters();
-        if (typeParameters != null && !typeParameters.getElements().isEmpty()) {
-            c = concatenatePrefix(c, typeParameters.getBefore());
-            return c.getPadding().withTypeParameters(typeParameters.withBefore(Space.EMPTY));
-        }
-
         return c.withName(c.getName().withPrefix(c.getName().getPrefix().withWhitespace(" ")));
     }
 

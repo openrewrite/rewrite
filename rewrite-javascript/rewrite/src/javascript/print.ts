@@ -21,7 +21,7 @@ import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
 import {Comment, emptySpace, J, Statement, TextComment, TrailingComma, TypedTree} from "../java";
 import {findMarker, Marker, Markers} from "../markers";
-import {DelegatedYield, FunctionDeclaration, Generator, NonNullAssertion, Optional, Spread} from "./markers";
+import {DelegatedYield, FunctionDeclaration, Generator, NonNullAssertion, Optional} from "./markers";
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
@@ -88,6 +88,14 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return statementExpression;
     }
 
+    override async visitSpread(spread: JS.Spread, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(spread, p);
+        p.append("...");
+        await this.visit(spread.expression, p);
+        await this.afterSyntax(spread, p);
+        return spread;
+    }
+
     override async visitInferType(inferType: JS.InferType, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(inferType, p);
         await this.visitLeftPaddedLocal("infer", inferType.typeParameter, p);
@@ -97,7 +105,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitJsxTag(element: JSX.Tag, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(element, p);
-        await this.visitLeftPaddedLocal("<", element.openName, p);
+        // Print < first, then the space after < (openName.before), then the tag name
+        p.append("<");
+        await this.visitSpace(element.openName.before, p);
+        await this.visit(element.openName.element, p);
         if (element.typeArguments) {
             await this.visitContainerLocal("<", element.typeArguments, ",", ">", p);
         }
@@ -113,7 +124,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 for (let i = 0; i < element.children.length; i++) {
                     await this.visit(element.children[i], p)
                 }
-                await this.visitLeftPaddedLocal("</", element.closingName, p);
+                // Print </ first, then the space after </ (closingName.before), then the tag name
+                p.append("</");
+                await this.visitSpace(element.closingName!.before, p);
+                await this.visit(element.closingName!.element, p);
                 await this.visitSpace(element.afterClosingName, p);
                 p.append(">");
             }
@@ -1895,12 +1909,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     protected async preVisit(tree: J, p: PrintOutputCapture): Promise<J | undefined> {
-        for (const marker of tree.markers.markers) {
-            if (marker.kind === JS.Markers.Spread) {
-                await this.visitSpace((marker as Spread).prefix, p);
-                p.append("...");
-            }
-        }
+        // Note: Spread is now handled as JS.Spread AST element via visitSpread
         return tree;
     }
 

@@ -1,8 +1,11 @@
 import {describe} from "@jest/globals";
-import {RecipeSpec} from "@openrewrite/rewrite/test";
-import {text} from "@openrewrite/rewrite/text";
-import {json} from "@openrewrite/rewrite/json";
+import {RecipeSpec} from "../../src/test";
+import {text} from "../../src/text";
+import {json} from "../../src/json";
 import {ChangeText} from "../../fixtures/change-text";
+import {ExecutionContext, ScanningRecipe} from "../../src";
+import {foundSearchResult, MarkersKind} from "../../src/markers";
+import {PlainText} from "../../src/text";
 
 describe("rewrite test", () => {
     const spec = new RecipeSpec();
@@ -38,4 +41,52 @@ describe("rewrite test", () => {
             }
         }
     ));
+
+    test("beforeRecipe can modify AST without breaking idempotence check", async () => {
+        // given
+        const sut = new RecipeSpec();
+        const markerFound: boolean[] = [];
+
+        // when
+        await sut.rewriteRun(
+            {
+                ...text("hello"),
+                beforeRecipe: (sourceFile: PlainText) => {
+                    return foundSearchResult(sourceFile, "test");
+                },
+                afterRecipe: (sourceFile: PlainText) => {
+                    const marker = sourceFile.markers.markers
+                        .find(m => m.kind === MarkersKind.SearchResult);
+                    markerFound.push(marker !== undefined);
+                }
+            }
+        );
+
+        // then
+        expect(markerFound).toEqual([true]);
+    });
+
+    test("two kinds of sources and a scanning recipe", async () => {
+        // given
+        const sut = new RecipeSpec();
+        let countOfAccumulators: number = 0;
+        sut.recipe = new class extends ScanningRecipe<{}> {
+            name = "ad-hoc";
+            displayName = "ad-hoc";
+            description = "ad-hoc";
+
+            initialValue(ctx: ExecutionContext): {} {
+                countOfAccumulators++;
+                return {};
+            }
+        };
+
+        // when
+        await sut.rewriteRun(
+            json('{"A": "a"}'),
+            text("just a regular text"));
+
+        // test
+        expect(countOfAccumulators).toBe(1);
+    });
 });

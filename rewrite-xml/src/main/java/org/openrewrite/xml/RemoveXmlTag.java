@@ -37,15 +37,9 @@ public class RemoveXmlTag extends Recipe {
     @Nullable
     String fileMatcher;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove XML tag";
-    }
+    String displayName = "Remove XML tag";
 
-    @Override
-    public String getDescription() {
-        return "Removes XML tags matching the provided expression.";
-    }
+    String description = "Removes XML tags matching the provided expression.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

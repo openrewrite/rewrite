@@ -60,16 +60,10 @@ public class FindParseFailures extends Recipe {
 
     transient ParseFailures failures = new ParseFailures(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Find source files with `ParseExceptionResult` markers";
-    }
+    String displayName = "Find source files with `ParseExceptionResult` markers";
 
-    @Override
-    public String getDescription() {
-        return "This recipe explores parse failures after an LST is produced for classifying the types of " +
+    String description = "This recipe explores parse failures after an LST is produced for classifying the types of " +
                "failures that can occur and prioritizing fixes according to the most common problems.";
-    }
 
     @Override
     public Validated<Object> validate() {

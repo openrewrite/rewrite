@@ -50,20 +50,14 @@ public class ChangePropertyValue extends Recipe {
     @Nullable
     Boolean trustParent;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven project property value";
-    }
+    String displayName = "Change Maven project property value";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s=%s`", key, newValue);
     }
 
-    @Override
-    public String getDescription() {
-        return "Changes the specified Maven project property value leaving the key intact.";
-    }
+    String description = "Changes the specified Maven project property value leaving the key intact.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
