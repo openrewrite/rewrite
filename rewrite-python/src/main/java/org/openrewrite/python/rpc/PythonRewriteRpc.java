@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.python.*;
 import org.openrewrite.python.marker.PythonResolutionResult;
@@ -63,8 +64,8 @@ public class PythonRewriteRpc extends RewriteRpc {
     private final Map<String, String> commandEnv;
     private final RewriteRpcProcess process;
 
-    PythonRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, String command, Map<String, String> commandEnv) {
-        super(process.getRpcClient(), marketplace);
+    PythonRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers, String command, Map<String, String> commandEnv) {
+        super(process.getRpcClient(), marketplace, resolvers);
         this.command = command;
         this.commandEnv = commandEnv;
         this.process = process;
@@ -351,6 +352,7 @@ public class PythonRewriteRpc extends RewriteRpc {
     @RequiredArgsConstructor
     public static class Builder implements Supplier<PythonRewriteRpc> {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
+        private List<RecipeBundleResolver> resolvers = Collections.emptyList();
         private final Map<String, String> environment = new HashMap<>();
         // Default to looking for a venv python, falling back to system python
         private Path pythonPath = findDefaultPythonPath();
@@ -393,6 +395,11 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
+            return this;
+        }
+
+        public Builder resolvers(List<RecipeBundleResolver> resolvers) {
+            this.resolvers = resolvers;
             return this;
         }
 
@@ -565,7 +572,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             process.start();
 
             try {
-                return (PythonRewriteRpc) new PythonRewriteRpc(process, marketplace,
+                return (PythonRewriteRpc) new PythonRewriteRpc(process, marketplace, resolvers,
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
