@@ -32,7 +32,7 @@ class ExposeTest implements RewriteTest {
               EXPOSE 8080
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Expose expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
+                var expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(expose.getPorts()).hasSize(1);
                 Docker.Port port = expose.getPorts().getFirst();
                 assertThat(port.getText()).isEqualTo("8080");
@@ -53,7 +53,7 @@ class ExposeTest implements RewriteTest {
               EXPOSE 8080 8443
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Expose expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
+                var expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(expose.getPorts()).hasSize(2);
                 assertThat(expose.getPorts().get(0).getText()).isEqualTo("8080");
                 assertThat(expose.getPorts().get(0).getStart()).isEqualTo(8080);
@@ -75,7 +75,7 @@ class ExposeTest implements RewriteTest {
               EXPOSE ${PORT}
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Expose expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
+                var expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
                 Docker.Port port = expose.getPorts().getFirst();
                 assertThat(port.getText()).isEqualTo("${PORT}");
                 assertThat(port.isVariable()).isTrue();
@@ -95,7 +95,7 @@ class ExposeTest implements RewriteTest {
               EXPOSE 8080/tcp 53/udp
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Expose expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
+                var expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(expose.getPorts()).hasSize(2);
 
                 Docker.Port tcpPort = expose.getPorts().get(0);
@@ -121,7 +121,7 @@ class ExposeTest implements RewriteTest {
               EXPOSE 8000-9000
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Expose expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
+                var expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
                 Docker.Port port = expose.getPorts().getFirst();
                 assertThat(port.getText()).isEqualTo("8000-9000");
                 assertThat(port.getStart()).isEqualTo(8000);
@@ -142,7 +142,7 @@ class ExposeTest implements RewriteTest {
               EXPOSE 8000-9000/udp
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Expose expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
+                var expose = (Docker.Expose) doc.getStages().getFirst().getInstructions().getLast();
                 Docker.Port port = expose.getPorts().getFirst();
                 assertThat(port.getText()).isEqualTo("8000-9000/udp");
                 assertThat(port.getStart()).isEqualTo(8000);

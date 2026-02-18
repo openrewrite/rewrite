@@ -376,7 +376,7 @@ class KotlinTypeMappingTest {
                             @Override
                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
                                 if (methodMatcher.matches(method)) {
-                                    assertThat(method.getMethodType().toString()).isEqualTo("kotlin.collections.MutableList<Generic{E}>{name=addAll,return=kotlin.Boolean,parameters=[kotlin.collections.Collection<Generic{E}>]}");
+                                    assertThat(method.getMethodType().toString()).isEqualTo("kotlin.collections.MutableList<kotlin.String>{name=addAll,return=kotlin.Boolean,parameters=[kotlin.collections.Collection<kotlin.String>]}");
                                     found.set(true);
                                 }
                                 return super.visitMethodInvocation(method, found);
@@ -578,8 +578,8 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @Test
         @Issue("https://github.com/openrewrite/rewrite/issues/6140")
+        @Test
         void companionObject() {
             rewriteRun(
               kotlin(

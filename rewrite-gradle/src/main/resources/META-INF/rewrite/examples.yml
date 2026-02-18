@@ -660,7 +660,7 @@ examples:
   sources:
   - before: |
       plugins {
-          java
+          id("java")
       }
       repositories { mavenCentral() }
       configurations.all {
@@ -677,7 +677,7 @@ examples:
       }
     after: |
       plugins {
-          java
+          id("java")
       }
       repositories { mavenCentral() }
       dependencies {
@@ -1376,6 +1376,30 @@ examples:
         }
       }
     language: settingsGradle
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.search.FindRepositoryOrder
+examples:
+- description: '`FindRepositoryOrderTest#repositoryInBuildGradle`'
+  sources:
+  - before: |
+      plugins {
+          id 'java'
+      }
+
+      repositories {
+          maven { url 'https://repo.spring.io/milestone' }
+      }
+    after: |
+      /*~~(https://repo.spring.io/milestone)~~>*/plugins {
+          id 'java'
+      }
+
+      repositories {
+          maven { url 'https://repo.spring.io/milestone' }
+      }
+    path: build.gradle
+    language: groovy
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.search.ModuleHasDependency

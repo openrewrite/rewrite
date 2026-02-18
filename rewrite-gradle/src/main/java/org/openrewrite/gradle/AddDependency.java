@@ -188,7 +188,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         // or when source files were scanned
         boolean hasExplicitConfiguration = !StringUtils.isBlank(configuration);
         return Preconditions.check(hasExplicitConfiguration || onlyIfUsing == null || !acc.configurationsByProject.isEmpty(),
-                Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+                Preconditions.check(new IsBuildGradle<>(true), new JavaIsoVisitor<ExecutionContext>() {
 
                     @Override
                     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {

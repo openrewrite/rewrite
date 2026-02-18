@@ -62,8 +62,8 @@ class AssignTest implements RewriteTest {
         );
     }
 
-    @Python3Only
     @ParameterizedTest
+    @Python3Only
     @ValueSource(strings = {
       "(a:=3)",
       "(a :=3)",
