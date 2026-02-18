@@ -182,7 +182,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
         return Preconditions.check(!acc.configurationsByProject.isEmpty(),
-                Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+                Preconditions.check(new IsBuildGradle<>(true), new JavaIsoVisitor<ExecutionContext>() {
 
                     @Override
                     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -190,11 +190,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return (J) tree;
                         }
                         JavaSourceFile s = (JavaSourceFile) tree;
-
-                        String filename = s.getSourcePath().getFileName().toString();
-                        if (!"build.gradle".equals(filename) && !"build.gradle.kts".equals(filename)) {
-                            return s;
-                        }
                         Optional<JavaProject> maybeJp = s.getMarkers().findFirst(JavaProject.class);
                         Optional<GradleProject> maybeGp = s.getMarkers().findFirst(GradleProject.class);
                         if (!maybeJp.isPresent() ||
