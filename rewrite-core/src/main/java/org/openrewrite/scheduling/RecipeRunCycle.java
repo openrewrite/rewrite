@@ -261,6 +261,33 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         for (SearchResults.Row searchResult : searchMarkers) {
             searchResults.insertRow(ctx, searchResult);
         }
+
+        if (hierarchical) {
+            recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), ctx);
+        }
+    }
+
+    private void recordSourceFileResult(@Nullable String beforePath, @Nullable String afterPath, List<Recipe> recipeStack, ExecutionContext ctx) {
+        if (recipeStack.size() <= 1) {
+            // No reason to record the synthetic root recipe which contains the recipe run
+            return;
+        }
+        String parentName;
+        if (recipeStack.size() == 2) {
+            // Record the parent name as blank rather than CompositeRecipe when the parent is the synthetic root recipe
+            parentName = "";
+        } else {
+            parentName = recipeStack.get(recipeStack.size() - 2).getName();
+        }
+        Recipe recipe = recipeStack.get(recipeStack.size() - 1);
+        sourcesFileResults.insertRow(ctx, new SourcesFileResults.Row(
+                beforePath,
+                afterPath,
+                parentName,
+                recipe.getName(),
+                0L,
+                cycle));
+        recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), ctx);
     }
 
     private @Nullable SourceFile handleError(Recipe recipe, SourceFile sourceFile, @Nullable SourceFile after,
