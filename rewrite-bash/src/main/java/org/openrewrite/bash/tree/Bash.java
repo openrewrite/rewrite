@@ -188,7 +188,19 @@ public interface Bash extends Tree {
          * The pipe operators between commands (|, |&).
          * Length is commands.size() - 1.
          */
-        List<Literal> pipeOperators;
+        List<PipeEntry> pipeOperators;
+
+        public enum PipeOp {
+            PIPE,
+            PIPE_AND
+        }
+
+        @Value
+        @With
+        public static class PipeEntry {
+            Space prefix;
+            PipeOp operator;
+        }
 
         @Override
         public <P> Bash acceptBash(BashVisitor<P> v, P p) {
@@ -197,7 +209,7 @@ public interface Bash extends Tree {
     }
 
     /**
-     * A command list: cmd1 && cmd2 || cmd3 ; cmd4 & cmd5
+     * A command list connected by && or ||: cmd1 && cmd2 || cmd3
      */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -212,10 +224,22 @@ public interface Bash extends Tree {
         List<Statement> commands;
 
         /**
-         * The operators between commands (&&, ||, ;, &).
+         * The operators between commands (&& or ||).
          * Length is commands.size() - 1.
          */
-        List<Literal> operators;
+        List<OperatorEntry> operators;
+
+        public enum Operator {
+            AND,
+            OR
+        }
+
+        @Value
+        @With
+        public static class OperatorEntry {
+            Space prefix;
+            Operator operator;
+        }
 
         @Override
         public <P> Bash acceptBash(BashVisitor<P> v, P p) {
@@ -917,6 +941,32 @@ public interface Bash extends Tree {
         @Override
         public <P> Bash acceptBash(BashVisitor<P> v, P p) {
             return v.visitRedirected(this, p);
+        }
+    }
+
+    /**
+     * A command run in the background: cmd &
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Background implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        Statement command;
+
+        /**
+         * Whitespace before the & operator
+         */
+        Space ampersandPrefix;
+
+        @Override
+        public <P> Bash acceptBash(BashVisitor<P> v, P p) {
+            return v.visitBackground(this, p);
         }
     }
 

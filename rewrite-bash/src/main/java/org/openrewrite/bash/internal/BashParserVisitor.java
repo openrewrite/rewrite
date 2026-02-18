@@ -131,56 +131,87 @@ public class BashParserVisitor {
     private List<Bash.Statement> visitCompleteCommands(BashParser.CompleteCommandsContext ctx) {
         List<Bash.Statement> statements = new ArrayList<>();
         for (BashParser.CompleteCommandContext cc : ctx.completeCommand()) {
-            Bash.Statement stmt = visitCompleteCommand(cc);
-            if (stmt != null) {
-                statements.add(stmt);
-            }
+            statements.addAll(visitCompleteCommand(cc));
         }
         return statements;
     }
 
-    private Bash.Statement visitCompleteCommand(BashParser.CompleteCommandContext ctx) {
-        Bash.Statement stmt = visitList(ctx.list());
+    private List<Bash.Statement> visitCompleteCommand(BashParser.CompleteCommandContext ctx) {
+        List<Bash.Statement> stmts = visitList(ctx.list());
         if (ctx.separator() != null) {
-            stmt = attachSeparator(stmt, ctx.separator());
+            stmts = attachSeparator(stmts, ctx.separator());
         }
-        return stmt;
+        return stmts;
     }
 
-    private Bash.Statement visitList(BashParser.ListContext ctx) {
+    private List<Bash.Statement> visitList(BashParser.ListContext ctx) {
         List<BashParser.AndOrContext> andOrs = ctx.andOr();
-        List<BashParser.ListSeparatorContext> seps = ctx.listSeparator();
+        List<BashParser.ListSepContext> seps = ctx.listSep();
 
         if (andOrs.size() == 1 && seps.isEmpty()) {
-            return visitAndOr(andOrs.get(0));
+            return Collections.singletonList(visitAndOr(andOrs.get(0)));
         }
 
-        // Multiple items: build a CommandList
-        Space prefix = prefix(andOrs.get(0).getStart());
-        List<Bash.Statement> commands = new ArrayList<>();
-        List<Bash.Literal> operators = new ArrayList<>();
-
-        // First command gets Space.EMPTY prefix (prefix is on the CommandList)
-        Bash.Statement first = visitAndOr(andOrs.get(0));
-        commands.add(first.withPrefix(Space.EMPTY));
+        // Multiple items separated by ; or &
+        List<Bash.Statement> results = new ArrayList<>();
+        Bash.Statement current = visitAndOr(andOrs.get(0));
 
         for (int i = 0; i < seps.size(); i++) {
-            BashParser.ListSeparatorContext sep = seps.get(i);
-            Space opPrefix = prefix(sep.getStart());
-            String opText = sep.getStart().getText();
-            skip(sep.getStart());
-            operators.add(new Bash.Literal(randomId(), opPrefix, Markers.EMPTY, opText));
+            BashParser.ListSepContext sep = seps.get(i);
+            if (sep.AMP() != null) {
+                // & — wrap in Background
+                Space ampPrefix = prefix(sep.AMP().getSymbol());
+                skip(sep.AMP().getSymbol());
+                current = new Bash.Background(randomId(), current.getPrefix(), Markers.EMPTY,
+                        current.withPrefix(Space.EMPTY), ampPrefix);
+            }
+            // For SEMI, don't skip — ; is absorbed into the prefix of the next element
+
+            results.add(current);
 
             if (i + 1 < andOrs.size()) {
-                commands.add(visitAndOr(andOrs.get(i + 1)));
+                current = visitAndOr(andOrs.get(i + 1));
+            }
+        }
+
+        // Add the last statement if it wasn't added yet
+        if (results.size() < andOrs.size()) {
+            results.add(current);
+        }
+
+        return results;
+    }
+
+    private Bash.Statement visitAndOr(BashParser.AndOrContext ctx) {
+        List<BashParser.PipelineContext> pipelines = ctx.pipeline();
+        List<BashParser.AndOrOpContext> ops = ctx.andOrOp();
+
+        if (pipelines.size() == 1 && ops.isEmpty()) {
+            return visitPipeline(pipelines.get(0));
+        }
+
+        // Multiple pipelines connected by && or ||
+        Space prefix = prefix(pipelines.get(0).getStart());
+        List<Bash.Statement> commands = new ArrayList<>();
+        List<Bash.CommandList.OperatorEntry> operators = new ArrayList<>();
+
+        Bash.Statement first = visitPipeline(pipelines.get(0));
+        commands.add(first.withPrefix(Space.EMPTY));
+
+        for (int i = 0; i < ops.size(); i++) {
+            BashParser.AndOrOpContext op = ops.get(i);
+            Space opPrefix = prefix(op.getStart());
+            Bash.CommandList.Operator opType = op.AND() != null ?
+                    Bash.CommandList.Operator.AND : Bash.CommandList.Operator.OR;
+            skip(op.getStart());
+            operators.add(new Bash.CommandList.OperatorEntry(opPrefix, opType));
+
+            if (i + 1 < pipelines.size()) {
+                commands.add(visitPipeline(pipelines.get(i + 1)));
             }
         }
 
         return new Bash.CommandList(randomId(), prefix, Markers.EMPTY, commands, operators);
-    }
-
-    private Bash.Statement visitAndOr(BashParser.AndOrContext ctx) {
-        return visitPipeline(ctx.pipeline());
     }
 
     private Bash.Statement visitPipeline(BashParser.PipelineContext ctx) {
@@ -207,17 +238,15 @@ public class BashParserVisitor {
 
         Space prefix;
         if (negated) {
-            // The pipeline prefix is the whitespace before !, not before the first command
             prefix = negationPrefix != null ? negationPrefix : Space.EMPTY;
         } else {
             prefix = prefix(ctx.getStart());
         }
         List<Bash.Statement> cmdList = new ArrayList<>();
-        List<Bash.Literal> pipeOps = new ArrayList<>();
+        List<Bash.Pipeline.PipeEntry> pipeOps = new ArrayList<>();
 
         Bash.Statement first = visitCommand(commands.get(0));
         if (negated) {
-            // Keep the first command's prefix — it carries the space after !
             cmdList.add(first);
         } else {
             cmdList.add(first.withPrefix(Space.EMPTY));
@@ -226,9 +255,10 @@ public class BashParserVisitor {
         for (int i = 0; i < pipes.size(); i++) {
             BashParser.PipeOpContext pipe = pipes.get(i);
             Space opPrefix = prefix(pipe.getStart());
-            String opText = pipe.getStart().getText();
+            Bash.Pipeline.PipeOp pipeOp = pipe.PIPE_AND() != null ?
+                    Bash.Pipeline.PipeOp.PIPE_AND : Bash.Pipeline.PipeOp.PIPE;
             skip(pipe.getStart());
-            pipeOps.add(new Bash.Literal(randomId(), opPrefix, Markers.EMPTY, opText));
+            pipeOps.add(new Bash.Pipeline.PipeEntry(opPrefix, pipeOp));
 
             if (i + 1 < commands.size()) {
                 cmdList.add(visitCommand(commands.get(i + 1)));
@@ -1179,26 +1209,21 @@ public class BashParserVisitor {
         return new Bash.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "");
     }
 
-    private Bash.Statement attachSeparator(Bash.Statement stmt, BashParser.SeparatorContext ctx) {
-        // For AMP (&), explicitly model it as a CommandList operator
+    private List<Bash.Statement> attachSeparator(List<Bash.Statement> stmts, BashParser.SeparatorContext ctx) {
         if (ctx.AMP() != null) {
+            // Wrap the last statement in Background
             Space ampPrefix = prefix(ctx.AMP().getSymbol());
             skip(ctx.AMP().getSymbol());
-            if (stmt instanceof Bash.CommandList) {
-                Bash.CommandList cl = (Bash.CommandList) stmt;
-                List<Bash.Literal> ops = new ArrayList<>(cl.getOperators());
-                ops.add(new Bash.Literal(randomId(), ampPrefix, Markers.EMPTY, "&"));
-                return cl.withOperators(ops);
-            }
-            List<Bash.Statement> commands = new ArrayList<>();
-            commands.add(stmt.withPrefix(Space.EMPTY));
-            List<Bash.Literal> operators = new ArrayList<>();
-            operators.add(new Bash.Literal(randomId(), ampPrefix, Markers.EMPTY, "&"));
-            return new Bash.CommandList(randomId(), stmt.getPrefix(), Markers.EMPTY, commands, operators);
+            Bash.Statement last = stmts.get(stmts.size() - 1);
+            Bash.Background bg = new Bash.Background(randomId(), last.getPrefix(), Markers.EMPTY,
+                    last.withPrefix(Space.EMPTY), ampPrefix);
+            List<Bash.Statement> result = new ArrayList<>(stmts.subList(0, stmts.size() - 1));
+            result.add(bg);
+            return result;
         }
         // For SEMI (;), don't skip — the separator text will be captured
         // as part of the prefix of the next element
-        return stmt;
+        return stmts;
     }
 
     private Bash.Statement attachRedirections(Bash.Statement stmt, BashParser.RedirectionListContext ctx) {

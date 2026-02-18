@@ -89,7 +89,9 @@ public class BashPrinter<P> extends BashVisitor<PrintOutputCapture<P>> {
         for (int i = 0; i < pipeline.getCommands().size(); i++) {
             visit(pipeline.getCommands().get(i), p);
             if (i < pipeline.getPipeOperators().size()) {
-                visit(pipeline.getPipeOperators().get(i), p);
+                Bash.Pipeline.PipeEntry pe = pipeline.getPipeOperators().get(i);
+                visitSpace(pe.getPrefix(), p);
+                p.append(pe.getOperator() == Bash.Pipeline.PipeOp.PIPE_AND ? "|&" : "|");
             }
         }
         afterSyntax(pipeline, p);
@@ -102,7 +104,9 @@ public class BashPrinter<P> extends BashVisitor<PrintOutputCapture<P>> {
         for (int i = 0; i < commandList.getCommands().size(); i++) {
             visit(commandList.getCommands().get(i), p);
             if (i < commandList.getOperators().size()) {
-                visit(commandList.getOperators().get(i), p);
+                Bash.CommandList.OperatorEntry oe = commandList.getOperators().get(i);
+                visitSpace(oe.getPrefix(), p);
+                p.append(oe.getOperator() == Bash.CommandList.Operator.AND ? "&&" : "||");
             }
         }
         afterSyntax(commandList, p);
@@ -419,6 +423,16 @@ public class BashPrinter<P> extends BashVisitor<PrintOutputCapture<P>> {
         }
         afterSyntax(redirected, p);
         return redirected;
+    }
+
+    @Override
+    public Bash visitBackground(Bash.Background background, PrintOutputCapture<P> p) {
+        beforeSyntax(background, p);
+        visit(background.getCommand(), p);
+        visitSpace(background.getAmpersandPrefix(), p);
+        p.append("&");
+        afterSyntax(background, p);
+        return background;
     }
 
     @Override

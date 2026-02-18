@@ -77,6 +77,24 @@ class CommandTest implements RewriteTest {
     }
 
     @Test
+    void pipelineInBackground() {
+        rewriteRun(
+          bash(
+            "echo ondemand | sudo tee /sys/policy &\n"
+          )
+        );
+    }
+
+    @Test
+    void backgroundFollowedByCommand() {
+        rewriteRun(
+          bash(
+            "sleep 10 & echo started\n"
+          )
+        );
+    }
+
+    @Test
     void shebang() {
         rewriteRun(
           bash(

@@ -93,4 +93,31 @@ class CommandListTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void andListInBackground() {
+        rewriteRun(
+          bash(
+            "cmd1 && cmd2 &\n"
+          )
+        );
+    }
+
+    @Test
+    void orListInBackground() {
+        rewriteRun(
+          bash(
+            "cmd1 || cmd2 &\n"
+          )
+        );
+    }
+
+    @Test
+    void andOrChainInBackground() {
+        rewriteRun(
+          bash(
+            "cmd1 && cmd2 || cmd3 &\n"
+          )
+        );
+    }
 }

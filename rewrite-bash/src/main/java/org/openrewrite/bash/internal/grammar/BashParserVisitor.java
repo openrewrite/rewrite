@@ -56,17 +56,23 @@ public interface BashParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitList(BashParser.ListContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link BashParser#listSeparator}.
+	 * Visit a parse tree produced by {@link BashParser#listSep}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitListSeparator(BashParser.ListSeparatorContext ctx);
+	T visitListSep(BashParser.ListSepContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link BashParser#andOr}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitAndOr(BashParser.AndOrContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link BashParser#andOrOp}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitAndOrOp(BashParser.AndOrOpContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link BashParser#pipeline}.
 	 * @param ctx the parse tree

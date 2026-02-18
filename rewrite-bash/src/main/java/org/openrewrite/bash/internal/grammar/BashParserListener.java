@@ -73,15 +73,15 @@ public interface BashParserListener extends ParseTreeListener {
 	 */
 	void exitList(BashParser.ListContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link BashParser#listSeparator}.
+	 * Enter a parse tree produced by {@link BashParser#listSep}.
 	 * @param ctx the parse tree
 	 */
-	void enterListSeparator(BashParser.ListSeparatorContext ctx);
+	void enterListSep(BashParser.ListSepContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link BashParser#listSeparator}.
+	 * Exit a parse tree produced by {@link BashParser#listSep}.
 	 * @param ctx the parse tree
 	 */
-	void exitListSeparator(BashParser.ListSeparatorContext ctx);
+	void exitListSep(BashParser.ListSepContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link BashParser#andOr}.
 	 * @param ctx the parse tree
@@ -92,6 +92,16 @@ public interface BashParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitAndOr(BashParser.AndOrContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link BashParser#andOrOp}.
+	 * @param ctx the parse tree
+	 */
+	void enterAndOrOp(BashParser.AndOrOpContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link BashParser#andOrOp}.
+	 * @param ctx the parse tree
+	 */
+	void exitAndOrOp(BashParser.AndOrOpContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link BashParser#pipeline}.
 	 * @param ctx the parse tree

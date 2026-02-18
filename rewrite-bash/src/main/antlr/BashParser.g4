@@ -47,21 +47,24 @@ completeCommand
     : list separator?
     ;
 
-// A list of pipelines connected by && || ; &
+// A list of pipelines separated by ; or &
 list
-    : andOr ( listSeparator andOr )*
+    : andOr ( listSep andOr )*
     ;
 
-listSeparator
-    : AND linebreak
-    | OR linebreak
-    | SEMI linebreak
+listSep
+    : SEMI linebreak
     | AMP linebreak
     ;
 
-// && and || chains
+// && and || chains (equal precedence in command lists)
 andOr
-    : pipeline
+    : pipeline ( andOrOp linebreak pipeline )*
+    ;
+
+andOrOp
+    : AND
+    | OR
     ;
 
 // ==========================================

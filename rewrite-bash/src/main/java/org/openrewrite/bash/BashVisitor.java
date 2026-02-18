@@ -58,6 +58,7 @@ public class BashVisitor<P> extends TreeVisitor<Bash, P> {
         pl = pl.withPrefix(visitSpace(pl.getPrefix(), p));
         pl = pl.withMarkers(visitMarkers(pl.getMarkers(), p));
         pl = pl.withCommands(ListUtils.map(pl.getCommands(), cmd -> (Bash.Statement) visit(cmd, p)));
+        pl = pl.withPipeOperators(ListUtils.map(pl.getPipeOperators(), op -> op.withPrefix(visitSpace(op.getPrefix(), p))));
         return pl;
     }
 
@@ -66,6 +67,7 @@ public class BashVisitor<P> extends TreeVisitor<Bash, P> {
         cl = cl.withPrefix(visitSpace(cl.getPrefix(), p));
         cl = cl.withMarkers(visitMarkers(cl.getMarkers(), p));
         cl = cl.withCommands(ListUtils.map(cl.getCommands(), cmd -> (Bash.Statement) visit(cmd, p)));
+        cl = cl.withOperators(ListUtils.map(cl.getOperators(), op -> op.withPrefix(visitSpace(op.getPrefix(), p))));
         return cl;
     }
 
@@ -271,6 +273,15 @@ public class BashVisitor<P> extends TreeVisitor<Bash, P> {
         r = r.withCommand((Bash.Statement) visit(r.getCommand(), p));
         r = r.withRedirections(ListUtils.map(r.getRedirections(), e -> (Bash.Expression) visit(e, p)));
         return r;
+    }
+
+    public Bash visitBackground(Bash.Background background, P p) {
+        Bash.Background bg = background;
+        bg = bg.withPrefix(visitSpace(bg.getPrefix(), p));
+        bg = bg.withMarkers(visitMarkers(bg.getMarkers(), p));
+        bg = bg.withCommand((Bash.Statement) visit(bg.getCommand(), p));
+        bg = bg.withAmpersandPrefix(visitSpace(bg.getAmpersandPrefix(), p));
+        return bg;
     }
 
     public Bash visitArrayLiteral(Bash.ArrayLiteral arrayLiteral, P p) {

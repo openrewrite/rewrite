@@ -92,13 +92,13 @@ public class BashParserBaseListener implements BashParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterListSeparator(BashParser.ListSeparatorContext ctx) { }
+	@Override public void enterListSep(BashParser.ListSepContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitListSeparator(BashParser.ListSeparatorContext ctx) { }
+	@Override public void exitListSep(BashParser.ListSepContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -111,6 +111,18 @@ public class BashParserBaseListener implements BashParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitAndOr(BashParser.AndOrContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterAndOrOp(BashParser.AndOrOpContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitAndOrOp(BashParser.AndOrOpContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
