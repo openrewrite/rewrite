@@ -1,8 +1,7 @@
-using System.Reflection;
-using Rewrite.Core.Rpc;
-using Rewrite.Java;
+using OpenRewrite.Core.Rpc;
+using OpenRewrite.Java;
 
-namespace Rewrite.Core;
+namespace OpenRewrite.Core;
 
 /// <summary>
 /// Marks an LST node as a search result with an optional description.

@@ -1,6 +1,6 @@
-using Rewrite.Core.Rpc;
+using OpenRewrite.Core.Rpc;
 
-namespace Rewrite.Core;
+namespace OpenRewrite.Core;
 
 /// <summary>
 /// Markers for annotating LST nodes with error, warning, info, or debug messages.

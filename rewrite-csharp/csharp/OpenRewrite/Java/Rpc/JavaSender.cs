@@ -1,9 +1,8 @@
-using System.Linq;
-using Rewrite.Core;
-using Rewrite.Core.Rpc;
+using OpenRewrite.Core;
+using OpenRewrite.Core.Rpc;
 using static Rewrite.Core.Rpc.Reference;
 
-namespace Rewrite.Java.Rpc;
+namespace OpenRewrite.Java.Rpc;
 
 public class JavaSender : JavaVisitor<RpcSendQueue>
 {
@@ -506,7 +505,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         return typeCast;
     }
 
-    public J VisitTypeParameter(TypeParameter typeParam, RpcSendQueue q)
+    public override J VisitTypeParameter(TypeParameter typeParam, RpcSendQueue q)
     {
         q.GetAndSendList(typeParam, t => t.Annotations, a => a.Id, annot => Visit(annot, q));
         q.GetAndSendList(typeParam, t => t.Modifiers, m => m.Id, mod => Visit(mod, q));
@@ -527,7 +526,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     {
         q.GetAndSend(variable, v => (J)v.Name, decl => Visit(decl, q));
         q.GetAndSendList(variable, v => v.DimensionsAfterName,
-            l => l.Element.ToString(), dim => VisitLeftPadded(dim, q));
+            l => l.Element.ToString()!, dim => VisitLeftPadded(dim, q));
         q.GetAndSend(variable, v => v.Initializer, init => VisitLeftPadded(init, q));
         q.GetAndSend(variable, v => AsRef(v.Type), type => VisitType(GetValueNonNull<JavaType>(type), q));
         return variable;

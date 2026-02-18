@@ -1,4 +1,4 @@
-namespace Rewrite.Core.Rpc;
+namespace OpenRewrite.Core.Rpc;
 
 public interface IRpcCodec
 {

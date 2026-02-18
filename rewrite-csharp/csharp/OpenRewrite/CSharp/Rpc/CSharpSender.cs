@@ -1,11 +1,10 @@
-using System.Linq;
-using Rewrite.Core;
-using Rewrite.Core.Rpc;
-using Rewrite.Java;
-using Rewrite.Java.Rpc;
+using OpenRewrite.Core;
+using OpenRewrite.Core.Rpc;
+using OpenRewrite.Java;
+using OpenRewrite.Java.Rpc;
 using static Rewrite.Core.Rpc.Reference;
 
-namespace Rewrite.CSharp.Rpc;
+namespace OpenRewrite.CSharp.Rpc;
 
 /// <summary>
 /// Serializes C# AST elements via the RPC protocol.

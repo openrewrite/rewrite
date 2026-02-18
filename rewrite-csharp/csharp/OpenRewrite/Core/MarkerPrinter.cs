@@ -1,4 +1,4 @@
-namespace Rewrite.Core;
+namespace OpenRewrite.Core;
 
 /// <summary>
 /// Controls how markers are printed in output. Called at three points during printing:

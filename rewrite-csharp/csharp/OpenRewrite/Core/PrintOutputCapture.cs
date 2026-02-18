@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Rewrite.Core;
+namespace OpenRewrite.Core;
 
 /// <summary>
 /// Captures output during tree printing operations.
