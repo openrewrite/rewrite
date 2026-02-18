@@ -23,7 +23,6 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.ipc.http.HttpSender;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URI;
 
 @Value
