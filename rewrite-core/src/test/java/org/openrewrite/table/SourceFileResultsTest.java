@@ -57,6 +57,10 @@ class SourceFileResultsTest implements RewriteTest {
 
     @Test
     void deepHierarchyRecordsAllLevels() {
+        // Our Sankey visualization of recipe execution relies on the data table recording all levels of the hierarchy,
+        // not just the leaf recipes. This test ensures that the data table includes rows for both the parent and leaf
+        // recipes, even when the parent recipe doesn't directly perform any transformations (i.e., it has zero
+        // estimated time saving).
         rewriteRun(
           spec -> spec
             .recipeFromYaml(
