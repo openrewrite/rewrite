@@ -35,34 +35,15 @@ class ChecksumTest {
     }
 
     @Test
-    void fromHexRejectsNonHexInput() {
-        assertThatThrownBy(() -> Checksum.fromHex("SHA-256", "<?"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("not valid hexadecimal");
-    }
-
-    @Test
     void fromUriRejectsNonSuccessfulResponse() {
         HttpSender httpSender = request -> new HttpSender.Response(
-                403,
-                new ByteArrayInputStream("<?xml version=\"1.0\"?>".getBytes(StandardCharsets.UTF_8)),
-                () -> {
-                });
+          403,
+          new ByteArrayInputStream("<?xml version=\"1.0\"?>".getBytes(StandardCharsets.UTF_8)),
+          () -> {
+          });
 
         assertThatThrownBy(() -> Checksum.fromUri(httpSender, URI.create("https://example.com/checksum.sha256")))
-                .isInstanceOf(UncheckedIOException.class)
-                .hasMessageContaining("403");
-    }
-
-    @Test
-    void fromUriTrimsWhitespace() {
-        HttpSender httpSender = request -> new HttpSender.Response(
-                200,
-                new ByteArrayInputStream("abcdef01\n".getBytes(StandardCharsets.UTF_8)),
-                () -> {
-                });
-
-        Checksum checksum = Checksum.fromUri(httpSender, URI.create("https://example.com/checksum.sha256"));
-        assertThat(checksum.getHexValue()).isEqualTo("abcdef01");
+          .isInstanceOf(UncheckedIOException.class)
+          .hasMessageContaining("403");
     }
 }

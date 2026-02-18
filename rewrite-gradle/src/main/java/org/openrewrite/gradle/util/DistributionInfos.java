@@ -48,12 +48,7 @@ public class DistributionInfos {
         return new DistributionInfos(gradleVersion.getDownloadUrl(), checksum, jarChecksum);
     }
 
-    @Nullable
     private static Checksum fetchChecksum(HttpSender httpSender, String checksumUrl) {
-        try {
-            return Checksum.fromUri(httpSender, URI.create(checksumUrl));
-        } catch (UncheckedIOException | IllegalArgumentException e) {
-            return null;
-        }
+        return Checksum.fromUri(httpSender, URI.create(checksumUrl));
     }
 }

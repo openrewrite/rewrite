@@ -54,15 +54,6 @@ public class Checksum implements RpcCodec<Checksum> {
         if (hex.length() % 2 != 0) {
             throw new IllegalArgumentException("Hex string must contain a set of hex pairs (length divisible by 2).");
         }
-        for (int i = 0; i < hex.length(); i++) {
-            char c = hex.charAt(i);
-            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
-                throw new IllegalArgumentException(
-                        "Input is not valid hexadecimal at position " + i + ": '" +
-                        hex.substring(0, Math.min(hex.length(), 40)) +
-                        (hex.length() > 40 ? "..." : "") + "'");
-            }
-        }
 
         byte[] value = new byte[hex.length() / 2];
         for (int i = 0; i < value.length; i++) {
@@ -97,7 +88,7 @@ public class Checksum implements RpcCodec<Checksum> {
                 throw new UncheckedIOException(new IOException(
                         "Failed to download checksum from " + uri + ": HTTP " + response.getCode()));
             }
-            String hexString = new String(response.getBodyAsBytes(), StandardCharsets.UTF_8).trim();
+            String hexString = new String(response.getBodyAsBytes(), StandardCharsets.UTF_8);
             return Checksum.fromHex(algorithm, hexString);
         }
     }
