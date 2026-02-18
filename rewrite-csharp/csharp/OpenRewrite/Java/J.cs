@@ -1,7 +1,7 @@
-using Rewrite.Core;
-using Rewrite.Core.Rpc;
+using OpenRewrite.Core;
+using OpenRewrite.Core.Rpc;
 
-namespace Rewrite.Java;
+namespace OpenRewrite.Java;
 
 /// <summary>
 /// The base interface for all Java-family LST elements.
@@ -367,7 +367,7 @@ public sealed class ControlParentheses<T>(
     public ControlParentheses<T> WithTree(JRightPadded<T> tree) =>
         ReferenceEquals(tree, Tree) ? this : new(Id, Prefix, Markers, tree);
 
-    Tree Core.Tree.WithId(Guid id) => WithId(id);
+    Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(ControlParentheses<T>? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as ControlParentheses<T>);
@@ -1596,7 +1596,7 @@ public sealed class Parentheses<T>(
     public Parentheses<T> WithTree(JRightPadded<T> tree) =>
         ReferenceEquals(tree, Tree) ? this : new(Id, Prefix, Markers, tree);
 
-    Tree Core.Tree.WithId(Guid id) => WithId(id);
+    Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(Parentheses<T>? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as Parentheses<T>);
@@ -1726,7 +1726,7 @@ public sealed class Primitive(
     public Primitive WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Kind);
     public Primitive WithKind(JavaType.PrimitiveKind kind) =>
-        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, kind);
+        kind == Kind ? this : new(Id, Prefix, Markers, kind);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1761,7 +1761,7 @@ public sealed class Modifier(
     public Modifier WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Type, Annotations, Keyword);
     public Modifier WithType(Modifier.ModifierType type) =>
-        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, type, Annotations, Keyword);
+        type == Type ? this : new(Id, Prefix, Markers, type, Annotations, Keyword);
     public Modifier WithAnnotations(IList<Annotation> annotations) =>
         ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, Type, annotations, Keyword);
     public Modifier WithKeyword(string? keyword) =>
@@ -2497,7 +2497,7 @@ public sealed class JContainer<T>(
     public JContainer<T> WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Before, Elements, markers);
 
-    public static JContainer<T> Empty() => new(Space.Empty, [], Core.Markers.Empty);
+    public static JContainer<T> Empty() => new(Space.Empty, [], Markers.Empty);
 }
 
 /// <summary>
@@ -2537,5 +2537,5 @@ public sealed class JRightPadded<T>(
     public JRightPadded<T> WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Element, After, markers);
 
-    public static JRightPadded<T> Build(T element) => new(element, Space.Empty, Core.Markers.Empty);
+    public static JRightPadded<T> Build(T element) => new(element, Space.Empty, Markers.Empty);
 }

@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Rewrite.Core.Rpc;
+namespace OpenRewrite.Core.Rpc;
 
 public sealed class RpcObjectData
 {

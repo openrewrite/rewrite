@@ -1,8 +1,8 @@
-using Rewrite.Core;
-using Rewrite.Core.Rpc;
-using Rewrite.CSharp.Rpc;
+using OpenRewrite.Core.Rpc;
+using OpenRewrite.CSharp.Rpc;
+using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
-namespace Rewrite.Java.Search;
+namespace OpenRewrite.Java.Search;
 
 /// <summary>
 /// Convenience functions for common precondition visitors.
@@ -15,7 +15,7 @@ public static class Preconditions
     /// Creates a UsesType precondition. If connected to Java via RPC, delegates to
     /// Java's org.openrewrite.java.search.HasType. Otherwise falls back to local implementation.
     /// </summary>
-    public static JavaVisitor<Core.ExecutionContext> UsesType(string fullyQualifiedTypeName)
+    public static JavaVisitor<ExecutionContext> UsesType(string fullyQualifiedTypeName)
     {
         var rpc = RewriteRpcServer.Current;
         if (rpc != null)
@@ -31,14 +31,14 @@ public static class Preconditions
             return new RpcVisitor(rpc, response.EditVisitor);
         }
 
-        return new LocalUsesType<Core.ExecutionContext>(fullyQualifiedTypeName);
+        return new LocalUsesType<ExecutionContext>(fullyQualifiedTypeName);
     }
 
     /// <summary>
     /// Creates a UsesMethod precondition. If connected to Java via RPC, delegates to
     /// Java's org.openrewrite.java.search.HasMethod.
     /// </summary>
-    public static JavaVisitor<Core.ExecutionContext> UsesMethod(string methodPattern)
+    public static JavaVisitor<ExecutionContext> UsesMethod(string methodPattern)
     {
         var rpc = RewriteRpcServer.Current;
         if (rpc != null)

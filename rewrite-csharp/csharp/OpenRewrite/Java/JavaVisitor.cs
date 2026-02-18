@@ -1,6 +1,6 @@
-using Rewrite.Core;
+using OpenRewrite.Core;
 
-namespace Rewrite.Java;
+namespace OpenRewrite.Java;
 
 /// <summary>
 /// Base visitor for Java LST elements.
@@ -638,7 +638,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         if (labelsChanged || statementsChanged || bodyChanged)
         {
-            return @case.WithCaseLabels(labelsChanged ? @case.CaseLabels.WithElements(newLabels) : @case.CaseLabels).WithStatements(statementsChanged ? @case.Statements.WithElements(newStatements) : @case.Statements).WithBody(bodyChanged && newBody != null ? @case.Body.WithElement(newBody) : @case.Body);
+            return @case.WithCaseLabels(labelsChanged ? @case.CaseLabels.WithElements(newLabels) : @case.CaseLabels).WithStatements(statementsChanged ? @case.Statements.WithElements(newStatements) : @case.Statements).WithBody(bodyChanged && newBody != null ? @case.Body!.WithElement(newBody) : @case.Body);
         }
 
         return @case;

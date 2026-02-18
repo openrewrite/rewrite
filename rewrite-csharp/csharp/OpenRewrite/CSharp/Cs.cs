@@ -1,8 +1,8 @@
-using Rewrite.Core;
-using Rewrite.Core.Rpc;
-using Rewrite.Java;
+using OpenRewrite.Core;
+using OpenRewrite.Core.Rpc;
+using OpenRewrite.Java;
 
-namespace Rewrite.CSharp;
+namespace OpenRewrite.CSharp;
 
 /// <summary>
 /// The base interface for C#-specific LST elements.
@@ -1043,7 +1043,7 @@ public sealed class ConditionalBranchMarker(
 
     public ConditionalBranchMarker RpcReceive(ConditionalBranchMarker before, RpcReceiveQueue q)
     {
-        return before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse)).WithDefinedSymbols(q.ReceiveList(before.DefinedSymbols, s => q.ReceiveAndGet<string, string>(s, x => x))!);
+        return before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse)).WithDefinedSymbols(q.ReceiveList(before.DefinedSymbols, s => q.ReceiveAndGet<string, string>(s, x => x)!) ?? []);
     }
 
     public bool Equals(ConditionalBranchMarker? other) => other is not null && Id == other.Id;
@@ -1120,6 +1120,35 @@ public sealed class PragmaWarningDirective(
 
     public bool Equals(PragmaWarningDirective? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as PragmaWarningDirective);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// A #pragma checksum directive.
+/// </summary>
+public sealed class PragmaChecksumDirective(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    string arguments
+) : Cs, Statement, IEquatable<PragmaChecksumDirective>
+{
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public string Arguments { get; } = arguments;
+
+    public PragmaChecksumDirective WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Arguments);
+    public PragmaChecksumDirective WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Arguments);
+    public PragmaChecksumDirective WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Arguments);
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(PragmaChecksumDirective? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as PragmaChecksumDirective);
     public override int GetHashCode() => Id.GetHashCode();
 }
 
@@ -2504,7 +2533,7 @@ public sealed class ClassOrStructConstraint(
     public ClassOrStructConstraint WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Kind, Nullable);
     public ClassOrStructConstraint WithKind(ClassOrStructConstraint.TypeKind kind) =>
-        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, kind, Nullable);
+        kind == Kind ? this : new(Id, Prefix, Markers, kind, Nullable);
     public ClassOrStructConstraint WithNullable(bool nullable) =>
         nullable == Nullable ? this : new(Id, Prefix, Markers, Kind, nullable);
 
@@ -3291,7 +3320,7 @@ public sealed class OperatorDeclaration(
     public enum OperatorKind
     {
         Plus, Minus, Bang, Tilde, PlusPlus, MinusMinus,
-        Star, Division, Percent, LeftShift, RightShift,
+        Star, Division, Percent, LeftShift, RightShift, UnsignedRightShift,
         LessThan, GreaterThan, LessThanEquals, GreaterThanEquals,
         Equals, NotEquals, Ampersand, Bar, Caret, True, False
     }

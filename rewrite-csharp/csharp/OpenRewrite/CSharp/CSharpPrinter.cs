@@ -1,8 +1,8 @@
 using System.Text.RegularExpressions;
-using Rewrite.Core;
-using Rewrite.Java;
+using OpenRewrite.Core;
+using OpenRewrite.Java;
 
-namespace Rewrite.CSharp;
+namespace OpenRewrite.CSharp;
 
 /// <summary>
 /// Prints C# LST back to source code.
@@ -51,7 +51,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             VisitSpace(usingDirective.Static.Before, p);
             p.Append("static");
         }
-        else if (usingDirective.Alias != null)
+
+        if (usingDirective.Alias != null)
         {
             Visit(usingDirective.Alias.Element, p);
             VisitSpace(usingDirective.Alias.After, p);
@@ -382,14 +383,22 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             p.Append('{');
 
             var elements = na.Initializer.Elements;
-            for (int i = 0; i < elements.Count; i++)
+            if (elements.Count == 1 && elements[0].Element is Empty)
             {
-                var elem = elements[i];
-                Visit(elem.Element, p);
-                VisitSpace(elem.After, p);
-                if (i < elements.Count - 1)
+                // Sentinel Empty — print its After space to preserve "{ }"
+                VisitSpace(elements[0].After, p);
+            }
+            else
+            {
+                for (int i = 0; i < elements.Count; i++)
                 {
-                    p.Append(',');
+                    var elem = elements[i];
+                    Visit(elem.Element, p);
+                    VisitSpace(elem.After, p);
+                    if (i < elements.Count - 1)
+                    {
+                        p.Append(',');
+                    }
                 }
             }
 
@@ -647,7 +656,19 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitInitializerExpression(InitializerExpression initializerExpression, PrintOutputCapture<P> p)
     {
         BeforeSyntax(initializerExpression, p);
-        VisitContainer("{", initializerExpression.Expressions, ",", "}", p);
+        var elements = initializerExpression.Expressions.Elements;
+        VisitSpace(initializerExpression.Expressions.Before, p);
+        p.Append("{");
+        if (elements.Count == 1 && elements[0].Element is Empty)
+        {
+            // Sentinel empty element preserves the space inside empty braces: { }
+            VisitSpace(elements[0].After, p);
+        }
+        else
+        {
+            VisitRightPadded(elements, ",", p);
+        }
+        p.Append("}");
         AfterSyntax(initializerExpression, p);
         return initializerExpression;
     }
@@ -1301,6 +1322,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             {
                 VisitVariableDeclarationsWithoutSemicolon(vd, p);
             }
+            else if (paddedInit.Element is ExpressionStatement es)
+            {
+                // Don't visit ExpressionStatement (which appends ';') — for-loop
+                // initializers are comma-separated, not semicolon-terminated
+                Visit(es.Expression, p);
+            }
             else
             {
                 Visit(paddedInit.Element, p);
@@ -1412,7 +1439,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(thr, p);
         p.Append("throw");
-        Visit(thr.Exception, p);
+        // Don't visit Empty exception (re-throw) — Empty prints a semicolon as a statement
+        if (thr.Exception is not Empty)
+        {
+            Visit(thr.Exception, p);
+        }
         // Suppress semicolon when throw is used as an expression (wrapped in StatementExpression)
         if (Cursor.Parent?.Value is not StatementExpression)
         {
@@ -1515,8 +1546,21 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
     public override J VisitInterpolation(Interpolation interp, PrintOutputCapture<P> p)
     {
-        // Opening brace
-        p.Append('{');
+        // Determine brace count from parent InterpolatedString delimiter (e.g., $$""" → 2 braces)
+        int braceCount = 1;
+        var parentCursor = Cursor.GetParentTreeCursor();
+        if (parentCursor.Value is InterpolatedString istr)
+        {
+            int dollarCount = 0;
+            foreach (var c in istr.Delimiter)
+            {
+                if (c == '$') dollarCount++;
+            }
+            if (dollarCount > 1) braceCount = dollarCount;
+        }
+
+        // Opening brace(s)
+        p.Append(new string('{', braceCount));
 
         // Space after opening brace
         VisitSpace(interp.Prefix, p);
@@ -1543,8 +1587,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // Space before closing brace
         VisitSpace(interp.After, p);
 
-        // Closing brace
-        p.Append('}');
+        // Closing brace(s)
+        p.Append(new string('}', braceCount));
 
         return interp;
     }
@@ -2022,6 +2066,23 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     // TypeParameterConstraintClause and TypeConstraint are deleted —
     // constraint printing now handled by PrintConstrainedTypeParameterConstraints
 
+    public override J VisitAllowsConstraintClause(AllowsConstraintClause acc, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(acc, p);
+        p.Append("allows");
+        VisitContainer("", acc.Expressions, ",", "", p);
+        AfterSyntax(acc, p);
+        return acc;
+    }
+
+    public override J VisitRefStructConstraint(RefStructConstraint rsc, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(rsc, p);
+        p.Append("ref struct");
+        AfterSyntax(rsc, p);
+        return rsc;
+    }
+
     public override J VisitClassOrStructConstraint(ClassOrStructConstraint cosc, PrintOutputCapture<P> p)
     {
         BeforeSyntax(cosc, p);
@@ -2066,9 +2127,17 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
         if (@params.Parenthesized)
         {
+            if (isAnonymousMethod)
+            {
+                // For anonymous methods, Prefix is the space between 'delegate' and '('
+                VisitSpace(@params.Prefix, p);
+            }
             p.Append('(');
-            // Print space inside parens (Prefix for parenthesized params is space after '(')
-            VisitSpace(@params.Prefix, p);
+            if (!isAnonymousMethod)
+            {
+                // For regular lambdas, Prefix is the space inside '(' (after open paren)
+                VisitSpace(@params.Prefix, p);
+            }
             for (int i = 0; i < @params.Elements.Count; i++)
             {
                 var paddedParam = @params.Elements[i];
@@ -2288,6 +2357,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             Binary.OperatorType.BitXor => "^",
             Binary.OperatorType.LeftShift => "<<",
             Binary.OperatorType.RightShift => ">>",
+            Binary.OperatorType.UnsignedRightShift => ">>>",
             Binary.OperatorType.Or => "||",
             Binary.OperatorType.And => "&&",
             _ => throw new InvalidOperationException($"Unknown operator: {op}")
@@ -2575,6 +2645,15 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         VisitRightPadded(pragmaWarningDirective.WarningCodes, ",", p);
         AfterSyntax(pragmaWarningDirective, p);
         return pragmaWarningDirective;
+    }
+
+    public override J VisitPragmaChecksumDirective(PragmaChecksumDirective pragmaChecksumDirective, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(pragmaChecksumDirective, p);
+        p.Append("#pragma checksum");
+        p.Append(pragmaChecksumDirective.Arguments);
+        AfterSyntax(pragmaChecksumDirective, p);
+        return pragmaChecksumDirective;
     }
 
     public override J VisitNullableDirective(NullableDirective nullableDirective, PrintOutputCapture<P> p)
@@ -2953,7 +3032,19 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(anonymousObject, p);
         p.Append("new");
-        VisitContainer("{", anonymousObject.Initializers, ",", "}", p);
+        var elements = anonymousObject.Initializers.Elements;
+        VisitSpace(anonymousObject.Initializers.Before, p);
+        p.Append("{");
+        if (elements.Count == 1 && elements[0].Element is Empty)
+        {
+            // Sentinel Empty — print its After space to preserve "{ }"
+            VisitSpace(elements[0].After, p);
+        }
+        else
+        {
+            VisitRightPadded(elements, ",", p);
+        }
+        p.Append("}");
         AfterSyntax(anonymousObject, p);
         return anonymousObject;
     }
@@ -3176,8 +3267,19 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // Parameters (without semicolons)
         PrintParameterList("(", operatorDeclaration.Parameters, ")", p);
 
-        // Body
-        VisitBlock(operatorDeclaration.Body, p);
+        // Body — expression-bodied (=> expr;) or block body ({...})
+        if (operatorDeclaration.Markers.FindFirst<ExpressionBodied>() != null)
+        {
+            VisitSpace(operatorDeclaration.Body.Prefix, p);
+            p.Append("=>");
+            var returnStmt = (Return)operatorDeclaration.Body.Statements[0].Element;
+            Visit(returnStmt.Expression, p);
+            p.Append(';');
+        }
+        else
+        {
+            VisitBlock(operatorDeclaration.Body, p);
+        }
 
         AfterSyntax(operatorDeclaration, p);
         return operatorDeclaration;
@@ -3198,6 +3300,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             OperatorDeclaration.OperatorKind.Percent => "%",
             OperatorDeclaration.OperatorKind.LeftShift => "<<",
             OperatorDeclaration.OperatorKind.RightShift => ">>",
+            OperatorDeclaration.OperatorKind.UnsignedRightShift => ">>>",
             OperatorDeclaration.OperatorKind.LessThan => "<",
             OperatorDeclaration.OperatorKind.GreaterThan => ">",
             OperatorDeclaration.OperatorKind.LessThanEquals => "<=",

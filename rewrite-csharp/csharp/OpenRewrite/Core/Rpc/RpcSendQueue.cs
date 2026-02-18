@@ -1,7 +1,8 @@
-using static Rewrite.Core.Rpc.RpcObjectData;
-using static Rewrite.Core.Rpc.RpcObjectData.ObjectState;
+using Rewrite.Core.Rpc;
+using static OpenRewrite.Core.Rpc.RpcObjectData;
+using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
 
-namespace Rewrite.Core.Rpc;
+namespace OpenRewrite.Core.Rpc;
 
 public class RpcSendQueue
 {

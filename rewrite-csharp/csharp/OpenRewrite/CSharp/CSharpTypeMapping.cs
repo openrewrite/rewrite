@@ -1,8 +1,8 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Rewrite.Java;
+using OpenRewrite.Java;
 
-namespace Rewrite.CSharp;
+namespace OpenRewrite.CSharp;
 
 /// <summary>
 /// Maps Roslyn semantic symbols to OpenRewrite JavaType.
@@ -243,13 +243,13 @@ internal class CSharpTypeMapping
     {
         long flags = 0;
         // Map accessibility
-        flags |= symbol.DeclaredAccessibility switch
+        flags |= (long)(symbol.DeclaredAccessibility switch
         {
             Accessibility.Public => 1,       // Flag.Public
             Accessibility.Private => 2,      // Flag.Private
             Accessibility.Protected => 4,    // Flag.Protected
             _ => 0
-        };
+        });
         if (symbol.IsStatic) flags |= 8;     // Flag.Static
         if (symbol.IsAbstract) flags |= 1024; // Flag.Abstract
         if (symbol.IsSealed) flags |= 16;     // Flag.Final (sealed ~ final)

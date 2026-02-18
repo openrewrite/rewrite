@@ -19,6 +19,9 @@
     <RepositoryUrl>https://github.com/openrewrite/rewrite</RepositoryUrl>
     <PackageTags>openrewrite;refactoring;csharp;dotnet</PackageTags>
     <NoPackageAnalysis>true</NoPackageAnalysis>
+    <!-- VSTHRD200: RPC method names must match Java-side protocol (no Async suffix) -->
+    <!-- VSTHRD002: Synchronous waits needed for RPC interop with Java peer -->
+    <NoWarn>VSTHRD200;VSTHRD002</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

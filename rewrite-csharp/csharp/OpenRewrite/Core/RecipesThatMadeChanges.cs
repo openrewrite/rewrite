@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace Rewrite.Core;
+namespace OpenRewrite.Core;
 
 /// <summary>
 /// Marker that records which recipes made changes to a source file.

@@ -1,6 +1,6 @@
 using JetBrains.Annotations;
 
-namespace Rewrite.Core;
+namespace OpenRewrite.Core;
 
 /// <summary>
 /// Marks a property as a configurable recipe option.

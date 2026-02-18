@@ -1,9 +1,11 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Newtonsoft.Json.Linq;
-using static Rewrite.Core.Rpc.RpcObjectData.ObjectState;
+using OpenRewrite.CSharp;
+using OpenRewrite.Java;
+using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
 
-namespace Rewrite.Core.Rpc;
+namespace OpenRewrite.Core.Rpc;
 
 /// <summary>
 /// Deserializes RPC object data received from a remote process.
@@ -326,34 +328,34 @@ public class RpcReceiveQueue
 
             // Special C# type name overrides (reverse of RpcSendQueue.RegisterJavaTypeName)
             "org.openrewrite.csharp.tree.Cs$BlockScopeNamespaceDeclaration" =>
-                typeof(Rewrite.CSharp.NamespaceDeclaration),
+                typeof(NamespaceDeclaration),
             "org.openrewrite.csharp.tree.Cs$Lambda" =>
-                typeof(Rewrite.CSharp.CsLambda),
+                typeof(CsLambda),
             // Cs-prefixed types that correspond to unprefixed Java names
             "org.openrewrite.csharp.tree.Cs$MethodDeclaration" =>
-                typeof(Rewrite.CSharp.CsMethodDeclaration),
+                typeof(CsMethodDeclaration),
             "org.openrewrite.csharp.tree.Cs$ConstrainedTypeParameter" =>
-                typeof(Rewrite.CSharp.ConstrainedTypeParameter),
+                typeof(ConstrainedTypeParameter),
             "org.openrewrite.csharp.tree.Cs$ExpressionStatement" =>
-                typeof(Rewrite.Java.ExpressionStatement),
+                typeof(ExpressionStatement),
             "org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable" =>
-                typeof(Rewrite.Java.NamedVariable),
+                typeof(NamedVariable),
 
             // Marker type overrides
             "org.openrewrite.java.marker.Semicolon" =>
-                typeof(Rewrite.Java.Semicolon),
+                typeof(Semicolon),
             "org.openrewrite.csharp.marker.PrimaryConstructor" =>
-                typeof(Rewrite.CSharp.PrimaryConstructor),
+                typeof(PrimaryConstructor),
             "org.openrewrite.csharp.marker.Implicit" =>
-                typeof(Rewrite.CSharp.Implicit),
+                typeof(Implicit),
             "org.openrewrite.csharp.marker.Struct" =>
-                typeof(Rewrite.CSharp.Struct),
+                typeof(Struct),
             "org.openrewrite.csharp.marker.RecordClass" =>
-                typeof(Rewrite.CSharp.RecordClass),
+                typeof(RecordClass),
             "org.openrewrite.csharp.marker.ExpressionBodied" =>
-                typeof(Rewrite.CSharp.ExpressionBodied),
+                typeof(ExpressionBodied),
             "org.openrewrite.java.marker.OmitParentheses" =>
-                typeof(Rewrite.Java.OmitParentheses),
+                typeof(OmitParentheses),
 
             _ => FromJavaTypeNameByConvention(javaTypeName)
         };

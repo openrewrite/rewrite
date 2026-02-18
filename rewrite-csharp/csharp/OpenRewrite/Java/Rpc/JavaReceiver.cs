@@ -1,7 +1,8 @@
-using Rewrite.Core;
-using Rewrite.Core.Rpc;
+using OpenRewrite.Core;
+using OpenRewrite.Core.Rpc;
+using Space = OpenRewrite.Core.Space;
 
-namespace Rewrite.Java.Rpc;
+namespace OpenRewrite.Java.Rpc;
 
 /// <summary>
 /// Deserializes Java AST elements via the RPC protocol.
@@ -13,7 +14,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     // In Java, preVisit() modifies and returns the tree before visitXxx is called,
     // so method-chaining captures the values early. In C#, record `with` expressions
     // evaluate all properties at the end, after child visits would overwrite shared fields.
-    private readonly Stack<(Guid Id, Space Prefix, Markers Markers)> _pvStack = new();
+    private readonly Stack<(Guid Id, Space Prefix, Core.Markers Markers)> _pvStack = new();
     protected Guid _pvId => _pvStack.Peek().Id;
     protected Space _pvPrefix => _pvStack.Peek().Prefix;
     protected Markers _pvMarkers => _pvStack.Peek().Markers;
@@ -540,7 +541,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         return typeCast.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithClazz((ControlParentheses<TypeTree>)clazz!).WithExpression((Expression)expression!);
     }
 
-    public J VisitTypeParameter(TypeParameter typeParam, RpcReceiveQueue q)
+    public override J VisitTypeParameter(TypeParameter typeParam, RpcReceiveQueue q)
     {
         var annotations = q.ReceiveList(typeParam.Annotations, a => (Annotation)VisitNonNull(a, q));
         var modifiers = q.ReceiveList(typeParam.Modifiers, m => (Modifier)VisitNonNull(m, q));
