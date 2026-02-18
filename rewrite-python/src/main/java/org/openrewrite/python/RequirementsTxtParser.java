@@ -47,6 +47,8 @@ public class RequirementsTxtParser implements Parser {
             "requirements(-[\\w-]+)?\\.(txt|in)"
     );
 
+    private static final Pattern EXTRA_MARKER_PATTERN = Pattern.compile("\\bextra\\s*==");
+
     private final PlainTextParser plainTextParser = new PlainTextParser();
 
     @Override
@@ -192,6 +194,12 @@ public class RequirementsTxtParser implements Parser {
     }
 
     private static @Nullable Path findSitePackages(Path workspace) {
+        // Windows: .venv/Lib/site-packages (no python* subdirectory)
+        Path windowsSitePackages = workspace.resolve(".venv/Lib/site-packages");
+        if (Files.isDirectory(windowsSitePackages)) {
+            return windowsSitePackages;
+        }
+        // Unix: .venv/lib/python*/site-packages
         Path lib = workspace.resolve(".venv/lib");
         if (!Files.isDirectory(lib)) {
             return null;
@@ -235,20 +243,20 @@ public class RequirementsTxtParser implements Parser {
         if (Files.exists(direct)) {
             return direct;
         }
-        // Fallback: glob for matching dist-info directory
+        // Fallback: glob for matching dist-info directory (must also match version)
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(sitePackages, "*.dist-info")) {
             String normalizedLower = PythonResolutionResult.normalizeName(packageName);
+            String expectedSuffix = "-" + version + ".dist-info";
             for (Path distInfo : stream) {
                 String dirName = distInfo.getFileName().toString();
-                // dirName is like "requests-2.31.0.dist-info"
-                int dashIdx = dirName.indexOf('-');
-                if (dashIdx > 0) {
-                    String dirPkgName = dirName.substring(0, dashIdx);
-                    if (PythonResolutionResult.normalizeName(dirPkgName).equals(normalizedLower)) {
-                        Path metadata = distInfo.resolve("METADATA");
-                        if (Files.exists(metadata)) {
-                            return metadata;
-                        }
+                if (!dirName.endsWith(expectedSuffix)) {
+                    continue;
+                }
+                String dirPkgName = dirName.substring(0, dirName.length() - expectedSuffix.length());
+                if (PythonResolutionResult.normalizeName(dirPkgName).equals(normalizedLower)) {
+                    Path metadata = distInfo.resolve("METADATA");
+                    if (Files.exists(metadata)) {
+                        return metadata;
                     }
                 }
             }
@@ -274,7 +282,7 @@ public class RequirementsTxtParser implements Parser {
             String value = trimmed.substring("Requires-Dist:".length()).trim();
 
             // Skip entries with "extra ==" markers (optional extras, not always installed)
-            if (value.contains("extra ==") || value.contains("extra=")) {
+            if (EXTRA_MARKER_PATTERN.matcher(value).find()) {
                 continue;
             }
 

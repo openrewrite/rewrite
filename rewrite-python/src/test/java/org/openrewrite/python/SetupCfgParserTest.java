@@ -16,10 +16,25 @@
 package org.openrewrite.python;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
+import org.openrewrite.python.internal.UvExecutor;
+import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
+import org.openrewrite.text.PlainText;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class SetupCfgParserTest {
 
@@ -37,5 +52,41 @@ class SetupCfgParserTest {
         SetupCfgParser.Builder builder = SetupCfgParser.builder();
         assertThat(builder.getDslName()).isEqualTo("setup.cfg");
         assertThat(builder.build()).isInstanceOf(SetupCfgParser.class);
+    }
+
+    @Test
+    void markerContainsDependenciesFromFreeze(@TempDir Path tempDir) throws IOException {
+        assumeTrue(UvExecutor.findUvExecutable() != null, "uv is not installed");
+
+        Files.writeString(tempDir.resolve("setup.cfg"), """
+                [metadata]
+                name = myapp
+                version = 1.0.0
+
+                [options]
+                install_requires =
+                    requests>=2.28.0
+                """);
+        // setup.py is required for uv pip install to recognize the project
+        Files.writeString(tempDir.resolve("setup.py"), "from setuptools import setup; setup()");
+
+        SetupCfgParser parser = new SetupCfgParser();
+        Parser.Input input = Parser.Input.fromFile(tempDir.resolve("setup.cfg"));
+        List<SourceFile> parsed = parser.parseInputs(
+                Collections.singletonList(input),
+                tempDir,
+                new InMemoryExecutionContext(Throwable::printStackTrace)
+        ).collect(Collectors.toList());
+
+        assertThat(parsed).hasSize(1);
+        PlainText text = (PlainText) parsed.get(0);
+        PythonResolutionResult marker = text.getMarkers()
+                .findFirst(PythonResolutionResult.class).orElse(null);
+        assertThat(marker).isNotNull();
+
+        assertThat(marker.getResolvedDependencies()).isNotEmpty();
+        assertThat(marker.getResolvedDependencies().stream().map(ResolvedDependency::getName))
+                .contains("requests");
+        assertThat(marker.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Uv);
     }
 }
