@@ -18,9 +18,13 @@ package org.openrewrite.python.rpc;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.python.*;
+import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
+import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
+import org.openrewrite.python.tree.Py;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
@@ -220,24 +224,124 @@ public class PythonRewriteRpc extends RewriteRpc {
             }
         }, false);
 
-        // Parse pyproject.toml and uv.lock if present
+        // For setup.py-only projects (no pyproject.toml, no setup.cfg),
+        // attach the marker to the Py.CompilationUnit already in the RPC stream
+        boolean hasPyproject = Files.exists(projectPath.resolve("pyproject.toml"));
+        boolean hasSetupCfg = Files.exists(projectPath.resolve("setup.cfg"));
+        boolean hasSetupPy = Files.exists(projectPath.resolve("setup.py"));
+
+        if (!hasPyproject && !hasSetupCfg && hasSetupPy) {
+            PythonResolutionResult marker = createSetupPyMarker(projectPath, relativeTo, ctx);
+            if (marker != null) {
+                final PythonResolutionResult finalMarker = marker;
+                rpcStream = rpcStream.map(sf -> {
+                    if (sf instanceof Py.CompilationUnit &&
+                            sf.getSourcePath().getFileName().toString().equals("setup.py")) {
+                        return sf.withMarkers(sf.getMarkers().addIfAbsent(finalMarker));
+                    }
+                    return sf;
+                });
+            }
+        }
+
+        Stream<SourceFile> manifestStream = parseManifest(projectPath, relativeTo, ctx);
+        return Stream.concat(rpcStream, manifestStream);
+    }
+
+    private @Nullable PythonResolutionResult createSetupPyMarker(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {
+        Path setupPyPath = projectPath.resolve("setup.py");
+        if (!Files.exists(setupPyPath)) {
+            return null;
+        }
+
+        String source;
+        try {
+            source = new String(Files.readAllBytes(setupPyPath), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return null;
+        }
+
+        Path workspace = DependencyWorkspace.getOrCreateSetuptoolsWorkspace(source, projectPath);
+        if (workspace == null) {
+            return null;
+        }
+
+        List<ResolvedDependency> resolvedDeps = RequirementsTxtParser.parseFreezeOutput(workspace);
+        if (resolvedDeps.isEmpty()) {
+            return null;
+        }
+
+        List<Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolvedDeps);
+
+        Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
+        String path = effectiveRelativeTo.relativize(setupPyPath).toString();
+
+        return new PythonResolutionResult(
+                org.openrewrite.Tree.randomId(),
+                null,
+                null,
+                null,
+                null,
+                path,
+                null,
+                null,
+                Collections.emptyList(),
+                deps,
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                Collections.emptyList(),
+                Collections.emptyList(),
+                resolvedDeps,
+                PythonResolutionResult.PackageManager.Uv,
+                null
+        );
+    }
+
+    private Stream<SourceFile> parseManifest(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {
+        Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
+
+        // Priority: pyproject.toml > setup.cfg > requirements.txt
+        // Note: setup.py is NOT handled here — it's already in the RPC stream as Py.CompilationUnit
+
         Path pyprojectPath = projectPath.resolve("pyproject.toml");
         if (Files.exists(pyprojectPath)) {
-            Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
             Parser.Input pyprojectInput = Parser.Input.fromFile(pyprojectPath);
-            Stream<SourceFile> pyprojectStream = new PyProjectTomlParser().parseInputs(
+            Stream<SourceFile> result = new PyProjectTomlParser().parseInputs(
                     Collections.singletonList(pyprojectInput), effectiveRelativeTo, ctx);
-            rpcStream = Stream.concat(rpcStream, pyprojectStream);
 
             Path uvLockPath = projectPath.resolve("uv.lock");
             if (Files.exists(uvLockPath)) {
                 Parser.Input uvLockInput = Parser.Input.fromFile(uvLockPath);
                 Stream<SourceFile> uvLockStream = new TomlParser().parseInputs(
                         Collections.singletonList(uvLockInput), effectiveRelativeTo, ctx);
-                rpcStream = Stream.concat(rpcStream, uvLockStream);
+                result = Stream.concat(result, uvLockStream);
             }
+            return result;
         }
-        return rpcStream;
+
+        Path setupCfgPath = projectPath.resolve("setup.cfg");
+        if (Files.exists(setupCfgPath)) {
+            Parser.Input input = Parser.Input.fromFile(setupCfgPath);
+            return new SetupCfgParser().parseInputs(
+                    Collections.singletonList(input), effectiveRelativeTo, ctx);
+        }
+
+        RequirementsTxtParser reqsParser = new RequirementsTxtParser();
+        try (Stream<Path> entries = Files.list(projectPath)) {
+            Path reqsPath = entries
+                    .filter(p -> reqsParser.accept(p.getFileName()))
+                    .findFirst()
+                    .orElse(null);
+            if (reqsPath != null) {
+                Parser.Input input = Parser.Input.fromFile(reqsPath);
+                return reqsParser.parseInputs(
+                        Collections.singletonList(input), effectiveRelativeTo, ctx);
+            }
+        } catch (IOException e) {
+            // Silently skip manifest parsing if we can't list the directory
+        }
+
+        return Stream.empty();
     }
 
     public static Builder builder() {

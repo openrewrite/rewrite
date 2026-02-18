@@ -18,3 +18,8 @@ type: specs.openrewrite.org/v1beta/category
 name: Java
 packageName: org.openrewrite.java
 description: Basic building blocks for transforming Java code.
+---
+type: specs.openrewrite.org/v1beta/category
+name: AI
+packageName: org.openrewrite.java.ai
+description: Recipes supporting AI code generation and analysis.
