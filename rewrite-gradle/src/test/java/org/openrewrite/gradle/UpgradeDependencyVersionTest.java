@@ -133,10 +133,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Test
     void mockitoTestImplementation() {
-        rewriteRun(recipeSpec -> {
+        rewriteRun(recipeSpec ->
               recipeSpec.beforeRecipe(withToolingApi())
-                .recipe(new UpgradeDependencyVersion("org.mockito", "*", "4.11.0", null));
-          },
+                .recipe(new UpgradeDependencyVersion("org.mockito", "*", "4.11.0", null)),
           buildGradle(
             """
               plugins {
@@ -395,6 +394,40 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multiComponentLiteralNotation() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("com.google.guava", "guava", "29.0-jre")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("com.google.guava", "guava", "30.1.1-jre")
+              }
+              """
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"$guavaVersion", "${guavaVersion}"})
     void mapNotationGStringInterpolation(String stringInterpolationReference) {
@@ -502,6 +535,45 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
               dependencies {
                 implementation platform("com.google.guava:guava:30.1.1-jre")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void platformsAreManagedVersionAware() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "spring-boot-dependencies", "3.2.4", null)),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation platform("org.springframework.boot:spring-boot-dependencies:2.4.0")
+                implementation("javax.servlet:javax.servlet-api")
+                implementation("org.apache.activemq:activemq-client-jakarta:5.18.2")
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation platform("org.springframework.boot:spring-boot-dependencies:3.2.4")
+                implementation("javax.servlet:javax.servlet-api:4.0.1")
+                implementation("org.apache.activemq:activemq-client-jakarta")
               }
               """
           )

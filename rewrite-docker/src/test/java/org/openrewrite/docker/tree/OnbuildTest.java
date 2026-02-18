@@ -32,7 +32,7 @@ class OnbuildTest implements RewriteTest {
               ONBUILD RUN apt-get update
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Onbuild onbuild = (Docker.Onbuild) doc.getStages().getFirst().getInstructions().getLast();
+                var onbuild = (Docker.Onbuild) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(onbuild.getInstruction()).isInstanceOf(Docker.Run.class);
             })
           )
@@ -48,7 +48,7 @@ class OnbuildTest implements RewriteTest {
               ONBUILD COPY app.jar /app/
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Onbuild onbuild = (Docker.Onbuild) doc.getStages().getFirst().getInstructions().getLast();
+                var onbuild = (Docker.Onbuild) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(onbuild.getInstruction()).isInstanceOf(Docker.Copy.class);
             })
           )

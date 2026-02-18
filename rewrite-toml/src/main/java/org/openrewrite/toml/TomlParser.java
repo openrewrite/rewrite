@@ -69,7 +69,8 @@ public class TomlParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".toml") || path.endsWith(".xmake.cfg");
+        String fileName = path.getFileName().toString();
+        return fileName.endsWith(".toml") || "uv.lock".equals(fileName) || ".xmake.cfg".equals(fileName);
     }
 
     @Override

@@ -265,6 +265,17 @@ public class AnnotationTemplateGenerator {
                 before.insert(0, stripped.printTrimmed(cursor.getParentOrThrow()).trim());
                 after.append("};");
             }
+        } else if (j instanceof J.VariableDeclarations && prior instanceof J.VariableDeclarations.NamedVariable) {
+            J.VariableDeclarations v = (J.VariableDeclarations) j;
+            StringBuilder varPrefix = new StringBuilder();
+            for (J.Modifier modifier : v.getModifiers()) {
+                varPrefix.append(modifier.getType().toString().toLowerCase()).append(' ');
+            }
+            if (v.getTypeExpression() != null) {
+                varPrefix.append(v.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed(cursor)).append(' ');
+            }
+            varPrefix.append(((J.VariableDeclarations.NamedVariable) prior).getSimpleName()).append(" = ");
+            before.insert(0, varPrefix);
         }
 
         template(next(cursor), j, before, after, templated);
@@ -322,11 +333,16 @@ public class AnnotationTemplateGenerator {
         // Build stub arguments to make it parseable
         StringBuilder stubArgs = new StringBuilder("(");
         List<Expression> arguments = nc.getArguments();
-        for (int i = 0; i < arguments.size(); i++) {
-            if (i > 0) {
+        boolean firstArg = true;
+        for (Expression arg : arguments) {
+            if (arg instanceof J.Empty) {
+                continue;
+            }
+            if (!firstArg) {
                 stubArgs.append(", ");
             }
-            stubArgs.append(valueOfType(arguments.get(i).getType()));
+            firstArg = false;
+            stubArgs.append(valueOfType(arg.getType()));
         }
         stubArgs.append(")");
 

@@ -18,9 +18,10 @@ package org.openrewrite.python;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.tree.Py;
-import org.openrewrite.text.PlainText;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.toml.tree.Toml;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -65,15 +66,20 @@ public final class Assertions {
             }
         }
 
-        // Second pass: create workspace and symlink .venv
+        // Second pass: create workspace and symlink .venv and uv.lock
         if (pyprojectContent != null) {
             Path workspaceDir = DependencyWorkspace.getOrCreateWorkspace(pyprojectContent);
             Path venvSource = workspaceDir.resolve(".venv");
             Path venvTarget = relativeTo.resolve(".venv");
+            Path lockFileSource = workspaceDir.resolve("uv.lock");
+            Path lockFileTarget = relativeTo.resolve("uv.lock");
 
             try {
                 if (Files.exists(venvSource) && !Files.exists(venvTarget)) {
                     Files.createSymbolicLink(venvTarget, venvSource);
+                }
+                if (Files.exists(lockFileSource) && !Files.exists(lockFileTarget)) {
+                    Files.createSymbolicLink(lockFileTarget, lockFileSource);
                 }
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to create symlink for .venv", e);
@@ -83,28 +89,137 @@ public final class Assertions {
         return SourceSpecs.dir(relativeTo.toString(), sources);
     }
 
-    /**
-     * Creates a pyproject.toml source spec for use with uv().
-     * The content is treated as plain text since we only need to write it to disk
-     * for the Python dependency workspace to use.
-     */
     public static SourceSpecs pyproject(@Language("toml") @Nullable String before) {
         return pyproject(before, s -> {
         });
     }
 
-    /**
-     * Creates a pyproject.toml source spec for use with uv().
-     */
     public static SourceSpecs pyproject(@Language("toml") @Nullable String before,
-                                        Consumer<SourceSpec<PlainText>> spec) {
-        SourceSpec<PlainText> text = new SourceSpec<>(
-                PlainText.class, null, org.openrewrite.text.PlainTextParser.builder(), before,
+                                        Consumer<SourceSpec<Toml.Document>> spec) {
+        SourceSpec<Toml.Document> toml = new SourceSpec<>(
+                Toml.Document.class, null, PyProjectTomlParser.builder(), before,
                 SourceSpec.ValidateSource.noop,
                 ctx -> {
                 }
         );
-        text.path("pyproject.toml");
+        toml.path("pyproject.toml");
+        spec.accept(toml);
+        return toml;
+    }
+
+    public static SourceSpecs pyproject(@Language("toml") @Nullable String before,
+                                        @Language("toml") @Nullable String after) {
+        return pyproject(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs pyproject(@Language("toml") @Nullable String before,
+                                        @Language("toml") @Nullable String after,
+                                        Consumer<SourceSpec<Toml.Document>> spec) {
+        SourceSpec<Toml.Document> toml = new SourceSpec<>(
+                Toml.Document.class, null, PyProjectTomlParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        toml.path("pyproject.toml");
+        toml.after(s -> after);
+        spec.accept(toml);
+        return toml;
+    }
+
+    public static SourceSpecs uvLock(@Language("toml") @Nullable String before) {
+        return uvLock(before, s -> {
+        });
+    }
+
+    public static SourceSpecs uvLock(@Language("toml") @Nullable String before,
+                                     Consumer<SourceSpec<Toml.Document>> spec) {
+        SourceSpec<Toml.Document> toml = new SourceSpec<>(
+                Toml.Document.class, null, org.openrewrite.toml.TomlParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        toml.path("uv.lock");
+        spec.accept(toml);
+        return toml;
+    }
+
+    public static SourceSpecs requirementsTxt(@Nullable String before) {
+        return requirementsTxt(before, s -> {
+        });
+    }
+
+    public static SourceSpecs requirementsTxt(@Nullable String before,
+                                               Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> text = new SourceSpec<>(
+                PlainText.class, null, RequirementsTxtParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        text.path("requirements.txt");
+        spec.accept(text);
+        return text;
+    }
+
+    public static SourceSpecs requirementsTxt(@Nullable String before,
+                                               @Nullable String after) {
+        return requirementsTxt(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs requirementsTxt(@Nullable String before,
+                                               @Nullable String after,
+                                               Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> text = new SourceSpec<>(
+                PlainText.class, null, RequirementsTxtParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        text.path("requirements.txt");
+        text.after(s -> after);
+        spec.accept(text);
+        return text;
+    }
+
+    public static SourceSpecs setupCfg(@Nullable String before) {
+        return setupCfg(before, s -> {
+        });
+    }
+
+    public static SourceSpecs setupCfg(@Nullable String before,
+                                        Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> text = new SourceSpec<>(
+                PlainText.class, null, SetupCfgParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        text.path("setup.cfg");
+        spec.accept(text);
+        return text;
+    }
+
+    public static SourceSpecs setupCfg(@Nullable String before,
+                                        @Nullable String after) {
+        return setupCfg(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs setupCfg(@Nullable String before,
+                                        @Nullable String after,
+                                        Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> text = new SourceSpec<>(
+                PlainText.class, null, SetupCfgParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        text.path("setup.cfg");
+        text.after(s -> after);
         spec.accept(text);
         return text;
     }

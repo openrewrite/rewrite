@@ -35,25 +35,8 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
           .recipe(new MigrateDependenciesToVersionCatalog());
     }
 
-    @Test
-    void doesNotProcessFilesExcludedByPreconditions() {
-        rewriteRun(
-          java(
-            """
-              package com.example;
-
-              public class Example {
-                  public void method() {
-                      String dep = "org.springframework:spring-core:5.3.0";
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     @DocumentExample
+    @Test
     void migrateStringNotationDependencies() {
         rewriteRun(
           buildGradle(
@@ -102,6 +85,23 @@ class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
               h2 = { group = "com.h2database", name = "h2", version.ref = "h2" }
               """,
             spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void doesNotProcessFilesExcludedByPreconditions() {
+        rewriteRun(
+          java(
+            """
+              package com.example;
+
+              public class Example {
+                  public void method() {
+                      String dep = "org.springframework:spring-core:5.3.0";
+                  }
+              }
+              """
           )
         );
     }

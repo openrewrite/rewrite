@@ -955,8 +955,12 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitClassExpression(ClassExpression clazz) {
-            Space prefix = whitespace();
             ClassNode type = clazz.getType();
+            if (type.isArray()) {
+                queue.add(arrayType(type));
+                return;
+            }
+            Space prefix = whitespace();
             String name = type.getNameWithoutPackage().replace('$', '.');
             if (!source.startsWith(name, cursor)) {
                 name = type.getUnresolvedName().replace('$', '.');
@@ -1360,17 +1364,26 @@ public class GroovyParserVisitor {
                 for (int i = 0; i < parameters.length; i++) {
                     Parameter p = parameters[i];
                     JavaType type = typeMapping.type(staticType(p));
-                    J expr = new J.VariableDeclarations(randomId(), whitespace(), Markers.EMPTY,
-                            emptyList(), emptyList(), p.isDynamicTyped() ? null : visitTypeTree(p.getType()),
+                    Space varDeclPrefix = whitespace();
+                    TypeTree paramType = p.isDynamicTyped() ? null : visitTypeTree(p.getType());
+                    JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
+                            new J.VariableDeclarations.NamedVariable(randomId(), sourceBefore(p.getName()), Markers.EMPTY,
+                                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), p.getName(), type, null),
+                                    emptyList(), null,
+                                    typeMapping.variableType(p.getName(), staticType(p)))
+                    );
+                    org.codehaus.groovy.ast.expr.Expression defaultValue = p.getInitialExpression();
+                    if (defaultValue != null) {
+                        paramName = paramName.withElement(paramName.getElement().getPadding()
+                                .withInitializer(new JLeftPadded<>(
+                                        sourceBefore("="),
+                                        visit(defaultValue),
+                                        Markers.EMPTY)));
+                    }
+                    J expr = new J.VariableDeclarations(randomId(), varDeclPrefix, Markers.EMPTY,
+                            emptyList(), emptyList(), paramType,
                             null,
-                            singletonList(
-                                    JRightPadded.build(
-                                            new J.VariableDeclarations.NamedVariable(randomId(), sourceBefore(p.getName()), Markers.EMPTY,
-                                                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), p.getName(), type, null),
-                                                    emptyList(), null,
-                                                    typeMapping.variableType(p.getName(), staticType(p)))
-                                    )
-                            ));
+                            singletonList(paramName));
                     JRightPadded<J> param = JRightPadded.build(expr);
                     if (i != parameters.length - 1) {
                         param = param.withAfter(sourceBefore(","));
@@ -1995,21 +2008,18 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMethodPointerExpression(MethodPointerExpression ref) {
-            String referenceName = null;
-            if (ref.getMethodName() instanceof ConstantExpression) {
-                referenceName = ((ConstantExpression) ref.getMethodName()).getValue().toString();
-            }
-
+            boolean isMethodRef = ref instanceof MethodReferenceExpression;
+            String name = ref.getMethodName().getText();
             queue.add(new J.MemberReference(randomId(),
                     whitespace(),
-                    Markers.EMPTY,
-                    padRight(visit(ref.getExpression()), sourceBefore("::")),
+                    isMethodRef ? Markers.EMPTY : Markers.build(singleton(new MethodPointer(randomId()))),
+                    padRight(visit(ref.getExpression()), sourceBefore(isMethodRef ? "::" : ".&")),
                     null, // not supported by Groovy
                     padLeft(whitespace(), new J.Identifier(randomId(),
-                            sourceBefore(referenceName),
+                            sourceBefore(name),
                             Markers.EMPTY,
                             emptyList(),
-                            referenceName,
+                            name,
                             null, null)),
                     typeMapping.type(ref.getType()),
                     null, // not enough information in the AST

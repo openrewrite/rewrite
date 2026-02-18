@@ -24,6 +24,7 @@ import org.openrewrite.marker.Markers;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.function.Supplier;
 
@@ -55,6 +56,31 @@ public class StyleHelper {
         return type.isEnum();
     }
 
+    @lombok.Value
+    private static class FieldAccessor {
+        Method getter;
+        Method wither;
+    }
+
+    private static final ClassValue<List<FieldAccessor>> FIELD_ACCESSORS = new ClassValue<List<FieldAccessor>>() {
+        @Override
+        protected List<FieldAccessor> computeValue(Class<?> styleClass) {
+            List<FieldAccessor> accessors = new ArrayList<>();
+            for (Field f : styleClass.getDeclaredFields()) {
+                if ((f.getModifiers() & Modifier.STATIC) != 0) {
+                    continue;
+                }
+                try {
+                    Method wither = styleClass.getMethod("with" + StringUtils.capitalize(f.getName()), f.getType());
+                    Method getter = styleClass.getMethod("get" + StringUtils.capitalize(f.getName()));
+                    accessors.add(new FieldAccessor(getter, wither));
+                } catch (NoSuchMethodException ignored) {
+                }
+            }
+            return accessors;
+        }
+    };
+
     /**
      * Copies all non-null properties from right into left, recursively. Assumes use of @With from project lombok.
      *
@@ -68,20 +94,12 @@ public class StyleHelper {
         if (right.getClass() != styleClass) {
             throw new RuntimeException(left.getClass().getName() + " and " + right.getClass().getName() + " should match exactly.");
         }
-        for (Field f : styleClass.getDeclaredFields()) {
-            Method wither;
-            Method getter;
+        for (FieldAccessor accessor : FIELD_ACCESSORS.get(styleClass)) {
             try {
-                wither = styleClass.getMethod("with" + StringUtils.capitalize(f.getName()), f.getType());
-                getter = styleClass.getMethod("get" + StringUtils.capitalize(f.getName()));
-            } catch (NoSuchMethodException e) {
-                continue;
-            }
-            try {
-                Object rightValue = getter.invoke(right);
+                Object rightValue = accessor.getGetter().invoke(right);
                 if (rightValue != null) {
                     if (!isPrimitiveOrWrapper(rightValue) && !isEnum(rightValue)) {
-                        Object leftValue = getter.invoke(left);
+                        Object leftValue = accessor.getGetter().invoke(left);
                         if (leftValue instanceof Collection) {
                             if (!((Collection<?>) leftValue).isEmpty()) {
                                 rightValue = merge(leftValue, rightValue);
@@ -91,7 +109,7 @@ public class StyleHelper {
                         }
                     }
                     //noinspection unchecked
-                    left = (T) wither.invoke(left, rightValue);
+                    left = (T) accessor.getWither().invoke(left, rightValue);
                 }
             } catch (IllegalAccessException | InvocationTargetException e) {
                 throw new RuntimeException(e);
