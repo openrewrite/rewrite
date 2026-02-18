@@ -285,7 +285,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 afterPath,
                 parentName,
                 recipe.getName(),
-                0L,
+                0L, // Zero here, as we later sum only the recipes that themselves made changes
                 cycle));
         recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), ctx);
     }
