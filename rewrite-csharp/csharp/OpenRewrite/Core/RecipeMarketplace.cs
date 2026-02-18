@@ -1,4 +1,4 @@
-namespace Rewrite.Core;
+namespace OpenRewrite.Core;
 
 /// <summary>
 /// A hierarchical marketplace of recipes organized by categories.

@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System.Text.RegularExpressions;
-using Rewrite.Core;
-using Rewrite.Java;
-using static Rewrite.Java.J;
 
-namespace Rewrite.CSharp;
+using System.Text.RegularExpressions;
+using OpenRewrite.Core;
+using OpenRewrite.Java;
+
+namespace OpenRewrite.CSharp;
 
 /// <summary>
 /// Scans a parsed tree for ghost comments (//DIRECTIVE:N) embedded in Space whitespace strings

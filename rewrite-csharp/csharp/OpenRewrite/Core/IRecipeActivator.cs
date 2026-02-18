@@ -1,4 +1,4 @@
-namespace Rewrite.Core;
+namespace OpenRewrite.Core;
 
 /// <summary>
 /// Implemented by recipe packages (NuGet assemblies) to register their recipes

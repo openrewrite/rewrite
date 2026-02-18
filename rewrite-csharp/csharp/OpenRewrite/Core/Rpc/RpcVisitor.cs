@@ -1,7 +1,7 @@
-using Rewrite.CSharp.Rpc;
-using Rewrite.Java;
+using OpenRewrite.CSharp.Rpc;
+using OpenRewrite.Java;
 
-namespace Rewrite.Core.Rpc;
+namespace OpenRewrite.Core.Rpc;
 
 /// <summary>
 /// A visitor that delegates to a named visitor on the Java RPC peer.

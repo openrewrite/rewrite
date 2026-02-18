@@ -1,6 +1,6 @@
-using Rewrite.Core;
+using OpenRewrite.Core;
 
-namespace Rewrite.Java.Search;
+namespace OpenRewrite.Java.Search;
 
 /// <summary>
 /// Simple local UsesType that walks the tree checking JavaType attributes.

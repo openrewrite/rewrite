@@ -1,7 +1,7 @@
-using Rewrite.Core;
-using Rewrite.Java;
+using OpenRewrite.Core;
+using OpenRewrite.Java;
 
-namespace Rewrite.CSharp;
+namespace OpenRewrite.CSharp;
 
 /// <summary>
 /// LINQ query expression types. These form a mini-DSL within C#.

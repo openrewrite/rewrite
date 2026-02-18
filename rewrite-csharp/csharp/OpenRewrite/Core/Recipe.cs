@@ -1,8 +1,8 @@
 using System.Reflection;
 using JetBrains.Annotations;
-using Rewrite.Java;
+using OpenRewrite.Java;
 
-namespace Rewrite.Core;
+namespace OpenRewrite.Core;
 
 /// <summary>
 /// Defines a transformation to be applied to source files.
