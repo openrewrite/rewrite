@@ -113,7 +113,7 @@ class FromTest implements RewriteTest {
                 assertThat(from.getFlags().getFirst().getName()).isEqualTo("platform");
                 assertThat(from.getFlags().getFirst().getValue().getContents().getFirst())
                   .isInstanceOf(Docker.EnvironmentVariable.class);
-                Docker.EnvironmentVariable envVar = (Docker.EnvironmentVariable) from.getFlags().getFirst().getValue().getContents().getFirst();
+                var envVar = (Docker.EnvironmentVariable) from.getFlags().getFirst().getValue().getContents().getFirst();
                 assertThat(envVar.getName()).isEqualTo("BUILDPLATFORM");
             })
           )
@@ -130,7 +130,7 @@ class FromTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.From from = doc.getStages().getFirst().getFrom();
                 assertThat(from.getFlags()).hasSize(1);
-                Docker.EnvironmentVariable envVar = (Docker.EnvironmentVariable) from.getFlags().getFirst().getValue().getContents().getFirst();
+                var envVar = (Docker.EnvironmentVariable) from.getFlags().getFirst().getValue().getContents().getFirst();
                 assertThat(envVar.getName()).isEqualTo("TARGETPLATFORM");
                 assertThat(envVar.isBraced()).isTrue();
             })

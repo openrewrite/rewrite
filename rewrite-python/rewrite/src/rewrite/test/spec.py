@@ -104,7 +104,12 @@ def dedent(s: Optional[str]) -> str:
     if not s:
         return ""
 
-    return textwrap.dedent(s)
+    # Preserve \r\n sequences through dedent: replace \r\n with a marker
+    # that keeps the \n (so line boundaries survive for textwrap.dedent)
+    _CR = '\x00CR\x00'
+    s = s.replace('\r\n', _CR + '\n')
+    s = textwrap.dedent(s)
+    return s.replace(_CR + '\n', '\r\n')
 
 
 def python(

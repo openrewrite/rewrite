@@ -77,10 +77,7 @@ public class RepositoryContainsFile extends ScanningRecipe<AtomicBoolean> {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public Tree visit(Tree tree, ExecutionContext ctx) {
-                if(tree.getMarkers().findFirst(SearchResult.class).isPresent()) {
-                    return tree;
-                }
-                return tree.withMarkers(tree.getMarkers().add(new SearchResult(Tree.randomId(), "Repository contains file matching pattern: " + filePattern)));
+                return SearchResult.mergingFound(tree, "Repository contains file matching pattern: " + filePattern);
             }
         };
     }

@@ -32,7 +32,7 @@ class WorkdirTest implements RewriteTest {
               WORKDIR /app
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Workdir workdir = (Docker.Workdir) doc.getStages().getFirst().getInstructions().getLast();
+                var workdir = (Docker.Workdir) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(((Docker.Literal) workdir.getPath().getContents().getFirst()).getText()).isEqualTo("/app");
             })
           )

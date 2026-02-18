@@ -17,7 +17,7 @@ ChangeMethodName recipe for Python that delegates to Java's ChangeMethodName.
 
 This recipe renames method invocations matching a pattern.
 """
-
+from dataclasses import field
 from typing import Any, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor, option
@@ -39,29 +39,29 @@ class ChangeMethodName(Recipe):
         )
     """
 
-    method_pattern: str = option(
+    method_pattern: str = field(metadata=option(
         display_name="Method pattern",
         description="A method pattern that matches method invocations to rename.",
         example="datetime.datetime utcnow()"
-    )
+    ))
 
-    new_method_name: str = option(
+    new_method_name: str = field(metadata=option(
         display_name="New method name",
         description="The new name for the method.",
         example="now"
-    )
+    ))
 
-    match_overrides: bool = option(
+    match_overrides: bool = field(metadata=option(
         display_name="Match overrides",
         description="When enabled, also match method overrides.",
         required=False
-    )
+    ))
 
-    ignore_definition: bool = option(
+    ignore_definition: bool = field(metadata=option(
         display_name="Ignore definition",
         description="When enabled, the method definition itself will not be renamed.",
         required=False
-    )
+    ))
 
     def __init__(
         self,

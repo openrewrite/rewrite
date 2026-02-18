@@ -39,8 +39,8 @@ class SingletonTest implements RewriteTest {
      * A simplified recipe that appends content to a text file.
      * Uses Singleton to ensure only one instance with the same content parameter makes changes.
      */
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     static class SingletonAppend extends Recipe {
         String content;
 
