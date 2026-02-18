@@ -39,7 +39,7 @@ public interface Style {
     }
 
     default Style merge(Style lowerPrecedence) {
-        return this;
+        return StyleHelper.merge(lowerPrecedence, this);
     }
 
     default Style applyDefaults() { return this; }
