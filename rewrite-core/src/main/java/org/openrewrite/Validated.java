@@ -374,10 +374,22 @@ public interface Validated<T> extends Iterable<Validated<T>> {
 
         @Override
         public Iterator<Validated<T>> iterator() {
-            return Stream.concat(
-                    stream(left.spliterator(), false),
-                    stream(right.spliterator(), false)
-            ).iterator();
+            List<Validated<T>> result = new ArrayList<>();
+            Deque<Validated<T>> stack = new ArrayDeque<>();
+            stack.push(this);
+            while (!stack.isEmpty()) {
+                Validated<T> current = stack.pop();
+                if (current instanceof Both) {
+                    Both<T> both = (Both<T>) current;
+                    stack.push(both.right);
+                    stack.push(both.left);
+                } else {
+                    for (Validated<T> v : current) {
+                        result.add(v);
+                    }
+                }
+            }
+            return result.iterator();
         }
     }
 }

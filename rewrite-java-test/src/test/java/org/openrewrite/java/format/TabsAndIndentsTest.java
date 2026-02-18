@@ -31,7 +31,6 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -127,7 +126,7 @@ class TabsAndIndentsTest implements RewriteTest {
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
             new NamedStyles(
               Tree.randomId(), "test", "Test", "Test", emptySet(),
-              Arrays.asList(
+              List.of(
                 with.apply(IntelliJ.tabsAndIndents()),
                 wrap.apply(IntelliJ.wrappingAndBraces())
               )
@@ -2627,6 +2626,21 @@ class TabsAndIndentsTest implements RewriteTest {
                       ""\";
                   private final String singleLine = ""\"
                     noEndLine""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                        indent me!
+                        ""\", ""\"
+                        indent me too!
+                        ""\");
+                      method(
+                        ""\"
+                        indent me!
+                        ""\",
+                        ""\"
+                        indent me too!
+                        ""\"
+                      );
+                  }
               }
               """,
             """
@@ -2640,6 +2654,21 @@ class TabsAndIndentsTest implements RewriteTest {
                           ""\";
                   private final String singleLine = ""\"
                                                     noEndLine""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                             indent me!
+                             ""\", ""\"
+                                   indent me too!
+                                   ""\");
+                      method(
+                              ""\"
+                              indent me!
+                              ""\",
+                              ""\"
+                              indent me too!
+                              ""\"
+                      );
+                  }
               }
               """
           )
@@ -2663,17 +2692,81 @@ class TabsAndIndentsTest implements RewriteTest {
                     ""\"
                       NO
                       ""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                        indent me!
+                        ""\", ""\"
+                              indent me too!
+                              ""\");
+                      method(
+                        ""\"
+                        indent me!
+                        ""\",
+                        ""\"
+                        indent me too!
+                        ""\"
+                      );
+                  }
               }
               """,
             """
               class Test {
                   private final String foo = ""\"
-                    YES
-                    ""\";
+                          YES
+                          ""\";
                   private final String bar =
                           ""\"
-                            NO
-                            ""\";
+                                  NO
+                                  ""\";
+                  private void method(String one, String two) {
+                      method(""\"
+                              indent me!
+                              ""\", ""\"
+                              indent me too!
+                              ""\");
+                      method(
+                              ""\"
+                                      indent me!
+                                      ""\",
+                              ""\"
+                                      indent me too!
+                                      ""\"
+                      );
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void textBlocksNotAlignedTabs() {
+        rewriteRun(
+          autoFormat(
+            spaces -> spaces.withUseTabCharacter(true),
+            wrap -> wrap
+          ),
+          java(
+            """
+              class Test {
+                  private final String foo = ""\"
+              YES
+              ""\";
+                  private final String bar =
+              ""\"
+              NO
+              ""\";
+              }
+              """,
+            """
+              class Test { 
+                  private final String foo = ""\"
+              \t\t\tYES
+              \t\t\t""\";
+                  private final String bar =
+              \t\t\t""\"
+              \t\t\t\t\tNO
+              \t\t\t\t\t""\";
               }
               """
           )

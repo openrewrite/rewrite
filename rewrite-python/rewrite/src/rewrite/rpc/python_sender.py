@@ -8,6 +8,7 @@ from typing import Any
 
 from rewrite import Markers
 from rewrite.java import Space, JRightPadded, JLeftPadded, JContainer, J
+from rewrite.parser import ParseError
 from rewrite.python import CompilationUnit
 from rewrite.python.tree import (
     Async, Await, Binary, ChainedAssignment, ExceptionType,
@@ -138,6 +139,8 @@ class PythonRpcSender:
             self._visit_match_case(tree, q)
         elif isinstance(tree, Slice):
             self._visit_slice(tree, q)
+        elif isinstance(tree, ParseError):
+            self._visit_parse_error(tree, q)
         elif isinstance(tree, J):
             # Delegate to Java visitor for Java types
             self._visit_java(tree, q)
@@ -162,6 +165,21 @@ class PythonRpcSender:
                            lambda stmt: stmt.element.id,
                            lambda stmt: self._visit_right_padded(stmt, q))
         q.get_and_send(cu, lambda x: x.eof, lambda space: self._visit_space(space, q))
+
+    def _visit_parse_error(self, pe: ParseError, q: 'RpcSendQueue') -> None:
+        """Visit ParseError - sends all fields matching Java's ParseError.rpcSend order.
+
+        ParseError is NOT a J type (no prefix), so id and markers are sent here
+        rather than in _pre_visit.
+        """
+        q.get_and_send(pe, lambda x: x.id)
+        q.get_and_send(pe, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
+        q.get_and_send(pe, lambda x: str(x.source_path))
+        q.get_and_send(pe, lambda x: x.charset_name)
+        q.get_and_send(pe, lambda x: x.charset_bom_marked)
+        q.get_and_send(pe, lambda x: x.checksum)
+        q.get_and_send(pe, lambda x: x.file_attributes)
+        q.get_and_send(pe, lambda x: x.text)
 
     def _visit_async(self, async_: Async, q: 'RpcSendQueue') -> None:
         q.get_and_send(async_, lambda x: x.statement, lambda el: self._visit(el, q))
@@ -450,7 +468,12 @@ class PythonRpcSender:
     def _visit_literal(self, lit, q: 'RpcSendQueue') -> None:
         q.get_and_send(lit, lambda x: x.value)
         q.get_and_send(lit, lambda x: x.value_source)
-        q.get_and_send(lit, lambda x: x.unicode_escapes)
+        q.get_and_send_list(lit, lambda x: x.unicode_escapes,
+                            lambda s: str(s.value_source_index) + s.code_point,
+                            lambda s: (
+                                q.get_and_send(s, lambda u: u.value_source_index),
+                                q.get_and_send(s, lambda u: u.code_point),
+                            ))
         q.get_and_send(lit, lambda x: x.type, lambda t: self._visit_type(t, q))
 
     def _visit_import(self, imp, q: 'RpcSendQueue') -> None:
@@ -894,7 +917,7 @@ class PythonRpcSender:
         q.get_and_send(comment, lambda x: x.multiline)
         q.get_and_send(comment, lambda x: x.text)
         q.get_and_send(comment, lambda x: x.suffix)
-        q.get_and_send(comment, lambda x: x.markers)
+        q.get_and_send(comment, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
 
     def _visit_right_padded(self, rp: JRightPadded, q: 'RpcSendQueue') -> None:
         """Visit a JRightPadded wrapper."""
@@ -910,7 +933,7 @@ class PythonRpcSender:
             # Primitives (bool, etc.) - send without callback
             q.get_and_send(rp, lambda x: x.element)
         q.get_and_send(rp, lambda x: x.after, lambda space: self._visit_space(space, q))
-        q.get_and_send(rp, lambda x: x.markers)
+        q.get_and_send(rp, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
 
     def _visit_left_padded(self, lp: JLeftPadded, q: 'RpcSendQueue') -> None:
         """Visit a JLeftPadded wrapper."""
@@ -926,7 +949,7 @@ class PythonRpcSender:
         else:
             # Primitives (enums, etc.) - send without callback
             q.get_and_send(lp, lambda x: x.element)
-        q.get_and_send(lp, lambda x: x.markers)
+        q.get_and_send(lp, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
 
     def _visit_container(self, container: JContainer, q: 'RpcSendQueue') -> None:
         """Visit a JContainer wrapper."""
@@ -937,4 +960,4 @@ class PythonRpcSender:
         q.get_and_send_list(container, lambda x: x.padding.elements,
                            lambda el: el.element.id,
                            lambda el: self._visit_right_padded(el, q))
-        q.get_and_send(container, lambda x: x.markers)
+        q.get_and_send(container, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))

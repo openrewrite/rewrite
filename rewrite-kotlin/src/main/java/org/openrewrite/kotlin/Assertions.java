@@ -476,7 +476,19 @@ public final class Assertions {
             return inPackageDeclaration() || inImport() || isClassName() ||
                     isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
                     isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident) ||
-                    isInJavaDoc(ident) || isWhenLabel() || isUseSite();
+                    isInJavaDoc(ident) || isWhenLabel() || isUseSite() || isNamedArgument();
+        }
+
+        private boolean isNamedArgument() {
+            // Named argument identifiers (e.g., `s` in `foo(s = "hello")`) are labels, not variable references
+            Cursor parent = getCursor().getParentTreeCursor();
+            if (parent.getValue() instanceof J.Assignment) {
+                Cursor grandparent = parent.getParentTreeCursor();
+                Object gp = grandparent.getValue();
+                return gp instanceof J.MethodInvocation || gp instanceof J.NewClass ||
+                        gp instanceof K.ConstructorInvocation;
+            }
+            return false;
         }
 
         private boolean inPackageDeclaration() {

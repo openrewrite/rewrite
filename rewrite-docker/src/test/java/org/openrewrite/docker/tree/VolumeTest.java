@@ -32,7 +32,7 @@ class VolumeTest implements RewriteTest {
               VOLUME ["/data", "/logs"]
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Volume volume = (Docker.Volume) doc.getStages().getFirst().getInstructions().getLast();
+                var volume = (Docker.Volume) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(volume.getValues()).hasSize(2);
                 assertThat(volume.isJsonForm()).isTrue();
             })
@@ -49,7 +49,7 @@ class VolumeTest implements RewriteTest {
               VOLUME /data /logs
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Volume volume = (Docker.Volume) doc.getStages().getFirst().getInstructions().getLast();
+                var volume = (Docker.Volume) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(volume.getValues()).hasSize(2);
                 assertThat(volume.isJsonForm()).isFalse();
                 assertThat(((Docker.Literal) volume.getValues().get(0).getContents().getFirst()).getText()).isEqualTo("/data");

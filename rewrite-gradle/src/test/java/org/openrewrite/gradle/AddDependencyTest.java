@@ -97,6 +97,51 @@ class AddDependencyTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
+    void onlyIfUsingTestScopeWithMainSource(String onlyIfUsing) {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing)),
+          mavenProject("project",
+            srcMainJava(
+              java(
+                """
+                  public class Main {
+                  }
+                  """
+              )
+            ),
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    testImplementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
     void onlyIfUsingSmokeTestScope(String onlyIfUsing) {
         AddDependency addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, onlyIfUsing, null, null, null, null);
         rewriteRun(
@@ -1341,6 +1386,72 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void addWithExplicitConfigurationAndNoJavaSources() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, "implementation")),
+          mavenProject("project",
+            buildGradle(
+              """
+                plugins {
+                    id 'java'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id 'java'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addWithNoTypeFilterAndNoJavaSourcesDefaultsToImplementation() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, null)),
+          mavenProject("project",
+            buildGradle(
+              """
+                plugins {
+                    id 'java'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id 'java'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
     @Issue("https://github.com/moderneinc/customer-requests/issues/792")
     @Nested
     class AddToJVMTestSuite {
@@ -1760,6 +1871,54 @@ class AddDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doNotAddDependencyToAppliedScripts() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, "implementation")),
+          mavenProject("project",
+            buildGradle(
+              //language=groovy
+              """
+                plugins {
+                    id "java-library"
+                }
+    
+                repositories {
+                    mavenCentral()
+                }
+    
+                apply from: "dependencies.gradle"
+                """,
+              //language=groovy
+              """
+                plugins {
+                    id "java-library"
+                }
+    
+                repositories {
+                    mavenCentral()
+                }
+    
+                apply from: "dependencies.gradle"
+    
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            ),
+            buildGradle(
+              //language=groovy
+              """
+                dependencies {
+                }
+                """,
+              s -> s.path("dependencies.gradle")
+            )
+          )
+        );
+    }
+
 
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null);

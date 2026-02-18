@@ -44,9 +44,9 @@ def test_large_int():
     RecipeSpec().rewrite_run(python("assert 0xC03A0019", after_recipe=check_first_literal_type(JavaType.Primitive.Int)))
 
 
-# def test_byte_string_concatenation():
-#     # language=python
-#     RecipeSpec().rewrite_run(python("assert b'hello' b'world'", after_recipe=check_first_literal_type(JavaType.Primitive.String)))
+def test_byte_string_concatenation():
+    # language=python
+    RecipeSpec().rewrite_run(python("assert b'hello' b'world'", after_recipe=check_first_literal_type(JavaType.Primitive.String)))
 
 
 def test_bigint():

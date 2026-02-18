@@ -39,6 +39,7 @@ class Quoted(Marker):
         DOUBLE: Style
         TRIPLE_SINGLE: Style
         TRIPLE_DOUBLE: Style
+        BACKTICK: Style
 
     _id: UUID
     _style: Style
@@ -63,3 +64,33 @@ class SuppressNewline(Marker):
     def id(self) -> UUID: ...
 
     def with_id(self, id_: UUID) -> 'SuppressNewline': ...
+
+@dataclass(frozen=True)
+class PrintSyntax(Marker):
+    _id: UUID
+    _has_destination: bool
+    _trailing_comma: bool
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def has_destination(self) -> bool: ...
+    @property
+    def trailing_comma(self) -> bool: ...
+
+    def with_id(self, id_: UUID) -> 'PrintSyntax': ...
+    def with_has_destination(self, has_destination: bool) -> 'PrintSyntax': ...
+    def with_trailing_comma(self, trailing_comma: bool) -> 'PrintSyntax': ...
+
+@dataclass(frozen=True)
+class ExecSyntax(Marker):
+    _id: UUID
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+
+    def with_id(self, id_: UUID) -> 'ExecSyntax': ...

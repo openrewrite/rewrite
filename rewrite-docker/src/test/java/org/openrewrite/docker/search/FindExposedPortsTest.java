@@ -17,7 +17,7 @@ package org.openrewrite.docker.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.docker.table.DockerExposedPorts;
+import org.openrewrite.docker.table.ExposedPorts;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -34,7 +34,7 @@ class FindExposedPortsTest implements RewriteTest {
     @Test
     void findSinglePort() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerExposedPorts.class.getName(),
+          spec -> spec.dataTableAsCsv(ExposedPorts.class.getName(),
             """
               sourceFile,stageName,port,protocol
               Dockerfile,,80,
@@ -56,7 +56,7 @@ class FindExposedPortsTest implements RewriteTest {
     @Test
     void findMultiplePorts() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerExposedPorts.class.getName(),
+          spec -> spec.dataTableAsCsv(ExposedPorts.class.getName(),
             """
               sourceFile,stageName,port,protocol
               Dockerfile,,80,
@@ -79,7 +79,7 @@ class FindExposedPortsTest implements RewriteTest {
     @Test
     void findPortWithProtocol() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerExposedPorts.class.getName(),
+          spec -> spec.dataTableAsCsv(ExposedPorts.class.getName(),
             """
               sourceFile,stageName,port,protocol
               Dockerfile,,53,udp
@@ -102,7 +102,7 @@ class FindExposedPortsTest implements RewriteTest {
     @Test
     void findPortRange() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerExposedPorts.class.getName(),
+          spec -> spec.dataTableAsCsv(ExposedPorts.class.getName(),
             """
               sourceFile,stageName,port,protocol
               Dockerfile,,8000-8100,
@@ -124,7 +124,7 @@ class FindExposedPortsTest implements RewriteTest {
     @Test
     void findPortWithStageName() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerExposedPorts.class.getName(),
+          spec -> spec.dataTableAsCsv(ExposedPorts.class.getName(),
             """
               sourceFile,stageName,port,protocol
               Dockerfile,app,8080,
@@ -155,7 +155,7 @@ class FindExposedPortsTest implements RewriteTest {
     void filterByPortPattern() {
         rewriteRun(
           spec -> spec.recipe(new FindExposedPorts("80*"))
-            .dataTableAsCsv(DockerExposedPorts.class.getName(),
+            .dataTableAsCsv(ExposedPorts.class.getName(),
               """
                 sourceFile,stageName,port,protocol
                 Dockerfile,,80,
@@ -179,7 +179,7 @@ class FindExposedPortsTest implements RewriteTest {
     void filterByProtocol() {
         rewriteRun(
           spec -> spec.recipe(new FindExposedPorts("*/udp"))
-            .dataTableAsCsv(DockerExposedPorts.class.getName(),
+            .dataTableAsCsv(ExposedPorts.class.getName(),
               """
                 sourceFile,stageName,port,protocol
                 Dockerfile,,53,udp
@@ -214,7 +214,7 @@ class FindExposedPortsTest implements RewriteTest {
     @Test
     void multipleExposeInstructions() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(DockerExposedPorts.class.getName(),
+          spec -> spec.dataTableAsCsv(ExposedPorts.class.getName(),
             """
               sourceFile,stageName,port,protocol
               Dockerfile,,80,

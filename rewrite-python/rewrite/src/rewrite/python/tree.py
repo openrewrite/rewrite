@@ -612,16 +612,7 @@ class StatementExpression(Py, Expression, Statement):
         if 'markers' in kwargs:
             new_statement = kwargs.get('statement', self._statement).replace(markers=kwargs.pop('markers'))
             kwargs['statement'] = new_statement
-        # Map remaining kwargs
-        mapped = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_') and hasattr(self, f'_{key}'):
-                mapped[f'_{key}'] = value
-            else:
-                mapped[key] = value
-        if not mapped:
-            return self
-        return dataclass_replace(self, **mapped)
+        return replace_if_changed(self, **kwargs)
 
     def accept_python(self, v: PythonVisitor[P], p: P) -> J:
         return v.visit_statement_expression(self, p)
@@ -960,6 +951,13 @@ class FormattedString(Py, Expression, TypedTree):
     @property
     def parts(self) -> List[Expression]:
         return self._parts
+
+
+    _type: Optional[JavaType]
+
+    @property
+    def type(self) -> Optional[JavaType]:
+        return self._type
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode

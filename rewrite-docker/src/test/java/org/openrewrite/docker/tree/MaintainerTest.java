@@ -32,7 +32,7 @@ class MaintainerTest implements RewriteTest {
               MAINTAINER John Doe <john@example.com>
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Maintainer maintainer = (Docker.Maintainer) doc.getStages().getFirst().getInstructions().getFirst();
+                var maintainer = (Docker.Maintainer) doc.getStages().getFirst().getInstructions().getFirst();
                 assertThat(((Docker.Literal) maintainer.getText().getContents().getFirst()).getText()).isEqualTo("John Doe <john@example.com>");
             })
           )
