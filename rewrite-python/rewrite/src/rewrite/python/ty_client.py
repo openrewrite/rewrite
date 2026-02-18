@@ -91,7 +91,7 @@ class TyTypesClient:
 
         try:
             self._process = subprocess.Popen(
-                [str(binary)],
+                [str(binary), '--serve'],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -104,9 +104,14 @@ class TyTypesClient:
 
     @staticmethod
     def _find_binary() -> Optional[Path]:
-        """Find the ty-types binary on PATH."""
-        import shutil
+        """Find the ty-types binary via the ty-types package or PATH."""
+        try:
+            from ty_types.__main__ import find_ty_types_bin
+            return Path(find_ty_types_bin())
+        except (ImportError, FileNotFoundError):
+            pass
 
+        import shutil
         ty_types = shutil.which('ty-types')
         if ty_types:
             return Path(ty_types)

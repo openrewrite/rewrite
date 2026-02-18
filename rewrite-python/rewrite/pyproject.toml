@@ -36,9 +36,7 @@ dev = [
     "ruff>=0.1.0",
 ]
 typing = [
-    # Type attribution requires the ty-types binary on PATH.
-    # Build from https://github.com/moderneinc/ty-types:
-    #   cargo build --release && cp target/release/ty-types ~/.local/bin/
+    "ty-types>=0.1.0",  # Type inference CLI for Python type attribution
 ]
 publish = [
     "build>=1.0.0",
