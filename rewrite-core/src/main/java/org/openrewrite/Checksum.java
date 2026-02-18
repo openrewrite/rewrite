@@ -25,6 +25,7 @@ import org.openrewrite.rpc.RpcSendQueue;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -52,6 +53,15 @@ public class Checksum implements RpcCodec<Checksum> {
     public static Checksum fromHex(String algorithm, String hex) {
         if (hex.length() % 2 != 0) {
             throw new IllegalArgumentException("Hex string must contain a set of hex pairs (length divisible by 2).");
+        }
+        for (int i = 0; i < hex.length(); i++) {
+            char c = hex.charAt(i);
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
+                throw new IllegalArgumentException(
+                        "Input is not valid hexadecimal at position " + i + ": '" +
+                        hex.substring(0, Math.min(hex.length(), 40)) +
+                        (hex.length() > 40 ? "..." : "") + "'");
+            }
         }
 
         byte[] value = new byte[hex.length() / 2];
@@ -83,7 +93,11 @@ public class Checksum implements RpcCodec<Checksum> {
                 .withMethod(HttpSender.Method.GET)
                 .build();
         try (HttpSender.Response response = httpSender.send(request)) {
-            String hexString = new String(response.getBodyAsBytes(), StandardCharsets.UTF_8);
+            if (!response.isSuccessful()) {
+                throw new UncheckedIOException(new IOException(
+                        "Failed to download checksum from " + uri + ": HTTP " + response.getCode()));
+            }
+            String hexString = new String(response.getBodyAsBytes(), StandardCharsets.UTF_8).trim();
             return Checksum.fromHex(algorithm, hexString);
         }
     }

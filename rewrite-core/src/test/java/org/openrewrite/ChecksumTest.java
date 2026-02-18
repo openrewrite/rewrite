@@ -36,7 +36,7 @@ class ChecksumTest {
 
     @Test
     void fromHexRejectsNonHexInput() {
-        assertThatThrownBy(() -> Checksum.fromHex("SHA-256", "<?xml version"))
+        assertThatThrownBy(() -> Checksum.fromHex("SHA-256", "<?"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("not valid hexadecimal");
     }
