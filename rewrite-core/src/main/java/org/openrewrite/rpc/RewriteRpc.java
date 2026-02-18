@@ -160,15 +160,9 @@ public class RewriteRpc {
         jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, (id, opts) -> {
             RecipeListing listing = marketplace.findRecipe(id);
             if (listing != null) {
-                try {
-                    return listing.prepare(resolvers, opts);
-                } catch (IllegalStateException e) {
-                    // Resolver not available for this ecosystem (e.g., Maven resolver not
-                    // provided to this RPC endpoint). Fall through to class-based loading.
-                }
+                return listing.prepare(resolvers, opts);
             }
             // Fall back to loading by class name if not found in marketplace
-            // or if no resolver is available for the recipe's ecosystem
             return new RecipeLoader(null).load(id, opts);
         }));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
