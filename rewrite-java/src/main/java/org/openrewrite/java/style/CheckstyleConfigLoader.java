@@ -1087,6 +1087,4 @@ public class CheckstyleConfigLoader {
 
         return result;
     }
-
-
 }
