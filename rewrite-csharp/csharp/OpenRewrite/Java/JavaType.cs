@@ -1,4 +1,4 @@
-namespace Rewrite.Java;
+namespace OpenRewrite.Java;
 
 /// <summary>
 /// Type attribution for LST elements.

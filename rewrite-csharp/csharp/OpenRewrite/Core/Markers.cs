@@ -1,6 +1,6 @@
-using Rewrite.Core.Rpc;
+using OpenRewrite.Core.Rpc;
 
-namespace Rewrite.Core;
+namespace OpenRewrite.Core;
 
 /// <summary>
 /// A marker that can be attached to any LST element to carry additional metadata.

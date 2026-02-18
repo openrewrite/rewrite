@@ -1,9 +1,9 @@
+using OpenRewrite.Core;
+using OpenRewrite.CSharp;
 using Rewrite.Core;
-using Rewrite.CSharp;
-using Xunit;
-using ExecutionContext = Rewrite.Core.ExecutionContext;
+using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
-namespace Rewrite.Test;
+namespace OpenRewrite.Test;
 
 /// <summary>
 /// Base class for rewrite tests with round-trip validation and recipe execution.

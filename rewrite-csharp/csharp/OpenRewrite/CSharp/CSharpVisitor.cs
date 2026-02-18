@@ -1,7 +1,6 @@
-using Rewrite.Core;
-using Rewrite.Java;
+using OpenRewrite.Java;
 
-namespace Rewrite.CSharp;
+namespace OpenRewrite.CSharp;
 
 /// <summary>
 /// Visitor for C# LST elements. Extends JavaVisitor to handle J types,
@@ -45,6 +44,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             TupleExpression te => VisitTupleExpression(te, p),
             ConditionalDirective cd => VisitConditionalDirective(cd, p),
             PragmaWarningDirective pwd => VisitPragmaWarningDirective(pwd, p),
+            PragmaChecksumDirective pcd => VisitPragmaChecksumDirective(pcd, p),
             NullableDirective nd => VisitNullableDirective(nd, p),
             RegionDirective rd => VisitRegionDirective(rd, p),
             EndRegionDirective erd => VisitEndRegionDirective(erd, p),
@@ -549,6 +549,11 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     public virtual J VisitPragmaWarningDirective(PragmaWarningDirective pragmaWarningDirective, P p)
     {
         return pragmaWarningDirective;
+    }
+
+    public virtual J VisitPragmaChecksumDirective(PragmaChecksumDirective pragmaChecksumDirective, P p)
+    {
+        return pragmaChecksumDirective;
     }
 
     public virtual J VisitNullableDirective(NullableDirective nullableDirective, P p)

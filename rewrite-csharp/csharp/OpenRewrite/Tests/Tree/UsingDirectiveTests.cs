@@ -1,6 +1,6 @@
-using Rewrite.Test;
+using OpenRewrite.Test;
 
-namespace Rewrite.CSharp.Tests.Tree;
+namespace OpenRewrite.Tests.Tree;
 
 public class UsingDirectiveTests : RewriteTest
 {

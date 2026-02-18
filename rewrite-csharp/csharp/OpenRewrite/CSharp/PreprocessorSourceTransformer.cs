@@ -1,7 +1,4 @@
-using System.Text;
-using System.Text.RegularExpressions;
-
-namespace Rewrite.CSharp;
+namespace OpenRewrite.CSharp;
 
 /// <summary>
 /// Preprocesses C# source text containing conditional directives (#if/#elif/#else/#endif)

@@ -1,9 +1,9 @@
-using Rewrite.Core;
-using Rewrite.Core.Rpc;
-using Rewrite.Java;
-using Rewrite.Java.Rpc;
+using OpenRewrite.Core;
+using OpenRewrite.Core.Rpc;
+using OpenRewrite.Java;
+using OpenRewrite.Java.Rpc;
 
-namespace Rewrite.CSharp.Rpc;
+namespace OpenRewrite.CSharp.Rpc;
 
 /// <summary>
 /// Deserializes C# AST elements via the RPC protocol.
@@ -239,7 +239,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var kind = q.Receive(ad.Kind, lp => _delegate.VisitLeftPadded(lp, q));
         var expressionBody = q.Receive(ad.ExpressionBody, lp => _delegate.VisitLeftPadded(lp!, q));
         var body = q.Receive((J?)ad.Body, el => (J)VisitNonNull(el!, q));
-        return ad.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithModifiers(modifiers!).WithKind(kind).WithExpressionBody(expressionBody).WithBody((Block?)body);
+        return ad.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithModifiers(modifiers!).WithKind(kind!).WithExpressionBody(expressionBody).WithBody((Block?)body);
     }
 
     // ---- AttributeList ----
@@ -255,7 +255,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var name = q.Receive(ne.Name, rp => _delegate.VisitRightPadded(rp, q));
         var expression = q.Receive((J)ne.Expression, el => (J)VisitNonNull(el, q));
-        return ne.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name).WithExpression((Expression)expression!);
+        return ne.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name!).WithExpression((Expression)expression!);
     }
 
     // ---- RefExpression ----
@@ -287,7 +287,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var expression = q.Receive((J)ip.Expression, el => (J)VisitNonNull(el, q));
         var pattern = q.Receive(ip.Pattern, lp => _delegate.VisitLeftPadded(lp, q));
-        return ip.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((Expression)expression!).WithPattern(pattern);
+        return ip.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((Expression)expression!).WithPattern(pattern!);
     }
 
     // ---- StatementExpression ----
@@ -357,7 +357,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var op = q.Receive(rp.Operator, lp => _delegate.VisitLeftPadded(lp, q));
         var value = q.Receive((J)rp.Value, el => (J)VisitNonNull(el, q));
-        return rp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithOperator(op).WithValue((Expression)value!);
+        return rp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithOperator(op!).WithValue((Expression)value!);
     }
 
     // ---- PropertyPattern ----
@@ -365,7 +365,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var typeQualifier = q.Receive((J?)pp.TypeQualifier, el => (J)VisitNonNull(el!, q));
         var subpatterns = q.Receive(pp.Subpatterns, c => _delegate.VisitContainer(c, q));
-        return pp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTypeQualifier((TypeTree?)typeQualifier).WithSubpatterns(subpatterns);
+        return pp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTypeQualifier((TypeTree?)typeQualifier).WithSubpatterns(subpatterns!);
     }
 
     // ---- ConstrainedTypeParameter ----
@@ -450,7 +450,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         if (usings != null) allMembers.AddRange(usings);
         if (members != null) allMembers.AddRange(members);
 
-        return ns.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name).WithMembers(allMembers).WithEnd(end!);
+        return ns.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name!).WithMembers(allMembers).WithEnd(end!);
     }
 
     // ---- TupleType ----
@@ -458,14 +458,14 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var elements = q.Receive(tt.Elements, c => _delegate.VisitContainer(c, q));
         q.Receive<object?>(null); // type attribution
-        return tt.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithElements(elements);
+        return tt.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithElements(elements!);
     }
 
     // ---- TupleExpression ----
     public override J VisitTupleExpression(TupleExpression te, RpcReceiveQueue q)
     {
         var arguments = q.Receive(te.Arguments, c => _delegate.VisitContainer(c, q));
-        return te.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithArguments(arguments);
+        return te.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithArguments(arguments!);
     }
 
     // ---- ConditionalDirective ----
@@ -478,7 +478,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         {
             var existing = i < cd.DirectiveLines.Count ? cd.DirectiveLines[i] : null;
             var lineNumber = q.Receive<int>(existing?.LineNumber ?? 0);
-            var text = q.Receive<string>(existing?.Text ?? "");
+            var text = q.Receive<string>(existing?.Text ?? "")!;
             var kind = (PreprocessorDirectiveKind)q.Receive<int>((int)(existing?.Kind ?? 0));
             var groupId = q.Receive<int>(existing?.GroupId ?? 0);
             var activeBranchIndex = q.Receive<int>(existing?.ActiveBranchIndex ?? -1);

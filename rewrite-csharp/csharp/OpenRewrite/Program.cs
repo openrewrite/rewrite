@@ -1,5 +1,5 @@
-using Rewrite.CSharp;
-using Rewrite.CSharp.Rpc;
+using OpenRewrite.CSharp;
+using OpenRewrite.CSharp.Rpc;
 
 // Pre-initialize the parser before starting the RPC server
 // This prevents initialization delays during RPC handling

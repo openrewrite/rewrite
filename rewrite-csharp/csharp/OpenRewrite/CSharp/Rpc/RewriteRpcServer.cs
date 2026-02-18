@@ -1,19 +1,19 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
-using System.Text.Json;
 using System.Xml.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
-using Rewrite.Core;
-using Rewrite.Core.Rpc;
-using Rewrite.Java;
+using OpenRewrite.Core;
+using OpenRewrite.Core.Rpc;
+using OpenRewrite.Java;
 using StreamJsonRpc;
-using static Rewrite.Core.Rpc.RpcObjectData.ObjectState;
+using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
+using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
-namespace Rewrite.CSharp.Rpc;
+namespace OpenRewrite.CSharp.Rpc;
 
 public class RewriteRpcServer
 {
@@ -856,7 +856,7 @@ public class RewriteRpcServer
             throw new InvalidOperationException($"Tree not found: {request.TreeId}");
         }
 
-        var ctx = new Core.ExecutionContext();
+        var ctx = new ExecutionContext();
         var visitor = recipe.GetVisitor();
         var result = visitor.Visit(tree, ctx);
 
