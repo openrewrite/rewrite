@@ -501,7 +501,7 @@ class PythonRpcReceiver:
         annotations = q.receive_list(ident.annotations)
         simple_name = q.receive(ident.simple_name)
         type_ = q.receive(ident.type)
-        field_type = q.receive(ident.field_type)
+        field_type = q.receive(ident.field_type, lambda t: self._receive_type(t, q))
         return replace_if_changed(ident, annotations=annotations, simple_name=simple_name, type=type_, field_type=field_type)
 
     def _visit_literal(self, lit, q: RpcReceiveQueue):
@@ -678,7 +678,7 @@ class PythonRpcReceiver:
             var.padding.initializer if hasattr(var.padding, 'initializer') else None,
             lambda lp: self._receive_left_padded(lp, q) if lp else None
         )
-        variable_type = q.receive(var.variable_type)
+        variable_type = q.receive(var.variable_type, lambda t: self._receive_type(t, q))
         return replace_if_changed(var, name=name, dimensions_after_name=dimensions_after_name,
                                   initializer=initializer, variable_type=variable_type)
 
@@ -1012,6 +1012,22 @@ class PythonRpcReceiver:
             class_type._members = members
             class_type._methods = methods
             return class_type
+
+        elif isinstance(java_type, JT.Variable):
+            # Variable: name, owner, type, annotations (no flags over RPC)
+            name = q.receive(getattr(java_type, '_name', ''))
+            owner = q.receive(getattr(java_type, '_owner', None),
+                               lambda t: self._receive_type(t, q))
+            type_ = q.receive(getattr(java_type, '_type', None),
+                               lambda t: self._receive_type(t, q))
+            annotations = q.receive_list(getattr(java_type, '_annotations', None) or [],
+                                          lambda t: self._receive_type(t, q))
+            var = JT.Variable()
+            var._name = name
+            var._owner = owner
+            var._type = type_
+            var._annotations = annotations
+            return var
 
         elif isinstance(java_type, JT.Unknown):
             # Unknown has no additional fields
@@ -1351,6 +1367,25 @@ def _receive_java_type_class(cls, q: RpcReceiveQueue):
     return class_type
 
 
+def _receive_java_type_variable(variable, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Variable - consumes all variable fields."""
+    from rewrite.java.support_types import JavaType as JT
+
+    # Receive fields in the same order as JavaTypeSender.visitVariable:
+    # name, owner, type, annotations (no flags over RPC)
+    name = q.receive(variable._name if variable else '')
+    owner = q.receive(variable._owner if variable else None)
+    type_ = q.receive(variable._type if variable else None)
+    annotations = q.receive_list(variable._annotations if variable else None)
+
+    var = JT.Variable()
+    var._name = name
+    var._owner = owner
+    var._type = type_
+    var._annotations = annotations
+    return var
+
+
 def _register_java_type_codecs():
     """Register codecs for JavaType classes."""
     from rewrite.java.support_types import JavaType as JT
@@ -1387,6 +1422,14 @@ def _register_java_type_codecs():
         JT.Class,
         _receive_java_type_class,
         lambda: JT.Class()  # Factory creates empty Class
+    )
+
+    # JavaType.Variable - full serialization of variable type info
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Variable',
+        JT.Variable,
+        _receive_java_type_variable,
+        lambda: JT.Variable()  # Factory creates empty Variable
     )
 
 

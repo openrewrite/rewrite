@@ -463,7 +463,7 @@ class PythonRpcSender:
                            lambda a: self._visit(a, q))
         q.get_and_send(ident, lambda x: x.simple_name)
         q.get_and_send(ident, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
-        q.get_and_send(ident, lambda x: x.field_type)
+        q.get_and_send(ident, lambda x: x.field_type, lambda t: self._visit_type(t, q) if t else None)
 
     def _visit_literal(self, lit, q: 'RpcSendQueue') -> None:
         q.get_and_send(lit, lambda x: x.value)
@@ -655,7 +655,7 @@ class PythonRpcSender:
                            lambda el: self._visit_left_padded(el, q))
         q.get_and_send(var, lambda x: x.padding.initializer if hasattr(x.padding, 'initializer') else None,
                       lambda lp: self._visit_left_padded(lp, q) if lp else None)
-        q.get_and_send(var, lambda x: x.variable_type)
+        q.get_and_send(var, lambda x: x.variable_type, lambda t: self._visit_type(t, q) if t else None)
 
     def _visit_j_class_declaration(self, class_decl, q: 'RpcSendQueue') -> None:
         # Java ClassDeclaration: leadingAnnotations, modifiers, kind, name, typeParameters, primaryConstructor, extends, implements, permits, body
@@ -879,6 +879,13 @@ class PythonRpcSender:
             q.get_and_send_list(java_type, lambda x: getattr(x, '_members', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
             q.get_and_send_list(java_type, lambda x: getattr(x, '_methods', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
 
+        elif isinstance(java_type, JT.Variable):
+            # Variable: name, owner, type, annotations (no flags over RPC)
+            q.get_and_send(java_type, lambda x: x._name)
+            q.get_and_send(java_type, lambda x: x._owner, lambda t: self._visit_type(t, q))
+            q.get_and_send(java_type, lambda x: x._type, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: x._annotations or [], self._type_signature, lambda t: self._visit_type(t, q))
+
         elif isinstance(java_type, JT.Unknown):
             # Unknown has no additional fields
             pass
@@ -897,6 +904,9 @@ class PythonRpcSender:
             declaring = getattr(java_type, '_declaring_type', None)
             declaring_name = self._type_signature(declaring) if declaring else ''
             return f"{declaring_name}#{java_type._name}"
+        if isinstance(java_type, JT.Variable):
+            owner_sig = self._type_signature(java_type._owner) if java_type._owner else ''
+            return f"{owner_sig}{{name={java_type._name},type={self._type_signature(java_type._type)}}}"
         return str(id(java_type))
 
     def _visit_space(self, space: Space, q: 'RpcSendQueue') -> None:
