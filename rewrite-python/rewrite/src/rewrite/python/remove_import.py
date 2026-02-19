@@ -111,6 +111,13 @@ class RemoveImport(PythonVisitor):
                 super().__init__()
                 self.in_import = False
 
+            def visit_import(self, import_: Import, p) -> J:
+                # Don't collect identifiers from standalone import statements
+                self.in_import = True
+                result = super().visit_import(import_, p)
+                self.in_import = False
+                return result
+
             def visit_multi_import(self, multi: MultiImport, p) -> J:
                 # Don't collect identifiers from import statements
                 self.in_import = True
