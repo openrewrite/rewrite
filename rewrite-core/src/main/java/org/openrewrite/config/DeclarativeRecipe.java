@@ -590,7 +590,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     @Override
     protected RecipeDescriptor createRecipeDescriptor() {
         List<RecipeDescriptor> recipeList = new ArrayList<>();
-        for (Recipe childRecipe : getRecipeList()) {
+        for (Recipe childRecipe : this.recipeList) {
             recipeList.add(childRecipe.getDescriptor());
         }
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription() != null ? getDescription() : "",

@@ -97,11 +97,38 @@ class DeclarativeRecipeTest implements RewriteTest {
         );
         dr.initialize(List.of());
         assertThat(dr.getDescriptor().getRecipeList())
-          .hasSize(3) // precondition + 2 recipes with options
+          .hasSize(2)
           .flatExtracting(RecipeDescriptor::getOptions)
           .hasSize(2)
           .extracting(OptionDescriptor::getName)
           .containsOnly("toText");
+    }
+
+    @Test
+    void descriptorDoesNotLeakBellwetherWhenPreconditionsPresent() {
+        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+          null, URI.create("dummy"), true, emptyList());
+        dr.addPrecondition(
+          toRecipe(() -> new PlainTextVisitor<>() {
+              @Override
+              public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                  if ("1".equals(text.getText())) {
+                      return SearchResult.found(text);
+                  }
+                  return text;
+              }
+          })
+        );
+        dr.addUninitialized(new ChangeText("2"));
+        dr.addUninitialized(new ChangeText("3"));
+        dr.initialize(List.of());
+
+        RecipeDescriptor descriptor = dr.getDescriptor();
+        assertThat(descriptor.getRecipeList())
+          .hasSize(2)
+          .extracting(RecipeDescriptor::getName)
+          .noneMatch(name -> name.contains("Bellwether"))
+          .noneMatch(name -> name.contains("BellwetherDecorated"));
     }
 
     @Test
