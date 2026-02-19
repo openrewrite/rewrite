@@ -344,7 +344,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     @Override
     public J visitClassOrStructConstraint(Cs.ClassOrStructConstraint classOrStructConstraint, RpcReceiveQueue q) {
         return classOrStructConstraint
-                .withKind(q.receiveAndGet(classOrStructConstraint.getKind(), toEnum(Cs.ClassOrStructConstraint.TypeKind.class)));
+                .withKind(q.receiveAndGet(classOrStructConstraint.getKind(), toEnum(Cs.ClassOrStructConstraint.TypeKind.class)))
+                .withNullable(q.receive(classOrStructConstraint.isNullable()));
     }
 
     @Override
