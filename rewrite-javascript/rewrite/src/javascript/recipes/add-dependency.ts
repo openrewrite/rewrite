@@ -25,8 +25,8 @@ import {
     allDependencyScopes,
     DependencyScope,
     findNodeResolutionResult,
-    NpmrcScope,
-    PackageManager
+    PackageManager,
+    serializeNpmrcConfigs
 } from "../node-resolution-result";
 import {emptyMarkers, markupWarn} from "../../markers";
 import {TreePrinters} from "../../print";
@@ -36,6 +36,7 @@ import {
     DependencyRecipeAccumulator,
     getAllLockFileNames,
     getLockFileName,
+    parseNpmrcScopes,
     parseLockFileContent,
     runInstallIfNeeded,
     runInstallInTempDir,
@@ -183,13 +184,11 @@ export class AddDependency extends ScanningRecipe<Accumulator> {
 
                 const pm = marker.packageManager ?? PackageManager.Npm;
 
-                // Extract project-level .npmrc config from marker
+                // Serialize npmrc configs from marker using requested scopes
                 const configFiles: Record<string, string> = {};
-                const projectNpmrc = marker.npmrcConfigs?.find(c => c.scope === NpmrcScope.Project);
-                if (projectNpmrc) {
-                    const lines = Object.entries(projectNpmrc.properties)
-                        .map(([key, value]) => `${key}=${value}`);
-                    configFiles['.npmrc'] = lines.join('\n');
+                const npmrcContent = serializeNpmrcConfigs(marker.npmrcConfigs, parseNpmrcScopes(recipe.npmrcScopes));
+                if (npmrcContent) {
+                    configFiles['.npmrc'] = npmrcContent;
                 }
 
                 acc.projectsToUpdate.set(doc.sourcePath, {
