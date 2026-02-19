@@ -15,7 +15,6 @@
  */
 package org.openrewrite.python.marketplace;
 
-import lombok.RequiredArgsConstructor;
 import org.openrewrite.python.rpc.InstallRecipesResponse;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.marketplace.RecipeBundle;
@@ -26,9 +25,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-@RequiredArgsConstructor
 public class PipRecipeBundleResolver implements RecipeBundleResolver {
-    private final PythonRewriteRpc rpc;
+    private volatile PythonRewriteRpc rpc;
+
+    public PipRecipeBundleResolver() {
+    }
+
+    public PipRecipeBundleResolver(PythonRewriteRpc rpc) {
+        this.rpc = rpc;
+    }
 
     @Override
     public String getEcosystem() {
@@ -37,6 +42,11 @@ public class PipRecipeBundleResolver implements RecipeBundleResolver {
 
     @Override
     public RecipeBundleReader resolve(RecipeBundle bundle) {
+        PythonRewriteRpc rpc = this.rpc;
+        if (rpc == null) {
+            rpc = PythonRewriteRpc.getOrStart();
+            this.rpc = rpc;
+        }
         Path pkgPath = Paths.get(bundle.getPackageName());
         InstallRecipesResponse response;
         if (Files.exists(pkgPath)) {
