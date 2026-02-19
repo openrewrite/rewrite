@@ -209,14 +209,14 @@ def generate_id() -> str:
     return str(uuid4())
 
 
-def parse_python_file(path: str, relative_to: Optional[str] = None) -> dict:
+def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=None) -> dict:
     """Parse a Python file and return its LST."""
     with open(path, 'r', encoding='utf-8') as f:
         source = f.read()
-    return parse_python_source(source, path, relative_to)
+    return parse_python_source(source, path, relative_to, ty_client)
 
 
-def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None) -> dict:
+def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None, ty_client=None) -> dict:
     """Parse Python source code and return its LST.
 
     The parser used depends on the REWRITE_PYTHON_VERSION environment variable:
@@ -241,7 +241,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             try:
                 source_for_ast = source[1:] if source.startswith('\ufeff') else source
                 tree = ast.parse(source_for_ast, path)
-                cu = ParserVisitor(source, path).visit(tree)
+                cu = ParserVisitor(source, path, ty_client).visit(tree)
             except SyntaxError:
                 from rewrite.python._py2_parser_visitor import Py2ParserVisitor
                 cu = Py2ParserVisitor(source, path, _python_version).parse()
@@ -256,7 +256,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             tree = ast.parse(source_for_ast, path)
 
             # Convert to OpenRewrite LST
-            cu = ParserVisitor(source, path).visit(tree)
+            cu = ParserVisitor(source, path, ty_client).visit(tree)
 
         cu = cu.replace(source_path=source_path)
         cu = cu.replace(markers=Markers.EMPTY)
@@ -324,22 +324,33 @@ def handle_parse(params: dict) -> List[str]:
     relative_to = params.get('relativeTo')
     results = []
 
-    for i, input_item in enumerate(inputs):
-        if isinstance(input_item, str):
-            # PathInput serialized via @JsonValue as a bare path string
-            result = parse_python_file(input_item, relative_to)
-        elif 'path' in input_item:
-            # File input as dict
-            result = parse_python_file(input_item['path'], relative_to)
-        elif 'text' in input_item or 'source' in input_item:
-            # String input - Java sends 'text' and 'sourcePath'
-            source = input_item.get('text') or input_item.get('source')
-            path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-            result = parse_python_source(source, path, relative_to)
-        else:
-            logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
-            continue
-        results.append(result['id'])
+    # Create a ty-types client for this parse batch, initialized with the project root
+    ty_client = None
+    try:
+        from rewrite.python.ty_client import TyTypesClient
+        ty_client = TyTypesClient()
+        if relative_to:
+            ty_client.initialize(relative_to)
+    except (ImportError, RuntimeError):
+        pass  # ty-types not available
+
+    try:
+        for i, input_item in enumerate(inputs):
+            if isinstance(input_item, str):
+                result = parse_python_file(input_item, relative_to, ty_client)
+            elif 'path' in input_item:
+                result = parse_python_file(input_item['path'], relative_to, ty_client)
+            elif 'text' in input_item or 'source' in input_item:
+                source = input_item.get('text') or input_item.get('source')
+                path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
+                result = parse_python_source(source, path, relative_to, ty_client)
+            else:
+                logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
+                continue
+            results.append(result['id'])
+    finally:
+        if ty_client is not None:
+            ty_client.shutdown()
 
     return results
 
@@ -354,18 +365,29 @@ def handle_parse_project(params: dict) -> List[dict]:
 
     results = []
 
-    for root, dirs, files in os.walk(project_path):
-        # Filter out excluded directories
-        dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, excl) for excl in exclusions)]
+    ty_client = None
+    try:
+        from rewrite.python.ty_client import TyTypesClient
+        ty_client = TyTypesClient()
+        ty_client.initialize(project_path)
+    except (ImportError, RuntimeError):
+        pass
 
-        for file in files:
-            if file.endswith('.py'):
-                path = os.path.join(root, file)
-                try:
-                    result = parse_python_file(path, relative_to)
-                    results.append(result)
-                except Exception as e:
-                    logger.error(f"Error parsing {path}: {e}")
+    try:
+        for root, dirs, files in os.walk(project_path):
+            dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, excl) for excl in exclusions)]
+
+            for file in files:
+                if file.endswith('.py'):
+                    path = os.path.join(root, file)
+                    try:
+                        result = parse_python_file(path, relative_to, ty_client)
+                        results.append(result)
+                    except Exception as e:
+                        logger.error(f"Error parsing {path}: {e}")
+    finally:
+        if ty_client is not None:
+            ty_client.shutdown()
 
     return results
 
@@ -488,13 +510,6 @@ def handle_reset(params: dict) -> bool:
     _execution_contexts.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
-
-    # Reset TyLspClient if it was initialized
-    try:
-        from rewrite.python.ty_client import TyLspClient
-        TyLspClient.reset()
-    except ImportError:
-        pass  # ty not available
 
     logger.info("Reset: cleared all cached state")
     return True
@@ -1380,12 +1395,7 @@ def main():
             traceback.print_exc()
             break
 
-    # Shutdown TyLspClient if it was initialized
-    try:
-        from rewrite.python.ty_client import TyLspClient
-        TyLspClient.reset()
-    except ImportError:
-        pass  # ty not available
+    # No ty-types cleanup needed here — clients are scoped per parse batch
 
     logger.info("Python RPC server shutting down...")
 

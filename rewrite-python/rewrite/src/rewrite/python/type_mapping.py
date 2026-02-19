@@ -33,13 +33,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ..java import JavaType
 
-# Try to import TyTypesClient, but make it optional for parsing to work without ty-types
-_TY_AVAILABLE = False
-try:
-    from .ty_client import TyTypesClient
-    _TY_AVAILABLE = True
-except ImportError:
-    TyTypesClient = None  # type: ignore
 
 
 # Mapping of Python builtin types to JavaType.Primitive
@@ -81,13 +74,15 @@ class PythonTypeMapping:
     # Cache for type mappings to avoid repeated class type creation
     _type_cache: Dict[str, JavaType] = {}
 
-    def __init__(self, source: str, file_path: Optional[str] = None):
+    def __init__(self, source: str, file_path: Optional[str] = None, ty_client=None):
         """Initialize type mapping for a source file.
 
         Args:
             source: The Python source code.
             file_path: Optional file path for the source. If provided,
                       it will be used for ty-types queries.
+            ty_client: Optional TyTypesClient instance. If provided and
+                      already initialized, fetches types from ty-types.
         """
         self._source = source
         self._file_path = file_path
@@ -104,25 +99,23 @@ class PythonTypeMapping:
         self._call_signature_index: Dict[Tuple[int, int], Dict[str, Any]] = {}  # (start, end) -> callSignature
 
         # Fetch all types in one batch call
-        if _TY_AVAILABLE:
+        if ty_client is not None:
             try:
-                self._fetch_types(source, file_path)
+                self._fetch_types(source, file_path, ty_client)
             except RuntimeError:
-                # ty-types not installed
                 pass
 
-    def _fetch_types(self, source: str, file_path: Optional[str]) -> None:
-        """Fetch all types for this file from ty-types."""
-        client = TyTypesClient.get()
+    def _fetch_types(self, source: str, file_path: Optional[str], client) -> None:
+        """Fetch all types for this file from ty-types.
+
+        The client must already be initialized with a project root.
+        """
+        if not client.is_available:
+            return
 
         # Determine the actual file path on disk
         actual_file = self._ensure_file_on_disk(source, file_path)
         if actual_file is None:
-            return
-
-        # Discover and initialize project root
-        project_root = self._discover_project_root(actual_file)
-        if not client.initialize(project_root):
             return
 
         # Fetch all types in one call
@@ -159,28 +152,6 @@ class PythonTypeMapping:
                 return tmp_path
             except OSError:
                 return None
-
-    @staticmethod
-    def _discover_project_root(file_path: str) -> str:
-        """Discover the project root by walking up from file_path.
-
-        Looks for pyproject.toml, setup.py, setup.cfg, or .git.
-        """
-        path = Path(file_path)
-        if not path.is_absolute():
-            path = path.resolve()
-
-        current = path.parent
-        for _ in range(20):
-            for marker in ('pyproject.toml', 'setup.py', 'setup.cfg', '.git'):
-                if (current / marker).exists():
-                    return str(current)
-            parent = current.parent
-            if parent == current:
-                break
-            current = parent
-
-        return str(path.parent)
 
     @staticmethod
     def _compute_line_byte_offsets(source: str) -> List[int]:

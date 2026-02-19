@@ -62,7 +62,7 @@ class ParserVisitor(ast.NodeVisitor):
     # UTF-8 BOM character
     _BOM = '\ufeff'
 
-    def __init__(self, source: str, file_path: Optional[str] = None):
+    def __init__(self, source: str, file_path: Optional[str] = None, ty_client=None):
         super().__init__()
         # Detect and strip UTF-8 BOM if present
         if source.startswith(self._BOM):
@@ -73,7 +73,7 @@ class ParserVisitor(ast.NodeVisitor):
 
         self._source = source
         self._parentheses_stack = []
-        self._type_mapping = PythonTypeMapping(source, file_path)
+        self._type_mapping = PythonTypeMapping(source, file_path, ty_client)
 
         # Pre-compute byte-to-char mappings for lines with multi-byte characters
         self._byte_to_char = self._build_byte_to_char_mapping(source)

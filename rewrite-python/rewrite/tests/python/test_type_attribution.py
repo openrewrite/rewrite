@@ -31,7 +31,7 @@ from pathlib import Path
 from rewrite.java import JavaType
 
 # Import type mapping modules
-from rewrite.python.type_mapping import PythonTypeMapping, _TY_AVAILABLE
+from rewrite.python.type_mapping import PythonTypeMapping
 from rewrite.python.ty_client import TyTypesClient
 
 
@@ -53,68 +53,47 @@ requires_ty_types_cli = pytest.mark.skipif(
 
 @requires_ty_types_cli
 class TestTyTypesClient:
-    """Tests for the TyTypesClient singleton.
+    """Tests for the TyTypesClient.
 
     These tests require the ty-types CLI to be installed.
     """
 
-    @pytest.fixture(autouse=True)
-    def reset_client(self):
-        """Reset the TyTypesClient singleton before each test."""
-        yield
-        TyTypesClient.reset()
-
     def test_client_initializes(self):
         """Test that TyTypesClient starts the ty-types process."""
-        client = TyTypesClient.get()
-        assert client is not None
+        with TyTypesClient() as client:
+            assert client is not None
 
-        # Create a temp dir as project root
-        with tempfile.TemporaryDirectory() as tmpdir:
-            assert client.initialize(tmpdir)
-            assert client.is_available
+            with tempfile.TemporaryDirectory() as tmpdir:
+                assert client.initialize(tmpdir)
+                assert client.is_available
 
-    def test_client_is_singleton(self):
-        """Test that TyTypesClient returns the same instance."""
-        client1 = TyTypesClient.get()
-        client2 = TyTypesClient.get()
-        assert client1 is client2
-
-    def test_client_reset(self):
-        """Test that reset creates a new instance."""
-        client1 = TyTypesClient.get()
-        TyTypesClient.reset()
-        client2 = TyTypesClient.get()
-        assert client1 is not client2
+    def test_client_context_manager(self):
+        """Test that TyTypesClient shuts down on context exit."""
+        with TyTypesClient() as client:
+            assert client._process is not None
+        assert client._process is None
 
     def test_get_types_on_simple_file(self):
         """Test that get_types returns node types for a file."""
-        client = TyTypesClient.get()
+        with TyTypesClient() as client:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                file_path = os.path.join(tmpdir, 'test.py')
+                with open(file_path, 'w') as f:
+                    f.write('x: int = 42\n')
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Write a simple Python file
-            file_path = os.path.join(tmpdir, 'test.py')
-            with open(file_path, 'w') as f:
-                f.write('x: int = 42\n')
+                client.initialize(tmpdir)
+                result = client.get_types(file_path)
 
-            client.initialize(tmpdir)
-            result = client.get_types(file_path)
-
-            assert result is not None
-            assert 'nodes' in result
-            assert 'types' in result
-            assert len(result['nodes']) > 0
-            assert len(result['types']) > 0
+                assert result is not None
+                assert 'nodes' in result
+                assert 'types' in result
+                assert len(result['nodes']) > 0
+                assert len(result['types']) > 0
 
 
 class TestPythonTypeMappingPrimitives:
     """Tests for mapping Python primitive types to JavaType."""
 
-    @pytest.fixture(autouse=True)
-    def reset_client(self):
-        """Reset the TyTypesClient singleton after each test."""
-        yield
-        TyTypesClient.reset()
 
     def test_string_constant(self):
         """Test that string constants map to JavaType.Primitive.String."""
@@ -181,11 +160,6 @@ class TestPythonTypeMappingPrimitives:
 class TestMethodInvocationType:
     """Tests for method_invocation_type returning proper JavaType.Method."""
 
-    @pytest.fixture(autouse=True)
-    def reset_client(self):
-        """Reset the TyTypesClient singleton after each test."""
-        yield
-        TyTypesClient.reset()
 
     def test_method_invocation_returns_method_type(self):
         """Test that a method call returns a JavaType.Method."""
@@ -212,12 +186,13 @@ class TestMethodInvocationType:
 
         try:
             tree = ast.parse(source)
-            mapping = PythonTypeMapping(source, file_path)
+            with TyTypesClient() as client:
+                mapping = PythonTypeMapping(source, file_path, client)
 
-            call = tree.body[0].value
-            result = mapping.method_invocation_type(call)
+                call = tree.body[0].value
+                result = mapping.method_invocation_type(call)
 
-            mapping.close()
+                mapping.close()
 
             assert result is not None
             assert isinstance(result, JavaType.Method)
@@ -315,11 +290,6 @@ class TestMethodInvocationType:
 class TestTypeAttributionWithImports:
     """Tests for type attribution on imported modules."""
 
-    @pytest.fixture(autouse=True)
-    def reset_client(self):
-        """Reset the TyTypesClient singleton after each test."""
-        yield
-        TyTypesClient.reset()
 
     def test_stdlib_function_call(self):
         """Test type attribution for stdlib function calls."""
@@ -332,13 +302,13 @@ os.getcwd()
 
         try:
             tree = ast.parse(source)
-            mapping = PythonTypeMapping(source, file_path)
+            with TyTypesClient() as client:
+                mapping = PythonTypeMapping(source, file_path, client)
 
-            # The call is in the second statement
-            call = tree.body[1].value
-            result = mapping.method_invocation_type(call)
+                call = tree.body[1].value
+                result = mapping.method_invocation_type(call)
 
-            mapping.close()
+                mapping.close()
 
             assert result is not None
             assert isinstance(result, JavaType.Method)
@@ -357,12 +327,13 @@ os.getcwd().split("/")
 
         try:
             tree = ast.parse(source)
-            mapping = PythonTypeMapping(source, file_path)
+            with TyTypesClient() as client:
+                mapping = PythonTypeMapping(source, file_path, client)
 
-            call = tree.body[1].value
-            result = mapping.method_invocation_type(call)
+                call = tree.body[1].value
+                result = mapping.method_invocation_type(call)
 
-            mapping.close()
+                mapping.close()
 
             assert result is not None
             assert result._name == 'split'
@@ -374,11 +345,6 @@ os.getcwd().split("/")
 class TestTypeAttributionEdgeCases:
     """Tests for edge cases in type attribution."""
 
-    @pytest.fixture(autouse=True)
-    def reset_client(self):
-        """Reset the TyTypesClient singleton after each test."""
-        yield
-        TyTypesClient.reset()
 
     def test_no_args(self):
         """Test method with no arguments."""
@@ -513,12 +479,19 @@ class TestStructuredCallSignatures:
         """Test that str.split() returns structured parameter data."""
         source = '"hello".split(",")'
         tree = ast.parse(source)
-        mapping = PythonTypeMapping(source)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            file_path = os.path.join(tmpdir, 'test.py')
+            with open(file_path, 'w') as f:
+                f.write(source)
 
-        call = tree.body[0].value
-        result = mapping.method_invocation_type(call)
+            with TyTypesClient() as client:
+                client.initialize(tmpdir)
+                mapping = PythonTypeMapping(source, file_path, ty_client=client)
 
-        mapping.close()
+                call = tree.body[0].value
+                result = mapping.method_invocation_type(call)
+
+                mapping.close()
 
         assert result is not None
         assert result._parameter_names is not None
@@ -530,33 +503,44 @@ class TestStructuredCallSignatures:
         """Test that structured signature resolves parameter types."""
         source = '"hello".split(",")'
         tree = ast.parse(source)
-        mapping = PythonTypeMapping(source)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            file_path = os.path.join(tmpdir, 'test.py')
+            with open(file_path, 'w') as f:
+                f.write(source)
 
-        call = tree.body[0].value
+            with TyTypesClient() as client:
+                client.initialize(tmpdir)
+                mapping = PythonTypeMapping(source, file_path, ty_client=client)
 
-        # Directly check the call signature index
-        sig = mapping._lookup_call_signature(call)
+                call = tree.body[0].value
+                sig = mapping._lookup_call_signature(call)
 
-        mapping.close()
+                mapping.close()
 
         assert sig is not None, "Expected structured callSignature data"
         params = sig['parameters']
         assert len(params) >= 1
         assert params[0]['name'] == 'sep'
         assert params[0]['typeId'] is not None
-        # sep has a default value
         assert params[0]['hasDefault'] is True
 
     def test_builtin_len_structured_signature(self):
         """Test structured signature for builtin len()."""
         source = 'len("hello")'
         tree = ast.parse(source)
-        mapping = PythonTypeMapping(source)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            file_path = os.path.join(tmpdir, 'test.py')
+            with open(file_path, 'w') as f:
+                f.write(source)
 
-        call = tree.body[0].value
-        sig = mapping._lookup_call_signature(call)
+            with TyTypesClient() as client:
+                client.initialize(tmpdir)
+                mapping = PythonTypeMapping(source, file_path, ty_client=client)
 
-        mapping.close()
+                call = tree.body[0].value
+                sig = mapping._lookup_call_signature(call)
+
+                mapping.close()
 
         assert sig is not None, "Expected structured callSignature for len()"
         params = sig['parameters']
@@ -568,7 +552,6 @@ class TestStructuredCallSignatures:
         tree = ast.parse(source)
         mapping = PythonTypeMapping(source)
 
-        # There's no call node, so we shouldn't find any signatures
         assert len(mapping._call_signature_index) == 0
 
         mapping.close()

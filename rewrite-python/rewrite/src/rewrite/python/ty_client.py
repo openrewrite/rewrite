@@ -15,16 +15,16 @@
 """
 Client for the ty-types CLI.
 
-This module provides a long-lived client that communicates with the ty-types
-binary via line-delimited JSON-RPC over stdin/stdout. The ty-types CLI returns
-all node types in a single batch call per file, with structured type
-descriptors and cross-file deduplication.
+This module provides a client that communicates with the ty-types binary via
+line-delimited JSON-RPC over stdin/stdout. The ty-types CLI returns all node
+types in a single batch call per file, with structured type descriptors and
+cross-file deduplication.
 """
 
 from __future__ import annotations
 
-import atexit
 import json
+import select
 import subprocess
 import threading
 from pathlib import Path
@@ -34,43 +34,17 @@ from typing import Any, Dict, Optional
 class TyTypesClient:
     """Client for the ty-types CLI.
 
-    This client starts `ty-types` as a subprocess and communicates via
-    line-delimited JSON-RPC over stdin/stdout. It is a lazy singleton
-    that initializes on first access and shuts down when the process exits.
+    This client starts `ty-types --serve` as a subprocess and communicates via
+    line-delimited JSON-RPC over stdin/stdout. Create an instance per parse
+    batch and close it when done.
 
     Usage:
-        client = TyTypesClient.get()
-        client.initialize("/path/to/project")
-        result = client.get_types("/path/to/file.py")
-        # result = {"nodes": [...], "types": {...}}
+        with TyTypesClient() as client:
+            client.initialize("/path/to/project")
+            result = client.get_types("/path/to/file.py")
     """
 
-    _instance: Optional[TyTypesClient] = None
-    _lock: threading.Lock = threading.Lock()
-
-    @classmethod
-    def get(cls) -> TyTypesClient:
-        """Get or create the singleton TyTypesClient instance.
-
-        Returns:
-            The singleton TyTypesClient instance.
-        """
-        with cls._lock:
-            if cls._instance is None:
-                cls._instance = cls()
-                atexit.register(cls._instance.shutdown)
-            return cls._instance
-
-    @classmethod
-    def reset(cls) -> None:
-        """Reset the singleton instance, shutting down any existing client."""
-        with cls._lock:
-            if cls._instance is not None:
-                cls._instance.shutdown()
-                cls._instance = None
-
     def __init__(self):
-        """Initialize the ty-types client."""
         self._process: Optional[subprocess.Popen] = None
         self._request_id: int = 0
         self._initialized = False
@@ -79,6 +53,12 @@ class TyTypesClient:
         self._write_lock = threading.Lock()
 
         self._start_process()
+
+    def __enter__(self) -> TyTypesClient:
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.shutdown()
 
     def _start_process(self) -> None:
         """Start the ty-types subprocess."""
@@ -117,15 +97,14 @@ class TyTypesClient:
             return Path(ty_types)
         return None
 
-    def _send_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Optional[Any]:
+    def _send_request(self, method: str, params: Optional[Dict[str, Any]] = None,
+                      timeout: float = 0) -> Optional[Any]:
         """Send a JSON-RPC request and read the response.
 
         Args:
             method: The JSON-RPC method name.
-            params: Optional request parameters.
-
-        Returns:
-            The result from the response, or None if the request failed.
+            params: Optional parameters for the request.
+            timeout: Maximum seconds to wait for a response (0 = no limit).
         """
         if self._process is None or self._process.stdin is None:
             return None
@@ -149,6 +128,12 @@ class TyTypesClient:
             with self._read_lock:
                 if self._process.stdout is None:
                     return None
+
+                if timeout > 0:
+                    ready, _, _ = select.select([self._process.stdout], [], [], timeout)
+                    if not ready:
+                        return None
+
                 response_line = self._process.stdout.readline().decode('utf-8')
                 if not response_line:
                     return None
@@ -166,22 +151,14 @@ class TyTypesClient:
 
         If already initialized with the same project root, this is a no-op.
         If initialized with a different root, shuts down and reinitializes.
-
-        Args:
-            project_root: Absolute path to the project root directory.
-
-        Returns:
-            True if initialization succeeded.
         """
         if self._initialized and self._project_root == project_root:
             return True
 
         if self._initialized:
-            # Need to shutdown and reinitialize with new project root
             self._send_request("shutdown")
             self._initialized = False
             self._project_root = None
-            # Restart the process
             if self._process is not None:
                 try:
                     self._process.wait(timeout=5)
@@ -196,19 +173,17 @@ class TyTypesClient:
             return True
         return False
 
-    def get_types(self, file_path: str) -> Optional[Dict[str, Any]]:
+    def get_types(self, file_path: str, timeout: float = 30) -> Optional[Dict[str, Any]]:
         """Get all node types for a Python file.
 
         Args:
-            file_path: Path to the Python file (absolute or relative to project root).
-
-        Returns:
-            A dict with 'nodes' (list of NodeAttribution) and 'types' (dict of
-            TypeId -> TypeDescriptor), or None if the request failed.
+            file_path: Absolute path to the Python file.
+            timeout: Maximum seconds to wait for a response (default 30s).
+                     Some files with recursive types can cause ty to hang.
         """
         if not self._initialized:
             return None
-        return self._send_request("getTypes", {"file": file_path})
+        return self._send_request("getTypes", {"file": file_path}, timeout=timeout)
 
     @property
     def is_available(self) -> bool:
