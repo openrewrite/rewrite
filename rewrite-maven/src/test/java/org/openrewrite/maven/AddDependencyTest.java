@@ -2114,7 +2114,7 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    void blah2() {
+    void doesNotClobberLatestWithExplicitVersion() {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
           mavenProject("project",
