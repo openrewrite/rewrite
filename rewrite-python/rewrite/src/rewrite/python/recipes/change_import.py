@@ -237,11 +237,28 @@ class ChangeImport(Recipe):
                     # import X - remove entire import
                     return self._remove_module_from_import(multi, old_module)
 
+            def visit_identifier(self, ident: Identifier, p: ExecutionContext) -> J:
+                ident = super().visit_identifier(ident, p)
+                if not isinstance(ident, Identifier):
+                    return ident
+                if not old_name or not new_name or not self.has_old_import:
+                    return ident
+                old_ref_name = self.old_alias or old_name
+                new_ref_name = new_alias or self.old_alias or new_name
+                if old_ref_name == new_ref_name:
+                    return ident
+                if ident.simple_name != old_ref_name:
+                    return ident
+                # Skip identifiers inside import statements
+                if self.cursor.first_enclosing(Import):
+                    return ident
+                return ident.replace(_simple_name=new_ref_name)
+
             def visit_method_invocation(self, method: MethodInvocation, p: ExecutionContext) -> J:
                 method = super().visit_method_invocation(method, p)
-                if not old_name or not self.has_direct_module_import:
-                    return method
                 if not isinstance(method, MethodInvocation):
+                    return method
+                if not old_name or not self.has_direct_module_import:
                     return method
                 if not isinstance(method.select, Identifier):
                     return method

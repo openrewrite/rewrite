@@ -14,6 +14,7 @@
 
 """Tests for ChangeImport recipe."""
 
+import pytest
 from rewrite.java.support_types import JavaType
 from rewrite.java.tree import FieldAccess, Identifier, MethodInvocation
 from rewrite.python.recipes.change_import import ChangeImport
@@ -323,3 +324,120 @@ class TestChangeImport:
             )
         )
         assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+    def test_change_from_import_renames_bare_references(self):
+        """Change: from time import clock / clock() -> from time import perf_counter / perf_counter()"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='time',
+            old_name='clock',
+            new_module='time',
+            new_name='perf_counter',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from time import clock
+                clock()
+                """,
+                """
+                from time import perf_counter
+                perf_counter()
+                """,
+            )
+        )
+
+    def test_change_from_import_renames_bare_reference_with_args(self):
+        """Bare reference with arguments: encodestring(data) -> encodebytes(data)"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='base64',
+            old_name='encodestring',
+            new_module='base64',
+            new_name='encodebytes',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from base64 import encodestring
+                encodestring(data)
+                """,
+                """
+                from base64 import encodebytes
+                encodebytes(data)
+                """,
+            )
+        )
+
+    def test_no_rename_when_name_unchanged(self):
+        """No bare reference rename when only the module changes."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='fractions',
+            old_name='gcd',
+            new_module='math',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from fractions import gcd
+                gcd(12, 8)
+                """,
+                """
+                from math import gcd
+                gcd(12, 8)
+                """,
+            )
+        )
+
+    def test_no_rename_bare_ref_in_unrelated_code(self):
+        """Only rename bare references that match old_name, not other identifiers."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='time',
+            old_name='clock',
+            new_module='time',
+            new_name='perf_counter',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from time import clock
+                clock()
+                x = 1
+                """,
+                """
+                from time import perf_counter
+                perf_counter()
+                x = 1
+                """,
+            )
+        )
+
+    @pytest.mark.xfail(reason="ChangeImport does not yet perform scope analysis to avoid renaming shadowed locals")
+    def test_no_rename_shadowed_in_function_scope(self):
+        """Don't rename a local variable in function scope that shadows the imported name."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='time',
+            old_name='clock',
+            new_module='time',
+            new_name='perf_counter',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from time import clock
+
+                def foo():
+                    clock = 42
+                    return clock
+
+                clock()
+                """,
+                """
+                from time import perf_counter
+
+                def foo():
+                    clock = 42
+                    return clock
+
+                perf_counter()
+                """,
+            )
+        )
