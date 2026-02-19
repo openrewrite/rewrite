@@ -594,7 +594,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    private static @Nullable Set<CustomImportOrderStyle> customImportOrderStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<ImportLayoutStyle> customImportOrderStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("CustomImportOrder");
         if (moduleList == null) {
             return null;
@@ -602,17 +602,96 @@ public class CheckstyleConfigLoader {
 
         return moduleList.stream()
                 .map(module -> {
-                    boolean separateLineBetweenGroups = parseBoolean(module.properties.get("separateLineBetweenGroups"));
-                    boolean sortImportsInGroupAlphabetically = parseBoolean(module.properties.get("sortImportsInGroupAlphabetically"));
+                    boolean separateLineBetweenGroups = module.prop("separateLineBetweenGroups", true);
                     String specialImportsRegExp = module.properties.get("specialImportsRegExp");
                     String standardPackageRegExp = module.properties.get("standardPackageRegExp");
                     String thirdPartyPackageRegExp = module.properties.get("thirdPartyPackageRegExp");
-                    List<CustomImportOrderStyle.GroupWithDepth> customImportOrderRules = CustomImportOrderStyle
-                            .parseImportOrder(module.properties.get("customImportOrderRules"));
-                    return new CustomImportOrderStyle(customImportOrderRules, separateLineBetweenGroups, sortImportsInGroupAlphabetically,
-                            specialImportsRegExp, standardPackageRegExp, thirdPartyPackageRegExp);
+                    String rulesInput = module.properties.get("customImportOrderRules");
+
+                    if (specialImportsRegExp == null || specialImportsRegExp.isEmpty()) {
+                        specialImportsRegExp = "^$";
+                    }
+                    if (standardPackageRegExp == null || standardPackageRegExp.isEmpty()) {
+                        standardPackageRegExp = "^(java|javax)\\.";
+                    }
+
+                    List<String> groupRules = new ArrayList<>();
+                    if (rulesInput != null && !rulesInput.trim().isEmpty()) {
+                        for (String rule : rulesInput.split("\\s*,\\s*|###")) {
+                            String trimmed = rule.trim();
+                            if (!trimmed.isEmpty()) {
+                                groupRules.add(trimmed);
+                            }
+                        }
+                    }
+
+                    ImportLayoutStyle.Builder builder = ImportLayoutStyle.builder();
+                    boolean hasStaticCatchAll = false;
+                    boolean hasNonStaticCatchAll = false;
+
+                    for (int i = 0; i < groupRules.size(); i++) {
+                        if (i > 0 && separateLineBetweenGroups) {
+                            builder.blankLine();
+                        }
+                        String rule = groupRules.get(i);
+                        if ("STATIC".equals(rule)) {
+                            builder.importStaticAllOthers();
+                            hasStaticCatchAll = true;
+                        } else if ("STANDARD_JAVA_PACKAGE".equals(rule)) {
+                            addRegExpPackages(builder, standardPackageRegExp, false);
+                        } else if ("THIRD_PARTY_PACKAGE".equals(rule)) {
+                            builder.importAllOthers();
+                            hasNonStaticCatchAll = true;
+                        } else if ("SPECIAL_IMPORTS".equals(rule)) {
+                            addRegExpPackages(builder, specialImportsRegExp, false);
+                        } else if (rule.startsWith("SAME_PACKAGE")) {
+                            // SAME_PACKAGE(n) cannot be accurately represented in ImportLayoutStyle
+                            builder.importAllOthers();
+                            hasNonStaticCatchAll = true;
+                        }
+                    }
+
+                    if (!hasStaticCatchAll) {
+                        builder.importStaticAllOthers();
+                    }
+                    if (!hasNonStaticCatchAll) {
+                        builder.importAllOthers();
+                    }
+
+                    return builder.build();
                 })
                 .collect(toSet());
+    }
+
+    private static void addRegExpPackages(ImportLayoutStyle.Builder builder, String regExp, boolean isStatic) {
+        // Convert common regex patterns to package wildcards
+        // e.g., "^(java|javax)\\." → java.*, javax.*
+        // e.g., "^org\\." → org.*
+        String cleaned = regExp.replaceAll("^\\^", "").replaceAll("\\\\\\.", ".");
+        if (cleaned.startsWith("(") && cleaned.endsWith(").")) {
+            // Group pattern like "(java|javax)."
+            String inner = cleaned.substring(1, cleaned.length() - 2);
+            for (String pkg : inner.split("\\|")) {
+                if (isStatic) {
+                    builder.staticImportPackage(pkg.trim() + ".*");
+                } else {
+                    builder.importPackage(pkg.trim() + ".*");
+                }
+            }
+        } else if (cleaned.endsWith(".")) {
+            if (isStatic) {
+                builder.staticImportPackage(cleaned + "*");
+            } else {
+                builder.importPackage(cleaned + "*");
+            }
+        } else if (!"^$".equals(regExp) && !".*".equals(regExp)) {
+            // Fallback: use the pattern as-is with wildcard
+            if (isStatic) {
+                builder.staticImportPackage(cleaned + ".*");
+            } else {
+                builder.importPackage(cleaned + ".*");
+            }
+        }
     }
 
     // https://checkstyle.sourceforge.io/checks/imports/avoidstarimport.html

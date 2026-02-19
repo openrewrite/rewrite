@@ -54,7 +54,6 @@ public class Checkstyle extends NamedStyles {
                         operatorWrapStyle(),
                         typecastParenPadStyle(),
                         unnecessaryParentheses(),
-                        customImportOrderStyle(),
                         unusedImportsStyle()
                 ));
     }
@@ -150,13 +149,6 @@ public class Checkstyle extends NamedStyles {
 
     public static MethodParamPadStyle methodParamPadStyle() {
         return new MethodParamPadStyle(false, false);
-    }
-
-    public static CustomImportOrderStyle customImportOrderStyle() {
-        return new CustomImportOrderStyle(Arrays.asList(new CustomImportOrderStyle.GroupWithDepth(CustomImportOrderStyle.CustomImportOrderGroup.STATIC, null),
-                new CustomImportOrderStyle.GroupWithDepth(CustomImportOrderStyle.CustomImportOrderGroup.STANDARD_JAVA_PACKAGE, null),
-                new CustomImportOrderStyle.GroupWithDepth(CustomImportOrderStyle.CustomImportOrderGroup.THIRD_PARTY_PACKAGE, null)),
-                true, false, "^$", "^(java|javax)\\.", ".*");
     }
 
     private static UnusedImportsStyle unusedImportsStyle() {

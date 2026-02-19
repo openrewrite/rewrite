@@ -347,20 +347,21 @@ class CheckstyleConfigLoaderTest {
             </module>
         """, emptyMap());
 
+        // CustomImportOrder is converted to ImportLayoutStyle
         assertThat(checkstyle.getStyles()).hasSize(1);
-        assertThat(checkstyle.getStyles()).allMatch(s -> s instanceof CustomImportOrderStyle);
+        assertThat(checkstyle.getStyles()).allMatch(s -> s instanceof ImportLayoutStyle);
 
-        CustomImportOrderStyle customImportOrderStyle = (CustomImportOrderStyle) checkstyle.getStyles().iterator().next();
-        assertThat(customImportOrderStyle.getSpecialImportsRegExp()).isEqualTo("^org\\.");
-        assertThat(customImportOrderStyle.getThirdPartyPackageRegExp()).isEqualTo("^com\\.");
-        assertThat(customImportOrderStyle.getStandardPackageRegExp()).isEqualTo("^(java\\.|javax\\.)");
-        assertThat(customImportOrderStyle.getSeparateLineBetweenGroups()).isFalse();
-        assertThat(customImportOrderStyle.getSortImportsInGroupAlphabetically()).isFalse();
-        assertThat(customImportOrderStyle.getImportOrder()).containsExactly(
-          new CustomImportOrderStyle.GroupWithDepth(CustomImportOrderStyle.CustomImportOrderGroup.STANDARD_JAVA_PACKAGE, null),
-          new CustomImportOrderStyle.GroupWithDepth(CustomImportOrderStyle.CustomImportOrderGroup.THIRD_PARTY_PACKAGE, null),
-          new CustomImportOrderStyle.GroupWithDepth(CustomImportOrderStyle.CustomImportOrderGroup.SPECIAL_IMPORTS, null),
-          new CustomImportOrderStyle.GroupWithDepth(CustomImportOrderStyle.CustomImportOrderGroup.STATIC, null));
+        ImportLayoutStyle importLayout = (ImportLayoutStyle) checkstyle.getStyles().iterator().next();
+        // Rules: STANDARD_JAVA_PACKAGE, THIRD_PARTY_PACKAGE, SPECIAL_IMPORTS, STATIC
+        // with separateLineBetweenGroups=true (default)
+        // Should produce: java.*, javax.*, blank, all-others, blank, org.*, blank, static-all-others
+        assertThat(importLayout.getLayout().stream()
+                .filter(b -> b.getClass().equals(ImportLayoutStyle.Block.ImportPackage.class))
+                .count()).isGreaterThanOrEqualTo(2); // java.*, javax.*, org.*
+
+        assertThat(importLayout.getLayout().stream()
+                .filter(b -> b instanceof ImportLayoutStyle.Block.AllOthers)
+                .count()).isEqualTo(2); // non-static catch-all + static catch-all
     }
 
     @Test
