@@ -204,6 +204,28 @@ class RecipeMarketplaceReaderTest {
     }
 
     @Test
+    void roundTripWithOptions() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,options,category,ecosystem,packageName
+          org.openrewrite.maven.UpgradeDependencyVersion,Upgrade Dependency,"[{""name"":""groupId"",""type"":""String"",""displayName"":""Group ID"",""description"":""The group ID of the dependency"",""required"":true,""example"":""org.openrewrite""},{""name"":""artifactId"",""type"":""String"",""displayName"":""Artifact ID"",""description"":""The artifact ID of the dependency"",""required"":false}]",Maven,maven,org.openrewrite:rewrite-maven
+          """);
+        @Language("csv") String writtenCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        assertThat(writtenCsv).contains("\"\"required\"\":true");
+        assertThat(writtenCsv).contains("\"\"required\"\":false");
+
+        RecipeMarketplace roundTripped = new RecipeMarketplaceReader().fromCsv(writtenCsv);
+        RecipeListing recipe = roundTripped.getAllRecipes().iterator().next();
+        assertThat(recipe.getOptions())
+          .hasSize(2)
+          .extracting("name", "required")
+          .containsExactlyInAnyOrder(
+            org.assertj.core.api.Assertions.tuple("groupId", true),
+            org.assertj.core.api.Assertions.tuple("artifactId", false)
+          );
+    }
+
+    @Test
     void writerOmitsCategoryDescriptionsWhenNonePresent() {
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
           name,category1,category2,ecosystem,packageName

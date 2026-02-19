@@ -43,7 +43,7 @@ public class RecipeMarketplaceWriter {
             "org.openrewrite.table.ParseFailures"
     ));
     private static final ObjectMapper JSON_MAPPER = new ObjectMapper()
-            .setSerializationInclusion(JsonInclude.Include.NON_DEFAULT);
+            .setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
     public @Language("csv") String toCsv(RecipeMarketplace marketplace) {
         StringWriter sw = new StringWriter();
