@@ -39,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
+@SuppressWarnings("NullableProblems")
 class DeclarativeRecipeTest implements RewriteTest {
 
     @DocumentExample
@@ -102,6 +103,25 @@ class DeclarativeRecipeTest implements RewriteTest {
           .hasSize(2)
           .extracting(OptionDescriptor::getName)
           .containsOnly("toText");
+    }
+
+    @Test
+    void preconditionDescriptorsIncludedInDescriptor() {
+        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+          null, URI.create("dummy"), true, emptyList());
+        dr.addPrecondition(new Find("precondition-marker", null, null, null, null, null, null, null));
+        dr.addUninitialized(new ChangeText("2"));
+        dr.initialize(List.of());
+
+        RecipeDescriptor descriptor = dr.getDescriptor();
+        assertThat(descriptor.getPreconditions())
+          .hasSize(1)
+          .first()
+          .satisfies(p -> assertThat(p.getName()).isEqualTo("org.openrewrite.text.Find"));
+        assertThat(descriptor.getRecipeList())
+          .hasSize(1)
+          .first()
+          .satisfies(r -> assertThat(r.getName()).isEqualTo("org.openrewrite.text.ChangeText"));
     }
 
     @Test
@@ -254,7 +274,6 @@ class DeclarativeRecipeTest implements RewriteTest {
               """, "org.openrewrite.PreconditionTest")
             .afterRecipe(run -> assertThat(run.getChangeset().getAllResults()).anySatisfy(
               s -> {
-                  //noinspection DataFlowIssue
                   assertThat(s.getAfter()).isNotNull();
                   assertThat(s.getAfter().getSourcePath()).isEqualTo(Path.of("test.txt"));
               }
