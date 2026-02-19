@@ -308,14 +308,14 @@ public class RpcSendQueue
 
         return type.Namespace switch
         {
-            "Rewrite.Java" => name switch
+            "OpenRewrite.Java" => name switch
             {
                 "JRightPadded" or "JLeftPadded" or "JContainer" or "JavaType" =>
                     $"org.openrewrite.java.tree.{name}",
                 _ => $"org.openrewrite.java.tree.J${name}",
             },
-            "Rewrite.CSharp" => $"org.openrewrite.csharp.tree.Cs${name}",
-            "Rewrite.Core" => name switch
+            "OpenRewrite.CSharp" => $"org.openrewrite.csharp.tree.Cs${name}",
+            "OpenRewrite.Core" => name switch
             {
                 "Markers" => "org.openrewrite.marker.Markers",
                 "SearchResult" => "org.openrewrite.marker.SearchResult",

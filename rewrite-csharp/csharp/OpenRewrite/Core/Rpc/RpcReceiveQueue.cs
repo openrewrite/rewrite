@@ -309,7 +309,7 @@ public class RpcReceiveQueue
     {
         var type = obj.GetType();
         var ns = type.Namespace;
-        return ns != null && (ns.StartsWith("Rewrite.Java") || ns.StartsWith("Rewrite.CSharp"));
+        return ns != null && (ns.StartsWith("OpenRewrite.Java") || ns.StartsWith("OpenRewrite.CSharp"));
     }
 
     /// <summary>
@@ -363,46 +363,46 @@ public class RpcReceiveQueue
 
     private static Type? FromJavaTypeNameByConvention(string javaTypeName)
     {
-        // Pattern: org.openrewrite.java.tree.J$ClassName → Rewrite.Java.ClassName
+        // Pattern: org.openrewrite.java.tree.J$ClassName → OpenRewrite.Java.ClassName
         if (javaTypeName.StartsWith("org.openrewrite.java.tree.J$"))
         {
             var name = javaTypeName["org.openrewrite.java.tree.J$".Length..];
-            return FindType("Rewrite.Java", name);
+            return FindType("OpenRewrite.Java", name);
         }
 
-        // Pattern: org.openrewrite.java.tree.JavaType$X → Rewrite.Java.JavaType+X
+        // Pattern: org.openrewrite.java.tree.JavaType$X → OpenRewrite.Java.JavaType+X
         if (javaTypeName.StartsWith("org.openrewrite.java.tree.JavaType$"))
         {
             var name = javaTypeName["org.openrewrite.java.tree.JavaType$".Length..];
-            return FindType("Rewrite.Java", "JavaType+" + name);
+            return FindType("OpenRewrite.Java", "JavaType+" + name);
         }
 
-        // Pattern: org.openrewrite.java.tree.X → Rewrite.Java.X (JRightPadded etc.)
+        // Pattern: org.openrewrite.java.tree.X → OpenRewrite.Java.X (JRightPadded etc.)
         if (javaTypeName.StartsWith("org.openrewrite.java.tree."))
         {
             var name = javaTypeName["org.openrewrite.java.tree.".Length..];
-            return FindType("Rewrite.Java", name);
+            return FindType("OpenRewrite.Java", name);
         }
 
-        // Pattern: org.openrewrite.csharp.tree.Linq$ClassName → Rewrite.CSharp.ClassName
+        // Pattern: org.openrewrite.csharp.tree.Linq$ClassName → OpenRewrite.CSharp.ClassName
         if (javaTypeName.StartsWith("org.openrewrite.csharp.tree.Linq$"))
         {
             var name = javaTypeName["org.openrewrite.csharp.tree.Linq$".Length..];
-            return FindType("Rewrite.CSharp", name);
+            return FindType("OpenRewrite.CSharp", name);
         }
 
-        // Pattern: org.openrewrite.csharp.tree.Cs$ClassName → Rewrite.CSharp.ClassName
+        // Pattern: org.openrewrite.csharp.tree.Cs$ClassName → OpenRewrite.CSharp.ClassName
         if (javaTypeName.StartsWith("org.openrewrite.csharp.tree.Cs$"))
         {
             var name = javaTypeName["org.openrewrite.csharp.tree.Cs$".Length..];
-            return FindType("Rewrite.CSharp", name);
+            return FindType("OpenRewrite.CSharp", name);
         }
 
-        // Pattern: org.openrewrite.marker.Markup$X → Rewrite.Core.Markup+X
+        // Pattern: org.openrewrite.marker.Markup$X → OpenRewrite.Core.Markup+X
         if (javaTypeName.StartsWith("org.openrewrite.marker.Markup$"))
         {
             var name = javaTypeName["org.openrewrite.marker.Markup$".Length..];
-            return FindType("Rewrite.Core", "Markup+" + name);
+            return FindType("OpenRewrite.Core", "Markup+" + name);
         }
 
         return null;

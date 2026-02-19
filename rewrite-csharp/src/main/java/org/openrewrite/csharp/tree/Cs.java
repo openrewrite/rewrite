@@ -3513,6 +3513,10 @@ public interface Cs extends J {
         @Getter
         TypeKind kind;
 
+        @With
+        @Getter
+        boolean nullable;
+
         public enum TypeKind {
             Class,
             Struct
