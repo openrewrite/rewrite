@@ -38,7 +38,6 @@ import {
     DependencyRecipeAccumulator,
     getAllLockFileNames,
     getLockFileName,
-    parseNpmrcScopes,
     parseLockFileContent,
     runInstallIfNeeded,
     runInstallInTempDir,
@@ -108,17 +107,6 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
         example: "^5.0.0"
     })
     newVersion!: string;
-
-    @Option({
-        displayName: "Npmrc scopes",
-        description: "Which .npmrc configuration scopes to include when running the package manager. " +
-            "By default, only 'Project' scope is used. Include 'User' or 'Global' to access private registries " +
-            "configured in those scopes. Pass as JSON array, e.g., '[\"Project\",\"User\"]'.",
-        required: false,
-        example: '["Project"]',
-        valid: ["Global", "User", "Project"]
-    })
-    npmrcScopes?: string[];
 
     initialValue(_ctx: ExecutionContext): Accumulator {
         return {
@@ -240,7 +228,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
 
                 // Serialize npmrc configs from marker using requested scopes
                 const configFiles: Record<string, string> = {};
-                const npmrcContent = serializeNpmrcConfigs(marker.npmrcConfigs, parseNpmrcScopes(recipe.npmrcScopes));
+                const npmrcContent = serializeNpmrcConfigs(marker.npmrcConfigs);
                 if (npmrcContent) {
                     configFiles['.npmrc'] = npmrcContent;
                 }
