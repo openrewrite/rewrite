@@ -605,7 +605,6 @@ public class CheckstyleConfigLoader {
                     boolean separateLineBetweenGroups = module.prop("separateLineBetweenGroups", true);
                     String specialImportsRegExp = module.properties.get("specialImportsRegExp");
                     String standardPackageRegExp = module.properties.get("standardPackageRegExp");
-                    String thirdPartyPackageRegExp = module.properties.get("thirdPartyPackageRegExp");
                     String rulesInput = module.properties.get("customImportOrderRules");
 
                     if (specialImportsRegExp == null || specialImportsRegExp.isEmpty()) {
@@ -638,12 +637,12 @@ public class CheckstyleConfigLoader {
                             builder.importStaticAllOthers();
                             hasStaticCatchAll = true;
                         } else if ("STANDARD_JAVA_PACKAGE".equals(rule)) {
-                            addRegExpPackages(builder, standardPackageRegExp, false);
+                            addRegExpPackages(builder, standardPackageRegExp);
                         } else if ("THIRD_PARTY_PACKAGE".equals(rule)) {
                             builder.importAllOthers();
                             hasNonStaticCatchAll = true;
                         } else if ("SPECIAL_IMPORTS".equals(rule)) {
-                            addRegExpPackages(builder, specialImportsRegExp, false);
+                            addRegExpPackages(builder, specialImportsRegExp);
                         } else if (rule.startsWith("SAME_PACKAGE")) {
                             // SAME_PACKAGE(n) cannot be accurately represented in ImportLayoutStyle
                             builder.importAllOthers();
@@ -663,7 +662,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    private static void addRegExpPackages(ImportLayoutStyle.Builder builder, String regExp, boolean isStatic) {
+    private static void addRegExpPackages(ImportLayoutStyle.Builder builder, String regExp) {
         // Convert common regex patterns to package wildcards
         // e.g., "^(java|javax)\\." → java.*, javax.*
         // e.g., "^org\\." → org.*
@@ -672,25 +671,12 @@ public class CheckstyleConfigLoader {
             // Group pattern like "(java|javax)."
             String inner = cleaned.substring(1, cleaned.length() - 2);
             for (String pkg : inner.split("\\|")) {
-                if (isStatic) {
-                    builder.staticImportPackage(pkg.trim() + ".*");
-                } else {
-                    builder.importPackage(pkg.trim() + ".*");
-                }
+                builder.importPackage(pkg.trim() + ".*");
             }
         } else if (cleaned.endsWith(".")) {
-            if (isStatic) {
-                builder.staticImportPackage(cleaned + "*");
-            } else {
-                builder.importPackage(cleaned + "*");
-            }
+            builder.importPackage(cleaned + "*");
         } else if (!"^$".equals(regExp) && !".*".equals(regExp)) {
-            // Fallback: use the pattern as-is with wildcard
-            if (isStatic) {
-                builder.staticImportPackage(cleaned + ".*");
-            } else {
-                builder.importPackage(cleaned + ".*");
-            }
+            builder.importPackage(cleaned + ".*");
         }
     }
 
