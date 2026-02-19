@@ -22,16 +22,33 @@ import org.openrewrite.marker.SearchResult;
 
 public class DeclaresType<P> extends JavaIsoVisitor<P> {
     private final String type;
+    private final boolean includeSubtypes;
 
     public DeclaresType(String type) {
+        this(type, false);
+    }
+
+    public DeclaresType(String type, boolean includeSubtypes) {
         this.type = type;
+        this.includeSubtypes = includeSubtypes;
     }
 
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
-        if (classDecl.getType() != null && TypeUtils.isOfClassType(classDecl.getType(), type)) {
-            return SearchResult.found(classDecl);
+        if (classDecl.getType() != null) {
+            if (includeSubtypes && TypeUtils.isAssignableTo(type, classDecl.getType()) ||
+                    TypeUtils.isOfClassType(classDecl.getType(), type)) {
+                return SearchResult.found(classDecl);
+            }
         }
         return super.visitClassDeclaration(classDecl, p);
+    }
+
+    @Override
+    public J.NewClass visitNewClass(J.NewClass newClass, P p) {
+        if (includeSubtypes && newClass.getBody() != null && TypeUtils.isAssignableTo(type, newClass.getType())) {
+            return SearchResult.found(newClass);
+        }
+        return super.visitNewClass(newClass, p);
     }
 }

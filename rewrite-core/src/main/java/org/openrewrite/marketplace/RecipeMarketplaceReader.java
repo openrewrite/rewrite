@@ -15,6 +15,12 @@
  */
 package org.openrewrite.marketplace;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import com.univocity.parsers.csv.CsvParser;
 import com.univocity.parsers.csv.CsvParserSettings;
 import lombok.Getter;
@@ -22,6 +28,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.config.CategoryDescriptor;
+import org.openrewrite.config.DataTableDescriptor;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.StringUtils;
 
 import java.io.*;
@@ -32,7 +41,16 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptySet;
+import static java.util.Collections.reverse;
+
 public class RecipeMarketplaceReader {
+    private static final ObjectMapper JSON_MAPPER = JsonMapper.builder()
+            .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+            .build()
+            .registerModule(new ParameterNamesModule())
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
     /**
      * Returns the recipe marketplace from CSV.
      *
@@ -127,10 +145,15 @@ public class RecipeMarketplaceReader {
         Duration estimatedEffortPerOccurrence = null;
         String ecosystem = null;
         String packageName = null;
+        String requestedVersion = null;
         String version = null;
+        int recipeCount = 1;
         String team = null;
-        List<String> categories = new ArrayList<>();
-        Map<Integer, RecipeListing.Option> options = new TreeMap<>();
+        Map<Integer, String> categoryDisplayNames = new TreeMap<>();
+        Map<Integer, String> categoryDescriptions = new TreeMap<>();
+        List<OptionDescriptor> options = new ArrayList<>();
+        List<DataTableDescriptor> dataTables = new ArrayList<>();
+        Map<String, Object> metadata = new LinkedHashMap<>();
 
         for (int i = 0; i < row.length && i < headers.size(); i++) {
             String value = row[i];
@@ -165,7 +188,14 @@ public class RecipeMarketplaceReader {
                     break;
                 case CATEGORY:
                     if (value != null) {
-                        categories.add(value);
+                        int categoryIndex = column.getIndex();
+                        categoryDisplayNames.put(categoryIndex, value);
+                    }
+                    break;
+                case CATEGORY_DESCRIPTION:
+                    if (value != null) {
+                        int categoryIndex = column.getIndex();
+                        categoryDescriptions.put(categoryIndex, value);
                     }
                     break;
                 case ECOSYSTEM:
@@ -174,32 +204,34 @@ public class RecipeMarketplaceReader {
                 case PACKAGE_NAME:
                     packageName = value;
                     break;
+                case REQUESTED_VERSION:
+                    requestedVersion = value;
+                    break;
                 case VERSION:
                     version = value;
+                    break;
+                case RECIPE_COUNT:
+                    recipeCount = value == null ? 1 : Integer.parseInt(value);
                     break;
                 case TEAM:
                     team = value;
                     break;
-                case OPTION_NAME:
+                case OPTIONS:
                     if (value != null) {
-                        int optionIndex = column.getIndex();
-                        options.computeIfAbsent(optionIndex, k -> new RecipeListing.Option()).setName(value);
+                        options.addAll(parseOptionsFromJson(value));
                     }
                     break;
-                case OPTION_DISPLAY_NAME:
+                case DATA_TABLES:
                     if (value != null) {
-                        int optionIndex = column.getIndex();
-                        options.computeIfAbsent(optionIndex, k -> new RecipeListing.Option()).setDisplayName(value);
+                        dataTables.addAll(parseDataTablesFromJson(value));
                     }
                     break;
-                case OPTION_DESCRIPTION:
+                case UNKNOWN:
+                    // Unknown columns are treated as metadata
                     if (value != null) {
-                        int optionIndex = column.getIndex();
-                        options.computeIfAbsent(optionIndex, k -> new RecipeListing.Option()).setDescription(value);
+                        metadata.put(column.getHeaderName(), value);
                     }
                     break;
-                default:
-                    // Ignore unknown columns
             }
         }
 
@@ -212,7 +244,7 @@ public class RecipeMarketplaceReader {
         }
 
         // Create bundle if ecosystem information is present
-        RecipeBundle bundle = new RecipeBundle(ecosystem.toLowerCase(), packageName, version, team);
+        RecipeBundle bundle = new RecipeBundle(ecosystem.toLowerCase(), packageName, requestedVersion, version, team);
 
         RecipeListing listing = new RecipeListing(
                 marketplace,
@@ -220,12 +252,53 @@ public class RecipeMarketplaceReader {
                 displayName != null ? displayName : name,
                 description != null ? description : "",
                 estimatedEffortPerOccurrence,
-                new ArrayList<>(options.values()),
+                options,
+                dataTables,
+                recipeCount,
                 bundle
         );
 
-        Collections.reverse(categories);
-        marketplace.install(listing, categories);
+        // Populate metadata from unknown columns
+        listing.getMetadata().putAll(metadata);
+
+        // Convert category maps to CategoryDescriptor list
+        // Categories are stored with index (1, 2, 3, ...) representing depth from deepest to shallowest
+        // But we need to reverse them to get shallowest to deepest order for install
+        List<CategoryDescriptor> categoryPath = new ArrayList<>();
+        for (Map.Entry<Integer, String> entry : categoryDisplayNames.entrySet()) {
+            int index = entry.getKey();
+            @Language("markdown") String catDisplayName = entry.getValue();
+            @Language("markdown") String catDescription = categoryDescriptions.getOrDefault(index, "");
+            categoryPath.add(new CategoryDescriptor(
+                    catDisplayName,
+                    "", // packageName not used for marketplace categories
+                    catDescription,
+                    emptySet(),
+                    false,
+                    CategoryDescriptor.LOWEST_PRECEDENCE,
+                    true // synthetic
+            ));
+        }
+        reverse(categoryPath);
+        marketplace.install(listing, categoryPath);
+    }
+
+    private List<OptionDescriptor> parseOptionsFromJson(String json) {
+        try {
+            return JSON_MAPPER.readValue(json, new TypeReference<List<OptionDescriptor>>() {
+            });
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to parse options JSON: " + json, e);
+        }
+    }
+
+    private List<DataTableDescriptor> parseDataTablesFromJson(String json) {
+        try {
+            return JSON_MAPPER.readValue(json, new TypeReference<List<DataTableDescriptor>>() {
+            });
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to parse data tables JSON: " + json, e);
+        }
     }
 
     @Getter
@@ -236,46 +309,38 @@ public class RecipeMarketplaceReader {
         DESCRIPTION("description"),
         ESTIMATED_EFFORT_PER_OCCURRENCE("estimatedEffortPerOccurrence"),
         CATEGORY("category"),
+        CATEGORY_DESCRIPTION("categoryDescription"),
         ECOSYSTEM("ecosystem"),
         PACKAGE_NAME("packageName"),
+        REQUESTED_VERSION("requestedVersion"),
         VERSION("version"),
+        RECIPE_COUNT("recipeCount"),
         TEAM("team"),
-        OPTION_NAME("optionName"),
-        OPTION_DISPLAY_NAME("optionDisplayName"),
-        OPTION_DESCRIPTION("optionDescription"),
+        OPTIONS("options"),
+        DATA_TABLES("dataTables"),
         UNKNOWN("_unknown");
 
         private final String columnName;
 
-        private static final Pattern OPTION_NAME_PATTERN = Pattern.compile("option(\\d+)Name", Pattern.CASE_INSENSITIVE);
-        private static final Pattern OPTION_DISPLAY_NAME_PATTERN = Pattern.compile("option(\\d+)DisplayName", Pattern.CASE_INSENSITIVE);
-        private static final Pattern OPTION_DESCRIPTION_PATTERN = Pattern.compile("option(\\d+)Description", Pattern.CASE_INSENSITIVE);
+        private static final Pattern CATEGORY_PATTERN = Pattern.compile("category(\\d*)", Pattern.CASE_INSENSITIVE);
+        private static final Pattern CATEGORY_DESCRIPTION_PATTERN = Pattern.compile("category(\\d*)Description", Pattern.CASE_INSENSITIVE);
 
         public static NamedColumn fromString(String key) {
-            String lowerKey = key.toLowerCase();
+            // Check for category description columns first (category1Description, category2Description, ...)
+            // Must check before category pattern since "category1Description" starts with "category"
+            Matcher categoryDescriptionMatcher = CATEGORY_DESCRIPTION_PATTERN.matcher(key);
+            if (categoryDescriptionMatcher.matches()) {
+                String indexStr = categoryDescriptionMatcher.group(1);
+                int index = indexStr.isEmpty() ? 1 : Integer.parseInt(indexStr);
+                return new NamedColumn(CATEGORY_DESCRIPTION, key, index);
+            }
 
             // Check for category columns (category, category1, category2, ...)
-            if (lowerKey.startsWith("category")) {
-                return new NamedColumn(CATEGORY, key, -1);
-            }
-
-            // Check for option columns with patterns
-            Matcher optionNameMatcher = OPTION_NAME_PATTERN.matcher(key);
-            if (optionNameMatcher.matches()) {
-                int index = Integer.parseInt(optionNameMatcher.group(1));
-                return new NamedColumn(OPTION_NAME, key, index);
-            }
-
-            Matcher optionDisplayNameMatcher = OPTION_DISPLAY_NAME_PATTERN.matcher(key);
-            if (optionDisplayNameMatcher.matches()) {
-                int index = Integer.parseInt(optionDisplayNameMatcher.group(1));
-                return new NamedColumn(OPTION_DISPLAY_NAME, key, index);
-            }
-
-            Matcher optionDescriptionMatcher = OPTION_DESCRIPTION_PATTERN.matcher(key);
-            if (optionDescriptionMatcher.matches()) {
-                int index = Integer.parseInt(optionDescriptionMatcher.group(1));
-                return new NamedColumn(OPTION_DESCRIPTION, key, index);
+            Matcher categoryMatcher = CATEGORY_PATTERN.matcher(key);
+            if (categoryMatcher.matches()) {
+                String indexStr = categoryMatcher.group(1);
+                int index = indexStr.isEmpty() ? 1 : Integer.parseInt(indexStr);
+                return new NamedColumn(CATEGORY, key, index);
             }
 
             // Check for standard columns

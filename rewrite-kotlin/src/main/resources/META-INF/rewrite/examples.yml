@@ -15,7 +15,7 @@
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangeAnnotationAttributeName
 examples:
-- description: ''
+- description: '`ChangeAnnotationAttributeNameTest#changeAnnotationAttributes`'
   parameters:
   - org.junit.jupiter.api.Tag
   - value
@@ -60,7 +60,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangePackage
 examples:
-- description: ''
+- description: '`ChangePackageTest#changePackage`'
   parameters:
   - a.b
   - x.y
@@ -90,7 +90,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangeType
 examples:
-- description: ''
+- description: '`ChangeTypeTest#changeDefinition`'
   parameters:
   - file
   - newFile
@@ -107,7 +107,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.UseStaticImport
 examples:
-- description: ''
+- description: '`UseStaticImportTest#noPriorImports`'
   parameters:
   - java.lang.Integer valueOf(..)
   sources:
@@ -122,7 +122,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindFields
 examples:
-- description: ''
+- description: '`FindFieldsTest#jvmStaticField`'
   parameters:
   - java.lang.Integer
   - 'false'
@@ -149,7 +149,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindMethods
 examples:
-- description: ''
+- description: '`FindMethodsTest#jvmStaticMethod`'
   parameters:
   - java.lang.Integer decode(..)
   - 'false'
@@ -179,7 +179,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.kotlin.FindKotlinSources
 examples:
-- description: ''
+- description: '`FindKotlinSourcesTest#kotlinFile`'
   parameters:
   - 'false'
   sources:
@@ -190,9 +190,28 @@ examples:
     language: kotlin
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.kotlin.OrderImports
+examples:
+- description: '`OrderImportsTest#orderImports`'
+  sources:
+  - before: |
+      import r.core.Flux
+      import s.core.Flux
+      import com.fasterxml.jackson.databind.ObjectMapper
+      import org.apache.commons.logging.Log
+      import reactor.core.publisher.Mono
+    after: |
+      import com.fasterxml.jackson.databind.ObjectMapper
+      import org.apache.commons.logging.Log
+      import r.core.Flux
+      import reactor.core.publisher.Mono
+      import s.core.Flux
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.kotlin.RenameTypeAlias
 examples:
-- description: ''
+- description: '`RenameTypeAliasTest#declaration`'
   parameters:
   - OldAlias
   - NewAlias
@@ -209,7 +228,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.kotlin.cleanup.EqualsMethodUsage
 examples:
-- description: ''
+- description: '`EqualsMethodUsageTest#replace`'
   sources:
   - before: |
       fun isSame(obj1 : String, obj2: String) : Boolean {
@@ -224,7 +243,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.kotlin.cleanup.ImplicitParameterInLambda
 examples:
-- description: ''
+- description: '`ImplicitParameterInLambdaTest#removeIt`'
   sources:
   - before: |
       fun method() {
@@ -241,7 +260,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.kotlin.cleanup.RemoveLambdaArgumentParentheses
 examples:
-- description: ''
+- description: '`RemoveLambdaArgumentParenthesesTest#removeParenthesesFromLet`'
   sources:
   - before: |
       fun method(number: Int) {
@@ -256,7 +275,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.kotlin.cleanup.RemoveTrailingComma
 examples:
-- description: ''
+- description: '`RemoveTrailingCommaTest#methodArgs`'
   sources:
   - before: |
       fun method(arg1: String,
@@ -271,7 +290,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.kotlin.cleanup.RemoveTrailingSemicolon
 examples:
-- description: ''
+- description: '`RemoveTrailingSemicolonTest#variableDeclaration`'
   sources:
   - before: |
       fun method() {
@@ -286,18 +305,11 @@ examples:
           var baz: String = "a"
       }
     language: kotlin
-- description: ''
-  sources:
-  - before: |
-      fun method() {
-          var foo = 1; var bar: Int
-      }
-    language: kotlin
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.kotlin.cleanup.ReplaceCharToIntWithCode
 examples:
-- description: ''
+- description: '`ReplaceCharToIntWithCodeTest#replace`'
   sources:
   - before: |
       fun decimalDigitalNumber(c : Char) : Int? {
@@ -318,7 +330,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.kotlin.cleanup.UnnecessaryTypeParentheses
 examples:
-- description: ''
+- description: '`UnnecessaryTypeParenthesesTest#variableDeclarations`'
   sources:
   - before: |
       val x : (Int) = 42
@@ -327,20 +339,11 @@ examples:
       val x : Int = 42
       val y : Int = 42
     language: kotlin
-- description: ''
-  sources:
-  - before: |
-      val sum : (Int, Int) -> (Int) = { a, b -> a + b }
-      val double : ((Int)) -> ((Int)) = { a -> a * 2 }
-    after: |
-      val sum : (Int, Int) -> Int = { a, b -> a + b }
-      val double : (Int) -> Int = { a -> a * 2 }
-    language: kotlin
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.kotlin.format.AutoFormat
 examples:
-- description: ''
+- description: '`AutoFormatVisitorTest#keepMaximumBetweenHeaderAndPackage`'
   sources:
   - before: |
       /*
@@ -363,5 +366,25 @@ examples:
       package com.intellij.samples
 
       class Test {
+      }
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.kotlin.replace.ReplaceKotlinMethod
+examples:
+- description: '`ReplaceKotlinMethodTest#replaceCharToIntWithCode`'
+  parameters:
+  - kotlin.Char toInt()
+  - code
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      fun test(c: Char): Int {
+          return c.toInt()
+      }
+    after: |
+      fun test(c: Char): Int {
+          return c.code
       }
     language: kotlin

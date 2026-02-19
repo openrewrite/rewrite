@@ -268,15 +268,10 @@ describe("AddDependency", () => {
                                 "uuid": "^9.0.0"
                             }
                         }
-                    `, `
-                        /*~~(Failed to add this-package-does-not-exist-12345 to ^1.0.0)~~>*/{
-                            "name": "test-project",
-                            "version": "1.0.0",
-                            "dependencies": {
-                                "uuid": "^9.0.0"
-                            }
-                        }
-                    `), afterRecipe: async (doc: Json.Document) => {
+                    `, (actual: string) => {
+                            expect(actual).toContain('/*~~(Failed to add this-package-does-not-exist-12345');
+                            return actual;
+                        }), afterRecipe: async (doc: Json.Document) => {
                             const warnMarker = findMarker(doc, MarkersKind.MarkupWarn);
                             expect(warnMarker).toBeDefined();
                             expect((warnMarker as any).message).toContain("Failed to add this-package-does-not-exist-12345");

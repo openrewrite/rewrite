@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.cleanup;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
@@ -31,20 +32,14 @@ import java.time.Duration;
 
 public class RemoveLambdaArgumentParentheses extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Remove method invocation parentheses around single lambda argument";
-    }
+    @Getter
+    final String displayName = "Remove method invocation parentheses around single lambda argument";
 
-    @Override
-    public String getDescription() {
-        return "For example, convert `1.let({ it + 1 })` to `1.let { it + 1 }`.";
-    }
+    @Getter
+    final String description = "For example, convert `1.let({ it + 1 })` to `1.let { it + 1 }`.";
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(1);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(1);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

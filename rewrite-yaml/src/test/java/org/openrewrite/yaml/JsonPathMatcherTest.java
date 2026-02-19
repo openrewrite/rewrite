@@ -26,6 +26,7 @@ import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JsonPathMatcherTest {
 
@@ -1106,5 +1107,35 @@ class JsonPathMatcherTest {
         }.reduce(new YamlParser().parse(before.toArray(new String[0]))
           .findFirst()
           .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML")), new ArrayList<>());
+    }
+
+    @Test
+    void invalidJsonPathValidationReturnsInvalid() {
+        var validated = JsonPathMatcher.validate("key", "$[invalid syntax");
+        assertThat(validated.isValid()).isFalse();
+        assertThat(validated.failures().get(0).getMessage())
+          .contains("Invalid JsonPath expression")
+          .contains("extraneous input '[' expecting EOF");
+    }
+
+    @Test
+    void invalidJsonPathMatchesThrowsIllegalArgumentException() {
+        Yaml.Documents yaml = (Yaml.Documents) new YamlParser().parse("key: value").findFirst().orElseThrow();
+        JsonPathMatcher matcher = new JsonPathMatcher("$[invalid syntax");
+        assertThatThrownBy(() -> new YamlVisitor<Integer>() {
+            @Override
+            public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, Integer p) {
+                matcher.matches(getCursor());
+                return entry;
+            }
+        }.reduce(yaml, 0))
+          .hasRootCauseInstanceOf(IllegalArgumentException.class)
+          .rootCause().hasMessageContaining("extraneous input '[' expecting EOF");
+    }
+
+    @Test
+    void rootOnlyJsonPathIsValid() {
+        // "$" alone is valid and means "root" - handled as special case
+        assertThat(JsonPathMatcher.validate("key", "$").isValid()).isTrue();
     }
 }

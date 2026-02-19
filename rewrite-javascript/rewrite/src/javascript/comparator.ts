@@ -249,12 +249,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
             return j;
         }
 
+        // Check if it's a Type node
+        if (Type.isType(j)) {
+            return await this.visitType(j, other);
+        }
+
         // Check if it's a Tree node (has a kind property with a string value)
         if (kind !== undefined && typeof kind === 'string') {
-            // Check if it's a Type node (starts with "org.openrewrite.java.tree.JavaType$")
-            if (kind.startsWith('org.openrewrite.java.tree.JavaType$')) {
-                return await this.visitType(j, other);
-            }
             return await this.visit(j, other);
         }
 
@@ -852,8 +853,19 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     }
 
     /**
+     * Overrides the visitSpread method to compare spread expressions.
+     *
+     * @param spread The spread expression to visit
+     * @param other The other spread expression to compare with
+     * @returns The visited spread expression, or undefined if the visit was aborted
+     */
+    override async visitSpread(spread: JS.Spread, other: J): Promise<J | undefined> {
+        return this.visitElement(spread, other as JS.Spread);
+    }
+
+    /**
      * Overrides the visitStatementExpression method to compare statement expressions.
-     * 
+     *
      * @param statementExpression The statement expression to visit
      * @param other The other statement expression to compare with
      * @returns The visited statement expression, or undefined if the visit was aborted
@@ -2244,13 +2256,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         if (this.lenientTypeMatching && (j == null || other == null)) {
             if (j !== other) {
                 // Don't abort if one is null and the other is a Type
-                const jKind = (j as any)?.kind;
-                const otherKind = (other as any)?.kind;
-                const isTypeComparison =
-                    (jKind && typeof jKind === 'string' && jKind.startsWith('org.openrewrite.java.tree.JavaType$')) ||
-                    (otherKind && typeof otherKind === 'string' && otherKind.startsWith('org.openrewrite.java.tree.JavaType$'));
-
-                if (!isTypeComparison) {
+                if (!Type.isType(j) && !Type.isType(other)) {
                     this.structuralMismatch(propertyName!);
                 }
             }

@@ -107,6 +107,7 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
     inputs.files(fileTree("rewrite/test"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.files("rewrite/build/test-results/jest/junit.xml")
+    outputs.cacheIf { true }
 
     args = listOf("run", "ci:test")
 }
@@ -195,6 +196,7 @@ testing {
                 implementation(project(":rewrite-test"))
                 implementation(project(":rewrite-json"))
                 implementation(project(":rewrite-java-tck"))
+                implementation(project(":rewrite-yaml"))
                 implementation("org.assertj:assertj-core:latest.release")
                 implementation("org.junit.platform:junit-platform-suite-api")
                 runtimeOnly("org.junit.platform:junit-platform-suite-engine")

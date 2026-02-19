@@ -54,20 +54,14 @@ public class RemovePluginDependency extends Recipe {
             example = "guava")
     String artifactId;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove Maven plugin dependency";
-    }
+    String displayName = "Remove Maven plugin dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("from `%s:%s`", pluginGroupId, pluginArtifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Removes a dependency from the <dependencies> section of a plugin in the pom.xml.";
-    }
+    String description = "Removes a dependency from the <dependencies> section of a plugin in the pom.xml.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

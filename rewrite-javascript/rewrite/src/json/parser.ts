@@ -14,11 +14,55 @@
  * limitations under the License.
  */
 import {emptyMarkers, markers, MarkersKind, ParseExceptionResult} from "../markers";
-import {Parser, ParserInput, parserInputRead, ParserSourceReader} from "../parser";
+import {Parser, ParserInput, parserInputRead, Parsers} from "../parser";
 import {randomId} from "../uuid";
 import {SourceFile} from "../tree";
 import {emptySpace, Json, space} from "./tree";
 import {ParseError, ParseErrorKind} from "../parse-error";
+import {createScanner} from "jsonc-parser";
+
+// Define token types locally to avoid const enum issues with isolatedModules
+const Token = {
+    OpenBraceToken: 1,
+    CloseBraceToken: 2,
+    OpenBracketToken: 3,
+    CloseBracketToken: 4,
+    CommaToken: 5,
+    ColonToken: 6,
+    NullKeyword: 7,
+    TrueKeyword: 8,
+    FalseKeyword: 9,
+    StringLiteral: 10,
+    NumericLiteral: 11,
+    LineCommentTrivia: 12,
+    BlockCommentTrivia: 13,
+    LineBreakTrivia: 14,
+    Trivia: 15,
+    Unknown: 16,
+    EOF: 17
+} as const;
+
+type TokenType = typeof Token[keyof typeof Token];
+
+const TokenNames: Record<number, string> = {
+    [Token.OpenBraceToken]: 'OpenBraceToken',
+    [Token.CloseBraceToken]: 'CloseBraceToken',
+    [Token.OpenBracketToken]: 'OpenBracketToken',
+    [Token.CloseBracketToken]: 'CloseBracketToken',
+    [Token.CommaToken]: 'CommaToken',
+    [Token.ColonToken]: 'ColonToken',
+    [Token.NullKeyword]: 'NullKeyword',
+    [Token.TrueKeyword]: 'TrueKeyword',
+    [Token.FalseKeyword]: 'FalseKeyword',
+    [Token.StringLiteral]: 'StringLiteral',
+    [Token.NumericLiteral]: 'NumericLiteral',
+    [Token.LineCommentTrivia]: 'LineCommentTrivia',
+    [Token.BlockCommentTrivia]: 'BlockCommentTrivia',
+    [Token.LineBreakTrivia]: 'LineBreakTrivia',
+    [Token.Trivia]: 'Trivia',
+    [Token.Unknown]: 'Unknown',
+    [Token.EOF]: 'EOF'
+};
 
 export class JsonParser extends Parser {
 
@@ -26,11 +70,11 @@ export class JsonParser extends Parser {
         for (const sourcePath of sourcePaths) {
             try {
                 yield {
-                    ...new ParseJsonReader(sourcePath).parse(),
+                    ...new JsoncParserReader(parserInputRead(sourcePath)).parse(),
                     sourcePath: this.relativePath(sourcePath)
                 };
             } catch (e: any) {
-                // Return a ParseError for files that can't be parsed (e.g., JSONC with comments)
+                // Return a ParseError for files that can't be parsed
                 const text = parserInputRead(sourcePath);
                 const parseError: ParseError = {
                     kind: ParseErrorKind,
@@ -51,177 +95,393 @@ export class JsonParser extends Parser {
     }
 }
 
-class ParseJsonReader extends ParserSourceReader {
-    constructor(sourcePath: ParserInput) {
-        super(sourcePath);
+/**
+ * Parser that uses jsonc-parser's scanner for tokenization.
+ * This is significantly faster than our custom character-by-character parsing.
+ */
+class JsoncParserReader {
+    private readonly source: string;
+    private readonly scanner: ReturnType<typeof createScanner>;
+    // Use explicit number type to prevent TypeScript from narrowing after switch cases
+    // (TypeScript doesn't know that consumeTrivia() and advance() modify this.token)
+    private token: number = 0;
+    private tokenOffset: number = 0;
+    private tokenLength: number = 0;
+    private tokenValue: string = '';
+
+    constructor(source: string) {
+        this.source = source;
+        // ignoreTrivia = false to get whitespace and comments
+        this.scanner = createScanner(source, false);
+        this.advance();
     }
 
-    private prefix() {
-        return space(this.whitespace());
+    private advance(): number {
+        this.token = this.scanner.scan();
+        this.tokenOffset = this.scanner.getTokenOffset();
+        this.tokenLength = this.scanner.getTokenLength();
+        this.tokenValue = this.scanner.getTokenValue();
+        return this.token;
+    }
+
+    /**
+     * Get current token. This method helps TypeScript understand that the token
+     * may have changed after calling consumeTrivia() or advance().
+     */
+    private currentToken(): number {
+        return this.token;
+    }
+
+    /**
+     * Consumes all trivia (whitespace and comments) and returns them as a single string.
+     */
+    private consumeTrivia(): string {
+        let trivia = '';
+        while (
+            this.token === Token.Trivia ||
+            this.token === Token.LineBreakTrivia ||
+            this.token === Token.LineCommentTrivia ||
+            this.token === Token.BlockCommentTrivia
+        ) {
+            trivia += this.source.slice(this.tokenOffset, this.tokenOffset + this.tokenLength);
+            this.advance();
+        }
+        return trivia;
+    }
+
+    private prefix(): Json.Space {
+        return space(this.consumeTrivia());
     }
 
     parse(): Omit<Json.Document, "sourcePath"> {
+        const prefix = this.prefix();
+
+        // Handle empty document
+        if (this.token === Token.EOF) {
+            return {
+                kind: Json.Kind.Document,
+                id: randomId(),
+                prefix,
+                markers: emptyMarkers,
+                value: {
+                    kind: Json.Kind.Literal,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers,
+                    source: this.source,
+                    value: ''
+                } satisfies Json.Literal as Json.Literal as Json.Value,
+                eof: emptySpace
+            };
+        }
+
+        const value = this.parseValue() as Json.Value;
+        const eof = this.prefix();
+
         return {
             kind: Json.Kind.Document,
             id: randomId(),
-            prefix: this.prefix(),
+            prefix,
             markers: emptyMarkers,
-            value: this.json(JSON.parse(this.source)) as Json.Value,
-            eof: space(this.source.slice(this.cursor))
-        }
+            value,
+            eof
+        };
     }
 
-    private json(parsed: any): Json {
+    private parseValue(): Json {
+        const prefix = this.prefix();
         const base = {
             id: randomId(),
-            prefix: this.prefix(),
+            prefix,
             markers: emptyMarkers
-        }
-        if (Array.isArray(parsed)) {
-            this.cursor++; // skip '['
-            let values: Json.RightPadded<Json.Value>[];
-            if (parsed.length === 0) {
-                // Empty array - capture whitespace in an Empty element
-                const afterWhitespace = this.whitespace();
-                values = [{
-                    kind: Json.Kind.RightPadded,
-                    element: {
-                        kind: Json.Kind.Empty,
-                        id: randomId(),
-                        prefix: emptySpace,
-                        markers: emptyMarkers
-                    } satisfies Json.Empty as Json.Empty,
-                    after: space(afterWhitespace),
-                    markers: emptyMarkers
-                } satisfies Json.RightPadded<Json.Value> as Json.RightPadded<Json.Value>];
-            } else {
-                values = parsed.map((p, i) => {
-                    const element = this.json(p) as Json.Value;
-                    const afterWhitespace = this.whitespace();
-                    // Check if there's a comma after this element
-                    const hasComma = this.source[this.cursor] === ',';
-                    if (hasComma) {
-                        this.cursor++; // skip ','
-                    }
-                    return {
-                        kind: Json.Kind.RightPadded,
-                        element,
-                        after: space(afterWhitespace),
-                        markers: emptyMarkers
-                    } satisfies Json.RightPadded<Json.Value> as Json.RightPadded<Json.Value>;
-                });
-            }
-            this.cursor++; // skip ']'
-            return {
-                kind: Json.Kind.Array,
-                ...base,
-                values
-            } satisfies Json.Array as Json.Array;
-        } else if (parsed !== null && typeof parsed === "object") {
-            this.cursor++; // skip '{'
-            const keys = Object.keys(parsed);
-            let members: Json.RightPadded<Json.Member>[];
-            if (keys.length === 0) {
-                // Empty object - capture whitespace in an Empty element
-                const afterWhitespace = this.whitespace();
-                members = [{
-                    kind: Json.Kind.RightPadded,
-                    element: {
-                        kind: Json.Kind.Empty,
-                        id: randomId(),
-                        prefix: emptySpace,
-                        markers: emptyMarkers
-                    } satisfies Json.Empty as Json.Empty as unknown as Json.Member,
-                    after: space(afterWhitespace),
-                    markers: emptyMarkers
-                } satisfies Json.RightPadded<Json.Member> as Json.RightPadded<Json.Member>];
-            } else {
-                members = keys.map((key, i) => {
-                    const element = this.member(parsed, key);
-                    const afterWhitespace = this.whitespace();
-                    // Check if there's a comma after this element
-                    const hasComma = this.source[this.cursor] === ',';
-                    if (hasComma) {
-                        this.cursor++; // skip ','
-                    }
-                    return {
-                        kind: Json.Kind.RightPadded,
-                        element,
-                        after: space(afterWhitespace),
-                        markers: emptyMarkers
-                    } satisfies Json.RightPadded<Json.Member> as Json.RightPadded<Json.Member>;
-                });
-            }
-            this.cursor++; // skip '}'
-            return {
-                kind: Json.Kind.Object,
-                ...base,
-                members
-            } satisfies Json.Object as Json.Object;
-        } else if (typeof parsed === "string") {
-            // Extract original source to preserve escape sequences
-            const sourceStart = this.cursor;
-            this.cursor++; // skip opening quote
-            while (this.cursor < this.source.length) {
-                const char = this.source[this.cursor];
-                if (char === '\\') {
-                    this.cursor += 2; // skip escape sequence
-                } else if (char === '"') {
-                    this.cursor++; // skip closing quote
-                    break;
-                } else {
-                    this.cursor++;
-                }
-            }
-            const source = this.source.slice(sourceStart, this.cursor);
-            return {
-                kind: Json.Kind.Literal,
-                ...base,
-                source,
-                value: parsed
-            } satisfies Json.Literal as Json.Literal;
-        } else if (typeof parsed === "number") {
-            // Extract original source to preserve precision for large numbers
-            const sourceStart = this.cursor;
-            // Numbers can have optional sign, digits, decimal point, and exponent
-            while (this.cursor < this.source.length) {
-                const char = this.source[this.cursor];
-                if (/[\d.eE+\-]/.test(char)) {
-                    this.cursor++;
-                } else {
-                    break;
-                }
-            }
-            const source = this.source.slice(sourceStart, this.cursor);
-            return {
-                kind: Json.Kind.Literal,
-                ...base,
-                source,
-                value: parsed,
-            } satisfies Json.Literal as Json.Literal;
-        } else if (typeof parsed === "boolean") {
-            const source = parsed ? "true" : "false";
-            this.cursor += source.length;
-            return {
-                kind: Json.Kind.Literal,
-                ...base,
-                source,
-                value: parsed,
-            } satisfies Json.Literal as Json.Literal;
-        } else if (parsed === null) {
-            this.cursor += 4; // "null".length
-            return {
-                kind: Json.Kind.Literal,
-                ...base,
-                source: "null",
-                value: null,
-            } satisfies Json.Literal as Json.Literal;
-        } else {
-            throw new Error(`Unsupported JSON type: ${typeof parsed}`);
+        };
+
+        switch (this.token) {
+            case Token.OpenBraceToken:
+                return this.parseObject(base);
+            case Token.OpenBracketToken:
+                return this.parseArray(base);
+            case Token.StringLiteral:
+                return this.parseStringLiteral(base);
+            case Token.NumericLiteral:
+                return this.parseNumericLiteral(base);
+            case Token.TrueKeyword:
+                this.advance();
+                return {
+                    kind: Json.Kind.Literal,
+                    ...base,
+                    source: 'true',
+                    value: true
+                } satisfies Json.Literal as Json.Literal;
+            case Token.FalseKeyword:
+                this.advance();
+                return {
+                    kind: Json.Kind.Literal,
+                    ...base,
+                    source: 'false',
+                    value: false
+                } satisfies Json.Literal as Json.Literal;
+            case Token.NullKeyword:
+                this.advance();
+                return {
+                    kind: Json.Kind.Literal,
+                    ...base,
+                    source: 'null',
+                    value: null
+                } satisfies Json.Literal as Json.Literal;
+            default:
+                throw new Error(`Unexpected token ${TokenNames[this.token] || this.token} at offset ${this.tokenOffset}`);
         }
     }
 
-    private member(parsed: any, key: string) {
+    private parseObject(base: { id: string; prefix: Json.Space; markers: typeof emptyMarkers }): Json.Object {
+        this.advance(); // consume '{'
+
+        const members: Json.RightPadded<Json.Member>[] = [];
+
+        // Check for empty object
+        const afterOpen = this.consumeTrivia();
+        if (this.token === Token.CloseBraceToken) {
+            this.advance(); // consume '}'
+            members.push({
+                kind: Json.Kind.RightPadded,
+                element: {
+                    kind: Json.Kind.Empty,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers
+                } satisfies Json.Empty as Json.Empty as unknown as Json.Member,
+                after: space(afterOpen),
+                markers: emptyMarkers
+            } satisfies Json.RightPadded<Json.Member> as Json.RightPadded<Json.Member>);
+        } else {
+            // Parse members
+            // Put back the trivia by prepending it to the key's prefix
+            let pendingTrivia = afterOpen;
+
+            while (true) {
+                const member = this.parseMember(pendingTrivia);
+                pendingTrivia = '';
+
+                const afterMember = this.consumeTrivia();
+
+                if (this.token === Token.CommaToken) {
+                    this.advance(); // consume ','
+
+                    // Check for trailing comma
+                    const afterComma = this.consumeTrivia();
+                    if (this.currentToken() === Token.CloseBraceToken) {
+                        // Trailing comma
+                        members.push({
+                            kind: Json.Kind.RightPadded,
+                            element: member,
+                            after: space(afterMember),
+                            markers: emptyMarkers
+                        } satisfies Json.RightPadded<Json.Member> as Json.RightPadded<Json.Member>);
+
+                        this.advance(); // consume '}'
+                        members.push({
+                            kind: Json.Kind.RightPadded,
+                            element: {
+                                kind: Json.Kind.Empty,
+                                id: randomId(),
+                                prefix: emptySpace,
+                                markers: emptyMarkers
+                            } satisfies Json.Empty as Json.Empty as unknown as Json.Member,
+                            after: space(afterComma),
+                            markers: emptyMarkers
+                        } satisfies Json.RightPadded<Json.Member> as Json.RightPadded<Json.Member>);
+                        break;
+                    } else {
+                        // More members - save trivia for next member's prefix
+                        members.push({
+                            kind: Json.Kind.RightPadded,
+                            element: member,
+                            after: space(afterMember),
+                            markers: emptyMarkers
+                        } satisfies Json.RightPadded<Json.Member> as Json.RightPadded<Json.Member>);
+                        pendingTrivia = afterComma;
+                    }
+                } else if (this.token === Token.CloseBraceToken) {
+                    this.advance(); // consume '}'
+                    members.push({
+                        kind: Json.Kind.RightPadded,
+                        element: member,
+                        after: space(afterMember),
+                        markers: emptyMarkers
+                    } satisfies Json.RightPadded<Json.Member> as Json.RightPadded<Json.Member>);
+                    break;
+                } else {
+                    throw new Error(`Expected ',' or '}' at offset ${this.tokenOffset}, found ${TokenNames[this.token] || this.token}`);
+                }
+            }
+        }
+
+        return {
+            kind: Json.Kind.Object,
+            ...base,
+            members
+        } satisfies Json.Object as Json.Object;
+    }
+
+    private parseArray(base: { id: string; prefix: Json.Space; markers: typeof emptyMarkers }): Json.Array {
+        this.advance(); // consume '['
+
+        const values: Json.RightPadded<Json.Value>[] = [];
+
+        // Check for empty array
+        const afterOpen = this.consumeTrivia();
+        if (this.token === Token.CloseBracketToken) {
+            this.advance(); // consume ']'
+            values.push({
+                kind: Json.Kind.RightPadded,
+                element: {
+                    kind: Json.Kind.Empty,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers
+                } satisfies Json.Empty as Json.Empty,
+                after: space(afterOpen),
+                markers: emptyMarkers
+            } satisfies Json.RightPadded<Json.Value> as Json.RightPadded<Json.Value>);
+        } else {
+            // Parse values - need to handle the trivia we already consumed
+            // by putting it back as a "pending" prefix
+            let pendingTrivia = afterOpen;
+
+            while (true) {
+                // For first value, prepend the afterOpen trivia
+                const valuePrefix = pendingTrivia + this.consumeTrivia();
+                pendingTrivia = '';
+
+                const valueBase = {
+                    id: randomId(),
+                    prefix: space(valuePrefix),
+                    markers: emptyMarkers
+                };
+
+                let value: Json.Value;
+                switch (this.token) {
+                    case Token.OpenBraceToken:
+                        value = this.parseObject(valueBase);
+                        break;
+                    case Token.OpenBracketToken:
+                        value = this.parseArray(valueBase);
+                        break;
+                    case Token.StringLiteral:
+                        value = this.parseStringLiteral(valueBase);
+                        break;
+                    case Token.NumericLiteral:
+                        value = this.parseNumericLiteral(valueBase);
+                        break;
+                    case Token.TrueKeyword:
+                        this.advance();
+                        value = {
+                            kind: Json.Kind.Literal,
+                            ...valueBase,
+                            source: 'true',
+                            value: true
+                        } satisfies Json.Literal as Json.Literal;
+                        break;
+                    case Token.FalseKeyword:
+                        this.advance();
+                        value = {
+                            kind: Json.Kind.Literal,
+                            ...valueBase,
+                            source: 'false',
+                            value: false
+                        } satisfies Json.Literal as Json.Literal;
+                        break;
+                    case Token.NullKeyword:
+                        this.advance();
+                        value = {
+                            kind: Json.Kind.Literal,
+                            ...valueBase,
+                            source: 'null',
+                            value: null
+                        } satisfies Json.Literal as Json.Literal;
+                        break;
+                    default:
+                        throw new Error(`Unexpected token ${TokenNames[this.token] || this.token} in array at offset ${this.tokenOffset}`);
+                }
+
+                const afterValue = this.consumeTrivia();
+
+                if (this.currentToken() === Token.CommaToken) {
+                    this.advance(); // consume ','
+
+                    // Check for trailing comma
+                    const afterComma = this.consumeTrivia();
+                    if (this.currentToken() === Token.CloseBracketToken) {
+                        // Trailing comma
+                        values.push({
+                            kind: Json.Kind.RightPadded,
+                            element: value,
+                            after: space(afterValue),
+                            markers: emptyMarkers
+                        } satisfies Json.RightPadded<Json.Value> as Json.RightPadded<Json.Value>);
+
+                        this.advance(); // consume ']'
+                        values.push({
+                            kind: Json.Kind.RightPadded,
+                            element: {
+                                kind: Json.Kind.Empty,
+                                id: randomId(),
+                                prefix: emptySpace,
+                                markers: emptyMarkers
+                            } satisfies Json.Empty as Json.Empty,
+                            after: space(afterComma),
+                            markers: emptyMarkers
+                        } satisfies Json.RightPadded<Json.Value> as Json.RightPadded<Json.Value>);
+                        break;
+                    } else {
+                        // More values
+                        values.push({
+                            kind: Json.Kind.RightPadded,
+                            element: value,
+                            after: space(afterValue),
+                            markers: emptyMarkers
+                        } satisfies Json.RightPadded<Json.Value> as Json.RightPadded<Json.Value>);
+                        pendingTrivia = afterComma;
+                    }
+                } else if (this.currentToken() === Token.CloseBracketToken) {
+                    this.advance(); // consume ']'
+                    values.push({
+                        kind: Json.Kind.RightPadded,
+                        element: value,
+                        after: space(afterValue),
+                        markers: emptyMarkers
+                    } satisfies Json.RightPadded<Json.Value> as Json.RightPadded<Json.Value>);
+                    break;
+                } else {
+                    throw new Error(`Expected ',' or ']' at offset ${this.tokenOffset}, found ${TokenNames[this.currentToken()] || this.currentToken()}`);
+                }
+            }
+        }
+
+        return {
+            kind: Json.Kind.Array,
+            ...base,
+            values
+        } satisfies Json.Array as Json.Array;
+    }
+
+    private parseMember(pendingTrivia: string): Json.Member {
+        const keyPrefix = pendingTrivia + this.consumeTrivia();
+        const key = this.parseKey({
+            id: randomId(),
+            prefix: space(keyPrefix),
+            markers: emptyMarkers
+        });
+
+        const afterKey = this.consumeTrivia();
+        if (this.token !== Token.ColonToken) {
+            throw new Error(`Expected ':' at offset ${this.tokenOffset}, found ${TokenNames[this.token] || this.token}`);
+        }
+        this.advance(); // consume ':'
+
+        const value = this.parseValue() as Json.Value;
+
         return {
             kind: Json.Kind.Member,
             id: randomId(),
@@ -230,10 +490,49 @@ class ParseJsonReader extends ParserSourceReader {
             key: {
                 kind: Json.Kind.RightPadded,
                 markers: emptyMarkers,
-                element: this.json(key) as Json.Key,
-                after: space(this.sourceBefore(":")),
+                element: key as Json.Key,
+                after: space(afterKey)
             } satisfies Json.RightPadded<Json.Key> as Json.RightPadded<Json.Key>,
-            value: this.json(parsed[key]) as Json.Value
+            value
         } satisfies Json.Member as Json.Member;
     }
+
+    /**
+     * Parses a key which is a string literal in standard JSON/JSONC.
+     * Note: jsonc-parser doesn't support JSON5 unquoted identifiers.
+     */
+    private parseKey(base: { id: string; prefix: Json.Space; markers: typeof emptyMarkers }): Json.Literal {
+        if (this.token !== Token.StringLiteral) {
+            throw new Error(`Expected string key at offset ${this.tokenOffset}, found ${TokenNames[this.token] || this.token}`);
+        }
+        return this.parseStringLiteral(base);
+    }
+
+    private parseStringLiteral(base: { id: string; prefix: Json.Space; markers: typeof emptyMarkers }): Json.Literal {
+        const source = this.source.slice(this.tokenOffset, this.tokenOffset + this.tokenLength);
+        const value = this.tokenValue;
+        this.advance();
+
+        return {
+            kind: Json.Kind.Literal,
+            ...base,
+            source,
+            value
+        } satisfies Json.Literal as Json.Literal;
+    }
+
+    private parseNumericLiteral(base: { id: string; prefix: Json.Space; markers: typeof emptyMarkers }): Json.Literal {
+        const source = this.source.slice(this.tokenOffset, this.tokenOffset + this.tokenLength);
+        const value = parseFloat(source);
+        this.advance();
+
+        return {
+            kind: Json.Kind.Literal,
+            ...base,
+            source,
+            value
+        } satisfies Json.Literal as Json.Literal;
+    }
 }
+
+Parsers.registerParser("json", JsonParser);

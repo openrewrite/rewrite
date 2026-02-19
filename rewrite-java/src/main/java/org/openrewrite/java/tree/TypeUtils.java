@@ -25,6 +25,7 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.newSetFromMap;
 import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.InferenceDirection.FROM;
 import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.InferenceDirection.TO;
 
@@ -523,6 +524,12 @@ public class TypeUtils {
         if (isWildcard(to) || context.getInference() == TO) {
             // If target "to" wildcard is unbounded, it accepts anything
             if (to.getBounds().isEmpty()) {
+                // A named type variable (e.g. V) should not bind to a wildcard (e.g. ? extends Class<?>),
+                // as this produces uncompilable code when the variable is later used in generic positions
+                // that create nested wildcard captures (e.g. Map<? extends K, ? extends V>).
+                if (!isWildcard(to) && isWildcard(from)) {
+                    return false;
+                }
                 return true;
             }
 
@@ -683,6 +690,22 @@ public class TypeUtils {
 
     private static JavaType resolveTypeParameters(JavaType type, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
         return Objects.requireNonNull(new JavaTypeVisitor<Map<JavaType.GenericTypeVariable, JavaType>>() {
+            @Nullable Set<JavaType> visited;
+
+            @Override
+            public JavaType visit(@Nullable JavaType javaType, Map<JavaType.GenericTypeVariable, JavaType> genericTypeVariableJavaTypeMap) {
+                // Prevent infinite recursion
+                if (javaType != null) {
+                    if (visited == null) {
+                        visited = newSetFromMap(new IdentityHashMap<>());
+                    }
+                    if (!visited.add(javaType)) {
+                        return javaType;
+                    }
+                }
+                return super.visit(javaType, genericTypeVariableJavaTypeMap);
+            }
+
             @Override
             public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
                 if (!replacements.containsKey(generic)) {

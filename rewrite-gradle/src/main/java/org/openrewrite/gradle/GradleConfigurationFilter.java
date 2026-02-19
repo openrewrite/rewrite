@@ -36,7 +36,7 @@ class GradleConfigurationFilter {
     public void removeTransitiveConfigurations() {
         Set<String> tmpConfigurations = new HashSet<>(filteredConfigurations);
         for (String tmpConfiguration : tmpConfigurations) {
-            GradleDependencyConfiguration gdc = requireNonNull((gradleProject.getConfiguration(tmpConfiguration)));
+            GradleDependencyConfiguration gdc = requireNonNull(gradleProject.getConfiguration(tmpConfiguration));
             for (GradleDependencyConfiguration transitive : gradleProject.configurationsExtendingFrom(gdc, true)) {
                 filteredConfigurations.remove(transitive.getName());
             }

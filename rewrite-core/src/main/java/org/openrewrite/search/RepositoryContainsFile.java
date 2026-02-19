@@ -38,22 +38,13 @@ public class RepositoryContainsFile extends ScanningRecipe<AtomicBoolean> {
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Repository contains file";
-    }
+    String displayName = "Repository contains file";
 
-    @Override
-    public String getDescription() {
-        return "Intended to be used primarily as a precondition for other recipes, this recipe checks if a repository " +
+    String description = "Intended to be used primarily as a precondition for other recipes, this recipe checks if a repository " +
                "contains a specific file or files matching a pattern. If present all files in the repository are marked " +
                "with a `SearchResult` marker. If you want to get only the matching file as a search result, use `FindSourceFiles` instead.";
-    }
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ZERO;
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ZERO;
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {
@@ -86,10 +77,7 @@ public class RepositoryContainsFile extends ScanningRecipe<AtomicBoolean> {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public Tree visit(Tree tree, ExecutionContext ctx) {
-                if(tree.getMarkers().findFirst(SearchResult.class).isPresent()) {
-                    return tree;
-                }
-                return tree.withMarkers(tree.getMarkers().add(new SearchResult(Tree.randomId(), "Repository contains file matching pattern: " + filePattern)));
+                return SearchResult.mergingFound(tree, "Repository contains file matching pattern: " + filePattern);
             }
         };
     }

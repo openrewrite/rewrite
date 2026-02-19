@@ -17,7 +17,7 @@ import {Cursor, isTree} from '../..';
 import {J} from '../../java';
 import {JS} from '..';
 import {JavaScriptVisitor} from '../visitor';
-import {produce} from 'immer';
+import {create as produce} from 'mutative';
 import {PlaceholderUtils} from './utils';
 import {CaptureImpl, TemplateParamImpl, CaptureValue, CAPTURE_NAME_SYMBOL} from './capture';
 import {Parameter} from './types';
@@ -260,7 +260,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                                         newElements.push(produce(item, draft => {
                                             if (i === 0 && draft.element) {
                                                 // Merge the placeholder's prefix with the first item's prefix
-                                                // Modify prefix directly without nested produce to avoid immer issues
+                                                // Modify prefix directly within the draft
                                                 draft.element.prefix = this.mergePrefix(draft.element.prefix, element.prefix);
                                             }
                                             // Keep all other wrapper properties (including markers with Semicolon)

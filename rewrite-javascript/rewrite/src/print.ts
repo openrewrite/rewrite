@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Marker, MarkersKind, SearchResult} from "./markers";
+import {Marker, MarkersKind, Markup, SearchResult} from "./markers";
 import {Cursor, isSourceFile, SourceFile, Tree} from "./tree";
 import {TreeVisitor} from "./visitor";
 import {trimIndent} from "./util";
@@ -35,7 +35,11 @@ export namespace MarkerPrinter {
                 let searchResult = marker as SearchResult;
                 return commentWrapper(searchResult.description == null ? "" : "(" + searchResult.description + ")");
             } else if (marker.kind.startsWith("org.openrewrite.marker.Markup$")) {
-                return commentWrapper("(" + (marker as any).message + ")");
+                const markup = marker as Markup;
+                const content = markup.detail
+                    ? `(${markup.message}: ${markup.detail})`
+                    : `(${markup.message})`;
+                return commentWrapper(content);
             }
             return "";
         },

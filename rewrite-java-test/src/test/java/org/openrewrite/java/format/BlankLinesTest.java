@@ -978,4 +978,47 @@ class BlankLinesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void tooMuchSpacesInBlock() {
+        rewriteRun(
+          blankLines(style -> style
+            .withKeepMaximum(style.getKeepMaximum().withInCode(2).withBeforeEndOfBlock(3))
+          ),
+          java(
+            """
+            public class Test {
+            
+            
+            
+            
+                //test
+            
+            
+            
+            
+                //Testing
+            
+            
+            
+            
+            
+            }
+            """,
+            """
+            public class Test {
+            
+
+                //test
+            
+            
+                //Testing
+
+
+
+            }
+            """
+          )
+        );
+    }
 }

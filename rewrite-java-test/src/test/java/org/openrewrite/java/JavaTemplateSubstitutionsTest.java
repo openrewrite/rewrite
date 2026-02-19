@@ -537,9 +537,9 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
         // Modelled after org.openrewrite.staticanalysis.BigDecimalRoundingConstantsToEnums.BIG_DECIMAL_SET_SCALE
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+            var m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
             if ("setScale".equals(m.getName().getSimpleName())) {
-                J.FieldAccess secondArgument = (J.FieldAccess) m.getArguments().get(1);
+                var secondArgument = (J.FieldAccess) m.getArguments().get(1);
                 if ("ROUND_DOWN".equals(secondArgument.getName().getSimpleName())) {
                     maybeAddImport("java.math.RoundingMode");
                     return JavaTemplate.builder("#{any(int)}, #{}")
@@ -550,5 +550,52 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
             }
             return m;
         }
+    }
+
+    @Test
+    void changeVarargsToList() {
+        rewriteRun(
+          // Mimics what a Refaster template would generate for varargs
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation elem, ExecutionContext ctx) {
+                  JavaTemplate.Matcher matcher;
+                  JavaTemplate before = JavaTemplate.builder("java.util.stream.Stream.of(#{value:anyArray(T)}).toList()")
+                    .bindType("java.util.List<T>")
+                    .genericTypes("T").build();
+                  if ((matcher = before.matcher(getCursor())).find()) {
+                      maybeRemoveImport("java.util.stream.Stream");
+                      return JavaTemplate.builder("java.util.Arrays.asList(#{value:anyArray(T)})")
+                        .bindType("java.util.List<T>")
+                        .genericTypes("T")
+                        .build()
+                        .apply(getCursor(), elem.getCoordinates().replace(), matcher.parameter(0));
+                  }
+                  return super.visitMethodInvocation(elem, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+              import java.util.stream.Stream;
+              
+              class Example {
+                  List<String> test() {
+                      return Stream.of("a", "b", "c").toList();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              
+              class Example {
+                  List<String> test() {
+                      return java.util.Arrays.asList("a", "b", "c");
+                  }
+              }
+              """
+          )
+        );
     }
 }

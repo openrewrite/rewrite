@@ -37,20 +37,11 @@ import java.util.*;
 @EqualsAndHashCode(callSuper = false)
 public class RemoveDuplicateDependencies extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Remove duplicate Maven dependencies";
-    }
+    String displayName = "Remove duplicate Maven dependencies";
 
-    @Override
-    public String getDescription() {
-        return "Removes duplicated dependencies in the `<dependencies>` and `<dependencyManagement>` sections of the `pom.xml`.";
-    }
+    String description = "Removes duplicated dependencies in the `<dependencies>` and `<dependencyManagement>` sections of the `pom.xml`.";
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(2);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(2);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

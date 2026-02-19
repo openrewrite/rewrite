@@ -36,16 +36,10 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = false)
 public class FindAndReplaceLiteral extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Find and replace literals in HCL files";
-    }
+    String displayName = "Find and replace literals in HCL files";
 
-    @Override
-    public String getDescription() {
-        return "Find and replace literal values in HCL files. This recipe parses the source files on which it runs as HCL, " +
+    String description = "Find and replace literal values in HCL files. This recipe parses the source files on which it runs as HCL, " +
                "meaning you can execute HCL language-specific recipes before and after this recipe in a single recipe run.";
-    }
 
     @Option(displayName = "Find", description = "The literal to find (and replace)", example = "blacklist")
     String find;

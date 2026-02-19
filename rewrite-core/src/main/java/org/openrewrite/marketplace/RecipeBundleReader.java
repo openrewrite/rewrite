@@ -20,7 +20,7 @@ import org.openrewrite.config.RecipeDescriptor;
 
 import java.util.Map;
 
-public interface RecipeBundleReader {
+public interface RecipeBundleReader extends AutoCloseable {
     RecipeBundle getBundle();
 
     RecipeMarketplace read();
@@ -29,5 +29,7 @@ public interface RecipeBundleReader {
 
     Recipe prepare(RecipeListing listing, Map<String, Object> options);
 
-    ClassLoader classLoader();
+    default void close() throws Exception {
+        // no-op
+    }
 }

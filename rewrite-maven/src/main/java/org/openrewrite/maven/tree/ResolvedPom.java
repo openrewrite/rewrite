@@ -42,6 +42,7 @@ import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.*;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -212,6 +213,10 @@ public class ResolvedPom {
                 emptyList()
         ).resolver(ctx, downloader).resolve();
 
+        if (!getVersion().equals(resolved.getVersion())) {
+            return resolved;
+        }
+
         for (Map.Entry<String, String> property : resolved.getProperties().entrySet()) {
             if (properties == null || (property.getValue() != null && !property.getValue().equals(properties.get(property.getKey())))) {
                 return resolved;
@@ -319,12 +324,13 @@ public class ResolvedPom {
         if (propVal != null) {
             // Check if this would create a circular reference
             // e.g., <project.version>${project.version}</project.version>
-            if (propVal.equals("${" + property + "}")) {
-                // Skip the user-defined property and fall through to built-in resolution
-                propVal = null;
-            } else {
+            if (!propVal.equals("${" + property + "}")) {
                 return propVal;
             }
+            // Skip the user-defined property and fall through to built-in resolution
+        } else if (properties.containsKey(property)) {
+            // An existing property key with a `null` value should be regarded as an empty string.
+            return "";
         }
         switch (property) {
             case "groupId":
@@ -895,30 +901,6 @@ public class ResolvedPom {
             );
         }
 
-        private ResolvedManagedDependency mergeProperties(ResolvedManagedDependency child, ResolvedManagedDependency parent) {
-            return new ResolvedManagedDependency(
-                    child.getGav().withVersion(child.getVersion() != null ? child.getVersion() : parent.getVersion()),
-                    child.getScope() != null ? child.getScope() : parent.getScope(),
-                    child.getType() != null ? child.getType() : parent.getType(),
-                    child.getClassifier() != null ? child.getClassifier() : parent.getClassifier(),
-                    // For exclusions, merge child and parent lists if both exist, otherwise take non-empty one
-                    mergeExclusions(child.getExclusions(), parent.getExclusions()),
-                    child.getRequested(), // Child's requested info always wins
-                    child.getRequestedBom() != null ? child.getRequestedBom() : parent.getRequestedBom(),
-                    child.getBomGav() != null ? child.getBomGav() : parent.getBomGav()
-            );
-        }
-
-        /**
-         * Merges exclusion lists, preferring child when both are present
-         */
-        private List<GroupArtifact> mergeExclusions(@Nullable List<GroupArtifact> childExclusions, @Nullable List<GroupArtifact> parentExclusions) {
-            if (childExclusions != null && !childExclusions.isEmpty()) {
-                return childExclusions;
-            }
-            return parentExclusions != null ? parentExclusions : emptyList();
-        }
-
         private void mergeDependencyManagement(
                 List<ManagedDependency> incomingDependencyManagement,
                 Map<GroupArtifactClassifierType, ResolvedManagedDependency> managedDependencyMap,
@@ -939,12 +921,7 @@ public class ResolvedPom {
                             .withRequestedBom(d)
                             .withBomGav(bom.getGav()));
                     for (ResolvedManagedDependency managed : bomManaged) {
-                        managedDependencyMap.compute(createDependencyManagementKey(managed), (key, existing) -> {
-                            if (existing == null) {
-                                return managed;
-                            }
-                            return mergeProperties(existing, managed);
-                        });
+                        managedDependencyMap.putIfAbsent(createDependencyManagementKey(managed), managed);
                     }
                 } else if (d instanceof Defined) {
                     Defined defined = (Defined) d;
@@ -952,21 +929,20 @@ public class ResolvedPom {
                             .getResolutionListener()
                             .dependencyManagement(defined.withGav(getValues(defined.getGav())), pom);
 
-                    ResolvedManagedDependency resolvedDefined = new ResolvedManagedDependency(
-                            getValues(defined.getGav()),
-                            defined.getScope() == null ? null : Scope.fromName(getValue(defined.getScope())),
-                            getValue(defined.getType()),
-                            getValue(defined.getClassifier()),
-                            ListUtils.map(defined.getExclusions(), (UnaryOperator<GroupArtifact>) ResolvedPom.this::getValues),
-                            defined,
-                            null,
-                            null
-                    );
-                    managedDependencyMap.compute(createDependencyManagementKey(defined), (key, existing) -> {
-                        if (existing == null || existing.getBomGav() != null) {
-                            return resolvedDefined;
+                    managedDependencyMap.compute(createDependencyManagementKey(defined), (gav, existing) -> {
+                        if (existing != null && existing.getBomGav() == null) {
+                            return existing;
                         }
-                        return mergeProperties(existing, resolvedDefined);
+                        return new ResolvedManagedDependency(
+                                getValues(defined.getGav()),
+                                defined.getScope() == null ? null : Scope.fromName(getValue(defined.getScope())),
+                                getValue(defined.getType()),
+                                getValue(defined.getClassifier()),
+                                ListUtils.map(defined.getExclusions(), (UnaryOperator<GroupArtifact>) ResolvedPom.this::getValues),
+                                defined,
+                                null,
+                                null
+                        );
                     });
                 }
             }
@@ -1009,7 +985,7 @@ public class ResolvedPom {
         int depth = 0;
         Collection<DependencyAndDependent> dependenciesAtDepth = rootDependencies.values();
         while (!dependenciesAtDepth.isEmpty()) {
-            Map<GroupArtifact, DependencyAndDependent> dependenciesAtNextDepthMap = new LinkedHashMap<>();
+            Map<GroupArtifactClassifierType, DependencyAndDependent> dependenciesAtNextDepthMap = new LinkedHashMap<>();
 
             for (DependencyAndDependent dd : dependenciesAtDepth) {
                 // First get the dependency (relative to the pom it was defined in)
@@ -1076,19 +1052,32 @@ public class ResolvedPom {
                     MavenPomCache cache = MavenExecutionContextView.view(ctx).getPomCache();
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
                     if (resolvedPom == null) {
-                        resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
-                                emptyList(), true, initialRepositories, emptyList(), emptyList(),
-                                emptyList(), emptyList(), emptyList(), emptyList());
+                        resolvedPom = new ResolvedPom(
+                                dPom,
+                                getActiveProfiles(),
+                                emptyMap(),
+                                emptyList(),
+                                true,
+                                initialRepositories,
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }
 
-                    ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
-                            resolvedPom.getGav(), dd.getDependency(), emptyList(),
+                    ResolvedDependency resolved = new ResolvedDependency(
+                            dPom.getRepository(),
+                            resolvedPom.getGav(),
+                            dd.getDependency(),
+                            emptyList(),
                             resolvedPom.getRequested().getLicenses(),
-                            resolvedPom.getValue(dd.getDependency().getType()),
-                            resolvedPom.getValue(dd.getDependency().getClassifier()),
-                            Boolean.valueOf(resolvedPom.getValue(dd.getDependency().getOptional())),
+                            dd.getDependency().getType(),
+                            dd.getDependency().getClassifier(),
+                            Boolean.valueOf(dd.getDependency().getOptional()),
                             depth,
                             emptyList());
 
@@ -1118,6 +1107,16 @@ public class ResolvedPom {
                             d2 = d2.withGav(d2.getGav().withGroupId(resolvedPom.getGroupId()));
                         }
 
+                        d2 = d2
+                                .withGav(d2.getGav()
+                                        .withGroupId(resolvedPom.getValue(d2.getGroupId()))
+                                        .withArtifactId(requireNonNull(resolvedPom.getValue(d2.getArtifactId())))
+                                        .withVersion(resolvedPom.getValue(d2.getVersion()))
+                                )
+                                .withClassifier(resolvedPom.getValue(d2.getClassifier()))
+                                .withScope(resolvedPom.getValue(d2.getScope()))
+                                .withType(resolvedPom.getValue(d2.getType()));
+
                         if (d.getExclusions() != null) {
                             d2 = d2.withExclusions(ListUtils.concatAll(d2.getExclusions(), d.getExclusions()));
                             for (GroupArtifact exclusion : d.getExclusions()) {
@@ -1140,8 +1139,13 @@ public class ResolvedPom {
                         Scope d2Scope = getDependencyScope(d2, resolvedPom);
                         if (d2Scope.isInClasspathOf(dd.getScope())) {
                             // For transitive dependencies at same depth, first parent declaration wins
-                            GroupArtifact d2Ga = new GroupArtifact(d2.getGroupId() == null ? "" : d2.getGroupId(), d2.getArtifactId());
-                            dependenciesAtNextDepthMap.putIfAbsent(d2Ga, new DependencyAndDependent(d2, d2Scope, resolved, dd.getRootDependent(), resolvedPom));
+                            GroupArtifactClassifierType d2Gact = new GroupArtifactClassifierType(
+                                    d2.getGroupId(), // will not be null based on check higher up
+                                    d2.getArtifactId(),
+                                    d2.getClassifier(),
+                                    d2.getType()
+                            );
+                            dependenciesAtNextDepthMap.putIfAbsent(d2Gact, new DependencyAndDependent(d2, d2Scope, resolved, dd.getRootDependent(), resolvedPom));
                         }
                     }
                 } catch (MavenDownloadingException e) {
@@ -1174,17 +1178,26 @@ public class ResolvedPom {
         Scope scopeInContainingPom;
         //noinspection ConstantConditions
         if (d2.getScope() != null) {
-            scopeInContainingPom = Scope.fromName(getValue(d2.getScope()));
+            scopeInContainingPom = Scope.fromName(d2.getScope());
         } else {
-            scopeInContainingPom = containingPom.getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
-                    getValue(d2.getClassifier()));
+            scopeInContainingPom = containingPom.getManagedScope(
+                    requireNonNull(d2.getGroupId()),
+                    d2.getArtifactId(),
+                    d2.getType(),
+                    d2.getClassifier()
+            );
             if (scopeInContainingPom == null) {
                 scopeInContainingPom = Scope.Compile;
             }
         }
+
         //noinspection ConstantConditions
-        Scope scopeInThisProject = getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
-                getValue(d2.getClassifier()));
+        Scope scopeInThisProject = getManagedScope(
+                getValue(d2.getGroupId()),
+                getValue(d2.getArtifactId()),
+                getValue(d2.getType()),
+                getValue(d2.getClassifier())
+        );
         // project POM's dependency management overrules the containingPom's dependencyManagement
         // IFF the dependency is in the runtime classpath of the containingPom;
         // if the dependency was not already in the classpath of the containingPom, then project POM cannot override scope / "promote" it into the classpath

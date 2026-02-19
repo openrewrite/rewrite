@@ -54,4 +54,49 @@ class SourceFileResultsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deepHierarchyRecordsAllLevels() {
+        // Our Sankey visualization of recipe execution relies on the data table recording all levels of the hierarchy,
+        // not just the leaf recipes. This test ensures that the data table includes rows for both the parent and leaf
+        // recipes, even when the parent recipe doesn't directly perform any transformations (i.e., it has zero
+        // estimated time saving).
+        rewriteRun(
+          spec -> spec
+            .recipeFromYaml(
+                //language=yml
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.GrandParent
+                  displayName: Grand parent recipe
+                  description: Three-level hierarchy.
+                  recipeList:
+                    - test.Parent
+                  ---
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.Parent
+                  displayName: Parent recipe
+                  description: Middle level.
+                  recipeList:
+                    - org.openrewrite.text.ChangeText:
+                        toText: Hello!
+                  """,
+              "test.GrandParent"
+            ).dataTable(SourcesFileResults.Row.class, rows -> {
+                // Leaf recipe row + one hierarchy row for the parent recipe.
+                // The root recipe (GrandParent) doesn't get its own row but appears
+                // as the parent in production runs where a synthetic root wraps it.
+                assertThat(rows).hasSize(2);
+                assertThat(rows.get(0).getParentRecipe()).isEqualTo("test.Parent");
+                assertThat(rows.get(0).getRecipe()).isEqualTo("org.openrewrite.text.ChangeText");
+                // Hierarchy row with zero effort so the column remains summable
+                assertThat(rows.get(1).getRecipe()).isEqualTo("test.Parent");
+                assertThat(rows.get(1).getEstimatedTimeSaving()).isEqualTo(0L);
+            }),
+          text(
+            "Hi",
+            "Hello!"
+          )
+        );
+    }
 }

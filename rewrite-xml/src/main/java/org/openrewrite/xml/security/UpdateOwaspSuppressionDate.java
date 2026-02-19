@@ -32,17 +32,11 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = false)
 public class UpdateOwaspSuppressionDate extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Update OWASP suppression date bounds";
-    }
+    String displayName = "Update OWASP suppression date bounds";
 
-    @Override
-    public String getDescription() {
-        return "Updates the expiration date for OWASP suppressions having a matching cve tag. " +
+    String description = "Updates the expiration date for OWASP suppressions having a matching cve tag. " +
                "For use with the OWASP `dependency-check` tool. " +
                "More details: https://jeremylong.github.io/DependencyCheck/general/suppression.html.";
-    }
 
     @Option(displayName = "CVE List",
             description = "Update suppressions having any of the specified CVE tags.",

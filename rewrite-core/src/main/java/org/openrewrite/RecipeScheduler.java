@@ -73,8 +73,7 @@ public class RecipeScheduler {
                 // use cases like sharing a `JavaTypeCache` between `JavaTemplate` parsers).
                 Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
                 try {
-                    RecipeRunCycle<LargeSourceSet> cycle = new RecipeRunCycle<>(recipe, i, rootCursor, ctxWithWatch,
-                            recipeRunStats, searchResults, sourceFileResults, errorsTable, LargeSourceSet::edit);
+                    RecipeRunCycle<LargeSourceSet> cycle = createRecipeRunCycle(recipe, i, rootCursor, ctxWithWatch, recipeRunStats, searchResults, sourceFileResults, errorsTable);
                     ctxWithWatch.putCycle(cycle);
                     after.beforeCycle(i == maxCycles);
 
@@ -115,6 +114,11 @@ public class RecipeScheduler {
             recursiveOnComplete(recipe, ctxWithWatch);
         }
         return after;
+    }
+
+    protected RecipeRunCycle<LargeSourceSet> createRecipeRunCycle(Recipe recipe, int cycle, Cursor rootCursor, WatchableExecutionContext ctxWithWatch, RecipeRunStats recipeRunStats, SearchResults searchResults, SourcesFileResults sourceFileResults, SourcesFileErrors errorsTable) {
+        return new RecipeRunCycle<>(recipe, cycle, rootCursor, ctxWithWatch,
+                recipeRunStats, searchResults, sourceFileResults, errorsTable, LargeSourceSet::edit);
     }
 
     private void recursiveOnComplete(Recipe recipe, ExecutionContext ctx) {

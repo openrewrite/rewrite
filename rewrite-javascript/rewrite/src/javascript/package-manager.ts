@@ -17,21 +17,25 @@
 import {
     createNodeResolutionResultMarker,
     findNodeResolutionResult,
-    Npmrc,
     NpmrcScope,
     PackageJsonContent,
     PackageLockContent,
-    PackageManager,
-    readNpmrcConfigs,
-    serializeNpmrcConfigs
+    PackageManager
 } from "./node-resolution-result";
 import {replaceMarkerByKind} from "../markers";
-import {Json} from "../json";
+import {Json, JsonParser, JsonVisitor} from "../json";
+import {isDocuments, Yaml, YamlParser, YamlVisitor} from "../yaml";
+import {PlainTextParser} from "../text";
+import {SourceFile} from "../tree";
+import {TreeVisitor} from "../visitor";
+import {ExecutionContext} from "../execution";
+import {getPlatformCommand} from "../shell-utils";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import * as os from "os";
 import {spawnSync} from "child_process";
+import * as YAML from "yaml";
 
 /**
  * Configuration for each package manager.
@@ -56,35 +60,37 @@ interface PackageManagerConfig {
 const PACKAGE_MANAGER_CONFIGS: Record<PackageManager, PackageManagerConfig> = {
     [PackageManager.Npm]: {
         lockFile: 'package-lock.json',
-        installLockOnlyCommand: ['npm', 'install', '--package-lock-only'],
-        installCommand: ['npm', 'install'],
+        // --ignore-scripts prevents prepublish/prepare scripts from running in temp directory
+        installLockOnlyCommand: ['npm', 'install', '--package-lock-only', '--ignore-scripts'],
+        installCommand: ['npm', 'install', '--ignore-scripts'],
         listCommand: ['npm', 'list', '--json', '--all'],
     },
     [PackageManager.YarnClassic]: {
         lockFile: 'yarn.lock',
-        // Yarn Classic doesn't have a lock-only mode
+        // Yarn Classic doesn't have a lock-only mode; --ignore-scripts prevents lifecycle scripts
         installLockOnlyCommand: ['yarn', 'install', '--ignore-scripts'],
-        installCommand: ['yarn', 'install'],
+        installCommand: ['yarn', 'install', '--ignore-scripts'],
         listCommand: ['yarn', 'list', '--json'],
     },
     [PackageManager.YarnBerry]: {
         lockFile: 'yarn.lock',
-        // Yarn Berry's mode skip-build skips post-install scripts
+        // --mode skip-build skips post-install scripts in Yarn Berry
         installLockOnlyCommand: ['yarn', 'install', '--mode', 'skip-build'],
-        installCommand: ['yarn', 'install'],
+        installCommand: ['yarn', 'install', '--mode', 'skip-build'],
         listCommand: ['yarn', 'info', '--all', '--json'],
     },
     [PackageManager.Pnpm]: {
         lockFile: 'pnpm-lock.yaml',
-        installLockOnlyCommand: ['pnpm', 'install', '--lockfile-only'],
-        installCommand: ['pnpm', 'install'],
+        // --ignore-scripts prevents lifecycle scripts from running in temp directory
+        installLockOnlyCommand: ['pnpm', 'install', '--lockfile-only', '--ignore-scripts'],
+        installCommand: ['pnpm', 'install', '--ignore-scripts'],
         listCommand: ['pnpm', 'list', '--json', '--depth=Infinity'],
     },
     [PackageManager.Bun]: {
         lockFile: 'bun.lock',
-        // Bun doesn't have a lock-only mode, but is very fast anyway
+        // Bun doesn't have a lock-only mode; --ignore-scripts prevents lifecycle scripts
         installLockOnlyCommand: ['bun', 'install', '--ignore-scripts'],
-        installCommand: ['bun', 'install'],
+        installCommand: ['bun', 'install', '--ignore-scripts'],
     },
 };
 
@@ -116,6 +122,34 @@ const LOCK_FILE_DETECTION: ReadonlyArray<LockFileDetectionConfig> = [
         preferNodeModules: true
     },
 ];
+
+/**
+ * Lock file names that should be parsed as JSON/JSONC format.
+ */
+export const JSON_LOCK_FILE_NAMES = ['bun.lock', 'package-lock.json'] as const;
+
+/**
+ * Lock file names that should be parsed as YAML format.
+ */
+export const YAML_LOCK_FILE_NAMES = ['pnpm-lock.yaml'] as const;
+
+/**
+ * Lock file names that should be parsed as plain text (custom formats like yarn.lock v1).
+ * Note: yarn.lock for Yarn Berry (v2+) is actually YAML format and should be parsed as such.
+ * Use `getLockFileFormat` with content to determine the correct format for yarn.lock.
+ */
+export const TEXT_LOCK_FILE_NAMES = ['yarn.lock'] as const;
+
+/**
+ * Detects if a yarn.lock file is Yarn Berry (v2+) format based on content.
+ * Yarn Berry lock files contain a `__metadata:` key which is not present in Classic.
+ *
+ * @param content The yarn.lock file content
+ * @returns true if this is a Yarn Berry lock file (YAML format), false for Classic
+ */
+export function isYarnBerryLockFile(content: string): boolean {
+    return content.includes('__metadata:');
+}
 
 /**
  * Result of running a package manager command.
@@ -199,12 +233,13 @@ function runInstall(pm: PackageManager, options: InstallOptions): PackageManager
     const [cmd, ...args] = command;
 
     try {
-        const result = spawnSync(cmd, args, {
+        const result = spawnSync(getPlatformCommand(cmd), args, {
             cwd: options.cwd,
             encoding: 'utf-8',
             stdio: ['pipe', 'pipe', 'pipe'],
             timeout: options.timeout ?? 120000,
             env: options.env ? {...process.env, ...options.env} : process.env,
+            ...(os.platform() === 'win32' ? { shell: true } : {})
         });
 
         if (result.error) {
@@ -253,11 +288,12 @@ export function runList(pm: PackageManager, cwd: string, timeout: number = 30000
 
     const [cmd, ...args] = config.listCommand;
 
-    const result = spawnSync(cmd, args, {
+    const result = spawnSync(getPlatformCommand(cmd), args, {
         cwd,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout,
+        ...(os.platform() === 'win32' ? { shell: true } : {})
     });
 
     if (result.error || result.status !== 0) {
@@ -343,12 +379,79 @@ export function getUpdatedLockFileContent<T>(
 }
 
 /**
+ * Determines the appropriate parser for a lock file based on its filename and optionally content.
+ *
+ * For yarn.lock files, the format depends on the Yarn version:
+ * - Yarn Classic (v1): Custom plain text format
+ * - Yarn Berry (v2+): YAML format
+ *
+ * If content is provided for yarn.lock, it will be used to detect the format.
+ * Otherwise, defaults to 'text' (Yarn Classic).
+ *
+ * @param lockFileName The lock file name (e.g., "pnpm-lock.yaml", "package-lock.json", "yarn.lock")
+ * @param content Optional file content (used for yarn.lock format detection)
+ * @returns 'yaml' for YAML lock files, 'json' for JSON lock files, 'text' for plain text
+ */
+export function getLockFileFormat(lockFileName: string, content?: string): 'yaml' | 'json' | 'text' {
+    if ((YAML_LOCK_FILE_NAMES as readonly string[]).includes(lockFileName)) {
+        return 'yaml';
+    }
+    if (lockFileName === 'yarn.lock') {
+        // Yarn Berry (v2+) uses YAML format, Classic uses custom text format
+        if (content && isYarnBerryLockFile(content)) {
+            return 'yaml';
+        }
+        return 'text';
+    }
+    if ((TEXT_LOCK_FILE_NAMES as readonly string[]).includes(lockFileName)) {
+        return 'text';
+    }
+    // package-lock.json, bun.lock
+    return 'json';
+}
+
+/**
+ * Re-parses updated lock file content using the appropriate parser.
+ * This is used by dependency recipes to create the updated lock file SourceFile.
+ *
+ * For yarn.lock files, the content is used to detect whether it's Yarn Berry (YAML)
+ * or Yarn Classic (plain text) format.
+ *
+ * @param content The updated lock file content
+ * @param sourcePath The source path of the lock file
+ * @param lockFileName The lock file name (e.g., "pnpm-lock.yaml", "yarn.lock")
+ * @returns The parsed SourceFile (Json.Document, Yaml.Documents, or PlainText)
+ */
+export async function parseLockFileContent(
+    content: string,
+    sourcePath: string,
+    lockFileName: string
+): Promise<SourceFile> {
+    // Pass content to getLockFileFormat for yarn.lock detection
+    const format = getLockFileFormat(lockFileName, content);
+
+    switch (format) {
+        case 'yaml': {
+            const parser = new YamlParser({});
+            return await parser.parseOne({text: content, sourcePath}) as Yaml.Documents;
+        }
+        case 'text': {
+            const parser = new PlainTextParser({});
+            return await parser.parseOne({text: content, sourcePath});
+        }
+        case 'json':
+        default: {
+            const parser = new JsonParser({});
+            return await parser.parseOne({text: content, sourcePath}) as Json.Document;
+        }
+    }
+}
+
+/**
  * Base interface for project update info used by dependency recipes.
  * Recipes extend this with additional fields specific to their needs.
  */
 export interface BaseProjectUpdateInfo {
-    /** Absolute path to the project directory */
-    projectDir: string;
     /** Relative path to package.json (from source root) */
     packageJsonPath: string;
     /** The package manager used by this project */
@@ -441,23 +544,33 @@ export async function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo
 
     if (updatedLockFile) {
         try {
-            lockContent = JSON.parse(updatedLockFile);
+            // Parse lock file based on format
+            if (updateInfo.packageManager === PackageManager.Pnpm) {
+                // pnpm-lock.yaml is YAML format
+                lockContent = YAML.parse(updatedLockFile);
+            } else if (updateInfo.packageManager === PackageManager.YarnClassic ||
+                       updateInfo.packageManager === PackageManager.YarnBerry) {
+                // yarn.lock has a custom format - skip parsing here
+                // The marker will still be updated with package.json info
+                lockContent = undefined;
+            } else {
+                // npm (package-lock.json) and bun (bun.lock) use JSON
+                lockContent = JSON.parse(updatedLockFile);
+            }
         } catch {
             // Continue without lock file content
         }
     }
 
-    // Read npmrc configs from the project directory
-    const npmrcConfigs = await readNpmrcConfigs(updateInfo.projectDir);
-
-    // Create new marker
+    // Create new marker, preserving existing npmrc configs from the parser
+    // (recipes don't have filesystem access to re-read them)
     const newMarker = createNodeResolutionResultMarker(
         existingMarker.path,
         packageJsonContent,
         lockContent,
         existingMarker.workspacePackagePaths,
         existingMarker.packageManager,
-        npmrcConfigs.length > 0 ? npmrcConfigs : undefined
+        existingMarker.npmrcConfigs
     );
 
     // Replace the marker in the document
@@ -501,83 +614,71 @@ export interface TempInstallOptions {
      */
     lockOnly?: boolean;
     /**
-     * Npmrc configurations from the NodeResolutionResult marker.
-     * If provided, these will be serialized and written to .npmrc in the temp directory
-     * instead of copying from the filesystem.
+     * Original lock file content to use. If provided, this content will be written
+     * to the temp directory instead of copying from projectDir.
+     * This allows recipes to work with in-memory SourceFiles without filesystem access.
      */
-    npmrcConfigs?: Npmrc[];
+    originalLockFileContent?: string;
     /**
-     * Which npmrc scopes to include when writing .npmrc to the temp directory.
-     * Default: [NpmrcScope.Project] - only project-level settings.
-     * Set to [NpmrcScope.Global, NpmrcScope.User, NpmrcScope.Project] to include all scopes.
+     * Config file contents to use. Keys are filenames (e.g., '.npmrc'), values are content.
+     * If provided, these will be written to the temp directory instead of copying from projectDir.
      */
-    npmrcScopes?: NpmrcScope[];
+    configFiles?: Record<string, string>;
 }
 
 /**
- * Runs package manager install in a temporary directory.
- *
- * This function:
- * 1. Creates a temp directory
- * 2. Writes the provided package.json content
- * 3. Copies the existing lock file (if present)
- * 4. Writes .npmrc from marker data (if provided) or copies config files from filesystem
- * 5. Runs the package manager install
- * 6. Returns the updated lock file content
- * 7. Cleans up the temp directory
- *
- * @param projectDir The original project directory (for copying lock file and configs)
- * @param pm The package manager to use
- * @param modifiedPackageJson The modified package.json content to use
- * @param options Optional settings for timeout, lock-only mode, and npmrc configuration
- * @returns Result containing success status and lock file content or error
+ * Options for running install in a temporary directory with workspace support.
  */
-export async function runInstallInTempDir(
-    projectDir: string,
+export interface WorkspaceTempInstallOptions extends TempInstallOptions {
+    /**
+     * Workspace package.json files. Keys are relative paths from the project root
+     * (e.g., "packages/foo/package.json"), values are the package.json content.
+     * The root package.json should have a "workspaces" field pointing to these packages.
+     */
+    workspacePackages?: Record<string, string>;
+}
+
+/**
+ * Internal implementation for running package manager install in a temporary directory.
+ * Supports both simple projects and workspaces.
+ */
+async function runInstallInTempDirCore(
     pm: PackageManager,
-    modifiedPackageJson: string,
-    options: TempInstallOptions = {}
+    rootPackageJson: string,
+    options: WorkspaceTempInstallOptions = {}
 ): Promise<TempInstallResult> {
     const {
         timeout = 120000,
         lockOnly = true,
-        npmrcConfigs,
-        npmrcScopes = [NpmrcScope.Project]
+        originalLockFileContent,
+        configFiles: configFileContents,
+        workspacePackages
     } = options;
     const lockFileName = getLockFileName(pm);
     const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'openrewrite-pm-'));
 
     try {
-        // Write modified package.json to temp directory
-        await fsp.writeFile(path.join(tempDir, 'package.json'), modifiedPackageJson);
+        // Write root package.json to temp directory
+        await fsp.writeFile(path.join(tempDir, 'package.json'), rootPackageJson);
 
-        // Copy existing lock file if present
-        const originalLockPath = path.join(projectDir, lockFileName);
-        if (fs.existsSync(originalLockPath)) {
-            await fsp.copyFile(originalLockPath, path.join(tempDir, lockFileName));
-        }
-
-        // Handle .npmrc: prefer marker data, fall back to filesystem
-        if (npmrcConfigs && npmrcConfigs.length > 0) {
-            // Serialize npmrc from marker data
-            const npmrcContent = serializeNpmrcConfigs(npmrcConfigs, npmrcScopes);
-            if (npmrcContent) {
-                await fsp.writeFile(path.join(tempDir, '.npmrc'), npmrcContent);
-            }
-        } else {
-            // Fall back to copying from filesystem
-            const npmrcPath = path.join(projectDir, '.npmrc');
-            if (fs.existsSync(npmrcPath)) {
-                await fsp.copyFile(npmrcPath, path.join(tempDir, '.npmrc'));
+        // Write workspace package.json files (creating subdirectories as needed)
+        if (workspacePackages) {
+            for (const [relativePath, content] of Object.entries(workspacePackages)) {
+                const fullPath = path.join(tempDir, relativePath);
+                await fsp.mkdir(path.dirname(fullPath), {recursive: true});
+                await fsp.writeFile(fullPath, content);
             }
         }
 
-        // Copy other config files if present (for Yarn, pnpm, etc.)
-        const otherConfigFiles = ['.yarnrc', '.yarnrc.yml', '.pnpmfile.cjs', 'pnpm-workspace.yaml'];
-        for (const configFile of otherConfigFiles) {
-            const configPath = path.join(projectDir, configFile);
-            if (fs.existsSync(configPath)) {
-                await fsp.copyFile(configPath, path.join(tempDir, configFile));
+        // Write lock file if provided
+        if (originalLockFileContent !== undefined) {
+            await fsp.writeFile(path.join(tempDir, lockFileName), originalLockFileContent);
+        }
+
+        // Write config files if provided
+        if (configFileContents) {
+            for (const [configFile, content] of Object.entries(configFileContents)) {
+                await fsp.writeFile(path.join(tempDir, configFile), content);
             }
         }
 
@@ -589,9 +690,21 @@ export async function runInstallInTempDir(
         });
 
         if (!result.success) {
+            // Combine error message with stderr for more useful diagnostics
+            const errorParts: string[] = [];
+            if (result.error) {
+                errorParts.push(result.error);
+            }
+            if (result.stderr) {
+                // Trim and limit stderr to avoid excessively long error messages
+                const stderr = result.stderr.trim();
+                if (stderr) {
+                    errorParts.push(stderr.length > 2000 ? stderr.slice(0, 2000) + '...' : stderr);
+                }
+            }
             return {
                 success: false,
-                error: result.error || result.stderr || 'Unknown error'
+                error: errorParts.length > 0 ? errorParts.join('\n\n') : 'Unknown error'
             };
         }
 
@@ -615,4 +728,110 @@ export async function runInstallInTempDir(
             // Ignore cleanup errors
         }
     }
+}
+
+/**
+ * Runs package manager install in a temporary directory.
+ *
+ * This function:
+ * 1. Creates a temp directory
+ * 2. Writes the provided package.json content
+ * 3. Writes the lock file content (if provided)
+ * 4. Writes config files (if provided)
+ * 5. Runs the package manager install
+ * 6. Returns the updated lock file content
+ * 7. Cleans up the temp directory
+ *
+ * @param pm The package manager to use
+ * @param modifiedPackageJson The modified package.json content to use
+ * @param options Optional settings for timeout, lock-only mode, and file contents
+ * @returns Result containing success status and lock file content or error
+ */
+export async function runInstallInTempDir(
+    pm: PackageManager,
+    modifiedPackageJson: string,
+    options: TempInstallOptions = {}
+): Promise<TempInstallResult> {
+    return runInstallInTempDirCore(pm, modifiedPackageJson, options);
+}
+
+/**
+ * Runs package manager install in a temporary directory with workspace support.
+ *
+ * This function:
+ * 1. Creates a temp directory
+ * 2. Writes the root package.json content
+ * 3. Writes workspace package.json files (creating subdirectories as needed)
+ * 4. Writes the lock file content (if provided)
+ * 5. Writes config files (if provided)
+ * 6. Runs the package manager install at the root
+ * 7. Returns the updated lock file content
+ * 8. Cleans up the temp directory
+ *
+ * @param pm The package manager to use
+ * @param rootPackageJson The root package.json content (should contain "workspaces" field)
+ * @param options Optional settings including workspace packages, timeout, lock-only mode, and file contents
+ * @returns Result containing success status and lock file content or error
+ */
+export async function runWorkspaceInstallInTempDir(
+    pm: PackageManager,
+    rootPackageJson: string,
+    options: WorkspaceTempInstallOptions = {}
+): Promise<TempInstallResult> {
+    return runInstallInTempDirCore(pm, rootPackageJson, options);
+}
+
+/**
+ * Creates a lock file visitor that handles updating YAML lock files (pnpm-lock.yaml).
+ * This is a reusable component for dependency recipes.
+ *
+ * @param acc The recipe accumulator containing updated lock file content
+ * @returns A YamlVisitor that updates YAML lock files
+ */
+export function createYamlLockFileVisitor<T>(
+    acc: DependencyRecipeAccumulator<T>
+): YamlVisitor<ExecutionContext> {
+    return new class extends YamlVisitor<ExecutionContext> {
+        protected async visitDocuments(docs: Yaml.Documents, _ctx: ExecutionContext): Promise<Yaml | undefined> {
+            const sourcePath = docs.sourcePath;
+            const updatedLockContent = getUpdatedLockFileContent(sourcePath, acc);
+            if (updatedLockContent) {
+                const lockFileName = path.basename(sourcePath);
+                const parsed = await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Yaml.Documents;
+                // Preserve original ID for RPC compatibility
+                return {
+                    ...docs,
+                    documents: parsed.documents,
+                    suffix: parsed.suffix
+                } as Yaml.Documents;
+            }
+            return docs;
+        }
+    };
+}
+
+/**
+ * Creates a composite visitor that delegates to the appropriate editor based on tree type.
+ * This handles both JSON (package-lock.json, bun.lock) and YAML (pnpm-lock.yaml) lock files.
+ *
+ * @param jsonEditor The JSON visitor for handling JSON files
+ * @param acc The recipe accumulator for YAML lock file handling
+ * @returns A TreeVisitor that handles both JSON and YAML files
+ */
+export function createLockFileEditor<T>(
+    jsonEditor: JsonVisitor<ExecutionContext>,
+    acc: DependencyRecipeAccumulator<T>
+): TreeVisitor<any, ExecutionContext> {
+    const yamlEditor = createYamlLockFileVisitor(acc);
+
+    return new class extends TreeVisitor<any, ExecutionContext> {
+        async visit(tree: any, ctx: ExecutionContext): Promise<any> {
+            if (isDocuments(tree)) {
+                return yamlEditor.visit(tree, ctx);
+            } else if (tree && tree.kind === Json.Kind.Document) {
+                return jsonEditor.visit(tree, ctx);
+            }
+            return tree;
+        }
+    };
 }

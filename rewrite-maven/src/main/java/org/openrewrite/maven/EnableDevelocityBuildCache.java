@@ -28,15 +28,9 @@ import org.openrewrite.xml.tree.Xml;
 @EqualsAndHashCode(callSuper = false)
 public class EnableDevelocityBuildCache extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Enable Develocity build cache";
-    }
+    String displayName = "Enable Develocity build cache";
 
-    @Override
-    public String getDescription() {
-        return "Add Develocity build cache configuration to any `.mvn/` Develocity configuration file that lack existing configuration.";
-    }
+    String description = "Add Develocity build cache configuration to any `.mvn/` Develocity configuration file that lack existing configuration.";
 
     @Option(displayName = "Enable local build cache",
             description = "Value for `//develocity/buildCache/local/enabled`.",

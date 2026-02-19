@@ -16,8 +16,10 @@
 package org.openrewrite.javascript.rpc;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 
 @Value
-class InstallRecipesResponse {
+public class InstallRecipesResponse {
     int recipesInstalled;
+    @Nullable String version;
 }

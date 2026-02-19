@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {ExecutionContext, foundSearchResult, Recipe, TreeVisitor} from "../src";
-import {JavaScriptVisitor} from "../src/javascript";
-import {J, Type} from "../src/java";
+import {ExecutionContext, foundSearchResult, Recipe, TreeVisitor} from "@openrewrite/rewrite";
+import {JavaScriptVisitor} from "@openrewrite/rewrite/javascript";
+import {J, Type} from "@openrewrite/rewrite/java";
 
 export class MarkClassTypes extends Recipe {
     name = "org.openrewrite.example.javascript.mark-class-types"

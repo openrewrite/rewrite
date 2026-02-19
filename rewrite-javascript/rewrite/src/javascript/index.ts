@@ -28,9 +28,12 @@ export * from "./templating/index";
 export * from "./method-matcher";
 export * from "./format";
 export * from "./autodetect";
+export * from "./tree-debug";
+export * from "./project-parser";
 
 export * from "./add-import";
 export * from "./remove-import";
+export * from "./cleanup/index";
 export * from "./recipes/index";
 export * from "./search/index";
 
