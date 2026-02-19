@@ -410,7 +410,6 @@ class TestChangeImport:
             )
         )
 
-    @pytest.mark.xfail(reason="ChangeImport does not yet perform scope analysis to avoid renaming shadowed locals")
     def test_no_rename_shadowed_in_function_scope(self):
         """Don't rename a local variable in function scope that shadows the imported name."""
         spec = RecipeSpec(recipe=ChangeImport(

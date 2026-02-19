@@ -497,6 +497,10 @@ class TestIsVariableHover:
     def test_markdown_wrapped_function(self):
         assert self.mapping._is_variable_hover("```python\ndef foo() -> int\n```") is False
 
+    def test_unknown_is_not_variable(self):
+        """Unknown hover means ty couldn't resolve the reference — not a variable."""
+        assert self.mapping._is_variable_hover("Unknown") is False
+
 
 class TestMakeVariable:
     """Tests for _make_variable creating JavaType.Variable instances."""

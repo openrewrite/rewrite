@@ -252,6 +252,9 @@ class ChangeImport(Recipe):
                 # Skip identifiers inside import statements
                 if self.cursor.first_enclosing(Import):
                     return ident
+                # Skip local variables that shadow the imported name
+                if ident.field_type is not None:
+                    return ident
                 return ident.replace(_simple_name=new_ref_name)
 
             def visit_method_invocation(self, method: MethodInvocation, p: ExecutionContext) -> J:

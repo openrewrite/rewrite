@@ -282,6 +282,8 @@ class PythonTypeMapping:
             return False
         if clean.startswith('def ') or clean.startswith('class ') or clean.startswith('<module'):
             return False
+        if clean == 'Unknown':
+            return False
         return True
 
     def _make_variable(self, name: str, var_type: Optional[JavaType],
