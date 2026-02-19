@@ -925,16 +925,28 @@ public class ResolvedPom {
                     }
                 } else if (d instanceof Defined) {
                     Defined defined = (Defined) d;
+                    GroupArtifactVersion groupArtifactVersion = getValues(defined.getGav());
+                    String gavVersion = groupArtifactVersion.getVersion();
+                    if ("LATEST".equalsIgnoreCase(gavVersion) || "RELEASE".equalsIgnoreCase(gavVersion)) {
+                        MavenMetadata.Versioning versioning = downloader.downloadMetadata(groupArtifactVersion, ResolvedPom.this, repositories).getVersioning();
+                        if ("LATEST".equalsIgnoreCase(gavVersion)) {
+                            groupArtifactVersion = groupArtifactVersion.withVersion(versioning.getLatest());
+                        } else {
+                            groupArtifactVersion = groupArtifactVersion.withVersion(versioning.getRelease());
+                        }
+                    }
+                    final GroupArtifactVersion finalGav = groupArtifactVersion;
                     MavenExecutionContextView.view(ctx)
                             .getResolutionListener()
-                            .dependencyManagement(defined.withGav(getValues(defined.getGav())), pom);
+                            .dependencyManagement(defined.withGav(finalGav), pom);
 
                     managedDependencyMap.compute(createDependencyManagementKey(defined), (gav, existing) -> {
                         if (existing != null && existing.getBomGav() == null) {
                             return existing;
                         }
+
                         return new ResolvedManagedDependency(
-                                getValues(defined.getGav()),
+                                finalGav,
                                 defined.getScope() == null ? null : Scope.fromName(getValue(defined.getScope())),
                                 getValue(defined.getType()),
                                 getValue(defined.getClassifier()),
