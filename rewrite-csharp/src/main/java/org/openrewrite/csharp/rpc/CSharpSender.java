@@ -342,6 +342,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     @Override
     public J visitClassOrStructConstraint(Cs.ClassOrStructConstraint classOrStructConstraint, RpcSendQueue q) {
         q.getAndSend(classOrStructConstraint, Cs.ClassOrStructConstraint::getKind);
+        q.getAndSend(classOrStructConstraint, Cs.ClassOrStructConstraint::isNullable);
         return classOrStructConstraint;
     }
 
