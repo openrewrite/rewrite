@@ -1581,13 +1581,28 @@ public class GroovyParserVisitor {
             List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(expression, classVisitor);
             Optional<MultiVariable> multiVariable = maybeMultiVariable();
             List<J.Modifier> modifiers = getModifiers();
-            TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
+            TypeTree typeExpr;
 
             J.VariableDeclarations.NamedVariable namedVariable;
             if (expression.isMultipleAssignmentDeclaration()) {
-                // def (a, b) = [1, 2]
-                throw new UnsupportedOperationException("Parsing multiple assignment (e.g.: def (a, b) = [1, 2]) is not implemented");
+                Space prefixBeforeOpenParentheses = whitespace();
+                typeExpr = visitTupleExpressionType(expression.getTupleExpression());
+                List<JRightPadded<J.VariableDeclarations>> variables = visitTupleExpressionVariables(expression.getTupleExpression());
+                Space beforeAssign = sourceBefore("=");
+                Expression initializer = visit(expression.getRightExpression());
+                G.DestructuringDeclaration destructuringDeclaration = new G.DestructuringDeclaration(
+                        randomId(),
+                        prefix,
+                        Markers.EMPTY,
+                        modifiers,
+                        typeExpr,
+                        padLeft(beforeAssign, initializer),
+                        JContainer.build(variables).withBefore(prefixBeforeOpenParentheses)
+                );
+                queue.add(destructuringDeclaration);
+                return;
             } else {
+                typeExpr = visitVariableExpressionType(expression.getVariableExpression());
                 J.Identifier name = visit(expression.getVariableExpression());
                 namedVariable = new J.VariableDeclarations.NamedVariable(
                         randomId(),
@@ -2282,10 +2297,54 @@ public class GroovyParserVisitor {
             queue.add(new G.Unary(randomId(), fmt, Markers.EMPTY, JLeftPadded.build(G.Unary.Type.Spread), visit(spreadExpression.getExpression()), null));
         }
 
-        public TypeTree visitVariableExpressionType(@Nullable VariableExpression expression) {
-            if (expression == null) {
-                return null;
-            }
+        public TypeTree visitTupleExpressionType(TupleExpression expression) {
+            String typeName = "";
+            JavaType type = typeMapping.type(expression.getType());
+            return new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), typeName, type, null);
+        }
+
+        public List<JRightPadded<J.VariableDeclarations>> visitTupleExpressionVariables(TupleExpression expression) {
+            JContainer<J.Identifier> identifiers = visit(expression);
+            return identifiers.getPadding().getElements().stream()
+                    .map(it -> {
+                        // If a tuple argument has an explicitly defined type, the type and variable will be grouped together in the whitespace.
+                        // Therefore, split the type and variable name if needed.
+                        String whitespace = it.getElement().getPrefix().getWhitespace();
+                        String typeName = whitespace.trim();
+                        String whitespacesBeforeTypeName = "", whitespacesAfterTypeName = "";
+                        int index = whitespace.indexOf(typeName);
+                        if (!typeName.isEmpty()) {
+                            whitespacesBeforeTypeName = whitespace.substring(0, index);
+                            whitespacesAfterTypeName = whitespace.substring(index + typeName.length());
+                        } else {
+                            whitespacesAfterTypeName = whitespace;
+                        }
+                        J.VariableDeclarations.NamedVariable variable = new J.VariableDeclarations.NamedVariable(
+                                randomId(),
+                                format(whitespacesAfterTypeName),
+                                it.getElement().getMarkers(),
+                                it.getElement().withPrefix(EMPTY),
+                                emptyList(),
+                                null,
+                                typeMapping.variableType(it.getElement().getSimpleName(), it.getElement().getType())
+                        );
+                        J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
+                                randomId(),
+                                format(whitespacesBeforeTypeName),
+                                Markers.EMPTY,
+                                emptyList(),
+                                emptyList(),
+                                new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), typeName, it.getElement().getType(), it.getElement().getFieldType()),
+                                null,
+                                emptyList(),
+                                singletonList(JRightPadded.build(variable))
+                        );
+                        return padRight(variableDeclarations, it.getAfter());
+                    })
+                    .collect(toList());
+        }
+
+        public TypeTree visitVariableExpressionType(VariableExpression expression) {
             if (!expression.isDynamicTyped() && expression.getOriginType().isArray()) {
                 return visitTypeTree(expression.getOriginType());
             }
@@ -2294,7 +2353,7 @@ public class GroovyParserVisitor {
             Space prefix = whitespace();
             String typeName = "";
 
-            if (!expression.isDynamicTyped() && source.startsWith(expression.getOriginType().getUnresolvedName(), cursor)) {
+            if (!expression.isDynamicTyped() && sourceStartsWith(expression.getOriginType().getUnresolvedName())) {
                 if (cursor + expression.getOriginType().getUnresolvedName().length() < source.length() &&
                         !isJavaIdentifierPart(source.charAt(cursor + expression.getOriginType().getUnresolvedName().length()))) {
                     typeName = expression.getOriginType().getUnresolvedName();
