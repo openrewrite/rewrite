@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import ast
 import os
-import re
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -211,9 +210,13 @@ class PythonTypeMapping:
             if result:
                 return result[0]  # type_id
 
-        # Fuzzy match by start offset
+        # Fuzzy match by start offset — prefer the entry whose end is closest
         entries = self._node_index_by_start.get(start, [])
         if entries:
+            if hasattr(node, 'end_lineno') and node.end_lineno is not None:
+                target_end = self._pos_to_byte_offset(node.end_lineno, node.end_col_offset)
+                best = min(entries, key=lambda e: abs(e[0] - target_end))
+                return best[1]  # type_id
             return entries[0][1]  # type_id of first match
 
         return None
@@ -260,24 +263,56 @@ class PythonTypeMapping:
             return self._create_class_type(module_name)
 
         elif kind in ('function', 'boundMethod'):
-            # Return type based on display string
-            display = descriptor.get('display', '')
-            if display:
-                return self._type_string_to_java_type(display)
+            # Use structured return type if available
+            return_type_id = descriptor.get('returnType')
+            if return_type_id is not None:
+                ret_desc = self._type_registry.get(return_type_id)
+                if ret_desc:
+                    return self._descriptor_to_java_type(ret_desc)
             return JavaType.Unknown()
 
         elif kind == 'classLiteral':
             class_name = descriptor.get('className', '')
             return self._create_class_type(class_name)
 
+        elif kind == 'typedDict':
+            name = descriptor.get('name', '')
+            if name:
+                return self._create_class_type(name)
+            return JavaType.Unknown()
+
+        elif kind == 'subclassOf':
+            base_id = descriptor.get('base')
+            if base_id is not None:
+                base_desc = self._type_registry.get(base_id)
+                if base_desc:
+                    return self._descriptor_to_java_type(base_desc)
+            return JavaType.Unknown()
+
+        elif kind == 'newType':
+            name = descriptor.get('name', '')
+            if name:
+                return self._create_class_type(name)
+            return JavaType.Unknown()
+
+        elif kind == 'intersection':
+            for member_id in descriptor.get('positive', []):
+                member = self._type_registry.get(member_id)
+                if member:
+                    return self._descriptor_to_java_type(member)
+            return JavaType.Unknown()
+
         elif kind in ('dynamic', 'never'):
             return JavaType.Unknown()
 
+        elif kind == 'enumLiteral':
+            class_name = descriptor.get('className', '')
+            return self._create_class_type(class_name)
+
+        elif kind == 'property':
+            return JavaType.Unknown()
+
         else:
-            # Try display string as fallback
-            display = descriptor.get('display', '')
-            if display:
-                return self._type_string_to_java_type(display)
             return JavaType.Unknown()
 
     def close(self) -> None:
@@ -398,19 +433,43 @@ class PythonTypeMapping:
         """Get parameter names and types from the method signature.
 
         Uses structured call signature from ty-types when available,
-        otherwise falls back to placeholder names.
+        then falls back to function/method descriptor parameters,
+        then to placeholder names.
         """
-        # Try structured call signature from ty-types
+        # Try structured call signature from ty-types (most specific)
         sig = self._lookup_call_signature(node)
         if sig:
             params = sig.get('parameters', [])
             if params:
-                names = [p['name'] for p in params]
-                types = [self._resolve_param_type(p) for p in params]
+                names = [p['name'] for p in params
+                         if p['name'] not in ('self', 'cls')]
+                types = [self._resolve_param_type(p) for p in params
+                         if p['name'] not in ('self', 'cls')]
                 return names, types
+
+        # Try function/method descriptor parameters
+        func_type_id = self._lookup_func_type_id(node)
+        if func_type_id is not None:
+            descriptor = self._type_registry.get(func_type_id)
+            if descriptor:
+                params = descriptor.get('parameters', [])
+                if params:
+                    names = [p['name'] for p in params
+                             if p['name'] not in ('self', 'cls')]
+                    types = [self._resolve_param_type(p) for p in params
+                             if p['name'] not in ('self', 'cls')]
+                    return names, types
 
         # Fall back to placeholder names
         return self._generate_placeholder_names(node)
+
+    def _lookup_func_type_id(self, node: ast.Call) -> Optional[int]:
+        """Look up the type ID of the function/method being called."""
+        if isinstance(node.func, ast.Attribute):
+            return self._lookup_type_id(node.func)
+        elif isinstance(node.func, ast.Name):
+            return self._lookup_type_id(node.func)
+        return None
 
     def _generate_placeholder_names(self, node: ast.Call) -> Tuple[List[str], List[JavaType]]:
         """Generate placeholder parameter names when signature parsing fails."""
@@ -460,6 +519,33 @@ class PythonTypeMapping:
             if module_name and module_name != 'builtins':
                 return self._create_class_type(f"{module_name}.{class_name}")
             return self._create_class_type(class_name)
+
+        elif kind == 'typedDict':
+            name = descriptor.get('name', '')
+            if name:
+                return self._create_class_type(name)
+            return None
+
+        elif kind == 'subclassOf':
+            base_id = descriptor.get('base')
+            if base_id is not None:
+                base_desc = self._type_registry.get(base_id)
+                if base_desc:
+                    return self._declaring_type_from_descriptor(base_desc)
+            return None
+
+        elif kind == 'newType':
+            name = descriptor.get('name', '')
+            if name:
+                return self._create_class_type(name)
+            return None
+
+        elif kind == 'intersection':
+            for member_id in descriptor.get('positive', []):
+                member = self._type_registry.get(member_id)
+                if member:
+                    return self._declaring_type_from_descriptor(member)
+            return None
 
         elif kind in ('stringLiteral', 'literalString'):
             return self._create_class_type('str')
@@ -573,79 +659,27 @@ class PythonTypeMapping:
     def _get_return_type(self, node: ast.Call) -> Optional[JavaType]:
         """Get the return type of a method call.
 
-        The type of an ExprCall node in ty-types IS the return type.
+        First tries the ExprCall node type (which IS the return type),
+        then falls back to the function descriptor's returnType field.
         """
+        # The type of an ExprCall node in ty-types IS the return type
         type_id = self._lookup_type_id(node)
         if type_id is not None:
             descriptor = self._type_registry.get(type_id)
             if descriptor:
                 return self._descriptor_to_java_type(descriptor)
+
+        # Fall back to function descriptor's structured returnType
+        func_type_id = self._lookup_func_type_id(node)
+        if func_type_id is not None:
+            func_desc = self._type_registry.get(func_type_id)
+            if func_desc:
+                ret_id = func_desc.get('returnType')
+                if ret_id is not None:
+                    ret_desc = self._type_registry.get(ret_id)
+                    if ret_desc:
+                        return self._descriptor_to_java_type(ret_desc)
         return None
-
-    def _type_string_to_java_type(self, type_str: str) -> Optional[JavaType]:
-        """Convert a Python type string to a JavaType."""
-        type_str = type_str.strip()
-
-        # Handle Unknown type
-        if type_str == 'Unknown':
-            return JavaType.Unknown()  # ty: ignore[invalid-return-type]
-
-        # Handle module type: <module 'name'>
-        module_match = re.match(r"<module\s+'([^']+)'", type_str)
-        if module_match:
-            module_name = module_match.group(1)
-            return self._create_class_type(module_name)  # ty: ignore[invalid-return-type]
-
-        # Handle LiteralString (from ty) - treat as str
-        if type_str == 'LiteralString':
-            return self._create_class_type('str')  # ty: ignore[invalid-return-type]
-
-        # Check primitives first
-        if type_str in _PYTHON_PRIMITIVES:
-            return _PYTHON_PRIMITIVES[type_str]  # ty: ignore[invalid-return-type]
-
-        # Handle Literal["value"] - extract base type from the value
-        literal_match = re.match(r'Literal\[(.+)\]', type_str)
-        if literal_match:
-            literal_value = literal_match.group(1).strip()
-            if (literal_value.startswith('"') and literal_value.endswith('"')) or \
-               (literal_value.startswith("'") and literal_value.endswith("'")):
-                return self._create_class_type('str')  # ty: ignore[invalid-return-type]
-            elif literal_value in ('True', 'False'):
-                return JavaType.Primitive.Boolean
-            elif literal_value.isdigit() or (literal_value.startswith('-') and literal_value[1:].isdigit()):
-                return JavaType.Primitive.Int
-            return self._create_class_type('str')
-
-        # Handle Optional[T], List[T], etc.
-        generic_match = re.match(r'(\w+)\[(.+)\]', type_str)
-        if generic_match:
-            base = generic_match.group(1).lower()
-            type_mapping = {
-                'list': 'list',
-                'dict': 'dict',
-                'set': 'set',
-                'tuple': 'tuple',
-                'frozenset': 'frozenset',
-                'optional': None,  # Optional[T] should use T
-            }
-            if base in type_mapping:
-                if type_mapping[base] is None:
-                    inner = generic_match.group(2)
-                    return self._type_string_to_java_type(inner)
-                return self._create_class_type(type_mapping[base])
-            return self._create_class_type(generic_match.group(1))
-
-        # Handle union types: T | None, Union[T, None]
-        if ' | ' in type_str:
-            parts = [p.strip() for p in type_str.split(' | ')]
-            for part in parts:
-                if part not in ('None', 'NoneType', 'Unknown'):
-                    return self._type_string_to_java_type(part)
-            return JavaType.Unknown()
-
-        # Default to class type
-        return self._create_class_type(type_str)  # ty: ignore[invalid-return-type]
 
     def _create_class_type(self, fqn: str) -> JavaType.Class:
         """Create a JavaType.Class from a fully qualified name."""
@@ -673,32 +707,6 @@ class PythonTypeMapping:
         if node.lineno <= len(self._source_lines):
             return self._source_lines[node.lineno - 1][node.col_offset:]
         return ""
-
-    def _discover_venv(self, file_path: str) -> Optional[Path]:
-        """Discover the virtual environment for a file.
-
-        Walks up from the file's directory looking for a .venv directory.
-        """
-        path = Path(file_path)
-        if not path.is_absolute():
-            path = path.resolve()
-
-        current = path.parent
-        for _ in range(20):
-            venv = current / '.venv'
-            if venv.is_dir():
-                return venv
-
-            pyproject = current / 'pyproject.toml'
-            if pyproject.exists():
-                break
-
-            parent = current.parent
-            if parent == current:
-                break
-            current = parent
-
-        return None
 
     @staticmethod
     def module_to_fqn(module_path: str) -> str:

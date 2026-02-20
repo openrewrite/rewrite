@@ -26,7 +26,6 @@ from __future__ import annotations
 import json
 import select
 import subprocess
-import threading
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -37,6 +36,8 @@ class TyTypesClient:
     This client starts `ty-types --serve` as a subprocess and communicates via
     line-delimited JSON-RPC over stdin/stdout. Create an instance per parse
     batch and close it when done.
+
+    Note: This client is NOT thread-safe. Use one instance per thread.
 
     Usage:
         with TyTypesClient() as client:
@@ -49,8 +50,6 @@ class TyTypesClient:
         self._request_id: int = 0
         self._initialized = False
         self._project_root: Optional[str] = None
-        self._read_lock = threading.Lock()
-        self._write_lock = threading.Lock()
 
         self._start_process()
 
@@ -121,28 +120,29 @@ class TyTypesClient:
         line = json.dumps(request) + "\n"
 
         try:
-            with self._write_lock:
-                self._process.stdin.write(line.encode('utf-8'))
-                self._process.stdin.flush()
+            self._process.stdin.write(line.encode('utf-8'))
+            self._process.stdin.flush()
 
-            with self._read_lock:
-                if self._process.stdout is None:
+            if self._process.stdout is None:
+                return None
+
+            if timeout > 0:
+                ready, _, _ = select.select([self._process.stdout], [], [], timeout)
+                if not ready:
                     return None
 
-                if timeout > 0:
-                    ready, _, _ = select.select([self._process.stdout], [], [], timeout)
-                    if not ready:
-                        return None
+            response_line = self._process.stdout.readline().decode('utf-8')
+            if not response_line:
+                return None
+            response = json.loads(response_line)
 
-                response_line = self._process.stdout.readline().decode('utf-8')
-                if not response_line:
-                    return None
-                response = json.loads(response_line)
+            if response.get('id') != self._request_id:
+                return None
 
-                if response.get('error') is not None:
-                    return None
+            if response.get('error') is not None:
+                return None
 
-                return response.get('result')
+            return response.get('result')
         except (BrokenPipeError, OSError, json.JSONDecodeError):
             return None
 
@@ -173,17 +173,24 @@ class TyTypesClient:
             return True
         return False
 
-    def get_types(self, file_path: str, timeout: float = 30) -> Optional[Dict[str, Any]]:
+    def get_types(self, file_path: str, timeout: float = 30,
+                  include_display: bool = False) -> Optional[Dict[str, Any]]:
         """Get all node types for a Python file.
 
         Args:
             file_path: Absolute path to the Python file.
             timeout: Maximum seconds to wait for a response (default 30s).
                      Some files with recursive types can cause ty to hang.
+            include_display: Whether to include display strings in type
+                           descriptors (default False — uses structured data).
         """
         if not self._initialized:
             return None
-        return self._send_request("getTypes", {"file": file_path}, timeout=timeout)
+        return self._send_request(
+            "getTypes",
+            {"file": file_path, "includeDisplay": include_display},
+            timeout=timeout,
+        )
 
     @property
     def is_available(self) -> bool:

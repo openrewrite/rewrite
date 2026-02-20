@@ -555,3 +555,418 @@ class TestStructuredCallSignatures:
         assert len(mapping._call_signature_index) == 0
 
         mapping.close()
+
+
+def _make_mapping(source: str) -> tuple:
+    """Helper: create a temp file, TyTypesClient, and PythonTypeMapping.
+
+    Returns (mapping, tree, tmpdir_path) inside active context managers.
+    Use with _with_mapping() instead for automatic cleanup.
+    """
+    tree = ast.parse(source)
+    tmpdir = tempfile.mkdtemp()
+    file_path = os.path.join(tmpdir, 'test.py')
+    with open(file_path, 'w') as f:
+        f.write(source)
+    client = TyTypesClient()
+    client.initialize(tmpdir)
+    mapping = PythonTypeMapping(source, file_path, ty_client=client)
+    return mapping, tree, tmpdir, client
+
+
+def _cleanup_mapping(mapping, tmpdir, client):
+    """Helper: clean up resources from _make_mapping."""
+    mapping.close()
+    client.shutdown()
+    import shutil
+    shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+class TestDeclaringTypeFromLiterals:
+    """Tests for declaring type inference from literal receivers (no CLI needed)."""
+
+    def test_list_literal_declaring_type(self):
+        source = '[1, 2, 3].append(4)'
+        tree = ast.parse(source)
+        mapping = PythonTypeMapping(source)
+
+        result = mapping.method_invocation_type(tree.body[0].value)
+        mapping.close()
+
+        assert result is not None
+        assert result._name == 'append'
+        assert result._declaring_type is not None
+        assert result._declaring_type._fully_qualified_name == 'list'
+
+    def test_dict_literal_declaring_type(self):
+        source = '{"a": 1}.keys()'
+        tree = ast.parse(source)
+        mapping = PythonTypeMapping(source)
+
+        result = mapping.method_invocation_type(tree.body[0].value)
+        mapping.close()
+
+        assert result is not None
+        assert result._name == 'keys'
+        assert result._declaring_type is not None
+        assert result._declaring_type._fully_qualified_name == 'dict'
+
+    def test_set_literal_declaring_type(self):
+        source = '{1, 2, 3}.add(4)'
+        tree = ast.parse(source)
+        mapping = PythonTypeMapping(source)
+
+        result = mapping.method_invocation_type(tree.body[0].value)
+        mapping.close()
+
+        assert result is not None
+        assert result._name == 'add'
+        assert result._declaring_type is not None
+        assert result._declaring_type._fully_qualified_name == 'set'
+
+    def test_tuple_literal_declaring_type(self):
+        source = '(1, 2, 3).count(1)'
+        tree = ast.parse(source)
+        mapping = PythonTypeMapping(source)
+
+        result = mapping.method_invocation_type(tree.body[0].value)
+        mapping.close()
+
+        assert result is not None
+        assert result._name == 'count'
+        assert result._declaring_type is not None
+        assert result._declaring_type._fully_qualified_name == 'tuple'
+
+    def test_bytes_literal_declaring_type(self):
+        source = 'b"hello".decode()'
+        tree = ast.parse(source)
+        mapping = PythonTypeMapping(source)
+
+        result = mapping.method_invocation_type(tree.body[0].value)
+        mapping.close()
+
+        assert result is not None
+        assert result._name == 'decode'
+        assert result._declaring_type is not None
+        assert result._declaring_type._fully_qualified_name == 'bytes'
+
+    def test_int_literal_declaring_type(self):
+        source = '(42).bit_length()'
+        tree = ast.parse(source)
+        mapping = PythonTypeMapping(source)
+
+        result = mapping.method_invocation_type(tree.body[0].value)
+        mapping.close()
+
+        assert result is not None
+        assert result._name == 'bit_length'
+        assert result._declaring_type is not None
+        assert result._declaring_type._fully_qualified_name == 'int'
+
+
+@requires_ty_types_cli
+class TestReturnTypes:
+    """Tests for return type resolution via ty-types."""
+
+    def test_str_upper_returns_str(self):
+        source = '"hello".upper()'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            result = mapping.method_invocation_type(tree.body[0].value)
+            assert result is not None
+            assert result._return_type == JavaType.Primitive.String
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_len_returns_int(self):
+        source = 'len("hello")'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            result = mapping.method_invocation_type(tree.body[0].value)
+            assert result is not None
+            assert result._return_type == JavaType.Primitive.Int
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_str_split_returns_list(self):
+        source = '"hello world".split()'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            result = mapping.method_invocation_type(tree.body[0].value)
+            assert result is not None
+            assert result._return_type is not None
+            assert isinstance(result._return_type, JavaType.Class)
+            assert result._return_type._fully_qualified_name == 'list'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_str_startswith_returns_bool(self):
+        source = '"hello".startswith("he")'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            result = mapping.method_invocation_type(tree.body[0].value)
+            assert result is not None
+            assert result._return_type == JavaType.Primitive.Boolean
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_str_find_returns_int(self):
+        source = '"hello".find("l")'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            result = mapping.method_invocation_type(tree.body[0].value)
+            assert result is not None
+            assert result._return_type == JavaType.Primitive.Int
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestDeclaringTypeWithTyTypes:
+    """Tests for declaring type resolution using ty-types inference."""
+
+    def test_variable_method_declaring_type(self):
+        """Calling a method on a typed variable resolves the declaring type."""
+        source = 'x: str = "hello"\nx.upper()'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[1].value
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._name == 'upper'
+            assert result._declaring_type is not None
+            assert result._declaring_type._fully_qualified_name == 'str'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_chained_call_declaring_type(self):
+        """Chained calls resolve the intermediate return type as declaring type."""
+        source = '"hello world".split().copy()'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[0].value  # .copy()
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._name == 'copy'
+            assert result._declaring_type is not None
+            assert result._declaring_type._fully_qualified_name == 'list'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_user_defined_class_method(self):
+        """Method call on a user-defined class instance."""
+        source = '''class Greeter:
+    def greet(self, name: str) -> str:
+        return "Hello, " + name
+
+g = Greeter()
+g.greet("World")
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[2].value  # g.greet("World")
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._name == 'greet'
+            assert result._declaring_type is not None
+            assert result._declaring_type._fully_qualified_name == 'Greeter'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_user_defined_class_method_return_type(self):
+        """Return type from a user-defined class method."""
+        source = '''class Greeter:
+    def greet(self, name: str) -> str:
+        return "Hello, " + name
+
+g = Greeter()
+g.greet("World")
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[2].value
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._return_type == JavaType.Primitive.String
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_stdlib_os_path_join(self):
+        """os.path.join() resolves correctly."""
+        source = '''import os
+os.path.join("/tmp", "file.txt")
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[1].value
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._name == 'join'
+            assert result._return_type == JavaType.Primitive.String
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestUnionTypes:
+    """Tests for union / Optional type resolution."""
+
+    def test_optional_str_variable_method(self):
+        """Calling a method on an Optional[str] variable that's been narrowed."""
+        source = '''from typing import Optional
+x: Optional[str] = "hello"
+if x is not None:
+    x.upper()
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            # x.upper() is inside the if body
+            call = tree.body[2].body[0].value
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._name == 'upper'
+            assert result._declaring_type is not None
+            assert result._declaring_type._fully_qualified_name == 'str'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_union_return_type(self):
+        """Function returning Optional[str] should have str or Unknown return type."""
+        source = '''from typing import Optional
+def maybe_name() -> Optional[str]:
+    return "Alice"
+
+maybe_name()
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[2].value  # maybe_name()
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._name == 'maybe_name'
+            # Return type should resolve to str (unwrapping Optional)
+            if result._return_type is not None:
+                assert result._return_type == JavaType.Primitive.String
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestVariableTypes:
+    """Tests for type() on variable/expression nodes."""
+
+    def test_typed_variable(self):
+        """type() on a variable with explicit annotation."""
+        source = 'x: int = 42\nx'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            name_node = tree.body[1].value  # the bare 'x' expression
+            result = mapping.type(name_node)
+            assert result == JavaType.Primitive.Int
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_inferred_str_variable(self):
+        """type() on a variable inferred as str."""
+        source = 'x = "hello"\nx'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            name_node = tree.body[1].value
+            result = mapping.type(name_node)
+            assert result == JavaType.Primitive.String
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_type_on_call_node_returns_result_type(self):
+        """type() on a Call node returns the return type of the call."""
+        source = 'len("hello")'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[0].value
+            result = mapping.type(call)
+            assert result is not None
+            assert isinstance(result, JavaType.Method)
+            assert result._name == 'len'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestMethodSignatureDetails:
+    """Tests for parameter name and type resolution in method signatures."""
+
+    def test_user_function_param_names(self):
+        """Parameter names are resolved from a user-defined function."""
+        source = '''def add(a: int, b: int) -> int:
+    return a + b
+
+add(1, 2)
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[1].value
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._name == 'add'
+            assert result._parameter_names is not None
+            assert 'a' in result._parameter_names
+            assert 'b' in result._parameter_names
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_user_function_param_types(self):
+        """Parameter types are resolved from a user-defined function."""
+        source = '''def add(a: int, b: int) -> int:
+    return a + b
+
+add(1, 2)
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[1].value
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._parameter_types is not None
+            assert len(result._parameter_types) == 2
+            assert result._parameter_types[0] == JavaType.Primitive.Int
+            assert result._parameter_types[1] == JavaType.Primitive.Int
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_method_filters_self_param(self):
+        """Method signature should not include 'self' in parameter names."""
+        source = '''class Calculator:
+    def add(self, a: int, b: int) -> int:
+        return a + b
+
+c = Calculator()
+c.add(1, 2)
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[2].value  # c.add(1, 2)
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._name == 'add'
+            if result._parameter_names is not None:
+                assert 'self' not in result._parameter_names
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_default_param_still_listed(self):
+        """Parameters with defaults are still included."""
+        source = '''def greet(name: str, greeting: str = "Hello") -> str:
+    return f"{greeting}, {name}!"
+
+greet("World")
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[1].value
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._parameter_names is not None
+            assert 'name' in result._parameter_names
+            assert 'greeting' in result._parameter_names
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)

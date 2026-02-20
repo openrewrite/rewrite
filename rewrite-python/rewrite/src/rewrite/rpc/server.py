@@ -326,13 +326,13 @@ def handle_parse(params: dict) -> List[str]:
 
     # Create a ty-types client for this parse batch, initialized with the project root
     ty_client = None
-    try:
-        from rewrite.python.ty_client import TyTypesClient
-        ty_client = TyTypesClient()
-        if relative_to:
+    if relative_to:
+        try:
+            from rewrite.python.ty_client import TyTypesClient
+            ty_client = TyTypesClient()
             ty_client.initialize(relative_to)
-    except (ImportError, RuntimeError):
-        pass  # ty-types not available
+        except (ImportError, RuntimeError):
+            pass  # ty-types not available
 
     try:
         for i, input_item in enumerate(inputs):
