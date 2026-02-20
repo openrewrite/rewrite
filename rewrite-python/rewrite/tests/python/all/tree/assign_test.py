@@ -139,7 +139,7 @@ def test_assign_type_attribution():
         TypeChecker().visit(source_file, None)
 
     # language=python
-    RecipeSpec().rewrite_run(python(
+    RecipeSpec(type_attribution=True).rewrite_run(python(
         "x: int = 42",
         after_recipe=check_types,
     ))
@@ -206,7 +206,7 @@ def test_assign_method_call_type_attribution():
         TypeChecker().visit(source_file, None)
 
     # language=python
-    RecipeSpec().rewrite_run(python(
+    RecipeSpec(type_attribution=True).rewrite_run(python(
         'parts = "a-b-c".split("-")',
         after_recipe=check_types,
     ))
