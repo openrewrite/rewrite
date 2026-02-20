@@ -666,6 +666,119 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void ambiguousImportIssue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("origpkg.validation", "newpkg.validation", true)),
+          //language=java
+          java(
+            """
+              package origpkg.validation;
+              
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              @Target({ElementType.TYPE, ElementType.FIELD})
+              @Retention(RetentionPolicy.RUNTIME)
+              public @interface ExtraneousAnnotation {}
+              """,
+            SourceSpec::skip
+          ),
+          //language=java
+          java(
+            """
+              package newpkg.validation;
+              
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              @Target({ElementType.TYPE, ElementType.FIELD})
+              @Retention(RetentionPolicy.RUNTIME)
+              public @interface ExtraneousAnnotation {}
+              """,
+            SourceSpec::skip
+          ),
+          //language=java
+          java(
+            """
+              package otherpkg.validation;
+              
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              @Target({ElementType.TYPE, ElementType.FIELD})
+              @Retention(RetentionPolicy.RUNTIME)
+              public @interface NotBlank {}
+              """,
+            SourceSpec::skip
+          ),
+          //language=java
+          java(
+            """
+              package newpkg.validation;
+              
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              @Target({ElementType.TYPE, ElementType.FIELD})
+              @Retention(RetentionPolicy.RUNTIME)
+              public @interface NotBlank {}
+              """,
+            SourceSpec::skip
+          ),
+          //language=java
+          java(
+            """
+              package xyz;
+              
+              import origpkg.validation.*;
+              import otherpkg.validation.*;
+              
+              class A {
+                  @NotBlank
+                  private String someField;
+                  @ExtraneousAnnotation
+                  private String otherField;
+              }
+              """,
+            """
+              package xyz;
+              
+              import newpkg.validation.*;
+              import otherpkg.validation.*;
+              
+              class A {
+                  @NotBlank
+                  private String someField;
+                  @ExtraneousAnnotation
+                  private String otherField;
+              }
+              """
+          ),
+          // TODO: This will fail to parse correctly, in comparison
+          //language=java
+          java(
+            """
+              package xyz;
+              
+              import newpkg.validation.*;
+              import otherpkg.validation.*;
+              
+              class B {
+                  @NotBlank
+                  private String someField;
+                  @ExtraneousAnnotation
+                  private String otherField;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void annotation() {
         rewriteRun(
           java(
