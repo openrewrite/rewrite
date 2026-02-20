@@ -1158,4 +1158,120 @@ class AutodetectTest implements RewriteTest {
         var styles = detector.build();
         assertThat(styles).isNotNull();
     }
+
+    @Test
+    void fourSpaceIndentDetection() {
+        // This test verifies that a file with 4-space indentation is correctly detected.
+        var cus = kp().parse(
+          """
+            class MyService {
+                private fun validateInput(value: Int) {
+                    logger.debug { "validating input" }
+                    if (value <= 0) {
+                        throw IllegalArgumentException("error")
+                    }
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+        assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
+
+    @Test
+    void fourSpaceWithLambdaAndSingleLineIf() {
+        // Test the pattern:
+        // - A function with 4-space indentation
+        // - Contains a lambda (logger.debug { ... })
+        // - Contains a single-line if statement
+        var cus = kp().parse(
+          """
+            class MyService {
+                private fun validateInput(value: Int) {
+                    logger.debug { "validating input" }
+                    if (value <= 0) throw IllegalArgumentException("error")
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+        assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
+
+    @Test
+    void mixedIndentProjectPrefersLargerSample() {
+        // Test that when a project has files with different indentation styles,
+        // the autodetect picks the most common one.
+        // This can cause issues when a file uses a minority indentation style.
+        var cus = kp().parse(
+          // File 1: 2-space indentation (many statements)
+          """
+            class TwoSpaceFile1 {
+              fun method1() {
+                val a = 1
+                val b = 2
+                val c = 3
+                val d = 4
+              }
+              fun method2() {
+                val e = 5
+                val f = 6
+              }
+            }
+            """,
+          // File 2: 2-space indentation (many statements)
+          """
+            class TwoSpaceFile2 {
+              fun method1() {
+                val g = 7
+                val h = 8
+                val i = 9
+              }
+              fun method2() {
+                val j = 10
+                val k = 11
+                val l = 12
+              }
+            }
+            """,
+          // File 3: 4-space indentation (fewer statements - minority)
+          """
+            class FourSpaceFile {
+                private fun validateInput(value: Int) {
+                    if (value <= 0) {
+                        throw Exception("error")
+                    }
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+        // The autodetect aggregates all files and picks the most common indentation.
+        // With more 2-space statements than 4-space statements, it picks 2 spaces.
+        // This demonstrates the potential issue - a file with 4-space indentation
+        // in a project that mostly uses 2-space will get reformatted to 2-space.
+        assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
+        // We expect this to be 2 because that's the dominant style in the project
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(2);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(2);
+    }
 }
