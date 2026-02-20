@@ -31,7 +31,6 @@ import org.openrewrite.test.SourceSpec;
 import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.xml.Assertions.xml;
@@ -1907,6 +1906,67 @@ class ChangePackageTest implements RewriteTest {
               import dev.nipafx.rewrite_changepackage_bug.Outer.Inner;
               public class Importer {
                   Inner inner;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1733")
+    @Test
+    void starImportExpandedWhenOtherStarImportsExist() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("javax.validation.constraints", "jakarta.validation.constraints", false))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package javax.validation.constraints;
+                public @interface NotNull {}
+                """,
+              """
+                package jakarta.validation.constraints;
+                public @interface NotNull {}
+                """,
+              """
+                package jakarta.validation.constraints;
+                public @interface NotBlank {}
+                """,
+              """
+                package org.hibernate.validator.constraints;
+                public @interface NotBlank {}
+                """
+            )),
+          // When there are multiple star imports and one is from a renamed package,
+          // the renamed star import should be expanded to explicit imports to avoid
+          // potential ambiguity. In this case, both jakarta.validation.constraints
+          // and org.hibernate.validator.constraints define @NotBlank, so leaving
+          // jakarta.validation.constraints.* as a star import would create an ambiguity.
+          java(
+            """
+              package com.example;
+
+              import javax.validation.constraints.*;
+              import org.hibernate.validator.constraints.*;
+
+              public class MyDTO {
+                  @NotNull
+                  private String id;
+
+                  @NotBlank
+                  private String name;
+              }
+              """,
+            """
+              package com.example;
+
+              import jakarta.validation.constraints.NotNull;
+              import org.hibernate.validator.constraints.*;
+
+              public class MyDTO {
+                  @NotNull
+                  private String id;
+
+                  @NotBlank
+                  private String name;
               }
               """
           )

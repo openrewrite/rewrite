@@ -26,10 +26,11 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
 
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.Map;
+import java.util.*;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
+import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -271,6 +272,9 @@ public class ChangePackage extends Recipe {
                     }
                 }
 
+                // Handle star imports that could become ambiguous after package rename
+                sf = unfoldAmbiguousStarImports(sf, ctx);
+
                 j = sf;
             }
             //noinspection DataFlowIssue
@@ -389,6 +393,100 @@ public class ChangePackage extends Recipe {
                    !packageName.startsWith(newPackageName);
         }
 
+        /**
+         * After a package rename, star imports can become ambiguous if the new package contains
+         * types with the same simple name as types in other star-imported packages.
+         * <p>
+         * When there are multiple star imports and one of them is from a renamed package,
+         * expand the renamed star import to explicit imports only if there's an actual collision
+         * between type names available in the star-imported packages.
+         */
+        private JavaSourceFile unfoldAmbiguousStarImports(JavaSourceFile sf, ExecutionContext ctx) {
+            // Collect all star imports and their packages
+            List<J.Import> starImports = ListUtils.filter(sf.getImports(), it ->
+                    !it.isStatic() && "*".equals(it.getQualid().getSimpleName()));
+
+            // Need at least 2 star imports for potential ambiguity
+            if (starImports.size() < 2) {
+                return sf;
+            }
+
+            Set<String> starImportPackages = starImports.stream()
+                    .map(J.Import::getPackageName)
+                    .collect(toSet());
+
+            // Get the JavaSourceSet from markers to access classpath information
+            org.openrewrite.java.marker.JavaSourceSet sourceSet = sf.getMarkers()
+                    .findFirst(org.openrewrite.java.marker.JavaSourceSet.class).orElse(null);
+
+            // Build a map of package -> all available type simple names from classpath
+            Map<String, Set<String>> availableTypesByPackage = new HashMap<>();
+            if (sourceSet != null) {
+                ListUtils.filter(sourceSet.getClasspath(), it ->
+                        starImportPackages.contains(it.getPackageName()))
+                        .forEach(type -> availableTypesByPackage.computeIfAbsent(type.getPackageName(),
+                                k -> new HashSet<>()).add(type.getClassName()));
+            }
+
+            // Collect types used from each star-imported package
+            Map<String, Set<String>> typesUsedByPackage = new HashMap<>();
+            sf.getTypesInUse().getTypesInUse().stream()
+                    .filter(it -> it instanceof JavaType.FullyQualified)
+                    .map(it -> (JavaType.FullyQualified) it)
+                    .filter(fq -> starImportPackages.contains(fq.getPackageName()))
+                    .forEach(fq -> typesUsedByPackage.computeIfAbsent(fq.getPackageName(),
+                                    k -> new HashSet<>()).add(fq.getClassName()));
+
+            // For each star import from a renamed package, check for actual collisions
+            JavaSourceFile result = sf;
+
+            List<J.Import> toExpand = starImports.stream()
+                    .filter(starImport -> {
+                        String importPkg = starImport.getPackageName();
+                        return (importPkg.equals(newPackageName) ||
+                                (Boolean.TRUE.equals(recursive) && importPkg.startsWith(newPackageName + "."))) &&
+                               !typesUsedByPackage.getOrDefault(importPkg, emptySet()).isEmpty(); 
+                            })
+                    .collect(toList());
+
+            for (J.Import starImport : toExpand) {
+                String importPkg = starImport.getPackageName();
+                Set<String> typesUsedFromThisPackage = typesUsedByPackage.getOrDefault(importPkg, emptySet());
+
+                if (availableTypesByPackage.isEmpty()) {
+                    result = expandStarImport(result, ctx, starImport, importPkg, typesUsedFromThisPackage);
+                    continue;
+                }
+
+                Set<String> typesInThisPkg = availableTypesByPackage.getOrDefault(importPkg, emptySet());
+                boolean hasCollision = availableTypesByPackage.entrySet().stream()
+                        .filter(e -> !e.getKey().equals(importPkg))
+                        .flatMap(e -> e.getValue().stream())
+                        .anyMatch(typesInThisPkg::contains);
+
+                if (hasCollision) {
+                    result = expandStarImport(result, ctx, starImport, importPkg, typesUsedFromThisPackage);
+                }
+            }
+
+            return result;
+        }
+
+        private JavaSourceFile expandStarImport(JavaSourceFile sf, ExecutionContext ctx, J.Import starImport,
+                                                String importPkg, Set<String> typesUsedFromThisPackage) {
+            // Remove the star import
+            sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(starImport.getTypeName(), true)
+                    .visitNonNull(sf, ctx, getCursor().getParentTreeCursor());
+
+            // Add explicit imports for types actually used from this package
+            for (String typeName : typesUsedFromThisPackage) {
+                String fqn = importPkg + "." + typeName;
+                sf = (JavaSourceFile) new AddImport<ExecutionContext>(fqn, null, false)
+                        .visitNonNull(sf, ctx, getCursor().getParentTreeCursor());
+            }
+
+            return sf;
+        }
     }
 
     @Value
