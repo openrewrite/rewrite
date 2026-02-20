@@ -632,13 +632,13 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void globArtifactIdRetainedWhenNewMatchesOld() {
+    void globArtifactIdRetainedWhenNewArtifactIdIsNull() {
         rewriteRun(
           spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
-            "javax.activation",
-            "javax.activation-*",
-            "jakarta.activation",
-            "javax.activation-*",
+            "io.swagger",
+            "swagger-*",
+            "io.swagger.core.v3",
+            null,
             null
           )),
           pomXml(
@@ -649,14 +649,14 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <properties>
-                      <activation.version>1.2.0</activation.version>
+                      <swagger.version>1.5.16</swagger.version>
                   </properties>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
-                              <groupId>javax.activation</groupId>
-                              <artifactId>javax.activation-api</artifactId>
-                              <version>${activation.version}</version>
+                              <groupId>io.swagger</groupId>
+                              <artifactId>swagger-annotations</artifactId>
+                              <version>${swagger.version}</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
@@ -669,14 +669,14 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <properties>
-                      <activation.version>1.2.0</activation.version>
+                      <swagger.version>1.5.16</swagger.version>
                   </properties>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
-                              <groupId>jakarta.activation</groupId>
-                              <artifactId>javax.activation-api</artifactId>
-                              <version>${activation.version}</version>
+                              <groupId>io.swagger.core.v3</groupId>
+                              <artifactId>swagger-annotations</artifactId>
+                              <version>${swagger.version}</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>

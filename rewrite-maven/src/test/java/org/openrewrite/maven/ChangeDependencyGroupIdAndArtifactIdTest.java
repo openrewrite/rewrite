@@ -3150,6 +3150,85 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
+    void handlesGlobCorrectlyWithManagedDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "io.swagger",
+            "swagger-*",
+            "io.swagger.core.v3",
+            null,
+            "2.2.0",
+            null
+          )),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo-child</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.swagger</groupId>
+                      <artifactId>swagger-annotations</artifactId>
+                      <version>1.5.16</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>io.swagger</groupId>
+                      <artifactId>swagger-models</artifactId>
+                      <version>1.5.16</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.swagger</groupId>
+                    <artifactId>swagger-annotations</artifactId>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger</groupId>
+                    <artifactId>swagger-models</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo-child</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.swagger.core.v3</groupId>
+                      <artifactId>swagger-annotations</artifactId>
+                      <version>2.2.0</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>io.swagger.core.v3</groupId>
+                      <artifactId>swagger-models</artifactId>
+                      <version>2.2.0</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.swagger.core.v3</groupId>
+                    <artifactId>swagger-annotations</artifactId>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger.core.v3</groupId>
+                    <artifactId>swagger-models</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void handlesCollisionInDeepRemoteParent() {
         rewriteRun(
             spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
