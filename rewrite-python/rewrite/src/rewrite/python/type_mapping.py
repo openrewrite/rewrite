@@ -33,6 +33,46 @@ from typing import Any, Dict, List, Optional, Tuple
 from ..java import JavaType
 
 
+def compute_source_line_data(
+        source: str,
+) -> Tuple[List[str], List[int], Optional[Dict[int, List[int]]]]:
+    """Split source into lines and compute byte offsets and byte-to-char mappings in one pass.
+
+    Returns:
+        source_lines: Lines with line endings stripped.
+        line_byte_offsets: line_byte_offsets[i] is the byte offset of line i+1 (1-based).
+        byte_to_char: Per-line byte-offset → char-offset mapping for non-ASCII lines only,
+                      or None when the source is pure ASCII.
+    """
+    is_ascii = source.isascii()
+    lines_with_endings = source.splitlines(True)
+    source_lines: List[str] = []
+    offsets: List[int] = [0]
+    byte_to_char: Dict[int, List[int]] = {}
+
+    for lineno, line in enumerate(lines_with_endings, start=1):
+        # Strip line ending
+        if line.endswith('\r\n'):
+            source_lines.append(line[:-2])
+        elif line.endswith(('\r', '\n')):
+            source_lines.append(line[:-1])
+        else:
+            source_lines.append(line)
+
+        if is_ascii:
+            offsets.append(offsets[-1] + len(line))
+        else:
+            line_bytes = line.encode('utf-8')
+            offsets.append(offsets[-1] + len(line_bytes))
+            if len(line_bytes) != len(line):  # non-ASCII line — build byte→char index
+                mapping: List[int] = []
+                for char_idx, char in enumerate(line):
+                    for _ in range(len(char.encode('utf-8'))):
+                        mapping.append(char_idx)
+                byte_to_char[lineno] = mapping
+
+    return source_lines, offsets, (byte_to_char if byte_to_char else None)
+
 
 # Shared Unknown singleton to avoid creating duplicate instances
 _UNKNOWN = JavaType.Unknown()
@@ -74,7 +114,9 @@ class PythonTypeMapping:
         method_type = mapping.method_invocation_type(call_node)
     """
 
-    def __init__(self, source: str, file_path: Optional[str] = None, ty_client=None):
+    def __init__(self, source: str, file_path: Optional[str] = None, ty_client=None,
+                 source_lines: Optional[List[str]] = None,
+                 line_byte_offsets: Optional[List[int]] = None):
         """Initialize type mapping for a source file.
 
         Args:
@@ -83,15 +125,26 @@ class PythonTypeMapping:
                       it will be used for ty-types queries.
             ty_client: Optional TyTypesClient instance. If provided and
                       already initialized, fetches types from ty-types.
+            source_lines: Pre-computed list of lines (no endings). When provided
+                         together with line_byte_offsets, avoids re-splitting source.
+            line_byte_offsets: Pre-computed cumulative byte offsets per line.
         """
         self._source = source
         self._file_path = file_path
-        self._source_lines = source.splitlines()
         self._temp_file: Optional[Path] = None
         self._type_cache: Dict[str, JavaType] = {}  # FQN -> JavaType (per-instance)
 
-        # Compute line byte offsets for position conversion
-        self._line_byte_offsets = self._compute_line_byte_offsets(source)
+        # Use pre-computed values when available (e.g. supplied by ParserVisitor),
+        # otherwise compute them here.
+        if source_lines is not None and line_byte_offsets is not None:
+            self._source_lines = source_lines
+            self._line_byte_offsets = line_byte_offsets
+        else:
+            self._source_lines, self._line_byte_offsets, _ = compute_source_line_data(source)
+
+        # Caches for byte offset and type ID lookups
+        self._byte_offset_cache: Dict[Tuple[int, int], int] = {}
+        self._lookup_cache: Dict[tuple, Optional[int]] = {}
 
         # ty-types data: populated by _build_index
         self._node_index: Dict[Tuple[int, int], Tuple[int, str]] = {}  # (start, end) -> (type_id, node_kind)
@@ -163,27 +216,23 @@ class PythonTypeMapping:
             except OSError:
                 return None
 
-    @staticmethod
-    def _compute_line_byte_offsets(source: str) -> List[int]:
-        """Compute the byte offset of the start of each line.
-
-        Returns a list where index i is the byte offset of line i+1 (1-based).
-        """
-        offsets = [0]
-        for line in source.splitlines(True):
-            offsets.append(offsets[-1] + len(line.encode('utf-8')))
-        return offsets
-
     def _pos_to_byte_offset(self, lineno: int, col_offset: int) -> int:
         """Convert AST (lineno, col_offset) to an absolute byte offset.
 
         Python's ast uses 1-based lineno and 0-based character col_offset (Python 3.8+).
         ty-types uses absolute byte offsets (ruff convention).
+        Results are cached since the same position is often queried multiple times.
         """
+        key = (lineno, col_offset)
+        cached = self._byte_offset_cache.get(key)
+        if cached is not None:
+            return cached
         line_start = self._line_byte_offsets[lineno - 1]
         line_text = self._source_lines[lineno - 1] if lineno <= len(self._source_lines) else ""
         byte_col = len(line_text[:col_offset].encode('utf-8'))
-        return line_start + byte_col
+        result = line_start + byte_col
+        self._byte_offset_cache[key] = result
+        return result
 
     def _build_index(self, result: Dict[str, Any]) -> None:
         """Build the byte-offset lookup index from a getTypes response."""
@@ -214,29 +263,41 @@ class PythonTypeMapping:
                     self._class_literal_index[cn] = tid
 
     def _lookup_type_id(self, node: ast.AST) -> Optional[int]:
-        """Look up a node's type ID by converting AST position to byte offset."""
+        """Look up a node's type ID by converting AST position to byte offset.
+
+        Results are cached by node position to avoid redundant byte-offset
+        conversions when the same node is queried from multiple call sites.
+        """
         if not hasattr(node, 'lineno') or node.lineno is None:
             return None
 
+        end_lineno = getattr(node, 'end_lineno', None)
+        end_col_offset = getattr(node, 'end_col_offset', None)
+        cache_key = (node.lineno, node.col_offset, end_lineno, end_col_offset)
+        if cache_key in self._lookup_cache:
+            return self._lookup_cache[cache_key]
+
         start = self._pos_to_byte_offset(node.lineno, node.col_offset)
+        end = self._pos_to_byte_offset(end_lineno, end_col_offset) if end_lineno is not None else None
 
-        if hasattr(node, 'end_lineno') and node.end_lineno is not None:
-            end = self._pos_to_byte_offset(node.end_lineno, node.end_col_offset)
-            # Try exact match first
-            result = self._node_index.get((start, end))
-            if result:
-                return result[0]  # type_id
+        result = None
+        if end is not None:
+            match = self._node_index.get((start, end))
+            if match:
+                result = match[0]  # type_id
 
-        # Fuzzy match by start offset — prefer the entry whose end is closest
-        entries = self._node_index_by_start.get(start, [])
-        if entries:
-            if hasattr(node, 'end_lineno') and node.end_lineno is not None:
-                target_end = self._pos_to_byte_offset(node.end_lineno, node.end_col_offset)
-                best = min(entries, key=lambda e: abs(e[0] - target_end))
-                return best[1]  # type_id
-            return entries[0][1]  # type_id of first match
+        if result is None:
+            # Fuzzy match by start offset — prefer the entry whose end is closest
+            entries = self._node_index_by_start.get(start, [])
+            if entries:
+                if end is not None:
+                    best = min(entries, key=lambda e: abs(e[0] - end))
+                    result = best[1]  # type_id
+                else:
+                    result = entries[0][1]  # type_id of first match
 
-        return None
+        self._lookup_cache[cache_key] = result
+        return result
 
     def _resolve_type(self, type_id: int) -> Optional[JavaType]:
         """Resolve a type ID to a JavaType, maximizing object reuse.
@@ -856,13 +917,14 @@ class PythonTypeMapping:
             parts = []
             current = receiver
             while isinstance(current, ast.Attribute):
-                parts.insert(0, current.attr)
+                parts.append(current.attr)
                 current = current.value
             if isinstance(current, ast.Name):
-                parts.insert(0, current.id)
+                parts.append(current.id)
 
             # Only create a class type if we have an attribute chain (len > 1)
             if len(parts) > 1:
+                parts.reverse()
                 fqn = '.'.join(parts)
                 return self._create_class_type(fqn)
         return None

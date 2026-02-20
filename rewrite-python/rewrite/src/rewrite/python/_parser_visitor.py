@@ -15,7 +15,7 @@ from rewrite.java import tree as j
 from rewrite.java.support_types import TextComment
 from . import tree as py
 from .markers import KeywordArguments, KeywordOnlyArguments, Quoted
-from .type_mapping import PythonTypeMapping
+from .type_mapping import PythonTypeMapping, compute_source_line_data
 
 T = TypeVar('T')
 J2 = TypeVar('J2', bound=J)
@@ -74,10 +74,12 @@ class ParserVisitor(ast.NodeVisitor):
 
         self._source = source
         self._parentheses_stack = []
-        self._type_mapping = PythonTypeMapping(source, file_path, ty_client)
 
-        # Pre-compute byte-to-char mappings for lines with multi-byte characters
-        self._byte_to_char = self._build_byte_to_char_mapping(source)
+        # Single pass: compute lines, byte offsets, and byte-to-char mapping together
+        source_lines, line_byte_offsets, self._byte_to_char = compute_source_line_data(source)
+        self._type_mapping = PythonTypeMapping(source, file_path, ty_client,
+                                               source_lines=source_lines,
+                                               line_byte_offsets=line_byte_offsets)
 
         # Normalize line endings for the tokenizer (it rejects mixed \r\n and \n),
         # but keep the original source for whitespace extraction
@@ -86,29 +88,6 @@ class ParserVisitor(ast.NodeVisitor):
             tokenize(BytesIO(tokenizer_source.encode('utf-8')).readline)
         )
         self._token_idx = 1  # Skip ENCODING token
-
-    @staticmethod
-    def _build_byte_to_char_mapping(source: str) -> Optional[Dict[int, List[int]]]:
-        """Build byte-to-char offset mappings for lines with multi-byte characters.
-
-        Python 3.8+ AST uses byte offsets for col_offset/end_col_offset,
-        but the tokenizer uses character offsets. This mapping enables
-        conversion for correct position comparisons.
-
-        Returns None for pure ASCII files (no multi-byte characters).
-        Only stores mappings for lines that actually have multi-byte characters,
-        since ASCII-only lines have identical byte and character offsets.
-        """
-        result: Dict[int, List[int]] = {}
-        for lineno, line in enumerate(source.splitlines(keepends=True), start=1):
-            line_bytes = line.encode('utf-8')
-            if len(line_bytes) != len(line):  # Line has multi-byte characters
-                mapping = []
-                for char_idx, char in enumerate(line):
-                    for _ in range(len(char.encode('utf-8'))):
-                        mapping.append(char_idx)
-                result[lineno] = mapping
-        return result if result else None  # Return None for pure ASCII files
 
     def _byte_offset_to_char_offset(self, lineno: int, byte_offset: int) -> int:
         """Convert a byte offset to a character offset for a given line."""

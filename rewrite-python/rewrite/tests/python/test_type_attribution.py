@@ -31,7 +31,7 @@ from pathlib import Path
 from rewrite.java import JavaType
 
 # Import type mapping modules
-from rewrite.python.type_mapping import PythonTypeMapping
+from rewrite.python.type_mapping import PythonTypeMapping, compute_source_line_data
 from rewrite.python.ty_client import TyTypesClient
 
 
@@ -520,10 +520,11 @@ class TestByteOffsetConversion:
     def test_line_byte_offsets(self):
         """Test line start byte offset computation."""
         source = 'abc\ndef\n'
-        offsets = PythonTypeMapping._compute_line_byte_offsets(source)
+        source_lines, offsets, _ = compute_source_line_data(source)
         # Line 1 starts at byte 0, line 2 at byte 4 (after 'abc\n')
         assert offsets[0] == 0
         assert offsets[1] == 4
+        assert source_lines == ['abc', 'def']
 
         mapping = PythonTypeMapping(source)
         mapping.close()
