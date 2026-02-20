@@ -14,8 +14,15 @@
 
 """Tests for ChangeImport recipe."""
 
+import shutil
+
 import pytest
 from rewrite.java.support_types import JavaType
+
+requires_ty_cli = pytest.mark.skipif(
+    shutil.which('ty') is None,
+    reason="ty CLI is not installed (install with: uv tool install ty)"
+)
 from rewrite.java.tree import FieldAccess, Identifier, MethodInvocation
 from rewrite.python.recipes.change_import import ChangeImport
 from rewrite.python.tree import CompilationUnit
@@ -410,6 +417,7 @@ class TestChangeImport:
             )
         )
 
+    @requires_ty_cli
     def test_no_rename_shadowed_in_function_scope(self):
         """Don't rename a local variable in function scope that shadows the imported name."""
         spec = RecipeSpec(recipe=ChangeImport(
