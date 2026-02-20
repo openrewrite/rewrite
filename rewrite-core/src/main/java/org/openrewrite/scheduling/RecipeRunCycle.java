@@ -34,6 +34,7 @@ import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
@@ -151,6 +152,25 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     try {
                         List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableList(acc), ctx));
                         generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
+                        Set<Path> seenInThisBatch = new HashSet<>();
+                        generated.removeIf(source -> {
+                            Path sourcePath = source.getSourcePath();
+                            if (sourceSet.getBefore(sourcePath) != null) {
+                                sourceSet.onGenerateCollision(sourcePath, true);
+                                return true;
+                            }
+                            for (SourceFile existing : acc) {
+                                if (existing.getSourcePath().equals(sourcePath)) {
+                                    sourceSet.onGenerateCollision(sourcePath, false);
+                                    return true;
+                                }
+                            }
+                            if (!seenInThisBatch.add(sourcePath)) {
+                                sourceSet.onGenerateCollision(sourcePath, false);
+                                return true;
+                            }
+                            return false;
+                        });
                         if (!generated.isEmpty()) {
                             acc.addAll(generated);
                             generated.forEach(source -> recordSourceFileResultAndSearchResults(null, source, recipeStack, ctx));
