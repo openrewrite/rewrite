@@ -441,6 +441,30 @@ class TestChangeImport:
             )
         )
 
+    def test_rename_bare_ref_at_module_level_even_if_typed(self):
+        """Module-level bare references to an imported name should be renamed
+        even when ty populates field_type (which indicates a variable)."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='time',
+            old_name='clock',
+            new_module='time',
+            new_name='perf_counter',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from time import clock
+                result = clock()
+                ref = clock
+                """,
+                """
+                from time import perf_counter
+                result = perf_counter()
+                ref = perf_counter
+                """,
+            )
+        )
+
     def test_both_from_import_and_direct_import(self):
         """When a file has both 'from X import name' and 'import X', handle without duplicates."""
         spec = RecipeSpec(recipe=ChangeImport(

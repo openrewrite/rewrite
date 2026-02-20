@@ -24,7 +24,7 @@ from rewrite.marketplace import Python
 from rewrite.recipe import option
 from rewrite.java import J
 from rewrite.java.support_types import JavaType
-from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, MethodInvocation
+from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, MethodDeclaration, MethodInvocation
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
 from rewrite.python.add_import import AddImportOptions, maybe_add_import
@@ -35,7 +35,11 @@ _Imports = [*Python, CategoryDescriptor(display_name="Imports")]
 
 
 def _create_module_type(fqn: str) -> JavaType.Class:
-    """Create a JavaType.Class for a module from its fully qualified name."""
+    """Create a JavaType.Class for a module from its fully qualified name.
+
+    JavaType.Class is not a dataclass, so fields are set directly after
+    construction.  This matches the pattern used elsewhere in the codebase.
+    """
     class_type = JavaType.Class()
     class_type._flags_bit_map = 0
     class_type._fully_qualified_name = fqn
@@ -131,12 +135,12 @@ class ChangeImport(Recipe):
         new_alias = self.new_alias
 
         class ChangeImportVisitor(PythonVisitor[ExecutionContext]):
-            has_old_import: bool
-            old_alias: Optional[str]
-            has_direct_module_import: bool
-            module_alias: Optional[str]
-            rewrote_qualified_refs: bool
-            new_module_type: Optional[JavaType.Class]
+            has_old_import: bool = False
+            old_alias: Optional[str] = None
+            has_direct_module_import: bool = False
+            module_alias: Optional[str] = None
+            rewrote_qualified_refs: bool = False
+            new_module_type: Optional[JavaType.Class] = None
 
             def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
                 self.has_old_import = False
@@ -253,11 +257,13 @@ class ChangeImport(Recipe):
                 if self.cursor.first_enclosing(Import):
                     return ident
                 # Skip local variables that shadow the imported name.
-                # This relies on ty type attribution populating field_type;
-                # when ty is unavailable, field_type is None for all identifiers
+                # Only check field_type inside function scopes — at module level,
+                # bare references to the imported name always need renaming.
+                # When ty is unavailable, field_type is None for all identifiers
                 # and shadowed locals may be incorrectly renamed.
-                if ident.field_type is not None:
-                    return ident
+                if self.cursor.first_enclosing(MethodDeclaration) is not None:
+                    if ident.field_type is not None:
+                        return ident
                 return ident.replace(_simple_name=new_ref_name)
 
             def visit_method_invocation(self, method: MethodInvocation, p: ExecutionContext) -> J:
@@ -275,6 +281,11 @@ class ChangeImport(Recipe):
                     return method
 
                 select_name = method.select.simple_name
+                # For dotted modules without aliases (e.g. `import os.path`),
+                # `old_module` is a dotted string like "os.path" which will
+                # never match a simple Identifier name — but those cases are
+                # already excluded by the `isinstance(method.select, Identifier)`
+                # guard above (the select would be a FieldAccess instead).
                 expected_name = self.module_alias or old_module
                 if select_name != expected_name:
                     return method

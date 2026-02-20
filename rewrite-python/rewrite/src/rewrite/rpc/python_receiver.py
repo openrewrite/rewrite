@@ -1360,10 +1360,10 @@ def _receive_java_type_variable(variable, q: RpcReceiveQueue):
 
     # Receive fields in the same order as JavaTypeSender.visitVariable:
     # name, owner, type, annotations (no flags over RPC)
-    name = q.receive(variable._name if variable else '')
-    owner = q.receive(variable._owner if variable else None)
-    type_ = q.receive(variable._type if variable else None)
-    annotations = q.receive_list(variable._annotations if variable else None)
+    name = q.receive(variable._name)
+    owner = q.receive(variable._owner)
+    type_ = q.receive(variable._type)
+    annotations = q.receive_list(variable._annotations)
 
     var = JT.Variable()
     var._name = name
