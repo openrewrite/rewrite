@@ -147,19 +147,29 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                         }
                     }
 
-                    t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("groupId").orElse(null), newGroupId).visitNonNull(t, ctx);
-                    t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").orElse(null), newArtifactId).visitNonNull(t, ctx);
+                    if (!newGroupId.equals(oldGroupId)) {
+                        t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("groupId").orElse(null), newGroupId).visitNonNull(t, ctx);
+                    }
+                    if (!newArtifactId.equals(oldArtifactId)) {
+                        t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").orElse(null), newArtifactId).visitNonNull(t, ctx);
+                    }
                     if (newVersion != null) {
                         try {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
                             if (versionTag.isPresent()) {
-                                String resolvedArtifactId = newArtifactId;
+                                String resolvedGroupId = t.getChildValue("groupId").orElse(newGroupId);
+                                String resolvedArtifactId = t.getChildValue("artifactId").orElse(newArtifactId);
                                 if (resolvedArtifactId.contains("${")) {
                                     ResolvedPom pom = getResolutionResult().getPom();
                                     Map<String, String> properties = pom.getProperties();
-                                    resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(newArtifactId, properties::get);
+                                    resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedArtifactId, properties::get);
                                 }
-                                String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, resolvedArtifactId, getResolutionResult().getPom().getValue(versionTag.get().getValue().orElse(null)));
+                                if (resolvedGroupId.contains("${")) {
+                                    ResolvedPom pom = getResolutionResult().getPom();
+                                    Map<String, String> properties = pom.getProperties();
+                                    resolvedGroupId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedGroupId, properties::get);
+                                }
+                                String resolvedNewVersion = resolveSemverVersion(ctx, resolvedGroupId, resolvedArtifactId, getResolutionResult().getPom().getValue(versionTag.get().getValue().orElse(null)));
                                 String versionTagValue = t.getChildValue("version").orElse(null);
                                 if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
                                     t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
