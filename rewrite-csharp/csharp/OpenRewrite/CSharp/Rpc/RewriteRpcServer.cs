@@ -896,7 +896,7 @@ public class RewriteRpcServer
         formatter.JsonSerializer.NullValueHandling = NullValueHandling.Ignore;
 
         var handler = new HeaderDelimitedMessageHandler(outputStream, inputStream, formatter);
-        using var jsonRpc = new JsonRpc(handler);
+        using var jsonRpc = new StringErrorDataJsonRpc(handler);
 
         var server = new RewriteRpcServer(marketplace);
         server._jsonRpc = jsonRpc;
@@ -956,6 +956,29 @@ public class RewriteRpcServer
         public static readonly TreeCodec Instance = new();
         public void RpcSend(object after, RpcSendQueue q) => new CSharpSender().Visit((J)after, q);
         public object RpcReceive(object before, RpcReceiveQueue q) => new CSharpReceiver().Visit((J)before, q)!;
+    }
+}
+
+/// <summary>
+/// A JsonRpc subclass that ensures error.data is always a string,
+/// for compatibility with the Java io.moderne:jsonrpc library which
+/// expects error.detail.data to be a string, not a structured object.
+/// </summary>
+internal class StringErrorDataJsonRpc : StreamJsonRpc.JsonRpc
+{
+    public StringErrorDataJsonRpc(StreamJsonRpc.IJsonRpcMessageHandler handler) : base(handler)
+    {
+    }
+
+    protected override StreamJsonRpc.Protocol.JsonRpcError.ErrorDetail CreateErrorDetails(
+        StreamJsonRpc.Protocol.JsonRpcRequest request, Exception exception)
+    {
+        return new StreamJsonRpc.Protocol.JsonRpcError.ErrorDetail
+        {
+            Code = (StreamJsonRpc.Protocol.JsonRpcErrorCode)(-32603),
+            Message = exception.Message,
+            Data = exception.ToString()
+        };
     }
 }
 
