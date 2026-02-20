@@ -670,6 +670,156 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradesMapNotationVariablesDefinedInExtraPropertiesInBuildscript() {
+        rewriteRun(
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "29.0-jre"
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath group: 'com.google.guava', name: 'guava', version: "${guavaVersion}"
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "30.1.1-jre"
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath group: 'com.google.guava', name: 'guava', version: "${guavaVersion}"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesSpringBootGradlePluginMapNotationInBuildscript() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "*", "3.5.x", null)),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      springBootVersion = '3.4.0'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath group: 'org.springframework.boot', name: 'spring-boot-gradle-plugin', version: "${springBootVersion}"
+                  }
+              }
+
+              apply plugin: 'java'
+              apply plugin: 'org.springframework.boot'
+              apply plugin: 'io.spring.dependency-management'
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(group: 'org.springframework.boot', name: 'spring-boot-starter-web')
+              }
+              """,
+            spec -> spec.after(gradle -> {
+                assertThat(gradle).contains("springBootVersion = '3.5.");
+                return gradle;
+            })
+          )
+        );
+    }
+
+    @Test
+    void upgradesSpringBootGradlePluginMapNotationInBuildscriptTo4() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "*", "4.0.x", null)),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      springBootVersion = '3.5.5'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath group: 'org.springframework.boot', name: 'spring-boot-gradle-plugin', version: "${springBootVersion}"
+                  }
+              }
+
+              apply plugin: 'java'
+              apply plugin: 'org.springframework.boot'
+              apply plugin: 'io.spring.dependency-management'
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(group: 'org.springframework.boot', name: 'spring-boot-starter-web')
+              }
+              """,
+            spec -> spec.after(gradle -> {
+                assertThat(gradle).contains("springBootVersion = '4.0.");
+                return gradle;
+            })
+          )
+        );
+    }
+
+    @Test
+    void upgradesSpringBootGradlePluginMapNotationWithAdditionalBuildscriptClasspathDeps() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "*", "4.0.x", null)),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      springBootVersion = '3.5.5'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath group: 'org.springframework.boot', name: 'spring-boot-gradle-plugin', version: "${springBootVersion}"
+                  }
+              }
+
+              apply plugin: 'java'
+              apply plugin: 'org.springframework.boot'
+              apply plugin: 'io.spring.dependency-management'
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(group: 'org.springframework.boot', name: 'spring-boot-starter-web')
+                  implementation(group: 'org.springframework.boot', name: 'spring-boot-starter-actuator')
+                  testImplementation(group: 'org.springframework.boot', name: 'spring-boot-starter-test')
+              }
+              """,
+            spec -> spec.after(gradle -> {
+                assertThat(gradle).contains("springBootVersion = '4.0.");
+                return gradle;
+            })
+          )
+        );
+    }
+
+    @Test
     void upgradesMultiModuleVariablesDefinedInExtraPropertiesInBuildscript() {
         rewriteRun(
           settingsGradle(
