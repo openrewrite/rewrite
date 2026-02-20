@@ -266,6 +266,54 @@ class PythonTypeMapping:
             return JavaType.Primitive.None_
         return None
 
+    def _is_variable_hover(self, hover: str) -> bool:
+        """Check if hover text describes a variable (not a function, class, or module).
+
+        ty hover patterns:
+        - Variable: just the type, e.g. ``int``, ``Literal[5]``, ``str``
+        - Function: ``def func(args) -> return_type``
+        - Class definition: ``class MyClass``
+        - Module: ``<module 'name'>``
+        """
+        if not hover:
+            return False
+        clean = self._strip_markdown(hover)
+        if not clean:
+            return False
+        if clean.startswith('def ') or clean.startswith('class ') or clean.startswith('<module'):
+            return False
+        if clean == 'Unknown':
+            return False
+        return True
+
+    def _make_variable(self, name: str, var_type: Optional[JavaType],
+                       owner: Optional[JavaType] = None) -> JavaType.Variable:
+        """Create a JavaType.Variable instance."""
+        return JavaType.Variable(_name=name, _type=var_type, _owner=owner)
+
+    def name_type_info(self, node: ast.Name) -> Tuple[Optional[JavaType], Optional[JavaType.Variable]]:
+        """Get expression type and variable type for a name reference.
+
+        Returns (expression_type, variable_field_type) from a single hover query.
+        """
+        if self._ty_client is None:
+            return None, None
+
+        hover = self._ty_client.get_hover(
+            self._uri,
+            node.lineno - 1,  # LSP uses 0-based lines
+            node.col_offset
+        )
+        if not hover:
+            return None, None
+
+        expr_type = self._parse_hover_type(hover)
+
+        if self._is_variable_hover(hover):
+            return expr_type, self._make_variable(node.id, expr_type)
+
+        return expr_type, None
+
     def _name_type(self, node: ast.Name) -> Optional[JavaType]:
         """Get the type for a name reference."""
         if self._ty_client is None:
@@ -280,6 +328,40 @@ class PythonTypeMapping:
         if hover:
             return self._parse_hover_type(hover)
         return None
+
+    def attribute_type_info(self, node: ast.Attribute,
+                            receiver_type: Optional[JavaType] = None
+                            ) -> Tuple[Optional[JavaType], Optional[JavaType.Variable]]:
+        """Get expression type and variable type for an attribute access.
+
+        Args:
+            node: The ast.Attribute node.
+            receiver_type: The type of the receiver (e.g., type of 'self').
+
+        Returns (expression_type, variable_field_type).
+
+        Note:
+            The hover column is computed as ``node.col_offset + len(receiver_text) + 1``.
+            This may be inaccurate for multiline or parenthesized receiver expressions
+            where ``_get_node_text`` returns a substring that differs from the full
+            source span.
+        """
+        if self._ty_client is None:
+            return None, None
+
+        hover = self._ty_client.get_hover(
+            self._uri, node.lineno - 1,
+            node.col_offset + len(self._get_node_text(node.value)) + 1
+        )
+        if not hover:
+            return None, None
+
+        expr_type = self._parse_hover_type(hover)
+
+        if self._is_variable_hover(hover):
+            return expr_type, self._make_variable(node.attr, expr_type, owner=receiver_type)
+
+        return expr_type, None
 
     def _attribute_type(self, node: ast.Attribute) -> Optional[JavaType]:
         """Get the type for an attribute access."""
