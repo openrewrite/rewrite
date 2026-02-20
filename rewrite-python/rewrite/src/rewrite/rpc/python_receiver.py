@@ -1014,20 +1014,7 @@ class PythonRpcReceiver:
             return class_type
 
         elif isinstance(java_type, JT.Variable):
-            # Variable: name, owner, type, annotations (no flags over RPC)
-            name = q.receive(getattr(java_type, '_name', ''))
-            owner = q.receive(getattr(java_type, '_owner', None),
-                               lambda t: self._receive_type(t, q))
-            type_ = q.receive(getattr(java_type, '_type', None),
-                               lambda t: self._receive_type(t, q))
-            annotations = q.receive_list(getattr(java_type, '_annotations', None) or [],
-                                          lambda t: self._receive_type(t, q))
-            var = JT.Variable()
-            var._name = name
-            var._owner = owner
-            var._type = type_
-            var._annotations = annotations
-            return var
+            return _receive_java_type_variable(java_type, q)
 
         elif isinstance(java_type, JT.Unknown):
             # Unknown has no additional fields

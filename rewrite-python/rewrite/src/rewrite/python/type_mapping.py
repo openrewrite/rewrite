@@ -289,11 +289,7 @@ class PythonTypeMapping:
     def _make_variable(self, name: str, var_type: Optional[JavaType],
                        owner: Optional[JavaType] = None) -> JavaType.Variable:
         """Create a JavaType.Variable instance."""
-        var = JavaType.Variable()
-        var._name = name
-        var._type = var_type
-        var._owner = owner
-        return var
+        return JavaType.Variable(_name=name, _type=var_type, _owner=owner)
 
     def name_type_info(self, node: ast.Name) -> Tuple[Optional[JavaType], Optional[JavaType.Variable]]:
         """Get expression type and variable type for a name reference.
@@ -343,6 +339,12 @@ class PythonTypeMapping:
             receiver_type: The type of the receiver (e.g., type of 'self').
 
         Returns (expression_type, variable_field_type).
+
+        Note:
+            The hover column is computed as ``node.col_offset + len(receiver_text) + 1``.
+            This may be inaccurate for multiline or parenthesized receiver expressions
+            where ``_get_node_text`` returns a substring that differs from the full
+            source span.
         """
         if self._ty_client is None:
             return None, None

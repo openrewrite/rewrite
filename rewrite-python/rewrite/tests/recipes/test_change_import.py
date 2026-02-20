@@ -440,3 +440,26 @@ class TestChangeImport:
                 """,
             )
         )
+
+    def test_both_from_import_and_direct_import(self):
+        """When a file has both 'from X import name' and 'import X', handle without duplicates."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='fractions',
+            old_name='gcd',
+            new_module='math',
+            new_name='gcd',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from fractions import gcd
+                import fractions
+
+                result = gcd(12, 8)
+                """,
+                # The old from-import is removed and new one added after
+                # existing imports; import fractions is preserved.
+                # Leading newline is inherited from the removed from-import's prefix.
+                "\n\nimport fractions\nfrom math import gcd\n\nresult = gcd(12, 8)\n",
+            )
+        )

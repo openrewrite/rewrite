@@ -252,7 +252,10 @@ class ChangeImport(Recipe):
                 # Skip identifiers inside import statements
                 if self.cursor.first_enclosing(Import):
                     return ident
-                # Skip local variables that shadow the imported name
+                # Skip local variables that shadow the imported name.
+                # This relies on ty type attribution populating field_type;
+                # when ty is unavailable, field_type is None for all identifiers
+                # and shadowed locals may be incorrectly renamed.
                 if ident.field_type is not None:
                     return ident
                 return ident.replace(_simple_name=new_ref_name)
@@ -263,6 +266,9 @@ class ChangeImport(Recipe):
                     return method
                 if not old_name or not self.has_direct_module_import:
                     return method
+                # Only matches simple module.func() calls where the select is an
+                # Identifier. Nested attribute chains like pkg.module.func()
+                # (where select is a FieldAccess) are not currently handled.
                 if not isinstance(method.select, Identifier):
                     return method
                 if not isinstance(method.name, Identifier):
