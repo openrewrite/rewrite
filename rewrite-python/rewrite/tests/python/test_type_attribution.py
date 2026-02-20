@@ -878,16 +878,50 @@ class TestVariableTypes:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
-    def test_type_on_call_node_returns_result_type(self):
-        """type() on a Call node returns the return type of the call."""
+    def test_type_on_call_node_returns_return_type(self):
+        """type() on a Call node returns the return type, not JavaType.Method."""
         source = 'len("hello")'
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             call = tree.body[0].value
             result = mapping.type(call)
             assert result is not None
+            assert not isinstance(result, JavaType.Method), \
+                "type() should return the expression type, not JavaType.Method"
+            assert result == JavaType.Primitive.Int
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_assignment_from_call_has_return_type(self):
+        """type() on `"a-b-c".split("-", 1)` returns list, not JavaType.Method."""
+        source = 'parts = "a-b-c".split("-", 1)'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[0].value  # the Call node
+            result = mapping.type(call)
+            assert result is not None
+            assert not isinstance(result, JavaType.Method), \
+                "type() should return the expression type, not JavaType.Method"
+            assert isinstance(result, JavaType.Class)
+            assert result._fully_qualified_name.startswith('list')
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_split_method_has_list_return_type(self):
+        """method_invocation_type() for str.split() has list as return type."""
+        source = 'parts = "a-b-c".split("-", 1)'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[0].value  # the Call node
+            result = mapping.method_invocation_type(call)
+            assert result is not None
             assert isinstance(result, JavaType.Method)
-            assert result._name == 'len'
+            assert result._name == 'split'
+            assert result._return_type is not None
+            assert not isinstance(result._return_type, JavaType.Unknown), \
+                "Return type should not be Unknown"
+            assert isinstance(result._return_type, JavaType.Class)
+            assert result._return_type._fully_qualified_name.startswith('list')
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 

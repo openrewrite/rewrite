@@ -382,7 +382,11 @@ class PythonTypeMapping:
                 pass
 
     def type(self, node: ast.AST) -> Optional[JavaType]:
-        """Get the JavaType for an AST node.
+        """Get the expression type for an AST node.
+
+        For call expressions this returns the return type of the call,
+        NOT a JavaType.Method. Use method_invocation_type() when you
+        need the full method signature.
 
         Args:
             node: The AST node to get the type for.
@@ -392,8 +396,6 @@ class PythonTypeMapping:
         """
         if isinstance(node, ast.Constant):
             return self._constant_type(node)
-        elif isinstance(node, ast.Call):
-            return self.method_invocation_type(node)
 
         # Try to look up in ty-types index
         type_id = self._lookup_type_id(node)
