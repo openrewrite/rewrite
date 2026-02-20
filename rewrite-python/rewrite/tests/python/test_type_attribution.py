@@ -342,6 +342,64 @@ os.getcwd().split("/")
             os.unlink(file_path)
 
 
+@requires_ty_types_cli
+class TestModuleFunctionDeclaringType:
+    """Tests that module-level function calls produce the correct declaring type."""
+
+    def test_os_getcwd_declaring_type_is_os(self):
+        """import os; os.getcwd() → declaring type FQN should be 'os'."""
+        source = '''import os
+os.getcwd()
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[1].value
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._name == 'getcwd'
+            assert result._declaring_type is not None
+            assert isinstance(result._declaring_type, JavaType.FullyQualified)
+            assert result._declaring_type.fully_qualified_name == 'os'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_os_path_join_declaring_type(self):
+        """import os; os.path.join() → declaring type FQN should contain 'os.path' or 'posixpath'."""
+        source = '''import os
+os.path.join("/tmp", "file.txt")
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[1].value
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._name == 'join'
+            assert result._declaring_type is not None
+            assert isinstance(result._declaring_type, JavaType.FullyQualified)
+            # os.path is an alias for posixpath/ntpath depending on platform
+            fqn = result._declaring_type.fully_qualified_name
+            assert 'path' in fqn.lower() or fqn == 'os.path'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_json_dumps_declaring_type(self):
+        """import json; json.dumps() → declaring type FQN should be 'json'."""
+        source = '''import json
+json.dumps({"key": "value"})
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[1].value
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._name == 'dumps'
+            assert result._declaring_type is not None
+            assert isinstance(result._declaring_type, JavaType.FullyQualified)
+            assert result._declaring_type.fully_qualified_name == 'json'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
 class TestTypeAttributionEdgeCases:
     """Tests for edge cases in type attribution."""
 
@@ -696,7 +754,7 @@ class TestReturnTypes:
             assert result is not None
             assert result._return_type is not None
             assert isinstance(result._return_type, (JavaType.Class, JavaType.Parameterized))
-            assert result._return_type._fully_qualified_name == 'list'
+            assert result._return_type.fully_qualified_name == 'list'
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -903,7 +961,7 @@ class TestVariableTypes:
             assert not isinstance(result, JavaType.Method), \
                 "type() should return the expression type, not JavaType.Method"
             assert isinstance(result, (JavaType.Class, JavaType.Parameterized))
-            assert result._fully_qualified_name == 'list'
+            assert result.fully_qualified_name == 'list'
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -921,7 +979,7 @@ class TestVariableTypes:
             assert not isinstance(result._return_type, JavaType.Unknown), \
                 "Return type should not be Unknown"
             assert isinstance(result._return_type, (JavaType.Class, JavaType.Parameterized))
-            assert result._return_type._fully_qualified_name == 'list'
+            assert result._return_type.fully_qualified_name == 'list'
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -948,7 +1006,7 @@ class TestParameterizedTypes:
             _cleanup_mapping(mapping, tmpdir, client)
 
     def test_parameterized_fqn_delegates(self):
-        """Parameterized._fully_qualified_name should delegate to base type."""
+        """Parameterized.fully_qualified_name should delegate to base type."""
         source = '"hello world".split()'
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
@@ -956,7 +1014,7 @@ class TestParameterizedTypes:
             assert result is not None
             rt = result._return_type
             assert isinstance(rt, JavaType.Parameterized)
-            assert rt._fully_qualified_name == 'list'
+            assert rt.fully_qualified_name == 'list'
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 

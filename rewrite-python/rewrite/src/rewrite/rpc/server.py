@@ -316,6 +316,33 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError'}
 
 
+def _infer_project_root(inputs: list) -> Optional[str]:
+    """Infer the project root from input paths.
+
+    When relativeTo is not provided, look at the input paths to find a
+    directory that contains a .venv or pyproject.toml — this is likely
+    the project root that ty-types should use.
+    """
+    for item in inputs:
+        path = None
+        if isinstance(item, str):
+            path = item
+        elif isinstance(item, dict):
+            path = item.get('sourcePath') or item.get('path')
+        if path and os.path.isabs(path):
+            parent = os.path.dirname(path)
+            # Walk up looking for a project root marker
+            for _ in range(10):
+                if os.path.isdir(os.path.join(parent, '.venv')) or \
+                   os.path.isfile(os.path.join(parent, 'pyproject.toml')):
+                    return parent
+                up = os.path.dirname(parent)
+                if up == parent:
+                    break
+                parent = up
+    return None
+
+
 def handle_parse(params: dict) -> List[str]:
     """Handle a Parse RPC request."""
     import tempfile
@@ -324,6 +351,10 @@ def handle_parse(params: dict) -> List[str]:
     inputs = params.get('inputs', [])
     relative_to = params.get('relativeTo')
     results = []
+
+    # If no relativeTo provided, try to infer from absolute input paths
+    if not relative_to:
+        relative_to = _infer_project_root(inputs)
 
     # Create a ty-types client for this parse batch
     ty_client = None
@@ -350,14 +381,16 @@ def handle_parse(params: dict) -> List[str]:
             elif 'text' in input_item or 'source' in input_item:
                 source = input_item.get('text') or input_item.get('source')
                 path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-                if tmpdir and not os.path.isabs(path):
-                    # Write source to temp dir so ty-types can analyze it
-                    disk_path = os.path.join(tmpdir, path)
+                # For relative paths, write the source under the project root
+                # (tmpdir or relative_to) so ty-types can resolve imports from
+                # the project's .venv and dependencies.
+                base_dir = tmpdir or relative_to
+                if base_dir and not os.path.isabs(path):
+                    disk_path = os.path.join(base_dir, path)
                     os.makedirs(os.path.dirname(disk_path), exist_ok=True)
                     with open(disk_path, 'w', encoding='utf-8') as f:
                         f.write(source)
-                    # Use tmpdir as relative_to so the LST source_path stays relative
-                    result = parse_python_source(source, disk_path, tmpdir, ty_client)
+                    result = parse_python_source(source, disk_path, base_dir, ty_client)
                 else:
                     result = parse_python_source(source, path, relative_to, ty_client)
             else:
