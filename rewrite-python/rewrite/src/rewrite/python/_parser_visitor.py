@@ -379,7 +379,7 @@ class ParserVisitor(ast.NodeVisitor):
                 cast(j.Identifier, name),
                 [],
                 initializer,
-                self._type_mapping.type(node)
+                self.__as_variable_type(self._type_mapping.type(node))
             ), after_name)],
         )
 
@@ -2191,7 +2191,7 @@ class ParserVisitor(ast.NodeVisitor):
             None,
             body,
             None,
-            self._type_mapping.type(node),
+            self.__as_method_type(self._type_mapping.type(node)),
         )
 
     def __map_decorator(self, decorator) -> j.Annotation:
@@ -3024,6 +3024,28 @@ class ParserVisitor(ast.NodeVisitor):
 
         # If not in paren map, scope check already passed
         return True
+
+    @staticmethod
+    def __as_variable_type(t: Optional[JavaType]) -> Optional[JavaType]:
+        """Filter a type for use in NamedVariable._variable_type.
+
+        Returns None if the type is not a JavaType.Variable, preventing
+        ClassCastExceptions on the Java side during RPC deserialization.
+        """
+        if t is None or isinstance(t, JavaType.Variable):
+            return t
+        return None
+
+    @staticmethod
+    def __as_method_type(t: Optional[JavaType]) -> Optional[JavaType]:
+        """Filter a type for use in MethodDeclaration._method_type.
+
+        Returns None if the type is not a JavaType.Method, preventing
+        ClassCastExceptions on the Java side during RPC deserialization.
+        """
+        if t is None or isinstance(t, JavaType.Method):
+            return t
+        return None
 
     def __convert_name(self, name: str, name_type: Optional[JavaType] = None) -> NameTree:
         def ident_or_field(parts: List[str]) -> NameTree:
