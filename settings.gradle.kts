@@ -11,6 +11,7 @@ rootProject.name = "rewrite"
 // ---------------------------------------------------------------
 
 val allProjects = listOf(
+    "rewrite-bash",
     "rewrite-benchmarks",
     "rewrite-bom",
     "rewrite-core",
