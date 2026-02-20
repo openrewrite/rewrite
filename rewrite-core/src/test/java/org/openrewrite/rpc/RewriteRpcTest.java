@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.marketplace.*;
