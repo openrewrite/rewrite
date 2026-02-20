@@ -979,6 +979,16 @@ class PythonRpcReceiver:
                 _declared_formal_type_names=formal_type_names,
             )
 
+        elif isinstance(java_type, JT.Parameterized):
+            type_ = q.receive(getattr(java_type, '_type', None),
+                              lambda t: self._receive_type(t, q))
+            type_params = q.receive_list(getattr(java_type, '_type_parameters', None) or [],
+                                          lambda t: self._receive_type(t, q))
+            p = JT.Parameterized()
+            p._type = type_
+            p._type_parameters = type_params
+            return p
+
         elif isinstance(java_type, JT.Class):
             # Class: flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype,
             #        owningClass, annotations, interfaces, members, methods
@@ -1013,8 +1023,30 @@ class PythonRpcReceiver:
             class_type._methods = methods
             return class_type
 
+        elif isinstance(java_type, JT.Array):
+            elem_type = q.receive(getattr(java_type, '_elem_type', None),
+                                   lambda t: self._receive_type(t, q))
+            annotations = q.receive_list(getattr(java_type, '_annotations', None) or [],
+                                          lambda t: self._receive_type(t, q))
+            arr = JT.Array()
+            arr._elem_type = elem_type
+            arr._annotations = annotations
+            return arr
+
         elif isinstance(java_type, JT.Variable):
-            return _receive_java_type_variable(java_type, q)
+            name = q.receive(getattr(java_type, '_name', ''))
+            owner = q.receive(getattr(java_type, '_owner', None),
+                               lambda t: self._receive_type(t, q))
+            type_ = q.receive(getattr(java_type, '_type', None),
+                               lambda t: self._receive_type(t, q))
+            annotations = q.receive_list(getattr(java_type, '_annotations', None) or [],
+                                          lambda t: self._receive_type(t, q))
+            var = JT.Variable()
+            var._name = name
+            var._owner = owner
+            var._type = type_
+            var._annotations = annotations
+            return var
 
         elif isinstance(java_type, JT.Unknown):
             # Unknown has no additional fields
@@ -1354,6 +1386,32 @@ def _receive_java_type_class(cls, q: RpcReceiveQueue):
     return class_type
 
 
+def _receive_java_type_parameterized(param, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Parameterized - consumes type and typeParameters."""
+    from rewrite.java.support_types import JavaType as JT
+
+    type_ = q.receive(getattr(param, '_type', None))
+    type_params = q.receive_list(getattr(param, '_type_parameters', None))
+
+    p = JT.Parameterized()
+    p._type = type_
+    p._type_parameters = type_params
+    return p
+
+
+def _receive_java_type_array(array, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Array - consumes elemType and annotations."""
+    from rewrite.java.support_types import JavaType as JT
+
+    elem_type = q.receive(array._elem_type)
+    annotations = q.receive_list(array._annotations)
+
+    arr = JT.Array()
+    arr._elem_type = elem_type
+    arr._annotations = annotations
+    return arr
+
+
 def _receive_java_type_variable(variable, q: RpcReceiveQueue):
     """Codec for receiving JavaType.Variable - consumes all variable fields."""
     from rewrite.java.support_types import JavaType as JT
@@ -1417,6 +1475,22 @@ def _register_java_type_codecs():
         JT.Variable,
         _receive_java_type_variable,
         lambda: JT.Variable()  # Factory creates empty Variable
+    )
+
+    # JavaType.Parameterized - base type and type parameters
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Parameterized',
+        JT.Parameterized,
+        _receive_java_type_parameterized,
+        lambda: JT.Parameterized()  # Factory creates empty Parameterized
+    )
+
+    # JavaType.Array - element type and annotations
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Array',
+        JT.Array,
+        _receive_java_type_array,
+        lambda: JT.Array()  # Factory creates empty Array
     )
 
 

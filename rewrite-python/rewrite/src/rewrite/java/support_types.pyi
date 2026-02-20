@@ -85,6 +85,13 @@ class JavaType(ABC):
         _type: JavaType.FullyQualified
         _type_parameters: Optional[List[JavaType]]
 
+        @property
+        def type(self) -> JavaType.FullyQualified: ...
+        @property
+        def type_parameters(self) -> Optional[List[JavaType]]: ...
+        @property
+        def _fully_qualified_name(self) -> str: ...
+
 
     class GenericTypeVariable:
         class Variance(Enum):
@@ -163,8 +170,15 @@ class JavaType(ABC):
         @property
         def annotations(self) -> Optional[List[JavaType.FullyQualified]]: ...
 
+    @dataclass
     class Array:
-        pass
+        _elem_type: Optional[JavaType] = ...
+        _annotations: Optional[List[JavaType.FullyQualified]] = ...
+
+        @property
+        def elem_type(self) -> Optional[JavaType]: ...
+        @property
+        def annotations(self) -> Optional[List[JavaType.FullyQualified]]: ...
 
 
 @dataclass(frozen=True)

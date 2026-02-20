@@ -46,6 +46,7 @@ _PYTHON_PRIMITIVES: Dict[str, JavaType.Primitive] = {
     'None': JavaType.Primitive.None_,
     'NoneType': JavaType.Primitive.None_,
     'bytes': JavaType.Primitive.String,  # Close enough for matching
+    'LiteralString': JavaType.Primitive.String,
 }
 
 # Reverse mapping from JavaType.Primitive to Python type name
@@ -105,6 +106,7 @@ class PythonTypeMapping:
         self._resolving_declaring_type_ids: set = set()
         self._cycle_placeholders: Dict[int, JavaType.Class] = {}  # placeholders created on cycle detection
         self._declaring_cycle_placeholders: Dict[int, JavaType.Class] = {}
+        self._class_literal_index: Dict[str, int] = {}  # className -> classLiteral type_id
 
         # Fetch all types in one batch call
         if ty_client is not None:
@@ -203,7 +205,13 @@ class PythonTypeMapping:
 
         # Merge types into registry (keys are strings in JSON)
         for type_id_str, descriptor in result.get('types', {}).items():
-            self._type_registry[int(type_id_str)] = descriptor
+            tid = int(type_id_str)
+            self._type_registry[tid] = descriptor
+            # Index classLiterals by className for kind inference
+            if descriptor.get('kind') == 'classLiteral':
+                cn = descriptor.get('className', '')
+                if cn:
+                    self._class_literal_index[cn] = tid
 
     def _lookup_type_id(self, node: ast.AST) -> Optional[int]:
         """Look up a node's type ID by converting AST position to byte offset."""
@@ -270,6 +278,15 @@ class PythonTypeMapping:
             if isinstance(result, JavaType.Class):
                 placeholder._fully_qualified_name = result._fully_qualified_name
                 placeholder._kind = result._kind
+                # Copy enriched fields so cycle placeholders retain supertypes/methods
+                for attr in ('_supertype', '_methods', '_type_parameters', '_interfaces',
+                             '_members', '_owning_class', '_annotations'):
+                    val = getattr(result, attr, None)
+                    if val is not None:
+                        setattr(placeholder, attr, val)
+            elif isinstance(result, JavaType.Parameterized):
+                if hasattr(result._type, '_fully_qualified_name'):
+                    placeholder._fully_qualified_name = result._type._fully_qualified_name
             self._type_id_cache[type_id] = placeholder
             return placeholder
 
@@ -287,10 +304,39 @@ class PythonTypeMapping:
             class_name = descriptor.get('className', '')
             if class_name in _PYTHON_PRIMITIVES:
                 return _PYTHON_PRIMITIVES[class_name]
-            module_name = descriptor.get('moduleName')
-            if module_name and module_name != 'builtins':
-                return self._create_class_type(f"{module_name}.{class_name}")
-            return self._create_class_type(class_name)
+
+            # Resolve base class: prefer classId (enriched with supertypes/methods)
+            class_id = descriptor.get('classId')
+            if class_id is None:
+                # Look up classLiteral by className to get kind/supertypes/methods
+                class_id = self._class_literal_index.get(class_name)
+
+            if class_id is not None:
+                base_class = self._resolve_type(class_id)
+                if not isinstance(base_class, JavaType.Class):
+                    base_class = self._create_class_type(class_name)
+            else:
+                module_name = descriptor.get('moduleName')
+                if module_name and module_name != 'builtins':
+                    base_class = self._create_class_type(f"{module_name}.{class_name}")
+                else:
+                    base_class = self._create_class_type(class_name)
+
+            # If typeArgs present, wrap in Parameterized
+            type_args = descriptor.get('typeArgs')
+            if type_args:
+                resolved_args = []
+                for arg_id in type_args:
+                    arg_type = self._resolve_type(arg_id)
+                    if arg_type is not None:
+                        resolved_args.append(arg_type)
+                if resolved_args:
+                    param = JavaType.Parameterized()
+                    param._type = base_class
+                    param._type_parameters = resolved_args
+                    return param
+
+            return base_class
 
         elif kind == 'intLiteral':
             return JavaType.Primitive.Int
@@ -331,7 +377,53 @@ class PythonTypeMapping:
 
         elif kind == 'classLiteral':
             class_name = descriptor.get('className', '')
-            return self._create_class_type(class_name)
+            class_type = self._create_class_type(class_name)
+
+            # Infer Kind from supertypes before resolving them
+            supertypes = descriptor.get('supertypes', [])
+            for st_id in supertypes:
+                st_desc = self._type_registry.get(st_id)
+                if st_desc:
+                    st_kind = st_desc.get('kind')
+                    st_name = st_desc.get('className', '')
+                    if st_kind == 'classLiteral' and st_name == 'Enum':
+                        class_type._kind = JavaType.FullyQualified.Kind.Enum
+                        break
+                    elif st_kind == 'specialForm' and st_desc.get('name', '') == 'typing.Protocol':
+                        class_type._kind = JavaType.FullyQualified.Kind.Interface
+                        break
+
+            # Populate supertypes: first → _supertype, rest → _interfaces
+            if supertypes and getattr(class_type, '_supertype', None) is None:
+                super_type = self._resolve_type(supertypes[0])
+                if isinstance(super_type, JavaType.FullyQualified):
+                    class_type._supertype = super_type
+
+                if len(supertypes) > 1 and getattr(class_type, '_interfaces', None) is None:
+                    interfaces = []
+                    for st_id in supertypes[1:]:
+                        iface = self._resolve_type(st_id)
+                        if isinstance(iface, JavaType.FullyQualified):
+                            interfaces.append(iface)
+                    if interfaces:
+                        class_type._interfaces = interfaces
+
+            # Populate methods from function/boundMethod members
+            members = descriptor.get('members', [])
+            if members and getattr(class_type, '_methods', None) is None:
+                methods = []
+                for member in members:
+                    member_type_id = member.get('typeId') if isinstance(member, dict) else member
+                    if member_type_id is None:
+                        continue
+                    member_desc = self._type_registry.get(member_type_id)
+                    if member_desc and member_desc.get('kind') in ('function', 'boundMethod'):
+                        method = self._create_method_from_descriptor(member_desc, class_type)
+                        if method:
+                            methods.append(method)
+                class_type._methods = methods if methods else None
+
+            return class_type
 
         elif kind == 'typedDict':
             name = descriptor.get('name', '')
@@ -365,7 +457,9 @@ class PythonTypeMapping:
 
         elif kind == 'enumLiteral':
             class_name = descriptor.get('className', '')
-            return self._create_class_type(class_name)
+            class_type = self._create_class_type(class_name)
+            class_type._kind = JavaType.FullyQualified.Kind.Enum
+            return class_type
 
         elif kind == 'property':
             return _UNKNOWN
@@ -713,6 +807,9 @@ class PythonTypeMapping:
             java_type = self._resolve_type(type_id)
             if isinstance(java_type, JavaType.Class):
                 return java_type
+            if isinstance(java_type, JavaType.Parameterized):
+                # For declaring type, unwrap to base class
+                return java_type._type if isinstance(java_type._type, JavaType.FullyQualified) else java_type
             if isinstance(java_type, JavaType.Primitive):
                 return self._create_class_type(
                     _PRIMITIVE_TO_PYTHON.get(java_type, java_type.name.lower())
@@ -801,6 +898,43 @@ class PythonTypeMapping:
                 if ret_id is not None:
                     return self._resolve_type(ret_id)
         return None
+
+    def _create_method_from_descriptor(self, descriptor: Dict[str, Any],
+                                        declaring_type: JavaType.FullyQualified) -> Optional[JavaType.Method]:
+        """Create a JavaType.Method from a ty-types function/boundMethod descriptor."""
+        name = descriptor.get('name', '')
+        if not name:
+            return None
+
+        # Resolve return type
+        return_type = None
+        return_type_id = descriptor.get('returnType')
+        if return_type_id is not None:
+            return_type = self._resolve_type(return_type_id)
+
+        # Resolve parameters (skip self/cls)
+        param_names = []
+        param_types = []
+        for param in descriptor.get('parameters', []):
+            p_name = param.get('name', '')
+            if p_name in ('self', 'cls'):
+                continue
+            param_names.append(p_name)
+            p_type_id = param.get('typeId')
+            if p_type_id is not None:
+                p_type = self._resolve_type(p_type_id)
+                param_types.append(p_type if p_type else _UNKNOWN)
+            else:
+                param_types.append(_UNKNOWN)
+
+        return JavaType.Method(
+            _flags_bit_map=0,
+            _declaring_type=declaring_type,
+            _name=name,
+            _return_type=return_type,
+            _parameter_names=param_names if param_names else None,
+            _parameter_types=param_types if param_types else None,
+        )
 
     def _create_class_type(self, fqn: str) -> JavaType.Class:
         """Create a JavaType.Class from a fully qualified name."""

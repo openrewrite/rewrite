@@ -865,6 +865,11 @@ class PythonRpcSender:
             q.get_and_send_list(java_type, lambda x: x._default_value or [], lambda s: s, None)
             q.get_and_send_list(java_type, lambda x: x._declared_formal_type_names or [], lambda s: s, None)
 
+        elif isinstance(java_type, JT.Parameterized):
+            # Parameterized: type (FullyQualified), typeParameters (list of JavaType)
+            q.get_and_send(java_type, lambda x: getattr(x, '_type', None), lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: getattr(x, '_type_parameters', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+
         elif isinstance(java_type, JT.Class):
             # Class: flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype,
             #        owningClass, annotations, interfaces, members, methods
@@ -878,6 +883,11 @@ class PythonRpcSender:
             q.get_and_send_list(java_type, lambda x: getattr(x, '_interfaces', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
             q.get_and_send_list(java_type, lambda x: getattr(x, '_members', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
             q.get_and_send_list(java_type, lambda x: getattr(x, '_methods', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
+
+        elif isinstance(java_type, JT.Array):
+            # Array: elemType, annotations
+            q.get_and_send(java_type, lambda x: x._elem_type, lambda t: self._visit_type(t, q))
+            q.get_and_send_list(java_type, lambda x: x._annotations or [], self._type_signature, lambda t: self._visit_type(t, q))
 
         elif isinstance(java_type, JT.Variable):
             # Variable: name, owner, type, annotations (no flags over RPC)
@@ -907,6 +917,13 @@ class PythonRpcSender:
         if isinstance(java_type, JT.Variable):
             owner_sig = self._type_signature(java_type._owner) if java_type._owner else ''
             return f"{owner_sig}{{name={java_type._name},type={self._type_signature(java_type._type)}}}"
+        if isinstance(java_type, JT.Parameterized):
+            inner_sig = self._type_signature(getattr(java_type, '_type', None))
+            params_sig = ','.join(self._type_signature(p) for p in (getattr(java_type, '_type_parameters', None) or []))
+            return f"{inner_sig}<{params_sig}>"
+        if isinstance(java_type, JT.Array):
+            elem_sig = self._type_signature(java_type._elem_type) if java_type._elem_type else ''
+            return f"{elem_sig}[]"
         return str(id(java_type))
 
     def _visit_space(self, space: Space, q: 'RpcSendQueue') -> None:

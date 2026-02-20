@@ -695,8 +695,8 @@ class TestReturnTypes:
             result = mapping.method_invocation_type(tree.body[0].value)
             assert result is not None
             assert result._return_type is not None
-            assert isinstance(result._return_type, JavaType.Class)
-            assert result._return_type._fully_qualified_name.startswith('list')
+            assert isinstance(result._return_type, (JavaType.Class, JavaType.Parameterized))
+            assert result._return_type._fully_qualified_name == 'list'
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -893,7 +893,7 @@ class TestVariableTypes:
             _cleanup_mapping(mapping, tmpdir, client)
 
     def test_assignment_from_call_has_return_type(self):
-        """type() on `"a-b-c".split("-", 1)` returns list, not JavaType.Method."""
+        """type() on `"a-b-c".split("-", 1)` returns list type, not JavaType.Method."""
         source = 'parts = "a-b-c".split("-", 1)'
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
@@ -902,13 +902,13 @@ class TestVariableTypes:
             assert result is not None
             assert not isinstance(result, JavaType.Method), \
                 "type() should return the expression type, not JavaType.Method"
-            assert isinstance(result, JavaType.Class)
-            assert result._fully_qualified_name.startswith('list')
+            assert isinstance(result, (JavaType.Class, JavaType.Parameterized))
+            assert result._fully_qualified_name == 'list'
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
     def test_split_method_has_list_return_type(self):
-        """method_invocation_type() for str.split() has list as return type."""
+        """method_invocation_type() for str.split() has list type as return type."""
         source = 'parts = "a-b-c".split("-", 1)'
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
@@ -920,8 +920,79 @@ class TestVariableTypes:
             assert result._return_type is not None
             assert not isinstance(result._return_type, JavaType.Unknown), \
                 "Return type should not be Unknown"
-            assert isinstance(result._return_type, JavaType.Class)
-            assert result._return_type._fully_qualified_name.startswith('list')
+            assert isinstance(result._return_type, (JavaType.Class, JavaType.Parameterized))
+            assert result._return_type._fully_qualified_name == 'list'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestParameterizedTypes:
+    """Tests for Parameterized type creation (e.g., list[str])."""
+
+    def test_split_returns_parameterized_list(self):
+        """str.split() should return Parameterized(list, [str])."""
+        source = '"hello world".split()'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            result = mapping.method_invocation_type(tree.body[0].value)
+            assert result is not None
+            rt = result._return_type
+            assert rt is not None
+            assert isinstance(rt, JavaType.Parameterized), \
+                f"Expected Parameterized, got {type(rt).__name__}"
+            assert rt._type._fully_qualified_name == 'list'
+            assert rt._type_parameters is not None
+            assert len(rt._type_parameters) >= 1
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_parameterized_fqn_delegates(self):
+        """Parameterized._fully_qualified_name should delegate to base type."""
+        source = '"hello world".split()'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            result = mapping.method_invocation_type(tree.body[0].value)
+            assert result is not None
+            rt = result._return_type
+            assert isinstance(rt, JavaType.Parameterized)
+            assert rt._fully_qualified_name == 'list'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_list_class_has_supertype(self):
+        """The list class should have a supertype populated from classLiteral."""
+        source = '"hello world".split()'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            result = mapping.method_invocation_type(tree.body[0].value)
+            assert result is not None
+            rt = result._return_type
+            assert isinstance(rt, JavaType.Parameterized)
+            base = rt._type
+            assert isinstance(base, JavaType.Class)
+            assert getattr(base, '_supertype', None) is not None, \
+                "list class should have a supertype"
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_list_class_has_methods(self):
+        """The list class should have methods populated from classLiteral."""
+        source = '"hello world".split()'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            result = mapping.method_invocation_type(tree.body[0].value)
+            assert result is not None
+            rt = result._return_type
+            assert isinstance(rt, JavaType.Parameterized)
+            base = rt._type
+            assert isinstance(base, JavaType.Class)
+            methods = getattr(base, '_methods', None)
+            assert methods is not None, "list class should have methods"
+            assert len(methods) > 0
+            method_names = [m._name for m in methods]
+            assert 'copy' in method_names
+            assert 'append' in method_names
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -1087,3 +1158,104 @@ class TestCyclicTypeResolution:
 
         result = mapping._resolve_type(50)
         assert result is JavaType.Primitive.Int
+
+
+@requires_ty_types_cli
+class TestClassKind:
+    """Tests for JavaType.Class.Kind inference from ty-types data."""
+
+    def test_enum_class_has_enum_kind(self):
+        """A class inheriting from Enum should have Kind.Enum."""
+        source = '''from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+
+x = Color.RED
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            # x = Color.RED — the type of x should be Color
+            name_node = tree.body[2].targets[0]  # x
+            result = mapping.type(name_node)
+            assert result is not None
+            assert isinstance(result, JavaType.Class)
+            assert result._fully_qualified_name == 'Color'
+            assert result._kind == JavaType.FullyQualified.Kind.Enum
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_protocol_class_has_interface_kind(self):
+        """A class inheriting from Protocol should have Kind.Interface."""
+        source = '''from typing import Protocol
+
+class Greeter(Protocol):
+    def greet(self, name: str) -> str: ...
+
+x: Greeter
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            name_node = tree.body[2].target  # x
+            result = mapping.type(name_node)
+            assert result is not None
+            assert isinstance(result, JavaType.Class)
+            assert result._fully_qualified_name == 'Greeter'
+            assert result._kind == JavaType.FullyQualified.Kind.Interface
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_regular_class_has_class_kind(self):
+        """A regular class should have Kind.Class."""
+        source = '''class MyClass:
+    pass
+
+x = MyClass()
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            name_node = tree.body[1].targets[0]  # x
+            result = mapping.type(name_node)
+            assert result is not None
+            assert isinstance(result, JavaType.Class)
+            assert result._fully_qualified_name == 'MyClass'
+            assert result._kind == JavaType.FullyQualified.Kind.Class
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_multiple_supertypes_stored_as_interfaces(self):
+        """Python multiple inheritance: first supertype → _supertype, rest → _interfaces."""
+        source = '''class Mixin:
+    def mix(self) -> str:
+        return 'mixed'
+
+class Base:
+    def base_method(self) -> int:
+        return 42
+
+class Multi(Base, Mixin):
+    pass
+
+x = Multi()
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            name_node = tree.body[3].targets[0]  # x
+            result = mapping.type(name_node)
+            assert result is not None
+            assert isinstance(result, JavaType.Class)
+            assert result._fully_qualified_name == 'Multi'
+            # First supertype → _supertype
+            assert getattr(result, '_supertype', None) is not None, \
+                "Multi should have a supertype"
+            assert result._supertype._fully_qualified_name == 'Base'
+            # Remaining supertypes → _interfaces
+            interfaces = getattr(result, '_interfaces', None)
+            assert interfaces is not None, \
+                "Multi should have interfaces for additional supertypes"
+            assert len(interfaces) >= 1
+            iface_names = [i._fully_qualified_name for i in interfaces]
+            assert 'Mixin' in iface_names
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)

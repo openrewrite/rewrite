@@ -219,6 +219,21 @@ class JavaType(ABC):
         _type: JavaType.FullyQualified
         _type_parameters: Optional[List[JavaType]]
 
+        @property
+        def type(self) -> JavaType.FullyQualified:
+            return self._type
+
+        @property
+        def type_parameters(self) -> Optional[List[JavaType]]:
+            return self._type_parameters
+
+        @property
+        def _fully_qualified_name(self) -> str:
+            t = getattr(self, '_type', None)
+            if t is not None and hasattr(t, '_fully_qualified_name'):
+                return t._fully_qualified_name
+            return ''
+
     class GenericTypeVariable:
         class Variance(Enum):
             Invariant = 0
@@ -326,8 +341,18 @@ class JavaType(ABC):
         def annotations(self) -> Optional[List[JavaType.FullyQualified]]:
             return self._annotations
 
+    @dataclass
     class Array:
-        pass
+        _elem_type: Optional[JavaType] = field(default=None)
+        _annotations: Optional[List[JavaType.FullyQualified]] = field(default=None)
+
+        @property
+        def elem_type(self) -> Optional[JavaType]:
+            return self._elem_type
+
+        @property
+        def annotations(self) -> Optional[List[JavaType.FullyQualified]]:
+            return self._annotations
 
 
 T = TypeVar('T')
