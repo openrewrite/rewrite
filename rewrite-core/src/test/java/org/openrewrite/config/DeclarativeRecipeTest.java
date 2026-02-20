@@ -98,7 +98,7 @@ class DeclarativeRecipeTest implements RewriteTest {
         );
         dr.initialize(List.of());
         assertThat(dr.getDescriptor().getRecipeList())
-          .hasSize(3) // precondition + 2 recipes with options
+          .hasSize(2)
           .flatExtracting(RecipeDescriptor::getOptions)
           .hasSize(2)
           .extracting(OptionDescriptor::getName)
