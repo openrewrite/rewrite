@@ -9,6 +9,7 @@ recipeDependencies {
 dependencies {
     implementation("org.assertj:assertj-core:3.+") // CVE-2026-24400 in 4.0.0-M1 and no higher versions available
     implementation(project(":rewrite-java"))
+    implementation(project(":rewrite-gradle"))
     implementation(project(":rewrite-kotlin"))
     implementation(project(":rewrite-groovy"))
     implementation(project(":rewrite-test"))
