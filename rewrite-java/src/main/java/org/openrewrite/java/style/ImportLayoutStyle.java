@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -35,6 +36,7 @@ import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.style.Style;
 
 import java.io.IOException;
 import java.util.*;
@@ -92,6 +94,15 @@ public class ImportLayoutStyle implements JavaStyle {
                 .collect(partitioningBy(block -> block instanceof Block.AllOthers));
         blocksNoCatchalls = blockGroups.get(false);
         blocksOnlyCatchalls = blockGroups.get(true);
+    }
+
+    /**
+     * ImportLayoutStyles cannot meaningfully be merged.
+     * Accepts the higher priority style outright.
+     */
+    @Override
+    public Style merge(Style higherPriority) {
+        return higherPriority;
     }
 
     /**
@@ -175,6 +186,7 @@ public class ImportLayoutStyle implements JavaStyle {
         AtomicBoolean isNewBlock = new AtomicBoolean(false);
         if (!(insertPosition == 0 && pkg == null)) {
             if (before == null) {
+                //noinspection ConstantValue
                 if (pkg != null) {
                     Space prefix = originalImports.get(0).getElement().getPrefix();
                     paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(prefix));
@@ -472,7 +484,7 @@ public class ImportLayoutStyle implements JavaStyle {
     /**
      * The in-progress state of a single layout operation.
      */
-    private static class LayoutState {
+    public static class LayoutState {
         Map<Block, List<JRightPadded<J.Import>>> imports = new HashMap<>();
 
         public void claimImport(Block block, JRightPadded<J.Import> import_) {
@@ -498,7 +510,7 @@ public class ImportLayoutStyle implements JavaStyle {
         return isPackageFolded;
     }
 
-    private static class ImportLayoutConflictDetection {
+    public static class ImportLayoutConflictDetection {
         private final Collection<JavaType.FullyQualified> classpath;
         private final List<JRightPadded<J.Import>> originalImports;
         private final Set<String> jvmClasspathNames = new HashSet<>();
@@ -642,6 +654,7 @@ public class ImportLayoutStyle implements JavaStyle {
             };
 
             private final Boolean statik;
+            @Getter
             private final Pattern packageWildcard;
 
             public ImportPackage(Boolean statik, String packageWildcard, boolean withSubpackages) {
@@ -653,10 +666,6 @@ public class ImportLayoutStyle implements JavaStyle {
 
             public boolean isStatic() {
                 return statik;
-            }
-
-            public Pattern getPackageWildcard() {
-                return packageWildcard;
             }
 
             @Override
@@ -733,16 +742,13 @@ public class ImportLayoutStyle implements JavaStyle {
 
         class AllOthers extends Block.ImportPackage {
             private final boolean statik;
+            @Setter
             private Collection<ImportPackage> packageImports = emptyList();
 
             public AllOthers(boolean statik) {
                 super(statik, "*", true
                 );
                 this.statik = statik;
-            }
-
-            public void setPackageImports(Collection<ImportPackage> packageImports) {
-                this.packageImports = packageImports;
             }
 
             @Override
@@ -801,7 +807,7 @@ class Deserializer extends JsonDeserializer<ImportLayoutStyle> {
         for (String currentField = null; p.hasCurrentToken() && p.getCurrentToken() != JsonToken.END_OBJECT; p.nextToken()) {
             switch (p.currentToken()) {
                 case FIELD_NAME:
-                    currentField = p.getCurrentName();
+                    currentField = p.currentName();
                     break;
                 case VALUE_STRING:
                     if ("layout".equals(currentField)) {
