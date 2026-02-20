@@ -298,8 +298,33 @@ class JavaType(ABC):
         def declared_formal_type_names(self) -> Optional[List[str]]:
             return self._declared_formal_type_names
 
+    @dataclass
     class Variable:
-        pass
+        _flags_bit_map: int = field(default=0)
+        _name: str = field(default="")
+        _owner: Optional[JavaType] = field(default=None)
+        _type: Optional[JavaType] = field(default=None)
+        _annotations: Optional[List[JavaType.FullyQualified]] = field(default=None)
+
+        @property
+        def flags_bit_map(self) -> int:
+            return self._flags_bit_map
+
+        @property
+        def name(self) -> str:
+            return self._name
+
+        @property
+        def owner(self) -> Optional[JavaType]:
+            return self._owner
+
+        @property
+        def type(self) -> Optional[JavaType]:
+            return self._type
+
+        @property
+        def annotations(self) -> Optional[List[JavaType.FullyQualified]]:
+            return self._annotations
 
     class Array:
         pass

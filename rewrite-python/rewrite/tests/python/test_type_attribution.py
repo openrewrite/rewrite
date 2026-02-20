@@ -456,3 +456,210 @@ class TestTypeAttributionEdgeCases:
         assert result._name == 'append'
         assert result._parameter_types is not None
         assert result._parameter_types[0] == JavaType.Primitive.Int
+
+
+class TestIsVariableHover:
+    """Tests for _is_variable_hover detecting variable vs function/class/module."""
+
+    @pytest.fixture(autouse=True)
+    def setup_mapping(self):
+        self.mapping = PythonTypeMapping("")
+        yield
+        self.mapping.close()
+
+    def test_bare_type_is_variable(self):
+        """ty returns just the type for variables, e.g. 'int'."""
+        assert self.mapping._is_variable_hover("int") is True
+
+    def test_literal_type_is_variable(self):
+        """ty returns Literal[5] for inferred constants."""
+        assert self.mapping._is_variable_hover("Literal[5]") is True
+
+    def test_class_type_is_variable(self):
+        """A class-typed variable shows just the class name."""
+        assert self.mapping._is_variable_hover("Response") is True
+
+    def test_function_hover(self):
+        assert self.mapping._is_variable_hover("def foo(x: int) -> str") is False
+
+    def test_class_hover(self):
+        assert self.mapping._is_variable_hover("class MyClass") is False
+
+    def test_module_hover(self):
+        assert self.mapping._is_variable_hover("<module 'os'>") is False
+
+    def test_empty_hover(self):
+        assert self.mapping._is_variable_hover("") is False
+
+    def test_markdown_wrapped_variable(self):
+        assert self.mapping._is_variable_hover("```python\nint\n```") is True
+
+    def test_markdown_wrapped_function(self):
+        assert self.mapping._is_variable_hover("```python\ndef foo() -> int\n```") is False
+
+    def test_unknown_is_not_variable(self):
+        """Unknown hover means ty couldn't resolve the reference — not a variable."""
+        assert self.mapping._is_variable_hover("Unknown") is False
+
+
+class TestMakeVariable:
+    """Tests for _make_variable creating JavaType.Variable instances."""
+
+    @pytest.fixture(autouse=True)
+    def setup_mapping(self):
+        self.mapping = PythonTypeMapping("")
+        yield
+        self.mapping.close()
+
+    def test_creates_variable_with_name_and_type(self):
+        var = self.mapping._make_variable("x", JavaType.Primitive.Int)
+        assert isinstance(var, JavaType.Variable)
+        assert var.name == "x"
+        assert var.type == JavaType.Primitive.Int
+        assert var.owner is None
+
+    def test_creates_variable_with_owner(self):
+        owner = JavaType.Class()
+        owner._fully_qualified_name = "MyClass"
+        var = self.mapping._make_variable("field", JavaType.Primitive.String, owner=owner)
+        assert var.name == "field"
+        assert var.type == JavaType.Primitive.String
+        assert var.owner is owner
+
+    def test_creates_variable_with_none_type(self):
+        var = self.mapping._make_variable("unknown", None)
+        assert var.name == "unknown"
+        assert var.type is None
+
+
+@requires_ty_cli
+class TestNameTypeInfo:
+    """Tests for name_type_info returning (expr_type, field_type) for name references."""
+
+    @pytest.fixture(autouse=True)
+    def reset_client(self):
+        yield
+        TyLspClient.reset()
+
+    def test_local_variable_has_field_type(self):
+        """A local variable reference should have a Variable field_type."""
+        source = 'x: int = 5\ny = x\n'
+        with tempfile.NamedTemporaryFile(suffix='.py', delete=False, mode='w') as f:
+            f.write(source)
+            file_path = f.name
+
+        try:
+            tree = ast.parse(source)
+            mapping = PythonTypeMapping(source, file_path)
+
+            # 'x' on line 2 (the reference)
+            name_node = tree.body[1].value  # the Name('x') on RHS
+            expr_type, field_type = mapping.name_type_info(name_node)
+
+            mapping.close()
+
+            assert expr_type is not None
+            assert field_type is not None
+            assert isinstance(field_type, JavaType.Variable)
+            assert field_type.name == "x"
+        finally:
+            os.unlink(file_path)
+
+    def test_function_name_has_no_field_type(self):
+        """A function name should not get a Variable field_type."""
+        source = 'def foo():\n    pass\nfoo()\n'
+        with tempfile.NamedTemporaryFile(suffix='.py', delete=False, mode='w') as f:
+            f.write(source)
+            file_path = f.name
+
+        try:
+            tree = ast.parse(source)
+            mapping = PythonTypeMapping(source, file_path)
+
+            # 'foo' in foo() call — the func is ast.Name
+            func_node = tree.body[1].value.func
+            _, field_type = mapping.name_type_info(func_node)
+
+            mapping.close()
+
+            assert field_type is None
+        finally:
+            os.unlink(file_path)
+
+    def test_annotated_module_variable(self):
+        """A module-level annotated variable should have a Variable field_type."""
+        source = 'MY_CONST: str = "hello"\nprint(MY_CONST)\n'
+        with tempfile.NamedTemporaryFile(suffix='.py', delete=False, mode='w') as f:
+            f.write(source)
+            file_path = f.name
+
+        try:
+            tree = ast.parse(source)
+            mapping = PythonTypeMapping(source, file_path)
+
+            # MY_CONST on line 2 (the reference inside print())
+            name_node = tree.body[1].value.args[0]
+            expr_type, field_type = mapping.name_type_info(name_node)
+
+            mapping.close()
+
+            assert field_type is not None
+            assert isinstance(field_type, JavaType.Variable)
+            assert field_type.name == "MY_CONST"
+        finally:
+            os.unlink(file_path)
+
+
+@requires_ty_cli
+class TestAttributeTypeInfo:
+    """Tests for attribute_type_info returning (expr_type, field_type) for attribute access."""
+
+    @pytest.fixture(autouse=True)
+    def reset_client(self):
+        yield
+        TyLspClient.reset()
+
+    def test_class_field_has_field_type(self):
+        """self.x should produce a Variable with the class as owner."""
+        source = 'class Foo:\n    def __init__(self):\n        self.x: int = 5\n    def get(self):\n        return self.x\n'
+        with tempfile.NamedTemporaryFile(suffix='.py', delete=False, mode='w') as f:
+            f.write(source)
+            file_path = f.name
+
+        try:
+            tree = ast.parse(source)
+            mapping = PythonTypeMapping(source, file_path)
+
+            # self.x on line 5 (the reference in get())
+            attr_node = tree.body[0].body[1].body[0].value  # Return's value = Attribute
+            expr_type, field_type = mapping.attribute_type_info(attr_node)
+
+            mapping.close()
+
+            assert expr_type is not None
+            assert field_type is not None
+            assert isinstance(field_type, JavaType.Variable)
+            assert field_type.name == "x"
+        finally:
+            os.unlink(file_path)
+
+    def test_method_attribute_has_no_field_type(self):
+        """obj.method (not a call, but a method reference) should not have Variable field_type."""
+        source = '"hello".upper()\n'
+        with tempfile.NamedTemporaryFile(suffix='.py', delete=False, mode='w') as f:
+            f.write(source)
+            file_path = f.name
+
+        try:
+            tree = ast.parse(source)
+            mapping = PythonTypeMapping(source, file_path)
+
+            # The Attribute node for .upper
+            attr_node = tree.body[0].value.func  # Call.func = Attribute
+            _, field_type = mapping.attribute_type_info(attr_node)
+
+            mapping.close()
+
+            assert field_type is None
+        finally:
+            os.unlink(file_path)

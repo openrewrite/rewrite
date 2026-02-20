@@ -14,7 +14,15 @@
 
 """Tests for ChangeImport recipe."""
 
+import shutil
+
+import pytest
 from rewrite.java.support_types import JavaType
+
+requires_ty_cli = pytest.mark.skipif(
+    shutil.which('ty') is None,
+    reason="ty CLI is not installed (install with: uv tool install ty)"
+)
 from rewrite.java.tree import FieldAccess, Identifier, MethodInvocation
 from rewrite.python.recipes.change_import import ChangeImport
 from rewrite.python.tree import CompilationUnit
@@ -323,3 +331,167 @@ class TestChangeImport:
             )
         )
         assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+    def test_change_from_import_renames_bare_references(self):
+        """Change: from time import clock / clock() -> from time import perf_counter / perf_counter()"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='time',
+            old_name='clock',
+            new_module='time',
+            new_name='perf_counter',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from time import clock
+                clock()
+                """,
+                """
+                from time import perf_counter
+                perf_counter()
+                """,
+            )
+        )
+
+    def test_change_from_import_renames_bare_reference_with_args(self):
+        """Bare reference with arguments: encodestring(data) -> encodebytes(data)"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='base64',
+            old_name='encodestring',
+            new_module='base64',
+            new_name='encodebytes',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from base64 import encodestring
+                encodestring(data)
+                """,
+                """
+                from base64 import encodebytes
+                encodebytes(data)
+                """,
+            )
+        )
+
+    def test_no_rename_when_name_unchanged(self):
+        """No bare reference rename when only the module changes."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='fractions',
+            old_name='gcd',
+            new_module='math',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from fractions import gcd
+                gcd(12, 8)
+                """,
+                """
+                from math import gcd
+                gcd(12, 8)
+                """,
+            )
+        )
+
+    def test_no_rename_bare_ref_in_unrelated_code(self):
+        """Only rename bare references that match old_name, not other identifiers."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='time',
+            old_name='clock',
+            new_module='time',
+            new_name='perf_counter',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from time import clock
+                clock()
+                x = 1
+                """,
+                """
+                from time import perf_counter
+                perf_counter()
+                x = 1
+                """,
+            )
+        )
+
+    @requires_ty_cli
+    def test_no_rename_shadowed_in_function_scope(self):
+        """Don't rename a local variable in function scope that shadows the imported name."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='time',
+            old_name='clock',
+            new_module='time',
+            new_name='perf_counter',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from time import clock
+
+                def foo():
+                    clock = 42
+                    return clock
+
+                clock()
+                """,
+                """
+                from time import perf_counter
+
+                def foo():
+                    clock = 42
+                    return clock
+
+                perf_counter()
+                """,
+            )
+        )
+
+    def test_rename_bare_ref_at_module_level_even_if_typed(self):
+        """Module-level bare references to an imported name should be renamed
+        even when ty populates field_type (which indicates a variable)."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='time',
+            old_name='clock',
+            new_module='time',
+            new_name='perf_counter',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from time import clock
+                result = clock()
+                ref = clock
+                """,
+                """
+                from time import perf_counter
+                result = perf_counter()
+                ref = perf_counter
+                """,
+            )
+        )
+
+    def test_both_from_import_and_direct_import(self):
+        """When a file has both 'from X import name' and 'import X', handle without duplicates."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='fractions',
+            old_name='gcd',
+            new_module='math',
+            new_name='gcd',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from fractions import gcd
+                import fractions
+
+                result = gcd(12, 8)
+                """,
+                # The old from-import is removed and new one added after
+                # existing imports; import fractions is preserved.
+                # Leading newline is inherited from the removed from-import's prefix.
+                "\n\nimport fractions\nfrom math import gcd\n\nresult = gcd(12, 8)\n",
+            )
+        )
