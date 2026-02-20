@@ -34,6 +34,9 @@ from ..java import JavaType
 
 
 
+# Shared Unknown singleton to avoid creating duplicate instances
+_UNKNOWN = JavaType.Unknown()
+
 # Mapping of Python builtin types to JavaType.Primitive
 _PYTHON_PRIMITIVES: Dict[str, JavaType.Primitive] = {
     'str': JavaType.Primitive.String,
@@ -96,6 +99,12 @@ class PythonTypeMapping:
         self._node_index_by_start: Dict[int, List[Tuple[int, int, str]]] = {}  # start -> [(end, type_id, node_kind)]
         self._type_registry: Dict[int, Dict[str, Any]] = {}  # type_id -> TypeDescriptor
         self._call_signature_index: Dict[Tuple[int, int], Dict[str, Any]] = {}  # (start, end) -> callSignature
+        self._type_id_cache: Dict[int, JavaType] = {}  # type_id -> resolved JavaType
+        self._declaring_type_id_cache: Dict[int, JavaType.FullyQualified] = {}  # type_id -> resolved declaring type
+        self._resolving_type_ids: set = set()  # type_ids currently being resolved (cycle detection)
+        self._resolving_declaring_type_ids: set = set()
+        self._cycle_placeholders: Dict[int, JavaType.Class] = {}  # placeholders created on cycle detection
+        self._declaring_cycle_placeholders: Dict[int, JavaType.Class] = {}
 
         # Fetch all types in one batch call
         if ty_client is not None:
@@ -221,6 +230,55 @@ class PythonTypeMapping:
 
         return None
 
+    def _resolve_type(self, type_id: int) -> Optional[JavaType]:
+        """Resolve a type ID to a JavaType, maximizing object reuse.
+
+        Caches resolved types so the same type_id always returns the same
+        object. Breaks cyclic type references by creating a placeholder Class
+        only when a cycle is actually detected — the placeholder is updated
+        in-place once resolution completes.
+        """
+        if type_id in self._type_id_cache:
+            return self._type_id_cache[type_id]
+
+        # Cycle detected — create a placeholder that will be updated later
+        if type_id in self._resolving_type_ids:
+            if type_id not in self._cycle_placeholders:
+                placeholder = JavaType.Class()
+                placeholder._flags_bit_map = 0
+                placeholder._kind = JavaType.FullyQualified.Kind.Class
+                placeholder._fully_qualified_name = ''
+                self._cycle_placeholders[type_id] = placeholder
+            return self._cycle_placeholders[type_id]
+
+        descriptor = self._type_registry.get(type_id)
+        if not descriptor:
+            return None
+
+        self._resolving_type_ids.add(type_id)
+        try:
+            result = self._descriptor_to_java_type(descriptor)
+        finally:
+            self._resolving_type_ids.discard(type_id)
+
+        if result is None:
+            return None
+
+        # If a cycle created a placeholder for this type_id, update it in-place
+        if type_id in self._cycle_placeholders:
+            placeholder = self._cycle_placeholders.pop(type_id)
+            if isinstance(result, JavaType.Class):
+                placeholder._fully_qualified_name = result._fully_qualified_name
+                placeholder._kind = result._kind
+            self._type_id_cache[type_id] = placeholder
+            return placeholder
+
+        # No cycle — cache the actual result directly for maximum reuse.
+        # For Class types this preserves the object from _create_class_type,
+        # ensuring FQN-based deduplication across type_ids.
+        self._type_id_cache[type_id] = result
+        return result
+
     def _descriptor_to_java_type(self, descriptor: Dict[str, Any]) -> Optional[JavaType]:
         """Convert a ty-types TypeDescriptor to a JavaType."""
         kind = descriptor.get('kind')
@@ -255,8 +313,8 @@ class PythonTypeMapping:
                     # Skip None/NoneType members
                     if member_kind == 'instance' and member.get('className') in ('None', 'NoneType'):
                         continue
-                    return self._descriptor_to_java_type(member)
-            return JavaType.Unknown()
+                    return self._resolve_type(member_id)
+            return _UNKNOWN
 
         elif kind == 'module':
             module_name = descriptor.get('moduleName', '')
@@ -266,10 +324,10 @@ class PythonTypeMapping:
             # Use structured return type if available
             return_type_id = descriptor.get('returnType')
             if return_type_id is not None:
-                ret_desc = self._type_registry.get(return_type_id)
-                if ret_desc:
-                    return self._descriptor_to_java_type(ret_desc)
-            return JavaType.Unknown()
+                result = self._resolve_type(return_type_id)
+                if result is not None:
+                    return result
+            return _UNKNOWN
 
         elif kind == 'classLiteral':
             class_name = descriptor.get('className', '')
@@ -279,41 +337,41 @@ class PythonTypeMapping:
             name = descriptor.get('name', '')
             if name:
                 return self._create_class_type(name)
-            return JavaType.Unknown()
+            return _UNKNOWN
 
         elif kind == 'subclassOf':
             base_id = descriptor.get('base')
             if base_id is not None:
-                base_desc = self._type_registry.get(base_id)
-                if base_desc:
-                    return self._descriptor_to_java_type(base_desc)
-            return JavaType.Unknown()
+                result = self._resolve_type(base_id)
+                if result is not None:
+                    return result
+            return _UNKNOWN
 
         elif kind == 'newType':
             name = descriptor.get('name', '')
             if name:
                 return self._create_class_type(name)
-            return JavaType.Unknown()
+            return _UNKNOWN
 
         elif kind == 'intersection':
             for member_id in descriptor.get('positive', []):
-                member = self._type_registry.get(member_id)
-                if member:
-                    return self._descriptor_to_java_type(member)
-            return JavaType.Unknown()
+                result = self._resolve_type(member_id)
+                if result is not None:
+                    return result
+            return _UNKNOWN
 
         elif kind in ('dynamic', 'never'):
-            return JavaType.Unknown()
+            return _UNKNOWN
 
         elif kind == 'enumLiteral':
             class_name = descriptor.get('className', '')
             return self._create_class_type(class_name)
 
         elif kind == 'property':
-            return JavaType.Unknown()
+            return _UNKNOWN
 
         else:
-            return JavaType.Unknown()
+            return _UNKNOWN
 
     def close(self) -> None:
         """Clean up temporary files."""
@@ -340,9 +398,7 @@ class PythonTypeMapping:
         # Try to look up in ty-types index
         type_id = self._lookup_type_id(node)
         if type_id is not None:
-            descriptor = self._type_registry.get(type_id)
-            if descriptor:
-                return self._descriptor_to_java_type(descriptor)
+            return self._resolve_type(type_id)
 
         return None
 
@@ -422,12 +478,10 @@ class PythonTypeMapping:
         """Resolve a ParameterInfo's typeId to a JavaType."""
         type_id = param.get('typeId')
         if type_id is not None:
-            descriptor = self._type_registry.get(type_id)
-            if descriptor:
-                java_type = self._descriptor_to_java_type(descriptor)
-                if java_type is not None:
-                    return java_type
-        return JavaType.Unknown()
+            result = self._resolve_type(type_id)
+            if result is not None:
+                return result
+        return _UNKNOWN
 
     def _get_method_signature(self, node: ast.Call) -> Tuple[List[str], List[JavaType]]:
         """Get parameter names and types from the method signature.
@@ -489,9 +543,7 @@ class PythonTypeMapping:
             # Try to look up receiver type in ty-types index
             type_id = self._lookup_type_id(receiver)
             if type_id is not None:
-                descriptor = self._type_registry.get(type_id)
-                if descriptor:
-                    return self._declaring_type_from_descriptor(descriptor)
+                return self._resolve_declaring_type(type_id)
 
         elif isinstance(node.func, ast.Name):
             # For function calls, look up the function name
@@ -504,6 +556,44 @@ class PythonTypeMapping:
                         return self._create_class_type(descriptor.get('moduleName', ''))
 
         return self._infer_declaring_type_from_ast(node)
+
+    def _resolve_declaring_type(self, type_id: int) -> Optional[JavaType.FullyQualified]:
+        """Resolve a type ID to a declaring type, maximizing object reuse."""
+        if type_id in self._declaring_type_id_cache:
+            return self._declaring_type_id_cache[type_id]
+
+        if type_id in self._resolving_declaring_type_ids:
+            if type_id not in self._declaring_cycle_placeholders:
+                placeholder = JavaType.Class()
+                placeholder._flags_bit_map = 0
+                placeholder._kind = JavaType.FullyQualified.Kind.Class
+                placeholder._fully_qualified_name = ''
+                self._declaring_cycle_placeholders[type_id] = placeholder
+            return self._declaring_cycle_placeholders[type_id]
+
+        descriptor = self._type_registry.get(type_id)
+        if not descriptor:
+            return None
+
+        self._resolving_declaring_type_ids.add(type_id)
+        try:
+            result = self._declaring_type_from_descriptor(descriptor)
+        finally:
+            self._resolving_declaring_type_ids.discard(type_id)
+
+        if result is None:
+            return None
+
+        if type_id in self._declaring_cycle_placeholders:
+            placeholder = self._declaring_cycle_placeholders.pop(type_id)
+            if isinstance(result, JavaType.Class):
+                placeholder._fully_qualified_name = result._fully_qualified_name
+                placeholder._kind = result._kind
+            self._declaring_type_id_cache[type_id] = placeholder
+            return placeholder
+
+        self._declaring_type_id_cache[type_id] = result
+        return result
 
     def _declaring_type_from_descriptor(self, descriptor: Dict[str, Any]) -> Optional[JavaType.FullyQualified]:
         """Extract a declaring type (class/module) from a TypeDescriptor."""
@@ -529,9 +619,7 @@ class PythonTypeMapping:
         elif kind == 'subclassOf':
             base_id = descriptor.get('base')
             if base_id is not None:
-                base_desc = self._type_registry.get(base_id)
-                if base_desc:
-                    return self._declaring_type_from_descriptor(base_desc)
+                return self._resolve_declaring_type(base_id)
             return None
 
         elif kind == 'newType':
@@ -542,9 +630,9 @@ class PythonTypeMapping:
 
         elif kind == 'intersection':
             for member_id in descriptor.get('positive', []):
-                member = self._type_registry.get(member_id)
-                if member:
-                    return self._declaring_type_from_descriptor(member)
+                result = self._resolve_declaring_type(member_id)
+                if result is not None:
+                    return result
             return None
 
         elif kind in ('stringLiteral', 'literalString'):
@@ -566,7 +654,7 @@ class PythonTypeMapping:
                 if member:
                     if member.get('kind') == 'instance' and member.get('className') in ('None', 'NoneType'):
                         continue
-                    return self._declaring_type_from_descriptor(member)
+                    return self._resolve_declaring_type(member_id)
 
         elif kind == 'classLiteral':
             class_name = descriptor.get('className', '')
@@ -583,15 +671,13 @@ class PythonTypeMapping:
         # The type of an ExprCall IS the return type
         type_id = self._lookup_type_id(call_node)
         if type_id is not None:
-            descriptor = self._type_registry.get(type_id)
-            if descriptor:
-                java_type = self._descriptor_to_java_type(descriptor)
-                if isinstance(java_type, JavaType.Class):
-                    return java_type
-                if isinstance(java_type, JavaType.Primitive):
-                    return self._create_class_type(
-                        _PRIMITIVE_TO_PYTHON.get(java_type, java_type.name.lower())
-                    )
+            java_type = self._resolve_type(type_id)
+            if isinstance(java_type, JavaType.Class):
+                return java_type
+            if isinstance(java_type, JavaType.Primitive):
+                return self._create_class_type(
+                    _PRIMITIVE_TO_PYTHON.get(java_type, java_type.name.lower())
+                )
         return None
 
     def _infer_declaring_type_from_ast(self, node: ast.Call) -> Optional[JavaType.FullyQualified]:
@@ -644,7 +730,7 @@ class PythonTypeMapping:
             if arg_type:
                 param_types.append(arg_type)
             else:
-                param_types.append(JavaType.Unknown())
+                param_types.append(_UNKNOWN)
 
         # Handle keyword arguments as well
         for kw in node.keywords:
@@ -652,7 +738,7 @@ class PythonTypeMapping:
             if kw_type:
                 param_types.append(kw_type)
             else:
-                param_types.append(JavaType.Unknown())
+                param_types.append(_UNKNOWN)
 
         return param_types if param_types else None
 
@@ -665,9 +751,7 @@ class PythonTypeMapping:
         # The type of an ExprCall node in ty-types IS the return type
         type_id = self._lookup_type_id(node)
         if type_id is not None:
-            descriptor = self._type_registry.get(type_id)
-            if descriptor:
-                return self._descriptor_to_java_type(descriptor)
+            return self._resolve_type(type_id)
 
         # Fall back to function descriptor's structured returnType
         func_type_id = self._lookup_func_type_id(node)
@@ -676,9 +760,7 @@ class PythonTypeMapping:
             if func_desc:
                 ret_id = func_desc.get('returnType')
                 if ret_id is not None:
-                    ret_desc = self._type_registry.get(ret_id)
-                    if ret_desc:
-                        return self._descriptor_to_java_type(ret_desc)
+                    return self._resolve_type(ret_id)
         return None
 
     def _create_class_type(self, fqn: str) -> JavaType.Class:
