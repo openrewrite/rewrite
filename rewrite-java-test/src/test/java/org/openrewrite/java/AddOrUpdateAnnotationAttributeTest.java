@@ -2907,7 +2907,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
             "org.example.Foo",
             "classes",
-            "java.util.List.class",
+            "org.example.data.SomeData.class",
             null,
             null,
             true
@@ -2922,6 +2922,13 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           ),
           java(
             """
+                package org.example.data;
+                public interface SomeData {
+                }
+                """
+          ),
+          java(
+            """
               import org.example.Foo;
 
               @Foo(classes = Integer.class)
@@ -2929,10 +2936,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               """,
             """
               import org.example.Foo;
-
-              import java.util.List;
+              import org.example.data.SomeData;
               
-              @Foo(classes = {Integer.class, List.class})
+              @Foo(classes = {Integer.class, SomeData.class})
               public class A {}
               """
           )
