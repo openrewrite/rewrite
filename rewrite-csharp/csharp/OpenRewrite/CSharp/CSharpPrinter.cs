@@ -588,6 +588,22 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         return ip;
     }
 
+    public override J VisitCsBinary(CsBinary csb, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(csb, p);
+        Visit(csb.Left, p);
+        VisitSpace(csb.Operator.Before, p);
+        p.Append(csb.Operator.Element switch
+        {
+            CsBinary.OperatorType.As => "as",
+            CsBinary.OperatorType.NullCoalescing => "??",
+            _ => throw new InvalidOperationException($"Unknown CsBinary operator: {csb.Operator.Element}")
+        });
+        Visit(csb.Right, p);
+        AfterSyntax(csb, p);
+        return csb;
+    }
+
     public override J VisitStatementExpression(StatementExpression se, PrintOutputCapture<P> p)
     {
         BeforeSyntax(se, p);

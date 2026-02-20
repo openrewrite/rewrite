@@ -683,7 +683,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
             case JavaType.GenericTypeVariable generic:
                 q.GetAndSend(generic, g => g.Name);
-                q.GetAndSend(generic, g => g.Variance);
+                q.GetAndSend(generic, g => g.Variance.ToString().ToUpper());
                 q.GetAndSendListAsRef(generic, g => g.Bounds,
                     t => TypeSignature(t), t => VisitType(t, q));
                 break;

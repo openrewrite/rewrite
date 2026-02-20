@@ -2440,4 +2440,133 @@ class CSharpRpcTest {
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
     }
+
+    @Test
+    void parseClassWithMixedMembersAndBoolProperty(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class NavItem
+                    {
+                        public NavItem(string? type, NavLevel ol)
+                            : this(type, false, null, ol)
+                        {
+                        }
+
+                        public NavItem(string? type, bool isHidden, string? head, NavLevel ol)
+                        {
+                            Type = type;
+                            IsHidden = isHidden;
+                            Head = head;
+                            Ol = ol;
+                        }
+
+                        public string? Type { get; }
+                        public bool IsHidden { get; }
+                        public string? Head { get; }
+                        public NavLevel Ol { get; }
+                    }
+
+                    public class NavLevel
+                    {
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("NavItem.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseNullCoalescingOperator(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public class Config
+                    {
+                        private string _name;
+
+                        public Config(string? name)
+                        {
+                            _name = name ?? "default";
+                        }
+
+                        public string Name => _name;
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Config.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseClassWithOverrideExpressionBodiedProperty(@TempDir Path tempDir) throws IOException {
+        String source = """
+                namespace Models
+                {
+                    public enum ContentType
+                    {
+                        TEXT,
+                        BINARY
+                    }
+
+                    public abstract class BaseFile
+                    {
+                        public abstract ContentType FileType { get; }
+                    }
+
+                    public class TextFile : BaseFile
+                    {
+                        public TextFile(string content)
+                        {
+                            Content = content ?? throw new System.ArgumentNullException(nameof(content));
+                        }
+
+                        public string Content { get; }
+
+                        public override ContentType FileType => ContentType.TEXT;
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("TextFile.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = rpc.parse(
+                List.of(sourceFile),
+                new InMemoryExecutionContext()
+        ).toList();
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
 }

@@ -230,12 +230,16 @@ public sealed class AttributeList(
 /// </summary>
 public sealed class DelegateInvocation(
     Guid id
-) : Marker, IEquatable<DelegateInvocation>
+) : Marker, IRpcCodec<DelegateInvocation>, IEquatable<DelegateInvocation>
 {
     public Guid Id { get; } = id;
 
     public DelegateInvocation WithId(Guid id) =>
         id == Id ? this : new(id);
+
+    public void RpcSend(DelegateInvocation after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public DelegateInvocation RpcReceive(DelegateInvocation before, RpcReceiveQueue q) =>
+        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
 
     public static DelegateInvocation Instance { get; } = new(Guid.Empty);
 
@@ -386,12 +390,16 @@ public sealed class Implicit(
 /// </summary>
 public sealed class NullCoalescing(
     Guid id
-) : Marker, IEquatable<NullCoalescing>
+) : Marker, IRpcCodec<NullCoalescing>, IEquatable<NullCoalescing>
 {
     public Guid Id { get; } = id;
 
     public NullCoalescing WithId(Guid id) =>
         id == Id ? this : new(id);
+
+    public void RpcSend(NullCoalescing after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public NullCoalescing RpcReceive(NullCoalescing before, RpcReceiveQueue q) =>
+        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
 
     public static NullCoalescing Instance { get; } = new(Guid.Empty);
 
@@ -407,12 +415,16 @@ public sealed class NullCoalescing(
 /// </summary>
 public sealed class MultiDimensionalArray(
     Guid id
-) : Marker, IEquatable<MultiDimensionalArray>
+) : Marker, IRpcCodec<MultiDimensionalArray>, IEquatable<MultiDimensionalArray>
 {
     public Guid Id { get; } = id;
 
     public MultiDimensionalArray WithId(Guid id) =>
         id == Id ? this : new(id);
+
+    public void RpcSend(MultiDimensionalArray after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public MultiDimensionalArray RpcReceive(MultiDimensionalArray before, RpcReceiveQueue q) =>
+        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
 
     public static MultiDimensionalArray Instance { get; } = new(Guid.Empty);
 

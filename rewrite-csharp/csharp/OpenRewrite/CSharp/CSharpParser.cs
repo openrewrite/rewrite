@@ -122,6 +122,21 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         _typeMapping = semanticModel != null ? new CSharpTypeMapping(semanticModel) : null;
     }
 
+    public override J? Visit(SyntaxNode? node)
+    {
+        try
+        {
+            return base.Visit(node);
+        }
+        catch (InvalidOperationException e) when (e.Message.StartsWith("Expected Expression but got"))
+        {
+            var snippet = node?.ToString() ?? "<null>";
+            if (snippet.Length > 200) snippet = snippet.Substring(0, 200) + "...";
+            throw new InvalidOperationException(
+                $"{e.Message} [node: {node?.GetType().Name}, kind: {node?.Kind()}, text: {snippet}]", e);
+        }
+    }
+
     public new CompilationUnit VisitCompilationUnit(CompilationUnitSyntax node)
     {
         var members = new List<Statement>();
@@ -2418,9 +2433,20 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         // Parse the nested pattern
         var pattern = Visit(node.Pattern);
-        if (pattern is not Expression patternExpr)
+        Expression patternExpr;
+        if (pattern is Expression expr)
         {
-            throw new InvalidOperationException($"Expected Expression but got {pattern?.GetType().Name}");
+            patternExpr = expr;
+        }
+        else if (pattern is Statement stmt)
+        {
+            // Declaration patterns (e.g., "not Type name") produce VariableDeclarations
+            // which is a Statement, not an Expression. Wrap in StatementExpression to bridge.
+            patternExpr = new StatementExpression(Guid.NewGuid(), Space.Empty, Markers.Empty, stmt);
+        }
+        else
+        {
+            throw new InvalidOperationException($"Expected Expression or Statement but got {pattern?.GetType().Name}");
         }
 
         // Use J.Unary with Not operator — printer detects pattern context for 'not' vs '!'
@@ -3817,6 +3843,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         );
     }
 
+    public override J? VisitGenericName(GenericNameSyntax node)
+    {
+        // Delegate to VisitType which handles GenericNameSyntax properly
+        return VisitType(node);
+    }
+
     public override J VisitPrefixUnaryExpression(PrefixUnaryExpressionSyntax node)
     {
         var prefix = ExtractPrefix(node);
@@ -3827,7 +3859,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var operand = Visit(node.Operand);
         if (operand is not Expression expr)
         {
-            throw new InvalidOperationException($"Expected Expression but got {operand?.GetType().Name}");
+            throw new InvalidOperationException($"Expected Expression but got {operand?.GetType().Name} in prefix unary: {Truncate(node.ToString())}");
         }
 
         return new Unary(
@@ -3904,6 +3936,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         );
     }
 
+    private static string Truncate(string s, int maxLen = 120) =>
+        s.Length <= maxLen ? s : s.Substring(0, maxLen) + "...";
+
     private static Unary.OperatorType MapPrefixUnaryOperator(SyntaxKind kind)
     {
         return kind switch
@@ -3936,7 +3971,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var left = Visit(node.Left);
         if (left is not Expression leftExpr)
         {
-            throw new InvalidOperationException($"Expected Expression but got {left?.GetType().Name}");
+            throw new InvalidOperationException($"Expected Expression but got {left?.GetType().Name} in binary expression: {Truncate(node.ToString())}");
         }
 
         // Extract space before the operator
@@ -3945,20 +3980,44 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Skip past the operator token
         _cursor = node.OperatorToken.Span.End;
 
-        // Handle 'is' operator as InstanceOf
+        // Handle 'is' type check (e.g., x is Type) as InstanceOf
         if (node.Kind() == SyntaxKind.IsExpression)
         {
-            // Right side is a type
-            var clazz = (J)VisitType((TypeSyntax)node.Right)!;
+            // Use VisitType for the right side since Visit() doesn't handle GenericNameSyntax
+            var typeExpr = node.Right is TypeSyntax rightType
+                ? (J?)VisitType(rightType)
+                : Visit(node.Right);
             return new InstanceOf(
                 Guid.NewGuid(),
                 prefix,
                 Markers.Empty,
                 new JRightPadded<Expression>(leftExpr, operatorPrefix, Markers.Empty),
-                clazz,
+                typeExpr!,
                 null,
                 _typeMapping?.Type(node),
                 null
+            );
+        }
+
+        // Handle 'as' type cast (e.g., x as Type) as CsBinary with As operator
+        if (node.Kind() == SyntaxKind.AsExpression)
+        {
+            // Use VisitType for the right side since Visit() doesn't handle GenericNameSyntax
+            var typeExpr = node.Right is TypeSyntax asRightType
+                ? (Expression?)VisitType(asRightType)
+                : Visit(node.Right) as Expression;
+            if (typeExpr is not Expression typeExpression)
+            {
+                throw new InvalidOperationException($"Expected Expression but got {typeExpr?.GetType().Name} in as expression: {Truncate(node.ToString())}");
+            }
+            return new CsBinary(
+                Guid.NewGuid(),
+                prefix,
+                Markers.Empty,
+                leftExpr,
+                new JLeftPadded<CsBinary.OperatorType>(operatorPrefix, CsBinary.OperatorType.As),
+                typeExpression,
+                _typeMapping?.Type(node)
             );
         }
 
@@ -3969,7 +4028,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var right = Visit(node.Right);
             if (right is not Expression rightExpr)
             {
-                throw new InvalidOperationException($"Expected Expression but got {right?.GetType().Name}");
+                throw new InvalidOperationException($"Expected Expression but got {right?.GetType().Name} in coalesce expression: {Truncate(node.ToString())}");
             }
 
             // Model as Ternary with NullCoalescing marker
@@ -3992,7 +4051,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var right2 = Visit(node.Right);
         if (right2 is not Expression rightExpr2)
         {
-            throw new InvalidOperationException($"Expected Expression but got {right2?.GetType().Name}");
+            throw new InvalidOperationException($"Expected Expression but got {right2?.GetType().Name} in binary expression: {Truncate(node.ToString())}");
         }
 
         return new Binary(
@@ -4133,7 +4192,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var inner = Visit(node.Expression);
         if (inner is not Expression innerExpr)
         {
-            throw new InvalidOperationException($"Expected Expression but got {inner?.GetType().Name}");
+            throw new InvalidOperationException($"Expected Expression but got {inner?.GetType().Name} in parenthesized: {Truncate(node.ToString())}");
         }
 
         // Extract space before the close paren
