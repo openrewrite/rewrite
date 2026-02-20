@@ -133,13 +133,28 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             @Nullable
             private GradleSettings gradleSettings;
 
+            private final Map<String, String> localVariableValues = new HashMap<>();
+
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
                     gradleSettings = tree.getMarkers().findFirst(GradleSettings.class).orElse(null);
+                    localVariableValues.clear();
                 }
                 return super.visit(tree, ctx);
+            }
+
+            @Override
+            public J visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+                J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, ctx);
+                if (v.getInitializer() instanceof J.Literal) {
+                    String value = literalValue(v.getInitializer());
+                    if (value != null) {
+                        localVariableValues.put(v.getSimpleName(), value);
+                    }
+                }
+                return v;
             }
 
             @Override
@@ -185,8 +200,12 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
                         G.GString.Value gStringValue = (G.GString.Value) gString.getStrings().get(0);
                         String versionVariableName = gStringValue.getTree().toString();
+                        String resolverPluginId = pluginId;
+                        if ("kotlin".equals(pluginId)) {
+                            resolverPluginId = String.format("org.jetbrains.%s.%s", pluginId, literalValue(pluginArgs.get(0)));
+                        }
                         String resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
-                                .select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
+                                .select(new GroupArtifact(resolverPluginId, resolverPluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
 
                         acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
                         assert resolvedPluginVersion != null;
@@ -194,11 +213,21 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     } else if (versionArgs.get(0) instanceof J.Identifier) {
                         J.Identifier identifier = (J.Identifier) versionArgs.get(0);
                         String versionVariableName = identifier.getSimpleName();
-                        String resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
-                                .select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
+                        String resolverPluginId = pluginId;
+                        if ("kotlin".equals(pluginId)) {
+                            resolverPluginId = String.format("org.jetbrains.%s.%s", pluginId, literalValue(pluginArgs.get(0)));
+                        }
+                        String localCurrentVersion = localVariableValues.get(versionVariableName);
+                        String resolvedPluginVersion;
+                        if (localCurrentVersion != null) {
+                            resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
+                                    .select(new GroupArtifactVersion(resolverPluginId, resolverPluginId + ".gradle.plugin", localCurrentVersion), "classpath", newVersion, versionPattern, ctx);
+                        } else {
+                            resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
+                                    .select(new GroupArtifact(resolverPluginId, resolverPluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
+                        }
 
                         acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
-                        assert resolvedPluginVersion != null;
                         acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
                     }
                 } catch (MavenDownloadingException e) {
