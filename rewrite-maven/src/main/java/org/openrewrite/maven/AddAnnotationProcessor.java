@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -22,6 +23,9 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.maven.trait.MavenPlugin;
 import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.Plugin;
+import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.XmlIsoVisitor;
@@ -95,6 +99,13 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
         Set<Path> aggregatorPaths = new HashSet<>();
 
         /**
+         * Paths of POMs where the annotation processor is already present in the effective POM
+         * (via a parent POM outside the reactor), but not in the POM's own XML.
+         * These POMs should be skipped to avoid redundant configuration.
+         */
+        Set<Path> alreadyConfiguredInEffectivePomPaths = new HashSet<>();
+
+        /**
          * Get the actual orphan paths (candidates minus aggregator-only POMs).
          * A true orphan has no parent in reactor and is not an aggregator-only POM.
          */
@@ -121,7 +132,20 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 MavenResolutionResult mrr = getResolutionResult();
-                Path sourcePath = mrr.getPom().getRequested().getSourcePath();
+                ResolvedPom resolvedPom = mrr.getPom();
+                Path sourcePath = resolvedPom.getRequested().getSourcePath();
+
+                // Check if the annotation processor is already in the effective POM (merged from parent POMs)
+                // but NOT in the current POM's own XML. In that case, skip this POM to avoid adding
+                // redundant configuration that duplicates what the parent already provides.
+                boolean inEffectivePom = hasAnnotationProcessor(resolvedPom.getPlugins()) ||
+                                        hasAnnotationProcessor(resolvedPom.getPluginManagement());
+                Pom requestedPom = resolvedPom.getRequested();
+                boolean inCurrentPomXml = hasAnnotationProcessor(requestedPom.getPlugins()) ||
+                                          hasAnnotationProcessor(requestedPom.getPluginManagement());
+                if (sourcePath != null && inEffectivePom && !inCurrentPomXml) {
+                    acc.alreadyConfiguredInEffectivePomPaths.add(sourcePath);
+                }
 
                 if (mrr.parentPomIsProjectPom()) {
                     // This module has a parent within the reactor
@@ -174,6 +198,12 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                 boolean isParent = acc.parentPomPaths.contains(sourcePath);
                 // Skip POMs that are neither parents nor orphans (children with parents in reactor)
                 if (!isParent && !acc.getOrphanPomPaths().contains(sourcePath)) {
+                    return tree;
+                }
+
+                // Skip POMs where the annotation processor is already configured via a parent POM
+                // outside the reactor (present in effective POM but not in own XML)
+                if (acc.alreadyConfiguredInEffectivePomPaths.contains(sourcePath)) {
                     return tree;
                 }
 
@@ -253,5 +283,34 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                 }.visit(tree, ctx);
             }
         };
+    }
+
+    private boolean hasAnnotationProcessor(List<Plugin> plugins) {
+        for (Plugin plugin : plugins) {
+            if (!MAVEN_COMPILER_PLUGIN_GROUP_ID.equals(plugin.getGroupId()) ||
+                    !MAVEN_COMPILER_PLUGIN_ARTIFACT_ID.equals(plugin.getArtifactId())) {
+                continue;
+            }
+            JsonNode config = plugin.getConfiguration();
+            if (config == null || config.isMissingNode()) {
+                continue;
+            }
+            JsonNode paths = config.path("annotationProcessorPaths").path("path");
+            if (paths.isArray()) {
+                for (JsonNode path : paths) {
+                    if (isMatchingProcessor(path)) {
+                        return true;
+                    }
+                }
+            } else if (!paths.isMissingNode() && isMatchingProcessor(paths)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isMatchingProcessor(JsonNode path) {
+        return groupId.equals(path.path("groupId").asText("")) &&
+               artifactId.equals(path.path("artifactId").asText(""));
     }
 }
