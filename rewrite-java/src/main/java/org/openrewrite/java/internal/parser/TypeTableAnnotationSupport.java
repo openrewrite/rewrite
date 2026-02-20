@@ -536,6 +536,12 @@ class AnnotationDeserializer {
                         case 't':
                             sb.append('\t');
                             break;
+                        case 'b':
+                            sb.append('\b');
+                            break;
+                        case 'f':
+                            sb.append('\f');
+                            break;
                         case '|':
                             sb.append('|');
                             break; // TypeTable-specific escape
