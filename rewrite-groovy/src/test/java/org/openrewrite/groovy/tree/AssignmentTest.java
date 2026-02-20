@@ -207,4 +207,140 @@ class AssignmentTest implements RewriteTest {
             """
           ));
     }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1478")
+    @Test
+    void destructuringAssignment() {
+        rewriteRun(
+          groovy(
+            """
+              def (a, b, c) = [1, 2, 3]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1478")
+    @Issue("https://github.com/openrewrite/rewrite/issues/4756")
+    @Test
+    void destructuringAssignmentTwoVariables() {
+        rewriteRun(
+          groovy(
+            """
+              def (x, y) = [1, 2]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1478")
+    @Issue("https://github.com/openrewrite/rewrite/issues/5283")
+    @Test
+    void destructuringAssignmentWithMethodCall() {
+        rewriteRun(
+          groovy(
+            """
+              def tag = '1.2.3'
+              def (major, minor, patch) = tag.tokenize('.')
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1478")
+    @Test
+    void destructuringAssignmentWithExtraSpaces() {
+        rewriteRun(
+          groovy(
+            """
+              def ( a , b , c ) = [1, 2, 3]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1478")
+    @Test
+    void destructuringAssignmentNoSpaces() {
+        rewriteRun(
+          groovy(
+            """
+              def (a,b,c) = [1,2,3]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1478")
+    @Test
+    void destructuringAssignmentNoSpaceBeforeParen() {
+        rewriteRun(
+          groovy(
+            """
+              def(key,value) = "a1:b2".split(":")
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1478")
+    @Test
+    void destructuringAssignmentWithTypedVariables() {
+        rewriteRun(
+          groovy(
+            """
+              def (String key, String value) = "a:b".split(":")
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1478")
+    @Test
+    void destructuringAssignmentWithMixedTypes() {
+        rewriteRun(
+          groovy(
+            """
+              def (String name, Integer age) = ["Alice", 30]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/5293")
+    @Test
+    void destructuringAssignmentWithFullyQualifiedType() {
+        rewriteRun(
+          groovy(
+            """
+              def (String key, java.lang.String value) = "a1:b2".split(":")
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/5293")
+    @Test
+    void destructuringAssignmentWithMixedTypedAndUntyped() {
+        rewriteRun(
+          groovy(
+            """
+              def  (first,  int           second,   third)   =     [1, 2, 3]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/5293")
+    @Test
+    void destructuringAssignmentNoSpacesAroundEquals() {
+        rewriteRun(
+          groovy(
+            """
+              def(key,value)="a1:b2".split(":")
+              """
+          )
+        );
+    }
+
 }

@@ -35,5 +35,8 @@ public class GSpace {
         RANGE_PREFIX,
         RANGE_INCLUSION,
         TOP_LEVEL_STATEMENT,
+        TUPLE_PREFIX,
+        TUPLE_ELEMENTS,
+        TUPLE_ELEMENT_SUFFIX,
     }
 }

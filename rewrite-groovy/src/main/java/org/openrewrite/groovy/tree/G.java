@@ -36,6 +36,7 @@ import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -1022,6 +1023,103 @@ public interface G extends J {
 
             public G.Unary withOperator(JLeftPadded<G.Unary.Type> operator) {
                 return t.operator == operator ? t : new G.Unary(t.id, t.prefix, t.markers, operator, t.expression, t.type);
+            }
+        }
+    }
+
+    /**
+     * Represents a Groovy tuple expression used in destructuring assignments.
+     * For example, in {@code def (a, b, c) = [1, 2, 3]} or
+     * {@code def (String key, String value) = "a:b".split(":")}, the
+     * parenthesized portion is a TupleExpression. Each element is a
+     * {@link J.VariableDeclarations} which can carry an optional per-variable type.
+     * Implements {@link VariableDeclarator} so it can be placed in
+     * {@link J.VariableDeclarations.NamedVariable#getDeclarator()}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class TupleExpression implements G, Expression, TypedTree, VariableDeclarator {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JContainer<J.VariableDeclarations> variables;
+
+        public List<J.VariableDeclarations> getVariables() {
+            return variables.getElements();
+        }
+
+        public TupleExpression withVariables(List<J.VariableDeclarations> variables) {
+            return getPadding().withVariables(JContainer.withElements(this.variables, variables));
+        }
+
+        @Override
+        public List<J.Identifier> getNames() {
+            List<J.Identifier> list = new ArrayList<>();
+            for (J.VariableDeclarations decl : variables.getElements()) {
+                for (J.VariableDeclarations.NamedVariable var : decl.getVariables()) {
+                    list.add(var.getName());
+                }
+            }
+            return list;
+        }
+
+        @Nullable
+        @With
+        @Getter
+        JavaType type;
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return v.visitTupleExpression(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final TupleExpression t;
+
+            public JContainer<J.VariableDeclarations> getVariables() {
+                return t.variables;
+            }
+
+            public TupleExpression withVariables(JContainer<J.VariableDeclarations> variables) {
+                return t.variables == variables ? t : new TupleExpression(t.id, t.prefix, t.markers, variables, t.type);
             }
         }
     }
