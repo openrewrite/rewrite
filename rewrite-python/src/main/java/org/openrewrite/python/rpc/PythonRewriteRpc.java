@@ -205,6 +205,8 @@ public class PythonRewriteRpc extends RewriteRpc {
                 index++;
 
                 SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
+                // for status update messages
+                parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
                 action.accept(sourceFile);
                 return true;
             }
