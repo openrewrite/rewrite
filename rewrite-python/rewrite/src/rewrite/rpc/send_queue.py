@@ -32,7 +32,7 @@ class RpcSendQueue:
 
     def __init__(self, source_file_type: Optional[str] = None):
         self.q: List[Dict[str, Any]] = []
-        self.refs: Dict[int, int] = {}  # id(obj) -> ref number
+        self.refs: Dict[int, tuple] = {}  # id(obj) -> (obj, ref_number) — verified with `is`
         self.next_ref: int = 0
         self.source_file_type = source_file_type
         self._before: Any = None
@@ -63,6 +63,14 @@ class RpcSendQueue:
         wrapped = None if on_change is None or after is None else (lambda: on_change(after))
         self.send(after, before, wrapped)
 
+    def get_and_send_as_ref(self, parent: T, getter: Callable[[T], Any],
+                            on_change: Optional[Callable[[Any], None]] = None) -> None:
+        """Get a value from parent and send it as a ref-tracked object."""
+        after = getter(parent)
+        before = getter(self._before) if self._before is not None else None
+        wrapped = None if on_change is None or after is None else (lambda: on_change(after))
+        self._send_as_ref(after, before, wrapped)
+
     def get_and_send_list(self, parent: T, getter: Callable[[T], Optional[List[Any]]],
                           id_getter: Callable[[Any], Any],
                           on_change: Optional[Callable[[Any], None]] = None) -> None:
@@ -70,6 +78,14 @@ class RpcSendQueue:
         after = getter(parent)
         before = getter(self._before) if self._before is not None else None
         self.send_list(after, before, id_getter, on_change)
+
+    def get_and_send_list_as_ref(self, parent: T, getter: Callable[[T], Optional[List[Any]]],
+                                  id_getter: Callable[[Any], Any],
+                                  on_change: Optional[Callable[[Any], None]] = None) -> None:
+        """Get a list from parent and send it with ref tracking for each item."""
+        after = getter(parent)
+        before = getter(self._before) if self._before is not None else None
+        self.send_list(after, before, id_getter, on_change, as_ref=True)
 
     def send(self, after: Any, before: Any = None,
              on_change: Optional[Callable[[], None]] = None) -> None:
@@ -94,12 +110,43 @@ class RpcSendQueue:
         self.put({'state': RpcObjectState.CHANGE, 'valueType': value_type, 'value': value})
         self._do_change(after, before, on_change, codec)
 
+    def _send_as_ref(self, after: Any, before: Any = None,
+                     on_change: Optional[Callable[[], None]] = None) -> None:
+        """Send a value as a ref-tracked object. If already sent, emit just the ref number."""
+        if before is after:
+            self.put({'state': RpcObjectState.NO_CHANGE})
+            return
+
+        if before is None or (after is not None and type(after) != type(before)):
+            self._add_as_ref(after, on_change)
+            return
+
+        if after is None:
+            self.put({'state': RpcObjectState.DELETE})
+            return
+
+        # Changed value — update ref tracking so `after` is recognized if seen again
+        before_id = id(before)
+        entry = self.refs.get(before_id)
+        if entry is not None and entry[0] is before:
+            ref_num = entry[1]
+            del self.refs[before_id]
+            self.refs[id(after)] = (after, ref_num)
+
+        value_type = self._get_value_type(after)
+        codec = self._get_rpc_codec(after)
+        value = None if on_change is not None or codec is not None else self._get_primitive_value(after)
+        self.put({'state': RpcObjectState.CHANGE, 'valueType': value_type, 'value': value})
+        self._do_change(after, before, on_change, codec)
+
     def send_list(self, after: Optional[List], before: Optional[List],
                   id_getter: Callable[[Any], Any],
-                  on_change: Optional[Callable[[Any], None]] = None) -> None:
+                  on_change: Optional[Callable[[Any], None]] = None,
+                  as_ref: bool = False) -> None:
         """Send a list with proper list protocol.
 
         on_change is a callback that takes a single list item and processes it.
+        If as_ref is True, list items are ref-tracked to avoid resending duplicates.
         """
         if before is after:
             self.put({'state': RpcObjectState.NO_CHANGE})
@@ -108,6 +155,8 @@ class RpcSendQueue:
         if after is None:
             self.put({'state': RpcObjectState.DELETE})
             return
+
+        add_fn = self._add_as_ref if as_ref else self._add
 
         def list_change():
             assert after is not None
@@ -135,13 +184,13 @@ class RpcSendQueue:
                 wrapped = (lambda i=item: on_change(i)) if on_change else None
 
                 if before_pos is None:
-                    self._add(item, wrapped)
+                    add_fn(item, wrapped)
                 else:
                     a_before = before[before_pos] if before else None
                     if a_before is item:
                         self.put({'state': RpcObjectState.NO_CHANGE})
                     elif a_before is None or type(item) != type(a_before):
-                        self._add(item, wrapped)
+                        add_fn(item, wrapped)
                     else:
                         self.put({'state': RpcObjectState.CHANGE, 'valueType': self._get_value_type(item)})
                         self._do_change(item, a_before, wrapped)
@@ -165,6 +214,29 @@ class RpcSendQueue:
         codec = self._get_rpc_codec(obj)
         value = None if on_change is not None or codec is not None else self._get_primitive_value(obj)
         self.put({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value})
+        self._do_change(obj, None, on_change, codec)
+
+    def _add_as_ref(self, obj: Any, on_change: Optional[Callable[[], None]] = None) -> None:
+        """Add an object with ref tracking. If already sent, emit just the ref number."""
+        if obj is None:
+            self.put({'state': RpcObjectState.DELETE})
+            return
+
+        obj_id = id(obj)
+        entry = self.refs.get(obj_id)
+        if entry is not None and entry[0] is obj:
+            # Already sent — emit ref number only, no onChange
+            self.put({'state': RpcObjectState.ADD, 'ref': entry[1]})
+            return
+
+        # First time — assign ref number and serialize fully
+        self.next_ref += 1
+        self.refs[obj_id] = (obj, self.next_ref)
+
+        value_type = self._get_value_type(obj)
+        codec = self._get_rpc_codec(obj)
+        value = None if on_change is not None or codec is not None else self._get_primitive_value(obj)
+        self.put({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value, 'ref': self.next_ref})
         self._do_change(obj, None, on_change, codec)
 
     def _do_change(self, after: Any, before: Any,
@@ -219,8 +291,14 @@ class RpcSendQueue:
             return 'org.openrewrite.java.tree.JavaType$Primitive'
         if isinstance(obj, JavaType.Method):
             return 'org.openrewrite.java.tree.JavaType$Method'
+        if isinstance(obj, JavaType.Parameterized):
+            return 'org.openrewrite.java.tree.JavaType$Parameterized'
         if isinstance(obj, JavaType.Class):
             return 'org.openrewrite.java.tree.JavaType$Class'
+        if isinstance(obj, JavaType.Union):
+            return 'org.openrewrite.java.tree.JavaType$MultiCatch'
+        if isinstance(obj, JavaType.Intersection):
+            return 'org.openrewrite.java.tree.JavaType$Intersection'
 
         # Other enums don't need type info (they're serialized by name)
         if isinstance(obj, Enum):

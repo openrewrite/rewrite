@@ -77,6 +77,8 @@ class JavaType(ABC):
         _members: Optional[List[JavaType.Variable]]
         _methods: Optional[List[JavaType.Method]]
 
+        @property
+        def fully_qualified_name(self) -> str: ...
 
     class ShallowClass(Class):
         pass
@@ -85,6 +87,16 @@ class JavaType(ABC):
         _type: JavaType.FullyQualified
         _type_parameters: Optional[List[JavaType]]
 
+        @property
+        def fully_qualified_name(self) -> str: ...
+
+        @property
+        def type(self) -> JavaType.FullyQualified: ...
+        @property
+        def type_parameters(self) -> Optional[List[JavaType]]: ...
+        @property
+        def fully_qualified_name(self) -> str: ...
+
 
     class GenericTypeVariable:
         class Variance(Enum):
@@ -92,7 +104,17 @@ class JavaType(ABC):
             Covariant: Variance
             Contravariant: Variance
 
+    class Union:
+        _bounds: Optional[List[JavaType]]
 
+        @property
+        def bounds(self) -> List[JavaType]: ...
+
+    class Intersection:
+        _bounds: Optional[List[JavaType]]
+
+        @property
+        def bounds(self) -> List[JavaType]: ...
 
     class Primitive(Enum):
         Boolean: Primitive
@@ -163,8 +185,15 @@ class JavaType(ABC):
         @property
         def annotations(self) -> Optional[List[JavaType.FullyQualified]]: ...
 
+    @dataclass
     class Array:
-        pass
+        _elem_type: Optional[JavaType] = ...
+        _annotations: Optional[List[JavaType.FullyQualified]] = ...
+
+        @property
+        def elem_type(self) -> Optional[JavaType]: ...
+        @property
+        def annotations(self) -> Optional[List[JavaType.FullyQualified]]: ...
 
 
 @dataclass(frozen=True)

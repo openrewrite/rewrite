@@ -20,8 +20,8 @@ import pytest
 from rewrite.java.support_types import JavaType
 
 requires_ty_cli = pytest.mark.skipif(
-    shutil.which('ty') is None,
-    reason="ty CLI is not installed (install with: uv tool install ty)"
+    shutil.which('ty-types') is None,
+    reason="ty-types CLI is not installed"
 )
 from rewrite.java.tree import FieldAccess, Identifier, MethodInvocation
 from rewrite.python.recipes.change_import import ChangeImport
