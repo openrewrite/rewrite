@@ -416,6 +416,43 @@ class PythonTypeMapping:
             return JavaType.Primitive.None_
         return None
 
+    def _is_variable_descriptor(self, descriptor: Dict[str, Any]) -> bool:
+        """Check if a type descriptor represents a variable (not a function, class, or module)."""
+        kind = descriptor.get('kind')
+        return kind not in ('function', 'boundMethod', 'module', 'classLiteral')
+
+    def name_type_info(self, node: ast.Name) -> Tuple[Optional[JavaType], Optional[JavaType.Variable]]:
+        """Get expression type and variable type for a name reference.
+
+        Returns (expression_type, variable_field_type).
+        """
+        type_id = self._lookup_type_id(node)
+        if type_id is None:
+            return None, None
+
+        expr_type = self._resolve_type(type_id)
+        descriptor = self._type_registry.get(type_id)
+        if descriptor and self._is_variable_descriptor(descriptor):
+            return expr_type, JavaType.Variable(_name=node.id, _type=expr_type)
+        return expr_type, None
+
+    def attribute_type_info(self, node: ast.Attribute,
+                            receiver_type: Optional[JavaType] = None
+                            ) -> Tuple[Optional[JavaType], Optional[JavaType.Variable]]:
+        """Get expression type and variable type for an attribute access.
+
+        Returns (expression_type, variable_field_type).
+        """
+        type_id = self._lookup_type_id(node)
+        if type_id is None:
+            return None, None
+
+        expr_type = self._resolve_type(type_id)
+        descriptor = self._type_registry.get(type_id)
+        if descriptor and self._is_variable_descriptor(descriptor):
+            return expr_type, JavaType.Variable(_name=node.attr, _type=expr_type, _owner=receiver_type)
+        return expr_type, None
+
     def method_invocation_type(self, node: ast.Call) -> Optional[JavaType.Method]:
         """Get the method type for a function/method call.
 

@@ -300,15 +300,8 @@ public class KotlinParser implements Parser {
         }
 
         public Builder classpathFromResources(ExecutionContext ctx, String... classpath) {
-            // K2 requires full class files; the type-transformed (.tt) stubs from
-            // JavaParser.dependenciesFromResources are not readable by K2's FIR compiler.
-            // Strip version suffixes and resolve full jars from the classpath instead.
-            List<String> stripped = new ArrayList<>(classpath.length);
-            for (String name : classpath) {
-                stripped.add(name.replaceAll("-\\d+$", ""));
-            }
-            this.artifactNames = stripped;
-            this.classpath = null;
+            this.artifactNames = null;
+            this.classpath = JavaParser.dependenciesFromResources(ctx, classpath);
             return this;
         }
 

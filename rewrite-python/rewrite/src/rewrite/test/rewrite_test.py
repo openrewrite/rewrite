@@ -233,14 +233,37 @@ class RecipeSpec:
 
     def _parse_python(self, source: str, source_path: Path) -> CompilationUnit:
         """Parse Python source code into a CompilationUnit."""
+        import tempfile
+        import os
         from rewrite.python._parser_visitor import ParserVisitor
 
-        visitor = ParserVisitor(source)
-        # Strip BOM before passing to ast.parse (ParserVisitor does this internally)
-        source_for_ast = source[1:] if source.startswith('\ufeff') else source
-        tree = ast.parse(source_for_ast)
-        cu = visitor.visit_Module(tree)
-        return cu.replace(source_path=source_path)
+        # Write source to a temp file so ty-types can analyze it
+        ty_client = None
+        tmp_dir = None
+        try:
+            from rewrite.python.ty_client import TyTypesClient
+            tmp_dir = tempfile.mkdtemp()
+            file_path = os.path.join(tmp_dir, source_path.name if source_path.name else 'test.py')
+            with open(file_path, 'w') as f:
+                f.write(source)
+            ty_client = TyTypesClient()
+            ty_client.initialize(tmp_dir)
+        except (ImportError, RuntimeError):
+            file_path = None
+
+        try:
+            visitor = ParserVisitor(source, file_path, ty_client)
+            # Strip BOM before passing to ast.parse (ParserVisitor does this internally)
+            source_for_ast = source[1:] if source.startswith('\ufeff') else source
+            tree = ast.parse(source_for_ast)
+            cu = visitor.visit_Module(tree)
+            return cu.replace(source_path=source_path)
+        finally:
+            if ty_client is not None:
+                ty_client.shutdown()
+            if tmp_dir is not None:
+                import shutil
+                shutil.rmtree(tmp_dir, ignore_errors=True)
 
     def _expect_no_parse_failures(
         self, parsed: List[Tuple[SourceSpec, SourceFile]]

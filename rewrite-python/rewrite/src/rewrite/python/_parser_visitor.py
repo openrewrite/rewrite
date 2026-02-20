@@ -1,4 +1,5 @@
 import ast
+import dataclasses
 import sys
 import token
 from argparse import ArgumentError
@@ -1050,13 +1051,24 @@ class ParserVisitor(ast.NodeVisitor):
         raise NotImplementedError("Implement visit_TypeIgnore!")
 
     def visit_Attribute(self, node):
+        prefix = self.__whitespace()
+        target = self.__convert(node.value)
+        receiver_type = getattr(target, 'type', None) if hasattr(target, 'type') else None
+        dot_space = self.__source_before('.')
+        name_ident = self.__convert_name(node.attr)
+
+        expr_type, field_type = self._type_mapping.attribute_type_info(node, receiver_type)
+
+        if isinstance(name_ident, j.Identifier):
+            name_ident = dataclasses.replace(name_ident, _type=expr_type, _field_type=field_type)
+
         return j.FieldAccess(
             random_id(),
-            self.__whitespace(),
+            prefix,
             Markers.EMPTY,
-            self.__convert(node.value),
-            self.__pad_left(self.__source_before('.'), self.__convert_name(node.attr)),
-            self._type_mapping.type(node),
+            target,
+            self.__pad_left(dot_space, name_ident),
+            expr_type,
         )
 
     def visit_Del(self, node):
@@ -2548,14 +2560,15 @@ class ParserVisitor(ast.NodeVisitor):
 
     def visit_Name(self, node):
         space, actual_name = self.__consume_identifier(node.id)
+        expr_type, field_type = self._type_mapping.name_type_info(node)
         return j.Identifier(
             random_id(),
             space,
             Markers.EMPTY,
             [],
             actual_name,
-            self._type_mapping.type(node),
-            None
+            expr_type,
+            field_type
         )
 
     def visit_NamedExpr(self, node):
