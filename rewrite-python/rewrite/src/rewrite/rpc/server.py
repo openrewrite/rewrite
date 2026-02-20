@@ -269,15 +269,13 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             'sourceFileType': 'org.openrewrite.python.tree.Py$CompilationUnit'
         }
     except ImportError as e:
-        logger.error(f"Failed to import parser: {e}")
-        traceback.print_exc()
+        logger.exception(f"Failed to import parser: {e}")
         return _create_parse_error(str(source_path), str(e), source)
     except SyntaxError as e:
         logger.error(f"Syntax error parsing {path}: {e}")
         return _create_parse_error(str(source_path), str(e), source)
     except Exception as e:
-        logger.error(f"Error parsing {path}: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error parsing {path}: {e}")
         return _create_parse_error(str(source_path), str(e), source)
 
 
@@ -360,7 +358,7 @@ def handle_parse_project(params: dict) -> List[dict]:
     import fnmatch
 
     project_path = params.get('projectPath', '.')
-    exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info'])
+    exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne'])
     relative_to = params.get('relativeTo') or project_path
 
     results = []
@@ -431,9 +429,7 @@ def handle_get_object(params: dict) -> List[dict]:
 
     except BaseException as e:
         source_path = getattr(obj, 'source_path', None)
-        logger.error(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
-        import traceback as tb
-        tb.print_exc()
+        logger.exception(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
         return [{'state': 'END_OF_OBJECT'}]
 
 
@@ -1371,8 +1367,7 @@ def main():
                     'result': result
                 }
             except Exception as e:
-                logger.error(f"Error handling request: {e}")
-                traceback.print_exc()
+                logger.exception(f"Error handling request: {e}")
                 # Include full stack trace in error response for debugging
                 tb_str = traceback.format_exc()
                 response = {
@@ -1391,8 +1386,7 @@ def main():
             write_message(response)
 
         except Exception as e:
-            logger.error(f"Fatal error: {e}")
-            traceback.print_exc()
+            logger.exception(f"Fatal error: {e}")
             break
 
     # No ty-types cleanup needed here — clients are scoped per parse batch
