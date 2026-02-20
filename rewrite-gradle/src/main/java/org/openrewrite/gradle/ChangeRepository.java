@@ -104,30 +104,33 @@ public class ChangeRepository extends Recipe {
                     return m;
                 }
 
-                // Remove mode: no new type specified
-                if (newType == null) {
+                // Remove mode: no new type or URL specified
+                if (newType == null && newUrl == null) {
                     //noinspection DataFlowIssue
                     return null;
                 }
 
+                // If newType is not specified, keep the matched repository's type
+                String effectiveNewType = newType != null ? newType : m.getSimpleName();
+
                 boolean isKotlinDsl = getCursor().firstEnclosingOrThrow(JavaSourceFile.class) instanceof K.CompilationUnit;
 
                 // If the target repository already exists as a sibling, remove the old one instead of replacing
-                if (newRepoAlreadyExists(m)) {
+                if (newRepoAlreadyExists(m, effectiveNewType)) {
                     //noinspection DataFlowIssue
                     return null;
                 }
 
                 // Named → Named (no URLs involved)
                 if (oldUrl == null && newUrl == null) {
-                    if (m.getSimpleName().equals(newType)) {
+                    if (m.getSimpleName().equals(effectiveNewType)) {
                         return m;
                     }
-                    return m.withName(m.getName().withSimpleName(newType));
+                    return m.withName(m.getName().withSimpleName(effectiveNewType));
                 }
 
                 // Custom → Custom with same type: just change the URL
-                if (m.getSimpleName().equals(newType) && newUrl != null) {
+                if (m.getSimpleName().equals(effectiveNewType) && newUrl != null) {
                     if (oldUrl != null && oldUrl.equals(newUrl)) {
                         return m;
                     }
@@ -135,7 +138,7 @@ public class ChangeRepository extends Recipe {
                 }
 
                 // All other cases: generate a new repository node and swap it in
-                J.MethodInvocation replacement = generateRepositoryInvocation(isKotlinDsl, ctx);
+                J.MethodInvocation replacement = generateRepositoryInvocation(effectiveNewType, isKotlinDsl, ctx);
                 return (J.MethodInvocation) autoFormat(replacement.withPrefix(m.getPrefix()), ctx, getCursor().getParentOrThrow());
             }
 
@@ -150,10 +153,7 @@ public class ChangeRepository extends Recipe {
                 }
             }
 
-            private boolean newRepoAlreadyExists(J.MethodInvocation current) {
-                if (newType == null) {
-                    return false;
-                }
+            private boolean newRepoAlreadyExists(J.MethodInvocation current, String effectiveNewType) {
                 try {
                     Cursor reposCursor = getCursor().dropParentUntil(e ->
                             e instanceof J.MethodInvocation &&
@@ -177,7 +177,7 @@ public class ChangeRepository extends Recipe {
                         if (siblingInvocation.getId().equals(current.getId())) {
                             continue;
                         }
-                        if (!newType.equals(siblingInvocation.getSimpleName())) {
+                        if (!effectiveNewType.equals(siblingInvocation.getSimpleName())) {
                             continue;
                         }
                         if (newUrl == null) {
@@ -282,14 +282,14 @@ public class ChangeRepository extends Recipe {
                 }.visitNonNull(m, new InMemoryExecutionContext());
             }
 
-            private J.MethodInvocation generateRepositoryInvocation(boolean isKotlinDsl, ExecutionContext ctx) {
+            private J.MethodInvocation generateRepositoryInvocation(String effectiveNewType, boolean isKotlinDsl, ExecutionContext ctx) {
                 String code;
                 if (newUrl == null) {
-                    code = newType + "()";
+                    code = effectiveNewType + "()";
                 } else if (isKotlinDsl) {
-                    code = newType + " {\n    url = uri(\"" + newUrl + "\")\n}";
+                    code = effectiveNewType + " {\n    url = uri(\"" + newUrl + "\")\n}";
                 } else {
-                    code = newType + " {\n    url = \"" + newUrl + "\"\n}";
+                    code = effectiveNewType + " {\n    url = \"" + newUrl + "\"\n}";
                 }
 
                 String template = "repositories {\n    " + code + "\n}";

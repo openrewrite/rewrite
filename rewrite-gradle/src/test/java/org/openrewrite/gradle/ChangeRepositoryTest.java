@@ -405,6 +405,52 @@ class ChangeRepositoryTest implements RewriteTest {
     }
 
     @Test
+    void newUrlOnlyKeepsType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeRepository("maven", "https://old-nexus.example.com/releases", null, "https://new-nexus.example.com/releases")),
+          buildGradle(
+            """
+              repositories {
+                  maven {
+                      url = "https://old-nexus.example.com/releases"
+                  }
+              }
+              """,
+            """
+              repositories {
+                  maven {
+                      url = "https://new-nexus.example.com/releases"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void newUrlOnlyKeepsTypeKts() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeRepository(null, "https://old-nexus.example.com/releases", null, "https://new-nexus.example.com/releases")),
+          buildGradleKts(
+            """
+              repositories {
+                  maven {
+                      url = uri("https://old-nexus.example.com/releases")
+                  }
+              }
+              """,
+            """
+              repositories {
+                  maven {
+                      url = uri("https://new-nexus.example.com/releases")
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void matchByUrlOnlyReplace() {
         rewriteRun(
           spec -> spec.recipe(new ChangeRepository(null, "https://old-nexus.example.com/releases", "mavenCentral", null)),
