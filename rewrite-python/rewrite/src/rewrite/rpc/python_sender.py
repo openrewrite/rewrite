@@ -875,7 +875,7 @@ class PythonRpcSender:
             #        owningClass, annotations, interfaces, members, methods
             q.get_and_send(java_type, lambda x: getattr(x, '_flags_bit_map', 0))
             q.get_and_send(java_type, lambda x: getattr(x, '_kind', JT.FullyQualified.Kind.Class))
-            q.get_and_send(java_type, lambda x: getattr(x, '_fully_qualified_name', ''))
+            q.get_and_send(java_type, lambda x: getattr(x, 'fully_qualified_name', ''))
             q.get_and_send_list_as_ref(java_type, lambda x: getattr(x, '_type_parameters', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
             q.get_and_send_as_ref(java_type, lambda x: getattr(x, '_supertype', None), lambda t: self._visit_type(t, q))
             q.get_and_send_as_ref(java_type, lambda x: getattr(x, '_owning_class', None), lambda t: self._visit_type(t, q))
@@ -896,6 +896,14 @@ class PythonRpcSender:
             q.get_and_send_as_ref(java_type, lambda x: x._type, lambda t: self._visit_type(t, q))
             q.get_and_send_list_as_ref(java_type, lambda x: x._annotations or [], self._type_signature, lambda t: self._visit_type(t, q))
 
+        elif isinstance(java_type, JT.Union):
+            # Union (MultiCatch in Java): bounds list
+            q.get_and_send_list_as_ref(java_type, lambda x: x.bounds, self._type_signature, lambda t: self._visit_type(t, q))
+
+        elif isinstance(java_type, JT.Intersection):
+            # Intersection: bounds list
+            q.get_and_send_list_as_ref(java_type, lambda x: x.bounds, self._type_signature, lambda t: self._visit_type(t, q))
+
         elif isinstance(java_type, JT.Unknown):
             # Unknown has no additional fields
             pass
@@ -909,7 +917,7 @@ class PythonRpcSender:
         if isinstance(java_type, JT.Primitive):
             return java_type.name
         if isinstance(java_type, JT.Class):
-            return getattr(java_type, '_fully_qualified_name', str(id(java_type)))
+            return getattr(java_type, 'fully_qualified_name', str(id(java_type)))
         if isinstance(java_type, JT.Method):
             declaring = getattr(java_type, '_declaring_type', None)
             declaring_name = self._type_signature(declaring) if declaring else ''
@@ -924,6 +932,10 @@ class PythonRpcSender:
         if isinstance(java_type, JT.Array):
             elem_sig = self._type_signature(java_type._elem_type) if java_type._elem_type else ''
             return f"{elem_sig}[]"
+        if isinstance(java_type, JT.Union):
+            return '|'.join(self._type_signature(b) for b in java_type.bounds)
+        if isinstance(java_type, JT.Intersection):
+            return '&'.join(self._type_signature(b) for b in java_type.bounds)
         return str(id(java_type))
 
     def _visit_space(self, space: Space, q: 'RpcSendQueue') -> None:

@@ -77,6 +77,8 @@ class JavaType(ABC):
         _members: Optional[List[JavaType.Variable]]
         _methods: Optional[List[JavaType.Method]]
 
+        @property
+        def fully_qualified_name(self) -> str: ...
 
     class ShallowClass(Class):
         pass
@@ -86,11 +88,14 @@ class JavaType(ABC):
         _type_parameters: Optional[List[JavaType]]
 
         @property
+        def fully_qualified_name(self) -> str: ...
+
+        @property
         def type(self) -> JavaType.FullyQualified: ...
         @property
         def type_parameters(self) -> Optional[List[JavaType]]: ...
         @property
-        def _fully_qualified_name(self) -> str: ...
+        def fully_qualified_name(self) -> str: ...
 
 
     class GenericTypeVariable:
@@ -99,7 +104,17 @@ class JavaType(ABC):
             Covariant: Variance
             Contravariant: Variance
 
+    class Union:
+        _bounds: Optional[List[JavaType]]
 
+        @property
+        def bounds(self) -> List[JavaType]: ...
+
+    class Intersection:
+        _bounds: Optional[List[JavaType]]
+
+        @property
+        def bounds(self) -> List[JavaType]: ...
 
     class Primitive(Enum):
         Boolean: Primitive

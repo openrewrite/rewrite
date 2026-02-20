@@ -921,6 +921,10 @@ class PythonRpcReceiver:
 
         This matches the sender's _visit_type which sends expanded type fields.
         The callback pattern ensures message counts match between sender and receiver.
+
+        IMPORTANT: isinstance ordering matters here. Parameterized must be checked
+        before Class because both are separate types. If inheritance changes, review
+        this ordering. Mirrors the sender's _visit_type chain.
         """
         from rewrite.java.support_types import JavaType as JT
 
@@ -994,7 +998,7 @@ class PythonRpcReceiver:
             #        owningClass, annotations, interfaces, members, methods
             flags = q.receive_defined(getattr(java_type, '_flags_bit_map', 0))
             kind = _to_enum(JT.FullyQualified.Kind)(q.receive(getattr(java_type, '_kind', JT.FullyQualified.Kind.Class)))
-            fqn = q.receive_defined(getattr(java_type, '_fully_qualified_name', ''))
+            fqn = q.receive_defined(getattr(java_type, 'fully_qualified_name', ''))
             type_params = q.receive_list(getattr(java_type, '_type_parameters', None) or [],
                                           lambda t: self._receive_type(t, q))
             supertype = q.receive(getattr(java_type, '_supertype', None),
@@ -1047,6 +1051,18 @@ class PythonRpcReceiver:
             var._type = type_
             var._annotations = annotations
             return var
+
+        elif isinstance(java_type, JT.Union):
+            # Union (MultiCatch in Java): bounds list
+            bounds = q.receive_list(getattr(java_type, '_bounds', None) or [],
+                                     lambda t: self._receive_type(t, q))
+            return JT.Union(_bounds=bounds)
+
+        elif isinstance(java_type, JT.Intersection):
+            # Intersection: bounds list
+            bounds = q.receive_list(getattr(java_type, '_bounds', None) or [],
+                                     lambda t: self._receive_type(t, q))
+            return JT.Intersection(_bounds=bounds)
 
         elif isinstance(java_type, JT.Unknown):
             # Unknown has no additional fields
@@ -1361,7 +1377,7 @@ def _receive_java_type_class(cls, q: RpcReceiveQueue):
     # owningClass, annotations, interfaces, members, methods
     flags = q.receive_defined(getattr(cls, '_flags_bit_map', 0) if cls else 0)
     kind = _to_enum(JT.FullyQualified.Kind)(q.receive(getattr(cls, '_kind', JT.FullyQualified.Kind.Class) if cls else JT.FullyQualified.Kind.Class))
-    fqn = q.receive_defined(getattr(cls, '_fully_qualified_name', '') if cls else '')
+    fqn = q.receive_defined(getattr(cls, 'fully_qualified_name', '') if cls else '')
     type_params = q.receive_list(getattr(cls, '_type_parameters', None) if cls else None)
     supertype = q.receive(getattr(cls, '_supertype', None) if cls else None)
     owning_class = q.receive(getattr(cls, '_owning_class', None) if cls else None)
@@ -1431,6 +1447,22 @@ def _receive_java_type_variable(variable, q: RpcReceiveQueue):
     return var
 
 
+def _receive_java_type_union(union, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Union (MultiCatch in Java) - consumes bounds list."""
+    from rewrite.java.support_types import JavaType as JT
+
+    bounds = q.receive_list(union._bounds)
+    return JT.Union(_bounds=bounds)
+
+
+def _receive_java_type_intersection(intersection, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Intersection - consumes bounds list."""
+    from rewrite.java.support_types import JavaType as JT
+
+    bounds = q.receive_list(intersection._bounds)
+    return JT.Intersection(_bounds=bounds)
+
+
 def _register_java_type_codecs():
     """Register codecs for JavaType classes."""
     from rewrite.java.support_types import JavaType as JT
@@ -1491,6 +1523,22 @@ def _register_java_type_codecs():
         JT.Array,
         _receive_java_type_array,
         lambda: JT.Array()  # Factory creates empty Array
+    )
+
+    # JavaType.Union (MultiCatch in Java) - bounds list
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$MultiCatch',
+        JT.Union,
+        _receive_java_type_union,
+        lambda: JT.Union()  # Factory creates empty Union
+    )
+
+    # JavaType.Intersection - bounds list
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Intersection',
+        JT.Intersection,
+        _receive_java_type_intersection,
+        lambda: JT.Intersection()  # Factory creates empty Intersection
     )
 
 

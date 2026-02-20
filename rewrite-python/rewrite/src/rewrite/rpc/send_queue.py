@@ -125,7 +125,14 @@ class RpcSendQueue:
             self.put({'state': RpcObjectState.DELETE})
             return
 
-        # Changed value
+        # Changed value — update ref tracking so `after` is recognized if seen again
+        before_id = id(before)
+        entry = self.refs.get(before_id)
+        if entry is not None and entry[0] is before:
+            ref_num = entry[1]
+            del self.refs[before_id]
+            self.refs[id(after)] = (after, ref_num)
+
         value_type = self._get_value_type(after)
         codec = self._get_rpc_codec(after)
         value = None if on_change is not None or codec is not None else self._get_primitive_value(after)
@@ -288,6 +295,10 @@ class RpcSendQueue:
             return 'org.openrewrite.java.tree.JavaType$Parameterized'
         if isinstance(obj, JavaType.Class):
             return 'org.openrewrite.java.tree.JavaType$Class'
+        if isinstance(obj, JavaType.Union):
+            return 'org.openrewrite.java.tree.JavaType$MultiCatch'
+        if isinstance(obj, JavaType.Intersection):
+            return 'org.openrewrite.java.tree.JavaType$Intersection'
 
         # Other enums don't need type info (they're serialized by name)
         if isinstance(obj, Enum):

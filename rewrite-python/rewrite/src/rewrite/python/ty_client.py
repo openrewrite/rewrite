@@ -156,14 +156,7 @@ class TyTypesClient:
             return True
 
         if self._initialized:
-            self._send_request("shutdown")
-            self._initialized = False
-            self._project_root = None
-            if self._process is not None:
-                try:
-                    self._process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    self._process.kill()
+            self.shutdown()
             self._start_process()
 
         result = self._send_request("initialize", {"projectRoot": project_root})

@@ -74,9 +74,6 @@ class PythonTypeMapping:
         method_type = mapping.method_invocation_type(call_node)
     """
 
-    # Cache for type mappings to avoid repeated class type creation
-    _type_cache: Dict[str, JavaType] = {}
-
     def __init__(self, source: str, file_path: Optional[str] = None, ty_client=None):
         """Initialize type mapping for a source file.
 
@@ -91,6 +88,7 @@ class PythonTypeMapping:
         self._file_path = file_path
         self._source_lines = source.splitlines()
         self._temp_file: Optional[Path] = None
+        self._type_cache: Dict[str, JavaType] = {}  # FQN -> JavaType (per-instance)
 
         # Compute line byte offsets for position conversion
         self._line_byte_offsets = self._compute_line_byte_offsets(source)
@@ -137,6 +135,8 @@ class PythonTypeMapping:
         """Ensure the source is available as a file on disk for ty-types.
 
         Returns the absolute file path, or None if unavailable.
+        When file_path is given but doesn't exist, writes source there.
+        Callers are responsible for providing safe paths (e.g. within a temp directory).
         """
         if file_path:
             path = Path(file_path)
@@ -144,9 +144,9 @@ class PythonTypeMapping:
                 path = path.resolve()
             if path.exists():
                 return str(path)
-            # File path given but doesn't exist — write source there
+            # File path given but doesn't exist — write source there.
+            # The parent directory must already exist (caller should ensure this).
             try:
-                path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(source, encoding='utf-8')
                 self._temp_file = path
                 return str(path)
@@ -177,7 +177,7 @@ class PythonTypeMapping:
     def _pos_to_byte_offset(self, lineno: int, col_offset: int) -> int:
         """Convert AST (lineno, col_offset) to an absolute byte offset.
 
-        Python's ast uses 1-based lineno and character-based col_offset.
+        Python's ast uses 1-based lineno and 0-based character col_offset (Python 3.8+).
         ty-types uses absolute byte offsets (ruff convention).
         """
         line_start = self._line_byte_offsets[lineno - 1]
@@ -276,7 +276,7 @@ class PythonTypeMapping:
         if type_id in self._cycle_placeholders:
             placeholder = self._cycle_placeholders.pop(type_id)
             if isinstance(result, JavaType.Class):
-                placeholder._fully_qualified_name = result._fully_qualified_name
+                placeholder._fully_qualified_name = result.fully_qualified_name
                 placeholder._kind = result._kind
                 # Copy enriched fields so cycle placeholders retain supertypes/methods
                 for attr in ('_supertype', '_methods', '_type_parameters', '_interfaces',
@@ -285,8 +285,8 @@ class PythonTypeMapping:
                     if val is not None:
                         setattr(placeholder, attr, val)
             elif isinstance(result, JavaType.Parameterized):
-                if hasattr(result._type, '_fully_qualified_name'):
-                    placeholder._fully_qualified_name = result._type._fully_qualified_name
+                if hasattr(result._type, 'fully_qualified_name'):
+                    placeholder._fully_qualified_name = result._type.fully_qualified_name
             self._type_id_cache[type_id] = placeholder
             return placeholder
 
@@ -351,7 +351,9 @@ class PythonTypeMapping:
             return JavaType.Primitive.String
 
         elif kind == 'union':
-            # Unwrap union: take first non-None type
+            # Resolve all non-None members into a Union type.
+            # For Optional[X] (= X | None) with a single real member, unwrap to just X.
+            resolved_bounds = []
             for member_id in descriptor.get('members', []):
                 member = self._type_registry.get(member_id)
                 if member:
@@ -359,8 +361,14 @@ class PythonTypeMapping:
                     # Skip None/NoneType members
                     if member_kind == 'instance' and member.get('className') in ('None', 'NoneType'):
                         continue
-                    return self._resolve_type(member_id)
-            return _UNKNOWN
+                    resolved = self._resolve_type(member_id)
+                    if resolved is not None:
+                        resolved_bounds.append(resolved)
+            if not resolved_bounds:
+                return _UNKNOWN
+            if len(resolved_bounds) == 1:
+                return resolved_bounds[0]
+            return JavaType.Union(_bounds=resolved_bounds)
 
         elif kind == 'module':
             module_name = descriptor.get('moduleName', '')
@@ -691,7 +699,12 @@ class PythonTypeMapping:
         return self._infer_declaring_type_from_ast(node)
 
     def _resolve_declaring_type(self, type_id: int) -> Optional[JavaType.FullyQualified]:
-        """Resolve a type ID to a declaring type, maximizing object reuse."""
+        """Resolve a type ID to a declaring type, maximizing object reuse.
+
+        NOTE: The cycle-detection pattern here mirrors _resolve_type intentionally.
+        They use separate caches and placeholder dicts because declaring types are
+        resolved independently (often to a simpler Class without methods/members).
+        """
         if type_id in self._declaring_type_id_cache:
             return self._declaring_type_id_cache[type_id]
 
@@ -720,7 +733,7 @@ class PythonTypeMapping:
         if type_id in self._declaring_cycle_placeholders:
             placeholder = self._declaring_cycle_placeholders.pop(type_id)
             if isinstance(result, JavaType.Class):
-                placeholder._fully_qualified_name = result._fully_qualified_name
+                placeholder._fully_qualified_name = result.fully_qualified_name
                 placeholder._kind = result._kind
             self._declaring_type_id_cache[type_id] = placeholder
             return placeholder

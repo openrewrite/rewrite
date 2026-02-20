@@ -203,7 +203,7 @@ class JavaType(ABC):
     class Class(FullyQualified):
         _flags_bit_map: int
         _fully_qualified_name: str
-        _kind: FullyQualified.Kind
+        _kind: JavaType.FullyQualified.Kind
         _type_parameters: Optional[List[JavaType]]
         _supertype: Optional[JavaType.FullyQualified]
         _owning_class: Optional[JavaType.FullyQualified]
@@ -211,6 +211,10 @@ class JavaType(ABC):
         _interfaces: Optional[List[JavaType.FullyQualified]]
         _members: Optional[List[JavaType.Variable]]
         _methods: Optional[List[JavaType.Method]]
+
+        @property
+        def fully_qualified_name(self) -> str:
+            return self._fully_qualified_name
 
     class ShallowClass(Class):
         pass
@@ -228,10 +232,10 @@ class JavaType(ABC):
             return self._type_parameters
 
         @property
-        def _fully_qualified_name(self) -> str:
+        def fully_qualified_name(self) -> str:
             t = getattr(self, '_type', None)
-            if t is not None and hasattr(t, '_fully_qualified_name'):
-                return t._fully_qualified_name
+            if t is not None and hasattr(t, 'fully_qualified_name'):
+                return t.fully_qualified_name
             return ''
 
     class GenericTypeVariable:
@@ -239,6 +243,24 @@ class JavaType(ABC):
             Invariant = 0
             Covariant = 1
             Contravariant = 2
+
+    @dataclass
+    class Union:
+        """Union type (e.g. str | int). Maps to JavaType$MultiCatch over RPC."""
+        _bounds: Optional[List[JavaType]] = field(default=None)
+
+        @property
+        def bounds(self) -> List[JavaType]:
+            return self._bounds if self._bounds is not None else []
+
+    @dataclass
+    class Intersection:
+        """Intersection type (e.g. A & B). Maps to JavaType$Intersection over RPC."""
+        _bounds: Optional[List[JavaType]] = field(default=None)
+
+        @property
+        def bounds(self) -> List[JavaType]:
+            return self._bounds if self._bounds is not None else []
 
     class Primitive(Enum):
         Boolean = 0
