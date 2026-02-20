@@ -45,6 +45,11 @@ public class DependencyWorkspace {
             System.getProperty("java.io.tmpdir"),
             "openrewrite-python-workspaces"
     );
+    /**
+     * Bump this when the workspace layout changes (e.g. new files expected)
+     * so that stale cached workspaces are automatically recreated.
+     */
+    private static final String WORKSPACE_VERSION = "2";
     private static final int MAX_CACHE_SIZE = 100;
     private static final Map<String, Path> cache = synchronizedMap(
             new LinkedHashMap<String, Path>(16, 0.75f, true) {
@@ -105,6 +110,10 @@ public class DependencyWorkspace {
 
                 // Install ty for type stubs
                 runCommand(tempDir, "uv", "pip", "install", "ty");
+
+                // Write workspace version for cache invalidation
+                Files.write(tempDir.resolve("version.txt"),
+                        WORKSPACE_VERSION.getBytes(StandardCharsets.UTF_8));
 
                 // Move to final location
                 try {
@@ -195,6 +204,10 @@ public class DependencyWorkspace {
                 // Install ty for type stubs (after freeze so it's not in the dep model)
                 runCommandWithPath(tempDir, uvPath, "pip", "install", "ty");
 
+                // Write workspace version for cache invalidation
+                Files.write(tempDir.resolve("version.txt"),
+                        WORKSPACE_VERSION.getBytes(StandardCharsets.UTF_8));
+
                 // Move to final location
                 try {
                     Files.move(tempDir, workspaceDir);
@@ -279,6 +292,10 @@ public class DependencyWorkspace {
                 // Install ty for type stubs (after freeze so it's not in the dep model)
                 runCommandWithPath(tempDir, uvPath, "pip", "install", "ty");
 
+                // Write workspace version for cache invalidation
+                Files.write(tempDir.resolve("version.txt"),
+                        WORKSPACE_VERSION.getBytes(StandardCharsets.UTF_8));
+
                 // Move to final location
                 try {
                     Files.move(tempDir, workspaceDir);
@@ -314,7 +331,8 @@ public class DependencyWorkspace {
     private static boolean isRequirementsWorkspaceValid(Path workspaceDir) {
         return Files.exists(workspaceDir) &&
                 Files.isDirectory(workspaceDir.resolve(".venv")) &&
-                Files.exists(workspaceDir.resolve("freeze.txt"));
+                Files.exists(workspaceDir.resolve("freeze.txt")) &&
+                hasCurrentVersion(workspaceDir);
     }
 
     private static void runCommandWithPath(Path dir, String uvPath, String... args) throws IOException, InterruptedException {
@@ -358,7 +376,21 @@ public class DependencyWorkspace {
     private static boolean isWorkspaceValid(Path workspaceDir) {
         return Files.exists(workspaceDir) &&
                 Files.isDirectory(workspaceDir.resolve(".venv")) &&
-                Files.exists(workspaceDir.resolve("pyproject.toml"));
+                Files.exists(workspaceDir.resolve("pyproject.toml")) &&
+                hasCurrentVersion(workspaceDir);
+    }
+
+    private static boolean hasCurrentVersion(Path workspaceDir) {
+        try {
+            Path versionFile = workspaceDir.resolve("version.txt");
+            if (!Files.exists(versionFile)) {
+                return false;
+            }
+            String version = new String(Files.readAllBytes(versionFile), StandardCharsets.UTF_8).trim();
+            return WORKSPACE_VERSION.equals(version);
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     private static void cleanupDirectory(Path dir) {
