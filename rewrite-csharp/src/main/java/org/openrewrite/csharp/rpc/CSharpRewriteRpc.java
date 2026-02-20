@@ -297,8 +297,13 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 index++;
 
                 // Use the Java CompilationUnit type name for codec lookup
-                SourceFile sourceFile = getObject(sourceFileId, Cs.CompilationUnit.class.getName());
-                action.accept(sourceFile);
+                try {
+                    SourceFile sourceFile = getObject(sourceFileId, Cs.CompilationUnit.class.getName());
+                    action.accept(sourceFile);
+                } catch (Exception e) {
+                    System.err.println("[DIAG] Failed to receive source file at index " + (index - 1) + " id=" + sourceFileId);
+                    throw e;
+                }
                 return true;
             }
 
