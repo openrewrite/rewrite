@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,6 +49,21 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
 
               sourceCompatibility = 11
               targetCompatibility = 1.8
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void toolchainOnly_default_does_not_add_if_missing() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.javaToolchain, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
               """
           )
         );
@@ -210,6 +225,166 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
                   }
               }
               """.formatted(afterCompatibility)
+          )
+        );
+    }
+
+
+    @Test
+    void javaToolchain_added_when_addIfMissingTrue() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(21, null, null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+              sourceCompatibility = 21
+              targetCompatibility = 21
+
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(21)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void javaToolchain_addIfMissingTrue_toolchainAddedToExistingJavaBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(21, UpdateJavaCompatibility.CompatibilityType.javaToolchain, null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              java {
+                  withJavadocJar()
+                  withSourcesJar()
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(21)
+                  }
+                  withJavadocJar()
+                  withSourcesJar()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void javaToolchain_isPresent_noModificationsNeeded() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(21, UpdateJavaCompatibility.CompatibilityType.javaToolchain, null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(21)
+                  }
+                  withJavadocJar()
+                  withSourcesJar()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void javaToolchain_version_upgrade_applied() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(21, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(8)
+                  }
+                  withJavadocJar()
+                  withSourcesJar()
+              }
+              sourceCompatibility = 8
+              targetCompatibility = 8
+              """,
+           """
+              plugins {
+                  id "java"
+              }
+
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(21)
+                  }
+                  withJavadocJar()
+                  withSourcesJar()
+              }
+              sourceCompatibility = 21
+              targetCompatibility = 21
+              """
+          )
+        );
+    }
+
+    @Test
+    void javaToolchain_version_downgrade_applied() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, true, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(21)
+                  }
+                  withJavadocJar()
+                  withSourcesJar()
+              }
+              sourceCompatibility = 21
+              targetCompatibility = 21
+              """,
+            """
+               plugins {
+                   id "java"
+               }
+ 
+               java {
+                   toolchain {
+                       languageVersion = JavaLanguageVersion.of(17)
+                   }
+                   withJavadocJar()
+                   withSourcesJar()
+               }
+               sourceCompatibility = 17
+               targetCompatibility = 17
+               """
           )
         );
     }
@@ -384,7 +559,13 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               sourceCompatibility = %s
               targetCompatibility = %s
 
-              """.formatted(sourceCompatibility, targetCompatibility)
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(%s)
+                  }
+              }
+              
+              """.formatted(sourceCompatibility, targetCompatibility, version)
           )
         );
     }
@@ -405,7 +586,13 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
                   id "java"
               }
               sourceCompatibility = 11
-
+              
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(11)
+                  }
+              }
+              
               """
           )
         );
@@ -427,7 +614,13 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
                   id "java"
               }
               targetCompatibility = 11
-
+              
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(11)
+                  }
+              }
+              
               """
           )
         );
@@ -520,10 +713,13 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   java
               }
-
+              sourceCompatibility = JavaVersion.VERSION_11
+              targetCompatibility = JavaVersion.VERSION_11
+              
               java {
-                  sourceCompatibility = JavaVersion.VERSION_11
-                  targetCompatibility = JavaVersion.VERSION_11
+                  toolchain {
+                      languageVersion.set(JavaLanguageVersion.of(11))
+                  }
               }
               """
           )
