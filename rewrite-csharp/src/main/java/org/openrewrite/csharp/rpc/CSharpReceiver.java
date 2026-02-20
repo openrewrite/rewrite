@@ -278,15 +278,23 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitPropertyDeclaration(Cs.PropertyDeclaration propertyDeclaration, RpcReceiveQueue q) {
-        return propertyDeclaration
-                .withAttributeLists(q.receiveList(propertyDeclaration.getAttributeLists(), el -> (Cs.AttributeList) visitNonNull(el, q)))
-                .withModifiers(q.receiveList(propertyDeclaration.getModifiers(), el -> (J.Modifier) visitNonNull(el, q)))
-                .withTypeExpression(q.receive(propertyDeclaration.getTypeExpression(), el -> (TypeTree) visitNonNull(el, q)))
-                .getPadding().withInterfaceSpecifier(q.receive(propertyDeclaration.getPadding().getInterfaceSpecifier(), el -> visitRightPadded(el, q)))
-                .withName(q.receive(propertyDeclaration.getName(), el -> (J.Identifier) visitNonNull(el, q)))
-                .withAccessors(q.receive(propertyDeclaration.getAccessors(), el -> (J.Block) visitNonNull(el, q)))
-                .getPadding().withExpressionBody(q.receive(propertyDeclaration.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q)))
+        propertyDeclaration = propertyDeclaration
+                .withAttributeLists(q.receiveList(propertyDeclaration.getAttributeLists(), el -> (Cs.AttributeList) visitNonNull(el, q)));
+        propertyDeclaration = propertyDeclaration
+                .withModifiers(q.receiveList(propertyDeclaration.getModifiers(), el -> (J.Modifier) visitNonNull(el, q)));
+        propertyDeclaration = propertyDeclaration
+                .withTypeExpression(q.receive(propertyDeclaration.getTypeExpression(), el -> (TypeTree) visitNonNull(el, q)));
+        propertyDeclaration = propertyDeclaration
+                .getPadding().withInterfaceSpecifier(q.receive(propertyDeclaration.getPadding().getInterfaceSpecifier(), el -> visitRightPadded(el, q)));
+        propertyDeclaration = propertyDeclaration
+                .withName(q.receive(propertyDeclaration.getName(), el -> (J.Identifier) visitNonNull(el, q)));
+        propertyDeclaration = propertyDeclaration
+                .withAccessors(q.receive(propertyDeclaration.getAccessors(), el -> (J.Block) visitNonNull(el, q)));
+        propertyDeclaration = propertyDeclaration
+                .getPadding().withExpressionBody(q.receive(propertyDeclaration.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q)));
+        propertyDeclaration = propertyDeclaration
                 .getPadding().withInitializer(q.receive(propertyDeclaration.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
+        return propertyDeclaration;
     }
 
     @Override

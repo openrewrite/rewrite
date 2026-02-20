@@ -29,6 +29,9 @@ import org.openrewrite.internal.NamingService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 import org.openrewrite.rpc.request.Print;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
@@ -8574,4 +8577,242 @@ public interface Cs extends J {
             }
         }
     }
+
+    // region C# Marker classes
+
+    @RequiredArgsConstructor
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    @Getter
+    @With
+    final class DelegateInvocation implements Marker, RpcCodec<DelegateInvocation> {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Override
+        public void rpcSend(DelegateInvocation after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+        }
+
+        @Override
+        public DelegateInvocation rpcReceive(DelegateInvocation before, RpcReceiveQueue q) {
+            return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+        }
+    }
+
+    @RequiredArgsConstructor
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    @Getter
+    @With
+    final class PrimaryConstructor implements Marker, RpcCodec<PrimaryConstructor> {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Override
+        public void rpcSend(PrimaryConstructor after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+        }
+
+        @Override
+        public PrimaryConstructor rpcReceive(PrimaryConstructor before, RpcReceiveQueue q) {
+            return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+        }
+    }
+
+    @RequiredArgsConstructor
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    @Getter
+    @With
+    final class Struct implements Marker, RpcCodec<Struct> {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Override
+        public void rpcSend(Struct after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+        }
+
+        @Override
+        public Struct rpcReceive(Struct before, RpcReceiveQueue q) {
+            return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+        }
+    }
+
+    @RequiredArgsConstructor
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    @Getter
+    @With
+    final class RecordClass implements Marker, RpcCodec<RecordClass> {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Override
+        public void rpcSend(RecordClass after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+        }
+
+        @Override
+        public RecordClass rpcReceive(RecordClass before, RpcReceiveQueue q) {
+            return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+        }
+    }
+
+    @RequiredArgsConstructor
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    @Getter
+    @With
+    final class ExpressionBodied implements Marker, RpcCodec<ExpressionBodied> {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Override
+        public void rpcSend(ExpressionBodied after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+        }
+
+        @Override
+        public ExpressionBodied rpcReceive(ExpressionBodied before, RpcReceiveQueue q) {
+            return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+        }
+    }
+
+    @RequiredArgsConstructor
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    @Getter
+    @With
+    final class AnonymousMethod implements Marker, RpcCodec<AnonymousMethod> {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Override
+        public void rpcSend(AnonymousMethod after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+        }
+
+        @Override
+        public AnonymousMethod rpcReceive(AnonymousMethod before, RpcReceiveQueue q) {
+            return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+        }
+    }
+
+    @RequiredArgsConstructor
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    @Getter
+    @With
+    final class Implicit implements Marker, RpcCodec<Implicit> {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Override
+        public void rpcSend(Implicit after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+        }
+
+        @Override
+        public Implicit rpcReceive(Implicit before, RpcReceiveQueue q) {
+            return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+        }
+    }
+
+    @RequiredArgsConstructor
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    @Getter
+    @With
+    final class NullCoalescing implements Marker, RpcCodec<NullCoalescing> {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Override
+        public void rpcSend(NullCoalescing after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+        }
+
+        @Override
+        public NullCoalescing rpcReceive(NullCoalescing before, RpcReceiveQueue q) {
+            return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+        }
+    }
+
+    @RequiredArgsConstructor
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    @Getter
+    @With
+    final class MultiDimensionalArray implements Marker, RpcCodec<MultiDimensionalArray> {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Override
+        public void rpcSend(MultiDimensionalArray after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+        }
+
+        @Override
+        public MultiDimensionalArray rpcReceive(MultiDimensionalArray before, RpcReceiveQueue q) {
+            return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+        }
+    }
+
+    @RequiredArgsConstructor
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    @Getter
+    @With
+    final class ConditionalBranchMarker implements Marker, RpcCodec<ConditionalBranchMarker> {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        List<String> definedSymbols;
+
+        @Override
+        public void rpcSend(ConditionalBranchMarker after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+            q.getAndSendList(after, ConditionalBranchMarker::getDefinedSymbols,
+                    s -> s, s -> q.getAndSend(s, x -> x));
+        }
+
+        @Override
+        public ConditionalBranchMarker rpcReceive(ConditionalBranchMarker before, RpcReceiveQueue q) {
+            return before
+                    .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                    .withDefinedSymbols(q.receiveList(before.getDefinedSymbols(),
+                            s -> q.<String, String>receiveAndGet(s, java.util.function.Function.identity())));
+        }
+    }
+
+    @RequiredArgsConstructor
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    @Getter
+    @With
+    final class DirectiveBoundaryMarker implements Marker, RpcCodec<DirectiveBoundaryMarker> {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        List<Integer> directiveIndices;
+
+        @Override
+        public void rpcSend(DirectiveBoundaryMarker after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+            q.getAndSendList(after, DirectiveBoundaryMarker::getDirectiveIndices,
+                    Object::toString, i -> q.getAndSend(i, Object::toString));
+        }
+
+        @Override
+        public DirectiveBoundaryMarker rpcReceive(DirectiveBoundaryMarker before, RpcReceiveQueue q) {
+            return before
+                    .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                    .withDirectiveIndices(q.receiveList(before.getDirectiveIndices(),
+                            idx -> q.<Integer, String>receiveAndGet(idx, Integer::valueOf)));
+        }
+    }
+
+    // endregion
 }
