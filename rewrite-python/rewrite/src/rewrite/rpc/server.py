@@ -318,19 +318,28 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
 
 def handle_parse(params: dict) -> List[str]:
     """Handle a Parse RPC request."""
+    import tempfile
+    import shutil
+
     inputs = params.get('inputs', [])
     relative_to = params.get('relativeTo')
     results = []
 
-    # Create a ty-types client for this parse batch, initialized with the project root
+    # Create a ty-types client for this parse batch
     ty_client = None
-    if relative_to:
-        try:
-            from rewrite.python.ty_client import TyTypesClient
-            ty_client = TyTypesClient()
+    tmpdir = None
+    try:
+        from rewrite.python.ty_client import TyTypesClient
+        ty_client = TyTypesClient()
+        if relative_to:
             ty_client.initialize(relative_to)
-        except (ImportError, RuntimeError):
-            pass  # ty-types not available
+        else:
+            # For inline text inputs without a project root, create a temp directory
+            # so ty-types can still provide type attribution
+            tmpdir = tempfile.mkdtemp(prefix='rewrite-parse-')
+            ty_client.initialize(tmpdir)
+    except (ImportError, RuntimeError):
+        ty_client = None  # ty-types not available
 
     try:
         for i, input_item in enumerate(inputs):
@@ -341,7 +350,16 @@ def handle_parse(params: dict) -> List[str]:
             elif 'text' in input_item or 'source' in input_item:
                 source = input_item.get('text') or input_item.get('source')
                 path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-                result = parse_python_source(source, path, relative_to, ty_client)
+                if tmpdir and not os.path.isabs(path):
+                    # Write source to temp dir so ty-types can analyze it
+                    disk_path = os.path.join(tmpdir, path)
+                    os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                    with open(disk_path, 'w', encoding='utf-8') as f:
+                        f.write(source)
+                    # Use tmpdir as relative_to so the LST source_path stays relative
+                    result = parse_python_source(source, disk_path, tmpdir, ty_client)
+                else:
+                    result = parse_python_source(source, path, relative_to, ty_client)
             else:
                 logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
                 continue
@@ -349,6 +367,8 @@ def handle_parse(params: dict) -> List[str]:
     finally:
         if ty_client is not None:
             ty_client.shutdown()
+        if tmpdir is not None:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
     return results
 
