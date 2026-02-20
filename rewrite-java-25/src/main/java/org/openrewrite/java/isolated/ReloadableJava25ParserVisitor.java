@@ -1775,8 +1775,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = convert(vartype);
         }
 
-        if (typeExpr == null && node.declaredUsingVar()) {
-            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", typeMapping.type(vartype), null);
+        if (typeExpr == null && (node.declaredUsingVar() ||
+                ((node.sym.flags() & Flags.MATCH_BINDING) != 0 && source.startsWith("var", indexOfNextNonWhitespace(cursor, source))))) {
+            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", vartype != null ? typeMapping.type(vartype) : typeMapping.type(node.sym.type), null);
         }
 
         if (typeExpr != null && !typeExprAnnotations.isEmpty()) {
