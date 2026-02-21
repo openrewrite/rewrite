@@ -27,6 +27,7 @@ import logging
 import os
 import select
 import sys
+import tempfile
 import traceback
 import threading
 from pathlib import Path
@@ -35,7 +36,7 @@ from uuid import uuid4
 
 # Configure logging - log to file by default to avoid filling stderr buffer
 # (which can cause deadlock if parent process doesn't read stderr)
-_default_log_file = '/tmp/python-rpc.log'
+_default_log_file = os.path.join(tempfile.gettempdir(), 'python-rpc.log')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
