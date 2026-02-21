@@ -20,11 +20,13 @@ concurrency:
 
 jobs:
   build:
-    uses: openrewrite/gh-automation/.github/workflows/ci-gradle.yml@main
+    uses: openrewrite/gh-automation/.github/workflows/ci-gradle-blacksmith.yml@main
     with:
+      runs_on: blacksmith-4vcpu-ubuntu-2404
       java_version: |
         25
         21
+      rerun_tasks: true
     secrets:
       gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       sonatype_username: ${{ secrets.SONATYPE_USERNAME }}
