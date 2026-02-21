@@ -116,10 +116,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     }
                     if ("value".equals(attributeName())) {
                         String attrVal = newAttributeValue.contains(",") && attributeIsArray(a) ? getAttributeValuesAsArray(a) : newAttributeValue;
-                        return JavaTemplate.apply("#{}", getCursor(), a.getCoordinates().replaceArguments(), attrVal);
+                        return getJavaTemplate("#{}").apply(getCursor(), a.getCoordinates().replaceArguments(), attrVal);
                     }
                     String attrVal = newAttributeValue.contains(",") && attributeIsArray(a) ? getAttributeValuesAsString(a) : newAttributeValue;
-                    return JavaTemplate.apply("#{} = #{}", getCursor(), a.getCoordinates().replaceArguments(), attributeName, attrVal);
+                    return getJavaTemplate("#{} = #{}").apply(getCursor(), a.getCoordinates().replaceArguments(), attributeName, attrVal);
                 }
 
                 // UPDATE the value when the annotation has arguments, e.g. @Foo(name="old") to `@Foo(name="new")
@@ -199,7 +199,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         return as.withAssignment(createNewArrayWithExistingAndNew(annotation, (J.FieldAccess) exp, getAttributeValues(annotation)));
                     }
                     //noinspection ConstantConditions
-                    return JavaTemplate.<J.Annotation>apply("#{} = #{}", getCursor(), as.getCoordinates().replace(), var_.getSimpleName(), newAttributeValue)
+                    return getJavaTemplate("#{} = #{}").<J.Annotation>apply(getCursor(), as.getCoordinates().replace(), var_.getSimpleName(), newAttributeValue)
                             .getArguments().get(annotation.getArguments().indexOf(as));
                 }
                 return as;
@@ -248,11 +248,22 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             getAttributeValues(annotation).stream().map(String::valueOf).collect(joining(",", "{", "}")) :
                             newAttributeValue;
                     //noinspection ConstantConditions
-                    return JavaTemplate.<J.Annotation>apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), attrVal)
+                    return getJavaTemplate("#{}").<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), attrVal)
                             .getArguments().get(0);
                 }
                 // Make the attribute name explicit, before we add the new value below
                 return createAnnotationAssignment(annotation, "value", fieldAccess);
+            }
+
+            private JavaTemplate getJavaTemplate(String template) {
+                JavaTemplate.Builder builder = JavaTemplate.builder(template);
+                if (isFullyQualifiedClass()) {
+                    JavaType.ShallowClass fqn = JavaType.ShallowClass.build(attributeValue.substring(0, attributeValue.length() - 6));
+                    builder
+                            .javaParser(JavaParser.fromJavaVersion().dependsOn(String.format("package %s;\npublic interface %s {}\n", fqn.getPackageName(), fqn.getClassName())))
+                            .imports(fqn.getFullyQualifiedName());
+                }
+                return builder.build();
             }
 
             private @Nullable Expression update(J.NewArray arrayValue, J.Annotation annotation, @Nullable String newAttributeValue) {
@@ -268,13 +279,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             private Expression createAnnotationLiteral(J.Annotation annotation, String newAttributeValue) {
                 String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ? getAttributeValuesAsString(annotation) : newAttributeValue;
                 //noinspection ConstantConditions
-                return JavaTemplate.<J.Annotation>apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), attrVal)
+                return getJavaTemplate("#{}").<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), attrVal)
                         .getArguments().get(0);
             }
 
             private J.Assignment createAnnotationAssignment(J.Annotation annotation, String name, @Nullable Object parameter) {
                 //noinspection ConstantConditions
-                return (J.Assignment) JavaTemplate.<J.Annotation>apply(name + " = " + (parameter instanceof J ? "#{any()}" : "#{}"), getCursor(), annotation.getCoordinates().replaceArguments(), parameter)
+                return (J.Assignment) getJavaTemplate(name + " = " + (parameter instanceof J ? "#{any()}" : "#{}")).<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), parameter)
                         .getArguments().get(0);
             }
 
@@ -290,7 +301,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 }
                 // Use a template to create the array structure, then replace the initializer
                 //noinspection ConstantConditions
-                J.NewArray template = (J.NewArray) JavaTemplate.<J.Annotation>apply("{#{any()}}", getCursor(), annotation.getCoordinates().replaceArguments(), existingLiteral)
+                J.NewArray template = (J.NewArray) getJavaTemplate("{#{any()}}").<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), existingLiteral)
                         .getArguments().get(0);
                 return template.withInitializer(initializer);
             }
@@ -302,19 +313,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 // Add new values, skipping duplicates - use template for non-string values
                 for (String attribute : newValues) {
                     if (!attributeNameOrValIsAlreadyPresent(initializer, singleton(attribute))) {
-                        JavaTemplate.Builder templateBuilder = JavaTemplate.builder("#{}");
                         String templateValue = attribute;
                         // For FQ classes, add stub so type info is resolved and use FQ name in template
                         if (isFullyQualifiedClass()) {
-                            String fqClassName = attributeValue.substring(0, attributeValue.length() - 6);
-                            String packageName = fqClassName.substring(0, fqClassName.lastIndexOf('.'));
-                            String simpleName = fqClassName.substring(fqClassName.lastIndexOf('.') + 1);
-                            templateBuilder = templateBuilder.javaParser(JavaParser.fromJavaVersion()
-                                    .dependsOn("package " + packageName + "; public class " + simpleName + " {}"));
-                            templateValue = fqClassName + ".class";
+                            templateValue = getFullyQualifiedClass(attributeValue);
                         }
                         //noinspection ConstantConditions
-                        Expression newExpr = templateBuilder.build().<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), templateValue)
+                        Expression newExpr = getJavaTemplate("#{}").<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), templateValue)
                                 .getArguments().get(0).withPrefix(SINGLE_SPACE);
                         initializer.add(newExpr);
                     }

@@ -2902,6 +2902,95 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void appendClassValueToExistingNamedClassAttributeWithImport() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "classes",
+            "org.example.data.SomeData.class",
+            null,
+            null,
+            true
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?>[] classes();
+              }
+              """
+          ),
+          java(
+            """
+                package org.example.data;
+                public interface SomeData {
+                }
+                """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(classes = Integer.class)
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+              import org.example.data.SomeData;
+              
+              @Foo(classes = {Integer.class, SomeData.class})
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void createClassValueAttributeWithImportNonJvmType() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "classes",
+            "org.example.data.SomeData.class",
+            null,
+            null,
+            true
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?>[] classes();
+                  String name;
+              }
+              """
+          ),
+          java(
+            """
+                package org.example.data;
+                public interface SomeData {
+                }
+                """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(name = "name")
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+              import org.example.data.SomeData;
+              
+              @Foo(classes = SomeData.class, name = "name")
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
     void dottedStringValueIsNotTreatedAsEnum() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
