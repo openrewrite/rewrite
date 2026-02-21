@@ -266,8 +266,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 if (configuredToChangeManagedDependency) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
                             oldGroupId, oldArtifactId,
-                            Optional.ofNullable(newGroupId).orElse(oldGroupId),
-                            Optional.ofNullable(newArtifactId).orElse(oldArtifactId),
+                            newGroupId,
+                            newArtifactId,
                             newVersion, versionPattern).getVisitor());
                 }
                 // Update any exclusions that reference the old coordinates
