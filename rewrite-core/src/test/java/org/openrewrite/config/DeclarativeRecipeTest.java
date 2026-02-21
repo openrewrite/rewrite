@@ -740,4 +740,254 @@ class DeclarativeRecipeTest implements RewriteTest {
             .hasMessageContaining("RecipeB")
             .hasMessageContaining("RecipeC");
     }
+
+    @Test
+    void programmaticInlinePrecondition() {
+        rewriteRun(
+          spec -> {
+              spec.validateRecipeSerialization(false);
+              // Create a nested DeclarativeRecipe with inline precondition
+              DeclarativeRecipe nested = new DeclarativeRecipe("nested", "nested", "nested", emptySet(),
+                null, URI.create("test"), false, emptyList());
+              nested.addPrecondition(new FindSourceFiles("**/target.txt"));
+              nested.addUninitialized(new ChangeText("changed"));
+              nested.initialize(List.of());
+
+              // Verify preconditions were initialized
+              assertThat(nested.getPreconditions()).hasSize(1);
+
+              // Create parent DeclarativeRecipe that contains the nested one
+              DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+                null, URI.create("null"), false, emptyList());
+              dr.addUninitialized(nested);
+              dr.initialize(List.of());
+              spec.recipe(dr);
+          },
+          text("original", "changed", spec -> spec.path("target.txt")),
+          text("original", spec -> spec.path("other.txt"))
+        );
+    }
+
+    @Test
+    void yamlInlinePrecondition() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.InlinePreconditionTest
+            description: Test inline preconditions.
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                  toText: changed
+                  preconditions:
+                    - org.openrewrite.FindSourceFiles:
+                        filePattern: "**/target.txt"
+            """, "org.openrewrite.InlinePreconditionTest"),
+          text("original", "changed", spec -> spec.path("target.txt")),
+          text("original", spec -> spec.path("other.txt"))
+        );
+    }
+
+    @Test
+    void yamlMultipleInlinePreconditions() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.MultipleInlinePreconditionsTest
+            description: Test multiple recipes with different inline preconditions.
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                  toText: xml-changed
+                  preconditions:
+                    - org.openrewrite.FindSourceFiles:
+                        filePattern: "**/*.xml"
+              - org.openrewrite.text.ChangeText:
+                  toText: json-changed
+                  preconditions:
+                    - org.openrewrite.FindSourceFiles:
+                        filePattern: "**/*.json"
+            """, "org.openrewrite.MultipleInlinePreconditionsTest"),
+          text("original", "xml-changed", spec -> spec.path("config.xml")),
+          text("original", "json-changed", spec -> spec.path("data.json")),
+          text("original", spec -> spec.path("readme.txt"))
+        );
+    }
+
+    @Test
+    void yamlTopLevelPreconditionWithWrapperRecipe() {
+        // This tests that top-level preconditions work correctly
+        // when there are no inline preconditions on the recipe.
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.TopLevelWithWrapperTest
+            description: Test top-level preconditions with wrapper.
+            preconditions:
+              - org.openrewrite.text.Find:
+                  find: needle
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                  toText: changed
+            """, "org.openrewrite.TopLevelWithWrapperTest"),
+          text("needle", "changed"),  // Has needle -> top-level passes -> changed
+          text("haystack")  // No needle -> top-level fails -> NOT changed
+        );
+    }
+
+    @Test
+    void yamlInlineAndTopLevelPreconditions() {
+        // Test that both top-level AND inline preconditions must be satisfied
+        // Top-level: Find "needle"
+        // Inline: FindSourceFiles "**/target.txt"
+        // Only the first file (has needle, at target.txt) should be changed
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.CombinedPreconditionsTest
+            description: Test combination of top-level and inline preconditions.
+            preconditions:
+              - org.openrewrite.text.Find:
+                  find: needle
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                  toText: changed
+                  preconditions:
+                    - org.openrewrite.FindSourceFiles:
+                        filePattern: "**/target.txt"
+            """, "org.openrewrite.CombinedPreconditionsTest"),
+          // Has needle, at target.txt -> BOTH preconditions pass -> changed
+          text("needle", "changed", spec -> spec.path("target.txt")),
+          // Has needle, NOT at target.txt -> top-level passes, inline fails -> NOT changed
+          text("needle", spec -> spec.path("other.txt")),
+          // NO needle, at target.txt -> top-level fails -> NOT changed (regardless of inline)
+          text("haystack", spec -> spec.path("also-target.txt"))
+        );
+    }
+
+    @Test
+    void yamlInlinePreconditionWithScanningRecipe() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.InlineScanningPreconditionTest
+            description: Test inline preconditions with scanning recipe.
+            recipeList:
+              - org.openrewrite.text.FindAndReplace:
+                  find: foo
+                  replace: bar
+                  preconditions:
+                    - org.openrewrite.search.RepositoryContainsFile:
+                        filePattern: pom.xml
+            """, "org.openrewrite.InlineScanningPreconditionTest"),
+          text("pom", spec -> spec.path("pom.xml")),
+          text("foo", "bar")
+        );
+    }
+
+    @Test
+    void yamlTwoInlinePreconditionsOnSingleRecipe() {
+        // Both inline preconditions must be satisfied (AND logic)
+        // Precondition 1: file must match "**/target.txt"
+        // Precondition 2: file content must contain "needle"
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.TwoInlinePreconditionsTest
+            description: Test two inline preconditions on a single recipe.
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                  toText: changed
+                  preconditions:
+                    - org.openrewrite.FindSourceFiles:
+                        filePattern: "**/target.txt"
+                    - org.openrewrite.text.Find:
+                        find: needle
+            """, "org.openrewrite.TwoInlinePreconditionsTest"),
+          // Matches both preconditions -> changed
+          text("needle", "changed", spec -> spec.path("target.txt")),
+          // Matches file pattern but NOT content -> NOT changed
+          text("haystack", spec -> spec.path("target.txt")),
+          // Matches content but NOT file pattern -> NOT changed
+          text("needle", spec -> spec.path("other.txt")),
+          // Matches neither -> NOT changed
+          text("haystack", spec -> spec.path("other.txt"))
+        );
+    }
+
+    @Test
+    void yamlInlinePreconditionNotMet() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.InlinePreconditionNotMetTest
+            description: Test inline preconditions when not met.
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                  toText: changed
+                  preconditions:
+                    - org.openrewrite.FindSourceFiles:
+                        filePattern: "**/nonexistent.txt"
+            """, "org.openrewrite.InlinePreconditionNotMetTest"),
+          text("original")
+        );
+    }
+
+    @Test
+    void yamlMixedRecipesWithAndWithoutPreconditions() {
+        // Test that recipes without preconditions run unconditionally,
+        // while recipes with preconditions only run when their preconditions are met
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.MixedPreconditionsTest
+            description: Test recipes with and without inline preconditions.
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                  toText: conditional-changed
+                  preconditions:
+                    - org.openrewrite.FindSourceFiles:
+                        filePattern: "**/target.txt"
+              - org.openrewrite.text.FindAndReplace:
+                  find: unconditional
+                  replace: replaced
+            """, "org.openrewrite.MixedPreconditionsTest"),
+          text("unconditional", "replaced", spec -> spec.path("any.txt")),
+          text("unconditional", "conditional-changed", spec -> spec.path("target.txt"))
+        );
+    }
+
+    @Test
+    void yamlInlinePreconditionWithDeclarativeRecipe() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.InlinePreconditionWithDeclarativeTest
+            description: Test inline preconditions with declarative recipe reference.
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                  toText: changed
+                  preconditions:
+                    - org.openrewrite.FindAnyTarget
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.FindAnyTarget
+            recipeList:
+              - org.openrewrite.FindSourceFiles:
+                  filePattern: "**/target1.txt"
+              - org.openrewrite.FindSourceFiles:
+                  filePattern: "**/target2.txt"
+            """, "org.openrewrite.InlinePreconditionWithDeclarativeTest"),
+          text("original", "changed", spec -> spec.path("target1.txt")),
+          text("original", "changed", spec -> spec.path("target2.txt")),
+          text("original", spec -> spec.path("other.txt"))
+        );
+    }
 }
