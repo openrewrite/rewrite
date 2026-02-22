@@ -318,12 +318,16 @@ class DeprecatedMethodScanner {
         pattern.append(function.getName());
         pattern.append("(");
 
-        List<KmValueParameter> params = function.getValueParameters();
-        if (!params.isEmpty()) {
-            pattern.append(params.stream()
-              .map(p -> typeToPattern(p.getType()))
-              .collect(joining(", ")));
+        StringJoiner paramJoiner = new StringJoiner(", ");
+        // Extension functions have a receiver type that becomes the first JVM parameter
+        KmType receiverType = function.getReceiverParameterType();
+        if (receiverType != null) {
+            paramJoiner.add(typeToPattern(receiverType));
         }
+        for (KmValueParameter param : function.getValueParameters()) {
+            paramJoiner.add(typeToPattern(param.getType()));
+        }
+        pattern.append(paramJoiner);
         pattern.append(")");
 
         return pattern.toString();

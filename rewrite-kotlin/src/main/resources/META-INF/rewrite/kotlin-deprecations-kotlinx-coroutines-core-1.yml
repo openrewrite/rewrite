@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-# Recipes generated for `@Deprecated` methods with `ReplaceWith` in `org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1`
+# Recipes generated for `@Deprecated` methods with `ReplaceWith` in `org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2`
 #
 
 ---
@@ -25,6 +25,24 @@ description: >-
   Automatically generated recipes to replace deprecated Kotlin methods based on
   `@Deprecated(replaceWith=ReplaceWith(...))` annotations.
 recipeList:
+  # @Deprecated("Use the overload that also accepts the `value` and the coroutine context in lambda", ReplaceWith("resume(value) { cause, _, _ -> onCancellation(cause) }"), DeprecationLevel.WARNING)
+  - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
+      methodPattern: 'kotlinx.coroutines.CancellableContinuation resume(.., kotlin.Function1)'
+      replacement: 'resume(value) { cause, _, _ -> onCancellation(cause) }'
+      classpathFromResources:
+        - 'kotlinx-coroutines-core-jvm-1'
+  # @Deprecated("Deprecated for good. Override 'limitedParallelism(parallelism: Int, name: String?)' instead", ReplaceWith("limitedParallelism(parallelism, null)"), DeprecationLevel.HIDDEN)
+  - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
+      methodPattern: 'kotlinx.coroutines.CoroutineDispatcher limitedParallelism(kotlin.Int)'
+      replacement: 'limitedParallelism(parallelism, null)'
+      classpathFromResources:
+        - 'kotlinx-coroutines-core-jvm-1'
+  # @Deprecated("This function does not do what its name implies: it will not cancel the future if just cancel() was called.", ReplaceWith("this.invokeOnCancellation { future.cancel(false) }"), DeprecationLevel.WARNING)
+  - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
+      methodPattern: 'kotlinx.coroutines.JobKt cancelFutureOnCancellation(kotlinx.coroutines.CancellableContinuation, java.util.concurrent.Future)'
+      replacement: 'this.invokeOnCancellation { future.cancel(false) }'
+      classpathFromResources:
+        - 'kotlinx-coroutines-core-jvm-1'
   # @Deprecated("Deprecated in the favour of 'receiveCatching'", ReplaceWith("receiveCatching().getOrNull()"), DeprecationLevel.HIDDEN)
   - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
       methodPattern: 'kotlinx.coroutines.channels.ChannelsKt receiveOrNull(kotlinx.coroutines.channels.ReceiveChannel, kotlin.coroutines.Continuation)'
@@ -67,10 +85,10 @@ recipeList:
       replacement: 'trySend(element).isSuccess'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
-  # @Deprecated("Flow analogue of 'cache()' is 'shareIn' with unlimited replay and 'started = SharingStared.Lazily' argument'", ReplaceWith("this.shareIn(scope, Int.MAX_VALUE, started = SharingStared.Lazily)"), DeprecationLevel.ERROR)
+  # @Deprecated("Flow analogue of 'cache()' is 'shareIn' with unlimited replay and 'started = SharingStarted.Lazily' argument'", ReplaceWith("this.shareIn(scope, started = SharingStarted.Lazily, replay = Int.MAX_VALUE)"), DeprecationLevel.ERROR)
   - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
       methodPattern: 'kotlinx.coroutines.flow.FlowKt cache(kotlinx.coroutines.flow.Flow)'
-      replacement: 'this.shareIn(scope, Int.MAX_VALUE, started = SharingStared.Lazily)'
+      replacement: 'this.shareIn(scope, started = SharingStarted.Lazily, replay = Int.MAX_VALUE)'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
   # @Deprecated("Flow analogue of 'combineLatest' is 'combine'", ReplaceWith("this.combine(other, transform)"), DeprecationLevel.ERROR)
@@ -181,25 +199,25 @@ recipeList:
       replacement: 'catch { e -> if (predicate(e)) emit(fallback) else throw e }'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
-  # @Deprecated("Flow analogue of 'publish()' is 'shareIn'.  publish().connect() is the default strategy (no extra call is needed),  publish().autoConnect() translates to 'started = SharingStared.Lazily' argument,  publish().refCount() translates to 'started = SharingStared.WhileSubscribed()' argument.", ReplaceWith("this.shareIn(scope, 0)"), DeprecationLevel.ERROR)
+  # @Deprecated("Flow analogue of 'publish()' is 'shareIn'.  publish().connect() is the default strategy (no extra call is needed),  publish().autoConnect() translates to 'started = SharingStarted.Lazily' argument,  publish().refCount() translates to 'started = SharingStarted.WhileSubscribed()' argument.", ReplaceWith("this.shareIn(scope, 0)"), DeprecationLevel.ERROR)
   - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
       methodPattern: 'kotlinx.coroutines.flow.FlowKt publish(kotlinx.coroutines.flow.Flow)'
       replacement: 'this.shareIn(scope, 0)'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
-  # @Deprecated("Flow analogue of 'publish(bufferSize)' is 'buffer' followed by 'shareIn'.  publish().connect() is the default strategy (no extra call is needed),  publish().autoConnect() translates to 'started = SharingStared.Lazily' argument,  publish().refCount() translates to 'started = SharingStared.WhileSubscribed()' argument.", ReplaceWith("this.buffer(bufferSize).shareIn(scope, 0)"), DeprecationLevel.ERROR)
+  # @Deprecated("Flow analogue of 'publish(bufferSize)' is 'buffer' followed by 'shareIn'.  publish().connect() is the default strategy (no extra call is needed),  publish().autoConnect() translates to 'started = SharingStarted.Lazily' argument,  publish().refCount() translates to 'started = SharingStarted.WhileSubscribed()' argument.", ReplaceWith("this.buffer(bufferSize).shareIn(scope, 0)"), DeprecationLevel.ERROR)
   - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
       methodPattern: 'kotlinx.coroutines.flow.FlowKt publish(kotlinx.coroutines.flow.Flow, kotlin.Int)'
       replacement: 'this.buffer(bufferSize).shareIn(scope, 0)'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
-  # @Deprecated("Flow analogue of 'replay()' is 'shareIn' with unlimited replay.  replay().connect() is the default strategy (no extra call is needed),  replay().autoConnect() translates to 'started = SharingStared.Lazily' argument,  replay().refCount() translates to 'started = SharingStared.WhileSubscribed()' argument.", ReplaceWith("this.shareIn(scope, Int.MAX_VALUE)"), DeprecationLevel.ERROR)
+  # @Deprecated("Flow analogue of 'replay()' is 'shareIn' with unlimited replay.  replay().connect() is the default strategy (no extra call is needed),  replay().autoConnect() translates to 'started = SharingStarted.Lazily' argument,  replay().refCount() translates to 'started = SharingStarted.WhileSubscribed()' argument.", ReplaceWith("this.shareIn(scope, Int.MAX_VALUE)"), DeprecationLevel.ERROR)
   - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
       methodPattern: 'kotlinx.coroutines.flow.FlowKt replay(kotlinx.coroutines.flow.Flow)'
       replacement: 'this.shareIn(scope, Int.MAX_VALUE)'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
-  # @Deprecated("Flow analogue of 'replay(bufferSize)' is 'shareIn' with the specified replay parameter.  replay().connect() is the default strategy (no extra call is needed),  replay().autoConnect() translates to 'started = SharingStared.Lazily' argument,  replay().refCount() translates to 'started = SharingStared.WhileSubscribed()' argument.", ReplaceWith("this.shareIn(scope, bufferSize)"), DeprecationLevel.ERROR)
+  # @Deprecated("Flow analogue of 'replay(bufferSize)' is 'shareIn' with the specified replay parameter.  replay().connect() is the default strategy (no extra call is needed),  replay().autoConnect() translates to 'started = SharingStarted.Lazily' argument,  replay().refCount() translates to 'started = SharingStarted.WhileSubscribed()' argument.", ReplaceWith("this.shareIn(scope, bufferSize)"), DeprecationLevel.ERROR)
   - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
       methodPattern: 'kotlinx.coroutines.flow.FlowKt replay(kotlinx.coroutines.flow.Flow, kotlin.Int)'
       replacement: 'this.shareIn(scope, bufferSize)'
@@ -241,51 +259,51 @@ recipeList:
       replacement: 'this.flatMapLatest(transform)'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
-  # @Deprecated("cancel() is resolved into the extension of outer CoroutineScope which is likely to be an error.Use currentCoroutineContext().cancel() instead or specify the receiver of cancel() explicitly", ReplaceWith("currentCoroutineContext().cancel(cause)"), DeprecationLevel.ERROR)
+  # @Deprecated("cancel() is resolved into the extension of outer CoroutineScope which is likely to be an error. Use currentCoroutineContext().cancel() instead or specify the receiver of cancel() explicitly", ReplaceWith("currentCoroutineContext().cancel(cause)"), DeprecationLevel.ERROR)
   - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
-      methodPattern: 'kotlinx.coroutines.flow.LintKt cancel(java.util.concurrent.CancellationException)'
+      methodPattern: 'kotlinx.coroutines.flow.LintKt cancel(kotlinx.coroutines.flow.FlowCollector, java.util.concurrent.CancellationException)'
       replacement: 'currentCoroutineContext().cancel(cause)'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
   # @Deprecated("Applying 'cancellable' to a SharedFlow has no effect. See the SharedFlow documentation on Operator Fusion.", ReplaceWith("this"), DeprecationLevel.ERROR)
   - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
-      methodPattern: 'kotlinx.coroutines.flow.LintKt cancellable()'
+      methodPattern: 'kotlinx.coroutines.flow.LintKt cancellable(kotlinx.coroutines.flow.SharedFlow)'
       replacement: 'this'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
   # @Deprecated("SharedFlow never completes, so this operator typically has not effect, it can only catch exceptions from 'onSubscribe' operator", ReplaceWith("this"), DeprecationLevel.WARNING)
   - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
-      methodPattern: 'kotlinx.coroutines.flow.LintKt catch(*)'
+      methodPattern: 'kotlinx.coroutines.flow.LintKt catch(kotlinx.coroutines.flow.SharedFlow, *)'
       replacement: 'this'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
   # @Deprecated("Applying 'conflate' to StateFlow has no effect. See the StateFlow documentation on Operator Fusion.", ReplaceWith("this"), DeprecationLevel.ERROR)
   - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
-      methodPattern: 'kotlinx.coroutines.flow.LintKt conflate()'
+      methodPattern: 'kotlinx.coroutines.flow.LintKt conflate(kotlinx.coroutines.flow.StateFlow)'
       replacement: 'this'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
   # @Deprecated("Applying 'distinctUntilChanged' to StateFlow has no effect. See the StateFlow documentation on Operator Fusion.", ReplaceWith("this"), DeprecationLevel.ERROR)
   - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
-      methodPattern: 'kotlinx.coroutines.flow.LintKt distinctUntilChanged()'
+      methodPattern: 'kotlinx.coroutines.flow.LintKt distinctUntilChanged(kotlinx.coroutines.flow.StateFlow)'
       replacement: 'this'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
   # @Deprecated("Applying 'flowOn' to SharedFlow has no effect. See the SharedFlow documentation on Operator Fusion.", ReplaceWith("this"), DeprecationLevel.ERROR)
   - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
-      methodPattern: 'kotlinx.coroutines.flow.LintKt flowOn(kotlin.coroutines.CoroutineContext)'
+      methodPattern: 'kotlinx.coroutines.flow.LintKt flowOn(kotlinx.coroutines.flow.SharedFlow, kotlin.coroutines.CoroutineContext)'
       replacement: 'this'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
   # @Deprecated("SharedFlow never completes, so this operator has no effect.", ReplaceWith("this"), DeprecationLevel.WARNING)
   - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
-      methodPattern: 'kotlinx.coroutines.flow.LintKt retry(kotlin.Long, *)'
+      methodPattern: 'kotlinx.coroutines.flow.LintKt retry(kotlinx.coroutines.flow.SharedFlow, kotlin.Long, *)'
       replacement: 'this'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
   # @Deprecated("SharedFlow never completes, so this operator has no effect.", ReplaceWith("this"), DeprecationLevel.WARNING)
   - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
-      methodPattern: 'kotlinx.coroutines.flow.LintKt retryWhen(*)'
+      methodPattern: 'kotlinx.coroutines.flow.LintKt retryWhen(kotlinx.coroutines.flow.SharedFlow, *)'
       replacement: 'this'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'
@@ -295,5 +313,11 @@ recipeList:
       replacement: 'onTimeout'
       imports:
         - 'kotlinx.coroutines.selects.onTimeout'
+      classpathFromResources:
+        - 'kotlinx-coroutines-core-jvm-1'
+  # @Deprecated("Use the overload that also accepts the `value` and the coroutine context in lambda", ReplaceWith("resume(value) { cause, _, _ -> onCancellation(cause) }"), DeprecationLevel.WARNING)
+  - org.openrewrite.kotlin.replace.ReplaceKotlinMethod:
+      methodPattern: 'kotlinx.coroutines.sync.MutexImpl$CancellableContinuationWithOwner resume(kotlin.Unit, kotlin.Function1)'
+      replacement: 'resume(value) { cause, _, _ -> onCancellation(cause) }'
       classpathFromResources:
         - 'kotlinx-coroutines-core-jvm-1'

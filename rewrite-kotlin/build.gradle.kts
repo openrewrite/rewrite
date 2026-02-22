@@ -31,15 +31,15 @@ dependencies {
     testImplementation("com.google.testing.compile:compile-testing:0.+")
 
     // Kotlin libraries for KotlinDeprecationRecipeGenerator
-    testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
-    testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.3")
+    testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.0")
 }
 
 recipeDependencies {
     // Kotlin libraries with @Deprecated(replaceWith=ReplaceWith(...)) annotations
     // Use the JVM variant artifact names since Kotlin multiplatform resolves to these
-    testParserClasspath("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.8.1")
-    testParserClasspath("org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.6.3")
+    testParserClasspath("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2")
+    testParserClasspath("org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.8.0")
 }
 
 java {
