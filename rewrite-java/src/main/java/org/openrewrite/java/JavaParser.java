@@ -446,7 +446,11 @@ class JdkParserBuilderCache {
             // We recommend running on LTS versions wherever possible; non-LTS versions may struggle given the above.
             // e.g.: Java 23+ changed the return type of `DocCommentTable.getCommentTree` from `DCDocComment` to `DocCommentTree`
 
-            if (version >= 25) {
+            if (version >= 26) {
+                supplier = tryCreateBuilderSupplier("org.openrewrite.java.JavaNextParser");
+            }
+
+            if (supplier == null && version >= 25) {
                 supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java25Parser");
             }
 
@@ -472,7 +476,7 @@ class JdkParserBuilderCache {
             }
 
             throw new IllegalStateException("Unable to create a Java parser instance. " +
-                    "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, `rewrite-java-21`, or `rewrite-java-25` must be on the classpath.");
+                    "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, `rewrite-java-21`, `rewrite-java-25`, or `rewrite-java-next` must be on the classpath.");
         }
     }
 
