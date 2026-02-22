@@ -16,7 +16,7 @@ jobs:
     uses: openrewrite/gh-automation/.github/workflows/publish-gradle.yml@main
     with:
       java_version: |
-        26
+        26-ea
         25
         21
     secrets:
