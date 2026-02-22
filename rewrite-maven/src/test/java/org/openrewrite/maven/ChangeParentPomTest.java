@@ -1564,6 +1564,69 @@ class ChangeParentPomTest implements RewriteTest {
               )
             );
         }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/6770")
+        @Test
+        void bringsDownRemovedManagedVersionFromGrandparent() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeParentPom(
+                "org.springframework.boot", "org.springframework.boot",
+                "spring-boot-starter-parent", "spring-boot-starter-parent",
+                "4.0.2",
+                null, null, null, null, null)),
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany</groupId>
+                      <artifactId>child</artifactId>
+                      <version>1.0.0-SNAPSHOT</version>
+                      <parent>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-parent</artifactId>
+                          <version>3.5.9</version>
+                          <relativePath/>
+                      </parent>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.retry</groupId>
+                          <artifactId>spring-retry</artifactId>
+                        </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany</groupId>
+                      <artifactId>child</artifactId>
+                      <version>1.0.0-SNAPSHOT</version>
+                      <parent>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-parent</artifactId>
+                          <version>4.0.2</version>
+                          <relativePath/>
+                      </parent>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>org.springframework.retry</groupId>
+                                  <artifactId>spring-retry</artifactId>
+                                  <version>2.0.12</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.retry</groupId>
+                          <artifactId>spring-retry</artifactId>
+                        </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1753")
