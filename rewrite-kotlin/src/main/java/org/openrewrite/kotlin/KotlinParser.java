@@ -22,7 +22,9 @@ import kotlin.jvm.functions.Function1;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
+import org.jetbrains.kotlin.KtPsiSourceFile;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
+import org.jetbrains.kotlin.KtSourceFile;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
@@ -32,7 +34,12 @@ import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
 import org.jetbrains.kotlin.cli.jvm.compiler.VfsBasedProjectEnvironment;
 import org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt;
+import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFir2IrPipelineArtifact;
+import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFir2IrPipelinePhase;
+import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFrontendPipelineArtifact;
 import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFrontendPipelinePhase;
+import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector;
+import org.jetbrains.kotlin.diagnostics.impl.SimpleDiagnosticsCollector;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
 import org.jetbrains.kotlin.com.intellij.openapi.util.text.StringUtilRt;
@@ -49,9 +56,13 @@ import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.pipeline.AnalyseKt;
+import org.jetbrains.kotlin.fir.pipeline.FirResult;
 import org.jetbrains.kotlin.fir.pipeline.FirUtilsKt;
+import org.jetbrains.kotlin.fir.pipeline.ModuleCompilerAnalyzedOutput;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
+import org.jetbrains.kotlin.ir.declarations.IrFile;
+import org.jetbrains.kotlin.ir.declarations.IrModuleFragment;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
 import org.jetbrains.kotlin.modules.Module;
@@ -448,7 +459,39 @@ public class KotlinParser implements Parser {
             kotlinSources.get(i).setFirFile(result.getSecond().get(i));
         }
 
+        // FIR-to-IR conversion
+        try {
+            ModuleCompilerAnalyzedOutput moduleOutput = new ModuleCompilerAnalyzedOutput(
+                    firSession, result.getFirst(), result.getSecond());
+            FirResult firResult = new FirResult(singletonList(moduleOutput));
+
+            List<KtSourceFile> sourceFiles = new ArrayList<>(ktFiles.size());
+            for (KtFile ktFile : ktFiles) {
+                sourceFiles.add(new KtPsiSourceFile(ktFile));
+            }
+
+            JvmFrontendPipelineArtifact frontendArtifact = new JvmFrontendPipelineArtifact(
+                    firResult, compilerConfiguration, projectEnvironment,
+                    new SimpleDiagnosticsCollector(BaseDiagnosticsCollector.RawReporter.Companion.getDO_NOTHING()),
+                    sourceFiles);
+
+            JvmFir2IrPipelineArtifact fir2IrArtifact =
+                    JvmFir2IrPipelinePhase.INSTANCE.executePhase(frontendArtifact);
+
+            IrModuleFragment irModule = fir2IrArtifact.getResult().getIrModuleFragment();
+            Map<String, IrFile> irFilesByName = new HashMap<>();
+            for (IrFile irFile : irModule.getFiles()) {
+                irFilesByName.put(irFile.getFileEntry().getName(), irFile);
+            }
+            for (KotlinSource kotlinSource : kotlinSources) {
+                kotlinSource.setIrFile(irFilesByName.get(kotlinSource.getKtFile().getName()));
+            }
+        } catch (Throwable ignored) {
+            // FIR-to-IR conversion is best-effort; irFile will remain null
+        }
+
         return new CompiledSource(firSession, kotlinSources);
+
     }
 
     private Module buildModule(CompilerConfiguration compilerConfiguration) {
