@@ -134,15 +134,21 @@ class RecipeSpec:
     # Whether to allow empty diffs (recipe modifies AST but printed output unchanged)
     allow_empty_diff: bool = False
 
+    # Whether to enable type attribution via ty-types.
+    # Set to False for pure parse/print tests to avoid the ty-types subprocess overhead.
+    type_attribution: bool = True
+
     def with_recipe(self, recipe: Recipe) -> "RecipeSpec":
         return RecipeSpec(recipe=recipe, execution_context=self.execution_context,
                           check_parse_print_idempotence=self.check_parse_print_idempotence,
-                          allow_empty_diff=self.allow_empty_diff)
+                          allow_empty_diff=self.allow_empty_diff,
+                          type_attribution=self.type_attribution)
 
     def with_allow_empty_diff(self, value: bool) -> "RecipeSpec":
         return RecipeSpec(recipe=self.recipe, execution_context=self.execution_context,
                           check_parse_print_idempotence=self.check_parse_print_idempotence,
-                          allow_empty_diff=value)
+                          allow_empty_diff=value,
+                          type_attribution=self.type_attribution)
 
     def with_recipes(self, *recipes: Recipe) -> "RecipeSpec":
         if len(recipes) == 1:
@@ -233,14 +239,39 @@ class RecipeSpec:
 
     def _parse_python(self, source: str, source_path: Path) -> CompilationUnit:
         """Parse Python source code into a CompilationUnit."""
+        import tempfile
+        import os
         from rewrite.python._parser_visitor import ParserVisitor
 
-        visitor = ParserVisitor(source)
-        # Strip BOM before passing to ast.parse (ParserVisitor does this internally)
-        source_for_ast = source[1:] if source.startswith('\ufeff') else source
-        tree = ast.parse(source_for_ast)
-        cu = visitor.visit_Module(tree)
-        return cu.replace(source_path=source_path)
+        # Write source to a temp file so ty-types can analyze it
+        ty_client = None
+        tmp_dir = None
+        file_path = None
+        if self.type_attribution:
+            try:
+                from rewrite.python.ty_client import TyTypesClient
+                tmp_dir = tempfile.mkdtemp()
+                file_path = os.path.join(tmp_dir, source_path.name if source_path.name else 'test.py')
+                with open(file_path, 'w') as f:
+                    f.write(source)
+                ty_client = TyTypesClient()
+                ty_client.initialize(tmp_dir)
+            except (ImportError, RuntimeError):
+                file_path = None
+
+        try:
+            visitor = ParserVisitor(source, file_path, ty_client)
+            # Strip BOM before passing to ast.parse (ParserVisitor does this internally)
+            source_for_ast = source[1:] if source.startswith('\ufeff') else source
+            tree = ast.parse(source_for_ast)
+            cu = visitor.visit_Module(tree)
+            return cu.replace(source_path=source_path)
+        finally:
+            if ty_client is not None:
+                ty_client.shutdown()
+            if tmp_dir is not None:
+                import shutil
+                shutil.rmtree(tmp_dir, ignore_errors=True)
 
     def _expect_no_parse_failures(
         self, parsed: List[Tuple[SourceSpec, SourceFile]]

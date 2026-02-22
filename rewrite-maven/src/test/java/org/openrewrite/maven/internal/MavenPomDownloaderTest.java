@@ -356,7 +356,6 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
-        @Disabled
         @Test
         void dontFetchSnapshotsFromReleaseRepos() throws Exception {
             try (MockWebServer snapshotRepo = new MockWebServer();
@@ -461,6 +460,50 @@ class MavenPomDownloaderTest implements RewriteTest {
 
                 assertThat(snapshotRepo.getRequestCount()).isGreaterThan(1);
                 assertThat(metadataPaths.get()).isEqualTo(0);
+            }
+        }
+
+        @Test
+        void datedSnapshotVersionIncludesSnapshotRepositories() throws Exception {
+            try (MockWebServer snapshotRepo = new MockWebServer()) {
+                snapshotRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        MockResponse response = new MockResponse().setResponseCode(200);
+                        if (request.getPath() != null && request.getPath().endsWith(".pom")) {
+                            //language=xml
+                            response.setBody(
+                              """
+                                <project>
+                                    <groupId>com.example</groupId>
+                                    <artifactId>my-lib</artifactId>
+                                    <version>3.28.0-SNAPSHOT</version>
+                                </project>
+                                """
+                            );
+                        }
+                        return response;
+                    }
+                });
+
+                snapshotRepo.start();
+
+                var downloader = new MavenPomDownloader(emptyMap(), ctx);
+                var snapshotRepoModel = MavenRepository.builder()
+                  .id("snapshots")
+                  .uri("http://%s:%d".formatted(snapshotRepo.getHostName(), snapshotRepo.getPort()))
+                  .releases("false")
+                  .snapshots(true)
+                  .build();
+
+                // A dated snapshot version should be recognized as a snapshot so that
+                // snapshot-only repositories are not excluded.
+                Pom pom = downloader.download(
+                  new GroupArtifactVersion("com.example", "my-lib", "3.28.0-20260220.175218-20"),
+                  null, null, List.of(snapshotRepoModel));
+
+                assertThat(pom).isNotNull();
+                assertThat(snapshotRepo.getRequestCount()).isGreaterThan(0);
             }
         }
 

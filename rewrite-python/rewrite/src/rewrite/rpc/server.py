@@ -27,6 +27,7 @@ import logging
 import os
 import select
 import sys
+import tempfile
 import traceback
 import threading
 from pathlib import Path
@@ -35,7 +36,7 @@ from uuid import uuid4
 
 # Configure logging - log to file by default to avoid filling stderr buffer
 # (which can cause deadlock if parent process doesn't read stderr)
-_default_log_file = '/tmp/python-rpc.log'
+_default_log_file = os.path.join(tempfile.gettempdir(), 'python-rpc.log')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -209,14 +210,14 @@ def generate_id() -> str:
     return str(uuid4())
 
 
-def parse_python_file(path: str, relative_to: Optional[str] = None) -> dict:
+def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=None) -> dict:
     """Parse a Python file and return its LST."""
     with open(path, 'r', encoding='utf-8') as f:
         source = f.read()
-    return parse_python_source(source, path, relative_to)
+    return parse_python_source(source, path, relative_to, ty_client)
 
 
-def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None) -> dict:
+def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None, ty_client=None) -> dict:
     """Parse Python source code and return its LST.
 
     The parser used depends on the REWRITE_PYTHON_VERSION environment variable:
@@ -241,7 +242,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             try:
                 source_for_ast = source[1:] if source.startswith('\ufeff') else source
                 tree = ast.parse(source_for_ast, path)
-                cu = ParserVisitor(source, path).visit(tree)
+                cu = ParserVisitor(source, path, ty_client).visit(tree)
             except SyntaxError:
                 from rewrite.python._py2_parser_visitor import Py2ParserVisitor
                 cu = Py2ParserVisitor(source, path, _python_version).parse()
@@ -256,7 +257,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             tree = ast.parse(source_for_ast, path)
 
             # Convert to OpenRewrite LST
-            cu = ParserVisitor(source, path).visit(tree)
+            cu = ParserVisitor(source, path, ty_client).visit(tree)
 
         cu = cu.replace(source_path=source_path)
         cu = cu.replace(markers=Markers.EMPTY)
@@ -269,15 +270,13 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             'sourceFileType': 'org.openrewrite.python.tree.Py$CompilationUnit'
         }
     except ImportError as e:
-        logger.error(f"Failed to import parser: {e}")
-        traceback.print_exc()
+        logger.exception(f"Failed to import parser: {e}")
         return _create_parse_error(str(source_path), str(e), source)
     except SyntaxError as e:
         logger.error(f"Syntax error parsing {path}: {e}")
         return _create_parse_error(str(source_path), str(e), source)
     except Exception as e:
-        logger.error(f"Error parsing {path}: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error parsing {path}: {e}")
         return _create_parse_error(str(source_path), str(e), source)
 
 
@@ -318,28 +317,92 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError'}
 
 
+def _infer_project_root(inputs: list) -> Optional[str]:
+    """Infer the project root from input paths.
+
+    When relativeTo is not provided, look at the input paths to find a
+    directory that contains a .venv or pyproject.toml — this is likely
+    the project root that ty-types should use.
+    """
+    for item in inputs:
+        path = None
+        if isinstance(item, str):
+            path = item
+        elif isinstance(item, dict):
+            path = item.get('sourcePath') or item.get('path')
+        if path and os.path.isabs(path):
+            parent = os.path.dirname(path)
+            # Walk up looking for a project root marker
+            for _ in range(10):
+                if os.path.isdir(os.path.join(parent, '.venv')) or \
+                   os.path.isfile(os.path.join(parent, 'pyproject.toml')):
+                    return parent
+                up = os.path.dirname(parent)
+                if up == parent:
+                    break
+                parent = up
+    return None
+
+
 def handle_parse(params: dict) -> List[str]:
     """Handle a Parse RPC request."""
+    import tempfile
+    import shutil
+
     inputs = params.get('inputs', [])
     relative_to = params.get('relativeTo')
     results = []
 
-    for i, input_item in enumerate(inputs):
-        if isinstance(input_item, str):
-            # PathInput serialized via @JsonValue as a bare path string
-            result = parse_python_file(input_item, relative_to)
-        elif 'path' in input_item:
-            # File input as dict
-            result = parse_python_file(input_item['path'], relative_to)
-        elif 'text' in input_item or 'source' in input_item:
-            # String input - Java sends 'text' and 'sourcePath'
-            source = input_item.get('text') or input_item.get('source')
-            path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-            result = parse_python_source(source, path, relative_to)
+    # If no relativeTo provided, try to infer from absolute input paths
+    if not relative_to:
+        relative_to = _infer_project_root(inputs)
+
+    # Create a ty-types client for this parse batch
+    ty_client = None
+    tmpdir = None
+    try:
+        from rewrite.python.ty_client import TyTypesClient
+        ty_client = TyTypesClient()
+        if relative_to:
+            ty_client.initialize(relative_to)
         else:
-            logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
-            continue
-        results.append(result['id'])
+            # For inline text inputs without a project root, create a temp directory
+            # so ty-types can still provide type attribution
+            tmpdir = tempfile.mkdtemp(prefix='rewrite-parse-')
+            ty_client.initialize(tmpdir)
+    except (ImportError, RuntimeError):
+        ty_client = None  # ty-types not available
+
+    try:
+        for i, input_item in enumerate(inputs):
+            if isinstance(input_item, str):
+                result = parse_python_file(input_item, relative_to, ty_client)
+            elif 'path' in input_item:
+                result = parse_python_file(input_item['path'], relative_to, ty_client)
+            elif 'text' in input_item or 'source' in input_item:
+                source = input_item.get('text') or input_item.get('source')
+                path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
+                # For relative paths, write the source under the project root
+                # (tmpdir or relative_to) so ty-types can resolve imports from
+                # the project's .venv and dependencies.
+                base_dir = tmpdir or relative_to
+                if base_dir and not os.path.isabs(path):
+                    disk_path = os.path.join(base_dir, path)
+                    os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                    with open(disk_path, 'w', encoding='utf-8') as f:
+                        f.write(source)
+                    result = parse_python_source(source, disk_path, base_dir, ty_client)
+                else:
+                    result = parse_python_source(source, path, relative_to, ty_client)
+            else:
+                logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
+                continue
+            results.append(result['id'])
+    finally:
+        if ty_client is not None:
+            ty_client.shutdown()
+        if tmpdir is not None:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
     return results
 
@@ -349,23 +412,34 @@ def handle_parse_project(params: dict) -> List[dict]:
     import fnmatch
 
     project_path = params.get('projectPath', '.')
-    exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info'])
+    exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne'])
     relative_to = params.get('relativeTo') or project_path
 
     results = []
 
-    for root, dirs, files in os.walk(project_path):
-        # Filter out excluded directories
-        dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, excl) for excl in exclusions)]
+    ty_client = None
+    try:
+        from rewrite.python.ty_client import TyTypesClient
+        ty_client = TyTypesClient()
+        ty_client.initialize(project_path)
+    except (ImportError, RuntimeError):
+        pass
 
-        for file in files:
-            if file.endswith('.py'):
-                path = os.path.join(root, file)
-                try:
-                    result = parse_python_file(path, relative_to)
-                    results.append(result)
-                except Exception as e:
-                    logger.error(f"Error parsing {path}: {e}")
+    try:
+        for root, dirs, files in os.walk(project_path):
+            dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, excl) for excl in exclusions)]
+
+            for file in files:
+                if file.endswith('.py'):
+                    path = os.path.join(root, file)
+                    try:
+                        result = parse_python_file(path, relative_to, ty_client)
+                        results.append(result)
+                    except Exception as e:
+                        logger.error(f"Error parsing {path}: {e}")
+    finally:
+        if ty_client is not None:
+            ty_client.shutdown()
 
     return results
 
@@ -409,9 +483,7 @@ def handle_get_object(params: dict) -> List[dict]:
 
     except BaseException as e:
         source_path = getattr(obj, 'source_path', None)
-        logger.error(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
-        import traceback as tb
-        tb.print_exc()
+        logger.exception(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
         return [{'state': 'END_OF_OBJECT'}]
 
 
@@ -488,13 +560,6 @@ def handle_reset(params: dict) -> bool:
     _execution_contexts.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
-
-    # Reset TyLspClient if it was initialized
-    try:
-        from rewrite.python.ty_client import TyLspClient
-        TyLspClient.reset()
-    except ImportError:
-        pass  # ty not available
 
     logger.info("Reset: cleared all cached state")
     return True
@@ -1356,8 +1421,7 @@ def main():
                     'result': result
                 }
             except Exception as e:
-                logger.error(f"Error handling request: {e}")
-                traceback.print_exc()
+                logger.exception(f"Error handling request: {e}")
                 # Include full stack trace in error response for debugging
                 tb_str = traceback.format_exc()
                 response = {
@@ -1376,16 +1440,10 @@ def main():
             write_message(response)
 
         except Exception as e:
-            logger.error(f"Fatal error: {e}")
-            traceback.print_exc()
+            logger.exception(f"Fatal error: {e}")
             break
 
-    # Shutdown TyLspClient if it was initialized
-    try:
-        from rewrite.python.ty_client import TyLspClient
-        TyLspClient.reset()
-    except ImportError:
-        pass  # ty not available
+    # No ty-types cleanup needed here — clients are scoped per parse batch
 
     logger.info("Python RPC server shutting down...")
 
