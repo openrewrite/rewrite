@@ -111,6 +111,9 @@ public class ReloadableJavaNextParser implements JavaParser {
         Options.instance(context).put("-proc", "none");
         Options.instance(context).put("-parameters", "true");
 
+        // Enable preview features so the parser can handle upcoming language features
+        Options.instance(context).put("--enable-preview", "");
+
         // Ensure type attribution continues despite errors in individual files or nodes.
         // If an error occurs in a single file or node, type attribution should still proceed
         // for all other source files and unaffected nodes within the same file.
