@@ -129,7 +129,7 @@ public class DeleteProperty extends Recipe {
                     for (int i = 1; i < entries.size(); i++) {
                         Yaml.Sequence.Entry entry = entries.get(i);
                         Yaml.Sequence.Entry prevEntry = entries.get(i - 1);
-                        if (!startsWithNewline(entry.getPrefix()) && !endsWithBlockScalar(prevEntry.getBlock())) {
+                        if (!containsNewline(entry.getPrefix()) && !endsWithBlockScalar(prevEntry.getBlock())) {
                             if (fixedEntries == null) {
                                 fixedEntries = new ArrayList<>(entries);
                             }
@@ -178,7 +178,7 @@ public class DeleteProperty extends Recipe {
                     } else {
                         if (entries.isEmpty() && firstDeletedPrefix != null && containsOnlyWhitespace(entry.getPrefix())) {
                             entry = entry.withPrefix(firstDeletedPrefix);
-                        } else if (previousWasDeleted && !entries.isEmpty() && !startsWithNewline(entry.getPrefix())) {
+                        } else if (previousWasDeleted && !entries.isEmpty() && !containsNewline(entry.getPrefix())) {
                             entry = entry.withPrefix("\n" + entry.getPrefix());
                         }
                         entries.add(entry);
@@ -206,7 +206,7 @@ public class DeleteProperty extends Recipe {
                     for (int i = 1; i < currentEntries.size(); i++) {
                         Yaml.Mapping.Entry entry = currentEntries.get(i);
                         Yaml.Mapping.Entry prevEntry = currentEntries.get(i - 1);
-                        if (!startsWithNewline(entry.getPrefix()) && !endsWithBlockScalar(prevEntry)) {
+                        if (!containsNewline(entry.getPrefix()) && !endsWithBlockScalar(prevEntry)) {
                             if (fixedEntries == null) {
                                 fixedEntries = new ArrayList<>(currentEntries);
                             }
@@ -238,8 +238,8 @@ public class DeleteProperty extends Recipe {
         return true;
     }
 
-    private static boolean startsWithNewline(@Nullable String str) {
-        return str != null && !str.isEmpty() && str.charAt(0) == '\n';
+    private static boolean containsNewline(@Nullable String str) {
+        return str != null && str.indexOf('\n') >= 0;
     }
 
     private static boolean endsWithBlockScalar(Yaml.Mapping.Entry entry) {
