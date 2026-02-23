@@ -83,20 +83,19 @@ public class ChangeDependencyArtifactId extends Recipe {
             GradleProject gradleProject;
 
             @Override
-            public @org.jspecify.annotations.Nullable J visit(@org.jspecify.annotations.Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile sf = (JavaSourceFile) tree;
                     Optional<GradleProject> maybeGp = sf.getMarkers().findFirst(GradleProject.class);
-                    if (!maybeGp.isPresent()) {
-                        return (J) tree;
+                    if (maybeGp.isPresent()) {
+                        gradleProject = maybeGp.get();
+                        J result = super.visit(tree, ctx);
+                        if (result != tree && result instanceof JavaSourceFile) {
+                            JavaSourceFile updated = (JavaSourceFile) result;
+                            return updated.withMarkers(updated.getMarkers().setByType(updateGradleModel(gradleProject)));
+                        }
                     }
-                    gradleProject = maybeGp.get();
-                    J result = super.visit(tree, ctx);
-                    if (result != tree && result instanceof JavaSourceFile) {
-                        JavaSourceFile updated = (JavaSourceFile) result;
-                        result = updated.withMarkers(updated.getMarkers().setByType(updateGradleModel(gradleProject)));
-                    }
-                    return result;
+                    return sf;
                 }
                 return super.visit(tree, ctx);
             }
