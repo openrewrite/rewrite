@@ -141,7 +141,7 @@ class ParseError(SourceFile):
         return self if erroneous is self._erroneous else replace(self, _erroneous=erroneous)
 
     def printer(self, cursor: Cursor) -> TreeVisitor[Tree, PrintOutputCapture[P]]:
-        return PrinterFactory.current().create_printer(cursor)
+        return PrinterFactory.current().create_printer(cursor)  # ty: ignore[unresolved-attribute]  # PrinterFactory.current() is always set
 
     def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool:
         return v.is_adaptable_to(ParseErrorVisitor)
@@ -155,7 +155,7 @@ class ParseErrorVisitor(TreeVisitor[Tree, P]):
         return isinstance(source_file, ParseError)
 
     def visit_parse_error(self, e: ParseError, p: P) -> ParseError:
-        return e.replace(markers=self.visit_markers(e.markers, p))
+        return e.replace(markers=self.visit_markers(e.markers, p))  # ty: ignore[unresolved-attribute]
 
 
 class Parser(ABC):

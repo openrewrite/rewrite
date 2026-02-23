@@ -19,6 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.table.DistinctGitProvenance;
@@ -36,7 +39,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.marker.GitProvenance.AutoCRLF.False;
@@ -129,6 +131,35 @@ class RecipeEstimatedEffortTest implements RewriteTest {
           ));
     }
 
+    @CsvSource({
+      "'foo is here', 'bar is here', 10",           // Only recipe1 applies
+      "'baz is here', 'qux is here', 5",            // Only recipe2 applies
+      "'foo and baz are here', 'bar and qux are here', 15" // Both recipes apply
+    })
+    @ParameterizedTest
+    void estimatedTimeSavingsForMultipleRecipes(String beforeContent, String afterContent, int expectedMinutes) {
+        // Create composite recipe with 2 recipes that have different estimated efforts
+        Recipe recipe1 = new CustomEstimatedEffortFindReplaceRecipe("foo", "bar", Duration.ofMinutes(10));
+        Recipe recipe2 = new CustomEstimatedEffortFindReplaceRecipe("baz", "qux", Duration.ofMinutes(5));
+        Recipe compositeRecipe = new CompositeRecipe(List.of(recipe1, recipe2));
+
+        rewriteRun(
+          spec -> spec.recipe(compositeRecipe)
+            .afterRecipe(run -> {
+                List<Result> results = run.getChangeset().getAllResults();
+                assertThat(results).hasSize(1);
+                assertThat(results.getFirst().getTimeSavings()).isEqualTo(Duration.ofMinutes(expectedMinutes));
+            })
+            .dataTable(SourcesFileResults.Row.class, rows -> {
+                long totalEstimatedTimeSaving = rows.stream()
+                    .mapToLong(SourcesFileResults.Row::getEstimatedTimeSaving)
+                    .sum();
+                assertThat(totalEstimatedTimeSaving).isEqualTo(expectedMinutes * 60L);
+            }),
+          text(beforeContent, afterContent)
+        );
+    }
+
     private static void assertEstimatedEffortInFirstRowOfSourceFileResults(List<SourcesFileResults.Row> rows, Long expectedEstimatedEffort) {
         assertThat(rows)
           .first()
@@ -160,7 +191,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
                 public PlainText visitText(PlainText text, ExecutionContext ctx) {
                     for (AlreadyReplaced alreadyReplaced : text.getMarkers().findAll(AlreadyReplaced.class)) {
                         if (Objects.equals(searchTerm, alreadyReplaced.getFind()) &&
-                          Objects.equals(appendText, alreadyReplaced.getReplace())) {
+                            Objects.equals(appendText, alreadyReplaced.getReplace())) {
                             return text;
                         }
                     }
@@ -178,6 +209,43 @@ class RecipeEstimatedEffortTest implements RewriteTest {
         @Override
         public Duration getEstimatedEffortPerOccurrence() {
             return Duration.ofMinutes(15);
+        }
+    }
+
+    @EqualsAndHashCode(callSuper = false)
+    @Value
+    private static class CustomEstimatedEffortFindReplaceRecipe extends Recipe {
+        String find;
+        String replace;
+        Duration estimatedEffort;
+
+        @Override
+        public String getDisplayName() {
+            return "Simple text replace";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Replaces text in files";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    String newText = text.getText().replace(find, replace);
+                    if (!newText.equals(text.getText())) {
+                        return text.withText(newText);
+                    }
+                    return text;
+                }
+            };
+        }
+
+        @Override
+        public Duration getEstimatedEffortPerOccurrence() {
+            return estimatedEffort;
         }
     }
 
@@ -219,7 +287,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
             if (shouldCreate.get()) {
                 return PlainTextParser.builder().build().parse(fileContents)
                   .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Path.of(relativeFileName)))
-                  .collect(toList());
+                  .toList();
             }
             return emptyList();
         }

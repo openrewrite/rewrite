@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "target": "es2016",
     "baseUrl": ".",
     "paths": {
       "@openrewrite/rewrite": ["./src/index.ts"],

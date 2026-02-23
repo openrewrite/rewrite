@@ -34,6 +34,15 @@ import {create as produce} from "mutative";
 import {mapAsync, ParserInput, SourceFile} from "../../../src";
 import {J} from "../../../src/java";
 
+class RemoveSpacesVisitor<P> extends JavaScriptVisitor<P> {
+    override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
+        const ret = await super.visitSpace(space, p) as J.Space;
+        return ret && produce(ret, draft => {
+            draft.whitespace = "";
+        });
+    }
+}
+
 describe('MinimumViableSpacingVisitor', () => {
     const spec = new RecipeSpec()
     spec.checkParsePrintIdempotence = false;
@@ -46,17 +55,8 @@ describe('MinimumViableSpacingVisitor', () => {
                 super({});
             }
 
-            static RemoveSpaces = class <P> extends JavaScriptVisitor<P> {
-                override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
-                    const ret = await super.visitSpace(space, p) as J.Space;
-                    return ret && produce(ret, draft => {
-                        draft.whitespace = "";
-                    });
-                }
-            }
-
             override async *parse(...inputs: ParserInput[]): AsyncGenerator<JS.CompilationUnit> {
-                const removeSpaces = new JavaScriptParserWithSpacesRemoved.RemoveSpaces();
+                const removeSpaces = new RemoveSpacesVisitor();
 
                 for await (const file of super.parse(...inputs)) {
                     yield (await removeSpaces.visit<JS.CompilationUnit>(file, undefined))!;

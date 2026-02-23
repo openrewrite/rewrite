@@ -45,7 +45,7 @@ For testing visitors directly without a Recipe:
 """
 
 from .spec import SourceSpec, AfterRecipeText, python, dedent
-from .rewrite_test import RecipeSpec, NoopRecipe, AdHocRecipe, from_visitor
+from .rewrite_test import RecipeSpec, NoopRecipe, AdHocRecipe, from_visitor, rewrite_run
 
 __all__ = [
     # Core types
@@ -56,6 +56,7 @@ __all__ = [
     "NoopRecipe",
     "AdHocRecipe",
     "from_visitor",
+    "rewrite_run",
     # Source spec helpers
     "python",
     "dedent",

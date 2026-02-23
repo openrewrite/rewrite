@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, List, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Callable, List, Optional, TypeVar, Union, cast
 
 from rewrite import Cursor, Marker, Markers, Tree
 from rewrite.java import (
@@ -28,13 +28,12 @@ from rewrite.java import (
     JRightPadded,
     JLeftPadded,
     JContainer,
-    Expression,
     Statement,
     Loop,
 )
 from rewrite.java.markers import Semicolon, TrailingComma, OmitParentheses
 from rewrite.python.support_types import Py
-from rewrite.python.markers import KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline
+from rewrite.python.markers import KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline, PrintSyntax, ExecSyntax
 
 if TYPE_CHECKING:
     from rewrite.python import tree as py
@@ -313,7 +312,7 @@ class PythonPrinter:
 
     def _visit_markers(self, markers: Markers, p: PrintOutputCapture) -> Markers:
         """Visit markers that need printing (like TrailingComma, Semicolon)."""
-        for marker in markers.markers:
+        for marker in markers._markers:
             if isinstance(marker, Semicolon):
                 p.append(';')
             elif isinstance(marker, TrailingComma):
@@ -371,7 +370,6 @@ class PythonPrinter:
 
     def visit_compilation_unit(self, cu: 'py.CompilationUnit', p: PrintOutputCapture) -> J:
         """Visit a Python compilation unit."""
-        from rewrite.java.tree import Import
         # Output UTF-8 BOM if the original file had one
         if cu.charset_bom_marked:
             p.append('\ufeff')
@@ -521,7 +519,7 @@ class PythonPrinter:
         self._before_syntax(clause, p)
         if clause.async_:
             p.append("async")
-            self._visit_space(clause.padding.async_.after, p)
+            self._visit_space(clause.padding.async_.after, p)  # ty: ignore[unresolved-attribute]  # guarded by if clause.async_
         p.append("for")
         self.visit(clause.iterator_variable, p)
         self._visit_space(clause.padding.iterated_list.before, p)
@@ -1066,7 +1064,7 @@ class PythonJavaPrinter:
 
     def _visit_markers(self, markers: Markers, p: PrintOutputCapture) -> Markers:
         """Visit markers that need printing (like TrailingComma, Semicolon)."""
-        for marker in markers.markers:
+        for marker in markers._markers:
             self._visit_marker(marker, p)
         return markers
 
@@ -1124,6 +1122,22 @@ class PythonJavaPrinter:
         self._visit_right_padded_list(container.padding.elements, suffix_between, p)
         if after:
             p.append(after)
+
+    def _visit_type_parameters(self, type_parameters, p: PrintOutputCapture) -> None:
+        """Visit a TypeParameters AST node (Python 3.12+ type params using [])."""
+        if type_parameters is None:
+            return
+        from rewrite.java.tree import TypeParameters
+        if not isinstance(type_parameters, TypeParameters):
+            return
+        # TypeParameters has annotations, prefix, markers, and right-padded type params
+        for annotation in type_parameters.annotations:
+            self.visit(annotation, p)
+        self._visit_space(type_parameters.prefix, p)
+        self._visit_markers(type_parameters.markers, p)
+        p.append("[")
+        self._visit_right_padded_list(type_parameters.padding.type_parameters, ",", p)
+        p.append("]")
 
     def _visit_statements(self, statements: List[JRightPadded], p: PrintOutputCapture) -> None:
         """Visit a list of statements."""
@@ -1185,9 +1199,10 @@ class PythonJavaPrinter:
         is_regular_assignment = (
             isinstance(parent_value, j.Block) or
             isinstance(parent_value, py.CompilationUnit) or
+            isinstance(parent_value, py.ExpressionStatement) or  # J.Assignment is both Expression and Statement, so the wrapping ExpressionStatement is redundant here, but template-generated replacements can produce this nesting
             (isinstance(parent_value, j.If) and parent_value.then_part == assignment) or
             (isinstance(parent_value, j.If.Else) and parent_value.body == assignment) or
-            (isinstance(parent_value, Loop) and parent_value.body == assignment)
+            (isinstance(parent_value, Loop) and parent_value.body == assignment)  # ty: ignore[unresolved-attribute]  # Loop base class doesn't have body
         )
 
         symbol = "=" if is_regular_assignment else ":="
@@ -1300,8 +1315,6 @@ class PythonJavaPrinter:
 
     def visit_catch(self, catch: 'j.Try.Catch', p: PrintOutputCapture) -> J:
         """Visit a catch clause (except in Python)."""
-        from rewrite.java import tree as j
-
         self._before_syntax(catch, p)
         p.append("except")
 
@@ -1462,7 +1475,14 @@ class PythonJavaPrinter:
 
         self._before_syntax(import_, p)
 
+        from rewrite.python import tree as _py
+        is_standalone = not self.get_cursor().first_enclosing(_py.MultiImport)
+        if is_standalone:
+            p.append("import")
+
         if isinstance(import_.qualid.target, j.Empty):
+            if is_standalone:
+                self._visit_space(import_.qualid.prefix, p)
             self.visit(import_.qualid.name, p)
         else:
             self.visit(import_.qualid, p)
@@ -1533,7 +1553,7 @@ class PythonJavaPrinter:
 
         self.visit(method.name, p)
         # Visit type parameters (Python 3.12+)
-        self._visit_container("[", method.padding.type_parameters, ",", "]", p)
+        self._visit_type_parameters(method.padding.type_parameters, p)
         self._visit_container("(", method.padding.parameters, ",", ")", p)
         self.visit(method.return_type_expression, p)
         self.visit(method.body, p)
@@ -1544,23 +1564,54 @@ class PythonJavaPrinter:
         """Visit a method invocation (function call)."""
         self._before_syntax(method, p)
 
-        # Visit select with appropriate separator
-        if method.padding.select:
-            suffix = "" if not method.name.simple_name else "."
-            self._visit_right_padded(method.padding.select, p, suffix)
+        print_syntax = method.markers.find_first(PrintSyntax)
+        exec_syntax = method.markers.find_first(ExecSyntax)
 
-        # Visit type parameters
-        self._visit_container("<", method.padding.type_parameters, ",", ">", p)
+        if print_syntax is not None:
+            # Python 2 print statement: print args
+            p.append("print")
+            args = method.padding.arguments
+            if args:
+                padded_elements = args.padding.elements
+                if print_syntax.has_destination and len(padded_elements) >= 1:
+                    # print >> dest, args
+                    p.append(" >>")
+                    for i, elem in enumerate(padded_elements):
+                        self._visit_right_padded(elem, p, "," if i < len(padded_elements) - 1 else ("," if print_syntax.trailing_comma else ""))
+                else:
+                    for i, elem in enumerate(padded_elements):
+                        self._visit_right_padded(elem, p, "," if i < len(padded_elements) - 1 else ("," if print_syntax.trailing_comma else ""))
+        elif exec_syntax is not None:
+            # Python 2 exec statement: exec code [in globals[, locals]]
+            p.append("exec")
+            args = method.padding.arguments
+            if args:
+                padded_elements = args.padding.elements
+                for i, elem in enumerate(padded_elements):
+                    suffix = ""
+                    if i == 0 and len(padded_elements) > 1:
+                        suffix = "in"
+                    elif i > 0 and i < len(padded_elements) - 1:
+                        suffix = ","
+                    self._visit_right_padded(elem, p, suffix)
+        else:
+            # Visit select with appropriate separator
+            if method.padding.select:
+                suffix = "" if not method.name.simple_name else "."
+                self._visit_right_padded(method.padding.select, p, suffix)
 
-        self.visit(method.name, p)
+            # Visit type parameters
+            self._visit_container("<", method.padding.type_parameters, ",", ">", p)
 
-        # Visit arguments
-        before = "("
-        after = ")"
-        if method.markers.find_first(OmitParentheses):
-            before = ""
-            after = ""
-        self._visit_container(before, method.padding.arguments, ",", after, p)
+            self.visit(method.name, p)
+
+            # Visit arguments
+            before = "("
+            after = ")"
+            if method.markers.find_first(OmitParentheses):
+                before = ""
+                after = ""
+            self._visit_container(before, method.padding.arguments, ",", after, p)
 
         self._after_syntax(method, p)
         return method
@@ -1647,14 +1698,34 @@ class PythonJavaPrinter:
         return throw
 
     def visit_type_parameter(self, type_param: 'j.TypeParameter', p: PrintOutputCapture) -> J:
-        """Visit a type parameter (Python 3.12+ PEP 695)."""
+        """Visit a type parameter (Python 3.12+ PEP 695, 3.13+ PEP 696 defaults)."""
+        from rewrite.java import tree as j
         self._before_syntax(type_param, p)
         # Visit modifiers (for * and ** prefixes)
         for mod in type_param.modifiers:
             self.visit(mod, p)
         self.visit(type_param.name, p)
-        # Visit bounds (for T: int style bounds in Python)
-        self._visit_container(":", type_param.padding.bounds, ",", "", p)
+        # Visit bounds: 1-element = constraint only, 2-element = [constraint, default]
+        bounds = type_param.padding.bounds
+        if bounds is not None:
+            elements = bounds.padding.elements
+            if len(elements) == 1:
+                # Legacy: only constraint, no default
+                self._visit_space(bounds.before, p)
+                p.append(":")
+                self._visit_right_padded(elements[0], p)
+            elif len(elements) == 2:
+                constraint = elements[0]
+                default = elements[1]
+                if not isinstance(constraint.element, j.Empty):
+                    self._visit_space(bounds.before, p)
+                    p.append(":")
+                    self._visit_right_padded(constraint, p)
+                if not isinstance(default.element, j.Empty):
+                    if isinstance(constraint.element, j.Empty):
+                        self._visit_space(bounds.before, p)
+                    p.append("=")
+                    self._visit_right_padded(default, p)
         self._after_syntax(type_param, p)
         return type_param
 
@@ -1756,13 +1827,14 @@ class PythonJavaPrinter:
 
     def visit_variable(self, variable: 'j.VariableDeclarations.NamedVariable', p: PrintOutputCapture) -> J:
         """Visit a named variable."""
+        from rewrite.java import tree as j
         from rewrite.python import tree as py
 
         self._before_syntax(variable, p)
 
         parent_cursor = self.get_cursor().parent
-        vd = parent_cursor.parent.value if parent_cursor and parent_cursor.parent else None
-        padding = parent_cursor.value if parent_cursor else None
+        vd = cast(j.VariableDeclarations, parent_cursor.parent.value) if parent_cursor and parent_cursor.parent else None
+        padding = cast(j.JRightPadded, parent_cursor.value) if parent_cursor else None
 
         type_expr = vd.type_expression if vd else None
 

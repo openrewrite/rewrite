@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
@@ -57,8 +58,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     private final Map<String, String> commandEnv;
     private final RewriteRpcProcess process;
 
-    JavaScriptRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, String command, Map<String, String> commandEnv) {
-        super(process.getRpcClient(), marketplace);
+    JavaScriptRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers, String command, Map<String, String> commandEnv) {
+        super(process.getRpcClient(), marketplace, resolvers);
         this.command = command;
         this.commandEnv = commandEnv;
         this.process = process;
@@ -199,8 +200,9 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     @RequiredArgsConstructor
     public static class Builder implements Supplier<JavaScriptRewriteRpc> {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
+        private List<RecipeBundleResolver> resolvers = Collections.emptyList();
         private final Map<String, String> environment = new HashMap<>();
-        private Path npxPath = Paths.get("npx");
+        private Path npxPath = System.getProperty("os.name").toLowerCase().contains("windows") ? Paths.get("npx.cmd") : Paths.get("npx");
         private @Nullable Path log;
         private @Nullable Path metricsCsv;
         private @Nullable Path recipeInstallDir;
@@ -215,6 +217,11 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
+            return this;
+        }
+
+        public Builder resolvers(List<RecipeBundleResolver> resolvers) {
+            this.resolvers = resolvers;
             return this;
         }
 
@@ -382,7 +389,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             process.start();
 
             try {
-                return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process, marketplace,
+                return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process, marketplace, resolvers,
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)

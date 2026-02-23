@@ -34,6 +34,7 @@ import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
@@ -48,6 +49,7 @@ import static org.openrewrite.Recipe.PANIC;
 @RequiredArgsConstructor
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 public class RecipeRunCycle<LSS extends LargeSourceSet> {
+
     /**
      * The root recipe that is running, which may contain a recipe list which will
      * also be iterated as part of this cycle.
@@ -101,9 +103,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                         Tree maybeMutated = scanner.visit(source, ctx, rootCursor);
                                         assert maybeMutated == source || !ctx.getMessage(SCANNING_MUTATION_VALIDATION, false) :
                                                 "Edits made from within ScanningRecipe.getScanner() are discarded. " +
-                                                "The purpose of a scanner is to aggregate information for use in subsequent phases. " +
-                                                "Use ScanningRecipe.getVisitor() for making edits. " +
-                                                "To disable this warning set TypeValidation.immutableScanning to false in your tests.";
+                                                        "The purpose of a scanner is to aggregate information for use in subsequent phases. " +
+                                                        "Use ScanningRecipe.getVisitor() for making edits. " +
+                                                        "To disable this warning set TypeValidation.immutableScanning to false in your tests.";
                                     }
                                     return source;
                                 });
@@ -150,6 +152,25 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     try {
                         List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableList(acc), ctx));
                         generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
+                        Set<Path> seenInThisBatch = new HashSet<>();
+                        generated.removeIf(source -> {
+                            Path sourcePath = source.getSourcePath();
+                            if (sourceSet.getBefore(sourcePath) != null) {
+                                sourceSet.onGenerateCollision(sourcePath, true);
+                                return true;
+                            }
+                            for (SourceFile existing : acc) {
+                                if (existing.getSourcePath().equals(sourcePath)) {
+                                    sourceSet.onGenerateCollision(sourcePath, false);
+                                    return true;
+                                }
+                            }
+                            if (!seenInThisBatch.add(sourcePath)) {
+                                sourceSet.onGenerateCollision(sourcePath, false);
+                                return true;
+                            }
+                            return false;
+                        });
                         if (!generated.isEmpty()) {
                             acc.addAll(generated);
                             generated.forEach(source -> recordSourceFileResultAndSearchResults(null, source, recipeStack, ctx));
@@ -169,76 +190,74 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     public LSS editSources(LSS sourceSet) {
-        // set root cursor as it is required by the `ScanningRecipe#isAcceptable()`
-        // propagate shared root cursor
-        // skip edits made to generated source files so that they don't show up in a diff
-        // that later fails to apply on a freshly cloned repository
-        // consider any recipes adding new messages as a changing recipe (which can request another cycle)
-        return sourceSetEditor.apply(sourceSet, sourceFile -> {
-                    recipeRunStats.recordSourceVisited(sourceFile);
-                    return allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
-                        Recipe recipe = recipeStack.peek();
-                        if (source == null) {
-                            return null;
-                        }
-
-                        SourceFile after = source;
-
-                        try {
-                            Duration duration = Duration.ofNanos(System.nanoTime() - cycleStartTime);
-                            if (duration.compareTo(ctx.getMessage(ExecutionContext.RUN_TIMEOUT, Duration.ofMinutes(4))) > 0) {
-                                if (thrownErrorOnTimeout.compareAndSet(false, true)) {
-                                    RecipeTimeoutException t = new RecipeTimeoutException(recipe);
-                                    ctx.getOnError().accept(t);
-                                    ctx.getOnTimeout().accept(t, ctx);
-                                }
-                                return source;
-                            }
-
-                            if (ctx.getMessage(PANIC) != null) {
-                                return source;
-                            }
-
-                            TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
-                            // set root cursor as it is required by the `ScanningRecipe#isAcceptable()`
-                            visitor.setCursor(rootCursor);
-
-                            after = recipeRunStats.recordEdit(recipe, () -> {
-                                if (visitor.isAcceptable(source, ctx)) {
-                                    // propagate shared root cursor
-                                    //noinspection DataFlowIssue
-                                    return (SourceFile) visitor.visit(source, ctx, rootCursor);
-                                }
-                                return source;
-                            });
-
-                            if (after != source) {
-                                madeChangesInThisCycle.add(recipe);
-                                recordSourceFileResultAndSearchResults(source, after, recipeStack, ctx);
-                                if (source.getMarkers().findFirst(Generated.class).isPresent()) {
-                                    // skip edits made to generated source files so that they don't show up in a diff
-                                    // that later fails to apply on a freshly cloned repository
-                                    return source;
-                                }
-                                recipeRunStats.recordSourceFileChanged(source, after);
-                            } else if (ctx.hasNewMessages()) {
-                                // consider any recipes adding new messages as a changing recipe (which can request another cycle)
-                                madeChangesInThisCycle.add(recipe);
-                                ctx.resetHasNewMessages();
-                            }
-                        } catch (Throwable t) {
-                            after = handleError(recipe, source, after, t);
-                        }
-                        if (after != null && after != source) {
-                            after = addRecipesThatMadeChanges(recipeStack, after);
-                        }
-                        return after;
-                    }, sourceFile);
-                }
+        //noinspection DataFlowIssue
+        return sourceSetEditor.apply(sourceSet, sourceFile -> editSource(sourceSet, sourceFile)
         );
     }
 
-    private void recordSourceFileResultAndSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, Stack<Recipe> recipeStack, ExecutionContext ctx) {
+    protected @Nullable SourceFile editSource(LSS sourceSet, SourceFile sourceFile) {
+        recipeRunStats.recordSourceVisited(sourceFile);
+        return allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
+            Recipe recipe = recipeStack.peek();
+            if (source == null) {
+                return null;
+            }
+
+            SourceFile after = source;
+
+            try {
+                Duration duration = Duration.ofNanos(System.nanoTime() - cycleStartTime);
+                if (duration.compareTo(ctx.getMessage(ExecutionContext.RUN_TIMEOUT, Duration.ofMinutes(4))) > 0) {
+                    if (thrownErrorOnTimeout.compareAndSet(false, true)) {
+                        RecipeTimeoutException t = new RecipeTimeoutException(recipe);
+                        ctx.getOnError().accept(t);
+                        ctx.getOnTimeout().accept(t, ctx);
+                    }
+                    return source;
+                }
+
+                if (ctx.getMessage(PANIC) != null) {
+                    return source;
+                }
+
+                TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
+                // set root cursor as it is required by the `ScanningRecipe#isAcceptable()`
+                visitor.setCursor(rootCursor);
+
+                after = recipeRunStats.recordEdit(recipe, () -> {
+                    if (visitor.isAcceptable(source, ctx)) {
+                        // propagate shared root cursor
+                        //noinspection DataFlowIssue
+                        return (SourceFile) visitor.visit(source, ctx, rootCursor);
+                    }
+                    return source;
+                });
+
+                if (after != source) {
+                    madeChangesInThisCycle.add(recipe);
+                    recordSourceFileResultAndSearchResults(source, after, recipeStack, ctx);
+                    if (source.getMarkers().findFirst(Generated.class).isPresent()) {
+                        // skip edits made to generated source files so that they don't show up in a diff
+                        // that later fails to apply on a freshly cloned repository
+                        return source;
+                    }
+                    recipeRunStats.recordSourceFileChanged(source, after);
+                } else if (ctx.hasNewMessages()) {
+                    // consider any recipes adding new messages as a changing recipe (which can request another cycle)
+                    madeChangesInThisCycle.add(recipe);
+                    ctx.resetHasNewMessages();
+                }
+            } catch (Throwable t) {
+                after = handleError(recipe, source, after, t);
+            }
+            if (after != null && after != source) {
+                after = addRecipesThatMadeChanges(recipeStack, after);
+            }
+            return after;
+        }, sourceFile);
+    }
+
+    protected void recordSourceFileResultAndSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, Stack<Recipe> recipeStack, ExecutionContext ctx) {
         String beforePath = (before == null) ? "" : before.getSourcePath().toString();
         String afterPath = (after == null) ? "" : after.getSourcePath().toString();
         Recipe recipe = recipeStack.peek();
@@ -264,11 +283,11 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         }
 
         if (hierarchical) {
-            recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
+            recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), ctx);
         }
     }
 
-    private void recordSourceFileResult(@Nullable String beforePath, @Nullable String afterPath, List<Recipe> recipeStack, Long effortSeconds, ExecutionContext ctx) {
+    private void recordSourceFileResult(@Nullable String beforePath, @Nullable String afterPath, List<Recipe> recipeStack, ExecutionContext ctx) {
         if (recipeStack.size() <= 1) {
             // No reason to record the synthetic root recipe which contains the recipe run
             return;
@@ -286,9 +305,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 afterPath,
                 parentName,
                 recipe.getName(),
-                effortSeconds,
+                0L, // Zero here, as we later sum only the recipes that themselves made changes
                 cycle));
-        recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
+        recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), ctx);
     }
 
     private @Nullable SourceFile handleError(Recipe recipe, SourceFile sourceFile, @Nullable SourceFile after,
@@ -324,6 +343,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     @NonFinal
     @Nullable
     transient Boolean isScanningRecipe;
+
     private boolean isScanningRequired() {
         if (isScanningRecipe == null) {
             isScanningRecipe = isScanningRequired(recipe);
@@ -335,7 +355,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         if (recipe instanceof ScanningRecipe) {
             // DeclarativeRecipe is technically a ScanningRecipe, but it only needs the
             // scanning phase if it or one of its sub-recipes or preconditions is a ScanningRecipe
-            if(recipe instanceof DeclarativeRecipe) {
+            if (recipe instanceof DeclarativeRecipe) {
                 for (Recipe precondition : ((DeclarativeRecipe) recipe).getPreconditions()) {
                     if (isScanningRequired(precondition)) {
                         return true;

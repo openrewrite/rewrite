@@ -13,6 +13,27 @@
 # limitations under the License.
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.yaml.AddCommentToProperty
+examples:
+- description: '`AddCommentToPropertyTest#addCommentToNestedProperty`'
+  parameters:
+  - management.metrics.enabled
+  - This property is deprecated
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      management:
+        metrics:
+          enabled: true
+    after: |
+      management:
+        metrics:
+          # This property is deprecated
+          enabled: true
+    language: yaml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.yaml.AppendToSequence
 examples:
 - description: '`AppendToSequenceTest#appendToSequenceHasDashTrue`'
@@ -220,6 +241,7 @@ examples:
   - 'null'
   - $.destination
   - 'null'
+  - 'null'
   sources:
   - before: |
       source: value
@@ -227,7 +249,6 @@ examples:
     after: |
       source: value
       destination: value
-    path: a.yml
     language: yaml
 ---
 type: specs.openrewrite.org/v1beta/example

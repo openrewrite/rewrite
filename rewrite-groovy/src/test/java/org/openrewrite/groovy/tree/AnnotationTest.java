@@ -268,4 +268,26 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6319")
+    @Test
+    void synchronizedAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+            package org.dummy
+            
+            import groovy.transform.Synchronized
+            
+            class Foo {
+            
+                @Synchronized
+                void bar() {
+                    println('Hello World')
+                }
+            }
+            """
+          )
+        );
+    }
 }

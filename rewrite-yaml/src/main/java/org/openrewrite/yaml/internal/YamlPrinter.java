@@ -19,6 +19,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.yaml.YamlVisitor;
+import org.openrewrite.yaml.marker.OmitColon;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.function.UnaryOperator;
@@ -100,7 +101,10 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, PrintOutputCapture<P> p) {
         beforeSyntax(entry, p);
         visit(entry.getKey(), p);
-        p.append(entry.getBeforeMappingValueIndicator()).append(':');
+        p.append(entry.getBeforeMappingValueIndicator());
+        if (!entry.getMarkers().findFirst(OmitColon.class).isPresent()) {
+            p.append(':');
+        }
         visit(entry.getValue(), p);
         afterSyntax(entry, p);
         return entry;

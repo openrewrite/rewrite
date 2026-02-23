@@ -55,6 +55,11 @@ public class ChangeValue extends Recipe {
     String description = "Change a YAML mapping entry value while leaving the key intact.";
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(JsonPathMatcher.validate("keyPath", keyPath));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(keyPath);
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {

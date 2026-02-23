@@ -26,6 +26,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class ChangeDependencyGroupIdTest implements RewriteTest {
@@ -444,6 +445,41 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
                   dependencies {
                       classpath 'org.newboot:spring-boot-starter:2.5.4'
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithEmptyStringConfigKts() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupId("org.springframework.boot", "spring-boot-starter", "org.newboot", "")),
+          buildGradleKts(
+            """
+              plugins {
+                  id("java-library")
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter:2.5.4")
+              }
+              """,
+            """
+              plugins {
+                  id("java-library")
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("org.newboot:spring-boot-starter:2.5.4")
               }
               """
           )

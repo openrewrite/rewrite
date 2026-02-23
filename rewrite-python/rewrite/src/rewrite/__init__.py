@@ -2,7 +2,7 @@ __path__ = __import__('pkgutil').extend_path(__path__, __name__)
 
 # helps pytest to rewrite the assert statements in test.py
 try:
-    import pytest
+    import pytest  # ty: ignore[unresolved-import]
     pytest.register_assert_rewrite("rewrite.test")
 except ImportError:
     pass  # pytest not available, skip assert rewriting
@@ -74,6 +74,11 @@ __all__ = [
     'Marker',
     'Markers',
     'SearchResult',
+    'Markup',
+    'MarkupWarn',
+    'MarkupError',
+    'MarkupInfo',
+    'MarkupDebug',
     'UnknownJavaMarker',
     'ParseExceptionResult',
 

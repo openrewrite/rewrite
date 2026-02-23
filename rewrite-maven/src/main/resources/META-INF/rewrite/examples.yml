@@ -323,6 +323,45 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.AddManagedPlugin
+examples:
+- description: '`AddManagedPluginTest#addPlugin`'
+  parameters:
+  - org.openrewrite.maven
+  - rewrite-maven-plugin
+  - '100.0'
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      <project>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+      </project>
+    after: |
+      <project>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+        <build>
+          <pluginManagement>
+            <plugins>
+              <plugin>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>rewrite-maven-plugin</artifactId>
+                <version>100.0</version>
+              </plugin>
+            </plugins>
+          </pluginManagement>
+        </build>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddParentPom
 examples:
 - description: '`AddParentPomTest#addParent`'
@@ -741,6 +780,69 @@ examples:
             <scope>test</scope>
           </dependency>
         </dependencies>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.ChangeExclusion
+examples:
+- description: '`ChangeExclusionTest#changeExclusionsWithGlob`'
+  parameters:
+  - org.springframework
+  - spring-web*
+  - org.springframework.boot
+  - spring-boot-starter-web
+  sources:
+  - before: |
+      <project>
+          <groupId>com.mycompany.app</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1.0.0</version>
+          <dependencyManagement>
+              <dependencies>
+                  <dependency>
+                      <groupId>com.fasterxml.jackson.core</groupId>
+                      <artifactId>jackson-databind</artifactId>
+                      <version>2.13.0</version>
+                      <exclusions>
+                          <exclusion>
+                              <groupId>org.springframework</groupId>
+                              <artifactId>spring-web</artifactId>
+                          </exclusion>
+                          <exclusion>
+                              <groupId>commons-logging</groupId>
+                              <artifactId>commons-logging</artifactId>
+                          </exclusion>
+                      </exclusions>
+                  </dependency>
+              </dependencies>
+          </dependencyManagement>
+      </project>
+    after: |
+      <project>
+          <groupId>com.mycompany.app</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1.0.0</version>
+          <dependencyManagement>
+              <dependencies>
+                  <dependency>
+                      <groupId>com.fasterxml.jackson.core</groupId>
+                      <artifactId>jackson-databind</artifactId>
+                      <version>2.13.0</version>
+                      <exclusions>
+                          <exclusion>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-starter-web</artifactId>
+                          </exclusion>
+                          <exclusion>
+                              <groupId>commons-logging</groupId>
+                              <artifactId>commons-logging</artifactId>
+                          </exclusion>
+                      </exclusions>
+                  </dependency>
+              </dependencies>
+          </dependencyManagement>
       </project>
     path: pom.xml
     language: xml
@@ -2613,18 +2715,6 @@ examples:
         <artifactId>my-app</artifactId>
         <version>1</version>
       </project>
-    after: |
-      <project>
-        <!--~~(org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:
-      https://repo.maven.apache.org/maven2: HTTP 404)~~>--><parent>
-            <groupId>org.jenkins-ci.plugins</groupId>
-            <artifactId>credentials</artifactId>
-            <version>2.3.0</version>
-        </parent>
-        <groupId>com.mycompany.app</groupId>
-        <artifactId>my-app</artifactId>
-        <version>1</version>
-      </project>
     path: pom.xml
     language: xml
 - description: '`UpgradeParentVersionTest#nonMavenCentralRepository`'
@@ -3650,21 +3740,19 @@ examples:
       3 [label="org.junit.jupiter:junit-jupiter-api:5.7.0"];
       4 [label="org.junit.jupiter:junit-jupiter-params:5.7.0"];
       5 [label="org.junit.jupiter:junit-jupiter-engine:5.7.0"];
-      6 [label="org.junit:junit-bom:5.7.0"];
-      7 [label="org.apiguardian:apiguardian-api:1.1.0"];
-      8 [label="org.opentest4j:opentest4j:1.2.0"];
-      9 [label="org.junit.platform:junit-platform-commons:1.7.0"];
-      10 [label="org.junit.platform:junit-platform-engine:1.7.0"];
+      6 [label="org.apiguardian:apiguardian-api:1.1.0"];
+      7 [label="org.opentest4j:opentest4j:1.2.0"];
+      8 [label="org.junit.platform:junit-platform-commons:1.7.0"];
+      9 [label="org.junit.platform:junit-platform-engine:1.7.0"];
       0 -> 1 [taillabel="Compile"];
       0 -> 2 [taillabel="Test"];
       2 -> 3 [taillabel="Test"];
+      3 -> 6 [taillabel="Test"];
       3 -> 7 [taillabel="Test"];
       3 -> 8 [taillabel="Test"];
-      3 -> 9 [taillabel="Test"];
       2 -> 4 [taillabel="Test"];
       2 -> 5 [taillabel="Test"];
-      5 -> 10 [taillabel="Test"];
-      2 -> 6 [taillabel="Test"];
+      5 -> 9 [taillabel="Test"];
       })~~>--><project>
         <groupId>com.mycompany.app</groupId>
         <artifactId>my-app</artifactId>

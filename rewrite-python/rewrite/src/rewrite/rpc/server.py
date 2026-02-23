@@ -27,6 +27,7 @@ import logging
 import os
 import select
 import sys
+import tempfile
 import traceback
 import threading
 from pathlib import Path
@@ -35,7 +36,7 @@ from uuid import uuid4
 
 # Configure logging - log to file by default to avoid filling stderr buffer
 # (which can cause deadlock if parent process doesn't read stderr)
-_default_log_file = '/tmp/python-rpc.log'
+_default_log_file = os.path.join(tempfile.gettempdir(), 'python-rpc.log')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -61,6 +62,10 @@ _pending_lock = threading.Lock()
 
 # Flag for trace mode
 _trace_rpc = False
+
+# Python version to parse (read from environment, default to "3")
+# Set REWRITE_PYTHON_VERSION to "2" or "2.7" to parse Python 2 code
+_python_version = os.environ.get("REWRITE_PYTHON_VERSION", "3")
 
 
 def _next_request_id() -> int:
@@ -146,6 +151,11 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         This is called by RpcReceiveQueue when it needs more data.
         We send GetObject requests repeatedly until END_OF_OBJECT is received.
         For large objects (>1000 items), Java sends data in multiple batches.
+
+        IMPORTANT: We filter out END_OF_OBJECT from the returned batch to prevent
+        it from being accidentally consumed during nested operations (like receive_list
+        expecting positions). Java's RewriteRpc.java explicitly consumes END_OF_OBJECT
+        after receive() completes (line 474), and we do the same by tracking received_end.
         """
         nonlocal received_end
 
@@ -164,8 +174,10 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
 
         # Check if this batch contains END_OF_OBJECT (last item has state='END_OF_OBJECT')
         # The END_OF_OBJECT marker is always at the end of the final batch
+        # We filter it out to prevent it from being consumed during nested operations
         if batch[-1].get('state') == 'END_OF_OBJECT':
             received_end = True
+            batch = batch[:-1]  # Remove END_OF_OBJECT from the batch
 
         return batch
 
@@ -178,6 +190,11 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
 
     # Receive and deserialize the object (applies diffs to before state)
     obj = receiver.receive(before, q)
+
+    # Verify we received the complete object (END_OF_OBJECT was in the final batch)
+    # This matches Java's RewriteRpc.java line 474-475 which explicitly checks for END_OF_OBJECT
+    if not received_end:
+        raise RuntimeError(f"Did not receive END_OF_OBJECT marker for object {obj_id}")
 
     if obj is not None:
         # Update our understanding of what Java has
@@ -193,29 +210,56 @@ def generate_id() -> str:
     return str(uuid4())
 
 
-def parse_python_file(path: str) -> dict:
+def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=None) -> dict:
     """Parse a Python file and return its LST."""
     with open(path, 'r', encoding='utf-8') as f:
         source = f.read()
-    return parse_python_source(source, path)
+    return parse_python_source(source, path, relative_to, ty_client)
 
 
-def parse_python_source(source: str, path: str = "<unknown>") -> dict:
-    """Parse Python source code and return its LST."""
+def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None, ty_client=None) -> dict:
+    """Parse Python source code and return its LST.
+
+    The parser used depends on the REWRITE_PYTHON_VERSION environment variable:
+    - "2" or "2.7": Use parso-based Py2ParserVisitor for Python 2 code
+    - "3" (default): Use ast-based ParserVisitor for Python 3 code
+    """
+    # Compute the source_path that will be stored on the LST
+    source_path = Path(path)
+    if relative_to is not None:
+        try:
+            source_path = source_path.relative_to(relative_to)
+        except ValueError:
+            pass  # path is not under relative_to, keep absolute
+
     try:
-        # Import parser visitor
-        from rewrite.python._parser_visitor import ParserVisitor
-        from rewrite import random_id, Markers
+        from rewrite import Markers
 
-        # Strip BOM before parsing (ParserVisitor handles it internally but ast.parse doesn't)
-        source_for_ast = source[1:] if source.startswith('\ufeff') else source
+        if _python_version.startswith("2"):
+            # Python 2: Try Python 3 ast-based parser first (handles most Python 2 code),
+            # fall back to parso-based parser for Python 2-specific syntax
+            from rewrite.python._parser_visitor import ParserVisitor
+            try:
+                source_for_ast = source[1:] if source.startswith('\ufeff') else source
+                tree = ast.parse(source_for_ast, path)
+                cu = ParserVisitor(source, path, ty_client).visit(tree)
+            except SyntaxError:
+                from rewrite.python._py2_parser_visitor import Py2ParserVisitor
+                cu = Py2ParserVisitor(source, path, _python_version).parse()
+        else:
+            # Python 3: Use standard ast-based parser
+            from rewrite.python._parser_visitor import ParserVisitor
 
-        # Parse using Python AST
-        tree = ast.parse(source_for_ast, path)
+            # Strip BOM before parsing (ParserVisitor handles it internally but ast.parse doesn't)
+            source_for_ast = source[1:] if source.startswith('\ufeff') else source
 
-        # Convert to OpenRewrite LST
-        cu = ParserVisitor(source).visit(tree)
-        cu = cu.replace(source_path=Path(path))
+            # Parse using Python AST
+            tree = ast.parse(source_for_ast, path)
+
+            # Convert to OpenRewrite LST
+            cu = ParserVisitor(source, path, ty_client).visit(tree)
+
+        cu = cu.replace(source_path=source_path)
         cu = cu.replace(markers=Markers.EMPTY)
 
         # Store and return
@@ -226,48 +270,139 @@ def parse_python_source(source: str, path: str = "<unknown>") -> dict:
             'sourceFileType': 'org.openrewrite.python.tree.Py$CompilationUnit'
         }
     except ImportError as e:
-        logger.error(f"Failed to import parser: {e}")
-        traceback.print_exc()
-        return _create_parse_error(path, str(e))
+        logger.exception(f"Failed to import parser: {e}")
+        return _create_parse_error(str(source_path), str(e), source)
     except SyntaxError as e:
         logger.error(f"Syntax error parsing {path}: {e}")
-        return _create_parse_error(path, str(e))
+        return _create_parse_error(str(source_path), str(e), source)
     except Exception as e:
-        logger.error(f"Error parsing {path}: {e}")
-        traceback.print_exc()
-        return _create_parse_error(path, str(e))
+        logger.exception(f"Error parsing {path}: {e}")
+        return _create_parse_error(str(source_path), str(e), source)
 
 
-def _create_parse_error(path: str, message: str) -> dict:
-    """Create a parse error result."""
-    obj_id = generate_id()
-    error = {
-        'id': obj_id,
-        'type': 'org.openrewrite.tree.ParseError',
-        'sourcePath': path,
-        'message': message,
-    }
-    local_objects[obj_id] = error
+def _create_parse_error(path: str, message: str, source: str = '') -> dict:
+    """Create a parse error result using the proper ParseError class.
+
+    This creates a real ParseError SourceFile that can be properly serialized
+    via the RPC protocol, rather than a dict that can't be handled.
+    """
+    from rewrite.parser import ParseError
+    from rewrite.markers import Markers, ParseExceptionResult
+    from rewrite import random_id
+
+    # Create a ParseExceptionResult marker with the error info
+    # We use 'PythonParser' as the parser type since we don't have a parser instance
+    exception_marker = ParseExceptionResult(
+        _id=random_id(),
+        _parser_type='PythonParser',
+        _exception_type='SyntaxError',
+        _message=message
+    )
+
+    # Create the ParseError with the marker
+    parse_error = ParseError(
+        _id=random_id(),
+        _markers=Markers(random_id(), [exception_marker]),
+        _source_path=Path(path),
+        _file_attributes=None,
+        _charset_name='utf-8',
+        _charset_bom_marked=False,
+        _checksum=None,
+        _text=source,
+        _erroneous=None
+    )
+
+    obj_id = str(parse_error.id)
+    local_objects[obj_id] = parse_error
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError'}
+
+
+def _infer_project_root(inputs: list) -> Optional[str]:
+    """Infer the project root from input paths.
+
+    When relativeTo is not provided, look at the input paths to find a
+    directory that contains a .venv or pyproject.toml — this is likely
+    the project root that ty-types should use.
+    """
+    for item in inputs:
+        path = None
+        if isinstance(item, str):
+            path = item
+        elif isinstance(item, dict):
+            path = item.get('sourcePath') or item.get('path')
+        if path and os.path.isabs(path):
+            parent = os.path.dirname(path)
+            # Walk up looking for a project root marker
+            for _ in range(10):
+                if os.path.isdir(os.path.join(parent, '.venv')) or \
+                   os.path.isfile(os.path.join(parent, 'pyproject.toml')):
+                    return parent
+                up = os.path.dirname(parent)
+                if up == parent:
+                    break
+                parent = up
+    return None
 
 
 def handle_parse(params: dict) -> List[str]:
     """Handle a Parse RPC request."""
+    import tempfile
+    import shutil
+
     inputs = params.get('inputs', [])
+    relative_to = params.get('relativeTo')
     results = []
 
-    for input_item in inputs:
-        if 'path' in input_item:
-            # File input
-            result = parse_python_file(input_item['path'])
-        elif 'text' in input_item or 'source' in input_item:
-            # String input - Java sends 'text' and 'sourcePath'
-            source = input_item.get('text') or input_item.get('source')
-            path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-            result = parse_python_source(source, path)
+    # If no relativeTo provided, try to infer from absolute input paths
+    if not relative_to:
+        relative_to = _infer_project_root(inputs)
+
+    # Create a ty-types client for this parse batch
+    ty_client = None
+    tmpdir = None
+    try:
+        from rewrite.python.ty_client import TyTypesClient
+        ty_client = TyTypesClient()
+        if relative_to:
+            ty_client.initialize(relative_to)
         else:
-            continue
-        results.append(result['id'])
+            # For inline text inputs without a project root, create a temp directory
+            # so ty-types can still provide type attribution
+            tmpdir = tempfile.mkdtemp(prefix='rewrite-parse-')
+            ty_client.initialize(tmpdir)
+    except (ImportError, RuntimeError):
+        ty_client = None  # ty-types not available
+
+    try:
+        for i, input_item in enumerate(inputs):
+            if isinstance(input_item, str):
+                result = parse_python_file(input_item, relative_to, ty_client)
+            elif 'path' in input_item:
+                result = parse_python_file(input_item['path'], relative_to, ty_client)
+            elif 'text' in input_item or 'source' in input_item:
+                source = input_item.get('text') or input_item.get('source')
+                path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
+                # For relative paths, write the source under the project root
+                # (tmpdir or relative_to) so ty-types can resolve imports from
+                # the project's .venv and dependencies.
+                base_dir = tmpdir or relative_to
+                if base_dir and not os.path.isabs(path):
+                    disk_path = os.path.join(base_dir, path)
+                    os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                    with open(disk_path, 'w', encoding='utf-8') as f:
+                        f.write(source)
+                    result = parse_python_source(source, disk_path, base_dir, ty_client)
+                else:
+                    result = parse_python_source(source, path, relative_to, ty_client)
+            else:
+                logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
+                continue
+            results.append(result['id'])
+    finally:
+        if ty_client is not None:
+            ty_client.shutdown()
+        if tmpdir is not None:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
     return results
 
@@ -277,23 +412,34 @@ def handle_parse_project(params: dict) -> List[dict]:
     import fnmatch
 
     project_path = params.get('projectPath', '.')
-    exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info'])
-    relative_to = params.get('relativeTo')
+    exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne'])
+    relative_to = params.get('relativeTo') or project_path
 
     results = []
 
-    for root, dirs, files in os.walk(project_path):
-        # Filter out excluded directories
-        dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, excl) for excl in exclusions)]
+    ty_client = None
+    try:
+        from rewrite.python.ty_client import TyTypesClient
+        ty_client = TyTypesClient()
+        ty_client.initialize(project_path)
+    except (ImportError, RuntimeError):
+        pass
 
-        for file in files:
-            if file.endswith('.py'):
-                path = os.path.join(root, file)
-                try:
-                    result = parse_python_file(path)
-                    results.append(result)
-                except Exception as e:
-                    logger.error(f"Error parsing {path}: {e}")
+    try:
+        for root, dirs, files in os.walk(project_path):
+            dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, excl) for excl in exclusions)]
+
+            for file in files:
+                if file.endswith('.py'):
+                    path = os.path.join(root, file)
+                    try:
+                        result = parse_python_file(path, relative_to, ty_client)
+                        results.append(result)
+                    except Exception as e:
+                        logger.error(f"Error parsing {path}: {e}")
+    finally:
+        if ty_client is not None:
+            ty_client.shutdown()
 
     return results
 
@@ -310,8 +456,10 @@ def handle_get_object(params: dict) -> List[dict]:
     """
     obj_id = params.get('id')
     source_file_type = params.get('sourceFileType')
+    if obj_id is None:
+        return [{'state': 'DELETE'}, {'state': 'END_OF_OBJECT'}]
     obj = local_objects.get(obj_id)
-    logger.info(f"handle_get_object: id={obj_id}, type={type(obj).__name__ if obj else 'None'}")
+    logger.debug(f"handle_get_object: id={obj_id}, type={type(obj).__name__ if obj else 'None'}")
 
     if obj is None:
         return [
@@ -327,19 +475,15 @@ def handle_get_object(params: dict) -> List[dict]:
 
         q = RpcSendQueue(source_file_type)
         result = q.generate(obj, before)
-        logger.debug(f"GetObject result: {len(result)} items")
-        for i, item in enumerate(result[:10]):  # Log first 10 items
-            logger.debug(f"  [{i}] {item}")
 
         # Update remote_objects to track that Java now has this version
         remote_objects[obj_id] = obj
 
         return result
 
-    except Exception as e:
-        logger.error(f"Error serializing object: {e}")
-        import traceback as tb
-        tb.print_exc()
+    except BaseException as e:
+        source_path = getattr(obj, 'source_path', None)
+        logger.exception(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
         return [{'state': 'END_OF_OBJECT'}]
 
 
@@ -374,7 +518,11 @@ def handle_print(params: dict) -> str:
     obj_id = params.get('treeId') or params.get('id')
     source_file_type = params.get('sourceFileType')
 
-    logger.info(f"handle_print: treeId={obj_id}, sourceFileType={source_file_type}")
+    logger.debug(f"handle_print: treeId={obj_id}, sourceFileType={source_file_type}")
+
+    if obj_id is None:
+        logger.warning("No treeId or id provided")
+        return ""
 
     # Fetch the object from Java to get the latest version (including recipe modifications)
     obj = get_object_from_java(obj_id, source_file_type)
@@ -412,6 +560,7 @@ def handle_reset(params: dict) -> bool:
     _execution_contexts.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
+
     logger.info("Reset: cleared all cached state")
     return True
 
@@ -436,6 +585,228 @@ def _get_marketplace():
         activate(_marketplace)
 
     return _marketplace
+
+
+def handle_install_recipes(params: dict) -> dict:
+    """Handle an InstallRecipes RPC request.
+
+    Activates a recipe package in the marketplace. The package should already be
+    installed by the caller (e.g., via pip install --target). This handler discovers
+    and activates the package's recipes.
+
+    Args:
+        params: Dict containing either:
+            - 'recipes': str - A local file path (package already installed to target)
+            - 'recipes': {'packageName': str, 'version': str|None} - A package spec
+
+    Returns:
+        Dict with 'recipesInstalled' count and 'version' (if resolved)
+    """
+    import importlib
+    import importlib.util
+
+    marketplace = _get_marketplace()
+    before_count = len(list(marketplace.all_recipes()))
+
+    recipes = params.get('recipes')
+    installed_version = None
+
+    if isinstance(recipes, str):
+        # Local file path - package should already be installed by caller
+        local_path = Path(recipes)
+        logger.info(f"Activating recipes from local path: {recipes}")
+
+        # Find and import the package
+        # For local paths, we look for the package name from setup.py/pyproject.toml
+        package_name = _find_package_name(local_path)
+        if package_name:
+            _import_and_activate_package(package_name, marketplace, local_path)
+
+    elif isinstance(recipes, dict):
+        # Package spec with name and optional version - package should already be installed
+        package_name = recipes.get('packageName')
+        version = recipes.get('version')
+
+        if not package_name:
+            raise ValueError("Package name is required")
+
+        logger.info(f"Activating recipes package: {package_name}")
+
+        # Get the installed version
+        try:
+            import importlib.metadata
+            installed_version = importlib.metadata.version(package_name)
+        except Exception:
+            pass
+
+        _import_and_activate_package(package_name, marketplace)
+    else:
+        raise ValueError(f"Invalid recipes parameter: {recipes}")
+
+    after_count = len(list(marketplace.all_recipes()))
+    recipes_installed = after_count - before_count
+
+    logger.info(f"InstallRecipes: installed {recipes_installed} recipes")
+    return {
+        'recipesInstalled': recipes_installed,
+        'version': installed_version
+    }
+
+
+def _add_source_to_path(local_path: Path) -> None:
+    """Add the package source directory to sys.path so it can be imported.
+
+    Reads [tool.setuptools.packages.find] 'where' from pyproject.toml to
+    determine the source directory. Falls back to adding the local_path itself.
+    """
+    import sys
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        try:
+            import tomli as tomllib  # type: ignore[import-not-found]
+        except ModuleNotFoundError:
+            src_dir = str(local_path)
+            if src_dir not in sys.path:
+                sys.path.insert(0, src_dir)
+            return
+
+    source_dir = local_path
+    pyproject_path = local_path / 'pyproject.toml'
+    if pyproject_path.exists():
+        try:
+            with open(pyproject_path, 'rb') as f:
+                data = tomllib.load(f)
+                where = (data.get('tool', {}).get('setuptools', {})
+                         .get('packages', {}).get('find', {}).get('where'))
+                if where and isinstance(where, list) and len(where) > 0:
+                    source_dir = local_path / where[0]
+        except Exception as e:
+            logger.warning(f"Failed to read source layout from pyproject.toml: {e}")
+
+    src_str = str(source_dir)
+    if src_str not in sys.path:
+        logger.info(f"Adding to sys.path: {src_str}")
+        sys.path.insert(0, src_str)
+
+
+def _find_package_name(local_path: Path) -> Optional[str]:
+    """Find the package name from a local path."""
+    import sys
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        try:
+            import tomli as tomllib  # type: ignore[import-not-found]
+        except ModuleNotFoundError:
+            return None
+
+    # Try pyproject.toml first
+    pyproject_path = local_path / 'pyproject.toml'
+    if pyproject_path.exists():
+        try:
+            with open(pyproject_path, 'rb') as f:
+                data = tomllib.load(f)
+                # Try [project] section first (PEP 621)
+                if 'project' in data and 'name' in data['project']:
+                    return data['project']['name']
+                # Try [tool.poetry] section
+                if 'tool' in data and 'poetry' in data['tool'] and 'name' in data['tool']['poetry']:
+                    return data['tool']['poetry']['name']
+        except Exception as e:
+            logger.warning(f"Failed to parse pyproject.toml: {e}")
+
+    # Try setup.py
+    setup_py = local_path / 'setup.py'
+    if setup_py.exists():
+        # Simple heuristic: look for name= in setup.py
+        try:
+            content = setup_py.read_text()
+            import re
+            match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', content)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            logger.warning(f"Failed to parse setup.py: {e}")
+
+    return None
+
+
+def _import_and_activate_package(package_name: str, marketplace, local_path: Optional[Path] = None):
+    """Import a package and call its activate function using entry points.
+
+    Uses importlib.metadata to discover entry points registered under
+    the 'openrewrite.recipes' group and calls their activate functions.
+    Since matching package names to entry points is unreliable (hyphens vs
+    underscores, different naming conventions), we activate ALL entry points
+    but the marketplace handles deduplication.
+
+    If entry points aren't found (e.g., package not pip-installed) and a
+    local_path is provided, the source directory is added to sys.path
+    as a fallback so the module can be imported directly.
+    """
+    from importlib.metadata import entry_points
+
+    # Normalize package name for comparison
+    def normalize(name: str) -> str:
+        return name.replace('-', '_').replace('.', '_').lower()
+
+    normalized_name = normalize(package_name)
+
+    # Find all entry points in the openrewrite.recipes group
+    eps = entry_points(group='openrewrite.recipes')
+    activated = False
+
+    for ep in eps:
+        try:
+            # Try to match this entry point to our package using the dist attribute
+            dist_name = None
+            if hasattr(ep, 'dist') and ep.dist is not None:
+                dist_name = ep.dist.name if hasattr(ep.dist, 'name') else str(ep.dist)
+
+            # Check if this entry point belongs to our package
+            matches_package = False
+            if dist_name and normalize(dist_name) == normalized_name:
+                matches_package = True
+            elif ep.name and normalize(ep.name) == normalized_name:
+                matches_package = True
+            elif ':' in ep.value:
+                # Check module name in value (e.g., "sample_recipe:activate")
+                module_name = ep.value.split(':')[0]
+                if normalize(module_name) == normalized_name:
+                    matches_package = True
+
+            if matches_package:
+                logger.info(f"Loading entry point: {ep.name} -> {ep.value} (dist: {dist_name})")
+                activate_fn = ep.load()
+                activate_fn(marketplace)
+                activated = True
+                logger.info(f"Successfully activated {ep.name}")
+        except Exception as e:
+            logger.warning(f"Failed to process entry point {ep.name}: {e}")
+
+    if not activated:
+        # Fallback: try direct module import (for packages without entry points)
+        # If a local path was provided, add its source directory to sys.path
+        if local_path is not None:
+            _add_source_to_path(local_path)
+
+        import importlib
+        module_name = package_name.replace('-', '_')
+        try:
+            if module_name in sys.modules:
+                importlib.reload(sys.modules[module_name])
+            else:
+                importlib.import_module(module_name)
+
+            module = sys.modules.get(module_name)
+            if module and hasattr(module, 'activate'):
+                logger.info(f"Calling activate() on {module_name}")
+                module.activate(marketplace)
+            else:
+                logger.warning(f"Package {package_name} does not have an activate() function")
+        except ImportError as e:
+            logger.warning(f"Could not import {module_name}: {e}")
 
 
 def handle_get_marketplace(params: dict) -> List[dict]:
@@ -510,6 +881,7 @@ def _recipe_descriptor_to_dict(descriptor) -> dict:
             }
             for name, value, opt in descriptor.options
         ],
+        'dataTables': descriptor.data_tables,
         'recipeList': [_recipe_descriptor_to_dict(r) for r in descriptor.recipe_list],
     }
 
@@ -533,6 +905,8 @@ _execution_contexts: Dict[str, Any] = {}
 _recipe_accumulators: Dict[str, Any] = {}
 # Phase tracking for recipes - maps recipe IDs to 'scan' or 'edit'
 _recipe_phases: Dict[str, str] = {}
+# Data table output directory - if set, data tables will be written to CSV files
+_data_table_output_dir: Optional[str] = None
 
 
 def handle_prepare_recipe(params: dict) -> dict:
@@ -545,17 +919,24 @@ def handle_prepare_recipe(params: dict) -> dict:
     4. Returning the descriptor and visitor info
 
     Args:
-        params: dict with 'id' (recipe name) and optional 'options'
+        params: dict with 'id' (recipe name), optional 'options', and optional 'dataTableOutputDir'
 
     Returns:
         dict with 'id', 'descriptor', 'editVisitor', and precondition info
     """
+    global _data_table_output_dir
+
     recipe_name = params.get('id')
     if recipe_name is None:
         raise ValueError("Recipe 'id' is required")
     options = params.get('options', {})
 
-    logger.info(f"PrepareRecipe: id={recipe_name}, options={options}")
+    # Set up data table output directory if specified
+    if 'dataTableOutputDir' in params:
+        _data_table_output_dir = params['dataTableOutputDir']
+        logger.info(f"Data table output directory set to: {_data_table_output_dir}")
+
+    logger.debug(f"PrepareRecipe: id={recipe_name}, options={options}")
 
     marketplace = _get_marketplace()
 
@@ -594,7 +975,7 @@ def handle_prepare_recipe(params: dict) -> dict:
         'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
     }
 
-    logger.info(f"PrepareRecipe response: {response}")
+    logger.debug(f"PrepareRecipe response: {response}")
     return response
 
 
@@ -632,7 +1013,7 @@ def handle_visit(params: dict) -> dict:
     if tree_id is None:
         raise ValueError("'treeId' is required")
 
-    logger.info(f"Visit: visitor={visitor_name}, treeId={tree_id}, p={p_id}")
+    logger.debug(f"Visit: visitor={visitor_name}, treeId={tree_id}, p={p_id}")
 
     # Get or create execution context
     if p_id and p_id in _execution_contexts:
@@ -640,6 +1021,12 @@ def handle_visit(params: dict) -> dict:
     else:
         from rewrite import InMemoryExecutionContext
         ctx = InMemoryExecutionContext()
+        # Set up data table store if output directory is configured
+        if _data_table_output_dir:
+            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
+            store = CsvDataTableStore(_data_table_output_dir)
+            store.accept_rows(True)
+            ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
 
@@ -677,7 +1064,7 @@ def handle_visit(params: dict) -> dict:
     else:
         modified = False
 
-    logger.info(f"Visit result: modified={modified}, tree_id={tree_id}, before.id={before.id}, after.id={after.id if after else None}")
+    logger.debug(f"Visit result: modified={modified}, tree_id={tree_id}, before.id={before.id}, after.id={after.id if after else None}")
     return {'modified': modified}
 
 
@@ -759,7 +1146,7 @@ def handle_generate(params: dict) -> dict:
     if recipe_id is None:
         raise ValueError("'id' is required")
 
-    logger.info(f"Generate: id={recipe_id}, p={p_id}")
+    logger.debug(f"Generate: id={recipe_id}, p={p_id}")
 
     recipe = _prepared_recipes.get(recipe_id)
     if recipe is None:
@@ -771,6 +1158,12 @@ def handle_generate(params: dict) -> dict:
     else:
         from rewrite import InMemoryExecutionContext
         ctx = InMemoryExecutionContext()
+        # Set up data table store if output directory is configured
+        if _data_table_output_dir:
+            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
+            store = CsvDataTableStore(_data_table_output_dir)
+            store.accept_rows(True)
+            ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
 
@@ -809,6 +1202,7 @@ def handle_request(method: str, params: dict) -> Any:
         'GetLanguages': handle_get_languages,
         'Print': handle_print,
         'Reset': handle_reset,
+        'InstallRecipes': handle_install_recipes,
         'GetMarketplace': handle_get_marketplace,
         'PrepareRecipe': handle_prepare_recipe,
         'Visit': handle_visit,
@@ -1015,6 +1409,10 @@ def main():
             method = message.get('method')
             params = message.get('params', {})
 
+            if method is None:
+                logger.error("Missing 'method' in request")
+                continue
+
             try:
                 result = handle_request(method, params)
                 response = {
@@ -1023,8 +1421,7 @@ def main():
                     'result': result
                 }
             except Exception as e:
-                logger.error(f"Error handling request: {e}")
-                traceback.print_exc()
+                logger.exception(f"Error handling request: {e}")
                 # Include full stack trace in error response for debugging
                 tb_str = traceback.format_exc()
                 response = {
@@ -1043,9 +1440,10 @@ def main():
             write_message(response)
 
         except Exception as e:
-            logger.error(f"Fatal error: {e}")
-            traceback.print_exc()
+            logger.exception(f"Fatal error: {e}")
             break
+
+    # No ty-types cleanup needed here — clients are scoped per parse batch
 
     logger.info("Python RPC server shutting down...")
 

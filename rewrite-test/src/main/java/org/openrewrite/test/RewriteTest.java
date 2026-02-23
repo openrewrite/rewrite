@@ -29,6 +29,8 @@ import org.openrewrite.remote.Remote;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
@@ -174,19 +176,25 @@ public interface RewriteTest extends SourceSpecs {
             assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                     .as("Recipe must be serializable/deserializable")
                     .isEqualTo(recipe);
-            assertThatCode(() -> {
-                Recipe r = new RecipeLoader(recipe.getClass().getClassLoader())
-                        .load(recipe.getClass(), null);
-                // getRecipeList should not fail with default parameters from RecipeLoader.
-                r.getRecipeList();
-                // We add recipes to HashSet in some places, we need to validate that hashCode and equals does not fail.
-                //noinspection ResultOfMethodCallIgnored
-                r.hashCode();
-                //noinspection EqualsWithItself,ResultOfMethodCallIgnored
-                r.equals(r);
-            })
-                    .as("Recipe must be able to instantiate via RecipeLoader")
-                    .doesNotThrowAnyException();
+            // Skip RecipeLoader null-instantiation test for Kotlin recipes with required options,
+            // as Jackson's Kotlin module enforces non-nullability and will fail when trying to
+            // instantiate with null arguments. The serialization round-trip test above still
+            // validates that actual recipe instances work correctly.
+            if (!RewriteTestUtils.isKotlinRecipeWithRequiredOptions(recipe.getClass())) {
+                assertThatCode(() -> {
+                    Recipe r = new RecipeLoader(recipe.getClass().getClassLoader())
+                            .load(recipe.getClass(), null);
+                    // getRecipeList should not fail with default parameters from RecipeLoader.
+                    r.getRecipeList();
+                    // We add recipes to HashSet in some places, we need to validate that hashCode and equals does not fail.
+                    //noinspection ResultOfMethodCallIgnored
+                    r.hashCode();
+                    //noinspection EqualsWithItself,ResultOfMethodCallIgnored
+                    r.equals(r);
+                })
+                        .as("Recipe must be able to instantiate via RecipeLoader")
+                        .doesNotThrowAnyException();
+            }
             validateRecipeNameAndDescription(recipe);
             validateRecipeOptions(recipe);
         }
@@ -297,7 +305,7 @@ public interface RewriteTest extends SourceSpecs {
 
                 SourceSpec<?> nextSpec = sourceSpecIter.next();
                 for (Marker marker : nextSpec.getMarkers()) {
-                    markers = markers.setByType(marker);
+                    markers = markers.add(marker);
                 }
                 sourceFile = sourceFile.withMarkers(markers);
 
@@ -383,6 +391,13 @@ public interface RewriteTest extends SourceSpecs {
             recipeCtx = testMethodSpec.getRecipeExecutionContext();
         } else if (testClassSpec.getRecipeExecutionContext() != null) {
             recipeCtx = testClassSpec.getRecipeExecutionContext();
+        }
+
+        // Apply customizations (like Maven settings) to recipe execution context when different from parsing context
+        if (recipeCtx != ctx) {
+            for (SourceSpec<?> s : sourceSpecs) {
+                s.customizeExecutionContext.accept(recipeCtx);
+            }
         }
 
         LargeSourceSet lss;
@@ -709,6 +724,30 @@ public interface RewriteTest extends SourceSpecs {
 }
 
 class RewriteTestUtils {
+
+    /**
+     * Checks if a Kotlin recipe class has required options that will fail when
+     * instantiated with null arguments via Jackson. This is because Jackson's
+     * Kotlin module enforces non-nullability for Kotlin classes.
+     * <p>
+     * This check only applies to Kotlin classes since Java classes can have
+     * null values for any parameter type.
+     */
+    static boolean isKotlinRecipeWithRequiredOptions(Class<?> recipeClass) {
+        for (Annotation a : recipeClass.getDeclaredAnnotations()) {
+            if ("kotlin.Metadata".equals(a.annotationType().getName())) {
+                // Check for @Option fields with required=true (which is the default)
+                for (Field field : recipeClass.getDeclaredFields()) {
+                    Option option = field.getAnnotation(Option.class);
+                    if (option != null && option.required()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     static boolean groupSourceSpecsByParser(List<Parser.Builder> parserBuilders, Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser, SourceSpec<?> sourceSpec) {
         for (Map.Entry<Parser.Builder, List<SourceSpec<?>>> entry : sourceSpecsByParser.entrySet()) {
             if (entry.getKey().getSourceFileType().equals(sourceSpec.sourceFileType) && sourceSpec.getParser().getClass().isAssignableFrom(entry.getKey().getClass())) {
