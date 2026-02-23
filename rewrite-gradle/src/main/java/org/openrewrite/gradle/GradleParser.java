@@ -37,7 +37,7 @@ import static java.util.Collections.singletonList;
 @RequiredArgsConstructor
 public class GradleParser implements Parser {
     @SuppressWarnings("LanguageMismatch")
-    private static final String KTS_BUILD_STUBS = "" +
+    private static final String KTS_BUILD_STUBS =
             "package org.gradle.api\n" +
             "import org.gradle.plugin.use.PluginDependenciesSpec\n" +
             "import org.gradle.plugin.use.PluginDependencySpec\n" +
@@ -45,7 +45,7 @@ public class GradleParser implements Parser {
             "fun PluginDependenciesSpec.kotlin(module: String): PluginDependencySpec = id(module)\n";
 
     @SuppressWarnings("LanguageMismatch")
-    private static final String KTS_SETTINGS_STUBS = "" +
+    private static final String KTS_SETTINGS_STUBS =
             "package org.gradle.api.initialization\n" +
             "import org.gradle.plugin.use.PluginDependenciesSpec\n" +
             "import org.gradle.plugin.use.PluginDependencySpec\n" +

@@ -25,6 +25,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.tree.K;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -34,6 +35,8 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
     // Wildcard type because KTS extension functions have a file-level declaring type, not Project/Settings
     MethodMatcher pluginsMatcher = new MethodMatcher("* plugins(..)", false);
     MethodMatcher applyPluginMatcher = new MethodMatcher("org.gradle.api.Project apply(..)", true);
+    MethodMatcher buildPluginsContainerMatcher = new MethodMatcher("org.gradle.api.Project plugins(..)", true);
+    MethodMatcher settingsPluginsContainerMatcher = new MethodMatcher("org.gradle.api.initialization.Settings plugins(..)", true);
 
     MethodMatcher pluginIdMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependenciesSpec id(..)", true);
     MethodMatcher pluginVersionMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependencySpec version(..)", true);
@@ -93,13 +96,16 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
         }));
     }
 
+    private boolean isPluginsMethod(J.MethodInvocation m) {
+        // Specifically for Kotlin type information is still missing; match strongly where possible for Groovy
+        return getCursor().firstEnclosing(K.CompilationUnit.class) != null ?
+                pluginsMatcher.matches(m) :
+                buildPluginsContainerMatcher.matches(m, true) || settingsPluginsContainerMatcher.matches(m);
+    }
+
     private boolean isPluginLiteral(Expression expression) {
         return expression instanceof J.Literal &&
                 pluginId.equals(((J.Literal) expression).getValue());
-    }
-
-    private boolean isPluginsMethod(J.MethodInvocation m) {
-        return pluginsMatcher.matches(m, true);
     }
 
     private boolean isIdMethodInvocation(@Nullable Expression expr) {
