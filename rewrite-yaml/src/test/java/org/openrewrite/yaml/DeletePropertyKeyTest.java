@@ -553,13 +553,11 @@ class DeletePropertyKeyTest implements RewriteTest {
             """
               root:
                 keep: yes # inline comment
-                other: data
                 delete-me: val
               """,
             """
               root:
                 keep: yes # inline comment
-                other: data
               """
           )
         );
