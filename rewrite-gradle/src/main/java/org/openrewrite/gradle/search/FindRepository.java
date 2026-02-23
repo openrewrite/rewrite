@@ -61,13 +61,15 @@ public class FindRepository extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        MethodMatcher pluginManagementMatcher = new MethodMatcher("RewriteSettings pluginManagement(..)");
+        MethodMatcher buildscriptMatcher = new MethodMatcher("RewriteGradleProject buildscript(..)");
         return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (purpose == null) {
                     return new RepositoryVisitor().visitMethodInvocation(method, ctx);
                 } else {
-                    boolean isPluginBlock = "pluginManagement".equals(method.getSimpleName()) || "buildscript".equals(method.getSimpleName());
+                    boolean isPluginBlock = pluginManagementMatcher.matches(method, true) || buildscriptMatcher.matches(method, true);
                     if ((purpose == Purpose.Project && !isPluginBlock) ||
                         (purpose == Purpose.Plugin && isPluginBlock)) {
                         return new RepositoryVisitor().visitMethodInvocation(method, ctx);
