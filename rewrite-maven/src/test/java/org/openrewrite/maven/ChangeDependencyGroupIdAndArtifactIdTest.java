@@ -3427,7 +3427,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                       <dependency>
                           <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
                           <artifactId>jackson-jakarta-rs-json-provider</artifactId>
-                          <version>2.21.0</version>
+                          <version>2.21.1</version>
                       </dependency>
                   </dependencies>
               </project>
