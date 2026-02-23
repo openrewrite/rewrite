@@ -3489,16 +3489,18 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1330")
     @Test
-    void exclusionUpdatedWhenDependencyGroupIdChanges() {
-        // When changing a dependency's groupId/artifactId, any exclusions that match
-        // the old coordinates should be updated to match the new coordinates.
+    void exclusionNotUpdatedWhenDependencyGroupIdChanges() {
+        // When changing a dependency's groupId/artifactId, exclusions that match
+        // the old coordinates should NOT be updated. The exclusion exists to block
+        // the old transitive dependency, and other libraries may still depend on
+        // the old artifact transitively.
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "com.fasterxml.jackson.jaxrs",
             "jackson-jaxrs-json-provider",
             "com.fasterxml.jackson.jakarta.rs",
             "jackson-jakarta-rs-json-provider",
-            "2.x",
+            "2.18.x",
             null
           )),
           pomXml(

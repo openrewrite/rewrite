@@ -122,8 +122,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
     }
 
     String description = "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before. " +
-                "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided. " +
-                "Exclusions that reference the old dependency coordinates will also be updated to match the new coordinates.";
+                "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided.";
 
     @Override
     public Validated<Object> validate() {
@@ -269,12 +268,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                             newGroupId,
                             newArtifactId,
                             newVersion, versionPattern).getVisitor());
-                }
-                // Update any exclusions that reference the old coordinates
-                if (newGroupId != null || newArtifactId != null) {
-                    doAfterVisit(new ChangeExclusion(
-                            oldGroupId, oldArtifactId,
-                            newGroupId, newArtifactId).getVisitor());
                 }
                 return super.visitDocument(document, ctx);
             }
