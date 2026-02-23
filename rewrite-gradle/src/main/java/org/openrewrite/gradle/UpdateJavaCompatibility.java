@@ -42,8 +42,8 @@ import static org.openrewrite.Tree.randomId;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpdateJavaCompatibility extends Recipe {
-    private static final MethodMatcher SOURCE_COMPATIBILITY_DSL = new MethodMatcher("RewriteGradleProject setSourceCompatibility(..)");
-    private static final MethodMatcher TARGET_COMPATIBILITY_DSL = new MethodMatcher("RewriteGradleProject setTargetCompatibility(..)");
+    private static final MethodMatcher SOURCE_COMPATIBILITY_DSL = new MethodMatcher("org.gradle.api.Project setSourceCompatibility(..)", true);
+    private static final MethodMatcher TARGET_COMPATIBILITY_DSL = new MethodMatcher("org.gradle.api.Project setTargetCompatibility(..)", true);
 
     @Option(displayName = "Java version",
             description = "The Java version to upgrade to.",

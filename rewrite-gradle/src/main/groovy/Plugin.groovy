@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-interface PluginSpec {
+interface PluginSpec extends org.gradle.plugin.use.PluginDependenciesSpec {
     Plugin id(String i)
 }
 
-interface Plugin {
+interface Plugin extends org.gradle.plugin.use.PluginDependencySpec {
     Plugin version(String v)
     Plugin apply(boolean a)
 }

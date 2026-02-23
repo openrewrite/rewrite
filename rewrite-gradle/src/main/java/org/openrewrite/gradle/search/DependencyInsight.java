@@ -53,7 +53,7 @@ public class DependencyInsight extends Recipe {
     transient ExplainDependenciesInUse explainDependenciesInUse = new ExplainDependenciesInUse(this);
 
     private static final MethodMatcher DEPENDENCY_CONFIGURATION_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
-    private static final MethodMatcher DEPENDENCY_CLOSURE_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
+    private static final MethodMatcher DEPENDENCY_CLOSURE_MATCHER = new MethodMatcher("org.gradle.api.Project dependencies(..)", true);
     private static final Function<Object, Set<GroupArtifactVersion>> EMPTY = gav -> new HashSet<>();
 
     @Option(displayName = "Group pattern",

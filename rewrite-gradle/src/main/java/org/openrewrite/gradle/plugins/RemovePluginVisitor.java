@@ -25,23 +25,19 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.kotlin.tree.K;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
     String pluginId;
 
-    MethodMatcher buildPluginsContainerMatcher = new MethodMatcher("RewriteGradleProject plugins(..)");
-    MethodMatcher applyPluginMatcher = new MethodMatcher("RewriteGradleProject apply(..)");
-    MethodMatcher settingsPluginsContainerMatcher = new MethodMatcher("RewriteSettings plugins(..)");
+    MethodMatcher buildPluginsContainerMatcher = new MethodMatcher("org.gradle.api.Project plugins(..)", true);
+    MethodMatcher applyPluginMatcher = new MethodMatcher("org.gradle.api.Project apply(..)", true);
+    MethodMatcher settingsPluginsContainerMatcher = new MethodMatcher("org.gradle.api.initialization.Settings plugins(..)", true);
 
-    MethodMatcher buildPluginMatcher = new MethodMatcher("PluginSpec id(..)");
-    MethodMatcher buildPluginWithVersionMatcher = new MethodMatcher("Plugin version(..)");
-    MethodMatcher buildPluginWithApplyMatcher = new MethodMatcher("Plugin apply(..)");
-    MethodMatcher settingsPluginMatcher = new MethodMatcher("PluginSpec id(..)");
-    MethodMatcher settingsPluginWithVersionMatcher = new MethodMatcher("Plugin version(..)");
-    MethodMatcher settingsPluginWithApplyMatcher = new MethodMatcher("Plugin apply(..)");
+    MethodMatcher pluginIdMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependenciesSpec id(..)", true);
+    MethodMatcher pluginVersionMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependencySpec version(..)", true);
+    MethodMatcher pluginApplyMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependencySpec apply(..)", true);
 
     @Override
     public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
@@ -52,10 +48,8 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
             return b;
         }
 
-        boolean isKotlin = getCursor().firstEnclosing(K.CompilationUnit.class) != null;
-        boolean isPluginsBlock = isKotlin ?
-                "plugins".equals(enclosingMethod.getSimpleName()) :
-                buildPluginsContainerMatcher.matches(enclosingMethod) || settingsPluginsContainerMatcher.matches(enclosingMethod);
+        boolean isPluginsBlock = buildPluginsContainerMatcher.matches(enclosingMethod) || settingsPluginsContainerMatcher.matches(enclosingMethod) ||
+                "plugins".equals(enclosingMethod.getSimpleName());
         if (!isPluginsBlock) {
             return b;
         }
@@ -71,28 +65,28 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
             }
 
             // Check for id("pluginId")
-            if (isIdMethodInvocation(m, isKotlin)) {
+            if (isIdMethodInvocation(m)) {
                 if (isPluginLiteral(m.getArguments().get(0))) {
                     return null;
                 }
             }
             // Check for id("pluginId").version("...")
-            else if (isVersionMethodInvocation(m, isKotlin)) {
+            else if (isVersionMethodInvocation(m)) {
                 if (m.getSelect() instanceof J.MethodInvocation &&
                         isPluginLiteral(((J.MethodInvocation) m.getSelect()).getArguments().get(0))) {
                     return null;
                 }
             }
             // Check for id("pluginId").apply(...) or id("pluginId").version("...").apply(...)
-            else if (isApplyMethodInvocation(m, isKotlin)) {
-                if (isIdMethodInvocation(m.getSelect(), isKotlin)) {
+            else if (isApplyMethodInvocation(m)) {
+                if (isIdMethodInvocation(m.getSelect())) {
                     if (m.getSelect() instanceof J.MethodInvocation &&
                             isPluginLiteral(((J.MethodInvocation) m.getSelect()).getArguments().get(0))) {
                         return null;
                     }
-                } else if (isVersionMethodInvocation(m.getSelect(), isKotlin)) {
+                } else if (isVersionMethodInvocation(m.getSelect())) {
                     if (m.getSelect() instanceof J.MethodInvocation &&
-                            isIdMethodInvocation(((J.MethodInvocation) m.getSelect()).getSelect(), isKotlin)) {
+                            isIdMethodInvocation(((J.MethodInvocation) m.getSelect()).getSelect())) {
                         if (((J.MethodInvocation) m.getSelect()).getSelect() instanceof J.MethodInvocation &&
                                 isPluginLiteral(((J.MethodInvocation) ((J.MethodInvocation) m.getSelect()).getSelect()).getArguments().get(0))) {
                             return null;
@@ -110,46 +104,37 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
                 pluginId.equals(((J.Literal) expression).getValue());
     }
 
-    private boolean isIdMethodInvocation(@Nullable Expression expr, boolean isKotlin) {
+    private boolean isIdMethodInvocation(@Nullable Expression expr) {
         if (!(expr instanceof J.MethodInvocation)) {
             return false;
         }
         J.MethodInvocation m = (J.MethodInvocation) expr;
-        return isKotlin ?
-                "id".equals(m.getSimpleName()) :
-                (buildPluginMatcher.matches(m) || settingsPluginMatcher.matches(m));
+        return pluginIdMatcher.matches(m) || "id".equals(m.getSimpleName());
     }
 
-    private boolean isVersionMethodInvocation(@Nullable Expression expr, boolean isKotlin) {
+    private boolean isVersionMethodInvocation(@Nullable Expression expr) {
         if (!(expr instanceof J.MethodInvocation)) {
             return false;
         }
         J.MethodInvocation m = (J.MethodInvocation) expr;
-        return isKotlin ?
-                "version".equals(m.getSimpleName()) :
-                (buildPluginWithVersionMatcher.matches(m) || settingsPluginWithVersionMatcher.matches(m));
+        return pluginVersionMatcher.matches(m) || "version".equals(m.getSimpleName());
     }
 
-    private boolean isApplyMethodInvocation(@Nullable Expression expr, boolean isKotlin) {
+    private boolean isApplyMethodInvocation(@Nullable Expression expr) {
         if (!(expr instanceof J.MethodInvocation)) {
             return false;
         }
         J.MethodInvocation m = (J.MethodInvocation) expr;
-        return isKotlin ?
-                "apply".equals(m.getSimpleName()) :
-                (buildPluginWithApplyMatcher.matches(m) || settingsPluginWithApplyMatcher.matches(m));
+        return pluginApplyMatcher.matches(m) || "apply".equals(m.getSimpleName());
     }
 
     @Override
     public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
         J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
 
-        boolean isKotlin = getCursor().firstEnclosing(K.CompilationUnit.class) != null;
-
         // Check for empty plugins{} block
-        boolean isPluginsMethod = isKotlin ?
-                "plugins".equals(m.getSimpleName()) :
-                (buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m));
+        boolean isPluginsMethod = buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m) ||
+                "plugins".equals(m.getSimpleName());
 
         if (isPluginsMethod) {
             if (m.getArguments().get(0) instanceof J.Lambda &&
@@ -159,7 +144,7 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
             }
         }
         // Check for TOP-LEVEL apply plugin: "..." or apply(plugin = "...")
-        else if ((isKotlin && "apply".equals(m.getSimpleName())) || (!isKotlin && applyPluginMatcher.matches(m))) {
+        else if (applyPluginMatcher.matches(m) || "apply".equals(m.getSimpleName())) {
             for (Expression arg : m.getArguments()) {
                 if (arg instanceof G.MapEntry) {
                     G.MapEntry me = (G.MapEntry) arg;
