@@ -2182,7 +2182,7 @@ class ParserVisitor(ast.NodeVisitor):
             None,
             body,
             None,
-            self.__as_method_type(self._type_mapping.type(node)),
+            self._type_mapping.method_declaration_type(node),
         )
 
     def __map_decorator(self, decorator) -> j.Annotation:
@@ -2871,7 +2871,7 @@ class ParserVisitor(ast.NodeVisitor):
                      enumerate(slices)],
                     Markers.EMPTY
                 ),
-                None
+                self._type_mapping.type(node)
             )
         elif isinstance(node, ast.BinOp):
             # Type unions using `|` was added in Python 3.10
