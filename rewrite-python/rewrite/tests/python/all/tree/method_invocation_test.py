@@ -1,4 +1,7 @@
+import json
 import shutil
+import subprocess
+import tempfile
 
 import pytest
 
@@ -11,6 +14,30 @@ from rewrite.test import RecipeSpec, python
 requires_ty_cli = pytest.mark.skipif(
     shutil.which('ty-types') is None,
     reason="ty-types CLI is not installed"
+)
+
+
+def _ty_types_has_module_name() -> bool:
+    """Check if the installed ty-types CLI provides moduleName on function descriptors."""
+    if shutil.which('ty-types') is None:
+        return False
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write('from os.path import join\njoin("a", "b")\n')
+            fname = f.name
+        result = subprocess.run(['ty-types', fname], capture_output=True, text=True, timeout=30)
+        data = json.loads(result.stdout)
+        return any(
+            d.get('kind') == 'function' and 'moduleName' in d
+            for d in data.get('types', {}).values()
+        )
+    except Exception:
+        return False
+
+
+requires_module_name = pytest.mark.skipif(
+    not _ty_types_has_module_name(),
+    reason="ty-types CLI does not provide moduleName on function descriptors"
 )
 
 
@@ -245,6 +272,46 @@ def test_generic_call_site_return_type():
         def identity[T](x: T) -> T:
             return x
         result = identity(42)
+        """,
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+
+@requires_module_name
+def test_bare_function_declaring_type_has_module():
+    """Verify that a bare function call imported from a module gets a declaring type with the module name."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_method_invocation(self, method, p):
+                if not isinstance(method, MethodInvocation):
+                    return method
+                if method.name.simple_name != 'join':
+                    return method
+                if method.method_type is None:
+                    errors.append("MethodInvocation.method_type is None for join()")
+                else:
+                    dt = method.method_type.declaring_type
+                    if dt is None:
+                        errors.append("method_type.declaring_type is None for join()")
+                    elif not hasattr(dt, '_fully_qualified_name') or 'posixpath' not in dt._fully_qualified_name:
+                        errors.append(
+                            f"declaring_type fqn is '{getattr(dt, '_fully_qualified_name', '?')}', "
+                            f"expected to contain 'posixpath' (os.path module)"
+                        )
+                return method
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        """\
+        from os.path import join
+        x = join("a", "b")
         """,
         after_recipe=check_types,
     ))

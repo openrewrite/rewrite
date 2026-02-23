@@ -139,7 +139,6 @@ def test_qualified_import_type_attribution():
 
 
 @requires_ty_cli
-@pytest.mark.xfail(reason="from-import direct calls do not yet populate declaring_type")
 def test_from_import_type_attribution():
     """from os import getcwd; getcwd() → declaring_type.fqn == 'os'."""
     errors = []
