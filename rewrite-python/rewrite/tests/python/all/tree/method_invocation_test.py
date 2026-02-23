@@ -207,3 +207,45 @@ def test_stdlib_function_type_attribution():
         after_recipe=check_types,
     ))
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+
+@requires_ty_cli
+def test_generic_call_site_return_type():
+    """Verify method_invocation_type returns call-site-specific return type for generic functions."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_method_invocation(self, method, p):
+                if not isinstance(method, MethodInvocation):
+                    return method
+                if method.name.simple_name != 'identity':
+                    return method
+                if method.method_type is None:
+                    errors.append("MethodInvocation.method_type is None for identity()")
+                else:
+                    mt = method.method_type
+                    if mt._return_type is None:
+                        errors.append("method_type.return_type is None")
+                    elif mt._return_type != JavaType.Primitive.Int:
+                        errors.append(f"method_type.return_type is {mt._return_type}, expected Primitive.Int")
+                    if mt._declared_formal_type_names is None:
+                        errors.append("method_type._declared_formal_type_names is None")
+                    elif 'T' not in mt._declared_formal_type_names:
+                        errors.append(f"method_type._declared_formal_type_names is {mt._declared_formal_type_names}, expected to contain 'T'")
+                return method
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        """\
+        def identity[T](x: T) -> T:
+            return x
+        result = identity(42)
+        """,
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
