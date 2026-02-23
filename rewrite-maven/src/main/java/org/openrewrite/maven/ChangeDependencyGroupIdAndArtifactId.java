@@ -122,7 +122,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
     }
 
     String description = "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before. " +
-                "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided.";
+                "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided. " +
+                "Exclusions that reference the old dependency coordinates are preserved, and a sibling exclusion for the new coordinates is added alongside them.";
 
     @Override
     public Validated<Object> validate() {
@@ -268,6 +269,36 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                             newGroupId,
                             newArtifactId,
                             newVersion, versionPattern).getVisitor());
+                }
+                // Add sibling exclusions for the new coordinates alongside existing old exclusions
+                if (newGroupId != null || newArtifactId != null) {
+                    String effectiveNewGroupId = newGroupId != null ? newGroupId : oldGroupId;
+                    String effectiveNewArtifactId = newArtifactId != null ? newArtifactId : oldArtifactId;
+                    doAfterVisit(new MavenVisitor<ExecutionContext>() {
+                        @Override
+                        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                            Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+                            if (!"exclusions".equals(t.getName())) {
+                                return t;
+                            }
+                            boolean hasOldExclusion = t.getChildren("exclusion").stream()
+                                    .anyMatch(e -> matchesGlob(e.getChildValue("groupId").orElse(null), oldGroupId) &&
+                                                   matchesGlob(e.getChildValue("artifactId").orElse(null), oldArtifactId));
+                            boolean hasNewExclusion = t.getChildren("exclusion").stream()
+                                    .anyMatch(e -> effectiveNewGroupId.equals(e.getChildValue("groupId").orElse(null)) &&
+                                                   effectiveNewArtifactId.equals(e.getChildValue("artifactId").orElse(null)));
+                            if (hasOldExclusion && !hasNewExclusion) {
+                                t = (Xml.Tag) new AddToTagVisitor<>(t, Xml.Tag.build(
+                                        "<exclusion>\n" +
+                                        "<groupId>" + effectiveNewGroupId + "</groupId>\n" +
+                                        "<artifactId>" + effectiveNewArtifactId + "</artifactId>\n" +
+                                        "</exclusion>"))
+                                        .visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                                maybeUpdateModel();
+                            }
+                            return t;
+                        }
+                    });
                 }
                 return super.visitDocument(document, ctx);
             }

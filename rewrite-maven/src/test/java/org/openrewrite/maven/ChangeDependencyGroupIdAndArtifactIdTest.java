@@ -3489,11 +3489,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1330")
     @Test
-    void exclusionNotUpdatedWhenDependencyGroupIdChanges() {
+    void exclusionPreservedAndSiblingAddedWhenDependencyGroupIdChanges() {
         // When changing a dependency's groupId/artifactId, exclusions that match
-        // the old coordinates should NOT be updated. The exclusion exists to block
-        // the old transitive dependency, and other libraries may still depend on
-        // the old artifact transitively.
+        // the old coordinates should be preserved, and a sibling exclusion for the
+        // new coordinates should be added alongside them.
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "com.fasterxml.jackson.jaxrs",
@@ -3532,7 +3531,14 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               </project>
               """,
             spec -> spec.after(actual -> assertThat(actual)
-              .containsPattern("<groupId>com\\.fasterxml\\.jackson\\.jakarta\\.rs</groupId>\\s*<artifactId>jackson-jakarta-rs-json-provider</artifactId>\\s*<version>2\\.\\d+\\.\\d+</version>")
+              // Old exclusion preserved
+              .contains("<groupId>com.fasterxml.jackson.jaxrs</groupId>")
+              .contains("<artifactId>jackson-jaxrs-json-provider</artifactId>")
+              // Sibling exclusion added for new coordinates
+              .contains("<groupId>com.fasterxml.jackson.jakarta.rs</groupId>")
+              .contains("<artifactId>jackson-jakarta-rs-json-provider</artifactId>")
+              // Version updated
+              .containsPattern("<version>2\\.\\d+\\.\\d+</version>")
               .doesNotContain("<version>2.9.7</version>")
               .actual())
           )
@@ -3540,11 +3546,11 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void exclusionsForOldDependencyShouldNotBeChanged() {
+    void exclusionPreservedAndSiblingAddedForNewCoordinates() {
         // When changing commons-lang:commons-lang to org.apache.commons:commons-lang3,
-        // exclusions for commons-lang:commons-lang in OTHER dependencies should NOT be updated.
-        // The exclusion exists to block the old vulnerable transitive dependency, and
-        // other libraries may still transitively depend on commons-lang:commons-lang.
+        // the old exclusion for commons-lang:commons-lang should be preserved (to block
+        // the vulnerable transitive dependency), and a sibling exclusion for the new
+        // coordinates should be added alongside it.
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "commons-lang",
@@ -3581,32 +3587,15 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.apache.commons</groupId>
-                          <artifactId>commons-lang3</artifactId>
-                          <version>3.20.0</version>
-                      </dependency>
-                      <dependency>
-                          <groupId>org.apache.struts</groupId>
-                          <artifactId>struts2-core</artifactId>
-                          <version>2.5.30</version>
-                          <exclusions>
-                              <exclusion>
-                                  <groupId>commons-lang</groupId>
-                                  <artifactId>commons-lang</artifactId>
-                              </exclusion>
-                          </exclusions>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
+            spec -> spec.after(actual -> assertThat(actual)
+              // Direct dependency changed to commons-lang3
+              .containsPattern("<groupId>org\\.apache\\.commons</groupId>\\s*<artifactId>commons-lang3</artifactId>\\s*<version>3\\.\\d+\\.\\d+</version>")
+              .doesNotContain("<version>2.6</version>")
+              // Old exclusion preserved
+              .containsPattern("<exclusion>\\s*<groupId>commons-lang</groupId>\\s*<artifactId>commons-lang</artifactId>\\s*</exclusion>")
+              // Sibling exclusion added for new coordinates
+              .containsPattern("<exclusion>\\s*<groupId>org\\.apache\\.commons</groupId>\\s*<artifactId>commons-lang3</artifactId>\\s*</exclusion>")
+              .actual())
           )
         );
     }
