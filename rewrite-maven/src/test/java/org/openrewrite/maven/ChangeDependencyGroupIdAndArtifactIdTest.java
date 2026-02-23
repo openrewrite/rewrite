@@ -3538,6 +3538,78 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
+    void exclusionsForOldDependencyShouldNotBeChanged() {
+        // When changing commons-lang:commons-lang to org.apache.commons:commons-lang3,
+        // exclusions for commons-lang:commons-lang in OTHER dependencies should NOT be updated.
+        // The exclusion exists to block the old vulnerable transitive dependency, and
+        // other libraries may still transitively depend on commons-lang:commons-lang.
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "commons-lang",
+            "commons-lang",
+            "org.apache.commons",
+            "commons-lang3",
+            "3.x",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>commons-lang</groupId>
+                          <artifactId>commons-lang</artifactId>
+                          <version>2.6</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.apache.struts</groupId>
+                          <artifactId>struts2-core</artifactId>
+                          <version>2.5.30</version>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>commons-lang</groupId>
+                                  <artifactId>commons-lang</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.apache.commons</groupId>
+                          <artifactId>commons-lang3</artifactId>
+                          <version>3.20.0</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.apache.struts</groupId>
+                          <artifactId>struts2-core</artifactId>
+                          <version>2.5.30</version>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>commons-lang</groupId>
+                                  <artifactId>commons-lang</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldNotChangeDependencyWithImplicitlyDefinedVersionProperty() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
