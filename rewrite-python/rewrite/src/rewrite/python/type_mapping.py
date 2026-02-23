@@ -477,6 +477,17 @@ class PythonTypeMapping:
                     if interfaces:
                         class_type._interfaces = interfaces
 
+            # Populate type parameters from typeVar descriptors
+            type_params = descriptor.get('typeParameters', [])
+            if type_params and getattr(class_type, '_type_parameters', None) is None:
+                resolved_type_params = []
+                for tp_id in type_params:
+                    tp_type = self._resolve_type(tp_id)
+                    if tp_type is not None:
+                        resolved_type_params.append(tp_type)
+                if resolved_type_params:
+                    class_type._type_parameters = resolved_type_params
+
             # Populate methods from function/boundMethod members
             members = descriptor.get('members', [])
             if members and getattr(class_type, '_methods', None) is None:
@@ -532,6 +543,10 @@ class PythonTypeMapping:
 
         elif kind == 'property':
             return _UNKNOWN
+
+        elif kind == 'typeVar':
+            name = descriptor.get('name', '')
+            return self._create_class_type(name) if name else _UNKNOWN
 
         else:
             return _UNKNOWN
@@ -601,6 +616,16 @@ class PythonTypeMapping:
             return expr_type, JavaType.Variable(_name=node.id, _type=expr_type)
         return expr_type, None
 
+    def param_type_info(self, node: ast.arg) -> Tuple[Optional[JavaType], Optional[JavaType.Variable]]:
+        """Get expression type and variable type for a function parameter.
+
+        Returns (expression_type, variable_field_type).
+        """
+        expr_type = self.type(node)
+        if expr_type is None:
+            return None, None
+        return expr_type, JavaType.Variable(_name=node.arg, _type=expr_type)
+
     def attribute_type_info(self, node: ast.Attribute,
                             receiver_type: Optional[JavaType] = None
                             ) -> Tuple[Optional[JavaType], Optional[JavaType.Variable]]:
@@ -660,7 +685,13 @@ class PythonTypeMapping:
         if node.returns is not None:
             return_type = self.type(node.returns)
 
-        if not param_names and return_type is None:
+        # Extract type parameter names from Python 3.12+ type_params
+        type_param_names: List[str] = []
+        for tp in getattr(node, 'type_params', []) or []:
+            if hasattr(tp, 'name'):
+                type_param_names.append(tp.name)
+
+        if not param_names and return_type is None and not type_param_names:
             return None
 
         return JavaType.Method(
@@ -670,6 +701,7 @@ class PythonTypeMapping:
             _return_type=return_type,
             _parameter_names=param_names if param_names else None,
             _parameter_types=param_types if param_types else None,
+            _declared_formal_type_names=type_param_names if type_param_names else None,
         )
 
     def _method_from_function_descriptor(
@@ -690,6 +722,8 @@ class PythonTypeMapping:
         if ret_id is not None:
             return_type = self._resolve_type(ret_id)
 
+        type_param_names = self._extract_type_param_names(descriptor)
+
         return JavaType.Method(
             _flags_bit_map=0,
             _declaring_type=None,
@@ -697,6 +731,7 @@ class PythonTypeMapping:
             _return_type=return_type,
             _parameter_names=param_names if param_names else None,
             _parameter_types=param_types if param_types else None,
+            _declared_formal_type_names=type_param_names if type_param_names else None,
         )
 
     def method_invocation_type(self, node: ast.Call) -> Optional[JavaType.Method]:
@@ -729,6 +764,14 @@ class PythonTypeMapping:
         # Get return type
         return_type = self._get_return_type(node)
 
+        # Extract type parameter names from function descriptor
+        type_param_names: List[str] = []
+        func_type_id = self._lookup_func_type_id(node)
+        if func_type_id is not None:
+            func_desc = self._type_registry.get(func_type_id)
+            if func_desc:
+                type_param_names = self._extract_type_param_names(func_desc)
+
         return JavaType.Method(
             _flags_bit_map=0,
             _declaring_type=declaring_type,
@@ -736,6 +779,7 @@ class PythonTypeMapping:
             _return_type=return_type,
             _parameter_names=param_names if param_names else None,
             _parameter_types=param_types if param_types else None,
+            _declared_formal_type_names=type_param_names if type_param_names else None,
         )
 
     def _extract_method_name(self, node: ast.Call) -> Optional[str]:
@@ -1037,9 +1081,20 @@ class PythonTypeMapping:
     def _get_return_type(self, node: ast.Call) -> Optional[JavaType]:
         """Get the return type of a method call.
 
-        First tries the ExprCall node type (which IS the return type),
-        then falls back to the function descriptor's returnType field.
+        Prefers the call-site-specific returnTypeId from the call signature
+        (which gives resolved types like int instead of generic T),
+        then tries the ExprCall node type, then falls back to the function
+        descriptor's returnType field.
         """
+        # Prefer call-site-specific return type from call signature
+        sig = self._lookup_call_signature(node)
+        if sig:
+            ret_id = sig.get('returnTypeId')
+            if ret_id is not None:
+                result = self._resolve_type(ret_id)
+                if result is not None:
+                    return result
+
         # The type of an ExprCall node in ty-types IS the return type
         type_id = self._lookup_type_id(node)
         if type_id is not None:
@@ -1083,6 +1138,8 @@ class PythonTypeMapping:
             else:
                 param_types.append(_UNKNOWN)
 
+        type_param_names = self._extract_type_param_names(descriptor)
+
         return JavaType.Method(
             _flags_bit_map=0,
             _declaring_type=declaring_type,
@@ -1090,7 +1147,19 @@ class PythonTypeMapping:
             _return_type=return_type,
             _parameter_names=param_names if param_names else None,
             _parameter_types=param_types if param_types else None,
+            _declared_formal_type_names=type_param_names if type_param_names else None,
         )
+
+    def _extract_type_param_names(self, descriptor: Dict[str, Any]) -> List[str]:
+        """Extract type parameter names from a descriptor's typeParameters list."""
+        names: List[str] = []
+        for tp_id in descriptor.get('typeParameters', []):
+            tp_desc = self._type_registry.get(tp_id)
+            if tp_desc and tp_desc.get('kind') == 'typeVar':
+                name = tp_desc.get('name', '')
+                if name:
+                    names.append(name)
+        return names
 
     def _create_class_type(self, fqn: str) -> JavaType.Class:
         """Create a JavaType.Class from a fully qualified name."""
