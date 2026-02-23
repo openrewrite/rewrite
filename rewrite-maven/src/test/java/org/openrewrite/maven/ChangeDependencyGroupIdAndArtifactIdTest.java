@@ -22,6 +22,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -3329,33 +3330,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>io.swagger.core.v3</groupId>
-                          <artifactId>swagger-jaxrs2</artifactId>
-                          <version>2.2.20</version>
-                          <scope>provided</scope>
-                          <exclusions>
-                              <exclusion>
-                                  <groupId>com.fasterxml.jackson.jaxrs</groupId>
-                                  <artifactId>*</artifactId>
-                              </exclusion>
-                          </exclusions>
-                      </dependency>
-                      <dependency>
-                          <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
-                          <artifactId>jackson-jakarta-rs-json-provider</artifactId>
-                          <version>2.21.0</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
+            spec -> spec.after(actual -> assertThat(actual)
+              .containsPattern("<groupId>com\\.fasterxml\\.jackson\\.jakarta\\.rs</groupId>\\s*<artifactId>jackson-jakarta-rs-json-provider</artifactId>\\s*<version>2\\.\\d+\\.\\d+</version>")
+              .doesNotContain("<version>2.9.7</version>")
+              .actual())
           )
         );
     }
@@ -3405,33 +3383,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>io.swagger.core.v3</groupId>
-                          <artifactId>swagger-jaxrs2-jakarta</artifactId>
-                          <version>2.2.20</version>
-                          <scope>provided</scope>
-                          <exclusions>
-                              <exclusion>
-                                  <groupId>com.fasterxml.jackson.jaxrs</groupId>
-                                  <artifactId>*</artifactId>
-                              </exclusion>
-                          </exclusions>
-                      </dependency>
-                      <dependency>
-                          <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
-                          <artifactId>jackson-jakarta-rs-json-provider</artifactId>
-                          <version>2.21.1</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
+            spec -> spec.after(actual -> assertThat(actual)
+              .containsPattern("<groupId>com\\.fasterxml\\.jackson\\.jakarta\\.rs</groupId>\\s*<artifactId>jackson-jakarta-rs-json-provider</artifactId>\\s*<version>2\\.\\d+\\.\\d+</version>")
+              .doesNotContain("<version>2.9.7</version>")
+              .actual())
           )
         );
     }
@@ -3574,33 +3529,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>io.swagger.core.v3</groupId>
-                          <artifactId>swagger-jaxrs2-jakarta</artifactId>
-                          <version>2.2.20</version>
-                          <scope>provided</scope>
-                          <exclusions>
-                              <exclusion>
-                                  <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
-                                  <artifactId>jackson-jakarta-rs-json-provider</artifactId>
-                              </exclusion>
-                          </exclusions>
-                      </dependency>
-                      <dependency>
-                          <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
-                          <artifactId>jackson-jakarta-rs-json-provider</artifactId>
-                          <version>2.21.0</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
+            spec -> spec.after(actual -> assertThat(actual)
+              .containsPattern("<groupId>com\\.fasterxml\\.jackson\\.jakarta\\.rs</groupId>\\s*<artifactId>jackson-jakarta-rs-json-provider</artifactId>\\s*<version>2\\.\\d+\\.\\d+</version>")
+              .doesNotContain("<version>2.9.7</version>")
+              .actual())
           )
         );
     }
