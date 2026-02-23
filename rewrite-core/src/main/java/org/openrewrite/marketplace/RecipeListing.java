@@ -26,8 +26,6 @@ import org.openrewrite.config.RecipeDescriptor;
 import java.time.Duration;
 import java.util.*;
 
-import static java.util.Collections.singleton;
-
 @Getter
 @RequiredArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -92,10 +90,9 @@ public class RecipeListing implements Comparable<RecipeListing> {
 
     public static RecipeListing fromDescriptor(RecipeDescriptor descriptor, RecipeBundle bundle) {
         int recipeCount = 1;
-        RecipeDescriptor d = descriptor;
-        for (Queue<RecipeDescriptor> queue = new LinkedList<>(singleton(descriptor)); !queue.isEmpty();
-             d = queue.poll()) {
-            recipeCount += d.getRecipeList().size();
+        for (Queue<RecipeDescriptor> queue = new LinkedList<>(descriptor.getRecipeList()); !queue.isEmpty(); ) {
+            RecipeDescriptor d = queue.poll();
+            recipeCount++;
             queue.addAll(d.getRecipeList());
         }
 
