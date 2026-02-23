@@ -31,6 +31,8 @@ import org.openrewrite.java.tree.J;
 public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
     String pluginId;
 
+    // Wildcard type because KTS extension functions have a file-level declaring type, not Project/Settings
+    MethodMatcher pluginsMatcher = new MethodMatcher("* plugins(..)", false);
     MethodMatcher applyPluginMatcher = new MethodMatcher("org.gradle.api.Project apply(..)", true);
 
     MethodMatcher pluginIdMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependenciesSpec id(..)", true);
@@ -97,7 +99,7 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
     }
 
     private boolean isPluginsMethod(J.MethodInvocation m) {
-        return "plugins".equals(m.getSimpleName());
+        return pluginsMatcher.matches(m, true);
     }
 
     private boolean isIdMethodInvocation(@Nullable Expression expr) {
