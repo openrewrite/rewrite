@@ -300,7 +300,7 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
 
     private K.CompilationUnit addPluginToKotlinCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
         MethodMatcher pluginsMatcher = new MethodMatcher("*..* plugins(..)");
-        MethodMatcher pluginIdMatcher = new MethodMatcher("*..* id(..)");
+        MethodMatcher pluginIdMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependenciesSpec id(..)", true);
         AtomicBoolean hasPlugin = new JavaIsoVisitor<AtomicBoolean>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
