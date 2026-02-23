@@ -38,8 +38,10 @@ import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFir2IrPipelineArtifact;
 import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFir2IrPipelinePhase;
 import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFrontendPipelineArtifact;
 import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFrontendPipelinePhase;
+import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar;
 import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector;
 import org.jetbrains.kotlin.diagnostics.impl.SimpleDiagnosticsCollector;
+import org.openrewrite.kotlin.internal.ScriptCompilerPlugin;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
 import org.jetbrains.kotlin.com.intellij.openapi.util.text.StringUtilRt;
@@ -129,6 +131,8 @@ public class KotlinParser implements Parser {
     private final String moduleName;
     private final KotlinLanguageLevel languageLevel;
     private final boolean isKotlinScript;
+    private final List<String> scriptImplicitReceivers;
+    private final List<String> scriptDefaultImports;
 
     @Override
     public Stream<SourceFile> parse(@Language("kotlin") String... sources) {
@@ -274,6 +278,8 @@ public class KotlinParser implements Parser {
         private String moduleName = "main";
         private KotlinLanguageLevel languageLevel = KotlinLanguageLevel.KOTLIN_2_2;
         private boolean isKotlinScript = false;
+        private List<String> scriptImplicitReceivers = emptyList();
+        private List<String> scriptDefaultImports = emptyList();
 
         public Builder() {
             super(K.CompilationUnit.class);
@@ -286,6 +292,8 @@ public class KotlinParser implements Parser {
             this.typeCache = base.typeCache;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
+            this.scriptImplicitReceivers = base.scriptImplicitReceivers;
+            this.scriptDefaultImports = base.scriptDefaultImports;
         }
 
         public Builder logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
@@ -295,6 +303,16 @@ public class KotlinParser implements Parser {
 
         public Builder isKotlinScript(boolean isKotlinScript) {
             this.isKotlinScript = isKotlinScript;
+            return this;
+        }
+
+        public Builder scriptImplicitReceivers(String... fqns) {
+            this.scriptImplicitReceivers = Arrays.asList(fqns);
+            return this;
+        }
+
+        public Builder scriptDefaultImports(String... packages) {
+            this.scriptDefaultImports = Arrays.asList(packages);
             return this;
         }
 
@@ -371,7 +389,7 @@ public class KotlinParser implements Parser {
 
         @Override
         public KotlinParser build() {
-            return new KotlinParser(resolvedClasspath(), dependsOn, styles, logCompilationWarningsAndErrors, typeCache, moduleName, languageLevel, isKotlinScript);
+            return new KotlinParser(resolvedClasspath(), dependsOn, styles, logCompilationWarningsAndErrors, typeCache, moduleName, languageLevel, isKotlinScript, scriptImplicitReceivers, scriptDefaultImports);
         }
 
         @Override
@@ -561,6 +579,13 @@ public class KotlinParser implements Parser {
         compilerConfiguration.put(ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS, true);
         compilerConfiguration.put(INCREMENTAL_COMPILATION, true);
         compilerConfiguration.put(LINK_VIA_SIGNATURES, true);
+
+        if (!scriptImplicitReceivers.isEmpty() || !scriptDefaultImports.isEmpty()) {
+            compilerConfiguration.put(
+                    CompilerPluginRegistrar.Companion.getCOMPILER_PLUGIN_REGISTRARS(),
+                    singletonList(new ScriptCompilerPlugin(scriptImplicitReceivers, scriptDefaultImports))
+            );
+        }
 
         addJvmSdkRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
 

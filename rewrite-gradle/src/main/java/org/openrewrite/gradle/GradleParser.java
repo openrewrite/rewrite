@@ -66,6 +66,9 @@ public class GradleParser implements Parser {
             }
             kotlinBuildParser = KotlinParser.builder(base.kotlinParser)
                     .classpath(buildscriptClasspath)
+                    .isKotlinScript(true)
+                    .scriptImplicitReceivers("org.gradle.api.Project")
+                    .scriptDefaultImports(DefaultImportsCustomizer.DEFAULT_IMPORTS)
                     .build();
         }
         if (groovySettingsParser == null) {
@@ -88,6 +91,9 @@ public class GradleParser implements Parser {
             }
             kotlinSettingsParser = KotlinParser.builder(base.kotlinParser)
                     .classpath(settingsClasspath)
+                    .isKotlinScript(true)
+                    .scriptImplicitReceivers("org.gradle.api.initialization.Settings")
+                    .scriptDefaultImports(DefaultImportsCustomizer.DEFAULT_IMPORTS)
                     .build();
         }
 

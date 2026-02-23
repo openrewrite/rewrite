@@ -23,7 +23,6 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -31,9 +30,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.format.BlankLinesVisitor;
 import org.openrewrite.java.search.FindMethods;
-import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
@@ -525,18 +522,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     cu = (JavaSourceFile) Preconditions.check(
                             not(new JavaIsoVisitor<ExecutionContext>() {
                                 @Override
-                                public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                                    if (tree instanceof G.CompilationUnit) {
-                                        return new UsesMethod<>(CONSTRAINTS_MATCHER).visit(tree, ctx);
-                                    }
-                                    // Kotlin is not type attributed, so do things more manually
-                                    return super.visit(tree, ctx);
-                                }
-
-                                @Override
                                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                                     J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                                    if ("constraints".equals(m.getSimpleName()) && withinBlock(getCursor(), "dependencies")) {
+                                    if (CONSTRAINTS_MATCHER.matches(m) ||
+                                        ("constraints".equals(m.getSimpleName()) && withinBlock(getCursor(), "dependencies"))) {
                                         return SearchResult.found(m);
                                     }
                                     return m;
@@ -997,25 +986,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .map(constraintsLambda -> (J.Block) constraintsLambda.getBody())
                         .map(constraintsBlock -> (J.Return) constraintsBlock.getStatements().get(0))
                         .map(returnConfiguration -> (J.MethodInvocation) returnConfiguration.getExpression())
-                        .map(it -> it.withName(it.getName().withSimpleName(config))
-                                .withArguments(ListUtils.map(it.getArguments(), arg -> {
-                                    if (arg instanceof J.Literal) {
-                                        return ((J.Literal) requireNonNull(arg))
-                                                .withValue(gav.toString())
-                                                .withValueSource("'" + gav + "'");
-                                    } else if (arg instanceof J.Lambda && because != null) {
-                                        return (Expression) new GroovyIsoVisitor<Integer>() {
-                                            @Override
-                                            public J.Literal visitLiteral(J.Literal literal, Integer integer) {
-                                                return literal.withValue(because)
-                                                        .withValueSource("'" + because + "'");
-                                            }
-                                        }.visitNonNull(arg, 0);
-                                    }
-                                    return arg;
-                                })))
-                        // Assign a unique ID so multiple constraints can be added
-                        .map(it -> it.withId(Tree.randomId()))
+                        .map(it -> configureConstraint(it, config, gav, because))
                         .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
             } else {
                 constraint = parseAsGradle(because == null ? INDIVIDUAL_CONSTRAINT_SNIPPET_KOTLIN : INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_KOTLIN, true, ctx)
@@ -1028,22 +999,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .map(constraintsInvocation -> (J.Lambda) constraintsInvocation.getArguments().get(0))
                         .map(constraintsLambda -> (J.Block) constraintsLambda.getBody())
                         .map(constraintsBlock -> (J.MethodInvocation) constraintsBlock.getStatements().get(0))
-                        .map(it -> it.withName(it.getName().withSimpleName(config))
-                                .withArguments(ListUtils.map(it.getArguments(), arg -> {
-                                    if (arg instanceof J.Literal) {
-                                        return ChangeStringLiteral.withStringValue((J.Literal) requireNonNull(arg), gav.toString());
-                                    } else if (arg instanceof J.Lambda && because != null) {
-                                        return (Expression) new KotlinIsoVisitor<Integer>() {
-                                            @Override
-                                            public J.Literal visitLiteral(J.Literal literal, Integer integer) {
-                                                return ChangeStringLiteral.withStringValue(literal, because);
-                                            }
-                                        }.visitNonNull(arg, 0);
-                                    }
-                                    return arg;
-                                })))
-                        // Assign a unique ID so multiple constraints can be added
-                        .map(it -> it.withId(Tree.randomId()))
+                        .map(it -> configureConstraint(it, config, gav, because))
                         .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
             }
 
@@ -1061,6 +1017,20 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         ListUtils.concat(constraint, body.getStatements())));
             })), ctx, getCursor().getParentOrThrow());
         }
+    }
+
+    private static J.MethodInvocation configureConstraint(J.MethodInvocation constraint, String config,
+                                                           GroupArtifactVersion gav, @Nullable String because) {
+        return constraint.withName(constraint.getName().withSimpleName(config))
+                .withArguments(ListUtils.map(constraint.getArguments(), arg -> {
+                    if (arg instanceof J.Literal) {
+                        return ChangeStringLiteral.withStringValue((J.Literal) requireNonNull(arg), gav.toString());
+                    } else if (arg instanceof J.Lambda && because != null) {
+                        return ChangeStringLiteral.withStringValue((Expression) arg, because);
+                    }
+                    return arg;
+                }))
+                .withId(Tree.randomId());
     }
 
     @Value
@@ -1194,13 +1164,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .map(J.Return.class::cast)
                         .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
                         .map(J.Lambda.class::cast)
-                        .map(it -> (J.Lambda) new GroovyIsoVisitor<Integer>() {
-                            @Override
-                            public J.Literal visitLiteral(J.Literal literal, Integer integer) {
-                                return literal.withValue(because)
-                                        .withValueSource("'" + because + "'");
-                            }
-                        }.visitNonNull(it, 0))
+                        .map(it -> (J.Lambda) ChangeStringLiteral.withStringValue(it, because))
                         .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
             } else {
                 becauseArg = parseAsGradle(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_KOTLIN, true, ctx)
@@ -1216,13 +1180,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .map(J.Return.class::cast)
                         .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
                         .map(J.Lambda.class::cast)
-                        .map(it -> (J.Lambda) new KotlinIsoVisitor<Integer>() {
-                            @Override
-                            public J.Literal visitLiteral(J.Literal literal, Integer integer) {
-                                return literal.withValue(because)
-                                        .withValueSource("\"" + because + "\"");
-                            }
-                        }.visitNonNull(it, 0))
+                        .map(it -> (J.Lambda) ChangeStringLiteral.withStringValue(it, because))
                         .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
             }
             m = m.withArguments(ListUtils.concat(m.getArguments().subList(0, 1), becauseArg));
