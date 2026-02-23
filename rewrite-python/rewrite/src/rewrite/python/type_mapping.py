@@ -446,7 +446,12 @@ class PythonTypeMapping:
 
         elif kind == 'classLiteral':
             class_name = descriptor.get('className', '')
-            class_type = self._create_class_type(class_name)
+            module_name = descriptor.get('moduleName')
+            if module_name and module_name != 'builtins':
+                fqn = f"{module_name}.{class_name}"
+            else:
+                fqn = class_name
+            class_type = self._create_class_type(fqn)
 
             # Infer Kind from supertypes before resolving them
             supertypes = descriptor.get('supertypes', [])
@@ -881,6 +886,10 @@ class PythonTypeMapping:
                     kind = descriptor.get('kind')
                     if kind == 'module':
                         return self._create_class_type(descriptor.get('moduleName', ''))
+                    elif kind in ('function', 'boundMethod'):
+                        module_name = descriptor.get('moduleName')
+                        if module_name and module_name != 'builtins':
+                            return self._create_class_type(module_name)
 
         return self._infer_declaring_type_from_ast(node)
 

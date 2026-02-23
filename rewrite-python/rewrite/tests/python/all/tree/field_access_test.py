@@ -1,16 +1,7 @@
-import shutil
-
-import pytest
-
 from rewrite.java.tree import FieldAccess
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
-
-requires_ty_cli = pytest.mark.skipif(
-    shutil.which('ty-types') is None,
-    reason="ty-types CLI is not installed"
-)
 
 
 # noinspection PyUnresolvedReferences
@@ -25,7 +16,6 @@ def test_nested_attribute():
     RecipeSpec().rewrite_run(python("a = foo.bar.baz"))
 
 
-@requires_ty_cli
 def test_field_access_type_attribution():
     """Verify that os.path has a non-None FieldAccess.type."""
     errors = []

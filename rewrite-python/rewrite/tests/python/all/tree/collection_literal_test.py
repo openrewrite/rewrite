@@ -1,7 +1,4 @@
-import shutil
 from typing import cast
-
-import pytest
 
 from rewrite.java import MethodDeclaration, Return
 from rewrite.java.support_types import JavaType
@@ -11,11 +8,6 @@ from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 
 Parameterized = JavaType.Parameterized
-
-requires_ty_cli = pytest.mark.skipif(
-    shutil.which('ty-types') is None,
-    reason="ty-types CLI is not installed"
-)
 
 
 def test_empty_tuple():
@@ -107,7 +99,6 @@ def test_list_of_tuples_with_double_parens():
 """))
 
 
-@requires_ty_cli
 def test_list_literal_type_attribution():
     """Verify that [1, 2, 3] has type list."""
     errors = []
@@ -139,7 +130,6 @@ def test_list_literal_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
 def test_dict_literal_type_attribution():
     """Verify that {"a": 1} has type dict."""
     errors = []

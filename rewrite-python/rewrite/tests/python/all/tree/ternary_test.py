@@ -1,17 +1,8 @@
-import shutil
-
-import pytest
-
 from rewrite.java.support_types import JavaType
 from rewrite.java.tree import Ternary
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
-
-requires_ty_cli = pytest.mark.skipif(
-    shutil.which('ty-types') is None,
-    reason="ty-types CLI is not installed"
-)
 
 
 def test_simple():
@@ -19,7 +10,6 @@ def test_simple():
     RecipeSpec().rewrite_run(python("assert True if True else False"))
 
 
-@requires_ty_cli
 def test_ternary_type_attribution():
     """Verify that '1 if True else 2' has type Int."""
     errors = []

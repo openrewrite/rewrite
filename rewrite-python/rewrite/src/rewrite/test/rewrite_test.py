@@ -227,7 +227,7 @@ class RecipeSpec:
                 continue
 
             # Determine source path
-            source_path = spec.path or Path(f"{uuid4().hex}.{spec.ext}")
+            source_path = spec.path or Path(f"_{uuid4().hex}.{spec.ext}")
 
             # Parse the source
             source = dedent(spec.before)
