@@ -28,6 +28,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -53,6 +54,7 @@ import static java.util.stream.Collectors.toSet;
 @EqualsAndHashCode(callSuper = false)
 public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.DependencyVersionState> {
     private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";
+    private static final MethodMatcher VERSION_MATCHER = new MethodMatcher("org.gradle.plugin.use.PluginDependencySpec version(..)", true);
 
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -112,7 +114,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             return false;
         }
         J.MethodInvocation maybeVersion = cursor.getValue();
-        if (!"version".equals(maybeVersion.getSimpleName())) {
+        if (!VERSION_MATCHER.matches(maybeVersion, true)) {
             return false;
         }
         Cursor parent = cursor.dropParentUntil(it -> (it instanceof J.MethodInvocation) || it == Cursor.ROOT_VALUE);
