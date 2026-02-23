@@ -31,6 +31,7 @@ import org.openrewrite.kotlin.tree.K;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Objects;
 
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
@@ -39,16 +40,9 @@ import static java.util.stream.Collectors.toList;
 @EqualsAndHashCode(callSuper = false)
 public class ChangeRepository extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Change repository";
-    }
+    String displayName = "Change repository";
 
-    @Override
-    public String getDescription() {
-        return "Replace or remove a repository in Gradle build scripts to standardize repository usage across an organization. " +
-               "When no new type or URL is specified, the matching repository will be removed.";
-    }
+    String description = "Replace a repository in Gradle build scripts to standardize repository usage across an organization.";
 
     @Option(displayName = "Old type",
             description = "The type of the artifact repository to replace. " +
@@ -68,7 +62,7 @@ public class ChangeRepository extends Recipe {
 
     @Option(displayName = "New type",
             description = "The type of the new artifact repository. " +
-                          "If not specified together with new URL, the matching repository will be removed.",
+                          "If not specified, the matched repository's type will be preserved.",
             required = false,
             example = "mavenCentral")
     @Nullable
@@ -80,6 +74,18 @@ public class ChangeRepository extends Recipe {
             example = "https://new-nexus.example.com/releases")
     @Nullable
     String newUrl;
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate()
+                .and(Validated.required("newType", newType).or(Validated.required("newUrl", newUrl)))
+                .and(Validated.test(
+                        "repository",
+                        "Old and new repository must be different",
+                        this,
+                        r -> !(Objects.equals(r.oldType, r.newType) && Objects.equals(r.oldUrl, r.newUrl))
+                ));
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -102,12 +108,6 @@ public class ChangeRepository extends Recipe {
                 // If oldUrl is specified, verify the URL matches
                 if (oldUrl != null && !urlMatches(m)) {
                     return m;
-                }
-
-                // Remove mode: no new type or URL specified
-                if (newType == null && newUrl == null) {
-                    //noinspection DataFlowIssue
-                    return null;
                 }
 
                 // If newType is not specified, keep the matched repository's type

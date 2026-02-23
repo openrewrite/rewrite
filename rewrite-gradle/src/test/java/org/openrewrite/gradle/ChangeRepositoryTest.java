@@ -208,22 +208,6 @@ class ChangeRepositoryTest implements RewriteTest {
     }
 
     @Test
-    void noChangeWhenUrlAlreadyCorrect() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeRepository("maven", "https://repo.example.com/releases", "maven", "https://repo.example.com/releases")),
-          buildGradle(
-            """
-              repositories {
-                  maven {
-                      url = "https://repo.example.com/releases"
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void onlyMatchesSpecifiedUrl() {
         rewriteRun(
           spec -> spec.recipe(new ChangeRepository("maven", "https://old-nexus.example.com/releases", "maven", "https://new-nexus.example.com/releases")),
@@ -298,68 +282,6 @@ class ChangeRepositoryTest implements RewriteTest {
     }
 
     @Test
-    void removeNamedRepository() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeRepository("jcenter", null, null, null)),
-          buildGradle(
-            """
-              repositories {
-                  jcenter()
-                  mavenCentral()
-              }
-              """,
-            """
-              repositories {
-                  mavenCentral()
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void removeCustomMavenRepository() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeRepository("maven", "https://old-nexus.example.com/releases", null, null)),
-          buildGradle(
-            """
-              repositories {
-                  maven {
-                      url = "https://old-nexus.example.com/releases"
-                  }
-                  mavenCentral()
-              }
-              """,
-            """
-              repositories {
-                  mavenCentral()
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void removeNamedRepositoryKts() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeRepository("jcenter", null, null, null)),
-          buildGradleKts(
-            """
-              repositories {
-                  jcenter()
-                  mavenCentral()
-              }
-              """,
-            """
-              repositories {
-                  mavenCentral()
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void matchByUrlOnly() {
         rewriteRun(
           spec -> spec.recipe(new ChangeRepository(null, "https://old-nexus.example.com/releases", "maven", "https://new-nexus.example.com/releases")),
@@ -376,28 +298,6 @@ class ChangeRepositoryTest implements RewriteTest {
                   maven {
                       url = "https://new-nexus.example.com/releases"
                   }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void matchByUrlOnlyRemove() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeRepository(null, "https://old-nexus.example.com/releases", null, null)),
-          buildGradle(
-            """
-              repositories {
-                  maven {
-                      url = "https://old-nexus.example.com/releases"
-                  }
-                  mavenCentral()
-              }
-              """,
-            """
-              repositories {
-                  mavenCentral()
               }
               """
           )
