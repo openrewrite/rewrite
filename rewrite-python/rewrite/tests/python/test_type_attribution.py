@@ -1137,6 +1137,27 @@ greet("World")
             _cleanup_mapping(mapping, tmpdir, client)
 
 
+@requires_ty_types_cli
+class TestTypingAliases:
+    """Tests for typing module type aliases (e.g. typing.Text → str)."""
+
+    def test_typing_text_resolves_to_str(self):
+        """typing.Text (deprecated alias for str) should resolve to Primitive.String.
+
+        ty-types resolves typing.Text to str at the type level, so our type_mapping
+        receives className='str' and maps it to JavaType.Primitive.String automatically.
+        """
+        source = 'from typing import Text\nx: Text = "hello"\nx\n'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            name_node = tree.body[2].value  # bare 'x' expression
+            result = mapping.type(name_node)
+            assert result == JavaType.Primitive.String, \
+                f"typing.Text should resolve to Primitive.String, got {result}"
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
 class TestCyclicTypeResolution:
     """Tests that cyclic type references don't cause infinite recursion."""
 

@@ -618,6 +618,87 @@ class PythonTypeMapping:
             return expr_type, JavaType.Variable(_name=node.attr, _type=expr_type, _owner=receiver_type)
         return expr_type, None
 
+    def method_declaration_type(self, node: ast.FunctionDef) -> Optional[JavaType.Method]:
+        """Get the method type for a function/method declaration.
+
+        Builds a JavaType.Method from the function's type descriptor when
+        available (parameters + returnType fields), falling back to resolving
+        parameter annotations and return annotation individually via ty-types.
+
+        Args:
+            node: The ast.FunctionDef or ast.AsyncFunctionDef node.
+
+        Returns:
+            A JavaType.Method, or None if types cannot be determined.
+        """
+        # First try: use structured data from the function descriptor
+        type_id = self._lookup_type_id(node)
+        if type_id is not None:
+            descriptor = self._type_registry.get(type_id)
+            if descriptor and descriptor.get('kind') in ('function', 'boundMethod'):
+                # If the descriptor has parameters/returnType, use them directly
+                params = descriptor.get('parameters')
+                ret_id = descriptor.get('returnType')
+                if params is not None or ret_id is not None:
+                    return self._method_from_function_descriptor(
+                        descriptor, node.name)
+
+        # Fallback: build from individual parameter/return annotation types
+        param_names: List[str] = []
+        param_types: List[JavaType] = []
+        for arg in node.args.args:
+            if arg.arg in ('self', 'cls'):
+                continue
+            param_names.append(arg.arg)
+            if arg.annotation is not None:
+                t = self.type(arg.annotation)
+                param_types.append(t if t is not None else _UNKNOWN)
+            else:
+                param_types.append(_UNKNOWN)
+
+        return_type = None
+        if node.returns is not None:
+            return_type = self.type(node.returns)
+
+        if not param_names and return_type is None:
+            return None
+
+        return JavaType.Method(
+            _flags_bit_map=0,
+            _declaring_type=None,
+            _name=node.name,
+            _return_type=return_type,
+            _parameter_names=param_names if param_names else None,
+            _parameter_types=param_types if param_types else None,
+        )
+
+    def _method_from_function_descriptor(
+            self, descriptor: Dict[str, Any], name: str
+    ) -> JavaType.Method:
+        """Build a JavaType.Method from a function descriptor with parameters/returnType."""
+        param_names: List[str] = []
+        param_types: List[JavaType] = []
+        for param in descriptor.get('parameters', []):
+            p_name = param.get('name', '')
+            if p_name in ('self', 'cls'):
+                continue
+            param_names.append(p_name)
+            param_types.append(self._resolve_param_type(param))
+
+        return_type = None
+        ret_id = descriptor.get('returnType')
+        if ret_id is not None:
+            return_type = self._resolve_type(ret_id)
+
+        return JavaType.Method(
+            _flags_bit_map=0,
+            _declaring_type=None,
+            _name=name,
+            _return_type=return_type,
+            _parameter_names=param_names if param_names else None,
+            _parameter_types=param_types if param_types else None,
+        )
+
     def method_invocation_type(self, node: ast.Call) -> Optional[JavaType.Method]:
         """Get the method type for a function/method call.
 

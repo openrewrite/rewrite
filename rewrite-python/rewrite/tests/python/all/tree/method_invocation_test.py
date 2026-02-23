@@ -1,6 +1,17 @@
+import shutil
+
 import pytest
 
+from rewrite.java.support_types import JavaType
+from rewrite.java.tree import MethodInvocation
+from rewrite.python.tree import CompilationUnit
+from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
+
+requires_ty_cli = pytest.mark.skipif(
+    shutil.which('ty-types') is None,
+    reason="ty-types CLI is not installed"
+)
 
 
 def test_no_select():
@@ -84,3 +95,115 @@ def test_keyword_argument():
 def test_no_name():
     # language=python
     RecipeSpec().rewrite_run(python("v = (a)()"))
+
+
+@requires_ty_cli
+def test_builtin_function_type_attribution():
+    """Verify type attribution on a builtin function call like len()."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_method_invocation(self, method, p):
+                if not isinstance(method, MethodInvocation):
+                    return method
+                if method.name.simple_name != 'len':
+                    return method
+                if method.method_type is None:
+                    errors.append("MethodInvocation.method_type is None for len()")
+                else:
+                    if method.method_type.name != 'len':
+                        errors.append(f"method_type.name is '{method.method_type.name}', expected 'len'")
+                    if method.method_type._return_type is None:
+                        errors.append("method_type.return_type is None")
+                    elif method.method_type._return_type != JavaType.Primitive.Int:
+                        errors.append(f"method_type.return_type is {method.method_type._return_type}, expected Primitive.Int")
+                return method
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        'x = len("hello")',
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+
+@requires_ty_cli
+def test_string_method_type_attribution():
+    """Verify type attribution on a string method call like str.upper()."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_method_invocation(self, method, p):
+                if not isinstance(method, MethodInvocation):
+                    return method
+                if method.name.simple_name != 'upper':
+                    return method
+                if method.method_type is None:
+                    errors.append("MethodInvocation.method_type is None for upper()")
+                else:
+                    if method.method_type.declaring_type is not None:
+                        dt = method.method_type.declaring_type
+                        if dt._fully_qualified_name != 'str':
+                            errors.append(f"declaring_type fqn is '{dt._fully_qualified_name}', expected 'str'")
+                    if method.method_type._return_type is None:
+                        errors.append("method_type.return_type is None")
+                    elif method.method_type._return_type != JavaType.Primitive.String:
+                        errors.append(f"method_type.return_type is {method.method_type._return_type}, expected Primitive.String")
+                return method
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        'x = "hello".upper()',
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+
+@requires_ty_cli
+def test_stdlib_function_type_attribution():
+    """Verify type attribution on a stdlib function call like os.getcwd()."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_method_invocation(self, method, p):
+                if not isinstance(method, MethodInvocation):
+                    return method
+                if method.name.simple_name != 'getcwd':
+                    return method
+                if method.method_type is None:
+                    errors.append("MethodInvocation.method_type is None for os.getcwd()")
+                else:
+                    if method.method_type.declaring_type is not None:
+                        dt = method.method_type.declaring_type
+                        if dt._fully_qualified_name != 'os':
+                            errors.append(f"declaring_type fqn is '{dt._fully_qualified_name}', expected 'os'")
+                    if method.method_type._return_type is None:
+                        errors.append("method_type.return_type is None")
+                    elif method.method_type._return_type != JavaType.Primitive.String:
+                        errors.append(f"method_type.return_type is {method.method_type._return_type}, expected Primitive.String")
+                return method
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        """\
+        import os
+        x = os.getcwd()
+        """,
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)

@@ -1,6 +1,17 @@
+import shutil
+
 import pytest
 
+from rewrite.java.support_types import JavaType
+from rewrite.java.tree import Binary
+from rewrite.python.tree import CompilationUnit
+from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
+
+requires_ty_cli = pytest.mark.skipif(
+    shutil.which('ty-types') is None,
+    reason="ty-types CLI is not installed"
+)
 
 
 def test_bool_ops():
@@ -95,3 +106,93 @@ def test_multiline_tuple_comparison():
         , False) is not None
         """,
     ),)
+
+
+@requires_ty_cli
+def test_arithmetic_type_attribution():
+    """Verify that 1 + 2 has type Int."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_binary(self, binary, p):
+                if not isinstance(binary, Binary):
+                    return binary
+                if binary.operator != Binary.Type.Addition:
+                    return binary
+                if binary.type is None:
+                    errors.append("Binary(Addition).type is None")
+                elif binary.type != JavaType.Primitive.Int:
+                    errors.append(f"Binary(Addition).type is {binary.type}, expected Primitive.Int")
+                return binary
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        "x = 1 + 2",
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+
+@requires_ty_cli
+def test_comparison_type_attribution():
+    """Verify that 1 < 2 has type Boolean."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_binary(self, binary, p):
+                if not isinstance(binary, Binary):
+                    return binary
+                if binary.operator != Binary.Type.LessThan:
+                    return binary
+                if binary.type is None:
+                    errors.append("Binary(LessThan).type is None")
+                elif binary.type != JavaType.Primitive.Boolean:
+                    errors.append(f"Binary(LessThan).type is {binary.type}, expected Primitive.Boolean")
+                return binary
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        "x = 1 < 2",
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+
+@requires_ty_cli
+def test_boolean_op_type_attribution():
+    """Verify that True and False has type Boolean."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_binary(self, binary, p):
+                if not isinstance(binary, Binary):
+                    return binary
+                if binary.operator != Binary.Type.And:
+                    return binary
+                if binary.type is None:
+                    errors.append("Binary(And).type is None")
+                elif binary.type != JavaType.Primitive.Boolean:
+                    errors.append(f"Binary(And).type is {binary.type}, expected Primitive.Boolean")
+                return binary
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        "x = True and False",
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)

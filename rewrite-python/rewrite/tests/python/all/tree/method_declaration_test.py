@@ -1,4 +1,17 @@
+import shutil
+
+import pytest
+
+from rewrite.java.support_types import JavaType
+from rewrite.java.tree import MethodDeclaration
+from rewrite.python.tree import CompilationUnit
+from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
+
+requires_ty_cli = pytest.mark.skipif(
+    shutil.which('ty-types') is None,
+    reason="ty-types CLI is not installed"
+)
 
 
 def test_whitespace_before_colon():
@@ -152,3 +165,54 @@ def test_line_break_after_last_param():
             return x
         """
     ))
+
+
+@requires_ty_cli
+def test_method_declaration_type_attribution():
+    """Verify method_type on a function with typed parameters and return type."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_method_declaration(self, method, p):
+                if not isinstance(method, MethodDeclaration):
+                    return method
+                if method.name.simple_name != 'foo':
+                    return method
+                if method.method_type is None:
+                    errors.append("MethodDeclaration.method_type is None")
+                else:
+                    mt = method.method_type
+                    if mt._return_type is None:
+                        errors.append("method_type.return_type is None")
+                    elif mt._return_type != JavaType.Primitive.Boolean:
+                        errors.append(f"method_type.return_type is {mt._return_type}, expected Primitive.Boolean")
+                    if mt._parameter_types is None:
+                        errors.append("method_type.parameter_types is None")
+                    elif len(mt._parameter_types) < 2:
+                        errors.append(f"method_type.parameter_types has {len(mt._parameter_types)} elements, expected at least 2")
+                    else:
+                        if mt._parameter_types[0] != JavaType.Primitive.Int:
+                            errors.append(f"parameter_types[0] is {mt._parameter_types[0]}, expected Primitive.Int")
+                        if mt._parameter_types[1] != JavaType.Primitive.String:
+                            errors.append(f"parameter_types[1] is {mt._parameter_types[1]}, expected Primitive.String")
+                    if mt._parameter_names is not None and len(mt._parameter_names) >= 2:
+                        if mt._parameter_names[0] != 'a':
+                            errors.append(f"parameter_names[0] is '{mt._parameter_names[0]}', expected 'a'")
+                        if mt._parameter_names[1] != 'b':
+                            errors.append(f"parameter_names[1] is '{mt._parameter_names[1]}', expected 'b'")
+                return method
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        """\
+        def foo(a: int, b: str) -> bool:
+            return True
+        """,
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
