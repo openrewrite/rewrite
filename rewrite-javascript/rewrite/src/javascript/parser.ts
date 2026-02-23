@@ -644,7 +644,7 @@ export class JavaScriptParserVisitor {
     private rightPadded<T extends J | boolean>(t: T, trailing: J.Space, markers?: Markers): J.RightPadded<T> {
         // For tree types (J), use intersection type: spread element and add padding
         // For primitives (boolean), use wrapper type with element property
-        const padding: J.Suffix = { after: trailing, markers: markers ?? emptyMarkers };
+        const padding: J.Suffix = { after: trailing ?? emptySpace, markers: markers ?? emptyMarkers };
         if (typeof t === 'boolean') {
             return {
                 element: t,
@@ -685,7 +685,7 @@ export class JavaScriptParserVisitor {
 
     private leftPadded<T extends J | J.Space | number | string | boolean>(before: J.Space, t: T, markers?: Markers): J.LeftPadded<T> {
         // For primitives (boolean, number, string), use wrapper type with element property
-        const padding: J.Prefix = { before: before, markers: markers ?? emptyMarkers };
+        const padding: J.Prefix = { before: before ?? emptySpace, markers: markers ?? emptyMarkers };
         if (typeof t === 'boolean' || typeof t === 'number' || typeof t === 'string') {
             return {
                 element: t,

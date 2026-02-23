@@ -55,13 +55,9 @@ public class JavaToJavaScriptRpcTest {
                   @Override
                   public J preVisit(J tree, ExecutionContext ctx) {
                       SourceFile t = (SourceFile) modifyAll.getVisitor().visitNonNull(tree, ctx);
-                      try {
-                          assertThat(t.printAll()).isEqualTo(((SourceFile) tree).printAll());
-                          stopAfterPreVisit();
-                          return tree;
-                      } finally {
-                          client.shutdown();
-                      }
+                      assertThat(t.printAll()).isEqualTo(((SourceFile) tree).printAll());
+                      stopAfterPreVisit();
+                      return tree;
                   }
               };
           }));
