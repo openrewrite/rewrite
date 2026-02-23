@@ -165,6 +165,7 @@ public class DeleteProperty extends Recipe {
                 List<Yaml.Mapping.Entry> entries = new ArrayList<>();
                 String firstDeletedPrefix = null;
                 boolean previousWasDeleted = false;
+                String trailingInlineComment = null;
                 for (Yaml.Mapping.Entry entry : m.getEntries()) {
                     if (ToBeRemoved.hasMarker(entry.getValue()) ||
                         ToBeRemoved.hasMarker(entry) ||
@@ -172,6 +173,10 @@ public class DeleteProperty extends Recipe {
                         // Entry is being deleted - capture prefix from the first deleted entry before any kept entries
                         if (entries.isEmpty() && firstDeletedPrefix == null) {
                             firstDeletedPrefix = entry.getPrefix();
+                        }
+                        // Capture inline comment from the first deleted entry after kept entries
+                        if (trailingInlineComment == null && !entries.isEmpty()) {
+                            trailingInlineComment = extractInlineComment(entry.getPrefix());
                         }
                         changed = true;
                         previousWasDeleted = true;
@@ -183,6 +188,19 @@ public class DeleteProperty extends Recipe {
                         }
                         entries.add(entry);
                         previousWasDeleted = false;
+                        trailingInlineComment = null;
+                    }
+                }
+
+                // Preserve inline comment from deleted trailing entries on the last kept entry
+                if (trailingInlineComment != null && !entries.isEmpty()) {
+                    int lastIndex = entries.size() - 1;
+                    Yaml.Mapping.Entry lastKept = entries.get(lastIndex);
+                    if (lastKept.getValue() instanceof Yaml.Scalar &&
+                        ((Yaml.Scalar) lastKept.getValue()).getStyle() == Yaml.Scalar.Style.PLAIN) {
+                        Yaml.Scalar scalar = (Yaml.Scalar) lastKept.getValue();
+                        entries.set(lastIndex, lastKept.withValue(
+                                scalar.withValue(scalar.getValue() + trailingInlineComment)));
                     }
                 }
 
@@ -240,6 +258,16 @@ public class DeleteProperty extends Recipe {
 
     private static boolean containsNewline(@Nullable String str) {
         return str != null && str.indexOf('\n') >= 0;
+    }
+
+    /**
+     * Extract an inline comment from a prefix string. Inline comments appear before the
+     * first newline in the prefix (e.g. {@code " # comment\n  "} → {@code " # comment"}).
+     */
+    private static @Nullable String extractInlineComment(String prefix) {
+        int newlineIndex = prefix.indexOf('\n');
+        String beforeNewline = newlineIndex >= 0 ? prefix.substring(0, newlineIndex) : prefix;
+        return beforeNewline.contains("#") ? beforeNewline : null;
     }
 
     private static boolean endsWithBlockScalar(Yaml.Mapping.Entry entry) {
