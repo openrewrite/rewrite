@@ -34,6 +34,7 @@ import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
@@ -151,6 +152,25 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     try {
                         List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableList(acc), ctx));
                         generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
+                        Set<Path> seenInThisBatch = new HashSet<>();
+                        generated.removeIf(source -> {
+                            Path sourcePath = source.getSourcePath();
+                            if (sourceSet.getBefore(sourcePath) != null) {
+                                sourceSet.onGenerateCollision(sourcePath, true);
+                                return true;
+                            }
+                            for (SourceFile existing : acc) {
+                                if (existing.getSourcePath().equals(sourcePath)) {
+                                    sourceSet.onGenerateCollision(sourcePath, false);
+                                    return true;
+                                }
+                            }
+                            if (!seenInThisBatch.add(sourcePath)) {
+                                sourceSet.onGenerateCollision(sourcePath, false);
+                                return true;
+                            }
+                            return false;
+                        });
                         if (!generated.isEmpty()) {
                             acc.addAll(generated);
                             generated.forEach(source -> recordSourceFileResultAndSearchResults(null, source, recipeStack, ctx));
@@ -261,6 +281,33 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         for (SearchResults.Row searchResult : searchMarkers) {
             searchResults.insertRow(ctx, searchResult);
         }
+
+        if (hierarchical) {
+            recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), ctx);
+        }
+    }
+
+    private void recordSourceFileResult(@Nullable String beforePath, @Nullable String afterPath, List<Recipe> recipeStack, ExecutionContext ctx) {
+        if (recipeStack.size() <= 1) {
+            // No reason to record the synthetic root recipe which contains the recipe run
+            return;
+        }
+        String parentName;
+        if (recipeStack.size() == 2) {
+            // Record the parent name as blank rather than CompositeRecipe when the parent is the synthetic root recipe
+            parentName = "";
+        } else {
+            parentName = recipeStack.get(recipeStack.size() - 2).getName();
+        }
+        Recipe recipe = recipeStack.get(recipeStack.size() - 1);
+        sourcesFileResults.insertRow(ctx, new SourcesFileResults.Row(
+                beforePath,
+                afterPath,
+                parentName,
+                recipe.getName(),
+                0L, // Zero here, as we later sum only the recipes that themselves made changes
+                cycle));
+        recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), ctx);
     }
 
     private @Nullable SourceFile handleError(Recipe recipe, SourceFile sourceFile, @Nullable SourceFile after,

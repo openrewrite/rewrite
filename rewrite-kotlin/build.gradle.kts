@@ -1,13 +1,11 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("org.openrewrite.build.language-library")
     kotlin("jvm") version "2.2.21"
 }
 
-val kotlinVersion = "1.9.25"
+val kotlinVersion = "2.2.0"
 
 dependencies {
     compileOnly(project(":rewrite-core"))
@@ -35,10 +33,14 @@ java {
     }
 }
 
-tasks.withType<KotlinCompile>().configureEach {
+kotlin {
     compilerOptions {
-        apiVersion = KotlinVersion.KOTLIN_1_9
-        languageVersion = KotlinVersion.KOTLIN_1_9
-        jvmTarget.set(if (name.contains("Test")) JvmTarget.JVM_21 else JvmTarget.JVM_1_8)
+        jvmTarget.set(JvmTarget.JVM_1_8)
+    }
+}
+
+tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileTestKotlin") {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_21)
     }
 }

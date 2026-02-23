@@ -160,4 +160,37 @@ class UvLockParserTest {
         Path found = UvLockParser.findLockFile(tempDir, tempDir);
         assertThat(found).isNull();
     }
+
+    @Test
+    void hasAlternativeLockFileDetectsPoetryLock(@TempDir Path tempDir) throws IOException {
+        Files.write(tempDir.resolve("poetry.lock"), "".getBytes());
+        assertThat(UvLockParser.hasAlternativeLockFile(tempDir, null)).isTrue();
+    }
+
+    @Test
+    void hasAlternativeLockFileDetectsPdmLock(@TempDir Path tempDir) throws IOException {
+        Files.write(tempDir.resolve("pdm.lock"), "".getBytes());
+        assertThat(UvLockParser.hasAlternativeLockFile(tempDir, null)).isTrue();
+    }
+
+    @Test
+    void hasAlternativeLockFileReturnsFalseWhenNoneExist(@TempDir Path tempDir) {
+        assertThat(UvLockParser.hasAlternativeLockFile(tempDir, tempDir)).isFalse();
+    }
+
+    @Test
+    void hasAlternativeLockFileWalksUpToParent(@TempDir Path tempDir) throws IOException {
+        Files.write(tempDir.resolve("poetry.lock"), "".getBytes());
+        Path subDir = tempDir.resolve("subproject");
+        Files.createDirectories(subDir);
+        assertThat(UvLockParser.hasAlternativeLockFile(subDir, null)).isTrue();
+    }
+
+    @Test
+    void hasAlternativeLockFileRespectsBoundary(@TempDir Path tempDir) throws IOException {
+        Files.write(tempDir.resolve("poetry.lock"), "".getBytes());
+        Path boundary = tempDir.resolve("boundary");
+        Files.createDirectories(boundary);
+        assertThat(UvLockParser.hasAlternativeLockFile(boundary, boundary)).isFalse();
+    }
 }

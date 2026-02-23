@@ -6,7 +6,7 @@ from enum import Enum, auto
 from typing import TypeVar, Optional, cast, List
 
 from rewrite.java import tree as j
-from rewrite.java.support_types import J, Space, Comment
+from rewrite.java.support_types import J, Space, Comment, Statement
 from rewrite.java.tree import (
     JRightPadded, JLeftPadded, JContainer, Block, ArrayDimension,
     ClassDeclaration, Empty, MethodDeclaration, MethodInvocation,
@@ -17,6 +17,7 @@ from rewrite.java.markers import TrailingComma
 from rewrite.python import (
     PythonVisitor, TabsAndIndentsStyle, DictLiteral, CollectionLiteral,
     ExpressionStatement, OtherStyle, IntelliJ, ComprehensionExpression, PyComment,
+    TrailingElseWrapper, Binary as PyBinary,
 )
 from rewrite.tree import Tree
 from rewrite.visitor import P, T, Cursor
@@ -79,6 +80,11 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 if self._other.use_continuation_indent.collections_and_comprehensions else self.IndentType.INDENT)
         elif isinstance(tree, ExpressionStatement):
             pass
+        elif isinstance(tree, (Binary, PyBinary)):
+            if self.cursor.first_enclosing(j.Parentheses) is not None:
+                self.cursor.put_message("indent_type", self.IndentType.ALIGN)
+            else:
+                self.cursor.put_message("indent_type", self.IndentType.INDENT)
         elif isinstance(tree, j.Expression):
             self.cursor.put_message("indent_type", self.IndentType.INDENT)
 
@@ -263,7 +269,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
 
     def visit_container(self, container: Optional[JContainer], p: P) -> Optional[JContainer]:
         if container is None:
-            return container  # type: ignore
+            return container
 
         self._cursor = Cursor(self._cursor, container)
 
@@ -274,7 +280,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         if isinstance(parent_tree, MethodDeclaration):
             rp_context = "method_declaration_parameter"
             needs_continuation_on_before = True
-        elif isinstance(parent_tree, MethodInvocation):
+        elif isinstance(parent_tree, (MethodInvocation, Annotation)):
             rp_context = "method_invocation_argument"
         elif isinstance(parent_tree, DictLiteral):
             rp_context = "dict_literal_element"
@@ -300,10 +306,12 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 self.cursor.put_message("indent_type",
                     self.IndentType.CONTINUATION_INDENT if self._other.use_continuation_indent.method_declaration_parameters
                     else self.IndentType.INDENT)
-            elif isinstance(parent_tree, MethodInvocation):
+            elif isinstance(parent_tree, (MethodInvocation, Annotation)):
                 self.cursor.put_message("indent_type",
                     self.IndentType.CONTINUATION_INDENT if self._other.use_continuation_indent.method_call_arguments
                     else self.IndentType.INDENT)
+            elif isinstance(parent_tree, ClassDeclaration):
+                self.cursor.put_message("indent_type", self.IndentType.CONTINUATION_INDENT)
             before = self.visit_space(container.before, p)
             js = list_map(lambda t: self.visit_right_padded(t, p), container.padding.elements)
 
@@ -370,6 +378,26 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
 
         return try_
 
+    def visit_trailing_else_wrapper(self, wrapper: TrailingElseWrapper, p: P) -> J:
+        wrapper = wrapper.replace(prefix=self.visit_space(wrapper.prefix, p))
+
+        temp_stmt = cast(Statement, self.visit_statement(wrapper, p))
+        if not isinstance(temp_stmt, type(wrapper)):
+            return temp_stmt
+        wrapper = temp_stmt
+
+        wrapper = wrapper.replace(markers=self.visit_markers(wrapper.markers, p))
+        wrapper = wrapper.replace(
+            statement=self.visit_and_cast(wrapper.statement, Statement, p)
+        )
+
+        self.cursor.put_message("space_context", "else_prefix")
+        wrapper = wrapper.padding.replace(
+            else_block=self.visit_left_padded(wrapper.padding.else_block, p)
+        )
+        self.cursor.put_message("space_context", None)
+        return wrapper
+
     def visit_else(self, else_: j.If.Else, p: P) -> J:
         self.cursor.put_message("space_context", "else_prefix")
         else_ = else_.replace(prefix=self.visit_space(else_.prefix, p))
@@ -379,7 +407,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         else_ = else_.padding.replace(body=self.visit_right_padded(else_.padding.body, p))
         return else_
 
-    def visit_compilation_unit(self, cu, p: P) -> J:  # ty: ignore[invalid-method-override]
+    def visit_compilation_unit(self, cu, p: P) -> J:
         self.cursor.put_message("space_context", "compilation_unit_prefix")
         cu = cu.replace(prefix=self.visit_space(cu.prefix, p))
         self.cursor.put_message("space_context", None)
@@ -429,13 +457,149 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             class_decl.body, Block, p))
         return class_decl
 
+    def visit_parentheses(self, parens: j.Parentheses, p: P) -> J:
+        parens = parens.replace(prefix=self.visit_space(parens.prefix, p))
+        temp_expr = self.visit_expression(parens, p)
+        if not isinstance(temp_expr, j.Parentheses):
+            return temp_expr
+        parens = temp_expr
+        parens = parens.replace(markers=self.visit_markers(parens.markers, p))
+
+        tree_rp = parens.padding.tree
+        elem = tree_rp.element
+
+        # When a Binary expression starts on the same line as '(', compute
+        # its column and set last_indent so continuation lines align there
+        if isinstance(elem, (Binary, PyBinary)) and '\n' not in elem.prefix.last_whitespace:
+            col = self._compute_column_of(elem)
+            if col >= 0:
+                self.cursor.put_message("last_indent", col)
+
+        if isinstance(elem, J):
+            elem = self.visit_and_cast(elem, J, p)
+
+        after = tree_rp.after
+        if '\n' in after.last_whitespace:
+            # Close paren should align to the enclosing indent level
+            indent = cast(int, self.cursor.parent_or_throw.get_nearest_message("last_indent")) or 0
+            after = self._indent_to(after, indent)
+        else:
+            after = self.visit_space(after, p)
+
+        if elem is not tree_rp.element or after is not tree_rp.after:
+            parens = parens.padding.replace(tree=tree_rp.replace(element=elem, after=after))
+        return parens
+
+    def visit_binary(self, binary: Binary, p: P) -> J:
+        if self.cursor.first_enclosing(j.Parentheses) is not None:
+            # Inside parentheses: operator before spaces align to same indent as first line
+            binary = binary.replace(prefix=self.visit_space(binary.prefix, p))
+            temp_expr = self.visit_expression(binary, p)
+            if not isinstance(temp_expr, Binary):
+                return temp_expr
+            binary = temp_expr
+            binary = binary.replace(markers=self.visit_markers(binary.markers, p))
+            binary = binary.replace(left=self.visit_and_cast(binary.left, j.Expression, p))
+
+            op = binary.padding.operator
+            if '\n' in op.before.last_whitespace:
+                indent = cast(int, self.cursor.get_nearest_message("last_indent")) or 0
+                before = self._indent_to(op.before, indent)
+                if before is not op.before:
+                    binary = binary.padding.replace(operator=op.replace(before=before))
+            else:
+                binary = binary.padding.replace(
+                    operator=self.visit_left_padded(binary.padding.operator, p))
+
+            binary = binary.replace(right=self.visit_and_cast(binary.right, j.Expression, p))
+            return binary
+        return super().visit_binary(binary, p)
+
     def visit_method_invocation(self, method: MethodInvocation, p: P) -> J:
         select = method.padding.select
         if select is not None and '\n' in select.after.last_whitespace:
-            col = self._compute_select_column(method)
-            if col >= 0:
-                self.cursor.put_message("method_select_indent", col)
+            # Skip column alignment for method chains inside parentheses.
+            # A chain exists when the method's select is itself a
+            # MethodInvocation, or when there's an enclosing
+            # MethodInvocation between this node and the Parentheses.
+            skip = isinstance(select.element, MethodInvocation)
+            if not skip:
+                for c in self.cursor.get_path_as_cursors():
+                    v = c.value
+                    if v is method:
+                        continue
+                    if isinstance(v, j.Parentheses):
+                        break
+                    if isinstance(v, MethodInvocation):
+                        skip = True
+                        break
+            if not skip:
+                col = self._compute_select_column(method)
+                if col >= 0:
+                    self.cursor.put_message("method_select_indent", col)
         return super().visit_method_invocation(method, p)
+
+    def _compute_column_of(self, target: Tree) -> int:
+        """Compute the column position of a target tree element by printing from line start."""
+        from rewrite.python.printer import PythonPrinter, PrintOutputCapture
+
+        line_start = None
+        line_start_cursor = None
+        for c in self.cursor.get_path_as_cursors():
+            v = c.value
+            if isinstance(v, J):
+                line_start = v
+                line_start_cursor = c
+                if '\n' in v.prefix.whitespace:
+                    break
+        if line_start is None:
+            return -1
+
+        class _ColumnCounter(PrintOutputCapture):
+            def __init__(self):
+                super().__init__()
+                self.col = 0
+                self.found = False
+
+            def append(self, text):
+                if text and not self.found:
+                    for ch in text:
+                        self.col = 0 if ch == '\n' else self.col + 1
+                return self
+
+        class _Printer(PythonPrinter):
+            def __init__(self):
+                super().__init__()
+                orig_visit = self._delegate.visit
+                def _check(tree, p):
+                    if tree is target:
+                        p.found = True
+                        return tree
+                    return orig_visit(tree, p) if not p.found else tree
+                self._delegate.visit = _check
+
+            def visit(self, tree, p, parent=None):
+                if p.found or tree is target:
+                    p.found = True
+                    return tree
+                return super().visit(tree, p)
+
+        counter = _ColumnCounter()
+        printer = _Printer()
+        # Build initial cursor with proper J parent so context-dependent
+        # printing (e.g., = vs :=) works correctly
+        initial = Cursor(None, Cursor.ROOT_VALUE)
+        assert line_start_cursor is not None
+        for c in line_start_cursor.get_path_as_cursors():
+            v = c.value
+            if v is line_start:
+                continue
+            if isinstance(v, J):
+                initial = Cursor(Cursor(None, Cursor.ROOT_VALUE), v)
+                break
+        printer.set_cursor(initial)
+        printer.visit(line_start, counter)
+        return counter.col if counter.found else -1
 
     def _compute_select_column(self, method: MethodInvocation) -> int:
         from rewrite.python.printer import PythonPrinter, PrintOutputCapture
@@ -497,16 +661,16 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             (expr.value_source.startswith("'''") and expr.value_source.endswith("'''"))) and \
             cursor.first_enclosing(Block) is not None
 
-    def visit_expression_statement(self, expression_statement: ExpressionStatement, p: P) -> J:
-        if self._is_doc_comment(expression_statement, self.cursor):
-            prefix_before = len(expression_statement.prefix.last_whitespace.split("\n")[-1])
-            stm = cast(ExpressionStatement, super().visit_expression_statement(expression_statement, p))
+    def visit_expression_statement(self, expr_stmt: ExpressionStatement, p: P) -> J:
+        if self._is_doc_comment(expr_stmt, self.cursor):
+            prefix_before = len(expr_stmt.prefix.last_whitespace.split("\n")[-1])
+            stm = cast(ExpressionStatement, super().visit_expression_statement(expr_stmt, p))
             literal = cast(Literal, stm.expression)
             shift = len(stm.prefix.last_whitespace.split("\n")[-1]) - prefix_before
             return stm.replace(expression=
                 literal.replace(value_source=textwrap.indent(str(literal.value_source), shift * " ")[shift:]))
 
-        return super().visit_expression_statement(expression_statement, p)
+        return super().visit_expression_statement(expr_stmt, p)
 
     # -------------------------------------------------------------------------
     # First parameter offset calculation
@@ -536,6 +700,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     self.cursor.parent_or_throw.put_message("last_indent", indent + self._style.continuation_indent)
 
         elem = self.visit_and_cast(elem, J, p)
+        assert elem is not None
         after = self._indent_to(right.after, indent)
         if after.comments or "\n" in after.last_whitespace:
             parent = self.cursor.parent_tree_cursor()

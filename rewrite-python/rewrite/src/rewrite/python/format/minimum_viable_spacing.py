@@ -33,7 +33,7 @@ class MinimumViableSpacingVisitor(PythonVisitor):
         return tree
 
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
-        return tree if self._stop else super().visit(tree, p, parent)
+        return cast(Optional[T], tree if self._stop else super().visit(tree, p, parent))
 
 
 def _common_margin(s1, s2):

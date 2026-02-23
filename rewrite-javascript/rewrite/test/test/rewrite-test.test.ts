@@ -4,6 +4,8 @@ import {text} from "../../src/text";
 import {json} from "../../src/json";
 import {ChangeText} from "../../fixtures/change-text";
 import {ExecutionContext, ScanningRecipe} from "../../src";
+import {foundSearchResult, MarkersKind} from "../../src/markers";
+import {PlainText} from "../../src/text";
 
 describe("rewrite test", () => {
     const spec = new RecipeSpec();
@@ -39,6 +41,30 @@ describe("rewrite test", () => {
             }
         }
     ));
+
+    test("beforeRecipe can modify AST without breaking idempotence check", async () => {
+        // given
+        const sut = new RecipeSpec();
+        const markerFound: boolean[] = [];
+
+        // when
+        await sut.rewriteRun(
+            {
+                ...text("hello"),
+                beforeRecipe: (sourceFile: PlainText) => {
+                    return foundSearchResult(sourceFile, "test");
+                },
+                afterRecipe: (sourceFile: PlainText) => {
+                    const marker = sourceFile.markers.markers
+                        .find(m => m.kind === MarkersKind.SearchResult);
+                    markerFound.push(marker !== undefined);
+                }
+            }
+        );
+
+        // then
+        expect(markerFound).toEqual([true]);
+    });
 
     test("two kinds of sources and a scanning recipe", async () => {
         // given

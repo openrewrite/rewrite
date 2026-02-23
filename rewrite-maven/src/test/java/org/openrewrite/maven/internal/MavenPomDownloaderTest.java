@@ -356,7 +356,6 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
-        @Disabled
         @Test
         void dontFetchSnapshotsFromReleaseRepos() throws Exception {
             try (MockWebServer snapshotRepo = new MockWebServer();
@@ -461,6 +460,50 @@ class MavenPomDownloaderTest implements RewriteTest {
 
                 assertThat(snapshotRepo.getRequestCount()).isGreaterThan(1);
                 assertThat(metadataPaths.get()).isEqualTo(0);
+            }
+        }
+
+        @Test
+        void datedSnapshotVersionIncludesSnapshotRepositories() throws Exception {
+            try (MockWebServer snapshotRepo = new MockWebServer()) {
+                snapshotRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        MockResponse response = new MockResponse().setResponseCode(200);
+                        if (request.getPath() != null && request.getPath().endsWith(".pom")) {
+                            //language=xml
+                            response.setBody(
+                              """
+                                <project>
+                                    <groupId>com.example</groupId>
+                                    <artifactId>my-lib</artifactId>
+                                    <version>3.28.0-SNAPSHOT</version>
+                                </project>
+                                """
+                            );
+                        }
+                        return response;
+                    }
+                });
+
+                snapshotRepo.start();
+
+                var downloader = new MavenPomDownloader(emptyMap(), ctx);
+                var snapshotRepoModel = MavenRepository.builder()
+                  .id("snapshots")
+                  .uri("http://%s:%d".formatted(snapshotRepo.getHostName(), snapshotRepo.getPort()))
+                  .releases("false")
+                  .snapshots(true)
+                  .build();
+
+                // A dated snapshot version should be recognized as a snapshot so that
+                // snapshot-only repositories are not excluded.
+                Pom pom = downloader.download(
+                  new GroupArtifactVersion("com.example", "my-lib", "3.28.0-20260220.175218-20"),
+                  null, null, List.of(snapshotRepoModel));
+
+                assertThat(pom).isNotNull();
+                assertThat(snapshotRepo.getRequestCount()).isGreaterThan(0);
             }
         }
 
@@ -624,6 +667,42 @@ class MavenPomDownloaderTest implements RewriteTest {
               .build();
             assertThrows(MavenDownloadingException.class, () ->
               new MavenPomDownloader(emptyMap(), ctx).downloadMetadata(new GroupArtifact("does.definitely.not", "exist"), null, List.of(repository)));
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/6739")
+        @Test
+        void deriveMetaDataFromHtmlWithTitleAttributes() throws Exception {
+            try (MockWebServer server = new MockWebServer()) {
+                server.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        if (request.getPath() != null && request.getPath().endsWith("maven-metadata.xml")) {
+                            return new MockResponse().setResponseCode(404);
+                        }
+                        return new MockResponse().setResponseCode(200).setBody(
+                          """
+                            <html><body>
+                            <a href="../" title="../">../</a>
+                            <a href="1.0.0/" title="1.0.0/">1.0.0/</a>
+                            <a href="1.1.0/" title="1.1.0/">1.1.0/</a>
+                            <a href="2.0.0/" title="2.0.0/">2.0.0/</a>
+                            </body></html>
+                            """
+                        );
+                    }
+                });
+                server.start();
+
+                MavenRepository repository = MavenRepository.builder()
+                  .id("html-with-title")
+                  .uri("http://%s:%d/".formatted(server.getHostName(), server.getPort()))
+                  .knownToExist(true)
+                  .deriveMetadataIfMissing(true)
+                  .build();
+                MavenMetadata metaData = new MavenPomDownloader(emptyMap(), ctx)
+                  .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
+                assertThat(metaData.getVersioning().getVersions()).containsExactlyInAnyOrder("1.0.0", "1.1.0", "2.0.0");
+            }
         }
 
         @SuppressWarnings("ConstantConditions")

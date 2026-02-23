@@ -23,6 +23,7 @@ import org.openrewrite.Option;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.tree.Toml;
@@ -74,7 +75,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
     static class Accumulator {
         final Set<String> projectsToUpdate = new HashSet<>();
-        final Map<String, String> updatedLockFiles = new HashMap<>();
     }
 
     @Override
@@ -87,7 +87,16 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         return new TomlIsoVisitor<ExecutionContext>() {
             @Override
             public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
-                if (!document.getSourcePath().toString().endsWith("pyproject.toml")) {
+                String sourcePath = document.getSourcePath().toString();
+
+                if (sourcePath.endsWith("uv.lock")) {
+                    PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
+                            PyProjectHelper.correspondingPyprojectPath(sourcePath),
+                            document.printAll());
+                    return document;
+                }
+
+                if (!sourcePath.endsWith("pyproject.toml")) {
                     return document;
                 }
                 Optional<PythonResolutionResult> resolution = document.getMarkers()
@@ -98,7 +107,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
                 PythonResolutionResult marker = resolution.get();
                 if (marker.findDependencyInAnyScope(oldPackageName) != null) {
-                    acc.projectsToUpdate.add(document.getSourcePath().toString());
+                    acc.projectsToUpdate.add(sourcePath);
                 }
                 return document;
             }
@@ -117,10 +126,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 }
 
                 if (sourcePath.endsWith("uv.lock")) {
-                    String pyprojectPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
-                    String newContent = acc.updatedLockFiles.get(pyprojectPath);
-                    if (newContent != null) {
-                        return PyProjectHelper.reparseToml(document, newContent);
+                    Toml.Document updatedLock = PyProjectHelper.maybeUpdateUvLock(document, ctx);
+                    if (updatedLock != null) {
+                        return updatedLock;
                     }
                 }
 
@@ -160,7 +168,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     sb.append('[').append(extras).append(']');
                 }
                 if (newVersion != null) {
-                    sb.append(newVersion);
+                    sb.append(PyProjectHelper.normalizeVersionConstraint(newVersion));
                 } else {
                     // Preserve the original version constraint
                     String originalVersion = extractVersionConstraint(spec, depName);
@@ -178,7 +186,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         }.visitNonNull(document, ctx);
 
         if (updated != document) {
-            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, acc.updatedLockFiles);
+            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, ctx);
         }
 
         return updated;

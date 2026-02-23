@@ -111,12 +111,21 @@ class RemoveImport(PythonVisitor):
                 super().__init__()
                 self.in_import = False
 
+            def visit_import(self, import_: Import, p) -> J:
+                # Don't collect identifiers from standalone import statements
+                self.in_import = True
+                try:
+                    return super().visit_import(import_, p)
+                finally:
+                    self.in_import = False
+
             def visit_multi_import(self, multi: MultiImport, p) -> J:
                 # Don't collect identifiers from import statements
                 self.in_import = True
-                result = super().visit_multi_import(multi, p)
-                self.in_import = False
-                return result
+                try:
+                    return super().visit_multi_import(multi, p)
+                finally:
+                    self.in_import = False
 
             def visit_identifier(self, ident: Identifier, p) -> J:
                 if not self.in_import:
@@ -135,6 +144,20 @@ class RemoveImport(PythonVisitor):
 
         for padded in cu.padding.statements:
             stmt = padded.element
+            if isinstance(stmt, Import) and not isinstance(stmt, MultiImport):
+                result = self._process_single_import(stmt)
+                if result is None:
+                    removed_prefix = stmt.prefix
+                    changed = True
+                else:
+                    if removed_prefix is not None:
+                        padded = JRightPadded(
+                            padded.element.replace(prefix=removed_prefix),
+                            padded.after, padded.markers
+                        )
+                        removed_prefix = None
+                    new_padded_stmts.append(padded)
+                continue
             if isinstance(stmt, MultiImport):
                 result = self._process_multi_import(stmt)
                 if result is None:
@@ -168,6 +191,15 @@ class RemoveImport(PythonVisitor):
         if changed:
             return cu.padding.replace(_statements=new_padded_stmts)
         return cu
+
+    def _process_single_import(self, imp: Import) -> Optional[Import]:
+        """Process a standalone J.Import. Return None to remove, or the original."""
+        if self.name is not None:
+            return imp
+        name = self._get_qualid_name(imp.qualid)
+        if name == self.module:
+            return None
+        return imp
 
     def _process_multi_import(self, multi: MultiImport) -> Optional[MultiImport]:
         """Process a MultiImport and return None to remove, modified, or original."""

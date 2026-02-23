@@ -5,6 +5,23 @@ from uuid import UUID, uuid4
 T = TypeVar('T')
 
 
+def _is_changed(old, new) -> bool:
+    """Check if a value has changed, using identity for complex objects and equality for primitives.
+
+    Identity (``is``) is the right check for most AST node types because visitors
+    intentionally create new wrapper objects to signal a change.  But for *leaf*
+    values — strings, numbers, booleans, ``None`` — a newly constructed value that
+    is equal to the original should be treated as unchanged.  Without this,
+    normalisation visitors that rebuild a string identical to the original would
+    cause a spurious "change" on every node they touch.
+    """
+    if old is new:
+        return False
+    if isinstance(new, (str, int, float, bool, type(None))):
+        return old != new
+    return True  # different identity → changed
+
+
 def replace_if_changed(obj: T, **kwargs) -> T:
     """Replace fields on a dataclass, returning the original if nothing changed.
 
@@ -38,14 +55,14 @@ def replace_if_changed(obj: T, **kwargs) -> T:
             private_key = f'_{base_key}'
             if hasattr(obj, private_key):
                 mapped_kwargs[private_key] = value
-                # Use 'or' for short-circuit evaluation - skips getattr() once changed is True
-                changed = changed or getattr(obj, private_key) is not value
+                # Use 'or' for short-circuit evaluation - skips check once changed is True
+                changed = changed or _is_changed(getattr(obj, private_key), value)
             else:
                 mapped_kwargs[key] = value
-                changed = changed or getattr(obj, key) is not value
+                changed = changed or _is_changed(getattr(obj, key), value)
         else:
             mapped_kwargs[key] = value
-            changed = changed or getattr(obj, key) is not value
+            changed = changed or _is_changed(getattr(obj, key), value)
 
     # cast needed because Python lacks a public Dataclass protocol (see cpython#102395)
     return cast(T, dataclass_replace(cast(Any, obj), **mapped_kwargs)) if changed else obj
@@ -66,13 +83,19 @@ def list_find(lst: List[T], t: T) -> int:
     return -1  # or raise ValueError to match list.index() behavior
 
 
+def _callable_arg_count(fn: Any) -> int:
+    """Get the number of expected arguments for a callable (function or bound method)."""
+    arg_count: int = fn.__code__.co_argcount
+    if hasattr(fn, '__self__'):  # bound method — co_argcount includes self
+        arg_count -= 1
+    return arg_count
+
+
 def list_map(fn: FnType[T], lst: List[T]) -> List[T]:
     changed = False
     mapped_lst = None
 
-    arg_count = fn.__code__.co_argcount
-    if hasattr(fn, '__self__'):  # bound method — co_argcount includes self
-        arg_count -= 1
+    arg_count = _callable_arg_count(fn)
     with_index = arg_count == 2
     for index, original in enumerate(lst):
         new = fn(original, index) if with_index else fn(original)  # type: ignore
@@ -98,9 +121,7 @@ def list_flat_map(fn: FlatMapFnType[T], lst: List[T]) -> List[T]:
     changed = False
     result: List[T] = []
 
-    arg_count = fn.__code__.co_argcount
-    if hasattr(fn, '__self__'):  # bound method — co_argcount includes self
-        arg_count -= 1
+    arg_count = _callable_arg_count(fn)
     with_index = arg_count == 2
     for index, item in enumerate(lst):
         new_items = fn(item, index) if with_index else fn(item)  # type: ignore

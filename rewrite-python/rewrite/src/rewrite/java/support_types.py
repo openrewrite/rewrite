@@ -203,7 +203,7 @@ class JavaType(ABC):
     class Class(FullyQualified):
         _flags_bit_map: int
         _fully_qualified_name: str
-        _kind: FullyQualified.Kind
+        _kind: JavaType.FullyQualified.Kind
         _type_parameters: Optional[List[JavaType]]
         _supertype: Optional[JavaType.FullyQualified]
         _owning_class: Optional[JavaType.FullyQualified]
@@ -212,6 +212,10 @@ class JavaType(ABC):
         _members: Optional[List[JavaType.Variable]]
         _methods: Optional[List[JavaType.Method]]
 
+        @property
+        def fully_qualified_name(self) -> str:
+            return self._fully_qualified_name
+
     class ShallowClass(Class):
         pass
 
@@ -219,11 +223,44 @@ class JavaType(ABC):
         _type: JavaType.FullyQualified
         _type_parameters: Optional[List[JavaType]]
 
+        @property
+        def type(self) -> JavaType.FullyQualified:
+            return self._type
+
+        @property
+        def type_parameters(self) -> Optional[List[JavaType]]:
+            return self._type_parameters
+
+        @property
+        def fully_qualified_name(self) -> str:
+            t = getattr(self, '_type', None)
+            if t is not None and hasattr(t, 'fully_qualified_name'):
+                return t.fully_qualified_name
+            return ''
+
     class GenericTypeVariable:
         class Variance(Enum):
             Invariant = 0
             Covariant = 1
             Contravariant = 2
+
+    @dataclass
+    class Union:
+        """Union type (e.g. str | int). Maps to JavaType$MultiCatch over RPC."""
+        _bounds: Optional[List[JavaType]] = field(default=None)
+
+        @property
+        def bounds(self) -> List[JavaType]:
+            return self._bounds if self._bounds is not None else []
+
+    @dataclass
+    class Intersection:
+        """Intersection type (e.g. A & B). Maps to JavaType$Intersection over RPC."""
+        _bounds: Optional[List[JavaType]] = field(default=None)
+
+        @property
+        def bounds(self) -> List[JavaType]:
+            return self._bounds if self._bounds is not None else []
 
     class Primitive(Enum):
         Boolean = 0
@@ -298,11 +335,46 @@ class JavaType(ABC):
         def declared_formal_type_names(self) -> Optional[List[str]]:
             return self._declared_formal_type_names
 
+    @dataclass
     class Variable:
-        pass
+        _flags_bit_map: int = field(default=0)
+        _name: str = field(default="")
+        _owner: Optional[JavaType] = field(default=None)
+        _type: Optional[JavaType] = field(default=None)
+        _annotations: Optional[List[JavaType.FullyQualified]] = field(default=None)
 
+        @property
+        def flags_bit_map(self) -> int:
+            return self._flags_bit_map
+
+        @property
+        def name(self) -> str:
+            return self._name
+
+        @property
+        def owner(self) -> Optional[JavaType]:
+            return self._owner
+
+        @property
+        def type(self) -> Optional[JavaType]:
+            return self._type
+
+        @property
+        def annotations(self) -> Optional[List[JavaType.FullyQualified]]:
+            return self._annotations
+
+    @dataclass
     class Array:
-        pass
+        _elem_type: Optional[JavaType] = field(default=None)
+        _annotations: Optional[List[JavaType.FullyQualified]] = field(default=None)
+
+        @property
+        def elem_type(self) -> Optional[JavaType]:
+            return self._elem_type
+
+        @property
+        def annotations(self) -> Optional[List[JavaType.FullyQualified]]:
+            return self._annotations
 
 
 T = TypeVar('T')

@@ -11,12 +11,12 @@ J2 = TypeVar('J2', bound=J)
 
 
 class NormalizeFormatVisitor(PythonVisitor):
-    def __init__(self, stop_after: Tree = None):
+    def __init__(self, stop_after: Optional[Tree] = None):
         self._stop_after = stop_after
         self._stop = False
 
-    def visit_class_declaration(self, cd: ClassDeclaration, p: P) -> J:
-        cd = cast(ClassDeclaration, super().visit_class_declaration(cd, p))
+    def visit_class_declaration(self, class_decl: ClassDeclaration, p: P) -> J:
+        cd = cast(ClassDeclaration, super().visit_class_declaration(class_decl, p))
         if cd.leading_annotations:
             cd = _concatenate_prefix(cd, Space.first_prefix(cd.leading_annotations))
             cd = cd.replace(leading_annotations=Space.format_first_prefix(cd.leading_annotations, Space.EMPTY))
@@ -26,8 +26,8 @@ class NormalizeFormatVisitor(PythonVisitor):
         cd = cd.padding.replace(kind=cd.padding.kind.with_prefix(Space.EMPTY))
         return cd
 
-    def visit_method_declaration(self, md: MethodDeclaration, p: P) -> J:
-        md = cast(MethodDeclaration, super().visit_method_declaration(md, p))
+    def visit_method_declaration(self, method: MethodDeclaration, p: P) -> J:
+        md = cast(MethodDeclaration, super().visit_method_declaration(method, p))
         if md.leading_annotations:
             md = _concatenate_prefix(md, Space.first_prefix(md.leading_annotations))
             md = md.replace(leading_annotations=Space.format_first_prefix(md.leading_annotations, Space.EMPTY))
@@ -46,7 +46,7 @@ class NormalizeFormatVisitor(PythonVisitor):
         return tree
 
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
-        return tree if self._stop else super().visit(tree, p, parent)
+        return cast(Optional[T], tree if self._stop else super().visit(tree, p, parent))
 
 
 def _common_margin(s1, s2):
@@ -62,7 +62,10 @@ def _common_margin(s1, s2):
     return s2 if len(s2) < len(s1) else s1
 
 
-def _concatenate_prefix(j: J, prefix: Space) -> J2:
+def _concatenate_prefix(j: J2, prefix: Space) -> J2:
+    if prefix.is_empty():
+        return j
+
     shift = _common_margin(None, j.prefix.whitespace)
 
     def modify_comment(c: PyComment) -> PyComment:

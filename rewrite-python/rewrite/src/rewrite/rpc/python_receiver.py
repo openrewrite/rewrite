@@ -501,7 +501,7 @@ class PythonRpcReceiver:
         annotations = q.receive_list(ident.annotations)
         simple_name = q.receive(ident.simple_name)
         type_ = q.receive(ident.type)
-        field_type = q.receive(ident.field_type)
+        field_type = q.receive(ident.field_type, lambda t: self._receive_type(t, q))
         return replace_if_changed(ident, annotations=annotations, simple_name=simple_name, type=type_, field_type=field_type)
 
     def _visit_literal(self, lit, q: RpcReceiveQueue):
@@ -678,7 +678,7 @@ class PythonRpcReceiver:
             var.padding.initializer if hasattr(var.padding, 'initializer') else None,
             lambda lp: self._receive_left_padded(lp, q) if lp else None
         )
-        variable_type = q.receive(var.variable_type)
+        variable_type = q.receive(var.variable_type, lambda t: self._receive_type(t, q))
         return replace_if_changed(var, name=name, dimensions_after_name=dimensions_after_name,
                                   initializer=initializer, variable_type=variable_type)
 
@@ -921,6 +921,10 @@ class PythonRpcReceiver:
 
         This matches the sender's _visit_type which sends expanded type fields.
         The callback pattern ensures message counts match between sender and receiver.
+
+        IMPORTANT: isinstance ordering matters here. Parameterized must be checked
+        before Class because both are separate types. If inheritance changes, review
+        this ordering. Mirrors the sender's _visit_type chain.
         """
         from rewrite.java.support_types import JavaType as JT
 
@@ -979,12 +983,22 @@ class PythonRpcReceiver:
                 _declared_formal_type_names=formal_type_names,
             )
 
+        elif isinstance(java_type, JT.Parameterized):
+            type_ = q.receive(getattr(java_type, '_type', None),
+                              lambda t: self._receive_type(t, q))
+            type_params = q.receive_list(getattr(java_type, '_type_parameters', None) or [],
+                                          lambda t: self._receive_type(t, q))
+            p = JT.Parameterized()
+            p._type = type_
+            p._type_parameters = type_params
+            return p
+
         elif isinstance(java_type, JT.Class):
             # Class: flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype,
             #        owningClass, annotations, interfaces, members, methods
             flags = q.receive_defined(getattr(java_type, '_flags_bit_map', 0))
             kind = _to_enum(JT.FullyQualified.Kind)(q.receive(getattr(java_type, '_kind', JT.FullyQualified.Kind.Class)))
-            fqn = q.receive_defined(getattr(java_type, '_fully_qualified_name', ''))
+            fqn = q.receive_defined(getattr(java_type, 'fully_qualified_name', ''))
             type_params = q.receive_list(getattr(java_type, '_type_parameters', None) or [],
                                           lambda t: self._receive_type(t, q))
             supertype = q.receive(getattr(java_type, '_supertype', None),
@@ -1012,6 +1026,43 @@ class PythonRpcReceiver:
             class_type._members = members
             class_type._methods = methods
             return class_type
+
+        elif isinstance(java_type, JT.Array):
+            elem_type = q.receive(getattr(java_type, '_elem_type', None),
+                                   lambda t: self._receive_type(t, q))
+            annotations = q.receive_list(getattr(java_type, '_annotations', None) or [],
+                                          lambda t: self._receive_type(t, q))
+            arr = JT.Array()
+            arr._elem_type = elem_type
+            arr._annotations = annotations
+            return arr
+
+        elif isinstance(java_type, JT.Variable):
+            name = q.receive(getattr(java_type, '_name', ''))
+            owner = q.receive(getattr(java_type, '_owner', None),
+                               lambda t: self._receive_type(t, q))
+            type_ = q.receive(getattr(java_type, '_type', None),
+                               lambda t: self._receive_type(t, q))
+            annotations = q.receive_list(getattr(java_type, '_annotations', None) or [],
+                                          lambda t: self._receive_type(t, q))
+            var = JT.Variable()
+            var._name = name
+            var._owner = owner
+            var._type = type_
+            var._annotations = annotations
+            return var
+
+        elif isinstance(java_type, JT.Union):
+            # Union (MultiCatch in Java): bounds list
+            bounds = q.receive_list(getattr(java_type, '_bounds', None) or [],
+                                     lambda t: self._receive_type(t, q))
+            return JT.Union(_bounds=bounds)
+
+        elif isinstance(java_type, JT.Intersection):
+            # Intersection: bounds list
+            bounds = q.receive_list(getattr(java_type, '_bounds', None) or [],
+                                     lambda t: self._receive_type(t, q))
+            return JT.Intersection(_bounds=bounds)
 
         elif isinstance(java_type, JT.Unknown):
             # Unknown has no additional fields
@@ -1326,7 +1377,7 @@ def _receive_java_type_class(cls, q: RpcReceiveQueue):
     # owningClass, annotations, interfaces, members, methods
     flags = q.receive_defined(getattr(cls, '_flags_bit_map', 0) if cls else 0)
     kind = _to_enum(JT.FullyQualified.Kind)(q.receive(getattr(cls, '_kind', JT.FullyQualified.Kind.Class) if cls else JT.FullyQualified.Kind.Class))
-    fqn = q.receive_defined(getattr(cls, '_fully_qualified_name', '') if cls else '')
+    fqn = q.receive_defined(getattr(cls, 'fully_qualified_name', '') if cls else '')
     type_params = q.receive_list(getattr(cls, '_type_parameters', None) if cls else None)
     supertype = q.receive(getattr(cls, '_supertype', None) if cls else None)
     owning_class = q.receive(getattr(cls, '_owning_class', None) if cls else None)
@@ -1349,6 +1400,67 @@ def _receive_java_type_class(cls, q: RpcReceiveQueue):
     class_type._methods = methods
 
     return class_type
+
+
+def _receive_java_type_parameterized(param, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Parameterized - consumes type and typeParameters."""
+    from rewrite.java.support_types import JavaType as JT
+
+    type_ = q.receive(getattr(param, '_type', None))
+    type_params = q.receive_list(getattr(param, '_type_parameters', None))
+
+    p = JT.Parameterized()
+    p._type = type_
+    p._type_parameters = type_params
+    return p
+
+
+def _receive_java_type_array(array, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Array - consumes elemType and annotations."""
+    from rewrite.java.support_types import JavaType as JT
+
+    elem_type = q.receive(array._elem_type)
+    annotations = q.receive_list(array._annotations)
+
+    arr = JT.Array()
+    arr._elem_type = elem_type
+    arr._annotations = annotations
+    return arr
+
+
+def _receive_java_type_variable(variable, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Variable - consumes all variable fields."""
+    from rewrite.java.support_types import JavaType as JT
+
+    # Receive fields in the same order as JavaTypeSender.visitVariable:
+    # name, owner, type, annotations (no flags over RPC)
+    name = q.receive(variable._name)
+    owner = q.receive(variable._owner)
+    type_ = q.receive(variable._type)
+    annotations = q.receive_list(variable._annotations)
+
+    var = JT.Variable()
+    var._name = name
+    var._owner = owner
+    var._type = type_
+    var._annotations = annotations
+    return var
+
+
+def _receive_java_type_union(union, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Union (MultiCatch in Java) - consumes bounds list."""
+    from rewrite.java.support_types import JavaType as JT
+
+    bounds = q.receive_list(union._bounds)
+    return JT.Union(_bounds=bounds)
+
+
+def _receive_java_type_intersection(intersection, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Intersection - consumes bounds list."""
+    from rewrite.java.support_types import JavaType as JT
+
+    bounds = q.receive_list(intersection._bounds)
+    return JT.Intersection(_bounds=bounds)
 
 
 def _register_java_type_codecs():
@@ -1387,6 +1499,46 @@ def _register_java_type_codecs():
         JT.Class,
         _receive_java_type_class,
         lambda: JT.Class()  # Factory creates empty Class
+    )
+
+    # JavaType.Variable - full serialization of variable type info
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Variable',
+        JT.Variable,
+        _receive_java_type_variable,
+        lambda: JT.Variable()  # Factory creates empty Variable
+    )
+
+    # JavaType.Parameterized - base type and type parameters
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Parameterized',
+        JT.Parameterized,
+        _receive_java_type_parameterized,
+        lambda: JT.Parameterized()  # Factory creates empty Parameterized
+    )
+
+    # JavaType.Array - element type and annotations
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Array',
+        JT.Array,
+        _receive_java_type_array,
+        lambda: JT.Array()  # Factory creates empty Array
+    )
+
+    # JavaType.Union (MultiCatch in Java) - bounds list
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$MultiCatch',
+        JT.Union,
+        _receive_java_type_union,
+        lambda: JT.Union()  # Factory creates empty Union
+    )
+
+    # JavaType.Intersection - bounds list
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Intersection',
+        JT.Intersection,
+        _receive_java_type_intersection,
+        lambda: JT.Intersection()  # Factory creates empty Intersection
     )
 
 
@@ -1492,7 +1644,7 @@ def _register_core_marker_codecs():
 
 def _register_markup_marker_codecs():
     """Register codecs for Markup marker types (Warn, Error, Info, Debug)."""
-    from rewrite.markers import MarkupWarn, MarkupError, MarkupInfo, MarkupDebug
+    from rewrite.markers import MarkupWarn, MarkupError, MarkupInfo, MarkupDebug  # ty: ignore[unresolved-import]
     from rewrite.rpc.receive_queue import register_codec_with_both_names
     from uuid import uuid4
 

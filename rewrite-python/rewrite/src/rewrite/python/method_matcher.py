@@ -419,8 +419,6 @@ def _get_fqn(type_obj) -> Optional[str]:
     if type_obj is None:
         return None
 
-    if hasattr(type_obj, "_fully_qualified_name"):
-        return type_obj._fully_qualified_name
     if hasattr(type_obj, "fully_qualified_name"):
         return type_obj.fully_qualified_name
 

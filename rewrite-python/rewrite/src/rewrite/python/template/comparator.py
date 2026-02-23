@@ -251,7 +251,7 @@ class PatternMatchingComparator:
 
         # Check for variadic capture
         if len(pattern_elements) == 1:
-            pattern_arg = pattern_elements[0].element
+            pattern_arg = pattern_elements[0]
             if isinstance(pattern_arg, j.Identifier):
                 cap_name = from_placeholder(pattern_arg.simple_name)
                 if cap_name and self._captures.get(cap_name, Capture(name=cap_name)).variadic:
@@ -267,7 +267,7 @@ class PatternMatchingComparator:
 
         # Compare each argument
         for p_elem, t_elem in zip(pattern_elements, target_elements):
-            if not self._compare(p_elem.element, t_elem.element, cursor):
+            if not self._compare(p_elem, t_elem, cursor):
                 return False
 
         return True

@@ -67,7 +67,7 @@ from rewrite.python.tree import (
     VariableScope,
     YieldFrom,
 )
-from rewrite.python.support_types import PyComment
+from rewrite.python.support_types import PyComment  # ty: ignore[unresolved-import]
 from rewrite.python.visitor import PythonVisitor
 from rewrite.python.style import (
     SpacesStyle,

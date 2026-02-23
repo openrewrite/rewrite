@@ -46,5 +46,5 @@ tasks.withType<Javadoc> {
     //   symbol:   method onConstructor_()
     //   location: @interface AllArgsConstructor
     // 1 error
-    exclude("**/RpcObjectData.java")
+    exclude("**/RpcObjectData.java", "**/RecipeDescriptor.java")
 }

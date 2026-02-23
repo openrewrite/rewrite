@@ -500,8 +500,8 @@ class XmlParserTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1382")
-    @ParameterizedTest
     @MethodSource
+    @ParameterizedTest
     void testUtf8WithAndWithoutBom(@Language("xml") String xml, boolean hasBom) {
         XmlParser parser = XmlParser.builder().build();
         SourceFile parsed = parser.parse(xml).findFirst().orElseThrow();

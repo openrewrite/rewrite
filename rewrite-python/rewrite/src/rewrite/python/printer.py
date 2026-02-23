@@ -519,7 +519,7 @@ class PythonPrinter:
         self._before_syntax(clause, p)
         if clause.async_:
             p.append("async")
-            self._visit_space(clause.padding.async_.after, p)  # ty: ignore[possibly-missing-attribute]  # guarded by if clause.async_
+            self._visit_space(clause.padding.async_.after, p)  # ty: ignore[unresolved-attribute]  # guarded by if clause.async_
         p.append("for")
         self.visit(clause.iterator_variable, p)
         self._visit_space(clause.padding.iterated_list.before, p)
@@ -1199,6 +1199,7 @@ class PythonJavaPrinter:
         is_regular_assignment = (
             isinstance(parent_value, j.Block) or
             isinstance(parent_value, py.CompilationUnit) or
+            isinstance(parent_value, py.ExpressionStatement) or  # J.Assignment is both Expression and Statement, so the wrapping ExpressionStatement is redundant here, but template-generated replacements can produce this nesting
             (isinstance(parent_value, j.If) and parent_value.then_part == assignment) or
             (isinstance(parent_value, j.If.Else) and parent_value.body == assignment) or
             (isinstance(parent_value, Loop) and parent_value.body == assignment)  # ty: ignore[unresolved-attribute]  # Loop base class doesn't have body
@@ -1474,7 +1475,14 @@ class PythonJavaPrinter:
 
         self._before_syntax(import_, p)
 
+        from rewrite.python import tree as _py
+        is_standalone = not self.get_cursor().first_enclosing(_py.MultiImport)
+        if is_standalone:
+            p.append("import")
+
         if isinstance(import_.qualid.target, j.Empty):
+            if is_standalone:
+                self._visit_space(import_.qualid.prefix, p)
             self.visit(import_.qualid.name, p)
         else:
             self.visit(import_.qualid, p)
