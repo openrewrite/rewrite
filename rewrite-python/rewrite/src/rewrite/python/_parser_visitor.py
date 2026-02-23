@@ -338,7 +338,8 @@ class ParserVisitor(ast.NodeVisitor):
     def map_arg(self, node, default=None, vararg=False, kwarg=False):
         prefix = self.__source_before('**') if kwarg else self.__whitespace()
         vararg_prefix = self.__source_before('*') if vararg else None
-        name = self.__convert_name(node.arg, self._type_mapping.type(node))
+        expr_type, field_type = self._type_mapping.param_type_info(node)
+        name = self.__convert_name(node.arg, expr_type, field_type)
         after_name = self.__source_before(':') if node.annotation else Space.EMPTY
         type_expression = self.__convert_type(node.annotation) if node.annotation else None
         initializer = self.__pad_left(self.__source_before('='), self.__convert(default)) if default else None
@@ -359,7 +360,7 @@ class ParserVisitor(ast.NodeVisitor):
                 cast(j.Identifier, name),
                 [],
                 initializer,
-                self.__as_variable_type(self._type_mapping.type(node))
+                field_type
             ), after_name)],
         )
 
@@ -2182,7 +2183,7 @@ class ParserVisitor(ast.NodeVisitor):
             None,
             body,
             None,
-            self.__as_method_type(self._type_mapping.type(node)),
+            self._type_mapping.method_declaration_type(node),
         )
 
     def __map_decorator(self, decorator) -> j.Annotation:
@@ -2871,7 +2872,7 @@ class ParserVisitor(ast.NodeVisitor):
                      enumerate(slices)],
                     Markers.EMPTY
                 ),
-                None
+                self._type_mapping.type(node)
             )
         elif isinstance(node, ast.BinOp):
             # Type unions using `|` was added in Python 3.10
@@ -3039,12 +3040,13 @@ class ParserVisitor(ast.NodeVisitor):
             return t
         return None
 
-    def __convert_name(self, name: str, name_type: Optional[JavaType] = None) -> NameTree:
+    def __convert_name(self, name: str, name_type: Optional[JavaType] = None,
+                        field_type: Optional[JavaType.Variable] = None) -> NameTree:
         def ident_or_field(parts: List[str]) -> NameTree:
             if len(parts) == 1:
                 space, actual_name = self.__consume_identifier(parts[-1])
                 return j.Identifier(random_id(), space, Markers.EMPTY, [], actual_name,
-                                    name_type, None)
+                                    name_type, field_type)
             else:
                 return j.FieldAccess(
                     random_id(),
@@ -3055,7 +3057,7 @@ class ParserVisitor(ast.NodeVisitor):
                         self.__source_before('.'),
                         (lambda s, n: j.Identifier(random_id(), s, Markers.EMPTY, [], n,
                                      name_type,
-                                     None))(*self.__consume_identifier(parts[-1])),
+                                     field_type))(*self.__consume_identifier(parts[-1])),
                     ),
                     name_type
                 )

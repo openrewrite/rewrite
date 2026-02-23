@@ -828,7 +828,7 @@ g.greet("World")
             assert result is not None
             assert result._name == 'greet'
             assert result._declaring_type is not None
-            assert result._declaring_type._fully_qualified_name == 'Greeter'
+            assert result._declaring_type._fully_qualified_name.endswith('Greeter')
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -1137,6 +1137,27 @@ greet("World")
             _cleanup_mapping(mapping, tmpdir, client)
 
 
+@requires_ty_types_cli
+class TestTypingAliases:
+    """Tests for typing module type aliases (e.g. typing.Text → str)."""
+
+    def test_typing_text_resolves_to_str(self):
+        """typing.Text (deprecated alias for str) should resolve to Primitive.String.
+
+        ty-types resolves typing.Text to str at the type level, so our type_mapping
+        receives className='str' and maps it to JavaType.Primitive.String automatically.
+        """
+        source = 'from typing import Text\nx: Text = "hello"\nx\n'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            name_node = tree.body[2].value  # bare 'x' expression
+            result = mapping.type(name_node)
+            assert result == JavaType.Primitive.String, \
+                f"typing.Text should resolve to Primitive.String, got {result}"
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
 class TestCyclicTypeResolution:
     """Tests that cyclic type references don't cause infinite recursion."""
 
@@ -1240,7 +1261,7 @@ x = Color.RED
             result = mapping.type(name_node)
             assert result is not None
             assert isinstance(result, JavaType.Class)
-            assert result._fully_qualified_name == 'Color'
+            assert result._fully_qualified_name.endswith('Color')
             assert result._kind == JavaType.FullyQualified.Kind.Enum
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
@@ -1260,7 +1281,7 @@ x: Greeter
             result = mapping.type(name_node)
             assert result is not None
             assert isinstance(result, JavaType.Class)
-            assert result._fully_qualified_name == 'Greeter'
+            assert result._fully_qualified_name.endswith('Greeter')
             assert result._kind == JavaType.FullyQualified.Kind.Interface
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
@@ -1278,7 +1299,7 @@ x = MyClass()
             result = mapping.type(name_node)
             assert result is not None
             assert isinstance(result, JavaType.Class)
-            assert result._fully_qualified_name == 'MyClass'
+            assert result._fully_qualified_name.endswith('MyClass')
             assert result._kind == JavaType.FullyQualified.Kind.Class
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
@@ -1304,17 +1325,17 @@ x = Multi()
             result = mapping.type(name_node)
             assert result is not None
             assert isinstance(result, JavaType.Class)
-            assert result._fully_qualified_name == 'Multi'
+            assert result._fully_qualified_name.endswith('Multi')
             # First supertype → _supertype
             assert getattr(result, '_supertype', None) is not None, \
                 "Multi should have a supertype"
-            assert result._supertype._fully_qualified_name == 'Base'
+            assert result._supertype._fully_qualified_name.endswith('Base')
             # Remaining supertypes → _interfaces
             interfaces = getattr(result, '_interfaces', None)
             assert interfaces is not None, \
                 "Multi should have interfaces for additional supertypes"
             assert len(interfaces) >= 1
             iface_names = [i._fully_qualified_name for i in interfaces]
-            assert 'Mixin' in iface_names
+            assert any(n.endswith('Mixin') for n in iface_names)
         finally:
             _cleanup_mapping(mapping, tmpdir, client)

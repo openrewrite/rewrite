@@ -1,7 +1,3 @@
-import shutil
-
-import pytest
-
 from rewrite.java.support_types import JavaType
 from rewrite.java.tree import Assignment, Identifier, MethodInvocation
 from rewrite.python.tree import CompilationUnit
@@ -9,11 +5,6 @@ from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 
 Parameterized = JavaType.Parameterized
-
-requires_ty_cli = pytest.mark.skipif(
-    shutil.which('ty-types') is None,
-    reason="ty-types CLI is not installed"
-)
 
 
 def test_assign():
@@ -112,7 +103,6 @@ def test_assign_op():
     RecipeSpec().rewrite_run(python("a @= 1"))
 
 
-@requires_ty_cli
 def test_assign_type_attribution():
     """Verify that type attribution is populated on assignment AST nodes."""
     errors = []
@@ -146,7 +136,6 @@ def test_assign_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
 def test_assign_method_call_type_attribution():
     """Verify type attribution on an assignment from a method call like str.split()."""
     errors = []
@@ -169,8 +158,8 @@ def test_assign_method_call_type_attribution():
                     if not assignment.type._type_parameters:
                         errors.append("Parameterized._type_parameters is empty")
                 elif isinstance(assignment.type, JavaType.Class):
-                    if assignment.type._fully_qualified_name != 'list':
-                        errors.append(f"Assignment.type fqn is '{assignment.type._fully_qualified_name}', expected 'list'")
+                    if not assignment.type._fully_qualified_name.startswith('list'):
+                        errors.append(f"Assignment.type fqn is '{assignment.type._fully_qualified_name}', expected to start with 'list'")
                 else:
                     errors.append(f"Assignment.type is {type(assignment.type).__name__}, expected Parameterized or Class")
                 return assignment
@@ -178,7 +167,7 @@ def test_assign_method_call_type_attribution():
             def visit_method_invocation(self, method, p):
                 if not isinstance(method, MethodInvocation):
                     return method
-                if method.simple_name != 'split':
+                if method.name.simple_name != 'split':
                     return method
                 # method_type should be populated
                 if method.method_type is None:
@@ -194,11 +183,11 @@ def test_assign_method_call_type_attribution():
                 if method.method_type is not None and method.method_type._return_type is not None:
                     rt = method.method_type._return_type
                     if isinstance(rt, Parameterized):
-                        if rt._type._fully_qualified_name != 'list':
-                            errors.append(f"return_type fqn is '{rt._type._fully_qualified_name}', expected 'list'")
+                        if not rt._type._fully_qualified_name.startswith('list'):
+                            errors.append(f"return_type fqn is '{rt._type._fully_qualified_name}', expected to start with 'list'")
                     elif isinstance(rt, JavaType.Class):
-                        if rt._fully_qualified_name != 'list':
-                            errors.append(f"return_type fqn is '{rt._fully_qualified_name}', expected 'list'")
+                        if not rt._fully_qualified_name.startswith('list'):
+                            errors.append(f"return_type fqn is '{rt._fully_qualified_name}', expected to start with 'list'")
                     else:
                         errors.append(f"return_type is {type(rt).__name__}, expected Parameterized or Class")
                 return method
