@@ -1,7 +1,4 @@
-import json
 import shutil
-import subprocess
-import tempfile
 
 import pytest
 
@@ -11,33 +8,11 @@ from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 
+from ._markers import requires_module_name
+
 requires_ty_cli = pytest.mark.skipif(
     shutil.which('ty-types') is None,
     reason="ty-types CLI is not installed"
-)
-
-
-def _ty_types_has_module_name() -> bool:
-    """Check if the installed ty-types CLI provides moduleName on classLiteral descriptors."""
-    if shutil.which('ty-types') is None:
-        return False
-    try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-            f.write('class _C:\n    pass\n')
-            fname = f.name
-        result = subprocess.run(['ty-types', fname], capture_output=True, text=True, timeout=30)
-        data = json.loads(result.stdout)
-        return any(
-            d.get('kind') == 'classLiteral' and 'moduleName' in d
-            for d in data.get('types', {}).values()
-        )
-    except Exception:
-        return False
-
-
-requires_module_name = pytest.mark.skipif(
-    not _ty_types_has_module_name(),
-    reason="ty-types CLI does not provide moduleName on classLiteral descriptors"
 )
 
 
@@ -238,7 +213,7 @@ def test_class_literal_module_qualified_fqn():
 
 @requires_ty_cli
 def test_class_instance_type_attribution():
-    """Verify that x = Foo() assigns a type with fqn 'Foo'."""
+    """Verify that x = Foo() assigns a type with fqn ending in 'Foo'."""
     errors = []
 
     def check_types(source_file):
@@ -251,8 +226,10 @@ def test_class_instance_type_attribution():
                 if assignment.type is None:
                     errors.append("Assignment.type is None for Foo()")
                 elif isinstance(assignment.type, JavaType.Class):
-                    if assignment.type._fully_qualified_name != 'Foo':
-                        errors.append(f"Assignment.type fqn is '{assignment.type._fully_qualified_name}', expected 'Foo'")
+                    fqn = assignment.type._fully_qualified_name
+                    # Accept 'Foo' or '<module>.Foo' (module-qualified with newer ty-types)
+                    if not fqn.endswith('Foo'):
+                        errors.append(f"Assignment.type fqn is '{fqn}', expected to end with 'Foo'")
                 else:
                     # Accept any non-None type
                     pass

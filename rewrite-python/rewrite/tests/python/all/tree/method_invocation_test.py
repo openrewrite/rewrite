@@ -1,7 +1,4 @@
-import json
 import shutil
-import subprocess
-import tempfile
 
 import pytest
 
@@ -11,33 +8,11 @@ from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 
+from ._markers import requires_module_name
+
 requires_ty_cli = pytest.mark.skipif(
     shutil.which('ty-types') is None,
     reason="ty-types CLI is not installed"
-)
-
-
-def _ty_types_has_module_name() -> bool:
-    """Check if the installed ty-types CLI provides moduleName on function descriptors."""
-    if shutil.which('ty-types') is None:
-        return False
-    try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-            f.write('from os.path import join\njoin("a", "b")\n')
-            fname = f.name
-        result = subprocess.run(['ty-types', fname], capture_output=True, text=True, timeout=30)
-        data = json.loads(result.stdout)
-        return any(
-            d.get('kind') == 'function' and 'moduleName' in d
-            for d in data.get('types', {}).values()
-        )
-    except Exception:
-        return False
-
-
-requires_module_name = pytest.mark.skipif(
-    not _ty_types_has_module_name(),
-    reason="ty-types CLI does not provide moduleName on function descriptors"
 )
 
 
@@ -298,10 +273,13 @@ def test_bare_function_declaring_type_has_module():
                     dt = method.method_type.declaring_type
                     if dt is None:
                         errors.append("method_type.declaring_type is None for join()")
-                    elif not hasattr(dt, '_fully_qualified_name') or 'posixpath' not in dt._fully_qualified_name:
+                    elif not hasattr(dt, '_fully_qualified_name') or (
+                        'posixpath' not in dt._fully_qualified_name and
+                        'ntpath' not in dt._fully_qualified_name
+                    ):
                         errors.append(
                             f"declaring_type fqn is '{getattr(dt, '_fully_qualified_name', '?')}', "
-                            f"expected to contain 'posixpath' (os.path module)"
+                            f"expected to contain 'posixpath' or 'ntpath' (os.path module)"
                         )
                 return method
 

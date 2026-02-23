@@ -9,6 +9,8 @@ from rewrite.python import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 
+from ._markers import requires_module_name
+
 requires_ty_cli = pytest.mark.skipif(
     shutil.which('ty-types') is None,
     reason="ty-types CLI is not installed"
@@ -138,7 +140,7 @@ def test_qualified_import_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
+@requires_module_name
 def test_from_import_type_attribution():
     """from os import getcwd; getcwd() → declaring_type.fqn == 'os'."""
     errors = []
@@ -168,7 +170,7 @@ def test_aliased_import_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
+@requires_module_name
 def test_aliased_from_import_type_attribution():
     """from os import getcwd as gwd; gwd() → declaring_type.fqn == 'os'."""
     errors = []
