@@ -1,19 +1,8 @@
-import shutil
-
-import pytest
-
 from rewrite.java.support_types import JavaType
 from rewrite.java.tree import MethodInvocation
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
-
-from ._markers import requires_module_name
-
-requires_ty_cli = pytest.mark.skipif(
-    shutil.which('ty-types') is None,
-    reason="ty-types CLI is not installed"
-)
 
 
 def test_no_select():
@@ -99,7 +88,6 @@ def test_no_name():
     RecipeSpec().rewrite_run(python("v = (a)()"))
 
 
-@requires_ty_cli
 def test_builtin_function_type_attribution():
     """Verify type attribution on a builtin function call like len()."""
     errors = []
@@ -134,7 +122,6 @@ def test_builtin_function_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
 def test_string_method_type_attribution():
     """Verify type attribution on a string method call like str.upper()."""
     errors = []
@@ -171,7 +158,6 @@ def test_string_method_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
 def test_stdlib_function_type_attribution():
     """Verify type attribution on a stdlib function call like os.getcwd()."""
     errors = []
@@ -211,7 +197,6 @@ def test_stdlib_function_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
 def test_generic_call_site_return_type():
     """Verify method_invocation_type returns call-site-specific return type for generic functions."""
     errors = []
@@ -253,7 +238,6 @@ def test_generic_call_site_return_type():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_module_name
 def test_bare_function_declaring_type_has_module():
     """Verify that a bare function call imported from a module gets a declaring type with the module name."""
     errors = []

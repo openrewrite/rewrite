@@ -1,20 +1,9 @@
-import shutil
-
-import pytest
-
 from rewrite.java import Import
 from rewrite.java.support_types import JavaType
 from rewrite.java.tree import MethodInvocation
 from rewrite.python import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
-
-from ._markers import requires_module_name
-
-requires_ty_cli = pytest.mark.skipif(
-    shutil.which('ty-types') is None,
-    reason="ty-types CLI is not installed"
-)
 
 
 def _assert_single_j_import(cu: CompilationUnit) -> None:
@@ -125,7 +114,6 @@ def _check_getcwd_declaring_type(source_file, errors):
     TypeChecker().visit(source_file, None)
 
 
-@requires_ty_cli
 def test_qualified_import_type_attribution():
     """import os; os.getcwd() → declaring_type.fqn == 'os'."""
     errors = []
@@ -140,7 +128,6 @@ def test_qualified_import_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_module_name
 def test_from_import_type_attribution():
     """from os import getcwd; getcwd() → declaring_type.fqn == 'os'."""
     errors = []
@@ -155,7 +142,6 @@ def test_from_import_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
 def test_aliased_import_type_attribution():
     """import os as o; o.getcwd() → declaring_type.fqn == 'os'."""
     errors = []
@@ -170,7 +156,6 @@ def test_aliased_import_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_module_name
 def test_aliased_from_import_type_attribution():
     """from os import getcwd as gwd; gwd() → declaring_type.fqn == 'os'."""
     errors = []

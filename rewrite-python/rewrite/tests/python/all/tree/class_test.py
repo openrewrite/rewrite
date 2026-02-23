@@ -1,19 +1,10 @@
-import shutil
-
-import pytest
+from pathlib import Path
 
 from rewrite.java.support_types import JavaType
 from rewrite.java.tree import Assignment, ClassDeclaration, Identifier
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
-
-from ._markers import requires_module_name
-
-requires_ty_cli = pytest.mark.skipif(
-    shutil.which('ty-types') is None,
-    reason="ty-types CLI is not installed"
-)
 
 
 def test_empty():
@@ -127,7 +118,6 @@ def test_starred_base():
     ))
 
 
-@requires_ty_cli
 def test_generic_class_type_params():
     """Verify type parameters on a generic class like class Box[T]."""
     errors = []
@@ -176,7 +166,6 @@ def test_generic_class_type_params():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_module_name
 def test_class_literal_module_qualified_fqn():
     """Verify that a class defined in a module gets a module-qualified FQN on its classLiteral type."""
     errors = []
@@ -206,12 +195,12 @@ def test_class_literal_module_qualified_fqn():
         class MyClass:
             pass
         """,
+        path=Path("a.py"),
         after_recipe=check_types,
     ))
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
 def test_class_instance_type_attribution():
     """Verify that x = Foo() assigns a type with fqn ending in 'Foo'."""
     errors = []
