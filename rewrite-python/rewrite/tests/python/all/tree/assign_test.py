@@ -1,7 +1,3 @@
-import shutil
-
-import pytest
-
 from rewrite.java.support_types import JavaType
 from rewrite.java.tree import Assignment, Identifier, MethodInvocation
 from rewrite.python.tree import CompilationUnit
@@ -9,11 +5,6 @@ from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 
 Parameterized = JavaType.Parameterized
-
-requires_ty_cli = pytest.mark.skipif(
-    shutil.which('ty-types') is None,
-    reason="ty-types CLI is not installed"
-)
 
 
 def test_assign():
@@ -112,7 +103,6 @@ def test_assign_op():
     RecipeSpec().rewrite_run(python("a @= 1"))
 
 
-@requires_ty_cli
 def test_assign_type_attribution():
     """Verify that type attribution is populated on assignment AST nodes."""
     errors = []
@@ -146,7 +136,6 @@ def test_assign_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
 def test_assign_method_call_type_attribution():
     """Verify type attribution on an assignment from a method call like str.split()."""
     errors = []

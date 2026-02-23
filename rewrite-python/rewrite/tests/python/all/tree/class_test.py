@@ -1,17 +1,10 @@
-import shutil
-
-import pytest
+from pathlib import Path
 
 from rewrite.java.support_types import JavaType
-from rewrite.java.tree import Assignment, Identifier
+from rewrite.java.tree import Assignment, ClassDeclaration, Identifier
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
-
-requires_ty_cli = pytest.mark.skipif(
-    shutil.which('ty-types') is None,
-    reason="ty-types CLI is not installed"
-)
 
 
 def test_empty():
@@ -125,7 +118,6 @@ def test_starred_base():
     ))
 
 
-@requires_ty_cli
 def test_generic_class_type_params():
     """Verify type parameters on a generic class like class Box[T]."""
     errors = []
@@ -174,9 +166,43 @@ def test_generic_class_type_params():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
+def test_class_literal_module_qualified_fqn():
+    """Verify that a class defined in a module gets a module-qualified FQN on its classLiteral type."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_class_declaration(self, class_decl, p):
+                if not isinstance(class_decl, ClassDeclaration):
+                    return class_decl
+                cd_type = class_decl.type
+                if cd_type is None:
+                    errors.append("ClassDeclaration.type is None for MyClass")
+                elif isinstance(cd_type, JavaType.Class):
+                    fqn = cd_type._fully_qualified_name
+                    # The FQN should contain a module prefix (not just bare 'MyClass')
+                    if '.' not in fqn:
+                        errors.append(f"ClassDeclaration.type fqn '{fqn}' has no module prefix, expected '<module>.MyClass'")
+                return class_decl
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        """\
+        class MyClass:
+            pass
+        """,
+        path=Path("a.py"),
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+
 def test_class_instance_type_attribution():
-    """Verify that x = Foo() assigns a type with fqn 'Foo'."""
+    """Verify that x = Foo() assigns a type with fqn ending in 'Foo'."""
     errors = []
 
     def check_types(source_file):
@@ -189,8 +215,10 @@ def test_class_instance_type_attribution():
                 if assignment.type is None:
                     errors.append("Assignment.type is None for Foo()")
                 elif isinstance(assignment.type, JavaType.Class):
-                    if assignment.type._fully_qualified_name != 'Foo':
-                        errors.append(f"Assignment.type fqn is '{assignment.type._fully_qualified_name}', expected 'Foo'")
+                    fqn = assignment.type._fully_qualified_name
+                    # Accept 'Foo' or '<module>.Foo' (module-qualified with newer ty-types)
+                    if not fqn.endswith('Foo'):
+                        errors.append(f"Assignment.type fqn is '{fqn}', expected to end with 'Foo'")
                 else:
                     # Accept any non-None type
                     pass

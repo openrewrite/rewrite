@@ -1,17 +1,8 @@
-import shutil
-
-import pytest
-
 from rewrite.java.support_types import JavaType
 from rewrite.java.tree import MethodDeclaration, VariableDeclarations
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
-
-requires_ty_cli = pytest.mark.skipif(
-    shutil.which('ty-types') is None,
-    reason="ty-types CLI is not installed"
-)
 
 
 def test_whitespace_before_colon():
@@ -167,7 +158,6 @@ def test_line_break_after_last_param():
     ))
 
 
-@requires_ty_cli
 def test_generic_function_type_params():
     """Verify method_type.declared_formal_type_names for def identity[T](x: T) -> T."""
     errors = []
@@ -206,7 +196,6 @@ def test_generic_function_type_params():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
 def test_method_declaration_type_attribution():
     """Verify method_type on a function with typed parameters and return type."""
     errors = []
@@ -257,7 +246,6 @@ def test_method_declaration_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
 def test_param_identifier_field_type():
     """Verify J.Identifier.field_type is JavaType.Variable for typed parameters."""
     errors = []

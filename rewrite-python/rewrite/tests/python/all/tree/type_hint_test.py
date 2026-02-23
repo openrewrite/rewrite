@@ -1,7 +1,3 @@
-import shutil
-
-import pytest
-
 from rewrite.java.support_types import JavaType
 from rewrite.java.tree import VariableDeclarations
 from rewrite.python.tree import CompilationUnit
@@ -9,11 +5,6 @@ from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 
 Parameterized = JavaType.Parameterized
-
-requires_ty_cli = pytest.mark.skipif(
-    shutil.which('ty-types') is None,
-    reason="ty-types CLI is not installed"
-)
 
 
 def test_primitive_type_hint():
@@ -190,7 +181,6 @@ def f(x: "Union[str]") -> None:
     ))
 
 
-@requires_ty_cli
 def test_list_int_param_type_attribution():
     """Verify List[int] parameter type is Parameterized with base list and type param Int."""
     errors = []
@@ -235,7 +225,6 @@ def test_list_int_param_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
 def test_dict_str_int_type_attribution():
     """Verify Dict[str, int] variable type is Parameterized with base dict."""
     errors = []
@@ -277,7 +266,6 @@ def test_dict_str_int_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
-@requires_ty_cli
 def test_optional_str_type_attribution():
     """Verify Optional[str] variable type resolves to str or a union containing str."""
     errors = []

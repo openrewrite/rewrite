@@ -1,16 +1,7 @@
-import shutil
-
-import pytest
-
 from rewrite.java.tree import Assignment, Lambda
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
-
-requires_ty_cli = pytest.mark.skipif(
-    shutil.which('ty-types') is None,
-    reason="ty-types CLI is not installed"
-)
 
 
 def test_no_parameters():
@@ -71,7 +62,6 @@ def test_multiple_complex():
     '''))
 
 
-@requires_ty_cli
 def test_lambda_type_attribution():
     """Verify that lambda x: x + 1 has a non-None type."""
     errors = []
