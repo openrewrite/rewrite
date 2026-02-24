@@ -372,6 +372,132 @@ class ChangeRepositoryTest implements RewriteTest {
     }
 
     @Test
+    void preservesCredentialsWhenChangingUrl() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeRepository("maven", "https://old-nexus.example.com/releases", "maven", "https://new-nexus.example.com/releases")),
+          buildGradle(
+            """
+              repositories {
+                  maven {
+                      url = "https://old-nexus.example.com/releases"
+                      credentials {
+                          username = findProperty("mavenUsername")
+                          password = findProperty("mavenPassword")
+                      }
+                  }
+              }
+              """,
+            """
+              repositories {
+                  maven {
+                      url = "https://new-nexus.example.com/releases"
+                      credentials {
+                          username = findProperty("mavenUsername")
+                          password = findProperty("mavenPassword")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesCredentialsWhenChangingUrlKts() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeRepository("maven", "https://old-nexus.example.com/releases", "maven", "https://new-nexus.example.com/releases")),
+          buildGradleKts(
+            """
+              repositories {
+                  maven {
+                      url = uri("https://old-nexus.example.com/releases")
+                      credentials {
+                          username = System.getenv("MAVEN_USERNAME")
+                          password = System.getenv("MAVEN_PASSWORD")
+                      }
+                  }
+              }
+              """,
+            """
+              repositories {
+                  maven {
+                      url = uri("https://new-nexus.example.com/releases")
+                      credentials {
+                          username = System.getenv("MAVEN_USERNAME")
+                          password = System.getenv("MAVEN_PASSWORD")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesAuthenticationBlockWhenChangingUrl() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeRepository("maven", "https://old-nexus.example.com/releases", "maven", "https://new-nexus.example.com/releases")),
+          buildGradle(
+            """
+              repositories {
+                  maven {
+                      url = "https://old-nexus.example.com/releases"
+                      credentials {
+                          username = findProperty("mavenUsername")
+                          password = findProperty("mavenPassword")
+                      }
+                      authentication {
+                          basic(BasicAuthentication)
+                      }
+                  }
+              }
+              """,
+            """
+              repositories {
+                  maven {
+                      url = "https://new-nexus.example.com/releases"
+                      credentials {
+                          username = findProperty("mavenUsername")
+                          password = findProperty("mavenPassword")
+                      }
+                      authentication {
+                          basic(BasicAuthentication)
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesNameAndOtherPropertiesWhenChangingUrl() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeRepository("maven", "https://old-nexus.example.com/releases", "maven", "https://new-nexus.example.com/releases")),
+          buildGradle(
+            """
+              repositories {
+                  maven {
+                      name = "myRepo"
+                      url = "https://old-nexus.example.com/releases"
+                      allowInsecureProtocol = true
+                  }
+              }
+              """,
+            """
+              repositories {
+                  maven {
+                      name = "myRepo"
+                      url = "https://new-nexus.example.com/releases"
+                      allowInsecureProtocol = true
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void removesOldWhenTargetNamedRepoAlreadyExists() {
         rewriteRun(
           spec -> spec.recipe(new ChangeRepository("jcenter", null, "mavenCentral", null)),
