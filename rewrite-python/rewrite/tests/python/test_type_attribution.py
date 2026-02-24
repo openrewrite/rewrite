@@ -1465,3 +1465,55 @@ class TestGenericTypeVariable:
         result1 = mapping._resolve_type(100)
         result2 = mapping._resolve_type(100)
         assert result1 is result2
+
+
+@requires_ty_types_cli
+class TestImportedNameTypeAttribution:
+    """Tests for type attribution of names imported via 'from X import Y'.
+
+    When a name is imported (e.g. `from typing import Callable`) and then
+    used in a type annotation, the identifier's field_type should resolve
+    to a JavaType.Class with the fully qualified name, not JavaType.Unknown.
+    """
+
+    def test_typing_callable_has_fqn(self):
+        """typing.Callable in a type annotation should resolve to typing.Callable, not Unknown."""
+        source = '''from typing import Callable
+handler: Callable[[int], str] = lambda x: str(x)
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            # handler: Callable[...] — the annotation target 'handler'
+            ann_node = tree.body[1]  # AnnAssign
+            # The annotation itself is the Subscript: Callable[[int], str]
+            annotation = ann_node.annotation  # ast.Subscript
+            # annotation.value is the Name node for 'Callable'
+            callable_name = annotation.value
+            result = mapping.type(callable_name)
+            assert result is not None, "Callable name node should have a type"
+            assert not isinstance(result, JavaType.Unknown), \
+                f"Expected typing.Callable to resolve to a Class, got Unknown"
+            assert isinstance(result, (JavaType.Class, JavaType.FullyQualified)), \
+                f"Expected JavaType.Class, got {type(result).__qualname__}"
+            assert 'typing' in result._fully_qualified_name, \
+                f"Expected FQN containing 'typing', got '{result._fully_qualified_name}'"
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_typing_callable_qualified_has_fqn(self):
+        """typing.Callable via qualified access should also resolve correctly."""
+        source = '''import typing
+handler: typing.Callable[[int], str] = lambda x: str(x)
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            ann_node = tree.body[1]  # AnnAssign
+            annotation = ann_node.annotation  # ast.Subscript
+            # annotation.value is the Attribute node: typing.Callable
+            attr_node = annotation.value  # ast.Attribute
+            result = mapping.type(attr_node)
+            assert result is not None, "typing.Callable attribute node should have a type"
+            assert not isinstance(result, JavaType.Unknown), \
+                f"Expected typing.Callable to resolve to a Class, got Unknown"
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)

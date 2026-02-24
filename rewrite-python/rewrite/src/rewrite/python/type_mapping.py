@@ -549,6 +549,12 @@ class PythonTypeMapping:
         elif kind == 'property':
             return _UNKNOWN
 
+        elif kind == 'specialForm':
+            name = descriptor.get('name', '')
+            if name:
+                return self._create_class_type(name)
+            return _UNKNOWN
+
         elif kind == 'typeVar':
             name = descriptor.get('name', '')
             if not name:
