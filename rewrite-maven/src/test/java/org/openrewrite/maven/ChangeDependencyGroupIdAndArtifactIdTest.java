@@ -3532,13 +3532,11 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               """,
             spec -> spec.after(actual -> assertThat(actual)
               // Old exclusion preserved
-              .contains("<groupId>com.fasterxml.jackson.jaxrs</groupId>")
-              .contains("<artifactId>jackson-jaxrs-json-provider</artifactId>")
+              .containsPattern("<exclusion>\\s*<groupId>com\\.fasterxml\\.jackson\\.jaxrs</groupId>\\s*<artifactId>jackson-jaxrs-json-provider</artifactId>\\s*</exclusion>")
               // Sibling exclusion added for new coordinates
-              .contains("<groupId>com.fasterxml.jackson.jakarta.rs</groupId>")
-              .contains("<artifactId>jackson-jakarta-rs-json-provider</artifactId>")
+              .containsPattern("<exclusion>\\s*<groupId>com\\.fasterxml\\.jackson\\.jakarta\\.rs</groupId>\\s*<artifactId>jackson-jakarta-rs-json-provider</artifactId>\\s*</exclusion>")
               // Version updated
-              .containsPattern("<version>2\\.\\d+\\.\\d+</version>")
+              .containsPattern("<groupId>com\\.fasterxml\\.jackson\\.jakarta\\.rs</groupId>\\s*<artifactId>jackson-jakarta-rs-json-provider</artifactId>\\s*<version>2\\.\\d+\\.\\d+</version>")
               .doesNotContain("<version>2.9.7</version>")
               .actual())
           )
