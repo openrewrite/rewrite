@@ -590,6 +590,70 @@ class TestDictLiteralMatching:
         assert result is None
 
 
+class TestTernaryMatching:
+    """Tests for ternary (conditional) expression comparison."""
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def teardown_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_placeholder_ternary_captures(self):
+        """{a} if {cond} else {b} should capture all three parts."""
+        captures = {'a': capture('a'), 'cond': capture('cond'), 'b': capture('b')}
+        pattern_tree = TemplateEngine.get_template_tree("{a} if {cond} else {b}", captures)
+        target_tree = TemplateEngine.get_template_tree("x if flag else y", {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator(captures)
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is not None
+        assert 'a' in result
+        assert 'cond' in result
+        assert 'b' in result
+
+    def test_concrete_ternary_match(self):
+        """x if True else y should match x if True else y."""
+        pattern_tree = TemplateEngine.get_template_tree("x if True else y", {})
+        target_tree = TemplateEngine.get_template_tree("x if True else y", {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator({})
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is not None
+
+    def test_ternary_condition_mismatch(self):
+        """x if True else y should not match x if False else y."""
+        pattern_tree = TemplateEngine.get_template_tree("x if True else y", {})
+        target_tree = TemplateEngine.get_template_tree("x if False else y", {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator({})
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is None
+
+    def test_ternary_true_part_mismatch(self):
+        """x if True else y should not match z if True else y."""
+        pattern_tree = TemplateEngine.get_template_tree("x if True else y", {})
+        target_tree = TemplateEngine.get_template_tree("z if True else y", {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator({})
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is None
+
+    def test_ternary_false_part_mismatch(self):
+        """x if True else y should not match x if True else z."""
+        pattern_tree = TemplateEngine.get_template_tree("x if True else y", {})
+        target_tree = TemplateEngine.get_template_tree("x if True else z", {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator({})
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is None
+
+
 class TestDefaultFallthrough:
     """Tests for the default comparison behavior on unrecognized types."""
 
