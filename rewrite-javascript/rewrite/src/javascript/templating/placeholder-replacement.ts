@@ -106,7 +106,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
     override async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
         const hasPlaceholder = block.statements.some(stmt => {
             if (stmt.kind === JS.Kind.ExpressionStatement) {
-                const exprStmt = stmt as unknown as JS.ExpressionStatement;
+                const exprStmt = stmt as Statement as JS.ExpressionStatement;
                 return this.isPlaceholder(exprStmt.expression);
             }
             return this.isPlaceholder(stmt);

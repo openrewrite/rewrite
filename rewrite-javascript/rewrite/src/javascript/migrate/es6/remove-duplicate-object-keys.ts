@@ -51,7 +51,7 @@ export class RemoveDuplicateObjectKeys extends Recipe {
                 for (let i = 0; i < statements.length; i++) {
                     const stmt = statements[i];
                     if (stmt.kind === JS.Kind.PropertyAssignment) {
-                        const prop = stmt as unknown as JS.PropertyAssignment;
+                        const prop = stmt as Statement as JS.PropertyAssignment;
                         const propName = this.getPropertyName(prop);
                         propertyNames.push(propName);
 
@@ -98,7 +98,7 @@ export class RemoveDuplicateObjectKeys extends Recipe {
             }
 
             private getPropertyName(prop: JS.PropertyAssignment): string | null {
-                const name = prop.name as unknown as Expression;
+                const name = prop.name as Expression;
 
                 // Handle identifier: { foo: 1 }
                 if (name.kind === J.Kind.Identifier) {

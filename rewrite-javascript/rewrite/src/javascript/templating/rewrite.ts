@@ -273,7 +273,7 @@ export function flattenBlock<P>(
             const newStatements: typeof parentBlock.statements = [];
 
             for (const stmt of parentBlock.statements) {
-                const stmtElement = stmt as unknown as Statement;
+                const stmtElement = stmt as Statement;
                 if (stmtElement === block || stmtElement.id === block.id) {
                     // Splice in the inner block's statements
                     for (let i = 0; i < block.statements.length; i++) {

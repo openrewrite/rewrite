@@ -130,7 +130,7 @@ export class ChangeImport extends Recipe {
 
                 // First pass: check if the old import exists and capture any alias
                 for (const statement of cu.statements) {
-                    const stmt = statement as unknown as Statement;
+                    const stmt = statement as Statement;
                     if (stmt.kind === JS.Kind.Import) {
                         const jsImport = stmt as JS.Import;
                         const aliasInfo = this.checkForOldImport(jsImport);

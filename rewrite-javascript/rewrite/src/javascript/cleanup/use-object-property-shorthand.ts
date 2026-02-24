@@ -18,7 +18,7 @@ import {Recipe} from "../../recipe";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {JavaScriptVisitor} from "../visitor";
-import {Expression, J} from "../../java";
+import {Expression, J, Statement} from "../../java";
 import {JS} from "../tree";
 import {create as produce} from "mutative";
 import {findMarker} from "../../markers";
@@ -54,8 +54,8 @@ export class UseObjectPropertyShorthand extends Recipe {
                 // For tree types, the padded value IS the element (intersection type)
                 const simplifiedBindings = visited.bindings.elements.map(right => {
                     if (right.kind === JS.Kind.BindingElement) {
-                        const binding = right as unknown as JS.BindingElement;
-                        const propNameExpr = binding.propertyName as unknown as Expression | undefined;
+                        const binding = right as J as JS.BindingElement;
+                        const propNameExpr = binding.propertyName as Expression | undefined;
                         if (propNameExpr?.kind === J.Kind.Identifier) {
                             const propName = (propNameExpr as J.Identifier).simpleName;
 
@@ -111,8 +111,8 @@ export class UseObjectPropertyShorthand extends Recipe {
 
                 const simplifiedStatements = statements.map(stmt => {
                     if (stmt.kind === JS.Kind.PropertyAssignment) {
-                        const prop = stmt as unknown as JS.PropertyAssignment;
-                        const nameExpr = prop.name as unknown as Expression;
+                        const prop = stmt as Statement as JS.PropertyAssignment;
+                        const nameExpr = prop.name as Expression;
                         if (nameExpr.kind === J.Kind.Identifier) {
                             const propName = (nameExpr as J.Identifier).simpleName;
 

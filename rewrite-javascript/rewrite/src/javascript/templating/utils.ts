@@ -300,7 +300,7 @@ export class PlaceholderUtils {
                 if (body.statements.length === 0) {
                     throw new Error(`${contextName} function body is empty`);
                 } else if (body.statements.length === 1) {
-                    const stmt = body.statements[0] as unknown as Statement;
+                    const stmt = body.statements[0] as Statement;
 
                     // Single expression statement → extract the expression
                     if (stmt.kind === JS.Kind.ExpressionStatement) {
