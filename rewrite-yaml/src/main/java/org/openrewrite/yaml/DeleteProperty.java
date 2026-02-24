@@ -193,15 +193,17 @@ public class DeleteProperty extends Recipe {
                 }
 
                 // Preserve inline comment from deleted trailing entries on the last kept entry
-                if (trailingInlineComment != null && !entries.isEmpty()) {
-                    int lastIndex = entries.size() - 1;
-                    Yaml.Mapping.Entry lastKept = entries.get(lastIndex);
-                    if (lastKept.getValue() instanceof Yaml.Scalar &&
-                        ((Yaml.Scalar) lastKept.getValue()).getStyle() == Yaml.Scalar.Style.PLAIN) {
-                        Yaml.Scalar scalar = (Yaml.Scalar) lastKept.getValue();
-                        entries.set(lastIndex, lastKept.withValue(
-                                scalar.withValue(scalar.getValue() + trailingInlineComment)));
-                    }
+                if (trailingInlineComment != null) {
+                    String comment = trailingInlineComment;
+                    entries = ListUtils.mapLast(entries, lastKept -> {
+                        if (lastKept.getValue() instanceof Yaml.Scalar &&
+                            ((Yaml.Scalar) lastKept.getValue()).getStyle() == Yaml.Scalar.Style.PLAIN) {
+                            Yaml.Scalar scalar = (Yaml.Scalar) lastKept.getValue();
+                            return lastKept.withValue(
+                                    scalar.withValue(scalar.getValue() + comment));
+                        }
+                        return lastKept;
+                    });
                 }
 
                 if (changed) {
