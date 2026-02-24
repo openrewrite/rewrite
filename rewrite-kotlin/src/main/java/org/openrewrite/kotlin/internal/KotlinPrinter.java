@@ -728,7 +728,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visitContainer("where", typeConstraints.getPadding().getConstraints(), JContainer.Location.TYPE_PARAMETERS, ",", "", p);
             }
 
-            if (!classDecl.getBody().getMarkers().findFirst(OmitBraces.class).isPresent()) {
+            if (classDecl.getBody() != null && !classDecl.getBody().getMarkers().findFirst(OmitBraces.class).isPresent()) {
                 visit(classDecl.getBody(), p);
             }
             afterSyntax(classDecl, p);
