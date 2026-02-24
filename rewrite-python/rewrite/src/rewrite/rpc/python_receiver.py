@@ -1008,7 +1008,7 @@ class PythonRpcReceiver:
             type_params = q.receive_list(getattr(java_type, '_type_parameters', None) or [],
                                           lambda t: self._receive_type(t, q))
             p = JT.Parameterized()
-            p._type = type_
+            p._type = type_  # ty: ignore[invalid-assignment]  # RPC deserialization
             p._type_parameters = type_params
             return p
 
@@ -1065,7 +1065,7 @@ class PythonRpcReceiver:
             annotations = q.receive_list(getattr(java_type, '_annotations', None) or [],
                                           lambda t: self._receive_type(t, q))
             var = JT.Variable()
-            var._name = name
+            var._name = name  # ty: ignore[invalid-assignment]  # RPC deserialization
             var._owner = owner
             var._type = type_
             var._annotations = annotations
@@ -1438,7 +1438,7 @@ def _receive_java_type_parameterized(param, q: RpcReceiveQueue):
     type_params = q.receive_list(getattr(param, '_type_parameters', None))
 
     p = JT.Parameterized()
-    p._type = type_
+    p._type = type_  # ty: ignore[invalid-assignment]  # RPC deserialization
     p._type_parameters = type_params
     return p
 
@@ -1468,7 +1468,7 @@ def _receive_java_type_variable(variable, q: RpcReceiveQueue):
     annotations = q.receive_list(variable._annotations)
 
     var = JT.Variable()
-    var._name = name
+    var._name = name  # ty: ignore[invalid-assignment]  # RPC deserialization
     var._owner = owner
     var._type = type_
     var._annotations = annotations

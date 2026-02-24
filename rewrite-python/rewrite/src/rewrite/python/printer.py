@@ -1202,7 +1202,7 @@ class PythonJavaPrinter:
             isinstance(parent_value, py.ExpressionStatement) or  # J.Assignment is both Expression and Statement, so the wrapping ExpressionStatement is redundant here, but template-generated replacements can produce this nesting
             (isinstance(parent_value, j.If) and parent_value.then_part == assignment) or
             (isinstance(parent_value, j.If.Else) and parent_value.body == assignment) or
-            (isinstance(parent_value, Loop) and parent_value.body == assignment)  # ty: ignore[unresolved-attribute]  # Loop base class doesn't have body
+            (isinstance(parent_value, Loop) and parent_value.body == assignment)  # ty: ignore[unresolved-attribute]  # Loop subclasses have body
         )
 
         symbol = "=" if is_regular_assignment else ":="

@@ -26,9 +26,9 @@ class MinimumViableSpacingVisitor(PythonVisitor):
             if not previous_statement or not previous_statement.markers.find_first(Semicolon):
                 new_prefix = tree.prefix.replace(whitespace='\n' + tree.prefix.whitespace)
                 if isinstance(tree, ExpressionStatement):
-                    tree = tree.replace(expression=tree.expression.replace(prefix=new_prefix))
+                    tree = tree.replace(expression=tree.expression.replace(prefix=new_prefix))  # ty: ignore[invalid-assignment]
                 else:
-                    tree = tree.replace(prefix=new_prefix)
+                    tree = tree.replace(prefix=new_prefix)  # ty: ignore[invalid-assignment]
 
         return tree
 
@@ -67,4 +67,4 @@ def _concatenate_prefix(j: J, prefix: Space) -> J2:
     if comments:
         new_prefix = new_prefix.replace(comments=comments)
 
-    return j.replace(prefix=new_prefix)
+    return j.replace(prefix=new_prefix)  # ty: ignore[invalid-return-type]

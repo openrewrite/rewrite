@@ -273,11 +273,11 @@ class PythonTypeMapping:
 
         end_lineno = getattr(node, 'end_lineno', None)
         end_col_offset = getattr(node, 'end_col_offset', None)
-        cache_key = (node.lineno, node.col_offset, end_lineno, end_col_offset)
+        cache_key = (node.lineno, node.col_offset, end_lineno, end_col_offset)  # ty: ignore[unresolved-attribute]  # AST nodes with lineno always have col_offset
         if cache_key in self._lookup_cache:
             return self._lookup_cache[cache_key]
 
-        start = self._pos_to_byte_offset(node.lineno, node.col_offset)
+        start = self._pos_to_byte_offset(node.lineno, node.col_offset)  # ty: ignore[unresolved-attribute]  # AST nodes with lineno always have col_offset
         end = self._pos_to_byte_offset(end_lineno, end_col_offset) if end_lineno is not None else None
 
         result = None
@@ -1202,7 +1202,7 @@ class PythonTypeMapping:
         class_type._fully_qualified_name = fqn
         class_type._kind = JavaType.FullyQualified.Kind.Class
 
-        self._type_cache[fqn] = class_type  # ty: ignore[invalid-assignment]
+        self._type_cache[fqn] = class_type
         return class_type
 
     def _get_node_text(self, node: ast.expr) -> str:
