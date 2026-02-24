@@ -313,7 +313,7 @@ class TemplateEngine:
             original = coordinates.tree
             if hasattr(original, 'prefix') and hasattr(result, 'prefix'):
                 # Replace the prefix to match original
-                result = result.replace(prefix=original.prefix)  # ty: ignore[unresolved-attribute]
+                result = result.replace(prefix=original.prefix)
 
         # Check if we need to wrap expression in statement
         # This happens when inserting an expression where a statement is expected

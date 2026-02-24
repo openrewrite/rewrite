@@ -101,7 +101,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
 
     def visit_space(self, space: Optional[Space], p: P) -> Space:
         if space is None:
-            return space  # type: ignore
+            return space  # ty: ignore[invalid-return-type]
 
         space_context = self.cursor.get_nearest_message("space_context")
         parent = self.cursor.parent
@@ -262,7 +262,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         else:
             after = self.visit_space(right.after, p)
 
-        self.cursor = self.cursor.parent  # type: ignore
+        self.cursor = self.cursor.parent  # ty: ignore[invalid-assignment]  # cursor property setter (ty#628)
         if t is right.element and after is right.after:
             return right
         return right.replace(element=t, after=after)
@@ -315,7 +315,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             before = self.visit_space(container.before, p)
             js = list_map(lambda t: self.visit_right_padded(t, p), container.padding.elements)
 
-        self._cursor = self._cursor.parent  # type: ignore
+        self._cursor = self._cursor.parent  # ty: ignore[invalid-assignment]  # _cursor.parent is Optional[Cursor]
 
         if container.padding.elements is js and container.before is before:
             return container
@@ -576,7 +576,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                         p.found = True
                         return tree
                     return orig_visit(tree, p) if not p.found else tree
-                self._delegate.visit = _check
+                self._delegate.visit = _check  # ty: ignore[invalid-assignment]  # monkey-patching delegate visitor
 
             def visit(self, tree, p, parent=None):
                 if p.found or tree is target:
@@ -637,7 +637,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                         p.found = True
                         return tree
                     return orig_visit(tree, p) if not p.found else tree
-                self._delegate.visit = _check
+                self._delegate.visit = _check  # ty: ignore[invalid-assignment]  # monkey-patching delegate visitor
 
             def visit(self, tree, p, parent=None):
                 if p.found or tree is select:
@@ -699,7 +699,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 if "\n" not in body.prefix.last_whitespace:
                     self.cursor.parent_or_throw.put_message("last_indent", indent + self._style.continuation_indent)
 
-        elem = self.visit_and_cast(elem, J, p)
+        elem = self.visit_and_cast(elem, J, p)  # ty: ignore[invalid-assignment]  # visit_and_cast returns Optional[J]
         assert elem is not None
         after = self._indent_to(right.after, indent)
         if after.comments or "\n" in after.last_whitespace:

@@ -168,7 +168,7 @@ class PrintOutputCapture(Generic[P]):
 
     def __init__(self, p: P, marker_printer: Optional['PrintOutputCapture.MarkerPrinter'] = None):
         self._context = p
-        self._marker_printer: PrintOutputCapture.MarkerPrinter = marker_printer or PrintOutputCapture.MarkerPrinter.DEFAULT
+        self._marker_printer: PrintOutputCapture.MarkerPrinter = marker_printer or PrintOutputCapture.MarkerPrinter.DEFAULT  # ty: ignore[invalid-assignment]  # DEFAULT always set at module load
         self._out: list[str] = []
 
     def get_out(self) -> str:

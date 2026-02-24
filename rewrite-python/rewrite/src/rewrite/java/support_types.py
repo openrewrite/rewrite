@@ -589,5 +589,5 @@ class JContainer(Generic[J2]):
     def empty(cls) -> JContainer[J2]:
         if cls._EMPTY is None:
             cls._EMPTY = JContainer(Space.EMPTY, [], Markers.EMPTY)
-        return cls._EMPTY  # type: ignore[return-value]  # _EMPTY is JContainer[J] but J2 is bound to J
+        return cls._EMPTY  # ty: ignore[invalid-return-type]  # _EMPTY is JContainer[J] but J2 is bound to J
 
