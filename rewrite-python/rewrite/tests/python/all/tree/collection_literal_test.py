@@ -1,10 +1,13 @@
 from typing import cast
 
-import pytest
-
 from rewrite.java import MethodDeclaration, Return
+from rewrite.java.support_types import JavaType
+from rewrite.java.tree import Assignment
 from rewrite.python import CollectionLiteral, CompilationUnit
+from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
+
+Parameterized = JavaType.Parameterized
 
 
 def test_empty_tuple():
@@ -94,3 +97,65 @@ def test_list_of_tuples_with_double_parens():
     "a": 0
 }), ((set(), {}))]
 """))
+
+
+def test_list_literal_type_attribution():
+    """Verify that [1, 2, 3] has type list."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_assignment(self, assignment, p):
+                if not isinstance(assignment, Assignment):
+                    return assignment
+                if assignment.type is None:
+                    errors.append("Assignment.type is None for list literal")
+                elif isinstance(assignment.type, Parameterized):
+                    if not assignment.type._type._fully_qualified_name.startswith('list'):
+                        errors.append(f"Parameterized base fqn is '{assignment.type._type._fully_qualified_name}', expected to start with 'list'")
+                elif isinstance(assignment.type, JavaType.Class):
+                    if not assignment.type._fully_qualified_name.startswith('list'):
+                        errors.append(f"Class fqn is '{assignment.type._fully_qualified_name}', expected to start with 'list'")
+                return assignment
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        "x = [1, 2, 3]",
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+
+def test_dict_literal_type_attribution():
+    """Verify that {"a": 1} has type dict."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_assignment(self, assignment, p):
+                if not isinstance(assignment, Assignment):
+                    return assignment
+                if assignment.type is None:
+                    errors.append("Assignment.type is None for dict literal")
+                elif isinstance(assignment.type, Parameterized):
+                    if not assignment.type._type._fully_qualified_name.startswith('dict'):
+                        errors.append(f"Parameterized base fqn is '{assignment.type._type._fully_qualified_name}', expected to start with 'dict'")
+                elif isinstance(assignment.type, JavaType.Class):
+                    if not assignment.type._fully_qualified_name.startswith('dict'):
+                        errors.append(f"Class fqn is '{assignment.type._fully_qualified_name}', expected to start with 'dict'")
+                return assignment
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        'x = {"a": 1}',
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)

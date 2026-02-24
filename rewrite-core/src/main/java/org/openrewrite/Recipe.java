@@ -203,8 +203,6 @@ public abstract class Recipe implements Cloneable {
      * A set of strings used for categorizing related recipes. For example
      * "testing", "junit", "spring". Any individual tag should consist of a
      * single word, all lowercase.
-     *
-     * @return The tags.
      */
     @Getter
     final Set<String> tags = emptySet();
@@ -225,11 +223,21 @@ public abstract class Recipe implements Cloneable {
 
     protected RecipeDescriptor createRecipeDescriptor() {
         List<OptionDescriptor> options = getOptionDescriptors();
-        ArrayList<RecipeDescriptor> recipeList1 = new ArrayList<>();
-        for (Recipe next : getRecipeList()) {
-            recipeList1.add(next.getDescriptor());
+        List<RecipeDescriptor> preconditionDescriptors = emptyList();
+        if (this instanceof RecipePreconditions) {
+            RecipePreconditions recipeWithPreconditions = (RecipePreconditions) this;
+            List<Recipe> preconditions = recipeWithPreconditions.getPreconditions();
+            preconditionDescriptors = new ArrayList<>(preconditions.size());
+            for (Recipe precondition : preconditions) {
+                preconditionDescriptors.add(precondition.getDescriptor());
+            }
         }
-        recipeList1.trimToSize();
+
+        List<Recipe> recipeList = getRecipeList();
+        List<RecipeDescriptor> recipeDescriptors = new ArrayList<>(recipeList.size());
+        for (Recipe next : recipeList) {
+            recipeDescriptors.add(next.getDescriptor());
+        }
 
         URI recipeSource;
         try {
@@ -239,7 +247,7 @@ public abstract class Recipe implements Cloneable {
         }
 
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription(), getTags(),
-                getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
+                getEstimatedEffortPerOccurrence(), options, preconditionDescriptors, recipeDescriptors, getDataTableDescriptors(),
                 getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
 

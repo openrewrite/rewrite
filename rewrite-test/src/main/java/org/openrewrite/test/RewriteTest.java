@@ -305,7 +305,7 @@ public interface RewriteTest extends SourceSpecs {
 
                 SourceSpec<?> nextSpec = sourceSpecIter.next();
                 for (Marker marker : nextSpec.getMarkers()) {
-                    markers = markers.setByType(marker);
+                    markers = markers.add(marker);
                 }
                 sourceFile = sourceFile.withMarkers(markers);
 

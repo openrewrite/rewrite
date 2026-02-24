@@ -68,7 +68,7 @@ import static org.openrewrite.gradle.UpgradeDependencyVersion.getGradleProjectKe
 @EqualsAndHashCode(callSuper = false)
 @RequiredArgsConstructor
 public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTransitiveDependencyVersion.DependencyVersionState> {
-    private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
+    private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("org.gradle.api.Project dependencies(..)", true);
     private static final MethodMatcher CONSTRAINTS_MATCHER = new MethodMatcher("org.gradle.api.artifacts.dsl.DependencyHandler constraints(..)", true);
     private static final String CONSTRAINT_MATCHER = "org.gradle.api.artifacts.dsl.DependencyHandler *(..)";
 
@@ -700,7 +700,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-            if (DEPENDENCIES_DSL_MATCHER.matches(method)) {
+            if (!isKotlinDsl && DEPENDENCIES_DSL_MATCHER.matches(method)) {
                 G.CompilationUnit withConstraints = (G.CompilationUnit) parseAsGradle(
                         //language=groovy
                         "plugins { id 'java' }\n" +

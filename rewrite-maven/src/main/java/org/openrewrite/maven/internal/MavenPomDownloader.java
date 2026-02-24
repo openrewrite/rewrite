@@ -534,16 +534,16 @@ public class MavenPomDownloader {
             }
         }
 
+        GroupArtifactVersion originalGav = gav;
+        gav = resolveNamedVersion(gav, containingPom, repositories, ctx);
+        String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
+        gav = handleSnapshotTimestampVersion(gav);
         Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
 
         Timer.Sample sample = Timer.start();
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "pom");
 
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
-        GroupArtifactVersion originalGav = gav;
-        gav = resolveNamedVersion(gav, containingPom, repositories, ctx);
-        String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
-        gav = handleSnapshotTimestampVersion(gav);
         List<String> uris = new ArrayList<>();
 
         // Keep the repo and resolved GAV of the found JAR to avoid throwing if JAR is found

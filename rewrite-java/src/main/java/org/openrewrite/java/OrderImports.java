@@ -155,11 +155,11 @@ public class OrderImports extends Recipe {
         if (allPresent) {
             return cu;
         }
-        // New styles must appear first to take precedence
+        // New styles must appear last to take precedence
         List<Marker> markers = cu.getMarkers().getMarkers();
         for (NamedStyles namedStyle : parsedStyles) {
             if (existingStyles.stream().noneMatch(es -> namedStylesEqual(namedStyle, es))) {
-                markers = ListUtils.concat(namedStyle, markers);
+                markers = ListUtils.concat(markers, namedStyle);
             }
         }
         return cu.withMarkers(Markers.build(markers));

@@ -22,7 +22,9 @@ import kotlin.jvm.functions.Function1;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
+import org.jetbrains.kotlin.KtPsiSourceFile;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
+import org.jetbrains.kotlin.KtSourceFile;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
@@ -32,7 +34,14 @@ import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
 import org.jetbrains.kotlin.cli.jvm.compiler.VfsBasedProjectEnvironment;
 import org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt;
+import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFir2IrPipelineArtifact;
+import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFir2IrPipelinePhase;
+import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFrontendPipelineArtifact;
 import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFrontendPipelinePhase;
+import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar;
+import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector;
+import org.jetbrains.kotlin.diagnostics.impl.SimpleDiagnosticsCollector;
+import org.openrewrite.kotlin.internal.ScriptCompilerPlugin;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
 import org.jetbrains.kotlin.com.intellij.openapi.util.text.StringUtilRt;
@@ -49,9 +58,13 @@ import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.pipeline.AnalyseKt;
+import org.jetbrains.kotlin.fir.pipeline.FirResult;
 import org.jetbrains.kotlin.fir.pipeline.FirUtilsKt;
+import org.jetbrains.kotlin.fir.pipeline.ModuleCompilerAnalyzedOutput;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
+import org.jetbrains.kotlin.ir.declarations.IrFile;
+import org.jetbrains.kotlin.ir.declarations.IrModuleFragment;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
 import org.jetbrains.kotlin.modules.Module;
@@ -118,6 +131,8 @@ public class KotlinParser implements Parser {
     private final String moduleName;
     private final KotlinLanguageLevel languageLevel;
     private final boolean isKotlinScript;
+    private final List<String> scriptImplicitReceivers;
+    private final List<String> scriptDefaultImports;
 
     @Override
     public Stream<SourceFile> parse(@Language("kotlin") String... sources) {
@@ -263,6 +278,8 @@ public class KotlinParser implements Parser {
         private String moduleName = "main";
         private KotlinLanguageLevel languageLevel = KotlinLanguageLevel.KOTLIN_2_2;
         private boolean isKotlinScript = false;
+        private List<String> scriptImplicitReceivers = emptyList();
+        private List<String> scriptDefaultImports = emptyList();
 
         public Builder() {
             super(K.CompilationUnit.class);
@@ -275,6 +292,8 @@ public class KotlinParser implements Parser {
             this.typeCache = base.typeCache;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
+            this.scriptImplicitReceivers = base.scriptImplicitReceivers;
+            this.scriptDefaultImports = base.scriptDefaultImports;
         }
 
         public Builder logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
@@ -284,6 +303,16 @@ public class KotlinParser implements Parser {
 
         public Builder isKotlinScript(boolean isKotlinScript) {
             this.isKotlinScript = isKotlinScript;
+            return this;
+        }
+
+        public Builder scriptImplicitReceivers(String... fqns) {
+            this.scriptImplicitReceivers = Arrays.asList(fqns);
+            return this;
+        }
+
+        public Builder scriptDefaultImports(String... packages) {
+            this.scriptDefaultImports = Arrays.asList(packages);
             return this;
         }
 
@@ -300,15 +329,8 @@ public class KotlinParser implements Parser {
         }
 
         public Builder classpathFromResources(ExecutionContext ctx, String... classpath) {
-            // K2 requires full class files; the type-transformed (.tt) stubs from
-            // JavaParser.dependenciesFromResources are not readable by K2's FIR compiler.
-            // Strip version suffixes and resolve full jars from the classpath instead.
-            List<String> stripped = new ArrayList<>(classpath.length);
-            for (String name : classpath) {
-                stripped.add(name.replaceAll("-\\d+$", ""));
-            }
-            this.artifactNames = stripped;
-            this.classpath = null;
+            this.artifactNames = null;
+            this.classpath = JavaParser.dependenciesFromResources(ctx, classpath);
             return this;
         }
 
@@ -367,7 +389,7 @@ public class KotlinParser implements Parser {
 
         @Override
         public KotlinParser build() {
-            return new KotlinParser(resolvedClasspath(), dependsOn, styles, logCompilationWarningsAndErrors, typeCache, moduleName, languageLevel, isKotlinScript);
+            return new KotlinParser(resolvedClasspath(), dependsOn, styles, logCompilationWarningsAndErrors, typeCache, moduleName, languageLevel, isKotlinScript, scriptImplicitReceivers, scriptDefaultImports);
         }
 
         @Override
@@ -455,7 +477,39 @@ public class KotlinParser implements Parser {
             kotlinSources.get(i).setFirFile(result.getSecond().get(i));
         }
 
+        // FIR-to-IR conversion
+        try {
+            ModuleCompilerAnalyzedOutput moduleOutput = new ModuleCompilerAnalyzedOutput(
+                    firSession, result.getFirst(), result.getSecond());
+            FirResult firResult = new FirResult(singletonList(moduleOutput));
+
+            List<KtSourceFile> sourceFiles = new ArrayList<>(ktFiles.size());
+            for (KtFile ktFile : ktFiles) {
+                sourceFiles.add(new KtPsiSourceFile(ktFile));
+            }
+
+            JvmFrontendPipelineArtifact frontendArtifact = new JvmFrontendPipelineArtifact(
+                    firResult, compilerConfiguration, projectEnvironment,
+                    new SimpleDiagnosticsCollector(BaseDiagnosticsCollector.RawReporter.Companion.getDO_NOTHING()),
+                    sourceFiles);
+
+            JvmFir2IrPipelineArtifact fir2IrArtifact =
+                    JvmFir2IrPipelinePhase.INSTANCE.executePhase(frontendArtifact);
+
+            IrModuleFragment irModule = fir2IrArtifact.getResult().getIrModuleFragment();
+            Map<String, IrFile> irFilesByName = new HashMap<>();
+            for (IrFile irFile : irModule.getFiles()) {
+                irFilesByName.put(irFile.getFileEntry().getName(), irFile);
+            }
+            for (KotlinSource kotlinSource : kotlinSources) {
+                kotlinSource.setIrFile(irFilesByName.get(kotlinSource.getKtFile().getName()));
+            }
+        } catch (Throwable ignored) {
+            // FIR-to-IR conversion is best-effort; irFile will remain null
+        }
+
         return new CompiledSource(firSession, kotlinSources);
+
     }
 
     private Module buildModule(CompilerConfiguration compilerConfiguration) {
@@ -525,6 +579,13 @@ public class KotlinParser implements Parser {
         compilerConfiguration.put(ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS, true);
         compilerConfiguration.put(INCREMENTAL_COMPILATION, true);
         compilerConfiguration.put(LINK_VIA_SIGNATURES, true);
+
+        if (!scriptImplicitReceivers.isEmpty() || !scriptDefaultImports.isEmpty()) {
+            compilerConfiguration.put(
+                    CompilerPluginRegistrar.Companion.getCOMPILER_PLUGIN_REGISTRARS(),
+                    singletonList(new ScriptCompilerPlugin(scriptImplicitReceivers, scriptDefaultImports))
+            );
+        }
 
         addJvmSdkRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
 

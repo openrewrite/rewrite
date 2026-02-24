@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -75,10 +76,20 @@ class RewriteTestTest implements RewriteTest {
 
     @Test
     void multipleFilesWithSamePath() {
-        assertThrows(AssertionError.class,
+        AssertionError e = assertThrows(AssertionError.class,
           () -> rewriteRun(
             spec -> spec.recipe(new CreatesTwoFilesSamePath()),
             text(null, "duplicate", spec -> spec.path("duplicate.txt"))));
+        assertThat(e).hasStackTraceContaining("Recipe generated multiple source files at the same path");
+    }
+
+    @Test
+    void generatesFileCollidingWithExistingFile() {
+        AssertionError e = assertThrows(AssertionError.class,
+          () -> rewriteRun(
+            spec -> spec.recipe(new GeneratesExistingFile()),
+            text("existing content", spec -> spec.path("existing.txt"))));
+        assertThat(e).hasStackTraceContaining("Recipe generated a source file that already exists in the source set");
     }
 
     @Test
@@ -313,4 +324,32 @@ class RecipeWithDescriptionNotEndingWithPeriod extends Recipe {
 
     @Getter
     final String description = "A fancy description";
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class GeneratesExistingFile extends ScanningRecipe<AtomicBoolean> {
+
+    String displayName = "Generates a file that already exists";
+
+    String description = "A recipe that generates a source file at a path that already exists in the source set.";
+
+    @Override
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+        return new AtomicBoolean(false);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicBoolean acc, ExecutionContext ctx) {
+        return List.of(PlainText.builder()
+          .text("generated content")
+          .sourcePath(Path.of("existing.txt"))
+          .build());
+    }
 }

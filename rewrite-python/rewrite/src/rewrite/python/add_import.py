@@ -287,7 +287,7 @@ class AddImport(PythonVisitor):
         insert_idx = 0
         padded_stmts = list(cu.padding.statements)
         for i, padded in enumerate(padded_stmts):
-            if isinstance(padded.element, MultiImport):
+            if isinstance(padded.element, (Import, MultiImport)):
                 insert_idx = i + 1
             elif insert_idx > 0:
                 break  # Stop after we've passed the import section
