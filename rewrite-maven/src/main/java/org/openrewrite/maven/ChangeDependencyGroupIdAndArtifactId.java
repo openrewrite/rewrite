@@ -284,15 +284,18 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                             boolean hasOldExclusion = t.getChildren("exclusion").stream()
                                     .anyMatch(e -> matchesGlob(e.getChildValue("groupId").orElse(null), oldGroupId) &&
                                                    matchesGlob(e.getChildValue("artifactId").orElse(null), oldArtifactId));
+                            if (!hasOldExclusion) {
+                                return t;
+                            }
                             boolean hasNewExclusion = t.getChildren("exclusion").stream()
                                     .anyMatch(e -> effectiveNewGroupId.equals(e.getChildValue("groupId").orElse(null)) &&
                                                    effectiveNewArtifactId.equals(e.getChildValue("artifactId").orElse(null)));
-                            if (hasOldExclusion && !hasNewExclusion) {
+                            if (!hasNewExclusion) {
                                 t = (Xml.Tag) new AddToTagVisitor<>(t, Xml.Tag.build(
                                         "<exclusion>\n" +
-                                        "<groupId>" + effectiveNewGroupId + "</groupId>\n" +
-                                        "<artifactId>" + effectiveNewArtifactId + "</artifactId>\n" +
-                                        "</exclusion>"))
+                                                "<groupId>" + effectiveNewGroupId + "</groupId>\n" +
+                                                "<artifactId>" + effectiveNewArtifactId + "</artifactId>\n" +
+                                                "</exclusion>"))
                                         .visitNonNull(t, ctx, getCursor().getParentOrThrow());
                                 maybeUpdateModel();
                             }
