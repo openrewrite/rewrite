@@ -238,11 +238,28 @@ class JavaType(ABC):
                 return t.fully_qualified_name
             return ''
 
+    @dataclass
     class GenericTypeVariable:
+        _name: str = field(default="")
+        _variance: GenericTypeVariable.Variance = field(default=None)
+        _bounds: Optional[List[JavaType]] = field(default=None)
+
         class Variance(Enum):
             Invariant = 0
             Covariant = 1
             Contravariant = 2
+
+        @property
+        def name(self) -> str:
+            return self._name
+
+        @property
+        def variance(self) -> GenericTypeVariable.Variance:
+            return self._variance
+
+        @property
+        def bounds(self) -> List[JavaType]:
+            return self._bounds if self._bounds is not None else []
 
     @dataclass
     class Union:

@@ -1339,3 +1339,129 @@ x = Multi()
             assert any(n.endswith('Mixin') for n in iface_names)
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
+
+
+class TestGenericTypeVariable:
+    """Tests for typeVar → GenericTypeVariable conversion."""
+
+    def test_plain_typevar_creates_generic_type_variable(self):
+        """A typeVar descriptor with just a name should create a GenericTypeVariable."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[100] = {
+            'kind': 'typeVar',
+            'name': 'T',
+            'variance': 'invariant',
+        }
+
+        result = mapping._resolve_type(100)
+        assert isinstance(result, JavaType.GenericTypeVariable)
+        assert result.name == 'T'
+        assert result.variance == JavaType.GenericTypeVariable.Variance.Invariant
+        assert result.bounds == []
+
+    def test_covariant_typevar(self):
+        """A typeVar with covariant variance should map correctly."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[100] = {
+            'kind': 'typeVar',
+            'name': 'T_co',
+            'variance': 'covariant',
+        }
+
+        result = mapping._resolve_type(100)
+        assert isinstance(result, JavaType.GenericTypeVariable)
+        assert result.name == 'T_co'
+        assert result.variance == JavaType.GenericTypeVariable.Variance.Covariant
+
+    def test_contravariant_typevar(self):
+        """A typeVar with contravariant variance should map correctly."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[100] = {
+            'kind': 'typeVar',
+            'name': 'T_contra',
+            'variance': 'contravariant',
+        }
+
+        result = mapping._resolve_type(100)
+        assert isinstance(result, JavaType.GenericTypeVariable)
+        assert result.name == 'T_contra'
+        assert result.variance == JavaType.GenericTypeVariable.Variance.Contravariant
+
+    def test_typevar_with_upper_bound(self):
+        """A typeVar with an upperBound should have a bounds list."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[100] = {
+            'kind': 'typeVar',
+            'name': 'T',
+            'variance': 'invariant',
+            'upperBound': 101,
+        }
+        mapping._type_registry[101] = {
+            'kind': 'instance',
+            'className': 'int',
+        }
+
+        result = mapping._resolve_type(100)
+        assert isinstance(result, JavaType.GenericTypeVariable)
+        assert result.name == 'T'
+        assert len(result.bounds) == 1
+        assert result.bounds[0] is JavaType.Primitive.Int
+
+    def test_typevar_with_class_upper_bound(self):
+        """A typeVar bounded by a class should resolve the bound."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[100] = {
+            'kind': 'typeVar',
+            'name': 'T',
+            'variance': 'covariant',
+            'upperBound': 101,
+        }
+        mapping._type_registry[101] = {
+            'kind': 'instance',
+            'className': 'Comparable',
+            'moduleName': 'builtins',
+        }
+
+        result = mapping._resolve_type(100)
+        assert isinstance(result, JavaType.GenericTypeVariable)
+        assert result.variance == JavaType.GenericTypeVariable.Variance.Covariant
+        assert len(result.bounds) == 1
+        assert isinstance(result.bounds[0], JavaType.Class)
+        assert result.bounds[0].fully_qualified_name == 'Comparable'
+
+    def test_typevar_without_variance_defaults_to_invariant(self):
+        """A typeVar without explicit variance should default to Invariant."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[100] = {
+            'kind': 'typeVar',
+            'name': 'T',
+        }
+
+        result = mapping._resolve_type(100)
+        assert isinstance(result, JavaType.GenericTypeVariable)
+        assert result.name == 'T'
+        assert result.variance == JavaType.GenericTypeVariable.Variance.Invariant
+
+    def test_typevar_without_name_returns_unknown(self):
+        """A typeVar without a name should return Unknown."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[100] = {
+            'kind': 'typeVar',
+            'name': '',
+        }
+
+        result = mapping._resolve_type(100)
+        assert isinstance(result, JavaType.Unknown)
+
+    def test_typevar_cached_by_type_id(self):
+        """Resolved GenericTypeVariable should be cached by type_id."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[100] = {
+            'kind': 'typeVar',
+            'name': 'T',
+            'variance': 'invariant',
+        }
+
+        result1 = mapping._resolve_type(100)
+        result2 = mapping._resolve_type(100)
+        assert result1 is result2

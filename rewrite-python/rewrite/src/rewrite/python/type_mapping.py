@@ -551,7 +551,21 @@ class PythonTypeMapping:
 
         elif kind == 'typeVar':
             name = descriptor.get('name', '')
-            return self._create_class_type(name) if name else _UNKNOWN
+            if not name:
+                return _UNKNOWN
+            variance_str = descriptor.get('variance', 'invariant')
+            variance_map = {
+                'covariant': JavaType.GenericTypeVariable.Variance.Covariant,
+                'contravariant': JavaType.GenericTypeVariable.Variance.Contravariant,
+            }
+            variance = variance_map.get(variance_str, JavaType.GenericTypeVariable.Variance.Invariant)
+            bounds = None
+            upper_bound_id = descriptor.get('upperBound')
+            if upper_bound_id is not None:
+                bound_type = self._resolve_type(upper_bound_id)
+                if bound_type is not None:
+                    bounds = [bound_type]
+            return JavaType.GenericTypeVariable(_name=name, _variance=variance, _bounds=bounds)
 
         else:
             return _UNKNOWN

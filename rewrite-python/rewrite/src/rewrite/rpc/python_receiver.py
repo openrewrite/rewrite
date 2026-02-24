@@ -49,6 +49,25 @@ def _to_enum(enum_class: Type[E]) -> Callable[[Any], E]:
     return mapper
 
 
+_JAVA_VARIANCE_MAP = {
+    'COVARIANT': 'Covariant',
+    'CONTRAVARIANT': 'Contravariant',
+    'INVARIANT': 'Invariant',
+}
+
+
+def _to_variance(value: Any, JT) -> Any:
+    """Convert a Java wire-format variance string to a Python Variance enum.
+
+    Handles both the ADD/CHANGE path (receives a Java UPPER_CASE string) and the
+    NO_CHANGE path (receives the existing Python Variance enum unchanged).
+    """
+    if isinstance(value, JT.GenericTypeVariable.Variance):
+        return value  # NO_CHANGE path — already a Variance enum
+    mapped = _JAVA_VARIANCE_MAP.get(str(value), 'Invariant')
+    return JT.GenericTypeVariable.Variance[mapped]
+
+
 class PythonRpcReceiver:
     """Receiver that mirrors Java's PythonReceiver for RPC deserialization."""
 
@@ -1052,6 +1071,15 @@ class PythonRpcReceiver:
             var._annotations = annotations
             return var
 
+        elif isinstance(java_type, JT.GenericTypeVariable):
+            # GenericTypeVariable: name, variance, bounds
+            name = q.receive(getattr(java_type, '_name', ''))
+            variance_raw = q.receive(getattr(java_type, '_variance', JT.GenericTypeVariable.Variance.Invariant))
+            variance = _to_variance(variance_raw, JT)
+            bounds = q.receive_list(getattr(java_type, '_bounds', None) or [],
+                                     lambda t: self._receive_type(t, q))
+            return JT.GenericTypeVariable(_name=name, _variance=variance, _bounds=bounds)
+
         elif isinstance(java_type, JT.Union):
             # Union (MultiCatch in Java): bounds list
             bounds = q.receive_list(getattr(java_type, '_bounds', None) or [],
@@ -1447,6 +1475,17 @@ def _receive_java_type_variable(variable, q: RpcReceiveQueue):
     return var
 
 
+def _receive_java_type_generic_type_variable(gtv, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.GenericTypeVariable - consumes name, variance, bounds."""
+    from rewrite.java.support_types import JavaType as JT
+
+    name = q.receive(gtv._name)
+    variance_raw = q.receive(gtv._variance)
+    variance = _to_variance(variance_raw, JT)
+    bounds = q.receive_list(gtv._bounds or [])
+    return JT.GenericTypeVariable(_name=name, _variance=variance, _bounds=bounds)
+
+
 def _receive_java_type_union(union, q: RpcReceiveQueue):
     """Codec for receiving JavaType.Union (MultiCatch in Java) - consumes bounds list."""
     from rewrite.java.support_types import JavaType as JT
@@ -1523,6 +1562,14 @@ def _register_java_type_codecs():
         JT.Array,
         _receive_java_type_array,
         lambda: JT.Array()  # Factory creates empty Array
+    )
+
+    # JavaType.GenericTypeVariable - name, variance, bounds
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$GenericTypeVariable',
+        JT.GenericTypeVariable,
+        _receive_java_type_generic_type_variable,
+        lambda: JT.GenericTypeVariable()  # Factory creates empty GenericTypeVariable
     )
 
     # JavaType.Union (MultiCatch in Java) - bounds list

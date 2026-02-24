@@ -98,11 +98,23 @@ class JavaType(ABC):
         def fully_qualified_name(self) -> str: ...
 
 
+    @dataclass
     class GenericTypeVariable:
+        _name: str
+        _variance: GenericTypeVariable.Variance
+        _bounds: Optional[List[JavaType]]
+
         class Variance(Enum):
             Invariant: Variance
             Covariant: Variance
             Contravariant: Variance
+
+        @property
+        def name(self) -> str: ...
+        @property
+        def variance(self) -> GenericTypeVariable.Variance: ...
+        @property
+        def bounds(self) -> List[JavaType]: ...
 
     class Union:
         _bounds: Optional[List[JavaType]]
