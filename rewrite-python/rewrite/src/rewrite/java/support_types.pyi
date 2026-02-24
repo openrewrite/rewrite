@@ -21,6 +21,7 @@ from rewrite.utils import replace_if_changed
 class J(Tree):
     @property
     def prefix(self) -> Space: ...
+    def replace(self, **kwargs: Any) -> Self: ...
     def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool: ...
     def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]: ...
     def accept_java(self, v: 'JavaVisitor[P]', p: P) -> Optional['J']: ...
@@ -98,18 +99,32 @@ class JavaType(ABC):
         def fully_qualified_name(self) -> str: ...
 
 
+    @dataclass
     class GenericTypeVariable:
+        _name: str
+        _variance: GenericTypeVariable.Variance
+        _bounds: Optional[List[JavaType]]
+
         class Variance(Enum):
             Invariant: Variance
             Covariant: Variance
             Contravariant: Variance
 
+        @property
+        def name(self) -> str: ...
+        @property
+        def variance(self) -> GenericTypeVariable.Variance: ...
+        @property
+        def bounds(self) -> List[JavaType]: ...
+
+    @dataclass
     class Union:
         _bounds: Optional[List[JavaType]]
 
         @property
         def bounds(self) -> List[JavaType]: ...
 
+    @dataclass
     class Intersection:
         _bounds: Optional[List[JavaType]]
 

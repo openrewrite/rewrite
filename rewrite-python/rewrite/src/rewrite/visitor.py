@@ -146,7 +146,7 @@ class TreeVisitor(ABC, Generic[T, P]):
                     if t is not None:
                         t = self.post_visit(t, p)
 
-            self.cursor = self._cursor.parent  # ty: ignore[invalid-assignment]  # property setter; ty#1379
+            self.cursor = self._cursor.parent  # ty: ignore[invalid-assignment]  # property setter (ty#628)
 
             if top_level:
                 if t is not None and self._after_visit is not None:
