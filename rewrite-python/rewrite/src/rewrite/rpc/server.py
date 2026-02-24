@@ -30,9 +30,14 @@ import sys
 import tempfile
 import traceback
 import threading
+
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable
 from uuid import uuid4
+
+# Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
+# overflow the default recursion limit (1000) during RPC serialization.
+sys.setrecursionlimit(sys.getrecursionlimit() * 2)
 
 # Configure logging - log to file by default to avoid filling stderr buffer
 # (which can cause deadlock if parent process doesn't read stderr)
