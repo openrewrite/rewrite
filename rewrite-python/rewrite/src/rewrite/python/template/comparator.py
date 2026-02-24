@@ -158,6 +158,8 @@ class PatternMatchingComparator:
             return self._compare_assignment(pattern, cast(j.Assignment, target), cursor)
         elif isinstance(pattern, j.Parentheses):
             return self._compare_parentheses(pattern, cast(j.Parentheses, target), cursor)
+        elif isinstance(pattern, j.Ternary):
+            return self._compare_ternary(pattern, cast(j.Ternary, target), cursor)
         elif isinstance(pattern, j.Return):
             return self._compare_return(pattern, cast(j.Return, target), cursor)
         elif isinstance(pattern, py.ExpressionStatement):
@@ -343,6 +345,21 @@ class PatternMatchingComparator:
             return False
 
         return self._compare(pattern.assignment, target.assignment, cursor)
+
+    def _compare_ternary(
+        self,
+        pattern: j.Ternary,
+        target: j.Ternary,
+        cursor: 'Cursor'
+    ) -> bool:
+        """Compare two ternary (conditional) expressions."""
+        if not self._compare(pattern.condition, target.condition, cursor):
+            return False
+
+        if not self._compare(pattern.true_part, target.true_part, cursor):
+            return False
+
+        return self._compare(pattern.false_part, target.false_part, cursor)
 
     def _compare_parentheses(
         self,
