@@ -607,7 +607,7 @@ class StatementExpression(Py, Expression, Statement):
         """Replace fields, handling delegated prefix/markers specially."""
         # Handle delegated properties by modifying the inner statement
         if 'prefix' in kwargs:
-            new_statement = self._statement.replace(prefix=kwargs.pop('prefix'))  # ty: ignore[unresolved-attribute]  # Statement base class doesn't have replace
+            new_statement = self._statement.replace(prefix=kwargs.pop('prefix'))  # Statement base class doesn't have replace
             kwargs['statement'] = new_statement
         if 'markers' in kwargs:
             new_statement = kwargs.get('statement', self._statement).replace(markers=kwargs.pop('markers'))
