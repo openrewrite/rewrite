@@ -161,9 +161,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         }
     }
 
-    @SuppressWarnings("NotNullFieldNotInitialized")
     @JsonIgnore
-    private transient Accumulator accumulator;
+    private transient ThreadLocal<Accumulator> accumulator = new ThreadLocal<>();
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
@@ -171,7 +170,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         for (Recipe precondition : preconditions) {
             registerNestedScanningRecipes(precondition, acc, ctx);
         }
-        accumulator = acc;
+        accumulator.set(acc);
         return acc;
     }
 
@@ -509,7 +508,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             //noinspection rawtypes
             ScanningRecipe scanning = (ScanningRecipe) recipe;
             //noinspection unchecked
-            conditions.add(scanning.getVisitor(accumulator.recipeToAccumulator.get(scanning)));
+            Accumulator acc = accumulator.get();
+            conditions.add(scanning.getVisitor(acc != null ? acc.recipeToAccumulator.get(scanning) : null));
         } else {
             conditions.add(recipe.getVisitor());
         }
@@ -600,6 +600,13 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         String displayName = "Lazy loaded recipe";
 
         String description = "Recipe that is loaded lazily.";
+    }
+
+    @Override
+    public DeclarativeRecipe clone() {
+        DeclarativeRecipe cloned = (DeclarativeRecipe) super.clone();
+        cloned.accumulator = new ThreadLocal<>();
+        return cloned;
     }
 
     @Override
