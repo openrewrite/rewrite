@@ -598,6 +598,89 @@ class AddAnnotationProcessorTest implements RewriteTest {
     }
 
     @Nested
+    class EffectivePomCheck {
+
+        @Test
+        void doesNotAddWhenAlreadyInEffectivePomViaAncestor() {
+            // 3-level hierarchy: grandparent has the processor in pluginManagement,
+            // intermediate parent inherits it via effective POM but has no own XML config.
+            // Expected: intermediate parent is NOT modified (annotation processor already in effective POM)
+            rewriteRun(
+              pomXml(
+                // Grandparent already has the processor configured in pluginManagement
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>grandparent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>parent-module</module>
+                      </modules>
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>org.apache.maven.plugins</groupId>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <annotationProcessorPaths>
+                                              <path>
+                                                  <groupId>org.projectlombok</groupId>
+                                                  <artifactId>lombok-mapstruct-binding</artifactId>
+                                                  <version>0.2.0</version>
+                                              </path>
+                                          </annotationProcessorPaths>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """
+              ),
+              mavenProject("parent-module",
+                pomXml(
+                  // Intermediate parent: inherits the processor from grandparent via effective POM,
+                  // but does NOT have it in its own XML. Should not be modified.
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>grandparent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>parent-module</artifactId>
+                        <packaging>pom</packaging>
+                        <modules>
+                            <module>child-module</module>
+                        </modules>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("child-module",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent-module</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>child-module</artifactId>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+    }
+
+    @Nested
     class CombinedAggregatorAndParent {
 
         @Test
