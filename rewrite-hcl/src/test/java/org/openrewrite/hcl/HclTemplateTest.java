@@ -18,6 +18,7 @@ package org.openrewrite.hcl;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.hcl.tree.Expression;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.test.RewriteTest;
@@ -25,6 +26,7 @@ import org.openrewrite.test.RewriteTest;
 import java.util.Comparator;
 
 import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.hcl.Assertions.hcl;
 
 class HclTemplateTest implements RewriteTest {
@@ -192,6 +194,29 @@ class HclTemplateTest implements RewriteTest {
             """
               hello = "jonathan"
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6446")
+    @Test
+    void allowsIfAsPropertyName() {
+        rewriteRun(
+          hcl(
+            """
+              resource "example" "test" {
+                if = "value"
+              }
+              """,
+            spec -> spec.afterRecipe(cf -> {
+                var resourceBlock = (Hcl.Block) cf.getBody().getFirst();
+                var attribute = (Hcl.Attribute) resourceBlock.getBody().getFirst();
+                var name = (Hcl.Identifier) attribute.getName();
+                assertThat(name.getName()).isEqualTo("if");
+                var template = (Hcl.QuotedTemplate) attribute.getValue();
+                var literal = (Hcl.Literal) template.getExpressions().getFirst();
+                assertThat(literal.getValueSource()).isEqualTo("value");
+            })
           )
         );
     }

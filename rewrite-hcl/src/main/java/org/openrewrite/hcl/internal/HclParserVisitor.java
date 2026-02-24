@@ -71,7 +71,9 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 randomId(),
                 Space.format(prefix),
                 Markers.EMPTY,
-                c.Identifier() != null ? visitIdentifier(c.Identifier()) : visitIdentifier(c.NULL()),
+                (Hcl.Identifier) (c.identifierLike() != null ?
+                        visitIdentifierLike(c.identifierLike()) :
+                        visitIdentifier(c.NULL())),
                 new HclLeftPadded<>(
                         sourceBefore("="),
                         Hcl.Attribute.Type.Assignment,
@@ -81,6 +83,27 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 null
         ));
     }
+
+    @Override
+    public Hcl visitIdentifierLike(HCLParser.IdentifierLikeContext ctx) {
+        if (ctx.Identifier() != null) {
+            return visitIdentifier(ctx.Identifier());
+        }
+
+        // must be IF
+        TerminalNode ifNode = ctx.IF();
+        Hcl.Identifier ident = new Hcl.Identifier(
+                randomId(),
+                Space.format(prefix(ifNode)),
+                Markers.EMPTY,
+                ifNode.getText()
+        );
+        skip(ifNode);
+        return ident;
+    }
+
+
+
 
     @Override
     public Hcl visitAttributeAccessExpression(HCLParser.AttributeAccessExpressionContext ctx) {
@@ -526,7 +549,9 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 if (ctx.LPAREN() != null) {
                     parenthesesPrefix = sourceBefore("(");
                 }
-                if (ctx.qualifiedIdentifier() != null) {
+                if (ctx.identifierLike() != null) {
+                    name = (Expression) visitIdentifierLike(ctx.identifierLike());
+                } else if (ctx.qualifiedIdentifier() != null) {
                     name = visitQualifiedIdentifier(ctx.qualifiedIdentifier());
                 } else if (ctx.NULL() != null) {
                     name = visitIdentifier(ctx.NULL());

@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,6 +61,12 @@ public interface HCLParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitBlockLabel(HCLParser.BlockLabelContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link HCLParser#identifierLike}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitIdentifierLike(HCLParser.IdentifierLikeContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code OperationExpression}
 	 * labeled alternative in {@link HCLParser#expression}.

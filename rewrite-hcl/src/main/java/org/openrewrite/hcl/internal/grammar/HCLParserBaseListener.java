@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -99,6 +99,18 @@ public class HCLParserBaseListener implements HCLParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitBlockLabel(HCLParser.BlockLabelContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterIdentifierLike(HCLParser.IdentifierLikeContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitIdentifierLike(HCLParser.IdentifierLikeContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
