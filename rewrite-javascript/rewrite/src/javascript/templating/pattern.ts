@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor} from '../..';
-import {getPaddedElement, J} from '../../java';
+import {getPaddedElement, isRightPadded, J} from '../../java';
 import {
     Any,
     Capture,
@@ -638,7 +638,7 @@ export class MatchResult implements IMatchResult {
         if (Array.isArray(value)) {
             // Check if it's an array of wrappers
             // For tree types, check for RightPaddingMixin's padding property
-            if (value.length > 0 && this.isRightPadded(value[0])) {
+            if (value.length > 0 && isRightPadded(value[0])) {
                 // Array of J.RightPadded - extract elements using getPaddedElement
                 return (value as J.RightPadded<J>[]).map(w => getPaddedElement(w)) as any;
             }
@@ -646,21 +646,14 @@ export class MatchResult implements IMatchResult {
             return value as any;
         }
         // Check if it's a scalar wrapper (has RightPaddingMixin properties)
-        if (this.isRightPadded(value)) {
+        if (isRightPadded(value)) {
             return getPaddedElement(value as J.RightPadded<J>);
         }
         // Scalar element
         return value as J;
     }
 
-    /**
-     * Checks if a value is a RightPadded wrapper.
-     * For tree types, checks for RightPaddingMixin's padding property.
-     */
-    private isRightPadded(value: unknown): boolean {
-        return typeof value === 'object' && value !== null &&
-            'padding' in value && !('element' in value);
-    }
+
 
     /**
      * Internal method to get wrappers (used by template expansion).
@@ -670,10 +663,10 @@ export class MatchResult implements IMatchResult {
     [WRAPPERS_MAP_SYMBOL](): Map<string, J.RightPadded<J> | J.RightPadded<J>[]> {
         const result = new Map<string, J.RightPadded<J> | J.RightPadded<J>[]>();
         for (const [name, value] of this.storage) {
-            if (Array.isArray(value) && value.length > 0 && this.isRightPadded(value[0])) {
+            if (Array.isArray(value) && value.length > 0 && isRightPadded(value[0])) {
                 // This is an array of wrappers (variadic)
                 result.set(name, value as J.RightPadded<J>[]);
-            } else if (!Array.isArray(value) && this.isRightPadded(value)) {
+            } else if (!Array.isArray(value) && isRightPadded(value)) {
                 // This is a scalar wrapper
                 result.set(name, value as J.RightPadded<J>);
             }
@@ -753,7 +746,7 @@ class Matcher {
         if (Array.isArray(value)) {
             // Check if it's an array of wrappers
             // For tree types, check for RightPaddingMixin's padding property
-            if (value.length > 0 && this.isRightPadded(value[0])) {
+            if (value.length > 0 && isRightPadded(value[0])) {
                 // Array of J.RightPadded - extract elements using getPaddedElement
                 return (value as J.RightPadded<J>[]).map(w => getPaddedElement(w)) as any;
             }
@@ -761,21 +754,14 @@ class Matcher {
             return value as any;
         }
         // Check if it's a scalar wrapper (has RightPaddingMixin properties)
-        if (this.isRightPadded(value)) {
+        if (isRightPadded(value)) {
             return getPaddedElement(value as J.RightPadded<J>);
         }
         // Scalar element
         return value as J;
     }
 
-    /**
-     * Checks if a value is a RightPadded wrapper.
-     * For tree types, checks for RightPaddingMixin's padding property.
-     */
-    private isRightPadded(value: unknown): boolean {
-        return typeof value === 'object' && value !== null &&
-            'padding' in value && !('element' in value);
-    }
+
 
     /**
      * Logs a debug message if debugging is enabled.

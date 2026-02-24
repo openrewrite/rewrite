@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor, isTree} from '../..';
-import {getPaddedElement, J, Statement} from '../../java';
+import {getPaddedElement, isRightPadded, J, Statement} from '../../java';
 import {JS} from '..';
 import {JavaScriptVisitor} from '../visitor';
 import {create as produce} from 'mutative';
@@ -426,12 +426,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             return placeholder;
         }
 
-        // Check if the parameter value is a J.RightPadded wrapper (intersection type)
-        // With intersection types, RightPadded tree elements have `padding` property but no `element`
-        const isRightPadded = param.value && typeof param.value === 'object' &&
-            'padding' in param.value && !('element' in param.value);
-
-        if (isRightPadded) {
+        if (isRightPadded(param.value)) {
             // For intersection types, the padded value IS the element (with padding mixed in)
             const element = param.value as J;
             return produce(element, draft => {

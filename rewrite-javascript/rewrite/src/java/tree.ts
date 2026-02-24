@@ -974,6 +974,28 @@ export function isIntersectionPadded(padded: any): boolean {
  */
 export const isTreePadded = isIntersectionPadded;
 
+/** Is this value a RightPadded of any form (intersection or primitive wrapper)? */
+export function isRightPadded(value: any): boolean {
+    if (value === null || typeof value !== 'object' || !('padding' in value)) return false;
+    return typeof value.padding === 'object' && value.padding !== null && 'after' in value.padding;
+}
+
+/** Is this value a LeftPadded of any form (intersection or primitive wrapper)? */
+export function isLeftPadded(value: any): boolean {
+    if (value === null || typeof value !== 'object' || !('padding' in value)) return false;
+    return typeof value.padding === 'object' && value.padding !== null && 'before' in value.padding;
+}
+
+/** Is this a primitive-wrapper RightPadded value (has `element` property)? */
+export function isPrimitiveRightPadded(value: any): boolean {
+    return isRightPadded(value) && 'element' in value;
+}
+
+/** Is this a primitive-wrapper LeftPadded value (has `element` property)? */
+export function isPrimitiveLeftPadded(value: any): boolean {
+    return isLeftPadded(value) && 'element' in value;
+}
+
 /**
  * Extracts the element from a padded value.
  * For tree nodes and Space: returns the padded value itself (it IS the element with padding mixed in).

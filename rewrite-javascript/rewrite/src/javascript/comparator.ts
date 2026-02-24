@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {JavaScriptVisitor} from './visitor';
-import {J, Type, Expression, Statement, isIdentifier, getPaddedElement, isIntersectionPadded} from '../java';
+import {J, Type, Expression, Statement, isIdentifier, getPaddedElement, isRightPadded, isLeftPadded} from '../java';
 import {JS, JSX} from './tree';
 import {Cursor, Tree} from "../tree";
 
@@ -237,31 +237,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
                 await this.visitLeftPadded(j, other);
         }
 
-        // Check for intersection-padded tree elements (has `padding` property but no `element`)
-        // These are tree types (J) with RightPaddingMixin or LeftPaddingMixin mixed in
-        if (isIntersectionPadded(j)) {
-            // Determine if it's left or right padded by checking for 'before' vs 'after' in padding
-            const padding = (j as any).padding;
-            if ('after' in padding) {
-                return propertyName ? await this.visitRightPaddedProperty(propertyName, j, other) :
-                    await this.visitRightPadded(j, other);
-            } else if ('before' in padding) {
-                return propertyName ? await this.visitLeftPaddedProperty(propertyName, j, other) :
-                    await this.visitLeftPadded(j, other);
-            }
+        // Check for padded values (both intersection-padded tree elements and primitive wrappers)
+        if (isRightPadded(j)) {
+            return propertyName ? await this.visitRightPaddedProperty(propertyName, j, other) :
+                await this.visitRightPadded(j, other);
         }
-
-        // Check for primitive-padded wrappers (has `padding` AND `element`)
-        // These are primitives (boolean, number, string) wrapped with padding
-        if (typeof j === 'object' && j !== null && 'padding' in j && 'element' in j) {
-            const padding = (j as any).padding;
-            if ('after' in padding) {
-                return propertyName ? await this.visitRightPaddedProperty(propertyName, j, other) :
-                    await this.visitRightPadded(j, other);
-            } else if ('before' in padding) {
-                return propertyName ? await this.visitLeftPaddedProperty(propertyName, j, other) :
-                    await this.visitLeftPadded(j, other);
-            }
+        if (isLeftPadded(j)) {
+            return propertyName ? await this.visitLeftPaddedProperty(propertyName, j, other) :
+                await this.visitLeftPadded(j, other);
         }
 
         if (kind === J.Kind.Container) {
@@ -375,7 +358,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Extract the other element if it's also a RightPadded
         // With intersection types, check for `padding` property (not `kind === J.Kind.RightPadded`)
-        const isRightPaddedOther = isIntersectionPadded(p) || ('element' in p && 'padding' in p);
+        const isRightPaddedOther = isRightPadded(p);
         const otherWrapper = isRightPaddedOther ? (p as unknown) as J.RightPadded<T> : undefined;
         // For tree types, the padded value IS the element; for primitives use getPaddedElement
         const otherElement = isRightPaddedOther ? getPaddedElement(otherWrapper!) : p;
@@ -415,7 +398,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Extract the other element if it's also a LeftPadded
         // With intersection types, check for `padding.before` property (not `kind === J.Kind.LeftPadded`)
-        const isLeftPaddedOther = (p as any)?.padding && 'before' in (p as any).padding;
+        const isLeftPaddedOther = isLeftPadded(p);
         const otherWrapper = isLeftPaddedOther ? (p as unknown) as J.LeftPadded<T> : undefined;
         // For tree types, the padded value IS the element; for primitives use getPaddedElement
         const otherElement = isLeftPaddedOther ? getPaddedElement(otherWrapper!) : p;

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor, Tree} from '../..';
-import {getPaddedElement, isIntersectionPadded, J} from '../../java';
+import {getPaddedElement, isRightPadded, J} from '../../java';
 import {JS} from '../index';
 import {JavaScriptSemanticComparatorVisitor} from '../comparator';
 import {CaptureMarker, CaptureStorageValue, PlaceholderUtils} from './utils';
@@ -191,7 +191,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         if (captureMarker) {
             // Extract the target wrapper if it's also a RightPadded
             // With intersection types, RightPadded elements have `padding` property but no `element`
-            const isRightPaddedOther = isIntersectionPadded(p);
+            const isRightPaddedOther = isRightPadded(p);
             const targetWrapper = isRightPaddedOther ? (p as unknown) as J.RightPadded<T> : undefined;
             // For tree types, the padded value IS the element (use getPaddedElement helper)
             const targetElement = isRightPaddedOther ? getPaddedElement(targetWrapper!) : p;
@@ -1000,7 +1000,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         const captureMarker = PlaceholderUtils.getCaptureMarkerFromPadded(right);
         if (captureMarker) {
             // With intersection types, RightPadded elements have `padding` property but no `element`
-            const isRightPaddedOther = isIntersectionPadded(p);
+            const isRightPaddedOther = isRightPadded(p);
             const targetWrapper = isRightPaddedOther ? (p as unknown) as J.RightPadded<T> : undefined;
             // For tree types, the padded value IS the element (use getPaddedElement helper)
             const targetElement = isRightPaddedOther ? getPaddedElement(targetWrapper!) : p;

@@ -18,6 +18,8 @@ import {JavaScriptVisitor} from "../visitor";
 import {
     getPaddedElement,
     isJava,
+    isLeftPadded,
+    isRightPadded,
     isSpace,
     J,
     lastWhitespace,
@@ -810,19 +812,11 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             !this.isLeftPaddedWrapper(v);
     }
 
-    /**
-     * Detects if a value is a RightPadded wrapper.
-     * RightPadded<J> intersection types have padding.after but not padding.before.
-     */
     private isRightPaddedWrapper(v: any): v is J.RightPadded<J> {
-        return v?.padding?.after !== undefined && v?.padding?.before === undefined;
+        return isRightPadded(v);
     }
 
-    /**
-     * Detects if a value is a LeftPadded wrapper.
-     * LeftPadded<J> intersection types have padding.before but not padding.after.
-     */
     private isLeftPaddedWrapper(v: any): v is J.LeftPadded<J> {
-        return v?.padding?.before !== undefined && v?.padding?.after === undefined;
+        return isLeftPadded(v);
     }
 }

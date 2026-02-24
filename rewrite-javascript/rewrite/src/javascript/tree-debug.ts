@@ -15,7 +15,7 @@
  */
 
 import {Cursor, Tree} from "../tree";
-import {Comment, isIdentifier, isJava, isLiteral, J, TextComment, getPaddedElement} from "../java";
+import {Comment, isIdentifier, isJava, isLiteral, J, TextComment, getPaddedElement, isPrimitiveLeftPadded, isPrimitiveRightPadded} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import * as fs from "fs";
@@ -999,21 +999,11 @@ export class LstDebugPrinter {
     }
 
     private isLeftPadded(value: any): boolean {
-        if (value === null || typeof value !== 'object') return false;
-        // Only match primitive wrappers (have .element), not intersection-padded J nodes
-        if ('padding' in value && 'element' in value && value.padding && typeof value.padding === 'object' && 'before' in value.padding) {
-            return true;
-        }
-        return false;
+        return isPrimitiveLeftPadded(value);
     }
 
     private isRightPadded(value: any): boolean {
-        if (value === null || typeof value !== 'object') return false;
-        // Only match primitive wrappers (have .element), not intersection-padded J nodes
-        if ('padding' in value && 'element' in value && value.padding && typeof value.padding === 'object' && 'after' in value.padding) {
-            return true;
-        }
-        return false;
+        return isPrimitiveRightPadded(value);
     }
 
     /**
