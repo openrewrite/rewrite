@@ -1,19 +1,4 @@
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-// Generated from ~/git/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.13.2
+// Generated from rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.13.2
 package org.openrewrite.hcl.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -32,38 +17,38 @@ public class HCLParser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		FOR_BRACE=1, FOR_BRACK=2, IF=3, IN=4, BooleanLiteral=5, NULL=6, LBRACE=7, 
-		RBRACE=8, ASSIGN=9, Identifier=10, WS=11, COMMENT=12, LINE_COMMENT=13, 
-		NEWLINE=14, NumericLiteral=15, QUOTE=16, HEREDOC_START=17, PLUS=18, AND=19, 
-		EQ=20, LT=21, DOUBLE_COLON=22, COLON=23, LBRACK=24, LPAREN=25, MINUS=26, 
-		OR=27, NEQ=28, GT=29, QUESTION=30, RBRACK=31, RPAREN=32, MUL=33, NOT=34, 
-		LEQ=35, DOT=36, DIV=37, GEQ=38, ARROW=39, COMMA=40, MOD=41, ELLIPSIS=42, 
-		TILDE=43, TEMPLATE_INTERPOLATION_START=44, TemplateStringLiteral=45, TemplateStringLiteralChar=46, 
-		HP_WS=47, HP_COMMENT=48, HP_LINE_COMMENT=49, HTemplateLiteral=50, HTemplateLiteralChar=51, 
+		FOR_BRACE=1, FOR_BRACK=2, IF=3, IN=4, BooleanLiteral=5, NULL=6, LBRACE=7,
+		RBRACE=8, ASSIGN=9, Identifier=10, WS=11, COMMENT=12, LINE_COMMENT=13,
+		NEWLINE=14, NumericLiteral=15, QUOTE=16, HEREDOC_START=17, PLUS=18, AND=19,
+		EQ=20, LT=21, DOUBLE_COLON=22, COLON=23, LBRACK=24, LPAREN=25, MINUS=26,
+		OR=27, NEQ=28, GT=29, QUESTION=30, RBRACK=31, RPAREN=32, MUL=33, NOT=34,
+		LEQ=35, DOT=36, DIV=37, GEQ=38, ARROW=39, COMMA=40, MOD=41, ELLIPSIS=42,
+		TILDE=43, TEMPLATE_INTERPOLATION_START=44, TemplateStringLiteral=45, TemplateStringLiteralChar=46,
+		HP_WS=47, HP_COMMENT=48, HP_LINE_COMMENT=49, HTemplateLiteral=50, HTemplateLiteralChar=51,
 		H_NEWLINE=52;
 	public static final int
-		RULE_configFile = 0, RULE_body = 1, RULE_bodyContent = 2, RULE_attribute = 3, 
-		RULE_block = 4, RULE_blockLabel = 5, RULE_expression = 6, RULE_exprTerm = 7, 
-		RULE_blockExpr = 8, RULE_literalValue = 9, RULE_collectionValue = 10, 
-		RULE_tuple = 11, RULE_object = 12, RULE_objectelem = 13, RULE_qualifiedIdentifier = 14, 
-		RULE_forExpr = 15, RULE_forTupleExpr = 16, RULE_forObjectExpr = 17, RULE_forIntro = 18, 
-		RULE_forCond = 19, RULE_variableExpr = 20, RULE_functionCall = 21, RULE_functionName = 22, 
-		RULE_arguments = 23, RULE_index = 24, RULE_getAttr = 25, RULE_legacyIndexAttr = 26, 
-		RULE_splat = 27, RULE_attrSplat = 28, RULE_fullSplat = 29, RULE_operation = 30, 
-		RULE_unaryOp = 31, RULE_binaryOp = 32, RULE_binaryOperator = 33, RULE_compareOperator = 34, 
-		RULE_arithmeticOperator = 35, RULE_logicOperator = 36, RULE_templateExpr = 37, 
-		RULE_heredocTemplatePart = 38, RULE_heredocLiteral = 39, RULE_quotedTemplatePart = 40, 
+		RULE_configFile = 0, RULE_body = 1, RULE_bodyContent = 2, RULE_attribute = 3,
+		RULE_block = 4, RULE_blockLabel = 5, RULE_expression = 6, RULE_exprTerm = 7,
+		RULE_blockExpr = 8, RULE_literalValue = 9, RULE_collectionValue = 10,
+		RULE_tuple = 11, RULE_object = 12, RULE_objectelem = 13, RULE_qualifiedIdentifier = 14,
+		RULE_forExpr = 15, RULE_forTupleExpr = 16, RULE_forObjectExpr = 17, RULE_forIntro = 18,
+		RULE_forCond = 19, RULE_variableExpr = 20, RULE_functionCall = 21, RULE_functionName = 22,
+		RULE_arguments = 23, RULE_index = 24, RULE_getAttr = 25, RULE_legacyIndexAttr = 26,
+		RULE_splat = 27, RULE_attrSplat = 28, RULE_fullSplat = 29, RULE_operation = 30,
+		RULE_unaryOp = 31, RULE_binaryOp = 32, RULE_binaryOperator = 33, RULE_compareOperator = 34,
+		RULE_arithmeticOperator = 35, RULE_logicOperator = 36, RULE_templateExpr = 37,
+		RULE_heredocTemplatePart = 38, RULE_heredocLiteral = 39, RULE_quotedTemplatePart = 40,
 		RULE_stringLiteral = 41, RULE_templateInterpolation = 42;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"configFile", "body", "bodyContent", "attribute", "block", "blockLabel", 
-			"expression", "exprTerm", "blockExpr", "literalValue", "collectionValue", 
-			"tuple", "object", "objectelem", "qualifiedIdentifier", "forExpr", "forTupleExpr", 
-			"forObjectExpr", "forIntro", "forCond", "variableExpr", "functionCall", 
-			"functionName", "arguments", "index", "getAttr", "legacyIndexAttr", "splat", 
-			"attrSplat", "fullSplat", "operation", "unaryOp", "binaryOp", "binaryOperator", 
-			"compareOperator", "arithmeticOperator", "logicOperator", "templateExpr", 
-			"heredocTemplatePart", "heredocLiteral", "quotedTemplatePart", "stringLiteral", 
+			"configFile", "body", "bodyContent", "attribute", "block", "blockLabel",
+			"expression", "exprTerm", "blockExpr", "literalValue", "collectionValue",
+			"tuple", "object", "objectelem", "qualifiedIdentifier", "forExpr", "forTupleExpr",
+			"forObjectExpr", "forIntro", "forCond", "variableExpr", "functionCall",
+			"functionName", "arguments", "index", "getAttr", "legacyIndexAttr", "splat",
+			"attrSplat", "fullSplat", "operation", "unaryOp", "binaryOp", "binaryOperator",
+			"compareOperator", "arithmeticOperator", "logicOperator", "templateExpr",
+			"heredocTemplatePart", "heredocLiteral", "quotedTemplatePart", "stringLiteral",
 			"templateInterpolation"
 		};
 	}
@@ -71,24 +56,24 @@ public class HCLParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, "'if'", "'in'", null, "'null'", "'{'", "'}'", "'='", 
-			null, null, null, null, null, null, null, null, "'+'", "'&&'", "'=='", 
-			"'<'", "'::'", "':'", "'['", "'('", "'-'", "'||'", "'!='", "'>'", "'?'", 
-			"']'", "')'", "'*'", "'!'", "'<='", "'.'", "'/'", "'>='", "'=>'", "','", 
-			"'%'", "'...'", "'~'", null, null, null, null, null, null, null, null, 
+			null, null, null, "'if'", "'in'", null, "'null'", "'{'", "'}'", "'='",
+			null, null, null, null, null, null, null, null, "'+'", "'&&'", "'=='",
+			"'<'", "'::'", "':'", "'['", "'('", "'-'", "'||'", "'!='", "'>'", "'?'",
+			"']'", "')'", "'*'", "'!'", "'<='", "'.'", "'/'", "'>='", "'=>'", "','",
+			"'%'", "'...'", "'~'", null, null, null, null, null, null, null, null,
 			"'\\n'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "FOR_BRACE", "FOR_BRACK", "IF", "IN", "BooleanLiteral", "NULL", 
-			"LBRACE", "RBRACE", "ASSIGN", "Identifier", "WS", "COMMENT", "LINE_COMMENT", 
-			"NEWLINE", "NumericLiteral", "QUOTE", "HEREDOC_START", "PLUS", "AND", 
-			"EQ", "LT", "DOUBLE_COLON", "COLON", "LBRACK", "LPAREN", "MINUS", "OR", 
-			"NEQ", "GT", "QUESTION", "RBRACK", "RPAREN", "MUL", "NOT", "LEQ", "DOT", 
-			"DIV", "GEQ", "ARROW", "COMMA", "MOD", "ELLIPSIS", "TILDE", "TEMPLATE_INTERPOLATION_START", 
-			"TemplateStringLiteral", "TemplateStringLiteralChar", "HP_WS", "HP_COMMENT", 
+			null, "FOR_BRACE", "FOR_BRACK", "IF", "IN", "BooleanLiteral", "NULL",
+			"LBRACE", "RBRACE", "ASSIGN", "Identifier", "WS", "COMMENT", "LINE_COMMENT",
+			"NEWLINE", "NumericLiteral", "QUOTE", "HEREDOC_START", "PLUS", "AND",
+			"EQ", "LT", "DOUBLE_COLON", "COLON", "LBRACK", "LPAREN", "MINUS", "OR",
+			"NEQ", "GT", "QUESTION", "RBRACK", "RPAREN", "MUL", "NOT", "LEQ", "DOT",
+			"DIV", "GEQ", "ARROW", "COMMA", "MOD", "ELLIPSIS", "TILDE", "TEMPLATE_INTERPOLATION_START",
+			"TemplateStringLiteral", "TemplateStringLiteralChar", "HP_WS", "HP_COMMENT",
 			"HP_LINE_COMMENT", "HTemplateLiteral", "HTemplateLiteralChar", "H_NEWLINE"
 		};
 	}
@@ -515,7 +500,7 @@ public class HCLParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_expression; }
-	 
+
 		public ExpressionContext() { }
 		public void copyFrom(ExpressionContext ctx) {
 			super.copyFrom(ctx);
@@ -648,7 +633,7 @@ public class HCLParser extends Parser {
 					setState(127);
 					expression(2);
 					}
-					} 
+					}
 				}
 				setState(133);
 				_errHandler.sync(this);
@@ -673,7 +658,7 @@ public class HCLParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_exprTerm; }
-	 
+
 		public ExprTermContext() { }
 		public void copyFrom(ExprTermContext ctx) {
 			super.copyFrom(ctx);
@@ -1054,7 +1039,7 @@ public class HCLParser extends Parser {
 						}
 						break;
 					}
-					} 
+					}
 				}
 				setState(159);
 				_errHandler.sync(this);
@@ -1303,7 +1288,7 @@ public class HCLParser extends Parser {
 						setState(173);
 						expression(0);
 						}
-						} 
+						}
 					}
 					setState(178);
 					_errHandler.sync(this);
@@ -2186,7 +2171,7 @@ public class HCLParser extends Parser {
 					setState(282);
 					expression(0);
 					}
-					} 
+					}
 				}
 				setState(287);
 				_errHandler.sync(this);
@@ -2479,7 +2464,7 @@ public class HCLParser extends Parser {
 					setState(307);
 					getAttr();
 					}
-					} 
+					}
 				}
 				setState(312);
 				_errHandler.sync(this);
@@ -2571,7 +2556,7 @@ public class HCLParser extends Parser {
 					default:
 						throw new NoViableAltException(this);
 					}
-					} 
+					}
 				}
 				setState(322);
 				_errHandler.sync(this);
@@ -3066,7 +3051,7 @@ public class HCLParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_templateExpr; }
-	 
+
 		public TemplateExprContext() { }
 		public void copyFrom(TemplateExprContext ctx) {
 			super.copyFrom(ctx);
@@ -3148,7 +3133,7 @@ public class HCLParser extends Parser {
 				match(HEREDOC_START);
 				setState(351);
 				match(Identifier);
-				setState(359); 
+				setState(359);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				do {
@@ -3172,7 +3157,7 @@ public class HCLParser extends Parser {
 					}
 					}
 					}
-					setState(361); 
+					setState(361);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				} while ( _la==NEWLINE );

@@ -1,19 +1,4 @@
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-// Generated from ~/git/rewrite/rewrite-hcl/src/main/antlr/JsonPathParser.g4 by ANTLR 4.13.2
+// Generated from rewrite-hcl/src/main/antlr/JsonPathParser.g4 by ANTLR 4.13.2
 package org.openrewrite.hcl.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -32,24 +17,24 @@ public class JsonPathParser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		WS=1, UTF_8_BOM=2, MATCHES_REGEX_OPEN=3, LBRACE=4, RBRACE=5, LBRACK=6, 
-		RBRACK=7, LPAREN=8, RPAREN=9, AT=10, DOT=11, DOT_DOT=12, ROOT=13, WILDCARD=14, 
-		COLON=15, QUESTION=16, CONTAINS=17, TRUE=18, FALSE=19, NULL=20, Identifier=21, 
-		StringLiteral=22, PositiveNumber=23, NegativeNumber=24, NumericLiteral=25, 
-		COMMA=26, TICK=27, QUOTE=28, MATCHES=29, LOGICAL_OPERATOR=30, AND=31, 
-		OR=32, EQUALITY_OPERATOR=33, EQ=34, NE=35, MATCHES_REGEX_CLOSE=36, S=37, 
+		WS=1, UTF_8_BOM=2, MATCHES_REGEX_OPEN=3, LBRACE=4, RBRACE=5, LBRACK=6,
+		RBRACK=7, LPAREN=8, RPAREN=9, AT=10, DOT=11, DOT_DOT=12, ROOT=13, WILDCARD=14,
+		COLON=15, QUESTION=16, CONTAINS=17, TRUE=18, FALSE=19, NULL=20, Identifier=21,
+		StringLiteral=22, PositiveNumber=23, NegativeNumber=24, NumericLiteral=25,
+		COMMA=26, TICK=27, QUOTE=28, MATCHES=29, LOGICAL_OPERATOR=30, AND=31,
+		OR=32, EQUALITY_OPERATOR=33, EQ=34, NE=35, MATCHES_REGEX_CLOSE=36, S=37,
 		REGEX=38;
 	public static final int
-		RULE_jsonPath = 0, RULE_expression = 1, RULE_dotOperator = 2, RULE_recursiveDecent = 3, 
-		RULE_bracketOperator = 4, RULE_filter = 5, RULE_filterExpression = 6, 
-		RULE_binaryExpression = 7, RULE_containsExpression = 8, RULE_regexExpression = 9, 
-		RULE_unaryExpression = 10, RULE_literalExpression = 11, RULE_property = 12, 
+		RULE_jsonPath = 0, RULE_expression = 1, RULE_dotOperator = 2, RULE_recursiveDecent = 3,
+		RULE_bracketOperator = 4, RULE_filter = 5, RULE_filterExpression = 6,
+		RULE_binaryExpression = 7, RULE_containsExpression = 8, RULE_regexExpression = 9,
+		RULE_unaryExpression = 10, RULE_literalExpression = 11, RULE_property = 12,
 		RULE_wildcard = 13, RULE_slice = 14, RULE_start = 15, RULE_end = 16, RULE_indexes = 17;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"jsonPath", "expression", "dotOperator", "recursiveDecent", "bracketOperator", 
-			"filter", "filterExpression", "binaryExpression", "containsExpression", 
-			"regexExpression", "unaryExpression", "literalExpression", "property", 
+			"jsonPath", "expression", "dotOperator", "recursiveDecent", "bracketOperator",
+			"filter", "filterExpression", "binaryExpression", "containsExpression",
+			"regexExpression", "unaryExpression", "literalExpression", "property",
 			"wildcard", "slice", "start", "end", "indexes"
 		};
 	}
@@ -57,20 +42,20 @@ public class JsonPathParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, "'\\uFEFF'", null, "'{'", "'}'", "'['", "']'", "'('", "')'", 
-			"'@'", "'.'", "'..'", "'$'", "'*'", "':'", "'?'", "'contains'", "'true'", 
-			"'false'", "'null'", null, null, null, null, null, "','", "'''", "'\"'", 
+			null, null, "'\\uFEFF'", null, "'{'", "'}'", "'['", "']'", "'('", "')'",
+			"'@'", "'.'", "'..'", "'$'", "'*'", "':'", "'?'", "'contains'", "'true'",
+			"'false'", "'null'", null, null, null, null, null, "','", "'''", "'\"'",
 			"'=~'", null, "'&&'", "'||'", null, "'=='", "'!='"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "WS", "UTF_8_BOM", "MATCHES_REGEX_OPEN", "LBRACE", "RBRACE", "LBRACK", 
-			"RBRACK", "LPAREN", "RPAREN", "AT", "DOT", "DOT_DOT", "ROOT", "WILDCARD", 
-			"COLON", "QUESTION", "CONTAINS", "TRUE", "FALSE", "NULL", "Identifier", 
-			"StringLiteral", "PositiveNumber", "NegativeNumber", "NumericLiteral", 
-			"COMMA", "TICK", "QUOTE", "MATCHES", "LOGICAL_OPERATOR", "AND", "OR", 
+			null, "WS", "UTF_8_BOM", "MATCHES_REGEX_OPEN", "LBRACE", "RBRACE", "LBRACK",
+			"RBRACK", "LPAREN", "RPAREN", "AT", "DOT", "DOT_DOT", "ROOT", "WILDCARD",
+			"COLON", "QUESTION", "CONTAINS", "TRUE", "FALSE", "NULL", "Identifier",
+			"StringLiteral", "PositiveNumber", "NegativeNumber", "NumericLiteral",
+			"COMMA", "TICK", "QUOTE", "MATCHES", "LOGICAL_OPERATOR", "AND", "OR",
 			"EQUALITY_OPERATOR", "EQ", "NE", "MATCHES_REGEX_CLOSE", "S", "REGEX"
 		};
 	}
@@ -176,7 +161,7 @@ public class JsonPathParser extends Parser {
 						setState(37);
 						expression();
 						}
-						} 
+						}
 					}
 					setState(42);
 					_errHandler.sync(this);
@@ -189,7 +174,7 @@ public class JsonPathParser extends Parser {
 			case DOT_DOT:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(44); 
+				setState(44);
 				_errHandler.sync(this);
 				_alt = 1;
 				do {
@@ -205,7 +190,7 @@ public class JsonPathParser extends Parser {
 					default:
 						throw new NoViableAltException(this);
 					}
-					setState(46); 
+					setState(46);
 					_errHandler.sync(this);
 					_alt = getInterpreter().adaptivePredict(_input,1,_ctx);
 				} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
@@ -494,7 +479,7 @@ public class JsonPathParser extends Parser {
 				break;
 			case 4:
 				{
-				setState(69); 
+				setState(69);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				do {
@@ -504,7 +489,7 @@ public class JsonPathParser extends Parser {
 					property();
 					}
 					}
-					setState(71); 
+					setState(71);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				} while ( _la==Identifier || _la==StringLiteral );
@@ -567,7 +552,7 @@ public class JsonPathParser extends Parser {
 			match(QUESTION);
 			setState(78);
 			match(LPAREN);
-			setState(80); 
+			setState(80);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -577,7 +562,7 @@ public class JsonPathParser extends Parser {
 				filterExpression();
 				}
 				}
-				setState(82); 
+				setState(82);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 64764992L) != 0) );
@@ -872,7 +857,7 @@ public class JsonPathParser extends Parser {
 						}
 						break;
 					}
-					} 
+					}
 				}
 				setState(140);
 				_errHandler.sync(this);
@@ -1501,7 +1486,7 @@ public class JsonPathParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(193); 
+			setState(193);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -1511,7 +1496,7 @@ public class JsonPathParser extends Parser {
 				match(PositiveNumber);
 				}
 				}
-				setState(195); 
+				setState(195);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( _la==PositiveNumber );
