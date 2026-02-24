@@ -603,6 +603,11 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     @Override
+    public void onComplete(ExecutionContext ctx) {
+        accumulator.remove();
+    }
+
+    @Override
     public DeclarativeRecipe clone() {
         DeclarativeRecipe cloned = (DeclarativeRecipe) super.clone();
         cloned.accumulator = new ThreadLocal<>();
