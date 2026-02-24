@@ -54,7 +54,6 @@ export class PreferOptionalChain extends Recipe {
                 // Check if the false part is undefined
                 // Note: We only convert when the false part is undefined, not null,
                 // because optional chaining returns undefined (not null) when the target is nullish.
-                // For tree types, the padded value IS the element (intersection type)
                 const falsePart = visited.falsePart as unknown as Expression;
                 const isUndefinedFalse = falsePart.kind === J.Kind.Identifier &&
                     (falsePart as J.Identifier).simpleName === 'undefined';
@@ -64,7 +63,6 @@ export class PreferOptionalChain extends Recipe {
                 }
 
                 // Check if the true part accesses a property/method on the condition
-                // For tree types, the padded value IS the element (intersection type)
                 const truePart = visited.truePart as unknown as Expression;
                 const result = this.extractOptionalChainTarget(truePart, conditionName);
 
@@ -120,7 +118,6 @@ export class PreferOptionalChain extends Recipe {
                 // Handle MethodInvocation: foo.bar()
                 if (expr.kind === J.Kind.MethodInvocation) {
                     const methodInvocation = expr as J.MethodInvocation;
-                    // For tree types, the padded value IS the element (intersection type)
                     const selectExpr = methodInvocation.select as unknown as Expression | undefined;
                     if (selectExpr?.kind === J.Kind.Identifier) {
                         const select = selectExpr as J.Identifier;

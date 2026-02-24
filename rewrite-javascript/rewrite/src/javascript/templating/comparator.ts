@@ -580,8 +580,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                         const candidateElement = targetElements[targetIdx + tryConsume];
 
                         // Skip J.Empty for arguments
-                        // For tree types, the padded value IS the element
-                        if (filterEmpty && (candidateElement as unknown as J).kind === J.Kind.Empty) {
+                        if (filterEmpty && candidateElement.kind === J.Kind.Empty) {
                             continue;
                         }
 
@@ -632,9 +631,8 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 // Capture elements for this consumption amount
                 // For empty argument lists, there will be a single J.Empty element that we need to filter out
                 const rawWrappers = targetElements.slice(targetIdx, targetIdx + consume);
-                // For tree types, the padded value IS the element
                 const capturedWrappers = filterEmpty
-                    ? rawWrappers.filter(w => (w as unknown as J).kind !== J.Kind.Empty)
+                    ? rawWrappers.filter(w => w.kind !== J.Kind.Empty)
                     : rawWrappers;
                 const capturedElements: J[] = capturedWrappers.map(w => getPaddedElement(w as J.RightPadded<J>));
 
@@ -1306,8 +1304,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                     if (targetIdx + tryConsume < targetElements.length) {
                         const candidateElement = targetElements[targetIdx + tryConsume];
 
-                        // For tree types, the padded value IS the element
-                        if (filterEmpty && (candidateElement as unknown as J).kind === J.Kind.Empty) {
+                        if (filterEmpty && candidateElement.kind === J.Kind.Empty) {
                             continue;
                         }
 
@@ -1352,9 +1349,8 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                 // Capture elements for this consumption amount
                 // For empty argument lists, there will be a single J.Empty element that we need to filter out
                 const rawWrappers = targetElements.slice(targetIdx, targetIdx + consume);
-                // For tree types, the padded value IS the element
                 const capturedWrappers = filterEmpty
-                    ? rawWrappers.filter(w => (w as unknown as J).kind !== J.Kind.Empty)
+                    ? rawWrappers.filter(w => w.kind !== J.Kind.Empty)
                     : rawWrappers;
                 const capturedElements: J[] = capturedWrappers.map(w => getPaddedElement(w as J.RightPadded<J>));
 

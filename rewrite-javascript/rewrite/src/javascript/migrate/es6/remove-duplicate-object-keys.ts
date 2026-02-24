@@ -48,9 +48,8 @@ export class RemoveDuplicateObjectKeys extends Recipe {
                 const propertyNameToLastIndex = new Map<string, number>();
                 const propertyNames: (string | null)[] = [];
 
-                // For tree types, the padded value IS the element (intersection type)
                 for (let i = 0; i < statements.length; i++) {
-                    const stmt = statements[i] as unknown as Statement;
+                    const stmt = statements[i];
                     if (stmt.kind === JS.Kind.PropertyAssignment) {
                         const prop = stmt as unknown as JS.PropertyAssignment;
                         const propName = this.getPropertyName(prop);
@@ -76,15 +75,13 @@ export class RemoveDuplicateObjectKeys extends Recipe {
                         if (propName !== null) {
                             const lastIndex = propertyNameToLastIndex.get(propName)!;
                             if (i < lastIndex) {
-                                // For tree types, statements[i] IS the element with padding
-                                formatter.markRemoved(statements[i] as unknown as J);
+                                formatter.markRemoved(statements[i]);
                                 continue;
                             }
                         }
 
                         const stmt = statements[i];
-                        // For tree types, stmt IS the element with padding mixed in
-                        const adjustedElement = formatter.processKept(stmt as unknown as J);
+                        const adjustedElement = formatter.processKept(stmt);
                         // Merge adjusted element with padding
                         filteredStatements.push({
                             ...adjustedElement,
@@ -101,7 +98,6 @@ export class RemoveDuplicateObjectKeys extends Recipe {
             }
 
             private getPropertyName(prop: JS.PropertyAssignment): string | null {
-                // For tree types, name IS the expression with padding mixed in
                 const name = prop.name as unknown as Expression;
 
                 // Handle identifier: { foo: 1 }

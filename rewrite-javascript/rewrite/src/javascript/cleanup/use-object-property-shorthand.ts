@@ -53,11 +53,8 @@ export class UseObjectPropertyShorthand extends Recipe {
 
                 // For tree types, the padded value IS the element (intersection type)
                 const simplifiedBindings = visited.bindings.elements.map(right => {
-                    // right IS the element with padding mixed in
                     if (right.kind === JS.Kind.BindingElement) {
                         const binding = right as unknown as JS.BindingElement;
-
-                        // For tree types, propertyName IS the identifier with padding mixed in
                         const propNameExpr = binding.propertyName as unknown as Expression | undefined;
                         if (propNameExpr?.kind === J.Kind.Identifier) {
                             const propName = (propNameExpr as J.Identifier).simpleName;
@@ -112,13 +109,9 @@ export class UseObjectPropertyShorthand extends Recipe {
 
                 let hasChanges = false;
 
-                // For tree types, the padded value IS the element (intersection type)
                 const simplifiedStatements = statements.map(stmt => {
-                    // stmt IS the statement with padding mixed in
                     if (stmt.kind === JS.Kind.PropertyAssignment) {
                         const prop = stmt as unknown as JS.PropertyAssignment;
-
-                        // For tree types, name IS the identifier with padding mixed in
                         const nameExpr = prop.name as unknown as Expression;
                         if (nameExpr.kind === J.Kind.Identifier) {
                             const propName = (nameExpr as J.Identifier).simpleName;

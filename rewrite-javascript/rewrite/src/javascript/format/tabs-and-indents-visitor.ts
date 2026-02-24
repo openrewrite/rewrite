@@ -35,7 +35,6 @@ import {Cursor, isScope, isTree, Tree} from "../../tree";
 import {mapAsync} from "../../util";
 import {produceAsync} from "../../visitor";
 import {TabsAndIndentsStyle} from "../style";
-import {findMarker} from "../../markers";
 
 type IndentKind = 'block' | 'continuation' | 'align';
 type IndentContext = [number, IndentKind];  // [indent, kind]
@@ -215,10 +214,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
 
     private prefixContainsNewline(tree: J): boolean {
         // Check if the element starts on a new line (only the last whitespace matters)
-        if (tree.prefix && lastWhitespace(tree.prefix).includes("\n")) {
-            return true;
-        }
-        return false;
+        return !!(tree.prefix && lastWhitespace(tree.prefix).includes("\n"));
     }
 
     private isJsxChildElement(tree: J): boolean {
@@ -556,10 +552,6 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         // Restore cursor
         this.cursor = this.cursor.parent!;
 
-        // For tree types, ret IS the element (intersection type); check if undefined directly
-        if (ret === undefined) {
-            return undefined;
-        }
         return ret;
     }
 
@@ -627,8 +619,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         // PropertyAssignment wrapping a spread (for object spread like `...obj`)
         if (element.kind === JS.Kind.PropertyAssignment) {
             const propAssign = element as JS.PropertyAssignment;
-            // For tree types, name IS the expression with padding mixed in
-            const nameElement = propAssign.name as unknown as J | undefined;
+            const nameElement = propAssign.name;
             if (nameElement?.kind === JS.Kind.Spread) {
                 return true;
             }
@@ -654,8 +645,6 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         let anchorCursor: Cursor | undefined;
         let anchorIndent = 0;
 
-        const DEBUG = false; // Set to true to enable debug logging
-
         for (let c = this.cursor.parent; c; c = c.parent) {
             path.push(c);
             const v = c.value;
@@ -665,7 +654,6 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             if (isJavaWithPrefix && !anchorCursor) {
                 const ws = lastWhitespace(v.prefix);
                 const idx = ws.lastIndexOf('\n');
-                if (DEBUG) console.log(`  CHECK ${v.kind}: prefix=${JSON.stringify(ws.substring(0, 50))} hasNewline=${idx !== -1}`);
                 if (idx !== -1) {
                     anchorCursor = c;
                     anchorIndent = ws.length - idx - 1;
@@ -684,18 +672,6 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         if (path.length === 0) return;
         path.reverse();
 
-        if (DEBUG) {
-            console.log(`PATH (raw): ${path.map(p => {
-                const v = p.value as any;
-                const isRP = this.isRightPaddedWrapper(v);
-                const isLP = this.isLeftPaddedWrapper(v);
-                const isCont = v?.kind === J.Kind.Container;
-                const wrapper = isRP ? '[RP]' : isLP ? '[LP]' : isCont ? '[C]' : '';
-                return `${v?.kind || 'unknown'}${wrapper}`;
-            }).join(' -> ')}`);
-            console.log(`ANCHOR: ${anchorCursor ? (anchorCursor.value as any)?.kind : 'none'} at indent ${anchorIndent}`);
-        }
-
         // Process ancestors from root to leaf
         for (let i = 0; i < path.length; i++) {
             const c = path[i];
@@ -708,7 +684,6 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             if (c === anchorCursor && !c.messages.has("indentContext")) {
                 const ctx: IndentContext = [anchorIndent, 'align'];
                 c.messages.set("indentContext", ctx);
-                if (DEBUG) console.log(`SET (anchor): ${v.kind} -> [${ctx[0]}, ${ctx[1]}]`);
                 continue;
             }
 
@@ -716,14 +691,14 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             // These need their context set up for proper indent propagation
             // Note: RightPadded<J> intersection types have the element's kind, not J.Kind.RightPadded
             // So we detect them by checking for padding.after property
-            if (this.isRightPaddedWrapper(v)) {
+            if (isRightPadded(v)) {
                 const savedCursor = this.cursor;
                 this.cursor = c;
                 this.preVisitRightPadded(v);
                 this.cursor = savedCursor;
                 continue;
             }
-            if (this.isLeftPaddedWrapper(v)) {
+            if (isLeftPadded(v)) {
                 const savedCursor = this.cursor;
                 this.cursor = c;
                 this.preVisitLeftPadded(v);
@@ -745,11 +720,6 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             // Only set up context if not already set (e.g., by If->Block handling above)
             if (!c.messages.has("indentContext")) {
                 this.setupCursorMessagesForTree(c, v);
-                const ctx = c.messages.get("indentContext") as IndentContext;
-                if (DEBUG) console.log(`SET (computed): ${v.kind} -> [${ctx?.[0]}, ${ctx?.[1]}]`);
-            } else {
-                const ctx = c.messages.get("indentContext") as IndentContext;
-                if (DEBUG) console.log(`SKIP (already set): ${v.kind} -> [${ctx?.[0]}, ${ctx?.[1]}]`);
             }
             this.cursor = savedCursor;
 
@@ -763,7 +733,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 if (nextCursor !== anchorCursor) {
                     const nextValue = nextCursor.value;
                     // Check if next is a statement (J node, not a wrapper type)
-                    if (this.isActualJNode(nextValue) && !this.isRightPaddedWrapper(nextValue)) {
+                    if (this.isActualJNode(nextValue) && !isRightPadded(nextValue)) {
                         // This is a Block child without explicit RightPadded wrapper in cursor chain
                         // Apply RightPadded-like context: add indent if statement has newline
                         const blockContext = c.messages.get("indentContext") as IndentContext | undefined;
@@ -776,10 +746,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                         // Create a synthetic cursor for the implied RightPadded context
                         // and set the context for the statement directly
                         nextCursor.messages.set("indentContext", [stmtIndent, 'align'] as IndentContext);
-                        if (DEBUG) console.log(`BLOCK->STMT: ${(nextValue as any).kind} hasNewline=${hasNewline} -> [${stmtIndent}, align]`);
                     }
-                } else {
-                    if (DEBUG) console.log(`BLOCK->ANCHOR: skipping (next is anchor)`);
                 }
             }
 
@@ -790,16 +757,13 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 if (nextCursor !== anchorCursor) {
                     const nextValue = nextCursor.value;
                     // If thenPart is a Block and not wrapped in RightPadded in cursor chain
-                    if (this.isActualJNode(nextValue) && nextValue.kind === J.Kind.Block && !this.isRightPaddedWrapper(nextValue)) {
+                    if (this.isActualJNode(nextValue) && nextValue.kind === J.Kind.Block && !isRightPadded(nextValue)) {
                         const ifContext = c.messages.get("indentContext") as IndentContext | undefined;
                         const [ifIndent] = ifContext ?? [0, 'continuation'];
                         // thenPart Block doesn't have newline in prefix (it's { after condition)
                         // Keep same indent, use 'block' so children get proper indentation
                         nextCursor.messages.set("indentContext", [ifIndent, 'block'] as IndentContext);
-                        if (DEBUG) console.log(`IF->BLOCK: ifIndent=${ifIndent} -> [${ifIndent}, block]`);
                     }
-                } else {
-                    if (DEBUG) console.log(`IF->ANCHOR: skipping (next is anchor)`);
                 }
             }
         }
@@ -808,15 +772,8 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     private isActualJNode(v: any): v is J {
         return isJava(v) &&
             v.kind !== J.Kind.Container &&
-            !this.isRightPaddedWrapper(v) &&
-            !this.isLeftPaddedWrapper(v);
+            !isRightPadded(v) &&
+            !isLeftPadded(v);
     }
 
-    private isRightPaddedWrapper(v: any): v is J.RightPadded<J> {
-        return isRightPadded(v);
-    }
-
-    private isLeftPaddedWrapper(v: any): v is J.LeftPadded<J> {
-        return isLeftPadded(v);
-    }
 }

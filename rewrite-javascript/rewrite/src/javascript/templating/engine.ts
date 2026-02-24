@@ -225,8 +225,7 @@ export class TemplateEngine {
         }
 
         // The template code is always the last statement (after context + preamble)
-        // For tree types, the padded value IS the element (intersection type)
-        const lastStatement = cu.statements[cu.statements.length - 1] as unknown as Statement;
+        const lastStatement = cu.statements[cu.statements.length - 1];
 
         // Extract from wrapper using shared utility
         const extracted = PlaceholderUtils.extractFromWrapper(lastStatement, 'Template');
@@ -500,8 +499,7 @@ export class TemplateEngine {
         }
 
         // The pattern code is always the last statement (after context + preamble)
-        // For tree types, the padded value IS the element (intersection type)
-        const lastStatement = cu.statements[cu.statements.length - 1] as unknown as Statement;
+        const lastStatement = cu.statements[cu.statements.length - 1];
 
         // Extract from wrapper using shared utility
         const extracted = PlaceholderUtils.extractFromWrapper(lastStatement, 'Pattern');

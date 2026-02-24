@@ -105,14 +105,11 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      */
     override async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
         const hasPlaceholder = block.statements.some(stmt => {
-            // For tree types, the padded value IS the element (intersection type)
-            const stmtElement = stmt as unknown as Statement;
-            // Check if it's an ExpressionStatement containing a placeholder
-            if (stmtElement.kind === JS.Kind.ExpressionStatement) {
-                const exprStmt = stmtElement as JS.ExpressionStatement;
+            if (stmt.kind === JS.Kind.ExpressionStatement) {
+                const exprStmt = stmt as unknown as JS.ExpressionStatement;
                 return this.isPlaceholder(exprStmt.expression);
             }
-            return this.isPlaceholder(stmtElement);
+            return this.isPlaceholder(stmt);
         });
 
         if (!hasPlaceholder) {
@@ -140,8 +137,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      * array-level access for variadic expansion.
      */
     override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: any): Promise<J | undefined> {
-        // For tree types, the padded value IS the element (intersection type)
-        const hasPlaceholder = compilationUnit.statements.some(stmt => this.isPlaceholder(stmt as unknown as Statement));
+        const hasPlaceholder = compilationUnit.statements.some(stmt => this.isPlaceholder(stmt));
 
         if (!hasPlaceholder) {
             return super.visitJsCompilationUnit(compilationUnit, p);

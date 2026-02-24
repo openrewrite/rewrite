@@ -300,7 +300,6 @@ export class PlaceholderUtils {
                 if (body.statements.length === 0) {
                     throw new Error(`${contextName} function body is empty`);
                 } else if (body.statements.length === 1) {
-                    // For tree types, the padded value IS the element (intersection type)
                     const stmt = body.statements[0] as unknown as Statement;
 
                     // Single expression statement → extract the expression

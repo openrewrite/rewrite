@@ -2260,8 +2260,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * Returns the simple name if the property is an identifier, undefined otherwise.
      */
     private getPropertyName(prop: JS.PropertyAssignment): string | undefined {
-        // For tree types, the padded value IS the element (no .element property)
-        const nameExpr = prop.name as unknown as Expression;
+        const nameExpr = prop.name;
         return isIdentifier(nameExpr) ? nameExpr.simpleName : undefined;
     }
 
@@ -2291,8 +2290,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             return undefined;
         }
 
-        // With intersection types, the statement IS the padded value (no .element property)
-        const stmt = block.statements[0] as unknown as Statement;
+        const stmt = block.statements[0];
 
         if ((stmt as any).kind !== J.Kind.Return) {
             return undefined;

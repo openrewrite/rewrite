@@ -66,10 +66,7 @@ export class OrderImports extends Recipe {
                 const sortedSpecifiers = this.sortNamedSpecifiersWithinImports(imports, useBraceSpaces);
 
                 // Sort imports by category and module path
-                // For tree types, the padded value IS the element (intersection type)
-                sortedSpecifiers.sort((aPadded, bPadded) => {
-                    const a = aPadded as unknown as JS.Import;
-                    const b = bPadded as unknown as JS.Import;
+                sortedSpecifiers.sort((a, b) => {
 
                     // First, compare by category
                     const categoryA = this.getImportCategory(a);
@@ -87,7 +84,7 @@ export class OrderImports extends Recipe {
                     }
 
                     // Tiebreaker: keep original order for stability
-                    return originalImportPosition[aPadded.id] - originalImportPosition[bPadded.id];
+                    return originalImportPosition[a.id] - originalImportPosition[b.id];
                 });
 
                 const cuWithImportsSorted = await produceAsync(cu, async draft => {
@@ -119,8 +116,7 @@ export class OrderImports extends Recipe {
                 // Namespace imports: import * as foo from 'module'
                 if (import_.importClause.namedBindings?.kind === JS.Kind.Alias) {
                     const alias = import_.importClause.namedBindings as JS.Alias;
-                    // For tree types, propertyName IS the identifier with padding mixed in
-                    const propertyName = alias.propertyName as unknown as J.Identifier;
+                    const propertyName = alias.propertyName;
                     if (propertyName.simpleName === "*") {
                         return ImportCategory.Namespace;
                     }
@@ -139,8 +135,7 @@ export class OrderImports extends Recipe {
              * Extract the module path from an import statement.
              */
             private getModulePath(import_: JS.Import): string {
-                // For tree types, the padded value IS the element (intersection type)
-                const moduleSpec = import_.moduleSpecifier as unknown as Expression | undefined;
+                const moduleSpec = import_.moduleSpecifier;
                 if (moduleSpec?.kind === J.Kind.Literal) {
                     const literal = moduleSpec as J.Literal;
                     // Remove quotes from the value
@@ -151,8 +146,7 @@ export class OrderImports extends Recipe {
 
             private countImports(cu: JS.CompilationUnit): number {
                 let i = 0;
-                // For tree types, the padded value IS the element (intersection type)
-                while ((i < cu.statements.length) && ((cu.statements[i] as unknown as Statement).kind === JS.Kind.Import)) {
+                while ((i < cu.statements.length) && (cu.statements[i].kind === JS.Kind.Import)) {
                     i++;
                 }
                 return i;
@@ -164,8 +158,7 @@ export class OrderImports extends Recipe {
             private sortNamedSpecifiersWithinImports(imports: J.RightPadded<JS.Import>[], useBraceSpaces: boolean): J.RightPadded<JS.Import>[] {
                 const ret = [];
                 for (const importPadded of imports) {
-                    // For tree types, the padded value IS the element (intersection type)
-                    const import_ = importPadded as unknown as JS.Import;
+                    const import_ = importPadded;
                     if (this.hasNamedImports(import_)) {
                         const importSorted = produce(import_, draft => {
                             const namedBindings = draft.importClause!.namedBindings as Draft<JS.NamedImports>;
@@ -184,10 +177,9 @@ export class OrderImports extends Recipe {
                             }
 
                             // Sort by the imported name (not alias)
-                            // For tree types, a IS the specifier with padding mixed in
                             elements.sort((a, b) => {
-                                const nameA = this.getSpecifierSortKey(a as unknown as JS.ImportSpecifier);
-                                const nameB = this.getSpecifierSortKey(b as unknown as JS.ImportSpecifier);
+                                const nameA = this.getSpecifierSortKey(a);
+                                const nameB = this.getSpecifierSortKey(b);
                                 return nameA.localeCompare(nameB);
                             });
 
@@ -243,8 +235,7 @@ export class OrderImports extends Recipe {
             private getSpecifierSortKey(specifier: JS.ImportSpecifier): string {
                 if (specifier.specifier.kind === JS.Kind.Alias) {
                     // import { foo as bar } - sort by 'foo'
-                    // For tree types, propertyName IS the identifier with padding mixed in
-                    const propertyName = (specifier.specifier as JS.Alias).propertyName as unknown as J.Identifier;
+                    const propertyName = (specifier.specifier as JS.Alias).propertyName;
                     return propertyName.simpleName;
                 } else if (specifier.specifier.kind === J.Kind.Identifier) {
                     // import { foo } - sort by 'foo'

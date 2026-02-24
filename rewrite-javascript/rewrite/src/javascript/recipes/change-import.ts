@@ -129,7 +129,6 @@ export class ChangeImport extends Recipe {
                 this.transformedImport = false;
 
                 // First pass: check if the old import exists and capture any alias
-                // For tree types, the padded value IS the element (intersection type)
                 for (const statement of cu.statements) {
                     const stmt = statement as unknown as Statement;
                     if (stmt.kind === JS.Kind.Import) {
@@ -257,8 +256,7 @@ export class ChangeImport extends Recipe {
 
                         if (specifierNode.kind === JS.Kind.Alias) {
                             const alias = specifierNode as JS.Alias;
-                            // For tree types, propertyName IS the identifier with padding mixed in
-                            const propertyName = alias.propertyName as unknown as J.Identifier;
+                            const propertyName = alias.propertyName;
                             if (propertyName.kind === J.Kind.Identifier) {
                                 return propertyName.simpleName !== memberToRemove;
                             }
@@ -281,16 +279,14 @@ export class ChangeImport extends Recipe {
 
                 const namedImports = namedBindings as JS.NamedImports;
                 for (const elem of namedImports.elements.elements) {
-                    // For tree types, elem IS the specifier with padding mixed in
-                    const specifier = elem as unknown as JS.ImportSpecifier;
+                    const specifier = elem;
                     const specifierNode = specifier.specifier;
 
                     if (isIdentifier(specifierNode)) {
                         imports.push(specifierNode.simpleName);
                     } else if (specifierNode.kind === JS.Kind.Alias) {
                         const alias = specifierNode as JS.Alias;
-                        // For tree types, propertyName IS the identifier with padding mixed in
-                        const propertyName = alias.propertyName as unknown as J.Identifier;
+                        const propertyName = alias.propertyName;
                         if (isIdentifier(propertyName)) {
                             imports.push(propertyName.simpleName);
                         }
@@ -635,8 +631,7 @@ export class ChangeImport extends Recipe {
                 const moduleSpecifier = jsImport.moduleSpecifier;
                 if (!moduleSpecifier) return { found: false };
 
-                // For tree types, the padded value IS the element (intersection type)
-                const literal = moduleSpecifier as unknown as Expression;
+                const literal = moduleSpecifier;
                 if (literal.kind !== J.Kind.Literal) return { found: false };
 
                 const value = (literal as J.Literal).value;
@@ -651,8 +646,7 @@ export class ChangeImport extends Recipe {
                 // Check for default import
                 if (oldMember === 'default') {
                     if (importClause.name) {
-                        // For tree types, name IS the identifier with padding mixed in
-                        const nameElem = importClause.name as unknown as J.Identifier;
+                        const nameElem = importClause.name;
                         if (isIdentifier(nameElem)) {
                             return { found: true, alias: nameElem.simpleName };
                         }
@@ -682,8 +676,7 @@ export class ChangeImport extends Recipe {
                 const elements = namedImports.elements.elements;
 
                 for (const elem of elements) {
-                    // For tree types, elem IS the specifier with padding mixed in
-                    const specifier = elem as unknown as JS.ImportSpecifier;
+                    const specifier = elem;
                     const specifierNode = specifier.specifier;
 
                     // Handle direct import: import { act }
@@ -694,8 +687,7 @@ export class ChangeImport extends Recipe {
                     // Handle aliased import: import { act as something }
                     if (specifierNode.kind === JS.Kind.Alias) {
                         const alias = specifierNode as JS.Alias;
-                        // For tree types, propertyName IS the identifier with padding mixed in
-                        const propertyName = alias.propertyName as unknown as J.Identifier;
+                        const propertyName = alias.propertyName;
                         if (isIdentifier(propertyName) && propertyName.simpleName === oldMember) {
                             if (isIdentifier(alias.alias)) {
                                 return { found: true, alias: alias.alias.simpleName };
