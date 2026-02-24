@@ -23,6 +23,23 @@ allprojects {
     description = "Eliminate tech-debt. Automatically."
 }
 
+subprojects {
+    tasks.withType<JavaExec>().configureEach {
+        if (name == "generateAntlrSources") {
+            doLast {
+                val idx = args?.indexOf("-o") ?: return@doLast
+                if (idx < 0 || idx + 1 >= args!!.size) return@doLast
+                val rootPrefix = rootProject.projectDir.absolutePath + "/"
+                project.file(args!![idx + 1]).walk().filter { it.extension == "java" }.forEach { file ->
+                    file.writeText(file.readLines().joinToString("\n") { line ->
+                        line.trimEnd().replace("// Generated from $rootPrefix", "// Generated from ")
+                    } + "\n")
+                }
+            }
+        }
+    }
+}
+
 // Use this task locally between different dependency check runs to have updated analysis:
 // OSSINDEX_PASSWORD=... OSSINDEX_USERNAME=... gradle cleanReports dCAg --no-parallel
 tasks.register<Delete>("cleanReports") {
