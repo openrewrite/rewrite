@@ -50,7 +50,10 @@ public class ChangePluginConfiguration extends Recipe {
     @Option(displayName = "Configuration",
             description = "Plugin configuration provided as raw XML overriding any existing configuration. " +
                           "Configuration inside `<executions>` blocks will not be altered. " +
-                          "Supplying `null` will remove any existing configuration.",
+                          "Supplying `null` will remove any existing configuration. " +
+                          "To include a literal `${...}` property reference in the configuration " +
+                          "(e.g. a Maven property like `${java.version}`), escape it as `\\${...}` " +
+                          "in your recipe YAML to prevent it from being resolved as a recipe placeholder.",
             example = "<foo>bar</foo>",
             required = false)
     @Nullable

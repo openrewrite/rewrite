@@ -113,6 +113,31 @@ class PropertyPlaceholderHelperTest {
     }
 
     @Test
+    void unresolvedPlaceholderLeftAsIs() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("${unresolved}", k -> null);
+        assertThat(s).isEqualTo("${unresolved}");
+    }
+
+    @Test
+    void normalResolutionStillWorks() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("${greeting} ${name}", k -> switch (k) {
+            case "greeting" -> "hello";
+            case "name" -> "world";
+            default -> null;
+        });
+        assertThat(s).isEqualTo("hello world");
+    }
+
+    @Test
+    void backslashNotBeforePrefixIsPreserved() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("path\\to\\file", k -> null);
+        assertThat(s).isEqualTo("path\\to\\file");
+    }
+
+    @Test
     void withValueSeparatorAndNullReplacement() {
         var helper = new PropertyPlaceholderHelper("%%{", "}", ",");
         var s = helper.replacePlaceholders("%%{k1,oh}%%{k2}", k -> switch (k) {
