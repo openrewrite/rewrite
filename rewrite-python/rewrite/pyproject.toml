@@ -30,6 +30,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "pip",
     "pytest>=8.0.0",
     "pytest-timeout>=2.0.0",
     "tox>=4.0.0",
