@@ -636,6 +636,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                 ProcessBuilder pb = new ProcessBuilder(
                         pythonPath.toString(),
                         "-m", "pip", "install",
+                        "--upgrade",
                         "--target=" + pipPackagesPath.toAbsolutePath().normalize(),
                         packageSpec
                 );
