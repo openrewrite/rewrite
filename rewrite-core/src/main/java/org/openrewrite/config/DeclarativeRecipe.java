@@ -178,8 +178,21 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         if (recipe instanceof ScanningRecipe && isScanningRequired(recipe)) {
             acc.recipeToAccumulator.put(recipe, ((ScanningRecipe<?>) recipe).getInitialValue(ctx));
         }
-        for (Recipe nested : recipe.getRecipeList()) {
-            registerNestedScanningRecipes(nested, acc, ctx);
+        // Recurse into DeclarativeRecipes using raw fields (preconditions + recipeList)
+        // to avoid getRecipeList() which wraps entries with bellwethers.
+        // Don't recurse into leaf ScanningRecipes — they have no precondition children.
+        if (recipe instanceof DeclarativeRecipe) {
+            DeclarativeRecipe dr = (DeclarativeRecipe) recipe;
+            for (Recipe precondition : dr.preconditions) {
+                registerNestedScanningRecipes(precondition, acc, ctx);
+            }
+            for (Recipe r : dr.recipeList) {
+                registerNestedScanningRecipes(r, acc, ctx);
+            }
+        } else if (!(recipe instanceof ScanningRecipe)) {
+            for (Recipe nested : recipe.getRecipeList()) {
+                registerNestedScanningRecipes(nested, acc, ctx);
+            }
         }
     }
 
@@ -203,8 +216,18 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             Object recipeAcc = acc.recipeToAccumulator.get(recipe);
             scanningRecipe.getScanner(recipeAcc).visit(tree, ctx);
         }
-        for (Recipe nested : recipe.getRecipeList()) {
-            scanNestedScanningRecipes(nested, acc, tree, ctx);
+        // Recurse into nested DeclarativeRecipes used as preconditions, scanning their
+        // raw preconditions and recipeList fields directly. We avoid getRecipeList() which
+        // wraps entries with bellwethers. Leaf ScanningRecipes (e.g. AddDependency) are
+        // not recursed into — their recipeList is scanned during recipe execution.
+        if (recipe instanceof DeclarativeRecipe) {
+            DeclarativeRecipe nested = (DeclarativeRecipe) recipe;
+            for (Recipe precondition : nested.preconditions) {
+                scanNestedScanningRecipes(precondition, acc, tree, ctx);
+            }
+            for (Recipe r : nested.recipeList) {
+                scanNestedScanningRecipes(r, acc, tree, ctx);
+            }
         }
     }
 
