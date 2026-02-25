@@ -129,7 +129,7 @@ public class DeleteProperty extends Recipe {
                     for (int i = 1; i < entries.size(); i++) {
                         Yaml.Sequence.Entry entry = entries.get(i);
                         Yaml.Sequence.Entry prevEntry = entries.get(i - 1);
-                        if (!startsWithNewline(entry.getPrefix()) && !endsWithBlockScalar(prevEntry.getBlock())) {
+                        if (!containsNewline(entry.getPrefix()) && !endsWithBlockScalar(prevEntry.getBlock())) {
                             if (fixedEntries == null) {
                                 fixedEntries = new ArrayList<>(entries);
                             }
@@ -165,6 +165,7 @@ public class DeleteProperty extends Recipe {
                 List<Yaml.Mapping.Entry> entries = new ArrayList<>();
                 String firstDeletedPrefix = null;
                 boolean previousWasDeleted = false;
+                String trailingInlineComment = null;
                 for (Yaml.Mapping.Entry entry : m.getEntries()) {
                     if (ToBeRemoved.hasMarker(entry.getValue()) ||
                         ToBeRemoved.hasMarker(entry) ||
@@ -173,17 +174,36 @@ public class DeleteProperty extends Recipe {
                         if (entries.isEmpty() && firstDeletedPrefix == null) {
                             firstDeletedPrefix = entry.getPrefix();
                         }
+                        // Capture inline comment from the first deleted entry after kept entries
+                        if (trailingInlineComment == null && !entries.isEmpty()) {
+                            trailingInlineComment = extractInlineComment(entry.getPrefix());
+                        }
                         changed = true;
                         previousWasDeleted = true;
                     } else {
                         if (entries.isEmpty() && firstDeletedPrefix != null && containsOnlyWhitespace(entry.getPrefix())) {
                             entry = entry.withPrefix(firstDeletedPrefix);
-                        } else if (previousWasDeleted && !entries.isEmpty() && !startsWithNewline(entry.getPrefix())) {
+                        } else if (previousWasDeleted && !entries.isEmpty() && !containsNewline(entry.getPrefix())) {
                             entry = entry.withPrefix("\n" + entry.getPrefix());
                         }
                         entries.add(entry);
                         previousWasDeleted = false;
+                        trailingInlineComment = null;
                     }
+                }
+
+                // Preserve inline comment from deleted trailing entries on the last kept entry
+                if (trailingInlineComment != null) {
+                    String comment = trailingInlineComment;
+                    entries = ListUtils.mapLast(entries, lastKept -> {
+                        if (lastKept.getValue() instanceof Yaml.Scalar &&
+                            ((Yaml.Scalar) lastKept.getValue()).getStyle() == Yaml.Scalar.Style.PLAIN) {
+                            Yaml.Scalar scalar = (Yaml.Scalar) lastKept.getValue();
+                            return lastKept.withValue(
+                                    scalar.withValue(scalar.getValue() + comment));
+                        }
+                        return lastKept;
+                    });
                 }
 
                 if (changed) {
@@ -206,7 +226,7 @@ public class DeleteProperty extends Recipe {
                     for (int i = 1; i < currentEntries.size(); i++) {
                         Yaml.Mapping.Entry entry = currentEntries.get(i);
                         Yaml.Mapping.Entry prevEntry = currentEntries.get(i - 1);
-                        if (!startsWithNewline(entry.getPrefix()) && !endsWithBlockScalar(prevEntry)) {
+                        if (!containsNewline(entry.getPrefix()) && !endsWithBlockScalar(prevEntry)) {
                             if (fixedEntries == null) {
                                 fixedEntries = new ArrayList<>(currentEntries);
                             }
@@ -238,8 +258,18 @@ public class DeleteProperty extends Recipe {
         return true;
     }
 
-    private static boolean startsWithNewline(@Nullable String str) {
-        return str != null && !str.isEmpty() && str.charAt(0) == '\n';
+    private static boolean containsNewline(@Nullable String str) {
+        return str != null && str.indexOf('\n') >= 0;
+    }
+
+    /**
+     * Extract an inline comment from a prefix string. Inline comments appear before the
+     * first newline in the prefix (e.g. {@code " # comment\n  "} → {@code " # comment"}).
+     */
+    private static @Nullable String extractInlineComment(String prefix) {
+        int newlineIndex = prefix.indexOf('\n');
+        String beforeNewline = newlineIndex >= 0 ? prefix.substring(0, newlineIndex) : prefix;
+        return beforeNewline.contains("#") ? beforeNewline : null;
     }
 
     private static boolean endsWithBlockScalar(Yaml.Mapping.Entry entry) {

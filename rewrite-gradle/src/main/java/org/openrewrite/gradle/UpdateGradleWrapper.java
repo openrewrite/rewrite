@@ -104,10 +104,15 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Option(example = "29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda",
             displayName = "SHA-256 checksum",
             description = "The SHA-256 checksum of the Gradle distribution. " +
-                          "If specified, the recipe will add the checksum along with the custom distribution URL.",
+                    "If specified, the recipe will add the checksum along with the custom distribution URL.",
             required = false)
     @Nullable
     final String distributionChecksum;
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return version == null ? "" : version + '-' + (distribution == null ? "bin" : distribution);
+    }
 
     @Override
     public Validated<Object> validate() {
@@ -231,7 +236,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         }
 
                         if ((sourceFile instanceof Quark || sourceFile instanceof Remote) &&
-                            equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
+                                equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
                             acc.addGradleWrapperJar = false;
                             return true;
                         }
@@ -286,11 +291,11 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
             //noinspection UnusedProperty
             Properties.File gradleWrapperProperties = new PropertiesParser().parse(
                             "distributionBase=GRADLE_USER_HOME\n" +
-                            "distributionPath=wrapper/dists\n" +
-                            "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +
-                            (checksum == null ? "" : "distributionSha256Sum=" + checksum + "\n") +
-                            "zipStoreBase=GRADLE_USER_HOME\n" +
-                            "zipStorePath=wrapper/dists")
+                                    "distributionPath=wrapper/dists\n" +
+                                    "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +
+                                    (checksum == null ? "" : "distributionSha256Sum=" + checksum + "\n") +
+                                    "zipStoreBase=GRADLE_USER_HOME\n" +
+                                    "zipStorePath=wrapper/dists")
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as properties"))
                     .withSourcePath(WRAPPER_PROPERTIES_LOCATION);

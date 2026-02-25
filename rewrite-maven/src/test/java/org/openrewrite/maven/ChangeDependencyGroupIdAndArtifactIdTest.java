@@ -22,6 +22,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -3329,33 +3330,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>io.swagger.core.v3</groupId>
-                          <artifactId>swagger-jaxrs2</artifactId>
-                          <version>2.2.20</version>
-                          <scope>provided</scope>
-                          <exclusions>
-                              <exclusion>
-                                  <groupId>com.fasterxml.jackson.jaxrs</groupId>
-                                  <artifactId>*</artifactId>
-                              </exclusion>
-                          </exclusions>
-                      </dependency>
-                      <dependency>
-                          <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
-                          <artifactId>jackson-jakarta-rs-json-provider</artifactId>
-                          <version>2.21.0</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
+            spec -> spec.after(actual -> assertThat(actual)
+              .containsPattern("<groupId>com\\.fasterxml\\.jackson\\.jakarta\\.rs</groupId>\\s*<artifactId>jackson-jakarta-rs-json-provider</artifactId>\\s*<version>2\\.\\d+\\.\\d+</version>")
+              .doesNotContain("<version>2.9.7</version>")
+              .actual())
           )
         );
     }
@@ -3405,33 +3383,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>io.swagger.core.v3</groupId>
-                          <artifactId>swagger-jaxrs2-jakarta</artifactId>
-                          <version>2.2.20</version>
-                          <scope>provided</scope>
-                          <exclusions>
-                              <exclusion>
-                                  <groupId>com.fasterxml.jackson.jaxrs</groupId>
-                                  <artifactId>*</artifactId>
-                              </exclusion>
-                          </exclusions>
-                      </dependency>
-                      <dependency>
-                          <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
-                          <artifactId>jackson-jakarta-rs-json-provider</artifactId>
-                          <version>2.21.0</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
+            spec -> spec.after(actual -> assertThat(actual)
+              .containsPattern("<groupId>com\\.fasterxml\\.jackson\\.jakarta\\.rs</groupId>\\s*<artifactId>jackson-jakarta-rs-json-provider</artifactId>\\s*<version>2\\.\\d+\\.\\d+</version>")
+              .doesNotContain("<version>2.9.7</version>")
+              .actual())
           )
         );
     }
@@ -3534,16 +3489,17 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1330")
     @Test
-    void exclusionUpdatedWhenDependencyGroupIdChanges() {
-        // When changing a dependency's groupId/artifactId, any exclusions that match
-        // the old coordinates should be updated to match the new coordinates.
+    void exclusionPreservedAndSiblingAddedWhenDependencyGroupIdChanges() {
+        // When changing a dependency's groupId/artifactId, exclusions that match
+        // the old coordinates should be preserved, and a sibling exclusion for the
+        // new coordinates should be added alongside them.
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "com.fasterxml.jackson.jaxrs",
             "jackson-jaxrs-json-provider",
             "com.fasterxml.jackson.jakarta.rs",
             "jackson-jakarta-rs-json-provider",
-            "2.x",
+            "2.18.x",
             null
           )),
           pomXml(
@@ -3574,6 +3530,35 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
+            spec -> spec.after(actual -> assertThat(actual)
+              // Old exclusion preserved
+              .containsPattern("<exclusion>\\s*<groupId>com\\.fasterxml\\.jackson\\.jaxrs</groupId>\\s*<artifactId>jackson-jaxrs-json-provider</artifactId>\\s*</exclusion>")
+              // Sibling exclusion added for new coordinates
+              .containsPattern("<exclusion>\\s*<groupId>com\\.fasterxml\\.jackson\\.jakarta\\.rs</groupId>\\s*<artifactId>jackson-jakarta-rs-json-provider</artifactId>\\s*</exclusion>")
+              // Version updated
+              .containsPattern("<groupId>com\\.fasterxml\\.jackson\\.jakarta\\.rs</groupId>\\s*<artifactId>jackson-jakarta-rs-json-provider</artifactId>\\s*<version>2\\.\\d+\\.\\d+</version>")
+              .doesNotContain("<version>2.9.7</version>")
+              .actual())
+          )
+        );
+    }
+
+    @Test
+    void exclusionPreservedAndSiblingAddedForNewCoordinates() {
+        // When changing commons-lang:commons-lang to org.apache.commons:commons-lang3,
+        // the old exclusion for commons-lang:commons-lang should be preserved (to block
+        // the vulnerable transitive dependency), and a sibling exclusion for the new
+        // coordinates should be added alongside it.
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "commons-lang",
+            "commons-lang",
+            "org.apache.commons",
+            "commons-lang3",
+            "3.x",
+            null
+          )),
+          pomXml(
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -3582,25 +3567,33 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <version>1</version>
                   <dependencies>
                       <dependency>
-                          <groupId>io.swagger.core.v3</groupId>
-                          <artifactId>swagger-jaxrs2-jakarta</artifactId>
-                          <version>2.2.20</version>
-                          <scope>provided</scope>
+                          <groupId>commons-lang</groupId>
+                          <artifactId>commons-lang</artifactId>
+                          <version>2.6</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.apache.struts</groupId>
+                          <artifactId>struts2-core</artifactId>
+                          <version>2.5.30</version>
                           <exclusions>
                               <exclusion>
-                                  <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
-                                  <artifactId>jackson-jakarta-rs-json-provider</artifactId>
+                                  <groupId>commons-lang</groupId>
+                                  <artifactId>commons-lang</artifactId>
                               </exclusion>
                           </exclusions>
                       </dependency>
-                      <dependency>
-                          <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
-                          <artifactId>jackson-jakarta-rs-json-provider</artifactId>
-                          <version>2.21.0</version>
-                      </dependency>
                   </dependencies>
               </project>
-              """
+              """,
+            spec -> spec.after(actual -> assertThat(actual)
+              // Direct dependency changed to commons-lang3
+              .containsPattern("<groupId>org\\.apache\\.commons</groupId>\\s*<artifactId>commons-lang3</artifactId>\\s*<version>3\\.\\d+\\.\\d+</version>")
+              .doesNotContain("<version>2.6</version>")
+              // Old exclusion preserved
+              .containsPattern("<exclusion>\\s*<groupId>commons-lang</groupId>\\s*<artifactId>commons-lang</artifactId>\\s*</exclusion>")
+              // Sibling exclusion added for new coordinates
+              .containsPattern("<exclusion>\\s*<groupId>org\\.apache\\.commons</groupId>\\s*<artifactId>commons-lang3</artifactId>\\s*</exclusion>")
+              .actual())
           )
         );
     }

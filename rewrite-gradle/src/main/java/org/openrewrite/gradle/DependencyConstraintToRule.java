@@ -45,7 +45,7 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = false)
 public class DependencyConstraintToRule extends Recipe {
 
-    private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
+    private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("org.gradle.api.Project dependencies(..)", true);
     private static final String CONSTRAINT_MATCHER = "org.gradle.api.artifacts.dsl.DependencyHandler *(..)";
 
     String displayName = "Dependency constraint to resolution rule";

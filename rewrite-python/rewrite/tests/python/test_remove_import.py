@@ -118,6 +118,89 @@ class TestMaybeRemoveImport:
             )
         )
 
+    def test_remove_import_when_only_shadowed_in_function(self):
+        """Remove import when the name is only used as a local variable shadowing it."""
+        class RemoveJoinVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(
+                    module='os.path',
+                    name='join',
+                    only_if_unused=True
+                ))
+                return super().visit_compilation_unit(cu, p)
+
+        spec = RecipeSpec(recipe=from_visitor(RemoveJoinVisitor()), type_attribution=True)
+        spec.rewrite_run(
+            python(
+                """\
+                from os.path import join
+
+                def foo():
+                    join = "not a function"
+                    return join
+                """,
+                """\
+                def foo():
+                    join = "not a function"
+                    return join
+                """,
+            )
+        )
+
+    def test_keep_import_when_used_at_module_level(self):
+        """Keep import when it's used at module level even if also shadowed in a function."""
+        class RemoveJoinVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(
+                    module='os.path',
+                    name='join',
+                    only_if_unused=True
+                ))
+                return super().visit_compilation_unit(cu, p)
+
+        spec = RecipeSpec(recipe=from_visitor(RemoveJoinVisitor()), type_attribution=True)
+        spec.rewrite_run(
+            python(
+                """\
+                from os.path import join
+
+                x = join("a", "b")
+
+                def foo():
+                    join = "shadowed"
+                    return join
+                """,
+            )
+        )
+
+    def test_remove_direct_import_when_only_shadowed(self):
+        """Remove 'import os' when 'os' is only used as a local variable name."""
+        class RemoveOsVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(
+                    module='os',
+                    only_if_unused=True
+                ))
+                return super().visit_compilation_unit(cu, p)
+
+        spec = RecipeSpec(recipe=from_visitor(RemoveOsVisitor()), type_attribution=True)
+        spec.rewrite_run(
+            python(
+                """\
+                import os
+
+                def foo():
+                    os = "not a module"
+                    return os
+                """,
+                """\
+                def foo():
+                    os = "not a module"
+                    return os
+                """,
+            )
+        )
+
     def test_no_change_when_import_not_present(self):
         """No change when the import to remove doesn't exist."""
         class RemoveJoinVisitor(PythonVisitor[ExecutionContext]):

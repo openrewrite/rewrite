@@ -20,7 +20,7 @@ from uuid import uuid4
 
 from rewrite.java import J
 from rewrite.java.support_types import JContainer, JRightPadded
-from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Space
+from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, MethodDeclaration, Space
 from rewrite.markers import Markers
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
@@ -129,6 +129,11 @@ class RemoveImport(PythonVisitor):
 
             def visit_identifier(self, ident: Identifier, p) -> J:
                 if not self.in_import:
+                    # Inside a function scope, identifiers with field_type are
+                    # local variables (shadowing the import), not actual uses.
+                    if self.cursor.first_enclosing(MethodDeclaration) is not None:
+                        if ident.field_type is not None:
+                            return ident
                     used.add(ident.simple_name)
                 return ident
 

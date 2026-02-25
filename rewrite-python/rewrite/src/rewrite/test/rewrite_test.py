@@ -227,7 +227,7 @@ class RecipeSpec:
                 continue
 
             # Determine source path
-            source_path = spec.path or Path(f"{uuid4().hex}.{spec.ext}")
+            source_path = spec.path or Path(f"_{uuid4().hex}.{spec.ext}")
 
             # Parse the source
             source = dedent(spec.before)
@@ -356,7 +356,7 @@ class RecipeSpec:
     def _resolve_after(self, after: AfterRecipeText, actual: str) -> str:
         """Resolve the expected after value."""
         if callable(after):
-            result = after(actual)
+            result = after(actual)  # ty: ignore[call-top-callable]
             if result is None:
                 return actual  # Callable returned None = actual is acceptable
             return result

@@ -22,7 +22,7 @@ import java.util.function.Consumer;
 
 public class DefaultImportsCustomizer implements Consumer<CompilerConfiguration> {
     // https://docs.gradle.org/current/userguide/writing_build_scripts.html#script-default-imports
-    private static final String[] DEFAULT_IMPORTS = new String[]{
+    public static final String[] DEFAULT_IMPORTS = new String[]{
             "org.gradle",
             "org.gradle.api",
             "org.gradle.api.artifacts",

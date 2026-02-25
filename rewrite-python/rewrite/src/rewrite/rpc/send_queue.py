@@ -295,6 +295,8 @@ class RpcSendQueue:
             return 'org.openrewrite.java.tree.JavaType$Parameterized'
         if isinstance(obj, JavaType.Class):
             return 'org.openrewrite.java.tree.JavaType$Class'
+        if isinstance(obj, JavaType.GenericTypeVariable):
+            return 'org.openrewrite.java.tree.JavaType$GenericTypeVariable'
         if isinstance(obj, JavaType.Union):
             return 'org.openrewrite.java.tree.JavaType$MultiCatch'
         if isinstance(obj, JavaType.Intersection):

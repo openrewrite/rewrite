@@ -22,11 +22,11 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
-import org.openrewrite.groovy.GroovyIsoVisitor;
-import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.HashMap;
@@ -76,26 +76,28 @@ public class ChangeDependencyArtifactId extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
 
             @SuppressWarnings("NotNullFieldNotInitialized")
             GradleProject gradleProject;
 
             @Override
-            public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
-                if (!maybeGp.isPresent()) {
-                    return cu;
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile sf = (JavaSourceFile) tree;
+                    Optional<GradleProject> maybeGp = sf.getMarkers().findFirst(GradleProject.class);
+                    if (maybeGp.isPresent()) {
+                        gradleProject = maybeGp.get();
+                        J result = super.visit(tree, ctx);
+                        if (result != tree && result instanceof JavaSourceFile) {
+                            JavaSourceFile updated = (JavaSourceFile) result;
+                            return updated.withMarkers(updated.getMarkers().setByType(updateGradleModel(gradleProject)));
+                        }
+                    }
+                    return sf;
                 }
-
-                gradleProject = maybeGp.get();
-
-                G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
-                if (g != cu) {
-                    g = g.withMarkers(g.getMarkers().setByType(updateGradleModel(gradleProject)));
-                }
-                return g;
+                return super.visit(tree, ctx);
             }
 
             @Override
