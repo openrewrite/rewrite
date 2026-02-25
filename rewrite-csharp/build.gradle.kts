@@ -90,6 +90,12 @@ tasks.withType<Test> {
 
     maxParallelForks = 1
     maxHeapSize = "8g"
+    // Exclude working-set tests by default; run with -PincludeWorkingSet to include
+    useJUnitPlatform {
+        if (!project.hasProperty("includeWorkingSet")) {
+            excludeTags("workingSet")
+        }
+    }
     // Add timeout to identify hanging tests
     systemProperty("junit.jupiter.execution.timeout.default", "30s")
     // Show test names as they run
