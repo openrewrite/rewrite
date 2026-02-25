@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.python.*;
@@ -607,10 +608,27 @@ public class PythonRewriteRpc extends RewriteRpc {
          * This is required for the RPC server to start.
          */
         private void bootstrapOpenrewrite(Path pipPackagesPath) {
-            Path rewriteModule = pipPackagesPath.resolve("rewrite");
-            if (Files.exists(rewriteModule)) {
-                return; // Already installed
+            String version = StringUtils.readFully(
+                    PythonRewriteRpc.class.getResourceAsStream("/META-INF/version.txt"));
+            boolean pinVersion = !version.isEmpty() && !version.endsWith(".dev0");
+
+            Path versionMarker = pipPackagesPath.resolve(".openrewrite-version");
+            if (Files.exists(pipPackagesPath.resolve("rewrite"))) {
+                // Already installed — check if version matches
+                if (!pinVersion) {
+                    return;
+                }
+                try {
+                    if (Files.exists(versionMarker) &&
+                            version.equals(new String(Files.readAllBytes(versionMarker), StandardCharsets.UTF_8).trim())) {
+                        return; // Correct version already installed
+                    }
+                } catch (IOException ignored) {
+                    // Can't read marker, reinstall to be safe
+                }
             }
+
+            String packageSpec = pinVersion ? "openrewrite==" + version : "openrewrite";
 
             try {
                 Files.createDirectories(pipPackagesPath);
@@ -619,7 +637,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                         pythonPath.toString(),
                         "-m", "pip", "install",
                         "--target=" + pipPackagesPath.toAbsolutePath().normalize(),
-                        "openrewrite"
+                        packageSpec
                 );
                 pb.redirectErrorStream(true);
                 if (log != null) {
@@ -651,6 +669,11 @@ public class PythonRewriteRpc extends RewriteRpc {
                 int exitCode = process.exitValue();
                 if (exitCode != 0) {
                     throw new RuntimeException("Failed to bootstrap openrewrite package, pip install exited with code " + exitCode);
+                }
+
+                // Write version marker so we can detect stale installs
+                if (pinVersion) {
+                    Files.write(versionMarker, version.getBytes(StandardCharsets.UTF_8));
                 }
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to bootstrap openrewrite package", e);
