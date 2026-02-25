@@ -51,9 +51,12 @@ import static org.openrewrite.internal.StringUtils.formatUriForPropertiesFile;
 
 @Value
 public class GradleWrapper {
+    private static final String GRADLE_DOWNLOADS_URL = "https://downloads.gradle.org";
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    @Deprecated
     private static final String GRADLE_SERVICES_URL = "https://services.gradle.org";
-    private static final String GRADLE_DISTRIBUTIONS_URL = GRADLE_SERVICES_URL + "/distributions";
-    private static final String GRADLE_VERSIONS_ALL_URL = GRADLE_SERVICES_URL + "/versions/all";
+    private static final String GRADLE_DISTRIBUTIONS_URL = GRADLE_DOWNLOADS_URL + "/distributions";
+    private static final String GRADLE_VERSIONS_ALL_URL = GRADLE_DOWNLOADS_URL + "/versions/all";
     public static final String WRAPPER_JAR_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.jar";
     public static final String WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.properties";
     public static final String WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH = "gradlew";
@@ -69,7 +72,7 @@ public class GradleWrapper {
 
     /**
      * Construct a Gradle wrapper from a distribution type and version.
-     * Used in contexts where services.gradle.org is available.
+     * Used in contexts where downloads.gradle.org is available.
      */
     public static GradleWrapper create(@Nullable String distributionTypeName, @Nullable String version, ExecutionContext ctx) {
         return create(null, distributionTypeName, version, ctx);
@@ -96,7 +99,7 @@ public class GradleWrapper {
 
     private static GradleVersion determineGradleVersion(@Nullable String currentDistributionUrl, @Nullable String version, VersionComparator versionComparator,
                                                         DistributionType distributionType, ExecutionContext ctx) {
-        if (currentDistributionUrl == null || currentDistributionUrl.startsWith(GRADLE_SERVICES_URL)) {
+        if (currentDistributionUrl == null || currentDistributionUrl.startsWith(GRADLE_DOWNLOADS_URL) || currentDistributionUrl.startsWith(GRADLE_SERVICES_URL)) {
             // Only list all versions via services endpoint if a wildcard notation was requested or null, e.g. 8.x
             if (!(versionComparator instanceof ExactVersion)) {
                 List<GradleVersion> allVersions = listAllPublicVersions(ctx);
@@ -104,7 +107,7 @@ public class GradleWrapper {
                         .filter(v -> versionComparator.isValid(null, v.version))
                         .filter(v -> v.distributionType == distributionType)
                         .max((v1, v2) -> versionComparator.compare(null, v1.version, v2.version))
-                        .orElseThrow(() -> new IllegalStateException(String.format("Expected to find at least one Gradle wrapper version to select from %s.", GRADLE_SERVICES_URL)));
+                        .orElseThrow(() -> new IllegalStateException(String.format("Expected to find at least one Gradle wrapper version to select from %s.", GRADLE_DOWNLOADS_URL)));
             }
 
             return new GradleVersion(version,
@@ -204,7 +207,7 @@ public class GradleWrapper {
 
     /**
      * Construct a Gradle wrapper from a URI.
-     * Can be used in contexts where services.gradle.org, normally used for version lookups, is unavailable.
+     * Can be used in contexts where downloads.gradle.org, normally used for version lookups, is unavailable.
      */
     public static GradleWrapper create(URI fullDistributionUri, @SuppressWarnings("unused") ExecutionContext ctx) {
         String version = "";

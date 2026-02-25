@@ -46,31 +46,26 @@ import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
 import static org.openrewrite.internal.StringUtils.isBlank;
 
-@RequiredArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE)
+@Value
 @EqualsAndHashCode(callSuper = false)
 public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.GradleWrapperState> {
 
-    @Getter
-    final String displayName = "Update Gradle wrapper";
+    String displayName = "Update Gradle wrapper";
 
-    @Getter
-    final String description = "Update the version of Gradle used in an existing Gradle wrapper. " +
-        "Queries services.gradle.org to determine the available releases, but prefers the artifact repository URL " +
+    String description = "Update the version of Gradle used in an existing Gradle wrapper. " +
+        "Queries `downloads.gradle.org` to determine the available releases, but prefers the artifact repository URL " +
         "which already exists within the wrapper properties file. " +
-        "If your artifact repository does not contain the same Gradle distributions as services.gradle.org, " +
+        "If your artifact repository does not contain the same Gradle distributions as `downloads.gradle.org`, " +
         "then the recipe may suggest a version which is not available in your artifact repository.";
 
-    @Getter
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "Defaults to the latest release available from services.gradle.org if not specified.",
+                          "Defaults to the latest release available from `downloads.gradle.org` if not specified.",
             example = "7.x",
             required = false)
     @Nullable
-    final String version;
+    String version;
 
-    @Getter
     @Option(displayName = "Distribution type",
             description = "The distribution of Gradle to use. \"bin\" includes Gradle binaries. " +
                           "\"all\" includes Gradle binaries, source code, and documentation. " +
@@ -79,17 +74,15 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
             required = false
     )
     @Nullable
-    final String distribution;
+    String distribution;
 
-    @Getter
     @Option(displayName = "Add if missing",
             description = "Add a Gradle wrapper, if it's missing. Defaults to `true`.",
             required = false)
     @Nullable
-    final Boolean addIfMissing;
+    Boolean addIfMissing;
 
-    @Getter
-    @Option(example = "https://services.gradle.org/distributions/gradle-8.5-bin.zip",
+    @Option(example = "https://downloads.gradle.org/distributions/gradle-8.5-bin.zip",
             displayName = "Wrapper URI",
             description = "The URI of the Gradle wrapper distribution.\n" +
                     "Specifies a custom location from which to download the Gradle wrapper scripts (gradlew, gradlew.bat, etc.). This is useful for setting up the Gradle wrapper without relying on Gradle's official distribution services.\n\n" +
@@ -98,16 +91,15 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     "If the URI is inaccessible, the recipe will leave the existing wrapper files in the repository unchanged, as they are generally compatible with various Gradle versions.",
             required = false)
     @Nullable
-    final String wrapperUri;
+    String wrapperUri;
 
-    @Getter
     @Option(example = "29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda",
             displayName = "SHA-256 checksum",
             description = "The SHA-256 checksum of the Gradle distribution. " +
                     "If specified, the recipe will add the checksum along with the custom distribution URL.",
             required = false)
     @Nullable
-    final String distributionChecksum;
+    String distributionChecksum;
 
     @Override
     public String getInstanceNameSuffix() {
@@ -202,7 +194,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             return entry;
                         }
 
-                        // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip or https://company.com/repo/gradle-8.2-bin.zip
+                        // Typical example: https://downloads.gradle.org/distributions/gradle-7.4-all.zip or https://company.com/repo/gradle-8.2-bin.zip
                         String currentDistributionUrl = entry.getValue().getText();
                         acc.currentDistributionUrl = currentDistributionUrl;
 
