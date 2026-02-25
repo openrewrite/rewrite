@@ -17,8 +17,9 @@
 from uuid import uuid4
 
 from rewrite.java import tree as j
-from rewrite.java.support_types import Space
+from rewrite.java.support_types import JLeftPadded, Space
 from rewrite.markers import Markers
+from rewrite.python import tree as py
 from rewrite.python.template import capture
 from rewrite.python.template.engine import TemplateEngine
 from rewrite.python.template.replacement import PlaceholderReplacementVisitor
@@ -141,3 +142,202 @@ class TestMethodInvocationReplacement:
 
         assert isinstance(result, j.MethodInvocation)
         assert result.name.simple_name == 'print'
+
+
+def _make_binary(left, op, right):
+    """Helper to construct a j.Binary node."""
+    return j.Binary(
+        uuid4(), Space.EMPTY, Markers.EMPTY,
+        left,
+        JLeftPadded(Space([], ' '), op, Markers.EMPTY),
+        right,
+        None,
+    )
+
+
+def _make_py_binary(left, op, right):
+    """Helper to construct a py.Binary node."""
+    return py.Binary(
+        uuid4(), Space.EMPTY, Markers.EMPTY,
+        left,
+        JLeftPadded(Space([], ' '), op, Markers.EMPTY),
+        None,   # negation
+        right,
+        None,   # type
+    )
+
+
+class TestAutoParenthesization:
+    """Tests for automatic parenthesization of substituted operands."""
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_or_operand_in_and_gets_parens(self):
+        """{a} and {b} with b=(x or y) should produce a and (x or y)."""
+        tree = TemplateEngine.get_template_tree(
+            "{a} and {b}", {'a': capture('a'), 'b': capture('b')}
+        )
+        or_expr = _make_binary(_ident('x'), j.Binary.Type.Or, _ident('y'))
+        visitor = PlaceholderReplacementVisitor({
+            'a': _ident('a'),
+            'b': or_expr,
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.Binary)
+        assert result.operator == j.Binary.Type.And
+        # Right operand should be wrapped in Parentheses
+        assert isinstance(result.right, j.Parentheses)
+        inner = result.right.tree
+        assert isinstance(inner, j.Binary)
+        assert inner.operator == j.Binary.Type.Or
+
+    def test_and_operand_in_and_no_parens(self):
+        """{a} and {b} with b=(x and y) should NOT add parens (same precedence)."""
+        tree = TemplateEngine.get_template_tree(
+            "{a} and {b}", {'a': capture('a'), 'b': capture('b')}
+        )
+        and_expr = _make_binary(_ident('x'), j.Binary.Type.And, _ident('y'))
+        visitor = PlaceholderReplacementVisitor({
+            'a': _ident('a'),
+            'b': and_expr,
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.Binary)
+        # Right operand should NOT be wrapped (same precedence)
+        assert isinstance(result.right, j.Binary)
+
+    def test_or_operand_in_left_of_and_gets_parens(self):
+        """{a} and {b} with a=(p or q) should produce (p or q) and b."""
+        tree = TemplateEngine.get_template_tree(
+            "{a} and {b}", {'a': capture('a'), 'b': capture('b')}
+        )
+        or_expr = _make_binary(_ident('p'), j.Binary.Type.Or, _ident('q'))
+        visitor = PlaceholderReplacementVisitor({
+            'a': or_expr,
+            'b': _ident('b'),
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.Binary)
+        assert isinstance(result.left, j.Parentheses)
+
+    def test_addition_in_multiplication_gets_parens(self):
+        """{a} * {b} with b=(x + y) should produce a * (x + y)."""
+        tree = TemplateEngine.get_template_tree(
+            "{a} * {b}", {'a': capture('a'), 'b': capture('b')}
+        )
+        add_expr = _make_binary(_ident('x'), j.Binary.Type.Addition, _ident('y'))
+        visitor = PlaceholderReplacementVisitor({
+            'a': _ident('a'),
+            'b': add_expr,
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.Binary)
+        assert isinstance(result.right, j.Parentheses)
+
+    def test_multiplication_in_addition_no_parens(self):
+        """{a} + {b} with b=(x * y) should NOT add parens (higher prec)."""
+        tree = TemplateEngine.get_template_tree(
+            "{a} + {b}", {'a': capture('a'), 'b': capture('b')}
+        )
+        mul_expr = _make_binary(_ident('x'), j.Binary.Type.Multiplication, _ident('y'))
+        visitor = PlaceholderReplacementVisitor({
+            'a': _ident('a'),
+            'b': mul_expr,
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.Binary)
+        assert isinstance(result.right, j.Binary)  # No parens
+
+    def test_identifier_operand_no_parens(self):
+        """{a} and {b} with simple identifiers should NOT add parens."""
+        tree = TemplateEngine.get_template_tree(
+            "{a} and {b}", {'a': capture('a'), 'b': capture('b')}
+        )
+        visitor = PlaceholderReplacementVisitor({
+            'a': _ident('x'),
+            'b': _ident('y'),
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.Binary)
+        assert isinstance(result.left, j.Identifier)
+        assert isinstance(result.right, j.Identifier)
+
+    def test_python_in_operand_in_or_no_parens(self):
+        """{a} or {b} with b=(x in y) should NOT add parens (higher prec)."""
+        tree = TemplateEngine.get_template_tree(
+            "{a} or {b}", {'a': capture('a'), 'b': capture('b')}
+        )
+        in_expr = _make_py_binary(_ident('x'), py.Binary.Type.In, _ident('y'))
+        visitor = PlaceholderReplacementVisitor({
+            'a': _ident('a'),
+            'b': in_expr,
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.Binary)
+        assert isinstance(result.right, py.Binary)  # No parens
+
+
+class TestNotAutoParenthesization:
+    """Tests for auto-parenthesization under `not` operator."""
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_and_operand_under_not_gets_parens(self):
+        """not {x} with x=(a and b) should produce not (a and b)."""
+        tree = TemplateEngine.get_template_tree(
+            "not {x}", {'x': capture('x')}
+        )
+        and_expr = _make_binary(_ident('a'), j.Binary.Type.And, _ident('b'))
+        visitor = PlaceholderReplacementVisitor({'x': and_expr})
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.Unary)
+        assert isinstance(result.expression, j.Parentheses)
+        inner = result.expression.tree
+        assert isinstance(inner, j.Binary)
+        assert inner.operator == j.Binary.Type.And
+
+    def test_or_operand_under_not_gets_parens(self):
+        """not {x} with x=(a or b) should produce not (a or b)."""
+        tree = TemplateEngine.get_template_tree(
+            "not {x}", {'x': capture('x')}
+        )
+        or_expr = _make_binary(_ident('a'), j.Binary.Type.Or, _ident('b'))
+        visitor = PlaceholderReplacementVisitor({'x': or_expr})
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.Unary)
+        assert isinstance(result.expression, j.Parentheses)
+
+    def test_identifier_under_not_no_parens(self):
+        """not {x} with x=foo should NOT add parens."""
+        tree = TemplateEngine.get_template_tree(
+            "not {x}", {'x': capture('x')}
+        )
+        visitor = PlaceholderReplacementVisitor({'x': _ident('foo')})
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.Unary)
+        assert isinstance(result.expression, j.Identifier)
+
+    def test_comparison_under_not_no_parens(self):
+        """not {x} with x=(a == b) should NOT add parens (comparisons have higher prec)."""
+        tree = TemplateEngine.get_template_tree(
+            "not {x}", {'x': capture('x')}
+        )
+        eq_expr = _make_binary(_ident('a'), j.Binary.Type.Equal, _ident('b'))
+        visitor = PlaceholderReplacementVisitor({'x': eq_expr})
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.Unary)
+        # Comparisons have precedence 4 which is >= 3 (not threshold), so no parens
+        assert isinstance(result.expression, j.Binary)
