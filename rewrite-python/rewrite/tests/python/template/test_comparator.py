@@ -128,6 +128,86 @@ class TestLiteralMatching:
         assert result is None
 
 
+class TestCrossTypeLiteralMatching:
+    """Tests that literals of different Python types never match each other."""
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def teardown_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_none_does_not_match_bytes_literal(self):
+        """None should not match b''."""
+        pattern_tree = TemplateEngine.get_template_tree("None", {})
+        target_tree = TemplateEngine.get_template_tree('b""', {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator({})
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is None
+
+    def test_none_does_not_match_nonempty_bytes(self):
+        """None should not match b'hello'."""
+        pattern_tree = TemplateEngine.get_template_tree("None", {})
+        target_tree = TemplateEngine.get_template_tree('b"hello"', {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator({})
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is None
+
+    def test_none_does_not_match_empty_string(self):
+        """None should not match ''."""
+        pattern_tree = TemplateEngine.get_template_tree("None", {})
+        target_tree = TemplateEngine.get_template_tree('""', {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator({})
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is None
+
+    def test_none_does_not_match_zero(self):
+        """None should not match 0."""
+        pattern_tree = TemplateEngine.get_template_tree("None", {})
+        target_tree = TemplateEngine.get_template_tree("0", {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator({})
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is None
+
+    def test_none_matches_none(self):
+        """None should match None."""
+        pattern_tree = TemplateEngine.get_template_tree("None", {})
+        target_tree = TemplateEngine.get_template_tree("None", {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator({})
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is not None
+
+    def test_none_does_not_match_ellipsis(self):
+        """None should not match ... (Ellipsis) — both have value=None internally."""
+        pattern_tree = TemplateEngine.get_template_tree("None", {})
+        target_tree = TemplateEngine.get_template_tree("...", {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator({})
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is None
+
+    def test_bytes_does_not_match_string(self):
+        """b'hello' should not match 'hello'."""
+        pattern_tree = TemplateEngine.get_template_tree('b"hello"', {})
+        target_tree = TemplateEngine.get_template_tree('"hello"', {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator({})
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is None
+
+
 class TestMethodInvocationMatching:
     """Tests for method invocation comparison."""
 
