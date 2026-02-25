@@ -22,9 +22,12 @@ from dataclasses import field
 from typing import Any, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor, option
+from rewrite.decorators import categorize
+from rewrite.marketplace import Python
 from rewrite.rpc.java_recipe import prepare_java_recipe, JavaRecipeVisitor, PreparedJavaRecipe
 
 
+@categorize(Python)
 class ChangeType(Recipe):
     """
     Change a type reference from one fully qualified name to another.
@@ -63,8 +66,8 @@ class ChangeType(Recipe):
 
     def __init__(
         self,
-        old_fully_qualified_type_name: str,
-        new_fully_qualified_type_name: str,
+        old_fully_qualified_type_name: str = "",
+        new_fully_qualified_type_name: str = "",
         ignore_definition: bool = False
     ):
         self.old_fully_qualified_type_name = old_fully_qualified_type_name
