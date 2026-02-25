@@ -84,10 +84,18 @@ public class PropertyPlaceholderHelper {
         return placeholders;
     }
 
+    /**
+     * Replace placeholders in the given value, resolving each against the supplied properties.
+     * A backslash before the placeholder prefix (e.g. {@code \${...}}) escapes it as a literal.
+     */
     public String replacePlaceholders(String value, final Properties properties) {
         return replacePlaceholders(value, properties::getProperty);
     }
 
+    /**
+     * Replace placeholders in the given value, resolving each via {@code placeholderResolver}.
+     * A backslash before the placeholder prefix (e.g. {@code \${...}}) escapes it as a literal.
+     */
     public String replacePlaceholders(String value, Function<String, @Nullable String> placeholderResolver) {
         // Support escaping: a backslash before the placeholder prefix produces a literal
         // prefix. E.g., for prefix "${", writing "\${" produces literal "${".
