@@ -126,6 +126,26 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitNamedExpression(Cs.NamedExpression namedExpression, RpcReceiveQueue q) {
+        return namedExpression
+                .getPadding().withName(q.receive(namedExpression.getPadding().getName(), el -> visitRightPadded(el, q)))
+                .withExpression(q.receive(namedExpression.getExpression(), el -> (Expression) visitNonNull(el, q)));
+    }
+
+    @Override
+    public J visitPropertyPattern(Cs.PropertyPattern propertyPattern, RpcReceiveQueue q) {
+        return propertyPattern
+                .withTypeQualifier(q.receive(propertyPattern.getTypeQualifier(), el -> (TypeTree) visitNonNull(el, q)))
+                .getPadding().withSubpatterns(q.receive(propertyPattern.getPadding().getSubpatterns(), el -> visitContainer(el, q)));
+    }
+
+    @Override
+    public J visitPragmaChecksumDirective(Cs.PragmaChecksumDirective pragmaChecksumDirective, RpcReceiveQueue q) {
+        return pragmaChecksumDirective
+                .withArguments(q.receiveAndGet(pragmaChecksumDirective.getArguments(), (String s) -> s));
+    }
+
+    @Override
     public J visitKeyword(Cs.Keyword keyword, RpcReceiveQueue q) {
         return keyword
                 .withKind(q.receiveAndGet(keyword.getKind(), toEnum(Cs.Keyword.KeywordKind.class)));
@@ -513,7 +533,7 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     @Override
     public J visitSwitchExpressionArm(Cs.SwitchExpressionArm switchExpressionArm, RpcReceiveQueue q) {
         return switchExpressionArm
-                .withPattern(q.receive(switchExpressionArm.getPattern(), el -> (Cs.Pattern) visitNonNull(el, q)))
+                .withPattern(q.receive(switchExpressionArm.getPattern(), el -> visitNonNull(el, q)))
                 .getPadding().withWhenExpression(q.receive(switchExpressionArm.getPadding().getWhenExpression(), el -> visitLeftPadded(el, q)))
                 .getPadding().withExpression(q.receive(switchExpressionArm.getPadding().getExpression(), el -> visitLeftPadded(el, q)));
     }

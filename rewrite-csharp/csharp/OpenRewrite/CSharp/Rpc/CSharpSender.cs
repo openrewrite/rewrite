@@ -94,7 +94,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             NullSafeExpression nse => VisitNullSafeExpression(nse, q),
             // New types
             Keyword kw => VisitKeyword(kw, q),
-            CsArgument csa => VisitCsArgument(csa, q),
             NameColon nc => VisitNameColon(nc, q),
             AnnotatedStatement ans => VisitAnnotatedStatement(ans, q),
             ArrayRankSpecifier ars => VisitArrayRankSpecifier(ars, q),
@@ -217,12 +216,10 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     // Nagoya model: Global (RP<bool>), Static (LP<bool>), Alias (RP<Identifier>?), NamespaceOrType
     public override J VisitUsingDirective(UsingDirective ud, RpcSendQueue q)
     {
-        // Send null for Global/Static when absent; nagoya's bool representation doesn't
-        // match Java's Keyword tree, but null/NO_CHANGE is protocol-compatible for absent cases
-        q.GetAndSend(ud, u => u.IsGlobal ? (object?)u.Global : null);
-        q.GetAndSend(ud, u => u.IsStatic ? (object?)u.Static : null);
-        // Unsafe: nagoya doesn't model this
-        q.GetAndSend(ud, _ => (object?)null);
+        q.GetAndSend(ud, u => u.Global, rp => VisitRightPadded(rp, q));
+        q.GetAndSend(ud, u => u.Static, lp => VisitLeftPadded(lp, q));
+        // Unsafe: nagoya doesn't model this, send a default JLeftPadded<bool>(false)
+        q.GetAndSend(ud, _ => new JLeftPadded<bool>(Space.Empty, false), lp => VisitLeftPadded(lp, q));
         q.GetAndSend(ud, u => u.Alias, rp => VisitRightPadded(rp!, q));
         q.GetAndSend(ud, u => (J)u.NamespaceOrType, el => Visit(el, q));
         return ud;
@@ -670,14 +667,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     {
         q.GetAndSend(kw, k => (object)k.Kind);
         return kw;
-    }
-
-    public override J VisitCsArgument(CsArgument arg, RpcSendQueue q)
-    {
-        q.GetAndSend(arg, a => a.NameColumn, rp => VisitRightPadded(rp!, q));
-        q.GetAndSend(arg, a => (J?)a.RefKindKeyword, el => Visit(el!, q));
-        q.GetAndSend(arg, a => (J)a.Expression, el => Visit(el, q));
-        return arg;
     }
 
     public override J VisitNameColon(NameColon nc, RpcSendQueue q)

@@ -2311,6 +2311,44 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         return unary;
     }
 
+    public override J VisitCsUnary(CsUnary csUnary, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(csUnary, p);
+
+        var op = csUnary.Operator.Element;
+        bool isPostfix = op == CsUnary.OperatorKind.SuppressNullableWarning;
+
+        if (!isPostfix)
+        {
+            p.Append(GetCsUnaryOperatorString(op));
+        }
+
+        Visit(csUnary.Expression, p);
+
+        if (isPostfix)
+        {
+            VisitSpace(csUnary.Operator.Before, p);
+            p.Append(GetCsUnaryOperatorString(op));
+        }
+
+        AfterSyntax(csUnary, p);
+        return csUnary;
+    }
+
+    private static string GetCsUnaryOperatorString(CsUnary.OperatorKind op)
+    {
+        return op switch
+        {
+            CsUnary.OperatorKind.SuppressNullableWarning => "!",
+            CsUnary.OperatorKind.PointerIndirection => "*",
+            CsUnary.OperatorKind.PointerType => "*",
+            CsUnary.OperatorKind.AddressOf => "&",
+            CsUnary.OperatorKind.Spread => "..",
+            CsUnary.OperatorKind.FromEnd => "^",
+            _ => throw new InvalidOperationException($"Unknown CsUnary operator: {op}")
+        };
+    }
+
     private static string GetUnaryOperatorString(Unary.OperatorType op)
     {
         return op switch
