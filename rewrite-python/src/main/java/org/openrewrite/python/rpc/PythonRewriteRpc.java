@@ -520,8 +520,18 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         @Override
         public PythonRewriteRpc get() {
-            // Bootstrap openrewrite package if pip packages path is set
-            if (pipPackagesPath != null) {
+            // For dev builds (version ending in .dev0), check whether the interpreter
+            // already has the rewrite package (e.g., from a venv with an editable install).
+            // If so, skip bootstrap and PYTHONPATH prepend so the interpreter's own
+            // version takes precedence. For release/CI builds, always use pipPackagesPath
+            // to ensure the correct pinned version.
+            String version = StringUtils.readFully(
+                    PythonRewriteRpc.class.getResourceAsStream("/META-INF/version.txt"));
+            boolean isDevBuild = version.isEmpty() || version.endsWith(".dev0");
+            boolean interpreterHasRewrite = isDevBuild && pipPackagesPath != null && canImportRewrite(pythonPath);
+            boolean usePipPackagesPath = pipPackagesPath != null && !interpreterHasRewrite;
+
+            if (usePipPackagesPath) {
                 bootstrapOpenrewrite(pipPackagesPath);
             }
 
@@ -551,8 +561,8 @@ public class PythonRewriteRpc extends RewriteRpc {
             // Set up PYTHONPATH for the rewrite package
             List<String> pythonPathParts = new ArrayList<>();
 
-            // Add pip packages path first if set (takes priority)
-            if (pipPackagesPath != null) {
+            // Add pip packages path if the interpreter doesn't already have rewrite
+            if (usePipPackagesPath) {
                 pythonPathParts.add(pipPackagesPath.toAbsolutePath().normalize().toString());
             }
 
@@ -600,6 +610,28 @@ public class PythonRewriteRpc extends RewriteRpc {
                         .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
+            }
+        }
+
+        /**
+         * Checks whether the given Python interpreter can already import the rewrite package
+         * without any PYTHONPATH modifications. This detects venvs or system installs that
+         * already have the openrewrite package available.
+         */
+        private static boolean canImportRewrite(Path pythonPath) {
+            try {
+                Process probe = new ProcessBuilder(
+                        pythonPath.toString(), "-c", "import rewrite"
+                ).redirectErrorStream(true).start();
+                // Drain output to prevent blocking
+                try (InputStream is = probe.getInputStream()) {
+                    //noinspection StatementWithEmptyBody
+                    while (is.read() != -1) {
+                    }
+                }
+                return probe.waitFor(10, TimeUnit.SECONDS) && probe.exitValue() == 0;
+            } catch (IOException | InterruptedException e) {
+                return false;
             }
         }
 
