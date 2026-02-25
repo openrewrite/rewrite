@@ -82,7 +82,7 @@ public class Singleton extends Recipe {
             "generates correct `equals()` and `hashCode()` implementations based on all fields.";
 
     public boolean isSingleton(ExecutionContext ctx) {
-        Integer recipeIndex = ctx.computeMessageIfAbsent(getClass().getName() + "@" + Integer.toHexString(hashCode()), key -> ctx.getCycleDetails().getRecipePosition());
+        Integer recipeIndex = ctx.computeMessageIfAbsent(getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(this)), key -> ctx.getCycleDetails().getRecipePosition());
         return recipeIndex == ctx.getCycleDetails().getRecipePosition();
     }
 
