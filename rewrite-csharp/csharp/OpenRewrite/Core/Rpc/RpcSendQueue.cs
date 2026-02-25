@@ -76,8 +76,19 @@ public class RpcSendQueue
     public void GetAndSend<T, U>(T parent, Func<T, U?> value, Action<U>? onChange)
     {
         var after = value(parent);
-        var before = _before == null ? default : value((T)_before);
-        Send(after, before, onChange == null || after == null ? null : () => onChange(after));
+        if (_before != null)
+        {
+            var before = value((T)_before);
+            Send(after, before, onChange == null || after == null ? null : () => onChange(after));
+        }
+        else
+        {
+            // No previous state. Pass null as before to Send so that non-null values
+            // are sent as ADD. Using default(U) when _before is null causes value types
+            // (e.g., bool) to get a non-null default (false), which incorrectly makes
+            // Send emit CHANGE instead of ADD, breaking the Java receiver.
+            Send<object?>(after, null, onChange == null || after == null ? null : () => onChange(after!));
+        }
     }
 
     public void GetAndSendListAsRef<T, U>(T? parent,

@@ -90,7 +90,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             Synchronized sync => VisitSynchronized(sync, q),
             TypeCast tc => VisitTypeCast(tc, q),
             Package pkg => VisitPackage(pkg, q),
-            _ => throw new InvalidOperationException($"Unknown J tree type: {tree.GetType().Name}")
+            _ => throw new InvalidOperationException($"Unknown J tree type: {tree.GetType()}")
         };
 
         PopPreVisit();
