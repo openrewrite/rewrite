@@ -222,7 +222,19 @@ class PatternMatchingComparator:
         return pattern.simple_name == target.simple_name
 
     def _compare_literal(self, pattern: j.Literal, target: j.Literal) -> bool:
-        """Compare two literals."""
+        """Compare two literals.
+
+        Uses a two-level comparison:
+        1. Value types must match (prevents cross-type false positives like
+           None vs b"" where both might serialize to the same representation).
+        2. When both values are None (Ellipsis, None keyword, or literals with
+           unicode escapes all store value=None), fall back to value_source
+           comparison to distinguish them.
+        """
+        if type(pattern.value) != type(target.value):
+            return False
+        if pattern.value is None:
+            return pattern.value_source == target.value_source
         return pattern.value == target.value
 
     def _compare_method_invocation(
