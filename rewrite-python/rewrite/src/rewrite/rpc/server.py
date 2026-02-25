@@ -30,9 +30,14 @@ import sys
 import tempfile
 import traceback
 import threading
+
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable
 from uuid import uuid4
+
+# Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
+# overflow the default recursion limit (1000) during RPC serialization.
+sys.setrecursionlimit(sys.getrecursionlimit() * 2)
 
 # Configure logging - log to file by default to avoid filling stderr buffer
 # (which can cause deadlock if parent process doesn't read stderr)
@@ -267,7 +272,8 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
         local_objects[obj_id] = cu
         return {
             'id': obj_id,
-            'sourceFileType': 'org.openrewrite.python.tree.Py$CompilationUnit'
+            'sourceFileType': 'org.openrewrite.python.tree.Py$CompilationUnit',
+            'sourcePath': str(source_path)
         }
     except ImportError as e:
         logger.exception(f"Failed to import parser: {e}")
@@ -314,7 +320,7 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
 
     obj_id = str(parse_error.id)
     local_objects[obj_id] = parse_error
-    return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError'}
+    return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError', 'sourcePath': path}
 
 
 def _infer_project_root(inputs: list) -> Optional[str]:

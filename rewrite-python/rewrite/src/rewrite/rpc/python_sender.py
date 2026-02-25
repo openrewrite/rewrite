@@ -896,6 +896,17 @@ class PythonRpcSender:
             q.get_and_send_as_ref(java_type, lambda x: x._type, lambda t: self._visit_type(t, q))
             q.get_and_send_list_as_ref(java_type, lambda x: x._annotations or [], self._type_signature, lambda t: self._visit_type(t, q))
 
+        elif isinstance(java_type, JT.GenericTypeVariable):
+            # GenericTypeVariable: name, variance, bounds
+            q.get_and_send(java_type, lambda x: x._name)
+            # Java expects UPPER_SNAKE_CASE variance enum names
+            _variance_to_java = {
+                JT.GenericTypeVariable.Variance.Covariant: 'COVARIANT',
+                JT.GenericTypeVariable.Variance.Contravariant: 'CONTRAVARIANT',
+            }
+            q.get_and_send(java_type, lambda x, m=_variance_to_java: m.get(x._variance, 'INVARIANT'))
+            q.get_and_send_list_as_ref(java_type, lambda x: x.bounds, self._type_signature, lambda t: self._visit_type(t, q))
+
         elif isinstance(java_type, JT.Union):
             # Union (MultiCatch in Java): bounds list
             q.get_and_send_list_as_ref(java_type, lambda x: x.bounds, self._type_signature, lambda t: self._visit_type(t, q))
@@ -932,6 +943,9 @@ class PythonRpcSender:
         if isinstance(java_type, JT.Array):
             elem_sig = self._type_signature(java_type._elem_type) if java_type._elem_type else ''
             return f"{elem_sig}[]"
+        if isinstance(java_type, JT.GenericTypeVariable):
+            bounds_sig = ' & '.join(self._type_signature(b) for b in java_type.bounds) if java_type.bounds else ''
+            return f"Generic{{{java_type._name}{' extends ' + bounds_sig if bounds_sig else ''}}}"
         if isinstance(java_type, JT.Union):
             return '|'.join(self._type_signature(b) for b in java_type.bounds)
         if isinstance(java_type, JT.Intersection):

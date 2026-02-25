@@ -242,7 +242,7 @@ class ChangeImport(Recipe):
                     return self._remove_module_from_import(multi, old_module)
 
             def visit_identifier(self, ident: Identifier, p: ExecutionContext) -> J:
-                ident = super().visit_identifier(ident, p)
+                ident = super().visit_identifier(ident, p)  # ty: ignore[invalid-assignment]  # visitor covariance
                 if not isinstance(ident, Identifier):
                     return ident
                 if not old_name or not new_name or not self.has_old_import:
@@ -267,7 +267,7 @@ class ChangeImport(Recipe):
                 return ident.replace(_simple_name=new_ref_name)
 
             def visit_method_invocation(self, method: MethodInvocation, p: ExecutionContext) -> J:
-                method = super().visit_method_invocation(method, p)
+                method = super().visit_method_invocation(method, p)  # ty: ignore[invalid-assignment]  # visitor covariance
                 if not isinstance(method, MethodInvocation):
                     return method
                 if not old_name or not self.has_direct_module_import:
@@ -315,7 +315,7 @@ class ChangeImport(Recipe):
                 return result
 
             def visit_field_access(self, field_access: FieldAccess, p: ExecutionContext) -> J:
-                field_access = super().visit_field_access(field_access, p)
+                field_access = super().visit_field_access(field_access, p)  # ty: ignore[invalid-assignment]  # visitor covariance
                 if not old_name or not self.has_direct_module_import:
                     return field_access
                 if not isinstance(field_access, FieldAccess):

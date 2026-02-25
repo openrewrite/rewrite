@@ -44,6 +44,23 @@ def test_single_element_tuple_with_trailing_comma():
     RecipeSpec().rewrite_run(python("t = (1 , )"))
 
 
+def test_single_element_tuple_with_trailing_comma_outside_parens():
+    # language=python - parenthesized expression with trailing comma outside
+    RecipeSpec().rewrite_run(python('("a"),\n'))
+
+
+def test_single_element_tuple_with_trailing_comma_outside_parens_multiline():
+    # language=python - multi-line parenthesized string with trailing comma outside
+    RecipeSpec().rewrite_run(python(
+        """\
+(
+    "Part 1"
+    " Part 2"
+),
+"""
+    ))
+
+
 def test_tuple_with_first_element_in_parens():
     # language=python
     RecipeSpec().rewrite_run(python("x = (1) // 2, 0"))
