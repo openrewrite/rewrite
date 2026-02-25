@@ -59,9 +59,13 @@ public class UvLockParser {
     }
 
     static @Nullable Path findLockFile(Path startDir, @Nullable Path boundary) {
+        return findLockFile(startDir, boundary, "uv.lock");
+    }
+
+    static @Nullable Path findLockFile(Path startDir, @Nullable Path boundary, String filename) {
         Path dir = startDir;
         while (dir != null) {
-            Path lockFile = dir.resolve("uv.lock");
+            Path lockFile = dir.resolve(filename);
             if (Files.isRegularFile(lockFile)) {
                 return lockFile;
             }
@@ -74,9 +78,17 @@ public class UvLockParser {
     }
 
     /**
+     * Check whether a poetry.lock or pdm.lock file exists near the given directory.
+     */
+    public static boolean hasAlternativeLockFile(Path startDir, @Nullable Path boundary) {
+        return findLockFile(startDir, boundary, "poetry.lock") != null ||
+               findLockFile(startDir, boundary, "pdm.lock") != null;
+    }
+
+    /**
      * Parse uv.lock content into a list of resolved dependencies.
      */
-    static List<ResolvedDependency> parse(String content) {
+    public static List<ResolvedDependency> parse(String content) {
         TomlParser parser = new TomlParser();
         Parser.Input input = Parser.Input.fromString(
                 Paths.get("uv.lock"),

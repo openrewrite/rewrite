@@ -44,6 +44,25 @@ class RecordPatternMatchingTest implements RewriteTest {
     }
 
     @Test
+    void shouldParseRecordPatternWithVarKeyword() {
+        rewriteRun(
+          java(
+            //language=java
+            """
+              record Point(int x, int y) {}
+              class Test {
+                  void printSum(Object obj) {
+                      if (obj instanceof Point(var x, var y)) {
+                          System.out.println(x + y);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldParseJava21NestedPatternMatchForRecords() {
         rewriteRun(
           java(
