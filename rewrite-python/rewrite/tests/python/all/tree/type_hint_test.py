@@ -88,6 +88,16 @@ def test_variable_with_parameterized_type_hint_in_quotes():
     RecipeSpec().rewrite_run(python("""foo: Dict["Foo", str] = None"""))
 
 
+def test_literal_string_type_hint_with_assignment():
+    # language=python - parenthesized string with trailing comma (tuple) before Literal type hint
+    RecipeSpec().rewrite_run(python(
+        """\
+("a"),
+y: Literal["test"] = "value"
+"""
+    ))
+
+
 def test_variable_with_quoted_type_hint():
     # language=python
     RecipeSpec().rewrite_run(python("""foo: 'Foo' = None"""))

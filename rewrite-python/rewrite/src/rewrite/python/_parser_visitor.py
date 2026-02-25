@@ -2691,6 +2691,25 @@ class ParserVisitor(ast.NodeVisitor):
                         close_line == second_elt.lineno and close_col < second_elt_char_col
                     ):
                         maybe_parens = False
+                elif close_paren_idx is not None and len(node.elts) == 1:
+                    # For single-element tuples like `("a"),`, check if the '('
+                    # wraps just the element (grouping parens) vs the tuple.
+                    # If the token after ')' is ',' AND there is no ',' inside
+                    # the parens, then '(' is a grouping paren and the trailing
+                    # ',' outside creates the tuple.
+                    # Compare with `("a",),` where ',' is inside the parens
+                    # (making a proper tuple) and the outer ',' belongs to an
+                    # enclosing context.
+                    next_idx = close_paren_idx + 1
+                    while next_idx < len(self._tokens) and self._tokens[next_idx].type in _SKIP_TOKEN_TYPES:
+                        next_idx += 1
+                    if next_idx < len(self._tokens) and self._tokens[next_idx].string == ',':
+                        # Check if there's a comma inside the parens
+                        prev_idx = close_paren_idx - 1
+                        while prev_idx > self._token_idx and self._tokens[prev_idx].type in _SKIP_TOKEN_TYPES:
+                            prev_idx -= 1
+                        if prev_idx > self._token_idx and self._tokens[prev_idx].string != ',':
+                            maybe_parens = False
 
         if maybe_parens:
             self._token_idx += 1  # consume '('
