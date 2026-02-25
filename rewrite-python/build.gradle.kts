@@ -1,5 +1,6 @@
 @file:Suppress("UnstableApiUsage")
 
+import nl.javadude.gradle.plugins.license.LicenseExtension
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -196,7 +197,7 @@ tasks.withType<Test> {
 // This is separate from Gradle because IntelliJ's Gradle integration doesn't support Python source roots.
 
 // ============================================
-// Python Publishing Tasks (PyPI)
+// Version Resource (for RPC version pinning)
 // ============================================
 
 // Generate a PEP 440 compliant version for CI builds
@@ -210,6 +211,31 @@ val pythonVersion: String = if (System.getenv("CI") != null) {
 } else {
     project.version.toString().replace("-SNAPSHOT", ".dev0")
 }
+
+// Write version.txt resource so PythonRewriteRpc can pin the pip package version
+val generateVersionTxt by tasks.registering {
+    group = "python"
+    description = "Generate META-INF/version.txt for RPC version pinning"
+
+    val versionTxt = file("src/main/resources/META-INF/version.txt")
+    inputs.property("version", pythonVersion)
+    outputs.file(versionTxt)
+
+    doLast {
+        versionTxt.parentFile.mkdirs()
+        versionTxt.writeText(pythonVersion)
+    }
+}
+
+listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
+    tasks.named(it) {
+        dependsOn(generateVersionTxt)
+    }
+}
+
+// ============================================
+// Python Publishing Tasks (PyPI)
+// ============================================
 
 // Task to update version in pyproject.toml
 val pythonUpdateVersion by tasks.registering {
@@ -362,5 +388,9 @@ val printTestClasspath by tasks.registering {
          .joinToString(File.pathSeparator) { it.absolutePath }
         println(classpath)
     }
+}
+
+extensions.configure<LicenseExtension> {
+    exclude("**/version.txt")
 }
 
