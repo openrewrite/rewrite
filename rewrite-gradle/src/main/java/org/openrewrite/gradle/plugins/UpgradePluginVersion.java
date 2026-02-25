@@ -31,6 +31,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -392,16 +393,15 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
         return Preconditions.or(propertiesVisitor, Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), javaVisitor));
     }
 
-    @SuppressWarnings("DataFlowIssue")
     private @Nullable String literalValue(Expression expr) {
-        AtomicReference<String> value = new AtomicReference<>(null);
-        new JavaVisitor<Integer>() {
+        return new JavaVisitor<AtomicReference<@Nullable String>>() {
             @Override
-            public J visitLiteral(J.Literal literal, Integer integer) {
-                value.set((String) literal.getValue());
+            public J visitLiteral(J.Literal literal, AtomicReference<@Nullable String> value) {
+                if (literal.getType() == JavaType.Primitive.String) {
+                    value.compareAndSet(null, (String) literal.getValue());
+                }
                 return literal;
             }
-        }.visit(expr, 0);
-        return value.get();
+        }.reduce(expr, new AtomicReference<>(null)).get();
     }
 }

@@ -272,7 +272,8 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
         local_objects[obj_id] = cu
         return {
             'id': obj_id,
-            'sourceFileType': 'org.openrewrite.python.tree.Py$CompilationUnit'
+            'sourceFileType': 'org.openrewrite.python.tree.Py$CompilationUnit',
+            'sourcePath': str(source_path)
         }
     except ImportError as e:
         logger.exception(f"Failed to import parser: {e}")
@@ -319,7 +320,7 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
 
     obj_id = str(parse_error.id)
     local_objects[obj_id] = parse_error
-    return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError'}
+    return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError', 'sourcePath': path}
 
 
 def _infer_project_root(inputs: list) -> Optional[str]:

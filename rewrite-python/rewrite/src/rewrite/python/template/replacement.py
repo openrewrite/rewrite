@@ -16,16 +16,95 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING
+from uuid import uuid4
 
-from rewrite.java import J
+from rewrite.java import J, Expression
 from rewrite.java import tree as j
-from rewrite.java.support_types import JContainer
+from rewrite.java.support_types import JContainer, JRightPadded
+from rewrite.python import tree as py
 from rewrite.python.visitor import PythonVisitor
 from .placeholder import from_placeholder
 
 if TYPE_CHECKING:
     pass
+
+
+# Operator precedence for Python binary operators (higher number = higher precedence).
+# Only operators relevant for precedence-sensitive substitution are listed.
+_BINARY_PRECEDENCE: Dict[object, int] = {
+    j.Binary.Type.Or: 1,
+    j.Binary.Type.And: 2,
+    # Comparisons (all same precedence)
+    j.Binary.Type.Equal: 4,
+    j.Binary.Type.NotEqual: 4,
+    j.Binary.Type.LessThan: 4,
+    j.Binary.Type.GreaterThan: 4,
+    j.Binary.Type.LessThanOrEqual: 4,
+    j.Binary.Type.GreaterThanOrEqual: 4,
+    # Python-specific comparisons
+    py.Binary.Type.In: 4,
+    py.Binary.Type.NotIn: 4,
+    py.Binary.Type.Is: 4,
+    py.Binary.Type.IsNot: 4,
+    # Bitwise
+    j.Binary.Type.BitOr: 5,
+    j.Binary.Type.BitXor: 6,
+    j.Binary.Type.BitAnd: 7,
+    # Shifts
+    j.Binary.Type.LeftShift: 8,
+    j.Binary.Type.RightShift: 8,
+    # Arithmetic
+    j.Binary.Type.Addition: 9,
+    j.Binary.Type.Subtraction: 9,
+    j.Binary.Type.Multiplication: 10,
+    j.Binary.Type.Division: 10,
+    j.Binary.Type.Modulo: 10,
+    py.Binary.Type.FloorDivision: 10,
+    py.Binary.Type.MatrixMultiplication: 10,
+    py.Binary.Type.Power: 11,
+}
+
+
+def _get_precedence(expr: J) -> Optional[int]:
+    """Return the precedence of an expression, or None if not a binary op."""
+    if isinstance(expr, j.Binary):
+        return _BINARY_PRECEDENCE.get(expr.operator)
+    if isinstance(expr, py.Binary):
+        return _BINARY_PRECEDENCE.get(expr.operator)
+    return None
+
+
+def _wrap_in_parens(expr: Expression) -> j.Parentheses:
+    """Wrap an expression in parentheses, preserving its prefix on the outer node."""
+    return j.Parentheses(
+        _id=uuid4(),
+        _prefix=expr.prefix,
+        _markers=j.Markers.EMPTY,
+        _tree=JRightPadded(
+            expr.replace(_prefix=j.Space([], '')),
+            j.Space([], ''),
+            j.Markers.EMPTY,
+        ),
+    )
+
+
+def _needs_parens_in_binary(child: J, parent_op_prec: int) -> bool:
+    """Check if a child expression needs parentheses inside a binary with the given precedence."""
+    child_prec = _get_precedence(child)
+    if child_prec is None:
+        return False
+    return child_prec < parent_op_prec
+
+
+def _needs_parens_under_not(child: J) -> bool:
+    """Check if a child expression needs parentheses when placed under `not`."""
+    # `not` binds tighter than `and` and `or`, so both need parens
+    child_prec = _get_precedence(child)
+    if child_prec is None:
+        return False
+    # `not` has precedence 3 (between `and` at 2 and comparisons at 4)
+    return child_prec < 3
 
 
 class PlaceholderReplacementVisitor(PythonVisitor[None]):
@@ -35,6 +114,10 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
     This visitor traverses a template AST and replaces any identifiers
     that match the placeholder pattern (__placeholder_name__) with
     the corresponding captured values.
+
+    When a substituted value has lower operator precedence than the
+    surrounding context, it is automatically wrapped in parentheses
+    to preserve semantics.
     """
 
     def __init__(self, values: Dict[str, J]):
@@ -72,6 +155,53 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
 
         # Not a placeholder or no value provided, continue normally
         return super().visit_identifier(ident, p)
+
+    def visit_binary(self, binary: j.Binary, p: None) -> J:
+        """Visit a Java Binary and auto-parenthesize substituted operands if needed."""
+        binary = super().visit_binary(binary, p)
+        parent_prec = _BINARY_PRECEDENCE.get(binary.operator)
+        if parent_prec is None:
+            return binary
+
+        left = binary.left
+        right = binary.right
+
+        if _needs_parens_in_binary(left, parent_prec):
+            left = _wrap_in_parens(left)
+        if _needs_parens_in_binary(right, parent_prec):
+            right = _wrap_in_parens(right)
+
+        if left is not binary.left or right is not binary.right:
+            binary = binary.replace(_left=left, _right=right)
+        return binary
+
+    def visit_python_binary(self, binary: py.Binary, p: None) -> J:
+        """Visit a Python Binary and auto-parenthesize substituted operands if needed."""
+        binary = super().visit_python_binary(binary, p)
+        parent_prec = _BINARY_PRECEDENCE.get(binary.operator)
+        if parent_prec is None:
+            return binary
+
+        left = binary.left
+        right = binary.right
+
+        if _needs_parens_in_binary(left, parent_prec):
+            left = _wrap_in_parens(left)
+        if _needs_parens_in_binary(right, parent_prec):
+            right = _wrap_in_parens(right)
+
+        if left is not binary.left or right is not binary.right:
+            binary = binary.replace(_left=left, _right=right)
+        return binary
+
+    def visit_unary(self, unary: j.Unary, p: None) -> J:
+        """Visit a Unary and auto-parenthesize substituted operand under `not` if needed."""
+        unary = super().visit_unary(unary, p)
+        if unary.operator == j.Unary.Type.Not:
+            expr = unary.expression
+            if _needs_parens_under_not(expr):
+                unary = unary.replace(_expression=_wrap_in_parens(expr))
+        return unary
 
     def visit_method_invocation(self, method: j.MethodInvocation, p: None) -> J:
         """

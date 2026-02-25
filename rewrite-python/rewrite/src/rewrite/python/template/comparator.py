@@ -146,6 +146,9 @@ class PatternMatchingComparator:
             return self._compare_identifier(pattern, cast(j.Identifier, target))
         elif isinstance(pattern, j.Literal):
             return self._compare_literal(pattern, cast(j.Literal, target))
+        elif isinstance(pattern, j.Empty):
+            # Two Empty sentinel nodes always match (used for absent values)
+            return True
         elif isinstance(pattern, j.MethodInvocation):
             return self._compare_method_invocation(pattern, cast(j.MethodInvocation, target), cursor)
         elif isinstance(pattern, j.FieldAccess):
@@ -162,6 +165,8 @@ class PatternMatchingComparator:
             return self._compare_ternary(pattern, cast(j.Ternary, target), cursor)
         elif isinstance(pattern, j.Return):
             return self._compare_return(pattern, cast(j.Return, target), cursor)
+        elif isinstance(pattern, j.ArrayAccess):
+            return self._compare_array_access(pattern, cast(j.ArrayAccess, target), cursor)
         elif isinstance(pattern, py.ExpressionStatement):
             return self._compare_expression_statement(pattern, cast(py.ExpressionStatement, target), cursor)
         elif isinstance(pattern, py.Binary):
@@ -171,10 +176,12 @@ class PatternMatchingComparator:
         elif isinstance(pattern, py.DictLiteral):
             return self._compare_dict_literal(pattern, cast(py.DictLiteral, target), cursor)
         else:
-            # Default: no deep comparison, types matched
+            # Default: unhandled node type — reject the match to prevent
+            # false positives.  If a pattern uses a node type that reaches
+            # this branch, a specific comparator method should be added.
             if self._debug:
-                print(f"No specific comparison for {type(pattern).__name__}, assuming match")
-            return True
+                print(f"No specific comparison for {type(pattern).__name__}, rejecting match")
+            return False
 
     def _capture_node(self, name: str, target: J) -> bool:
         """
@@ -215,7 +222,19 @@ class PatternMatchingComparator:
         return pattern.simple_name == target.simple_name
 
     def _compare_literal(self, pattern: j.Literal, target: j.Literal) -> bool:
-        """Compare two literals."""
+        """Compare two literals.
+
+        Uses a two-level comparison:
+        1. Value types must match (prevents cross-type false positives like
+           None vs b"" where both might serialize to the same representation).
+        2. When both values are None (Ellipsis, None keyword, or literals with
+           unicode escapes all store value=None), fall back to value_source
+           comparison to distinguish them.
+        """
+        if type(pattern.value) != type(target.value):
+            return False
+        if pattern.value is None:
+            return pattern.value_source == target.value_source
         return pattern.value == target.value
 
     def _compare_method_invocation(
@@ -360,6 +379,18 @@ class PatternMatchingComparator:
             return False
 
         return self._compare(pattern.false_part, target.false_part, cursor)
+
+    def _compare_array_access(
+        self,
+        pattern: j.ArrayAccess,
+        target: j.ArrayAccess,
+        cursor: 'Cursor'
+    ) -> bool:
+        """Compare two array/subscript accesses."""
+        if not self._compare(pattern.indexed, target.indexed, cursor):
+            return False
+
+        return self._compare(pattern.dimension.index, target.dimension.index, cursor)
 
     def _compare_parentheses(
         self,

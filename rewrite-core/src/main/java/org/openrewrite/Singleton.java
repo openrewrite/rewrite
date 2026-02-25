@@ -81,12 +81,8 @@ public class Singleton extends Recipe {
             "The easiest way is to use Lombok's `@Value` annotation on your recipe class, which automatically " +
             "generates correct `equals()` and `hashCode()` implementations based on all fields.";
 
-    @Nullable Integer recipeIndex;
-
     public boolean isSingleton(ExecutionContext ctx) {
-        if (recipeIndex == null) {
-            recipeIndex = ctx.getCycleDetails().getRecipePosition();
-        }
+        Integer recipeIndex = ctx.computeMessageIfAbsent(getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(this)), key -> ctx.getCycleDetails().getRecipePosition());
         return recipeIndex == ctx.getCycleDetails().getRecipePosition();
     }
 
