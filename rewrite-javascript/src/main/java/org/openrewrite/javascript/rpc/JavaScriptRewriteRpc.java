@@ -212,7 +212,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private @Nullable Integer inspectBrk;
         private @Nullable Path inspectBrkRewriteSourcePath;
 
-        private @Nullable Integer maxHeapSize;
         private @Nullable Path workingDirectory;
 
         public Builder marketplace(RecipeMarketplace marketplace) {
@@ -302,19 +301,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Set the maximum heap size for the Node.js process in megabytes.
-         * Default V8 heap size is approximately 1.5-2 GB on 64-bit systems.
-         * For large repositories with many source files, you may need to increase this.
-         *
-         * @param maxHeapSize Maximum heap size in megabytes (e.g., 4096 for 4GB)
-         * @return This builder
-         */
-        public Builder maxHeapSize(@Nullable Integer maxHeapSize) {
-            this.maxHeapSize = maxHeapSize;
-            return this;
-        }
-
-        /**
          * Set the working directory for the Node.js process.
          * This affects where profile logs and other output files are generated.
          * If not set, the process inherits the current working directory.
@@ -341,7 +327,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         "node",
                         "--enable-source-maps",
                         "--inspect-brk=" + inspectBrk,
-                        maxHeapSize != null ? "--max-old-space-size=" + maxHeapSize : null,
                         serverJs.toAbsolutePath().normalize().toString(),
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         traceRpcMessages ? "--trace-rpc-messages" : null,
@@ -369,18 +354,9 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 process.setWorkingDirectory(workingDirectory);
             }
 
-            // Build NODE_OPTIONS with all necessary flags
-            StringBuilder nodeOptions = new StringBuilder("--enable-source-maps");
-            if (inspectBrk == null) {
-                // When not using inspect-brk, we need to pass Node.js flags via NODE_OPTIONS
-                // since npx spawns a child process
-                // Note: --prof is not allowed in NODE_OPTIONS for security reasons
-                if (maxHeapSize != null) {
-                    nodeOptions.append(" --max-old-space-size=").append(maxHeapSize);
-                }
-            }
             process.environment().putAll(environment);
-            process.environment().put("NODE_OPTIONS", nodeOptions.toString());
+            // caller-provided options, if any, are taking precedence over the options baked above
+            process.environment().merge("NODE_OPTIONS", " --enable-source-maps", (callerProvided, local) -> local + " " + callerProvided);
             if (npxPath.getParent() != null) {
                 // `npx` is typically a shebang script alongside the `node` executable
                 process.environment().put("PATH", npxPath.getParent() + File.pathSeparator +
