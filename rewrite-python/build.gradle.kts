@@ -1,5 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
+import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
+import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import nl.javadude.gradle.plugins.license.LicenseExtension
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -163,12 +165,20 @@ val pytestTest by tasks.registering(Exec::class) {
     dependsOn(pythonInstall)
 
     workingDir = pythonDir
-    commandLine(pythonExe.absolutePath, "-m", "pytest", "tests/", "-v")
+    commandLine(pythonExe.absolutePath, "-m", "pytest", "tests/", "-v",
+        "--junitxml=build/test-results/pytest/junit.xml")
 
     inputs.dir(pythonDir.resolve("src"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(pythonDir.resolve("tests"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(pythonDir.resolve("pyproject.toml"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(pythonDir.resolve("build/test-results/pytest/junit.xml"))
+    outputs.cacheIf { true }
 }
+
+ImportJUnitXmlReports.register(tasks, pytestTest, JUnitXmlDialect.GENERIC)
 
 tasks.named("check") {
     dependsOn(testing.suites.named("py2CompatibilityTest"))
