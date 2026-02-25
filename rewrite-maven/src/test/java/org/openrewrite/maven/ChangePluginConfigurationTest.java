@@ -186,7 +186,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
               - org.openrewrite.maven.ChangePluginConfiguration:
                   groupId: org.openrewrite.maven
                   artifactId: rewrite-maven-plugin
-                  configuration: "<targetJdk>$${java.version}</targetJdk>"
+                  configuration: "<targetJdk>\\${java.version}</targetJdk>"
             """,
             "com.yourorg.ChangePluginConfigurationExample"),
           pomXml(

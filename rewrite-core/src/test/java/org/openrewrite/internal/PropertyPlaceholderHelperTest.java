@@ -91,21 +91,21 @@ class PropertyPlaceholderHelperTest {
     @Test
     void escapedPlaceholder() {
         var helper = new PropertyPlaceholderHelper("${", "}", null);
-        var s = helper.replacePlaceholders("$${java.version}", k -> "should-not-resolve");
+        var s = helper.replacePlaceholders("\\${java.version}", k -> "should-not-resolve");
         assertThat(s).isEqualTo("${java.version}");
     }
 
     @Test
     void escapedPlaceholderWithOtherPrefix() {
         var helper = new PropertyPlaceholderHelper("%%{", "}", null);
-        var s = helper.replacePlaceholders("%%%{k1}", k -> "should-not-resolve");
+        var s = helper.replacePlaceholders("\\%%{k1}", k -> "should-not-resolve");
         assertThat(s).isEqualTo("%%{k1}");
     }
 
     @Test
     void mixedEscapedAndResolvedPlaceholders() {
         var helper = new PropertyPlaceholderHelper("${", "}", null);
-        var s = helper.replacePlaceholders("${greeting} $${java.version}", k -> {
+        var s = helper.replacePlaceholders("${greeting} \\${java.version}", k -> {
             if ("greeting".equals(k)) return "hello";
             return null;
         });
