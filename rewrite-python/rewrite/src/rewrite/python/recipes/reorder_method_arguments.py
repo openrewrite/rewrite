@@ -22,9 +22,12 @@ from importlib.metadata import metadata
 from typing import Any, List, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor, option
+from rewrite.decorators import categorize
+from rewrite.marketplace import Python
 from rewrite.rpc.java_recipe import prepare_java_recipe, JavaRecipeVisitor, PreparedJavaRecipe
 
 
+@categorize(Python)
 class ReorderMethodArguments(Recipe):
     """
     Reorder arguments in method invocations matching a pattern.
@@ -59,8 +62,8 @@ class ReorderMethodArguments(Recipe):
 
     def __init__(
             self,
-            method_pattern: str,
-            new_parameter_names: List[str],
+            method_pattern: str = "",
+            new_parameter_names: Optional[List[str]] = None,
             old_parameter_names: Optional[List[str]] = None
     ):
         self.method_pattern = method_pattern

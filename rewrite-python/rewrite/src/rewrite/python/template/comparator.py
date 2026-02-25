@@ -146,6 +146,9 @@ class PatternMatchingComparator:
             return self._compare_identifier(pattern, cast(j.Identifier, target))
         elif isinstance(pattern, j.Literal):
             return self._compare_literal(pattern, cast(j.Literal, target))
+        elif isinstance(pattern, j.Empty):
+            # Two Empty sentinel nodes always match (used for absent values)
+            return True
         elif isinstance(pattern, j.MethodInvocation):
             return self._compare_method_invocation(pattern, cast(j.MethodInvocation, target), cursor)
         elif isinstance(pattern, j.FieldAccess):
@@ -158,8 +161,12 @@ class PatternMatchingComparator:
             return self._compare_assignment(pattern, cast(j.Assignment, target), cursor)
         elif isinstance(pattern, j.Parentheses):
             return self._compare_parentheses(pattern, cast(j.Parentheses, target), cursor)
+        elif isinstance(pattern, j.Ternary):
+            return self._compare_ternary(pattern, cast(j.Ternary, target), cursor)
         elif isinstance(pattern, j.Return):
             return self._compare_return(pattern, cast(j.Return, target), cursor)
+        elif isinstance(pattern, j.ArrayAccess):
+            return self._compare_array_access(pattern, cast(j.ArrayAccess, target), cursor)
         elif isinstance(pattern, py.ExpressionStatement):
             return self._compare_expression_statement(pattern, cast(py.ExpressionStatement, target), cursor)
         elif isinstance(pattern, py.Binary):
@@ -169,10 +176,12 @@ class PatternMatchingComparator:
         elif isinstance(pattern, py.DictLiteral):
             return self._compare_dict_literal(pattern, cast(py.DictLiteral, target), cursor)
         else:
-            # Default: no deep comparison, types matched
+            # Default: unhandled node type — reject the match to prevent
+            # false positives.  If a pattern uses a node type that reaches
+            # this branch, a specific comparator method should be added.
             if self._debug:
-                print(f"No specific comparison for {type(pattern).__name__}, assuming match")
-            return True
+                print(f"No specific comparison for {type(pattern).__name__}, rejecting match")
+            return False
 
     def _capture_node(self, name: str, target: J) -> bool:
         """
@@ -343,6 +352,33 @@ class PatternMatchingComparator:
             return False
 
         return self._compare(pattern.assignment, target.assignment, cursor)
+
+    def _compare_ternary(
+        self,
+        pattern: j.Ternary,
+        target: j.Ternary,
+        cursor: 'Cursor'
+    ) -> bool:
+        """Compare two ternary (conditional) expressions."""
+        if not self._compare(pattern.condition, target.condition, cursor):
+            return False
+
+        if not self._compare(pattern.true_part, target.true_part, cursor):
+            return False
+
+        return self._compare(pattern.false_part, target.false_part, cursor)
+
+    def _compare_array_access(
+        self,
+        pattern: j.ArrayAccess,
+        target: j.ArrayAccess,
+        cursor: 'Cursor'
+    ) -> bool:
+        """Compare two array/subscript accesses."""
+        if not self._compare(pattern.indexed, target.indexed, cursor):
+            return False
+
+        return self._compare(pattern.dimension.index, target.dimension.index, cursor)
 
     def _compare_parentheses(
         self,

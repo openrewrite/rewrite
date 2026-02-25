@@ -17,7 +17,7 @@ def visit_container(v: 'JavaVisitor', container: Optional[JContainer[J2]], p: P)
     v.cursor = Cursor(v.cursor, container)
     before = v.visit_space(container.before, p)
     js = list_map(lambda el: v.visit_right_padded(el, p), container.padding.elements)
-    v.cursor = v.cursor.parent  # ty: ignore[invalid-assignment]  # cursor.parent is Optional[Cursor]; ty#1379
+    v.cursor = v.cursor.parent  # ty: ignore[invalid-assignment]  # cursor.parent is Optional[Cursor] (ty#628)
 
     return container if js is container.padding.elements and before is container.before else JContainer(before, js, container.markers)
 
@@ -30,7 +30,7 @@ def visit_right_padded(v: 'JavaVisitor', right: Optional[JRightPadded[T]], p: P)
     v.cursor = Cursor(v.cursor, right)
     if isinstance(t, Tree):
         t = v.visit_and_cast(t, T, p)
-    v.cursor = v.cursor.parent  # ty: ignore[invalid-assignment]  # cursor.parent is Optional[Cursor]; ty#1379
+    v.cursor = v.cursor.parent  # ty: ignore[invalid-assignment]  # cursor.parent is Optional[Cursor] (ty#628)
 
     if t is None:
         return None
@@ -50,7 +50,7 @@ def visit_left_padded(v: 'JavaVisitor', left: Optional[JLeftPadded[T]], p: P) ->
     t = left.element
     if isinstance(t, Tree):
         t = v.visit_and_cast(t, T, p)
-    v.cursor = v.cursor.parent  # ty: ignore[invalid-assignment]  # cursor.parent is Optional[Cursor]; ty#1379
+    v.cursor = v.cursor.parent  # ty: ignore[invalid-assignment]  # cursor.parent is Optional[Cursor] (ty#628)
 
     if left.element is t and before is left.before:
         return left

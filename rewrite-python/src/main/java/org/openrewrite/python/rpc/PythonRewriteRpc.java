@@ -19,16 +19,19 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.python.*;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.python.tree.Py;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -41,6 +44,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -204,9 +208,24 @@ public class PythonRewriteRpc extends RewriteRpc {
                 ParseProjectResponse.Item item = response.get(index);
                 index++;
 
-                SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
-                // for status update messages
-                parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
+                SourceFile sourceFile;
+                try {
+                    sourceFile = getObject(item.getId(), item.getSourceFileType());
+                    parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
+                } catch (Exception e) {
+                    sourceFile = new ParseError(
+                            Tree.randomId(),
+                            new Markers(Tree.randomId(), Collections.singletonList(
+                                    ParseExceptionResult.build(PythonParser.class, e, null))),
+                            Paths.get(item.getSourcePath()),
+                            null,
+                            StandardCharsets.UTF_8.name(),
+                            false,
+                            null,
+                            e.getMessage(),
+                            null
+                    );
+                }
                 action.accept(sourceFile);
                 return true;
             }
@@ -501,8 +520,18 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         @Override
         public PythonRewriteRpc get() {
-            // Bootstrap openrewrite package if pip packages path is set
-            if (pipPackagesPath != null) {
+            // For dev builds (version ending in .dev0), check whether the interpreter
+            // already has the rewrite package (e.g., from a venv with an editable install).
+            // If so, skip bootstrap and PYTHONPATH prepend so the interpreter's own
+            // version takes precedence. For release/CI builds, always use pipPackagesPath
+            // to ensure the correct pinned version.
+            String version = StringUtils.readFully(
+                    PythonRewriteRpc.class.getResourceAsStream("/META-INF/version.txt"));
+            boolean isDevBuild = version.isEmpty() || version.endsWith(".dev0");
+            boolean interpreterHasRewrite = isDevBuild && pipPackagesPath != null && canImportRewrite(pythonPath);
+            boolean usePipPackagesPath = pipPackagesPath != null && !interpreterHasRewrite;
+
+            if (usePipPackagesPath) {
                 bootstrapOpenrewrite(pipPackagesPath);
             }
 
@@ -532,8 +561,8 @@ public class PythonRewriteRpc extends RewriteRpc {
             // Set up PYTHONPATH for the rewrite package
             List<String> pythonPathParts = new ArrayList<>();
 
-            // Add pip packages path first if set (takes priority)
-            if (pipPackagesPath != null) {
+            // Add pip packages path if the interpreter doesn't already have rewrite
+            if (usePipPackagesPath) {
                 pythonPathParts.add(pipPackagesPath.toAbsolutePath().normalize().toString());
             }
 
@@ -585,14 +614,53 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
+         * Checks whether the given Python interpreter can already import the rewrite package
+         * without any PYTHONPATH modifications. This detects venvs or system installs that
+         * already have the openrewrite package available.
+         */
+        private static boolean canImportRewrite(Path pythonPath) {
+            try {
+                Process probe = new ProcessBuilder(
+                        pythonPath.toString(), "-c", "import rewrite"
+                ).redirectErrorStream(true).start();
+                // Drain output to prevent blocking
+                try (InputStream is = probe.getInputStream()) {
+                    //noinspection StatementWithEmptyBody
+                    while (is.read() != -1) {
+                    }
+                }
+                return probe.waitFor(10, TimeUnit.SECONDS) && probe.exitValue() == 0;
+            } catch (IOException | InterruptedException e) {
+                return false;
+            }
+        }
+
+        /**
          * Ensures the openrewrite Python package is installed in the pip packages directory.
          * This is required for the RPC server to start.
          */
         private void bootstrapOpenrewrite(Path pipPackagesPath) {
-            Path rewriteModule = pipPackagesPath.resolve("rewrite");
-            if (Files.exists(rewriteModule)) {
-                return; // Already installed
+            String version = StringUtils.readFully(
+                    PythonRewriteRpc.class.getResourceAsStream("/META-INF/version.txt"));
+            boolean pinVersion = !version.isEmpty() && !version.endsWith(".dev0");
+
+            Path versionMarker = pipPackagesPath.resolve(".openrewrite-version");
+            if (Files.exists(pipPackagesPath.resolve("rewrite"))) {
+                // Already installed — check if version matches
+                if (!pinVersion) {
+                    return;
+                }
+                try {
+                    if (Files.exists(versionMarker) &&
+                            version.equals(new String(Files.readAllBytes(versionMarker), StandardCharsets.UTF_8).trim())) {
+                        return; // Correct version already installed
+                    }
+                } catch (IOException ignored) {
+                    // Can't read marker, reinstall to be safe
+                }
             }
+
+            String packageSpec = pinVersion ? "openrewrite==" + version : "openrewrite";
 
             try {
                 Files.createDirectories(pipPackagesPath);
@@ -600,8 +668,9 @@ public class PythonRewriteRpc extends RewriteRpc {
                 ProcessBuilder pb = new ProcessBuilder(
                         pythonPath.toString(),
                         "-m", "pip", "install",
+                        "--upgrade",
                         "--target=" + pipPackagesPath.toAbsolutePath().normalize(),
-                        "openrewrite"
+                        packageSpec
                 );
                 pb.redirectErrorStream(true);
                 if (log != null) {
@@ -633,6 +702,11 @@ public class PythonRewriteRpc extends RewriteRpc {
                 int exitCode = process.exitValue();
                 if (exitCode != 0) {
                     throw new RuntimeException("Failed to bootstrap openrewrite package, pip install exited with code " + exitCode);
+                }
+
+                // Write version marker so we can detect stale installs
+                if (pinVersion) {
+                    Files.write(versionMarker, version.getBytes(StandardCharsets.UTF_8));
                 }
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to bootstrap openrewrite package", e);

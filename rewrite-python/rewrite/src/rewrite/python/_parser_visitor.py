@@ -774,7 +774,7 @@ class ParserVisitor(ast.NodeVisitor):
             prefix = self.__source_before('import')
             imp = self.__convert(node.names[0])
             assert imp is not None
-            return imp.replace(prefix=prefix, qualid=imp.qualid.replace(prefix=imp.prefix))
+            return imp.replace(prefix=prefix, qualid=imp.qualid.replace(prefix=imp.prefix))  # ty: ignore[unresolved-attribute]  # imp is Import at runtime
 
         prefix = self.__source_before('import')
         names_prefix = self.__whitespace()
@@ -1197,7 +1197,7 @@ class ParserVisitor(ast.NodeVisitor):
                             py.MatchCase.Pattern.Kind.GROUP,
                             JContainer(
                                 prefix,
-                                [JRightPadded(inner.replace(prefix=inner_prefix) if hasattr(inner, 'replace') else inner, Space.EMPTY, Markers.EMPTY)],  # ty: ignore[call-non-callable]
+                                [JRightPadded(inner.replace(prefix=inner_prefix) if hasattr(inner, 'replace') else inner, Space.EMPTY, Markers.EMPTY)],
                                 Markers.EMPTY
                             ),
                             None
@@ -2243,7 +2243,7 @@ class ParserVisitor(ast.NodeVisitor):
             name = name.replace(prefix=extra_parens[-1][1])  # ty: ignore[unresolved-attribute]  # recursive call returns unknown
 
             # Wrap in extra parentheses (innermost to outermost)
-            wrapped: Expression = name
+            wrapped: Expression = name  # ty: ignore[invalid-assignment]
             for i in range(len(extra_parens) - 1, -1, -1):
                 paren_prefix, _ = extra_parens[i]
                 suffix = self.__whitespace()
@@ -2691,6 +2691,25 @@ class ParserVisitor(ast.NodeVisitor):
                         close_line == second_elt.lineno and close_col < second_elt_char_col
                     ):
                         maybe_parens = False
+                elif close_paren_idx is not None and len(node.elts) == 1:
+                    # For single-element tuples like `("a"),`, check if the '('
+                    # wraps just the element (grouping parens) vs the tuple.
+                    # If the token after ')' is ',' AND there is no ',' inside
+                    # the parens, then '(' is a grouping paren and the trailing
+                    # ',' outside creates the tuple.
+                    # Compare with `("a",),` where ',' is inside the parens
+                    # (making a proper tuple) and the outer ',' belongs to an
+                    # enclosing context.
+                    next_idx = close_paren_idx + 1
+                    while next_idx < len(self._tokens) and self._tokens[next_idx].type in _SKIP_TOKEN_TYPES:
+                        next_idx += 1
+                    if next_idx < len(self._tokens) and self._tokens[next_idx].string == ',':
+                        # Check if there's a comma inside the parens
+                        prev_idx = close_paren_idx - 1
+                        while prev_idx > self._token_idx and self._tokens[prev_idx].type in _SKIP_TOKEN_TYPES:
+                            prev_idx -= 1
+                        if prev_idx > self._token_idx and self._tokens[prev_idx].string != ',':
+                            maybe_parens = False
 
         if maybe_parens:
             self._token_idx += 1  # consume '('
@@ -2769,7 +2788,7 @@ class ParserVisitor(ast.NodeVisitor):
         prefix = self.__whitespace()
         converted_type = self.__convert_internal(node, self.__convert_type, self.__convert_type_mapper)
         if isinstance(converted_type, TypeTree):
-            return converted_type.replace(prefix=prefix)  # ty: ignore[unresolved-attribute]  # TypeTree base class doesn't have replace
+            return converted_type.replace(prefix=prefix)  # TypeTree base class doesn't have replace
         else:
             return py.ExpressionTypeTree(
                 random_id(),
@@ -3065,14 +3084,14 @@ class ParserVisitor(ast.NodeVisitor):
         return ident_or_field(name.split('.'))
 
     def __convert_all(self, trees: Sequence) -> List[J2]:
-        return [c for tree in trees if (c := self.__convert(tree)) is not None]  # ty: ignore[invalid-return-type]
+        return [c for tree in trees if (c := self.__convert(tree)) is not None]  # ty: ignore[invalid-return-type]  # J list, J2 is bound to J
 
     def __convert_block(self, statements: Sequence[Statement], delim: str = ':') -> j.Block:
         prefix = self.__source_before(delim)
         if statements:
-            statements = [self.__pad_statement(cast(ast.stmt, s)) for s in statements]  # ty: ignore[invalid-assignment]
+            statements = [self.__pad_statement(cast(ast.stmt, s)) for s in statements]  # ty: ignore[invalid-assignment]  # padded statement list type
         else:
-            statements = [self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY)]  # ty: ignore[invalid-assignment]
+            statements = [self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY)]  # ty: ignore[invalid-assignment]  # padded statement list type
         return j.Block(
             random_id(),
             prefix,
@@ -3095,7 +3114,7 @@ class ParserVisitor(ast.NodeVisitor):
             self._token_idx = save_idx
             padding = Space.EMPTY
             markers = Markers.EMPTY
-        return JRightPadded(statement, padding, markers)  # ty: ignore[invalid-return-type]  # statement is J|None from __convert_statement
+        return JRightPadded(statement, padding, markers)  # ty: ignore[invalid-return-type]  # statement is J from __convert_statement
 
     def __pad_list_element(self, element: J2, last: bool = False, pad_last: bool = True, delim: str = ',',
                            end_delim: Optional[str] = None) -> JRightPadded[J2]:
