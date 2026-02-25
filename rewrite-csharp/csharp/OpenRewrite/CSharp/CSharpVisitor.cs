@@ -56,7 +56,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             NullSafeExpression nse => VisitNullSafeExpression(nse, p),
             // New types
             Keyword kw => VisitKeyword(kw, p),
-            CsArgument csa => VisitCsArgument(csa, p),
             NameColon nc => VisitNameColon(nc, p),
             AnnotatedStatement ans => VisitAnnotatedStatement(ans, p),
             ArrayRankSpecifier ars => VisitArrayRankSpecifier(ars, p),
@@ -601,12 +600,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     // ---- New types ----
 
     public virtual J VisitKeyword(Keyword keyword, P p) => keyword;
-
-    public virtual J VisitCsArgument(CsArgument csArgument, P p)
-    {
-        Visit(csArgument.Expression, p);
-        return csArgument;
-    }
 
     public virtual J VisitNameColon(NameColon nameColon, P p) => nameColon;
 

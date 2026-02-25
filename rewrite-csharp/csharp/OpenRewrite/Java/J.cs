@@ -1122,7 +1122,7 @@ public sealed class Identifier(
     Markers markers,
     string simpleName,
     JavaType? type
-) : J, Expression, NameTree, IEquatable<Identifier>
+) : J, Expression, TypeTree, IEquatable<Identifier>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
@@ -1700,7 +1700,7 @@ public sealed class NamedVariable(
 /// <summary>
 /// A type reference in source code.
 /// </summary>
-public interface TypeTree : J
+public interface TypeTree : NameTree
 {
 }
 
@@ -1844,7 +1844,7 @@ public sealed class Annotation(
 /// <summary>
 /// A name reference in source code.
 /// </summary>
-public interface NameTree : TypeTree
+public interface NameTree : J
 {
 }
 

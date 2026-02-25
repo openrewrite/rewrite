@@ -27,6 +27,9 @@
   <ItemGroup>
     <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
     <PackageReference Include="StreamJsonRpc" Version="2.20.20" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.3" />

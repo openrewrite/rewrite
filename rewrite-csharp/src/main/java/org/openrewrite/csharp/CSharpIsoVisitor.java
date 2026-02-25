@@ -69,6 +69,21 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
+    public Cs.NamedExpression visitNamedExpression(Cs.NamedExpression namedExpression, P p) {
+        return (Cs.NamedExpression) super.visitNamedExpression(namedExpression, p);
+    }
+
+    @Override
+    public Cs.PropertyPattern visitPropertyPattern(Cs.PropertyPattern propertyPattern, P p) {
+        return (Cs.PropertyPattern) super.visitPropertyPattern(propertyPattern, p);
+    }
+
+    @Override
+    public Cs.PragmaChecksumDirective visitPragmaChecksumDirective(Cs.PragmaChecksumDirective pragmaChecksumDirective, P p) {
+        return (Cs.PragmaChecksumDirective) super.visitPragmaChecksumDirective(pragmaChecksumDirective, p);
+    }
+
+    @Override
     public Cs.Keyword visitKeyword(Cs.Keyword keyword, P p) {
         return (Cs.Keyword) super.visitKeyword(keyword, p);
     }

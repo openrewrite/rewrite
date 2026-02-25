@@ -39,6 +39,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             Unary un => VisitUnary(un, p),
             Parentheses<Expression> paren => VisitParentheses(paren, p),
             ControlParentheses<Expression> cp => VisitControlParentheses(cp, p),
+            ControlParentheses<TypeTree> cptt => VisitControlParentheses(cptt, p),
+            ControlParentheses<VariableDeclarations> cpvd => VisitControlParentheses(cpvd, p),
             ExpressionStatement es => VisitExpressionStatement(es, p),
             VariableDeclarations vd => VisitVariableDeclarations(vd, p),
             Primitive prim => VisitPrimitive(prim, p),
@@ -61,7 +63,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             TypeCast tc => VisitTypeCast(tc, p),
             TypeParameter tp => VisitTypeParameter(tp, p),
             Package pkg => VisitPackage(pkg, p),
-            _ => throw new InvalidOperationException($"Unknown J tree type: {tree.GetType().Name}")
+            _ => throw new InvalidOperationException($"Unknown J tree type: {tree.GetType()}")
         };
     }
 
@@ -263,6 +265,18 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     }
 
     public virtual J VisitControlParentheses(ControlParentheses<Expression> cp, P p)
+    {
+        Visit(cp.Tree.Element, p);
+        return cp;
+    }
+
+    public virtual J VisitControlParentheses(ControlParentheses<TypeTree> cp, P p)
+    {
+        Visit(cp.Tree.Element, p);
+        return cp;
+    }
+
+    public virtual J VisitControlParentheses(ControlParentheses<VariableDeclarations> cp, P p)
     {
         Visit(cp.Tree.Element, p);
         return cp;

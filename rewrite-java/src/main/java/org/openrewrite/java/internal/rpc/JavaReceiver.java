@@ -651,17 +651,18 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, RpcReceiveQueue q) {
+        T element = q.receive(right.getElement(), t -> {
+            if (t instanceof J) {
+                //noinspection unchecked
+                return (T) visitNonNull((J) t, q);
+            } else if (t instanceof Space) {
+                //noinspection unchecked
+                return (T) visitSpace((Space) t, q);
+            }
+            return t;
+        });
         return right
-                .withElement(q.receive(right.getElement(), t -> {
-                    if (t instanceof J) {
-                        //noinspection unchecked
-                        return (T) visitNonNull((J) t, q);
-                    } else if (t instanceof Space) {
-                        //noinspection unchecked
-                        return (T) visitSpace((Space) t, q);
-                    }
-                    return t;
-                }))
+                .withElement(element)
                 .withAfter(q.receive(right.getAfter(), s -> visitSpace(s, q)))
                 .withMarkers(q.receive(right.getMarkers()));
     }

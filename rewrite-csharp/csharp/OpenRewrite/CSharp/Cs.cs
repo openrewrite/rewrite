@@ -704,7 +704,7 @@ public sealed class StatementExpression(
     Space prefix,
     Markers markers,
     Statement statement
-) : Cs, Expression, IEquatable<StatementExpression>
+) : Pattern, IEquatable<StatementExpression>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
@@ -2812,13 +2812,13 @@ public sealed class ImplicitElementAccess(
     Guid id,
     Space prefix,
     Markers markers,
-    JContainer<CsArgument> argumentList
+    JContainer<Expression> argumentList
 ) : Cs, Expression, IEquatable<ImplicitElementAccess>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public JContainer<CsArgument> ArgumentList { get; } = argumentList;
+    public JContainer<Expression> ArgumentList { get; } = argumentList;
 
     public ImplicitElementAccess WithId(Guid id) =>
         id == Id ? this : new(id, Prefix, Markers, ArgumentList);
@@ -2826,7 +2826,7 @@ public sealed class ImplicitElementAccess(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, ArgumentList);
     public ImplicitElementAccess WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, ArgumentList);
-    public ImplicitElementAccess WithArgumentList(JContainer<CsArgument> argumentList) =>
+    public ImplicitElementAccess WithArgumentList(JContainer<Expression> argumentList) =>
         ReferenceEquals(argumentList, ArgumentList) ? this : new(Id, Prefix, Markers, argumentList);
 
     Tree Tree.WithId(Guid id) => WithId(id);

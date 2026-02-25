@@ -15,21 +15,25 @@
  */
 package org.openrewrite.csharp.rpc;
 
-import java.util.ArrayList;
-import java.util.Collection;
+import lombok.Value;
+import org.openrewrite.rpc.request.RpcRequest;
+
+import java.nio.file.Path;
 
 /**
- * Response from the Parse RPC call.
- * Contains IDs of the parsed source files.
- * Extends ArrayList to support direct deserialization from JSON array.
+ * RPC request to parse a .sln or .csproj via MSBuildWorkspace.
+ * The C# side loads the solution/project, resolves references,
+ * and parses all source files with correct type attribution.
  */
-class ParseResponse extends ArrayList<String> {
+@Value
+class ParseSolution implements RpcRequest {
+    /**
+     * Path to the .sln or .csproj file to parse.
+     */
+    Path path;
 
-    ParseResponse() {
-        super();
-    }
-
-    ParseResponse(Collection<String> sourceFileIds) {
-        super(sourceFileIds);
-    }
+    /**
+     * Repository root directory for computing relative source paths.
+     */
+    Path rootDir;
 }

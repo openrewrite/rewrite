@@ -118,9 +118,20 @@ internal class CSharpTypeMapping
             _typeCache[symbol] = parameterized;
 
             var rawType = MapNamedType(symbol.OriginalDefinition);
-            var typeArgs = symbol.TypeArguments.Select(MapType).ToList()!;
-            parameterized.UnsafeSet(rawType as JavaType.FullyQualified, typeArgs!);
-            return parameterized;
+
+            // Guard: if rawType resolved back to the same Parameterized (cache collision
+            // between symbol and OriginalDefinition) or is not a FullyQualified, fall back
+            if (ReferenceEquals(rawType, parameterized) || rawType is not JavaType.FullyQualified fq)
+            {
+                _typeCache.Remove(symbol);
+                // Fall through to create as a plain Class below
+            }
+            else
+            {
+                var typeArgs = symbol.TypeArguments.Select(MapType).ToList()!;
+                parameterized.UnsafeSet(fq, typeArgs!);
+                return parameterized;
+            }
         }
 
         // Shell cache pattern: create empty shell, cache it, then populate

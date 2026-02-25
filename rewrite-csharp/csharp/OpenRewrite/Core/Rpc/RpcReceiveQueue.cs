@@ -279,11 +279,23 @@ public class RpcReceiveQueue
             {
                 type = typeof(T);
             }
+            else if (typeof(Marker).IsAssignableFrom(typeof(T)))
+            {
+                // Unknown marker type from Java — use UnknownMarker as fallback
+                return (T)(object)new UnknownMarker(Guid.NewGuid());
+            }
             else
             {
                 throw new InvalidOperationException(
                     $"Cannot map Java type name to C# type: {javaTypeName}");
             }
+        }
+        if (type.IsInterface || type.IsAbstract)
+        {
+            if (typeof(Marker).IsAssignableFrom(type))
+                return (T)(object)new UnknownMarker(Guid.NewGuid());
+            throw new InvalidOperationException(
+                $"Cannot instantiate interface/abstract type: {type.FullName} (from {javaTypeName})");
         }
         return (T)RuntimeHelpers.GetUninitializedObject(type);
     }
@@ -296,8 +308,22 @@ public class RpcReceiveQueue
     {
         var type = FromJavaTypeName(javaTypeName) ?? typeof(T);
 
-        if (value is JObject jobj)
-            return (T)jobj.ToObject(type)!;
+        // If the resolved type is an interface or abstract class, use UnknownMarker
+        // as fallback for marker types that have no C# equivalent (e.g., GitProvenance,
+        // LstProvenance, BuildTool, etc. added by the mod CLI).
+        if ((type.IsInterface || type.IsAbstract) && typeof(Marker).IsAssignableFrom(type))
+        {
+            if (value is JObject jobj)
+            {
+                var idToken = jobj["id"];
+                var id = idToken != null ? Guid.Parse(idToken.ToString()) : Guid.NewGuid();
+                return (T)(object)new UnknownMarker(id);
+            }
+            return (T)(object)new UnknownMarker(Guid.NewGuid());
+        }
+
+        if (value is JObject jobjNormal)
+            return (T)jobjNormal.ToObject(type)!;
 
         if (value is T t)
             return t;
@@ -398,11 +424,33 @@ public class RpcReceiveQueue
             return FindType("OpenRewrite.CSharp", name);
         }
 
+        // Marker type conventions — markers live in marker packages, not tree packages
+        // Pattern: org.openrewrite.csharp.marker.ClassName → OpenRewrite.CSharp.ClassName
+        if (javaTypeName.StartsWith("org.openrewrite.csharp.marker."))
+        {
+            var name = javaTypeName["org.openrewrite.csharp.marker.".Length..];
+            return FindType("OpenRewrite.CSharp", name);
+        }
+
+        // Pattern: org.openrewrite.java.marker.ClassName → OpenRewrite.Java.ClassName
+        if (javaTypeName.StartsWith("org.openrewrite.java.marker."))
+        {
+            var name = javaTypeName["org.openrewrite.java.marker.".Length..];
+            return FindType("OpenRewrite.Java", name);
+        }
+
         // Pattern: org.openrewrite.marker.Markup$X → OpenRewrite.Core.Markup+X
         if (javaTypeName.StartsWith("org.openrewrite.marker.Markup$"))
         {
             var name = javaTypeName["org.openrewrite.marker.Markup$".Length..];
             return FindType("OpenRewrite.Core", "Markup+" + name);
+        }
+
+        // Pattern: org.openrewrite.marker.ClassName → OpenRewrite.Core.ClassName
+        if (javaTypeName.StartsWith("org.openrewrite.marker."))
+        {
+            var name = javaTypeName["org.openrewrite.marker.".Length..];
+            return FindType("OpenRewrite.Core", name);
         }
 
         return null;

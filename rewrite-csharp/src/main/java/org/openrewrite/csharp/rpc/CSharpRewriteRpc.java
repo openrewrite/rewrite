@@ -22,8 +22,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.tree.Cs;
-import org.openrewrite.marker.Generated;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
@@ -32,10 +30,8 @@ import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -44,7 +40,6 @@ import java.time.Duration;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -124,52 +119,27 @@ public class CSharpRewriteRpc extends RewriteRpc {
     }
 
     /**
-     * Parses an entire C# project from a .csproj file.
-     * Discovers source files, resolves NuGet references, and includes source-generator
-     * output from obj/ for complete type attribution.
+     * Parses a .sln or .csproj file via MSBuildWorkspace on the C# side.
+     * The C# side loads the solution/project, resolves all references,
+     * discovers source files, and parses with correct type attribution.
      *
-     * @param projectPath Path to the .csproj file
-     * @param ctx         Execution context for parsing
+     * @param path    Path to the .sln or .csproj file
+     * @param rootDir Repository root directory for computing relative source paths
+     * @param ctx     Execution context for parsing
      * @return Stream of parsed source files
      */
-    public Stream<SourceFile> parseProject(Path projectPath, ExecutionContext ctx) {
-        return parseProject(projectPath, null, null, ctx);
-    }
-
-    /**
-     * Parses an entire C# project from a .csproj file.
-     *
-     * @param projectPath Path to the .csproj file
-     * @param exclusions  Optional glob patterns to exclude from parsing
-     * @param ctx         Execution context for parsing
-     * @return Stream of parsed source files
-     */
-    public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, ExecutionContext ctx) {
-        return parseProject(projectPath, exclusions, null, ctx);
-    }
-
-    /**
-     * Parses an entire C# project from a .csproj file.
-     *
-     * @param projectPath Path to the .csproj file
-     * @param exclusions  Optional glob patterns to exclude from parsing
-     * @param relativeTo  Optional path to make source file paths relative to. If not specified,
-     *                    paths are relative to the .csproj directory.
-     * @param ctx         Execution context for parsing
-     * @return Stream of parsed source files
-     */
-    public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseSolution(Path path, Path rootDir, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
-            private @Nullable ParseProjectResponse response;
+            private @Nullable ParseSolutionResponse response;
 
             @Override
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
-                    parsingListener.intermediateMessage("Starting C# project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo), ParseProjectResponse.class);
+                    parsingListener.intermediateMessage("Starting C# solution parsing: " + path);
+                    response = send("ParseSolution", new ParseSolution(path, rootDir), ParseSolutionResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
@@ -177,133 +147,13 @@ public class CSharpRewriteRpc extends RewriteRpc {
                     return false;
                 }
 
-                ParseProjectResponse.Item item = response.get(index);
+                ParseSolutionResponse.Item item = response.get(index);
                 index++;
 
                 SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
 
-                // Add Generated marker to source-generator-produced files
-                if (item.isGenerated()) {
-                    sourceFile = sourceFile.withMarkers(
-                            sourceFile.getMarkers().add(new Generated(UUID.randomUUID())));
-                }
-
                 parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
                 action.accept(sourceFile);
-                return true;
-            }
-
-            @Override
-            public @Nullable Spliterator<SourceFile> trySplit() {
-                return null;
-            }
-
-            @Override
-            public long estimateSize() {
-                return response == null ? Long.MAX_VALUE : response.size() - index;
-            }
-
-            @Override
-            public int characteristics() {
-                return response == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
-            }
-        }, false);
-    }
-
-    /**
-     * Parses C# source files without type attribution.
-     *
-     * @param sourcePaths Paths to the C# source files to parse
-     * @param ctx         Execution context for parsing
-     * @return Stream of parsed source files
-     */
-    public Stream<SourceFile> parse(List<Path> sourcePaths, ExecutionContext ctx) {
-        return parse(sourcePaths, null, ctx);
-    }
-
-    /**
-     * Parses C# source files with optional assembly references for type attribution.
-     *
-     * @param sourcePaths        Paths to the C# source files to parse
-     * @param assemblyReferences NuGet package names, versioned package names (e.g., "Newtonsoft.Json@13.0.1"),
-     *                           or direct DLL paths. Null for syntax-only parsing.
-     * @param ctx                Execution context for parsing
-     * @return Stream of parsed source files
-     */
-    public Stream<SourceFile> parse(List<Path> sourcePaths, @Nullable List<String> assemblyReferences, ExecutionContext ctx) {
-        List<ParseRequest.Input> inputs = sourcePaths.stream()
-                .map(p -> new ParseRequest.Input(p.toString(), null))
-                .collect(Collectors.toList());
-        return doParse(inputs, assemblyReferences, ctx);
-    }
-
-    /**
-     * Parses C# source files from Parser.Input objects with optional assembly references.
-     * Source text is read inline from each input, so files don't need to exist on disk.
-     *
-     * @param inputs             Parser inputs (may contain inline text)
-     * @param relativeTo         Base path for computing relative source paths
-     * @param assemblyReferences NuGet package names, versioned package names, or DLL paths.
-     *                           Null for syntax-only parsing.
-     * @param ctx                Execution context for parsing
-     * @return Stream of parsed source files
-     */
-    public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo,
-                                    @Nullable List<String> assemblyReferences, ExecutionContext ctx) {
-        List<ParseRequest.Input> parseInputs = new ArrayList<>();
-        for (Parser.Input input : inputs) {
-            String sourcePath = relativeTo != null
-                    ? relativeTo.relativize(input.getPath()).toString()
-                    : input.getPath().toString();
-            String text;
-            try (InputStream is = input.getSource(ctx)) {
-                byte[] buf = new byte[4096];
-                StringBuilder sb = new StringBuilder();
-                int n;
-                while ((n = is.read(buf)) != -1) {
-                    sb.append(new String(buf, 0, n, StandardCharsets.UTF_8));
-                }
-                text = sb.toString();
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            parseInputs.add(new ParseRequest.Input(sourcePath, text));
-        }
-        return doParse(parseInputs, assemblyReferences, ctx);
-    }
-
-    private Stream<SourceFile> doParse(List<ParseRequest.Input> inputs,
-                                       @Nullable List<String> assemblyReferences,
-                                       ExecutionContext ctx) {
-        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-
-        return StreamSupport.stream(new Spliterator<SourceFile>() {
-            private int index = 0;
-            private @Nullable ParseResponse response;
-
-            @Override
-            public boolean tryAdvance(Consumer<? super SourceFile> action) {
-                if (response == null) {
-                    parsingListener.intermediateMessage("Starting C# parsing: " + inputs.size() + " files");
-                    response = send("Parse", new ParseRequest(inputs, assemblyReferences), ParseResponse.class);
-                    parsingListener.intermediateMessage(String.format("Parsed %,d files", response.size()));
-                }
-
-                if (index >= response.size()) {
-                    return false;
-                }
-
-                String sourceFileId = response.get(index);
-                index++;
-
-                // Use the Java CompilationUnit type name for codec lookup
-                try {
-                    SourceFile sourceFile = getObject(sourceFileId, Cs.CompilationUnit.class.getName());
-                    action.accept(sourceFile);
-                } catch (Exception e) {
-                    System.err.println("[DIAG] Failed to receive source file at index " + (index - 1) + " id=" + sourceFileId);
-                    throw e;
-                }
                 return true;
             }
 
@@ -453,14 +303,32 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 return csharpServerEntry;
             }
 
-            // Try to find the C# project in the project structure
-            Path basePath = workingDirectory != null ? workingDirectory : Paths.get(System.getProperty("user.dir"));
+            // Check for globally installed dotnet tool
+            Path toolStore = Paths.get(System.getProperty("user.home"), ".dotnet", "tools", ".store", "openrewrite.csharp");
+            if (Files.isDirectory(toolStore)) {
+                try (Stream<Path> versions = Files.list(toolStore)) {
+                    Optional<Path> dll = versions
+                            .sorted(Comparator.reverseOrder())
+                            .flatMap(versionDir -> {
+                                try {
+                                    return Files.walk(versionDir)
+                                            .filter(p -> p.getFileName().toString().equals("OpenRewrite.dll"));
+                                } catch (IOException e) {
+                                    return Stream.empty();
+                                }
+                            })
+                            .findFirst();
+                    if (dll.isPresent()) {
+                        return dll.get().toAbsolutePath().normalize();
+                    }
+                } catch (IOException ignored) {
+                }
+            }
 
-            // Check common locations relative to nagoya (rewrite) repo
+            // Fall back to development paths relative to working directory
+            Path basePath = workingDirectory != null ? workingDirectory : Paths.get(System.getProperty("user.dir"));
             Path[] searchPaths = {
-                    // From rewrite-csharp module dir
                     basePath.resolve("csharp"),
-                    // From rewrite root dir
                     basePath.resolve("rewrite-csharp/csharp"),
             };
 
@@ -473,7 +341,8 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
             throw new IllegalStateException(
                     "Could not find C# Rewrite project. Please set csharpServerEntry() on the builder. " +
-                    "Expected to find OpenRewrite/OpenRewrite.csproj in the project directory.");
+                    "Expected to find OpenRewrite.dll in ~/.dotnet/tools/.store/openrewrite.csharp/ " +
+                    "or OpenRewrite/OpenRewrite.csproj in the project directory.");
         }
     }
 }

@@ -20,10 +20,10 @@ import lombok.Value;
 import java.util.ArrayList;
 
 /**
- * Response from ParseProject RPC call.
- * Contains a list of parsed source file items with their IDs, types, and generated status.
+ * Response from ParseSolution RPC call.
+ * Contains a list of parsed source file items with their IDs, types, and project paths.
  */
-class ParseProjectResponse extends ArrayList<ParseProjectResponse.Item> {
+class ParseSolutionResponse extends ArrayList<ParseSolutionResponse.Item> {
 
     /**
      * A single parsed source file item.
@@ -42,10 +42,8 @@ class ParseProjectResponse extends ArrayList<ParseProjectResponse.Item> {
         String sourceFileType;
 
         /**
-         * Whether this file was produced by a source generator.
-         * Generated files are included for type attribution but edits to them
-         * are suppressed by RecipeRunCycle.
+         * The path of the project this file belongs to.
          */
-        boolean generated;
+        String projectPath;
     }
 }

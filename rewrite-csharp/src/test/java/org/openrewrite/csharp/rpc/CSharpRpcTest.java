@@ -21,7 +21,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.java.tree.J;
@@ -35,7 +34,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -47,8 +45,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 class CSharpRpcTest {
 
+    private static final String TEST_CSPROJ = """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """;
+
     private static boolean factoryConfigured = false;
     private CSharpRewriteRpc rpc;
+
+    private List<SourceFile> parseSolution(Path tempDir, Path... sourceFiles) throws IOException {
+        Path csproj = tempDir.resolve("Test.csproj");
+        if (!Files.exists(csproj)) {
+            Files.writeString(csproj, TEST_CSPROJ);
+        }
+        return rpc.parseSolution(csproj, tempDir, new InMemoryExecutionContext()).toList();
+    }
 
     @BeforeEach
     void setUp() {
@@ -115,10 +129,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("HelloWorld.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -156,10 +167,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Person.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -201,10 +209,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("DataService.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -250,10 +255,7 @@ class CSharpRpcTest {
         Files.writeString(file1, source1);
         Files.writeString(file2, source2);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(file1, file2),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(2);
 
@@ -285,10 +287,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("AsyncService.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -325,10 +324,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Formatter.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -370,10 +366,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("TypeChecker.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -402,10 +395,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Records.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -436,10 +426,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Region.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -471,10 +458,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Pragma.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -501,10 +485,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Nullable.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -534,10 +515,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("ErrorWarning.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -569,10 +547,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Line.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -604,10 +579,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("PragmaMulti.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -636,10 +608,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Person.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -675,10 +644,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Animal.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -713,10 +679,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Derived.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -744,10 +707,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Point.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -795,13 +755,8 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Calculator.cs");
         Files.writeString(sourceFile, source);
 
-        // Parse with empty assembly references to trigger compilation creation
-        // (framework refs are automatically included)
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                Collections.emptyList(),
-                new InMemoryExecutionContext()
-        ).toList();
+        // Parse via MSBuildWorkspace which handles type attribution automatically
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -878,10 +833,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Dog.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -914,10 +866,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Container.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -945,10 +894,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Button.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -981,10 +927,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Calculator.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1010,10 +953,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Validator.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1041,10 +981,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("TypeHelper.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1072,10 +1009,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("SizeHelper.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1104,10 +1038,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("LabelHelper.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1138,10 +1069,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("UnsafeHelper.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1171,10 +1099,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("DefaultHelper.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1204,10 +1129,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("FixedHelper.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1241,10 +1163,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Factory.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1271,10 +1190,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Resource.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1299,10 +1215,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("C.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1330,10 +1243,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("C.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1363,10 +1273,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Linq.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1440,10 +1347,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Dispatcher.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1475,10 +1379,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("FileReader.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1511,10 +1412,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Math.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1544,10 +1442,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Flow.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1574,10 +1469,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Color.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1600,10 +1492,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Handler.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1634,10 +1523,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Parser.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1668,10 +1554,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Grid.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1704,10 +1587,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Point.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1738,10 +1618,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Slicer.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1770,10 +1647,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Builder.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1801,10 +1675,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Factory.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1834,10 +1705,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Button.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1868,10 +1736,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Generator.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1899,10 +1764,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Data.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1931,10 +1793,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Memory.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1962,10 +1821,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Demo.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -1996,10 +1852,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Demo.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2028,10 +1881,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Demo.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2061,10 +1911,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Demo.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2094,10 +1941,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Demo.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2127,10 +1971,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Demo.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2162,10 +2003,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Demo.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2203,10 +2041,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("IfEndif.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2236,10 +2071,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("IfElse.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2264,10 +2096,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("KeywordSplit.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2296,10 +2125,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Nested.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2330,10 +2156,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Elif.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2360,10 +2183,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Complex.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2391,10 +2211,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("BaseClass.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2428,10 +2245,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Polyfill.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2476,10 +2290,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("NavItem.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2511,10 +2322,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("Config.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
@@ -2557,10 +2365,7 @@ class CSharpRpcTest {
         Path sourceFile = tempDir.resolve("TextFile.cs");
         Files.writeString(sourceFile, source);
 
-        List<SourceFile> sourceFiles = rpc.parse(
-                List.of(sourceFile),
-                new InMemoryExecutionContext()
-        ).toList();
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();

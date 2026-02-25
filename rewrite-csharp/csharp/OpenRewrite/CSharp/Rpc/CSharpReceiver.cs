@@ -89,7 +89,6 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             NullSafeExpression nse => VisitNullSafeExpression(nse, q),
             // New types
             Keyword kw => VisitKeyword(kw, q),
-            CsArgument csa => VisitCsArgument(csa, q),
             NameColon nc => VisitNameColon(nc, q),
             AnnotatedStatement ans => VisitAnnotatedStatement(ans, q),
             ArrayRankSpecifier ars => VisitArrayRankSpecifier(ars, q),
@@ -198,7 +197,11 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
 
         // Reconstruct members
         var allMembers = new List<Statement>();
-        if (usings != null) allMembers.AddRange(usings.Select(rp => rp.Element));
+        if (usings != null)
+        {
+            foreach (var rp in usings)
+                allMembers.Add(rp.Element);
+        }
         if (attrLists != null) allMembers.AddRange(attrLists);
         if (members != null) allMembers.AddRange(members.Select(rp => rp.Element));
 
@@ -208,13 +211,14 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- UsingDirective ----
     public override J VisitUsingDirective(UsingDirective ud, RpcReceiveQueue q)
     {
-        q.Receive(ud.IsGlobal ? (object?)ud.Global : null);
-        q.Receive(ud.IsStatic ? (object?)ud.Static : null);
-        // Unsafe: nagoya doesn't model this
-        q.Receive<object?>(null);
+        var global = q.Receive(ud.Global, rp => _delegate.VisitRightPadded(rp, q));
+        var @static = q.Receive(ud.Static, lp => _delegate.VisitLeftPadded(lp, q));
+        // Unsafe: nagoya doesn't model this; consume and discard
+        q.Receive(new JLeftPadded<bool>(Space.Empty, false), lp => _delegate.VisitLeftPadded(lp, q));
         var alias = q.Receive(ud.Alias, rp => _delegate.VisitRightPadded(rp!, q));
         var namespaceOrType = q.Receive((J)ud.NamespaceOrType, el => (J)VisitNonNull(el, q));
-        return ud.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAlias(alias).WithNamespaceOrType((TypeTree)namespaceOrType!);
+        return ud.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
+            .WithGlobal(global!).WithStatic(@static!).WithAlias(alias).WithNamespaceOrType((TypeTree)namespaceOrType!);
     }
 
     // ---- PropertyDeclaration ----
@@ -561,14 +565,6 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var kind = q.Receive<object>(kw.Kind);
         return kw.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithKind((KeywordKind)kind!);
-    }
-
-    public override J VisitCsArgument(CsArgument arg, RpcReceiveQueue q)
-    {
-        var nameColumn = q.Receive(arg.NameColumn, rp => _delegate.VisitRightPadded(rp!, q));
-        var refKindKeyword = q.Receive((J?)arg.RefKindKeyword, el => (J)VisitNonNull(el!, q));
-        var expression = q.Receive((J)arg.Expression, el => (J)VisitNonNull(el, q));
-        return arg.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithNameColumn(nameColumn).WithRefKindKeyword((Keyword?)refKindKeyword).WithExpression((Expression)expression!);
     }
 
     public override J VisitNameColon(NameColon nc, RpcReceiveQueue q)

@@ -123,6 +123,26 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitNamedExpression(Cs.NamedExpression namedExpression, RpcSendQueue q) {
+        q.getAndSend(namedExpression, n -> n.getPadding().getName(), el -> visitRightPadded(el, q));
+        q.getAndSend(namedExpression, Cs.NamedExpression::getExpression, el -> visit(el, q));
+        return namedExpression;
+    }
+
+    @Override
+    public J visitPropertyPattern(Cs.PropertyPattern propertyPattern, RpcSendQueue q) {
+        q.getAndSend(propertyPattern, Cs.PropertyPattern::getTypeQualifier, el -> visit(el, q));
+        q.getAndSend(propertyPattern, p -> p.getPadding().getSubpatterns(), el -> visitContainer(el, q));
+        return propertyPattern;
+    }
+
+    @Override
+    public J visitPragmaChecksumDirective(Cs.PragmaChecksumDirective pragmaChecksumDirective, RpcSendQueue q) {
+        q.getAndSend(pragmaChecksumDirective, Cs.PragmaChecksumDirective::getArguments);
+        return pragmaChecksumDirective;
+    }
+
+    @Override
     public J visitKeyword(Cs.Keyword keyword, RpcSendQueue q) {
         q.getAndSend(keyword, Cs.Keyword::getKind);
         return keyword;

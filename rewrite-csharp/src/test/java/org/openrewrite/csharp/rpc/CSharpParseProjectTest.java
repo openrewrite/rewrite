@@ -23,7 +23,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.tree.Cs;
-import org.openrewrite.marker.Generated;
 import org.openrewrite.tree.ParseError;
 
 import java.io.IOException;
@@ -36,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integration tests for C# ParseProject RPC.
+ * Integration tests for C# ParseSolution RPC.
  */
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 class CSharpParseProjectTest {
@@ -115,8 +114,9 @@ class CSharpParseProjectTest {
                 }
                 """);
 
-        List<SourceFile> sourceFiles = rpc.parseProject(
+        List<SourceFile> sourceFiles = rpc.parseSolution(
                 tempDir.resolve("Test.csproj"),
+                tempDir,
                 new InMemoryExecutionContext()
         ).toList();
 
@@ -124,8 +124,6 @@ class CSharpParseProjectTest {
         for (SourceFile sf : sourceFiles) {
             assertThat(sf).isNotInstanceOf(ParseError.class);
             assertThat(sf).isInstanceOf(Cs.CompilationUnit.class);
-            // Verify no Generated marker on user files
-            assertThat(sf.getMarkers().findFirst(Generated.class)).isEmpty();
         }
     }
 
@@ -158,8 +156,9 @@ class CSharpParseProjectTest {
                 }
                 """);
 
-        List<SourceFile> sourceFiles = rpc.parseProject(
+        List<SourceFile> sourceFiles = rpc.parseSolution(
                 tempDir.resolve("Test.csproj"),
+                tempDir,
                 new InMemoryExecutionContext()
         ).toList();
 
@@ -208,8 +207,9 @@ class CSharpParseProjectTest {
                 }
                 """);
 
-        List<SourceFile> sourceFiles = rpc.parseProject(
+        List<SourceFile> sourceFiles = rpc.parseSolution(
                 tempDir.resolve("Test.csproj"),
+                tempDir,
                 new InMemoryExecutionContext()
         ).toList();
 
@@ -221,7 +221,7 @@ class CSharpParseProjectTest {
     }
 
     @Test
-    void parseProjectWithGeneratedFiles(@TempDir Path tempDir) throws IOException {
+    void generatedFilesExcludedFromLst(@TempDir Path tempDir) throws IOException {
         // Create a .csproj
         Files.writeString(tempDir.resolve("Test.csproj"), """
                 <Project Sdk="Microsoft.NET.Sdk">
@@ -254,26 +254,17 @@ class CSharpParseProjectTest {
                 }
                 """);
 
-        List<SourceFile> sourceFiles = rpc.parseProject(
+        List<SourceFile> sourceFiles = rpc.parseSolution(
                 tempDir.resolve("Test.csproj"),
+                tempDir,
                 new InMemoryExecutionContext()
         ).toList();
 
-        assertThat(sourceFiles).hasSize(2);
-
-        // Find the generated file and verify it has the Generated marker
-        SourceFile generatedFile = sourceFiles.stream()
-                .filter(sf -> sf.getMarkers().findFirst(Generated.class).isPresent())
-                .findFirst()
-                .orElse(null);
-        assertThat(generatedFile).isNotNull();
-
-        // Find the user file and verify it does NOT have the Generated marker
-        SourceFile userFile = sourceFiles.stream()
-                .filter(sf -> sf.getMarkers().findFirst(Generated.class).isEmpty())
-                .findFirst()
-                .orElse(null);
-        assertThat(userFile).isNotNull();
+        // Only the user file should be in the LST — generated files are excluded
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile sf = sourceFiles.getFirst();
+        assertThat(sf).isInstanceOf(Cs.CompilationUnit.class);
+        assertThat(sf.getSourcePath().toString()).doesNotContain("obj");
     }
 
     @Test
@@ -299,10 +290,9 @@ class CSharpParseProjectTest {
                 }
                 """);
 
-        // Parse with relativeTo pointing to the temp dir root
-        List<SourceFile> sourceFiles = rpc.parseProject(
+        // Parse with rootDir pointing to the temp dir root
+        List<SourceFile> sourceFiles = rpc.parseSolution(
                 projectDir.resolve("MyApp.csproj"),
-                null,
                 tempDir,
                 new InMemoryExecutionContext()
         ).toList();

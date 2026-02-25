@@ -11,6 +11,16 @@ public interface Marker
 }
 
 /// <summary>
+/// Fallback marker for Java marker types that have no C# equivalent.
+/// Similar to Java's RpcMarker, this captures the Id so the marker can
+/// be round-tripped without losing identity, while the actual data is ignored.
+/// </summary>
+public sealed class UnknownMarker(Guid id) : Marker
+{
+    public Guid Id { get; } = id;
+}
+
+/// <summary>
 /// A collection of markers attached to an LST element.
 /// Markers allow attaching metadata without modifying the tree structure.
 /// </summary>

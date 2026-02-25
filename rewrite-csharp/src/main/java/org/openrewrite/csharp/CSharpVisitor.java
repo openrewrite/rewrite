@@ -133,6 +133,40 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         return nameColon.getPadding().withName(visitRightPadded(nameColon.getPadding().getName(), CsRightPadded.Location.NAME_COLON_NAME, p));
     }
 
+    public J visitNamedExpression(Cs.NamedExpression namedExpression, P p) {
+        namedExpression = namedExpression.withPrefix(visitSpace(namedExpression.getPrefix(), CsSpace.Location.NAMED_EXPRESSION_PREFIX, p));
+        Expression tempExpression = (Expression) visitExpression(namedExpression, p);
+        if (!(tempExpression instanceof Cs.NamedExpression)) {
+            return tempExpression;
+        }
+        namedExpression = (Cs.NamedExpression) tempExpression;
+        namedExpression = namedExpression.withMarkers(visitMarkers(namedExpression.getMarkers(), p));
+        namedExpression = namedExpression.getPadding().withName(visitRightPadded(namedExpression.getPadding().getName(), CsRightPadded.Location.NAMED_EXPRESSION_NAME, p));
+        return namedExpression.withExpression(visitAndCast(namedExpression.getExpression(), p));
+    }
+
+    public J visitPropertyPattern(Cs.PropertyPattern propertyPattern, P p) {
+        propertyPattern = propertyPattern.withPrefix(visitSpace(propertyPattern.getPrefix(), CsSpace.Location.PROPERTY_PATTERN_CLAUSE_PREFIX, p));
+        Expression tempExpression = (Expression) visitExpression(propertyPattern, p);
+        if (!(tempExpression instanceof Cs.PropertyPattern)) {
+            return tempExpression;
+        }
+        propertyPattern = (Cs.PropertyPattern) tempExpression;
+        propertyPattern = propertyPattern.withMarkers(visitMarkers(propertyPattern.getMarkers(), p));
+        propertyPattern = propertyPattern.withTypeQualifier(visitAndCast(propertyPattern.getTypeQualifier(), p));
+        return propertyPattern.getPadding().withSubpatterns(visitContainer(propertyPattern.getPadding().getSubpatterns(), CsContainer.Location.PROPERTY_PATTERN_CLAUSE_SUBPATTERNS, p));
+    }
+
+    public J visitPragmaChecksumDirective(Cs.PragmaChecksumDirective pragmaChecksumDirective, P p) {
+        pragmaChecksumDirective = pragmaChecksumDirective.withPrefix(visitSpace(pragmaChecksumDirective.getPrefix(), CsSpace.Location.PRAGMA_CHECKSUM_DIRECTIVE_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(pragmaChecksumDirective, p);
+        if (!(tempStatement instanceof Cs.PragmaChecksumDirective)) {
+            return tempStatement;
+        }
+        pragmaChecksumDirective = (Cs.PragmaChecksumDirective) tempStatement;
+        return pragmaChecksumDirective.withMarkers(visitMarkers(pragmaChecksumDirective.getMarkers(), p));
+    }
+
     public J visitKeyword(Cs.Keyword keyword, P p) {
         keyword = keyword.withPrefix(visitSpace(keyword.getPrefix(), CsSpace.Location.KEYWORD_PREFIX, p));
         return keyword.withMarkers(visitMarkers(keyword.getMarkers(), p));

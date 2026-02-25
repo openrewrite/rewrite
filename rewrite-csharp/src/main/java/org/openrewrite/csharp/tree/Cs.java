@@ -463,7 +463,7 @@ public interface Cs extends J {
         @Getter
         JavaType.@Nullable Method methodType;
 
-        public @Nullable NameTree getExplicitInterfaceSpecifier() {
+        public @Nullable TypeTree getExplicitInterfaceSpecifier() {
             return explicitInterfaceSpecifier == null ? null : explicitInterfaceSpecifier.getElement();
         }
 
@@ -1155,6 +1155,116 @@ public interface Cs extends J {
         }
     }
 
+    /**
+     * Represents a named expression with an identifier label followed by a colon and a value.
+     * Java has no equivalent — Java arguments are positional-only and patterns don't exist.
+     * Used for C# named arguments ({@code name: value}) and property sub-patterns
+     * ({@code Length: > 5}).
+     * <p>
+     * For example:
+     * <pre>
+     *     Method(name: "foo");
+     *     if (obj is { Length: > 5 }) { }
+     * </pre>
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class NamedExpression implements Cs, Expression {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        /**
+         * <pre>
+         * Method(name: "foo")
+         *        ^^^^
+         * </pre>
+         */
+        JRightPadded<J.Identifier> name;
+
+        public J.Identifier getName() {
+            return name.getElement();
+        }
+
+        public NamedExpression withName(J.Identifier name) {
+            return getPadding().withName(this.name.withElement(name));
+        }
+
+        /**
+         * <pre>
+         * Method(name: "foo")
+         *              ^^^^^
+         * </pre>
+         */
+        @With
+        @Getter
+        Expression expression;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitNamedExpression(this, p);
+        }
+
+        @Override
+        public JavaType getType() {
+            return expression.getType();
+        }
+
+        @Override
+        public NamedExpression withType(@Nullable JavaType type) {
+            return withExpression(expression.withType(type));
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final NamedExpression t;
+
+            public JRightPadded<J.Identifier> getName() {
+                return t.name;
+            }
+
+            public NamedExpression withName(JRightPadded<J.Identifier> name) {
+                return t.name == name ? t : new NamedExpression(t.id, t.prefix, t.markers, name, t.expression);
+            }
+        }
+    }
+
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1741,7 +1851,7 @@ public interface Cs extends J {
          *                          ^^^^^^^^^^^^^^^^^^^^
          * </pre>
          */
-        public @Nullable NameTree getInterfaceSpecifier() {
+        public @Nullable TypeTree getInterfaceSpecifier() {
             return interfaceSpecifier == null ? null : interfaceSpecifier.getElement();
         }
 
@@ -2707,7 +2817,7 @@ public interface Cs extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @With
-    final class StatementExpression implements Cs, Expression {
+    final class StatementExpression implements Pattern {
 
         @EqualsAndHashCode.Include
         UUID id;
@@ -2863,7 +2973,7 @@ public interface Cs extends J {
             }
 
             public UsingDirective withAlias(JRightPadded<Identifier> alias) {
-                return t.alias == alias ? t : new UsingDirective(t.id, t.prefix, t.markers, t.global, t.statik, t.unsafe, t.alias, t.namespaceOrType);
+                return t.alias == alias ? t : new UsingDirective(t.id, t.prefix, t.markers, t.global, t.statik, t.unsafe, alias, t.namespaceOrType);
             }
         }
     }
@@ -5406,6 +5516,103 @@ public interface Cs extends J {
 
     }
 
+    /**
+     * Represents a C# property pattern for pattern matching.
+     * Java has no pattern matching with property destructuring; this syntax is unique to C#.
+     * <p>
+     * For example:
+     * <pre>
+     *     if (obj is { Length: > 5 })
+     *     if (person is { Name: "John", Age: 25 })
+     * </pre>
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class PropertyPattern implements Pattern {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        @Nullable
+        TypeTree typeQualifier;
+
+        JContainer<NamedExpression> subpatterns;
+
+        public List<NamedExpression> getSubpatterns() {
+            return subpatterns.getElements();
+        }
+
+        public PropertyPattern withSubpatterns(List<NamedExpression> subpatterns) {
+            return getPadding().withSubpatterns(JContainer.withElements(this.subpatterns, subpatterns));
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return typeQualifier != null ? typeQualifier.getType() : null;
+        }
+
+        @Override
+        public PropertyPattern withType(@Nullable JavaType type) {
+            return this;
+        }
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitPropertyPattern(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final PropertyPattern t;
+
+            public JContainer<NamedExpression> getSubpatterns() {
+                return t.subpatterns;
+            }
+
+            public PropertyPattern withSubpatterns(JContainer<NamedExpression> subpatterns) {
+                return t.subpatterns == subpatterns ? t : new PropertyPattern(t.id, t.prefix, t.markers, t.typeQualifier, subpatterns);
+            }
+        }
+    }
+
     //endregion
 
     /**
@@ -5585,7 +5792,7 @@ public interface Cs extends J {
          */
         @With
         @Getter
-        Pattern pattern;
+        J pattern;
 
         /**
          * <pre>
@@ -7897,6 +8104,47 @@ public interface Cs extends J {
             public PragmaWarningDirective withWarningCodes(List<JRightPadded<Expression>> warningCodes) {
                 return t.warningCodes == warningCodes ? t : new PragmaWarningDirective(t.id, t.prefix, t.markers, t.action, warningCodes);
             }
+        }
+    }
+
+    /**
+     * Represents a C# {@code #pragma checksum} directive.
+     * Java has no preprocessor directives; this is C#-specific syntax for debugger file mapping.
+     * <p>
+     * Example:
+     * <pre>
+     *     #pragma checksum "file.cs" "{guid}" "checksum"
+     * </pre>
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(access = AccessLevel.PUBLIC)
+    final class PragmaChecksumDirective implements Cs, Statement {
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        String arguments;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitPragmaChecksumDirective(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 

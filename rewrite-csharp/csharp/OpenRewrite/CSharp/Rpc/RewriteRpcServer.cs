@@ -25,7 +25,6 @@ public class RewriteRpcServer
     /// </summary>
     public static RewriteRpcServer? Current => _current;
 
-    private readonly CSharpParser _parser = new();
     private readonly RecipeMarketplace _marketplace;
     private readonly Dictionary<string, Recipe> _preparedRecipes = new();
     private string? _recipesProjectDir;
@@ -63,6 +62,20 @@ public class RewriteRpcServer
         // Cs-prefixed types in C# that correspond to unprefixed Java names
         RpcSendQueue.RegisterJavaTypeName(typeof(CsMethodDeclaration),
             "org.openrewrite.csharp.tree.Cs$MethodDeclaration");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsBinary),
+            "org.openrewrite.csharp.tree.Cs$Binary");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsUnary),
+            "org.openrewrite.csharp.tree.Cs$Unary");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsExpressionStatement),
+            "org.openrewrite.csharp.tree.Cs$ExpressionStatement");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsNewClass),
+            "org.openrewrite.csharp.tree.Cs$NewClass");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsArrayType),
+            "org.openrewrite.csharp.tree.Cs$ArrayType");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsTry),
+            "org.openrewrite.csharp.tree.Cs$Try");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsTryCatch),
+            "org.openrewrite.csharp.tree.Cs$Try$Catch");
         RpcSendQueue.RegisterJavaTypeName(typeof(ConstrainedTypeParameter),
             "org.openrewrite.csharp.tree.Cs$ConstrainedTypeParameter");
 
@@ -77,6 +90,8 @@ public class RewriteRpcServer
         // Marker type name overrides — markers live in marker packages, not tree packages
         RpcSendQueue.RegisterJavaTypeName(typeof(Java.Semicolon),
             "org.openrewrite.java.marker.Semicolon");
+        RpcSendQueue.RegisterJavaTypeName(typeof(Java.NullSafe),
+            "org.openrewrite.java.marker.NullSafe");
         RpcSendQueue.RegisterJavaTypeName(typeof(PrimaryConstructor),
             "org.openrewrite.csharp.marker.PrimaryConstructor");
         RpcSendQueue.RegisterJavaTypeName(typeof(Implicit),
@@ -125,268 +140,37 @@ public class RewriteRpcServer
             "org.openrewrite.csharp.tree.Linq$QueryContinuation");
     }
 
-    [JsonRpcMethod("Parse", UseSingleObjectParameterDeserialization = true)]
-    public Task<string[]> Parse(ParseRequest request)
+    [JsonRpcMethod("ParseSolution", UseSingleObjectParameterDeserialization = true)]
+    public async Task<List<ParseSolutionResponseItem>> ParseSolution(ParseSolutionRequest request)
     {
-        var sourceFileIds = new List<string>();
+        var solutionParser = new SolutionParser();
+        var path = ResolvePath(request.Path);
+        var rootDir = ResolvePath(request.RootDir);
+        var solution = await solutionParser.LoadAsync(path, CancellationToken.None);
 
-        if (request.Inputs == null)
+        var items = new List<ParseSolutionResponseItem>();
+        var seenProjects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var project in solution.Projects.Where(p => p.FilePath != null))
         {
-            return Task.FromResult(sourceFileIds.ToArray());
-        }
-
-        // Resolve assembly references into a Roslyn compilation if provided
-        Microsoft.CodeAnalysis.CSharp.CSharpCompilation? compilation = null;
-        var syntaxTrees = new List<Microsoft.CodeAnalysis.SyntaxTree>();
-        var sourceTexts = new Dictionary<string, string>();
-
-        // First pass: parse all syntax trees
-        foreach (var input in request.Inputs)
-        {
-            string content = input.Text ?? File.ReadAllText(input.SourcePath);
-            sourceTexts[input.SourcePath] = content;
-            var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(content, path: input.SourcePath);
-            syntaxTrees.Add(tree);
-        }
-
-        // Create compilation if assembly references are provided (even if empty, to get framework refs)
-        if (request.AssemblyReferences != null)
-        {
-            var references = ResolveAssemblyReferences(request.AssemblyReferences);
-
-            compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
-                "ParseCompilation",
-                syntaxTrees,
-                references,
-                new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
-                    Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
-        }
-
-        // Second pass: create LST with optional type attribution
-        foreach (var tree in syntaxTrees)
-        {
-            var sourcePath = tree.FilePath;
-            var content = sourceTexts[sourcePath];
-            Microsoft.CodeAnalysis.SemanticModel? semanticModel =
-                compilation?.GetSemanticModel(tree);
-
-            var cu = _parser.Parse(content, sourcePath, semanticModel);
-            var id = cu.Id.ToString();
-            _localObjects[id] = cu;
-            sourceFileIds.Add(id);
-        }
-
-        return Task.FromResult(sourceFileIds.ToArray());
-    }
-
-    /// <summary>
-    /// Resolves assembly reference strings to MetadataReference objects.
-    /// Supports direct DLL paths and includes core framework references.
-    /// </summary>
-    private List<Microsoft.CodeAnalysis.MetadataReference> ResolveAssemblyReferences(
-        List<string> assemblyReferences)
-    {
-        var references = new List<Microsoft.CodeAnalysis.MetadataReference>();
-
-        // Always include core framework assemblies
-        var trustedAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
-        if (trustedAssemblies != null)
-        {
-            foreach (var assemblyPath in trustedAssemblies.Split(Path.PathSeparator))
-            {
-                if (File.Exists(assemblyPath))
-                {
-                    references.Add(Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(assemblyPath));
-                }
-            }
-        }
-
-        // Resolve user-specified references
-        foreach (var reference in assemblyReferences)
-        {
-            if (File.Exists(reference) && reference.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-            {
-                // Direct DLL path
-                references.Add(Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(reference));
-            }
-            else if (reference.Contains('@'))
-            {
-                // NuGet package with version: "PackageName@Version"
-                var parts = reference.Split('@', 2);
-                var packageName = parts[0];
-                var version = parts[1];
-
-                var dlls = FindPackageAssemblies(packageName, version);
-                if (dlls.Count == 0)
-                {
-                    // Package not in cache — download it
-                    var csprojPath = EnsureRecipesProject();
-                    RunDotnet($"add \"{csprojPath}\" package {packageName} --version {version}");
-                    RunDotnet($"restore \"{csprojPath}\"");
-                    dlls = FindPackageAssemblies(packageName, version);
-                }
-
-                foreach (var dll in dlls)
-                {
-                    references.Add(Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(dll));
-                }
-            }
-        }
-
-        return references;
-    }
-
-    [JsonRpcMethod("ParseProject", UseSingleObjectParameterDeserialization = true)]
-    public Task<List<ParseProjectResponseItem>> ParseProject(ParseProjectRequest request)
-    {
-        var items = new List<ParseProjectResponseItem>();
-        var projectPath = ResolvePath(request.ProjectPath);
-
-        if (!File.Exists(projectPath))
-        {
-            throw new FileNotFoundException($".csproj not found: {projectPath}");
-        }
-
-        var projectDir = Path.GetDirectoryName(projectPath)!;
-        var relativeTo = request.RelativeTo != null ? ResolvePath(request.RelativeTo) : projectDir;
-
-        // Read the .csproj to extract PackageReferences
-        var doc = XDocument.Load(projectPath);
-        var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
-
-        var packageReferences = doc.Descendants(ns + "PackageReference")
-            .Select(e =>
-            {
-                var name = e.Attribute("Include")?.Value ?? "";
-                var version = e.Attribute("Version")?.Value;
-                return version != null ? $"{name}@{version}" : name;
-            })
-            .Where(s => !string.IsNullOrEmpty(s))
-            .ToList();
-
-        // Discover user source files
-        var exclusionSet = new HashSet<string>(request.Exclusions ?? [], StringComparer.OrdinalIgnoreCase);
-        var userFiles = DiscoverSourceFiles(projectDir, exclusionSet);
-
-        // Discover generated files from obj/
-        var generatedFiles = DiscoverGeneratedFiles(projectDir);
-
-        // Parse all syntax trees, using relative paths as the tree file path
-        // so that the CompilationUnit.SourcePath is set correctly
-        var syntaxTrees = new List<Microsoft.CodeAnalysis.SyntaxTree>();
-        var sourceTexts = new Dictionary<string, string>();
-        var generatedRelativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var filePath in userFiles.Concat(generatedFiles))
-        {
-            string content = File.ReadAllText(filePath);
-            var sourcePath = Path.GetRelativePath(relativeTo, filePath);
-            sourceTexts[sourcePath] = content;
-            // Use the relative path as the tree's file path — the CSharpParser uses
-            // node.SyntaxTree.FilePath to set the CompilationUnit.SourcePath
-            var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(content, path: sourcePath);
-            syntaxTrees.Add(tree);
-
-            if (generatedFiles.Contains(filePath))
-            {
-                generatedRelativePaths.Add(sourcePath);
-            }
-        }
-
-        // Create compilation with resolved references
-        var references = ResolveAssemblyReferences(packageReferences);
-        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
-            "ParseProjectCompilation",
-            syntaxTrees,
-            references,
-            new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
-                Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
-
-        // Build LSTs
-        foreach (var tree in syntaxTrees)
-        {
-            var sourcePath = tree.FilePath;
-            var content = sourceTexts[sourcePath];
-            var semanticModel = compilation.GetSemanticModel(tree);
-
-            var cu = _parser.Parse(content, sourcePath, semanticModel);
-            var id = cu.Id.ToString();
-            _localObjects[id] = cu;
-
-            items.Add(new ParseProjectResponseItem
-            {
-                Id = id,
-                SourceFileType = "org.openrewrite.csharp.tree.Cs$CompilationUnit",
-                Generated = generatedRelativePaths.Contains(sourcePath)
-            });
-        }
-
-        return Task.FromResult(items);
-    }
-
-    /// <summary>
-    /// Discovers C# source files in the project directory, excluding bin/, obj/, and user-specified patterns.
-    /// </summary>
-    private static HashSet<string> DiscoverSourceFiles(string projectDir, HashSet<string> exclusions)
-    {
-        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var file in Directory.EnumerateFiles(projectDir, "*.cs", SearchOption.AllDirectories))
-        {
-            var relativePath = Path.GetRelativePath(projectDir, file);
-
-            // Skip bin/ and obj/ directories
-            if (relativePath.StartsWith("bin" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
-                relativePath.StartsWith("obj" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            {
+            if (!seenProjects.Add(project.FilePath!))
                 continue;
-            }
 
-            // Check user exclusions
-            bool excluded = false;
-            foreach (var exclusion in exclusions)
+            var results = solutionParser.ParseProject(solution, project.FilePath!, rootDir);
+            foreach (var cu in results)
             {
-                if (relativePath.Contains(exclusion, StringComparison.OrdinalIgnoreCase))
+                var id = cu.Id.ToString();
+                _localObjects[id] = cu;
+                items.Add(new ParseSolutionResponseItem
                 {
-                    excluded = true;
-                    break;
-                }
-            }
-
-            if (!excluded)
-            {
-                files.Add(ResolvePath(file));
+                    Id = id,
+                    SourceFileType = "org.openrewrite.csharp.tree.Cs$CompilationUnit",
+                    ProjectPath = project.FilePath!
+                });
             }
         }
 
-        return files;
-    }
-
-    /// <summary>
-    /// Discovers source-generator-produced files in the obj/ directory.
-    /// Source generators write output to obj/{Config}/{TFM}/generated/{GeneratorAssembly}/{GeneratorName}/*.cs
-    /// </summary>
-    private static HashSet<string> DiscoverGeneratedFiles(string projectDir)
-    {
-        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var objDir = Path.Combine(projectDir, "obj");
-
-        if (!Directory.Exists(objDir))
-        {
-            return files;
-        }
-
-        // Search for generated/ directories under obj/
-        // Pattern: obj/{Config}/{TFM}/generated/**/*.cs
-        foreach (var dir in Directory.EnumerateDirectories(objDir, "generated", SearchOption.AllDirectories))
-        {
-            foreach (var file in Directory.EnumerateFiles(dir, "*.cs", SearchOption.AllDirectories))
-            {
-                files.Add(ResolvePath(file));
-            }
-        }
-
-        return files;
+        return items;
     }
 
     /// <summary>
@@ -436,7 +220,15 @@ public class RewriteRpcServer
             TreeCodec.Instance
         );
 
-        sendQueue.Send(after, before, null);
+        try
+        {
+            sendQueue.Send(after, before, null);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Failed to send object {request.Id} (type: {after.GetType().Name}): {ex.Message}\n{ex.StackTrace}", ex);
+        }
         sendQueue.Put(new RpcObjectData { State = END_OF_OBJECT });
         sendQueue.Flush();
 
@@ -449,9 +241,26 @@ public class RewriteRpcServer
     [JsonRpcMethod("Print", UseSingleObjectParameterDeserialization = true)]
     public async Task<string> Print(PrintRequest request)
     {
-        var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
-        var printer = new CSharpPrinter<int>();
-        return printer.Print(tree);
+        Tree tree;
+        try
+        {
+            tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Print: Failed to receive tree {request.TreeId} (type: {request.SourceFileType}): {ex.Message}\n{ex.StackTrace}", ex);
+        }
+        try
+        {
+            var printer = new CSharpPrinter<int>();
+            return printer.Print(tree);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Print: Failed to print tree {request.TreeId} (type: {request.SourceFileType}, treeType: {tree.GetType().Name}): {ex.Message}\n{ex.StackTrace}", ex);
+        }
     }
 
     /// <summary>
@@ -473,7 +282,16 @@ public class RewriteRpcServer
             TreeCodec.Instance
         );
 
-        var remoteObject = q.Receive(localObject, (Func<object, object>?)null);
+        object? remoteObject;
+        try
+        {
+            remoteObject = q.Receive(localObject, (Func<object, object>?)null);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Failed to receive object {id} (type: {sourceFileType}): {ex.Message}\n{ex.StackTrace}", ex);
+        }
         if (q.Take().State != END_OF_OBJECT)
             throw new InvalidOperationException("Expected END_OF_OBJECT");
 
@@ -984,16 +802,17 @@ internal class StringErrorDataJsonRpc : StreamJsonRpc.JsonRpc
 
 // --- Request/Response DTOs ---
 
-public class ParseRequest
+public class ParseSolutionRequest
 {
-    public List<ParseInput>? Inputs { get; set; }
-    public List<string>? AssemblyReferences { get; set; }
+    public string Path { get; set; } = "";
+    public string RootDir { get; set; } = "";
 }
 
-public class ParseInput
+public class ParseSolutionResponseItem
 {
-    public string SourcePath { get; set; } = "";
-    public string? Text { get; set; }
+    public string Id { get; set; } = "";
+    public string SourceFileType { get; set; } = "";
+    public string ProjectPath { get; set; } = "";
 }
 
 public class GetObjectRequest
@@ -1116,16 +935,3 @@ public class VisitResponse
     public bool Modified { get; set; }
 }
 
-public class ParseProjectRequest
-{
-    public string ProjectPath { get; set; } = "";
-    public List<string>? Exclusions { get; set; }
-    public string? RelativeTo { get; set; }
-}
-
-public class ParseProjectResponseItem
-{
-    public string Id { get; set; } = "";
-    public string SourceFileType { get; set; } = "";
-    public bool Generated { get; set; }
-}

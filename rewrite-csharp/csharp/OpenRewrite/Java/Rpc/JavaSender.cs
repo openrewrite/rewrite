@@ -79,7 +79,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             Synchronized sync => VisitSynchronized(sync, q),
             TypeCast tc => VisitTypeCast(tc, q),
             Package pkg => VisitPackage(pkg, q),
-            _ => throw new InvalidOperationException($"Unknown J tree type: {tree.GetType().Name}")
+            _ => throw new InvalidOperationException($"Unknown J tree type: {tree.GetType()}")
         };
 
         Cursor = Cursor.Parent!;
@@ -600,8 +600,27 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     public virtual void VisitContainer<TJ>(JContainer<TJ> container, RpcSendQueue q) where TJ : J
     {
         q.GetAndSend(container, c => c.Before, space => VisitSpace(GetValueNonNull<Space>(space), q));
-        q.GetAndSendList(container, c => c.Elements, e => e.Element.Id, e => VisitRightPadded(e, q));
+        q.GetAndSendList(container, c => c.Elements, e =>
+        {
+            if (e.Element == null)
+                throw new NullReferenceException(
+                    $"Null element in JContainer<{typeof(TJ).Name}>, cursor path: {BuildCursorPath()}");
+            return e.Element.Id;
+        }, e => VisitRightPadded(e, q));
         q.GetAndSend(container, c => c.Markers);
+    }
+
+    private string BuildCursorPath()
+    {
+        var parts = new List<string>();
+        var c = Cursor;
+        while (c != null && !c.IsRoot)
+        {
+            parts.Add(c.Value?.GetType().Name ?? "null");
+            c = c.Parent;
+        }
+        parts.Reverse();
+        return string.Join(" > ", parts);
     }
 
     public virtual void VisitSpace(Space space, RpcSendQueue q)
@@ -738,29 +757,41 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     /// Produces a signature string for a JavaType, used as the identity function
     /// for GetAndSendListAsRef. Matches DefaultJavaTypeSignatureBuilder.java.
     /// </summary>
+    [ThreadStatic] private static HashSet<JavaType>? _typeSignatureStack;
+
     private static object TypeSignature(JavaType type)
     {
-        return type switch
+        _typeSignatureStack ??= new HashSet<JavaType>(ReferenceEqualityComparer.Instance);
+        if (!_typeSignatureStack.Add(type))
+            return "{circular}";
+        try
         {
-            JavaType.Primitive p => p.Keyword,
-            JavaType.Class c => c.FullyQualifiedName,
-            JavaType.Parameterized p => TypeSignature(p.Type!) + "<" +
-                string.Join(", ", (p.TypeParameters ?? []).Select(TypeSignature)) + ">",
-            JavaType.GenericTypeVariable g => "Generic{" + g.Name + "}",
-            JavaType.Array a => TypeSignature(a.ElemType!) + "[]",
-            JavaType.Method m => TypeSignature(m.DeclaringType!) +
-                "{name=" + m.Name + ",return=" + TypeSignature(m.ReturnType!) +
-                ",parameters=[" + string.Join(",", (m.ParameterTypes ?? []).Select(TypeSignature)) + "]}",
-            JavaType.Variable v => TypeSignature(v.Owner!) +
-                "{name=" + v.Name + ",type=" + TypeSignature(v.Type!) + "}",
-            JavaType.MultiCatch mc => string.Join("|",
-                (mc.ThrowableTypes ?? []).Select(TypeSignature)),
-            JavaType.Intersection i => string.Join(" & ",
-                (i.Bounds ?? []).Select(TypeSignature)),
-            JavaType.Annotation a => "@" + (a.AnnotationType != null ? TypeSignature(a.AnnotationType) : "{undefined}"),
-            JavaType.Unknown => "{undefined}",
-            _ => "{undefined}"
-        };
+            return type switch
+            {
+                JavaType.Primitive p => p.Keyword,
+                JavaType.Class c => c.FullyQualifiedName,
+                JavaType.Parameterized p => TypeSignature(p.Type!) + "<" +
+                    string.Join(", ", (p.TypeParameters ?? []).Select(TypeSignature)) + ">",
+                JavaType.GenericTypeVariable g => "Generic{" + g.Name + "}",
+                JavaType.Array a => TypeSignature(a.ElemType!) + "[]",
+                JavaType.Method m => TypeSignature(m.DeclaringType!) +
+                    "{name=" + m.Name + ",return=" + TypeSignature(m.ReturnType!) +
+                    ",parameters=[" + string.Join(",", (m.ParameterTypes ?? []).Select(TypeSignature)) + "]}",
+                JavaType.Variable v => TypeSignature(v.Owner!) +
+                    "{name=" + v.Name + ",type=" + TypeSignature(v.Type!) + "}",
+                JavaType.MultiCatch mc => string.Join("|",
+                    (mc.ThrowableTypes ?? []).Select(TypeSignature)),
+                JavaType.Intersection i => string.Join(" & ",
+                    (i.Bounds ?? []).Select(TypeSignature)),
+                JavaType.Annotation a => "@" + (a.AnnotationType != null ? TypeSignature(a.AnnotationType) : "{undefined}"),
+                JavaType.Unknown => "{undefined}",
+                _ => "{undefined}"
+            };
+        }
+        finally
+        {
+            _typeSignatureStack.Remove(type);
+        }
     }
 
     private static string GetPrimitiveKeyword(JavaType.PrimitiveKind kind) => kind switch
