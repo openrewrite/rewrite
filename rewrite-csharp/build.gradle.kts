@@ -89,7 +89,7 @@ tasks.withType<Test> {
     dependsOn(csharpBuild)
 
     maxParallelForks = 1
-    maxHeapSize = "4g"
+    maxHeapSize = "8g"
     // Add timeout to identify hanging tests
     systemProperty("junit.jupiter.execution.timeout.default", "30s")
     // Show test names as they run
