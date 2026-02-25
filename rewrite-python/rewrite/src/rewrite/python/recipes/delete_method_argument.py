@@ -21,9 +21,12 @@ from dataclasses import field
 from typing import Any, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor, option
+from rewrite.decorators import categorize
+from rewrite.marketplace import Python
 from rewrite.rpc.java_recipe import prepare_java_recipe, JavaRecipeVisitor, PreparedJavaRecipe
 
 
+@categorize(Python)
 class DeleteMethodArgument(Recipe):
     """
     Remove an argument from method invocations matching a pattern.
@@ -51,8 +54,8 @@ class DeleteMethodArgument(Recipe):
 
     def __init__(
         self,
-        method_pattern: str,
-        argument_index: int
+        method_pattern: str = "",
+        argument_index: int = 0
     ):
         self.method_pattern = method_pattern
         self.argument_index = argument_index
