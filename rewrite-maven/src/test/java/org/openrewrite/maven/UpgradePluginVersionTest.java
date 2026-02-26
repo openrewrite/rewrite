@@ -941,4 +941,86 @@ class UpgradePluginVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/992")
+    @Test
+    void shouldNotAddVersionWhenManagedByParent() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "org.apache.maven.plugins",
+            "maven-compiler-plugin",
+            "3.11.0",
+            null,
+            null,
+            true
+          )),
+          pomXml(
+            """
+              <project>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app-parent</artifactId>
+                <version>1</version>
+                <packaging>pom</packaging>
+                <build>
+                  <pluginManagement>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <version>3.8.1</version>
+                      </plugin>
+                    </plugins>
+                  </pluginManagement>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app-parent</artifactId>
+                <version>1</version>
+                <packaging>pom</packaging>
+                <build>
+                  <pluginManagement>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <version>3.11.0</version>
+                      </plugin>
+                    </plugins>
+                  </pluginManagement>
+                </build>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>org.openrewrite.example</groupId>
+                    <artifactId>my-app-parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <artifactId>my-app-child</artifactId>
+                  <build>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                          <source>1.8</source>
+                          <target>1.8</target>
+                        </configuration>
+                      </plugin>
+                    </plugins>
+                  </build>
+                </project>
+                """
+              // No changes expected — version is managed by parent
+            )
+          )
+        );
+    }
 }
