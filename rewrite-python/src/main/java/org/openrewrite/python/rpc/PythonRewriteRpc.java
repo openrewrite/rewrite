@@ -379,6 +379,7 @@ public class PythonRewriteRpc extends RewriteRpc {
         private Path pythonPath = findDefaultPythonPath();
         private @Nullable Path log;
         private @Nullable Path pipPackagesPath;
+        private @Nullable Path recipeInstallDir;
 
         private static Path findDefaultPythonPath() {
             // Try to find a venv in the project structure
@@ -502,6 +503,19 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
+         * Set the directory where user-installed recipe packages live.
+         * This directory is added to PYTHONPATH so the RPC server can
+         * find recipe packages installed via pip.
+         *
+         * @param recipeInstallDir The directory containing recipe pip packages
+         * @return This builder
+         */
+        public Builder recipeInstallDir(@Nullable Path recipeInstallDir) {
+            this.recipeInstallDir = recipeInstallDir;
+            return this;
+        }
+
+        /**
          * Set the Python language version to parse.
          * <p>
          * Supported values:
@@ -531,8 +545,12 @@ public class PythonRewriteRpc extends RewriteRpc {
             boolean interpreterHasRewrite = isDevBuild && pipPackagesPath != null && canImportRewrite(pythonPath);
             boolean usePipPackagesPath = pipPackagesPath != null && !interpreterHasRewrite;
 
+            // Resolve version-specific subdirectory under pipPackagesPath
+            Path resolvedPipPackagesPath = null;
             if (usePipPackagesPath) {
-                bootstrapOpenrewrite(pipPackagesPath);
+                String versionDir = isDevBuild ? "dev" : version;
+                resolvedPipPackagesPath = pipPackagesPath.resolve(versionDir);
+                bootstrapOpenrewrite(resolvedPipPackagesPath);
             }
 
             Stream<@Nullable String> cmd;
@@ -562,8 +580,13 @@ public class PythonRewriteRpc extends RewriteRpc {
             List<String> pythonPathParts = new ArrayList<>();
 
             // Add pip packages path if the interpreter doesn't already have rewrite
-            if (usePipPackagesPath) {
-                pythonPathParts.add(pipPackagesPath.toAbsolutePath().normalize().toString());
+            if (resolvedPipPackagesPath != null) {
+                pythonPathParts.add(resolvedPipPackagesPath.toAbsolutePath().normalize().toString());
+            }
+
+            // Add recipe install directory to PYTHONPATH
+            if (recipeInstallDir != null) {
+                pythonPathParts.add(recipeInstallDir.toAbsolutePath().normalize().toString());
             }
 
             // If debug source path is set, use it
