@@ -116,8 +116,6 @@ class TemplateEngine:
         cls,
         template_tree: J,
         values: Dict[str, J],
-        cursor: 'Cursor',
-        coordinates: Optional[PythonCoordinates] = None
     ) -> Optional[J]:
         """
         Substitute placeholder identifiers with actual values.
@@ -125,8 +123,6 @@ class TemplateEngine:
         Args:
             template_tree: The parsed template AST.
             values: Dict mapping capture names to their AST values.
-            cursor: Current cursor position.
-            coordinates: Where/how to apply the template.
 
         Returns:
             The template with placeholders replaced by actual values.
@@ -135,13 +131,7 @@ class TemplateEngine:
 
         # Replace placeholders with actual values
         visitor = PlaceholderReplacementVisitor(values)
-        result = visitor.visit(template_tree, None)
-
-        # Apply coordinates (wrap in statement if needed, etc.)
-        if coordinates and result is not None:
-            result = cls.apply_coordinates(result, cursor, coordinates)
-
-        return result
+        return visitor.visit(template_tree, None)
 
     @classmethod
     def _make_cache_key(

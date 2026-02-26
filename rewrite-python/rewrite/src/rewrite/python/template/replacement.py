@@ -67,11 +67,13 @@ _BINARY_PRECEDENCE: Dict[object, int] = {
 
 
 def _get_precedence(expr: J) -> Optional[int]:
-    """Return the precedence of an expression, or None if not a binary op."""
+    """Return the precedence of an expression, or None if not an operator node."""
     if isinstance(expr, j.Binary):
         return _BINARY_PRECEDENCE.get(expr.operator)
     if isinstance(expr, py.Binary):
         return _BINARY_PRECEDENCE.get(expr.operator)
+    if isinstance(expr, j.Unary) and expr.operator == j.Unary.Type.Not:
+        return 3  # `not` sits between `and` (2) and comparisons (4)
     return None
 
 
@@ -110,6 +112,11 @@ def _needs_parens_under_not(child: J) -> bool:
 def maybe_parenthesize(result: J, cursor: 'Cursor') -> J:
     """Wrap *result* in parentheses when its precedence is lower than the
     surrounding context (the cursor's parent tree node).
+
+    This handles the *outer* boundary: whether the template result as a whole
+    needs parentheses relative to where it is being inserted in the tree.
+    The *inner* operand parenthesization (within the template result itself)
+    is handled by ``PlaceholderReplacementVisitor.visit_binary`` / ``visit_unary``.
 
     This mirrors ``ParenthesizeVisitor.maybeParenthesize`` in the Java
     ``JavaTemplate`` implementation.

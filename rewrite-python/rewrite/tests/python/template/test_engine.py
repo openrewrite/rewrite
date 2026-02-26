@@ -329,7 +329,7 @@ class TestAutoFormatIntegration:
         )
 
     def test_apply_coordinates_no_cu_context_does_not_crash(self):
-        """_apply_coordinates with cursor lacking CU context doesn't crash."""
+        """apply_coordinates with cursor lacking CU context doesn't crash."""
         from rewrite.visitor import Cursor
         from rewrite.python.template.coordinates import PythonCoordinates
 
@@ -340,5 +340,5 @@ class TestAutoFormatIntegration:
         coordinates = PythonCoordinates.replace(original)
         cursor = Cursor(parent=Cursor(None, Cursor.ROOT_VALUE), value=original)
 
-        out = TemplateEngine._apply_coordinates(result, cursor, coordinates)
+        out = TemplateEngine.apply_coordinates(result, cursor, coordinates)
         assert out is not None

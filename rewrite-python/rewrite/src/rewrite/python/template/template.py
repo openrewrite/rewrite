@@ -143,7 +143,6 @@ class Template:
             result = TemplateEngine.apply_substitutions(
                 template_tree,
                 values_dict,
-                cursor,
             )
         else:
             result = template_tree
@@ -151,7 +150,7 @@ class Template:
         # Phase 2: parenthesize the result if it has lower precedence than
         # the surrounding context, mirroring JavaTemplate.doApply().
         # This must happen before coordinates are applied, because
-        # _apply_coordinates may wrap the expression in ExpressionStatement.
+        # apply_coordinates may wrap the expression in ExpressionStatement.
         if result is not None and cursor is not None:
             from .replacement import maybe_parenthesize
             result = maybe_parenthesize(result, cursor)
