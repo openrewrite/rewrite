@@ -27,7 +27,7 @@ from rewrite.python.visitor import PythonVisitor
 from .placeholder import from_placeholder
 
 if TYPE_CHECKING:
-    pass
+    from rewrite.visitor import Cursor
 
 
 # Operator precedence for Python binary operators (higher number = higher precedence).
@@ -67,11 +67,13 @@ _BINARY_PRECEDENCE: Dict[object, int] = {
 
 
 def _get_precedence(expr: J) -> Optional[int]:
-    """Return the precedence of an expression, or None if not a binary op."""
+    """Return the precedence of an expression, or None if not an operator node."""
     if isinstance(expr, j.Binary):
         return _BINARY_PRECEDENCE.get(expr.operator)
     if isinstance(expr, py.Binary):
         return _BINARY_PRECEDENCE.get(expr.operator)
+    if isinstance(expr, j.Unary) and expr.operator == j.Unary.Type.Not:
+        return 3  # `not` sits between `and` (2) and comparisons (4)
     return None
 
 
@@ -105,6 +107,41 @@ def _needs_parens_under_not(child: J) -> bool:
         return False
     # `not` has precedence 3 (between `and` at 2 and comparisons at 4)
     return child_prec < 3
+
+
+def maybe_parenthesize(result: J, cursor: 'Cursor') -> J:
+    """Wrap *result* in parentheses when its precedence is lower than the
+    surrounding context (the cursor's parent tree node).
+
+    This handles the *outer* boundary: whether the template result as a whole
+    needs parentheses relative to where it is being inserted in the tree.
+    The *inner* operand parenthesization (within the template result itself)
+    is handled by ``PlaceholderReplacementVisitor.visit_binary`` / ``visit_unary``.
+
+    This mirrors ``ParenthesizeVisitor.maybeParenthesize`` in the Java
+    ``JavaTemplate`` implementation.
+    """
+    if not isinstance(result, (j.Binary, py.Binary, j.Unary)):
+        return result
+
+    parent_cursor = cursor.parent_tree_cursor()
+    parent = parent_cursor.value
+    if not isinstance(parent, J):
+        return result
+
+    # Parent is a binary operator — check precedence
+    if isinstance(parent, (j.Binary, py.Binary)):
+        parent_prec = _get_precedence(parent)
+        result_prec = _get_precedence(result)
+        if parent_prec is not None and result_prec is not None and result_prec < parent_prec:
+            return _wrap_in_parens(result)
+
+    # Parent is `not` — or/and need parens underneath
+    if isinstance(parent, j.Unary) and parent.operator == j.Unary.Type.Not:
+        if _needs_parens_under_not(result):
+            return _wrap_in_parens(result)
+
+    return result
 
 
 class PlaceholderReplacementVisitor(PythonVisitor[None]):

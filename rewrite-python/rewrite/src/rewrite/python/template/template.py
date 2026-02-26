@@ -138,27 +138,32 @@ class Template:
                 # Assume it's a MatchResult
                 values_dict = values.as_dict()
 
-        # Apply substitutions
+        # Phase 1: placeholder substitution (no coordinates yet)
         if values_dict:
             result = TemplateEngine.apply_substitutions(
                 template_tree,
                 values_dict,
-                cursor,
-                coordinates,
             )
         else:
             result = template_tree
 
-        # If no explicit coordinates, create default replacement coordinates
-        if coordinates is None and cursor is not None:
+        # Phase 2: parenthesize the result if it has lower precedence than
+        # the surrounding context, mirroring JavaTemplate.doApply().
+        # This must happen before coordinates are applied, because
+        # apply_coordinates may wrap the expression in ExpressionStatement.
+        if result is not None and cursor is not None:
+            from .replacement import maybe_parenthesize
+            result = maybe_parenthesize(result, cursor)
+
+        # Phase 3: apply coordinates (prefix preservation, statement wrapping, auto-format)
+        effective_coords = coordinates
+        if effective_coords is None and cursor is not None:
             tree = cursor.value
             if tree is not None:
-                result = TemplateEngine.apply_substitutions(
-                    result if values_dict else template_tree,
-                    values_dict,
-                    cursor,
-                    PythonCoordinates.replace(tree),
-                )
+                effective_coords = PythonCoordinates.replace(tree)
+
+        if effective_coords is not None and result is not None:
+            result = TemplateEngine.apply_coordinates(result, cursor, effective_coords)
 
         return result
 
