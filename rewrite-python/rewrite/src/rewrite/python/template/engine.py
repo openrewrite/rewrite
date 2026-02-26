@@ -139,7 +139,7 @@ class TemplateEngine:
 
         # Apply coordinates (wrap in statement if needed, etc.)
         if coordinates and result is not None:
-            result = cls._apply_coordinates(result, cursor, coordinates)
+            result = cls.apply_coordinates(result, cursor, coordinates)
 
         return result
 
@@ -286,7 +286,7 @@ class TemplateEngine:
         return statements[0]
 
     @classmethod
-    def _apply_coordinates(
+    def apply_coordinates(
         cls,
         result: J,
         cursor: 'Cursor',
