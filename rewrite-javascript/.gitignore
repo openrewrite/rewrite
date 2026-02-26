@@ -4,4 +4,4 @@ rpc.*.log
 /.rewrite
 /.working-dir
 
-src/main/resources/META-INF/version.txt
+src/main/resources/META-INF/rewrite-javascript-version.txt

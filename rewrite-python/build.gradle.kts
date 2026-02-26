@@ -222,12 +222,12 @@ val pythonVersion: String = if (System.getenv("CI") != null) {
     project.version.toString().replace("-SNAPSHOT", ".dev0")
 }
 
-// Write version.txt resource so PythonRewriteRpc can pin the pip package version
+// Write rewrite-python-version.txt resource so PythonRewriteRpc can pin the pip package version
 val generateVersionTxt by tasks.registering {
     group = "python"
-    description = "Generate META-INF/version.txt for RPC version pinning"
+    description = "Generate META-INF/rewrite-python-version.txt for RPC version pinning"
 
-    val versionTxt = file("src/main/resources/META-INF/version.txt")
+    val versionTxt = file("src/main/resources/META-INF/rewrite-python-version.txt")
     inputs.property("version", pythonVersion)
     outputs.file(versionTxt)
 
@@ -401,6 +401,6 @@ val printTestClasspath by tasks.registering {
 }
 
 extensions.configure<LicenseExtension> {
-    exclude("**/version.txt")
+    exclude("**/rewrite-python-version.txt")
 }
 

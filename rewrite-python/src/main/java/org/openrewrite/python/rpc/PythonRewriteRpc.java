@@ -542,7 +542,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             // version takes precedence. For release/CI builds, always use pipPackagesPath
             // to ensure the correct pinned version.
             String version = StringUtils.readFully(
-                    PythonRewriteRpc.class.getResourceAsStream("/META-INF/version.txt")).trim();
+                    PythonRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-python-version.txt")).trim();
             boolean isDevBuild = version.isEmpty() || version.endsWith(".dev0");
             boolean interpreterHasRewrite = isDevBuild && pipPackagesPath != null && canImportRewrite(pythonPath);
             boolean usePipPackagesPath = pipPackagesPath != null && !interpreterHasRewrite;

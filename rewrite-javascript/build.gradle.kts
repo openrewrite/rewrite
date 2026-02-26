@@ -72,7 +72,7 @@ fun extractVersionFromJar(): String? {
     if (!jarFile.exists()) return null
 
     return zipTree(jarFile).matching {
-        include("META-INF/version.txt")
+        include("META-INF/rewrite-javascript-version.txt")
     }.singleFile.readText().trim()
 }
 
@@ -129,7 +129,7 @@ val npmBuild = tasks.register<NpmTask>("npmBuild") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(file("rewrite/dist/"))
 
-    val versionTxt = file("src/main/resources/META-INF/version.txt")
+    val versionTxt = file("src/main/resources/META-INF/rewrite-javascript-version.txt")
     outputs.file(versionTxt)
     doLast {
         versionTxt.writeText(datedSnapshotVersion)
@@ -138,7 +138,7 @@ val npmBuild = tasks.register<NpmTask>("npmBuild") {
     args = listOf("run", "build")
 }
 
-// Because each of these sees version.txt as an input
+// Because each of these sees rewrite-javascript-version.txt as an input
 listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
     tasks.named(it) {
         dependsOn(npmBuild)
@@ -240,7 +240,7 @@ tasks.named("publish") {
 
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
-    exclude("**/version.txt")
+    exclude("**/rewrite-javascript-version.txt")
 //    includePatterns.addAll(
 //        listOf("**/*.ts")
 //    )
