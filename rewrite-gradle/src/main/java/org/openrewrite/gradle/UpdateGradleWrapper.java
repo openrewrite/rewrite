@@ -46,7 +46,9 @@ import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
 import static org.openrewrite.internal.StringUtils.isBlank;
 
-@Value
+@Getter
+@RequiredArgsConstructor
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = false)
 public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.GradleWrapperState> {
 
