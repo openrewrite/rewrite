@@ -153,19 +153,22 @@ public class GradleWrapper {
                         });
                 List<GradleVersion> allGradleVersions = new ArrayList<>(gradleVersions.size() * 2);
                 for (GradleVersion gradleVersion : gradleVersions) {
+                    String downloadUrl = migrateToDownloadsUrl(gradleVersion.downloadUrl);
+                    String checksumUrl = migrateToDownloadsUrl(gradleVersion.checksumUrl);
+                    String wrapperChecksumUrl = migrateToDownloadsUrl(gradleVersion.wrapperChecksumUrl);
                     allGradleVersions.add(new GradleVersion(
                             gradleVersion.version,
-                            gradleVersion.downloadUrl,
+                            downloadUrl,
                             DistributionType.Bin,
-                            gradleVersion.checksumUrl,
-                            gradleVersion.wrapperChecksumUrl
+                            checksumUrl,
+                            wrapperChecksumUrl
                     ));
                     allGradleVersions.add(new GradleVersion(
                             gradleVersion.version,
-                            gradleVersion.downloadUrl.replace("-bin.zip", "-all.zip"),
+                            downloadUrl.replace("-bin.zip", "-all.zip"),
                             DistributionType.All,
-                            gradleVersion.checksumUrl == null ? null : gradleVersion.checksumUrl.replace("-bin.zip", "-all.zip"),
-                            gradleVersion.wrapperChecksumUrl
+                            checksumUrl == null ? null : checksumUrl.replace("-bin.zip", "-all.zip"),
+                            wrapperChecksumUrl
                     ));
                 }
                 return allGradleVersions;
@@ -201,6 +204,10 @@ public class GradleWrapper {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    private static @Nullable String migrateToDownloadsUrl(@Nullable String url) {
+        return url == null ? null : url.replace(GRADLE_SERVICES_URL, GRADLE_DOWNLOADS_URL);
     }
 
     private static final Pattern GRADLE_VERSION_PATTERN = Pattern.compile("gradle-([0-9.]+)");
