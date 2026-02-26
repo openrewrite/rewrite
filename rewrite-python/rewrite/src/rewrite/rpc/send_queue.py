@@ -316,7 +316,14 @@ class RpcSendQueue:
             return None
         if isinstance(obj, bool):
             return obj
-        if isinstance(obj, (int, str)):
+        if isinstance(obj, int):
+            # Integers exceeding Java's long range cannot be serialized as
+            # JSON numbers (Jackson's StreamReadConstraints rejects them).
+            # Convert to string — the original source is preserved in valueSource.
+            if obj > 9223372036854775807 or obj < -9223372036854775808:
+                return str(obj)
+            return obj
+        if isinstance(obj, str):
             return obj
         if isinstance(obj, float):
             # Special float values (inf, nan) are not valid JSON
