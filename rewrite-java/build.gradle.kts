@@ -64,7 +64,7 @@ dependencies {
     testImplementation("org.yaml:snakeyaml:latest.release")
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-java-test"))
-    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly(project(":rewrite-java-25"))
     testImplementation("com.tngtech.archunit:archunit:1.0.1")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.0.1")
     testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
@@ -78,7 +78,7 @@ dependencies {
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
 
