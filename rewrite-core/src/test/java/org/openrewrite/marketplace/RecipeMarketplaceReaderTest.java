@@ -350,6 +350,44 @@ class RecipeMarketplaceReaderTest {
         assertThat(rtJsListing.getBundle().getRequestedVersion()).isEqualTo(requestedVersion);
     }
 
+    @Test
+    void nullLiteralVersionIsTreatedAsNull() {
+        // When a CSV contains the literal string "null" for version/requestedVersion,
+        // the reader should treat it as null (not the string "null")
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName,requestedVersion,version
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Unnecessary Parentheses,Removes unnecessary parentheses,Java Cleanup,maven,org.openrewrite:rewrite-java,null,null
+          """);
+
+        RecipeListing listing = marketplace.getAllRecipes().iterator().next();
+        RecipeBundle bundle = listing.getBundle();
+        assertThat(bundle.getRequestedVersion()).isNull();
+        assertThat(bundle.getVersion()).isNull();
+    }
+
+    @Test
+    void roundTripPreservesNullVersions() {
+        // Create a marketplace with null versions, write to CSV, read back,
+        // and verify versions remain null (not the string "null")
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Unnecessary Parentheses,Removes unnecessary parentheses,Java Cleanup,maven,org.openrewrite:rewrite-java
+          """);
+
+        // Verify initial state has null versions
+        RecipeListing listing = marketplace.getAllRecipes().iterator().next();
+        assertThat(listing.getBundle().getVersion()).isNull();
+        assertThat(listing.getBundle().getRequestedVersion()).isNull();
+
+        // Round-trip through CSV
+        @Language("csv") String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+        RecipeMarketplace roundTripped = new RecipeMarketplaceReader().fromCsv(csv);
+
+        RecipeListing rtListing = roundTripped.getAllRecipes().iterator().next();
+        assertThat(rtListing.getBundle().getVersion()).isNull();
+        assertThat(rtListing.getBundle().getRequestedVersion()).isNull();
+    }
+
     private void setVersionRecursive(RecipeMarketplace.Category category, String packageName,
                                      String requestedVersion, String version) {
         for (RecipeListing recipe : category.getRecipes()) {
