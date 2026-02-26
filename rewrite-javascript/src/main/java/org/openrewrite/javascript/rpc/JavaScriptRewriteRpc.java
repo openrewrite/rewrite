@@ -333,7 +333,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
                 );
             } else {
-                String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
+                String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/rewrite-javascript-version.txt"));
                 cmd = Stream.of(
                         npxPath.toString(),
                         // For SNAPSHOT versions, assume npm link has been run and don't use --package
