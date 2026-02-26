@@ -31,7 +31,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.CategoryDescriptor;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.OptionDescriptor;
-import org.openrewrite.internal.StringUtils;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -95,7 +94,6 @@ public class RecipeMarketplaceReader {
         CsvParserSettings settings = new CsvParserSettings();
         settings.setLineSeparatorDetectionEnabled(true);
         settings.setHeaderExtractionEnabled(false);
-        settings.setNullValue("");
         settings.setDelimiterDetectionEnabled(true, ',', '\t', ';');
         // Allow larger content in columns (e.g., long recipe descriptions)
         settings.setMaxCharsPerColumn(-1); // No limit
@@ -159,7 +157,7 @@ public class RecipeMarketplaceReader {
             String value = row[i];
             if (value != null) {
                 value = value.trim();
-                if (StringUtils.isBlank(value) || "null".equals(value)) {
+                if ("null".equals(value)) {
                     value = null;
                 }
             }
