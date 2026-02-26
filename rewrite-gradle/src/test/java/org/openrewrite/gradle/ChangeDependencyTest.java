@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.properties.Assertions.properties;
 
 class ChangeDependencyTest implements RewriteTest {
     @Override
@@ -238,6 +239,12 @@ class ChangeDependencyTest implements RewriteTest {
     void worksWithGString() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          properties(
+            """
+              commonsLangVersion=2.6
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
           buildGradle(
             """
               plugins {
@@ -248,9 +255,8 @@ class ChangeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              def version = '2.6'
               dependencies {
-                  implementation platform("commons-lang:commons-lang:${version}")
+                  implementation platform("commons-lang:commons-lang:${commonsLangVersion}")
               }
               """,
             """
@@ -262,9 +268,8 @@ class ChangeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              def version = '2.6'
               dependencies {
-                  implementation platform("org.apache.commons:commons-lang3:${version}")
+                  implementation platform("org.apache.commons:commons-lang3:${commonsLangVersion}")
               }
               """
           )
@@ -548,6 +553,12 @@ class ChangeDependencyTest implements RewriteTest {
     void kotlinDslStringInterpolation() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          properties(
+            """
+              commonsLangVersion=2.6
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
           buildGradleKts(
             """
               plugins {
@@ -558,8 +569,8 @@ class ChangeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
+              val commonsLangVersion: String by project
               dependencies {
-                  val commonsLangVersion = "2.6"
                   implementation("commons-lang:commons-lang:${commonsLangVersion}")
               }
               """,
@@ -572,8 +583,8 @@ class ChangeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
+              val commonsLangVersion: String by project
               dependencies {
-                  val commonsLangVersion = "2.6"
                   implementation("org.apache.commons:commons-lang3:${commonsLangVersion}")
               }
               """
