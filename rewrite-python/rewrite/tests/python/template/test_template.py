@@ -93,7 +93,7 @@ class TestApplySubstitutions:
         assert isinstance(tree, j.MethodInvocation)
 
         result = TemplateEngine.apply_substitutions(
-            tree, {'expr': self._ident("hello")}, cursor=None,
+            tree, {'expr': self._ident("hello")},
         )
 
         assert isinstance(result, j.MethodInvocation)
@@ -111,7 +111,7 @@ class TestApplySubstitutions:
         assert isinstance(tree, j.MethodInvocation)
 
         result = TemplateEngine.apply_substitutions(
-            tree, {'obj': self._ident("myobj")}, cursor=None,
+            tree, {'obj': self._ident("myobj")},
         )
 
         assert isinstance(result, j.MethodInvocation)
@@ -128,7 +128,7 @@ class TestApplySubstitutions:
         assert isinstance(tree, j.Binary)
 
         result = TemplateEngine.apply_substitutions(
-            tree, {'a': self._ident("x"), 'b': self._ident("y")}, cursor=None,
+            tree, {'a': self._ident("x"), 'b': self._ident("y")},
         )
 
         assert isinstance(result, j.Binary)
