@@ -490,11 +490,13 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Set the pip packages directory for recipe installations.
-         * When set, this directory will be added to PYTHONPATH and the openrewrite
-         * package will be automatically installed if not present.
+         * Set the base pip packages directory.
+         * When set, a version-specific subdirectory (e.g., {@code <pipPackagesPath>/0.5.3/}
+         * for releases, or {@code <pipPackagesPath>/dev/} for dev builds) will be resolved
+         * and added to PYTHONPATH. The openrewrite package is automatically installed
+         * into that subdirectory if not already present.
          *
-         * @param pipPackagesPath The directory where pip packages are installed
+         * @param pipPackagesPath The base directory under which version-specific pip packages are installed
          * @return This builder
          */
         public Builder pipPackagesPath(@Nullable Path pipPackagesPath) {
@@ -540,7 +542,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             // version takes precedence. For release/CI builds, always use pipPackagesPath
             // to ensure the correct pinned version.
             String version = StringUtils.readFully(
-                    PythonRewriteRpc.class.getResourceAsStream("/META-INF/version.txt"));
+                    PythonRewriteRpc.class.getResourceAsStream("/META-INF/version.txt")).trim();
             boolean isDevBuild = version.isEmpty() || version.endsWith(".dev0");
             boolean interpreterHasRewrite = isDevBuild && pipPackagesPath != null && canImportRewrite(pythonPath);
             boolean usePipPackagesPath = pipPackagesPath != null && !interpreterHasRewrite;
@@ -550,7 +552,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             if (usePipPackagesPath) {
                 String versionDir = isDevBuild ? "dev" : version;
                 resolvedPipPackagesPath = pipPackagesPath.resolve(versionDir);
-                bootstrapOpenrewrite(resolvedPipPackagesPath);
+                bootstrapOpenrewrite(resolvedPipPackagesPath, version, isDevBuild);
             }
 
             Stream<@Nullable String> cmd;
@@ -662,10 +664,8 @@ public class PythonRewriteRpc extends RewriteRpc {
          * Ensures the openrewrite Python package is installed in the pip packages directory.
          * This is required for the RPC server to start.
          */
-        private void bootstrapOpenrewrite(Path pipPackagesPath) {
-            String version = StringUtils.readFully(
-                    PythonRewriteRpc.class.getResourceAsStream("/META-INF/version.txt"));
-            boolean pinVersion = !version.isEmpty() && !version.endsWith(".dev0");
+        private void bootstrapOpenrewrite(Path pipPackagesPath, String version, boolean isDevBuild) {
+            boolean pinVersion = !isDevBuild;
 
             Path versionMarker = pipPackagesPath.resolve(".openrewrite-version");
             if (Files.exists(pipPackagesPath.resolve("rewrite"))) {
