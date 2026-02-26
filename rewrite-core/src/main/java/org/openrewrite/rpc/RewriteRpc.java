@@ -473,7 +473,15 @@ public class RewriteRpc {
                 sourceFileType,
                 log.get()
         );
-        Object remoteObject = q.receive(before, null);
+        Object remoteObject;
+        try {
+            remoteObject = q.receive(before, null);
+        } catch (Exception e) {
+            // Reset our tracking of the remote state so the next interaction
+            // forces a full object sync (ADD) instead of a delta (CHANGE).
+            remoteObjects.remove(id);
+            throw e;
+        }
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }

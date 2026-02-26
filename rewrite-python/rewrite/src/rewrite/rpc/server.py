@@ -194,7 +194,13 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
     before = remote_objects.get(obj_id)
 
     # Receive and deserialize the object (applies diffs to before state)
-    obj = receiver.receive(before, q)
+    try:
+        obj = receiver.receive(before, q)
+    except Exception:
+        # Reset our tracking of the remote state so the next interaction
+        # forces a full object sync (ADD) instead of a delta (CHANGE).
+        remote_objects.pop(obj_id, None)
+        raise
 
     # Verify we received the complete object (END_OF_OBJECT was in the final batch)
     # This matches Java's RewriteRpc.java line 474-475 which explicitly checks for END_OF_OBJECT
@@ -1036,10 +1042,9 @@ def handle_visit(params: dict) -> dict:
         if p_id:
             _execution_contexts[p_id] = ctx
 
-    # Get the tree - fetch from Java if we don't have it locally
-    tree = local_objects.get(tree_id)
-    if tree is None:
-        tree = get_object_from_java(tree_id, source_file_type)
+    # Always fetch the tree from Java to ensure we have the latest version.
+    # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
+    tree = get_object_from_java(tree_id, source_file_type)
 
     if tree is None:
         raise ValueError(f"Tree not found: {tree_id}")

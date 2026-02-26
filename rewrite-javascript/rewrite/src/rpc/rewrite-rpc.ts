@@ -137,7 +137,15 @@ export class RewriteRpc {
             );
         }, this.logger, this.traceGetObject.receive);
 
-        const remoteObject = await q.receive<P>(before as P);
+        let remoteObject: P;
+        try {
+            remoteObject = await q.receive<P>(before as P);
+        } catch (e) {
+            // Reset our tracking of the remote state so the next interaction
+            // forces a full object sync (ADD) instead of a delta (CHANGE).
+            this.remoteObjects.delete(id);
+            throw e;
+        }
 
         const eof = (await q.take());
         if (eof.state !== RpcObjectState.END_OF_OBJECT) {
