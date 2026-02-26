@@ -302,7 +302,7 @@ public class ChangeDependency extends Recipe {
                             if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
                                 updated = updated.withGav(updated.getGav().withArtifactId(newArtifactId));
                             }
-                            if (!StringUtils.isBlank(newVersion)) {
+                            if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(original.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
                                 String resolvedVersion;
                                 try {
                                     resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
@@ -315,10 +315,23 @@ public class ChangeDependency extends Recipe {
                                 }
                             }
                             if (original != updated) {
-                                String replacement = DependencyNotation.toStringNotation(updated);
-                                J.Literal newLiteral = literal.withValue(replacement)
-                                        .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
-                                m = m.withArguments(singletonList(newLiteral));
+                                if (Objects.equals(original.getVersion(), updated.getVersion())) {
+                                    // Version unchanged: preserve GString structure, only update the literal prefix
+                                    String oldGav = original.getGroupId() + ":" + original.getArtifactId();
+                                    String newGav = updated.getGroupId() + ":" + updated.getArtifactId();
+                                    String oldValue = (String) literal.getValue();
+                                    String updatedValue = oldValue.replace(oldGav, newGav);
+                                    J.Literal updatedLiteral = literal.withValue(updatedValue).withValueSource(updatedValue);
+                                    m = m.withArguments(singletonList(
+                                            gstring.withStrings(ListUtils.mapFirst(strings, s -> updatedLiteral))
+                                    ));
+                                } else {
+                                    // Version changed: collapse GString to a literal
+                                    String replacement = DependencyNotation.toStringNotation(updated);
+                                    J.Literal newLiteral = literal.withValue(replacement)
+                                            .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
+                                    m = m.withArguments(singletonList(newLiteral));
+                                }
                             }
                         }
                     }
@@ -595,7 +608,7 @@ public class ChangeDependency extends Recipe {
                             if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
                                 updated = updated.withGav(updated.getGav().withArtifactId(newArtifactId));
                             }
-                            if (!StringUtils.isBlank(newVersion)) {
+                            if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(original.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
                                 String resolvedVersion;
                                 try {
                                     resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
@@ -608,10 +621,23 @@ public class ChangeDependency extends Recipe {
                                 }
                             }
                             if (original != updated) {
-                                String replacement = DependencyNotation.toStringNotation(updated);
-                                J.Literal newLiteral = literal.withValue(replacement)
-                                        .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
-                                m = m.withArguments(singletonList(newLiteral));
+                                if (Objects.equals(original.getVersion(), updated.getVersion())) {
+                                    // Version unchanged: preserve StringTemplate structure, only update the literal prefix
+                                    String oldGav = original.getGroupId() + ":" + original.getArtifactId();
+                                    String newGav = updated.getGroupId() + ":" + updated.getArtifactId();
+                                    String oldValue = (String) literal.getValue();
+                                    String updatedValue = oldValue.replace(oldGav, newGav);
+                                    J.Literal updatedLiteral = literal.withValue(updatedValue).withValueSource(updatedValue);
+                                    m = m.withArguments(singletonList(
+                                            template.withStrings(ListUtils.mapFirst(strings, s -> updatedLiteral))
+                                    ));
+                                } else {
+                                    // Version changed: collapse StringTemplate to a literal
+                                    String replacement = DependencyNotation.toStringNotation(updated);
+                                    J.Literal newLiteral = literal.withValue(replacement)
+                                            .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
+                                    m = m.withArguments(singletonList(newLiteral));
+                                }
                             }
                         }
                     }
