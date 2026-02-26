@@ -25,6 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
@@ -38,8 +39,10 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
 import static java.util.Objects.requireNonNull;
@@ -80,6 +83,57 @@ class RewriteRpcTest implements RewriteTest {
     void after() {
         client.shutdown();
         server.shutdown();
+    }
+
+    /**
+     * Verifies that getObject() uses remoteObjects (last synced state) as the
+     * diff baseline, not localObjects. When the local side modifies a tree
+     * (e.g., via a local recipe) before calling getObject(), the localObjects
+     * entry diverges from what the remote used as its baseline. Using
+     * localObjects would cause NO_CHANGE fields to retain the local
+     * modification rather than the synced value.
+     * <p>
+     * The bug only manifests for object fields (identity-compared via ==)
+     * where the sender emits NO_CHANGE. Here, the server changes only text
+     * (a value field), so Markers — an object field preserved by reference
+     * in withText() — is sent as NO_CHANGE. If the client locally created
+     * a different Markers object, the wrong baseline would retain it.
+     */
+    @Test
+    void getObjectUsesRemoteObjectsAsBaseline() {
+        PlainText original = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .text("Hello")
+          .build();
+
+        String id = original.getId().toString();
+        String sourceFileType = PlainText.class.getName();
+
+        // Server has the tree; client fetches it → both synced
+        server.localObjects.put(id, original);
+        PlainText synced = client.getObject(id, sourceFileType);
+        UUID syncedMarkersId = synced.getMarkers().getId();
+
+        // Server modifies text only — Markers reference stays the same
+        // (original.withText() preserves the Markers by reference via @With),
+        // so the handler sends NO_CHANGE for the Markers field.
+        // Using original (not synced) ensures server's before == original.getMarkers()
+        // and after == original.withText(...).getMarkers() are the same reference.
+        server.localObjects.put(id, original.withText("Hello World"));
+
+        // Client locally modifies Markers (simulating a local recipe step),
+        // creating a new Markers object with a different ID
+        Markers localMarkers = synced.getMarkers().withId(Tree.randomId());
+        client.localObjects.put(id, synced.withMarkers(localMarkers));
+
+        // Fetch: server sends Markers=NO_CHANGE, text=CHANGE("Hello World").
+        // The receiver should apply NO_CHANGE against remoteObjects (synced
+        // markers), not localObjects (local markers).
+        PlainText result = client.getObject(id, sourceFileType);
+        assertThat(result.getText()).isEqualTo("Hello World");
+        assertThat(result.getMarkers().getId())
+          .describedAs("Markers should come from remoteObjects baseline, not localObjects")
+          .isEqualTo(syncedMarkersId);
     }
 
     @DocumentExample
