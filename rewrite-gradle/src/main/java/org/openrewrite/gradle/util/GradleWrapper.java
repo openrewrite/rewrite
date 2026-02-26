@@ -52,10 +52,8 @@ import static org.openrewrite.internal.StringUtils.formatUriForPropertiesFile;
 @Value
 public class GradleWrapper {
     private static final String GRADLE_DOWNLOADS_URL = "https://downloads.gradle.org";
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @Deprecated
-    private static final String GRADLE_SERVICES_URL = "https://services.gradle.org";
     private static final String GRADLE_DISTRIBUTIONS_URL = GRADLE_DOWNLOADS_URL + "/distributions";
+    private static final String GRADLE_SERVICES_URL = "https://services.gradle.org";
     private static final String GRADLE_VERSIONS_ALL_URL = GRADLE_SERVICES_URL + "/versions/all";
     public static final String WRAPPER_JAR_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.jar";
     public static final String WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.properties";
