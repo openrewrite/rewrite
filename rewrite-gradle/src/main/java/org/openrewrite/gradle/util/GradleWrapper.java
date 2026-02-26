@@ -56,7 +56,7 @@ public class GradleWrapper {
     @Deprecated
     private static final String GRADLE_SERVICES_URL = "https://services.gradle.org";
     private static final String GRADLE_DISTRIBUTIONS_URL = GRADLE_DOWNLOADS_URL + "/distributions";
-    private static final String GRADLE_VERSIONS_ALL_URL = GRADLE_DOWNLOADS_URL + "/versions/all";
+    private static final String GRADLE_VERSIONS_ALL_URL = GRADLE_SERVICES_URL + "/versions/all";
     public static final String WRAPPER_JAR_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.jar";
     public static final String WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.properties";
     public static final String WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH = "gradlew";
