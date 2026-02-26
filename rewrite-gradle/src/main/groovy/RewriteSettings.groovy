@@ -16,8 +16,7 @@
 //file:noinspection UnstableApiUsage
 
 
-import com.gradle.enterprise.gradleplugin.GradleEnterpriseExtension
-import com.gradle.scan.plugin.BuildScanExtension
+import com.gradle.develocity.agent.gradle.scan.BuildScanConfiguration
 import org.gradle.api.initialization.Settings
 
 interface PluginManagementSpec extends org.gradle.plugin.management.PluginManagementSpec {
@@ -25,8 +24,8 @@ interface PluginManagementSpec extends org.gradle.plugin.management.PluginManage
     void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl)
 }
 
-interface GradleEnterpriseSpec extends GradleEnterpriseExtension {
-    void buildScan(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=BuildScanExtension) Closure cl);
+interface GradleEnterpriseSpec extends BuildScanConfiguration {
+    void buildScan(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=BuildScanConfiguration) Closure cl);
 }
 
 abstract class RewriteSettings extends groovy.lang.Script implements Settings {
