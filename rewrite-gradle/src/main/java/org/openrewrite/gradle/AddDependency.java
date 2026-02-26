@@ -202,15 +202,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         if (!maybeGp.isPresent()) {
                             return s;
                         }
-                        // When onlyIfUsing is set, skip projects that don't use the specified type
                         if (onlyIfUsing != null) {
+                            // When onlyIfUsing is set, skip projects that don't use the specified type
                             if (!maybeJp.isPresent() || !acc.usingType.getOrDefault(maybeJp.get(), false)) {
                                 return s;
                             }
-                        }
-                        // When configuration needs to be inferred, also require source set info
-                        if (!hasExplicitConfiguration && onlyIfUsing != null) {
-                            if (!acc.configurationsByProject.containsKey(maybeJp.get())) {
+                            // When configuration needs to be inferred, also require source set info
+                            if (!hasExplicitConfiguration && !acc.configurationsByProject.containsKey(maybeJp.get())) {
                                 return s;
                             }
                         }
