@@ -93,7 +93,7 @@ class AssertionsTest implements RewriteTest {
           }
 
           """;
-        GradleWrapper gradleWrapper = GradleWrapper.create(URI.create("https://services.gradle.org/distributions/gradle-8.6-bin.zip"), null);
+        GradleWrapper gradleWrapper = GradleWrapper.create(URI.create("https://downloads.gradle.org/distributions/gradle-8.6-bin.zip"), null);
         rewriteRun(
           spec -> spec.beforeRecipe(Assertions.withToolingApi(gradleWrapper, alternateInit)),
           //language=groovy
