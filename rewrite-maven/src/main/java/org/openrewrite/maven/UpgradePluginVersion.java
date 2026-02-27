@@ -156,8 +156,8 @@ public class UpgradePluginVersion extends Recipe {
             private boolean hasManagedPluginVersion(ResolvedPom resolvedPom, String groupId, String artifactId) {
                 for (Plugin p : ListUtils.concatAll(resolvedPom.getPluginManagement(),
                         resolvedPom.getRequested().getPluginManagement())) {
-                    if (Objects.equals(p.getGroupId(), groupId) &&
-                            Objects.equals(p.getArtifactId(), artifactId) &&
+                    if (p.getGroupId().equals(groupId) &&
+                            p.getArtifactId().equals(artifactId) &&
                             p.getVersion() != null) {
                         return true;
                     }
