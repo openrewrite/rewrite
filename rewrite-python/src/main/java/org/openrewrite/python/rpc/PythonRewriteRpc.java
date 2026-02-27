@@ -539,14 +539,12 @@ public class PythonRewriteRpc extends RewriteRpc {
         public PythonRewriteRpc get() {
             String version = StringUtils.readFully(
                     PythonRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-python-version.txt")).trim();
-            boolean isDevBuild = version.isEmpty() || version.contains(".dev") || "unspecified".equals(version);
+            boolean isDevBuild = version.isEmpty() || version.endsWith(".dev0") || "unspecified".equals(version);
 
             Path resolvedPipPackagesPath = null;
             if (!isDevBuild) {
-                // Release version — try to find or install the pinned version.
-                // 1. Check pipPackagesPath for an existing install
-                // 2. Check if the interpreter already has the right version
-                // 3. Install to pipPackagesPath if available, otherwise fail
+                // Known version (release or published pre-release) — try to find or
+                // install the pinned version, falling back to any available install.
                 if (pipPackagesPath != null && isVersionInstalled(pipPackagesPath.resolve(version), version)) {
                     resolvedPipPackagesPath = pipPackagesPath.resolve(version);
                 } else if (hasRewriteVersion(pythonPath, version)) {
@@ -554,6 +552,10 @@ public class PythonRewriteRpc extends RewriteRpc {
                 } else if (pipPackagesPath != null) {
                     resolvedPipPackagesPath = pipPackagesPath.resolve(version);
                     bootstrapOpenrewrite(resolvedPipPackagesPath, version);
+                } else if (canImportRewrite(pythonPath)) {
+                    // Interpreter has a different version, but no pipPackagesPath to
+                    // install the right one — proceed with what's available (e.g., CI
+                    // running tests against a venv with an editable install)
                 } else {
                     throw new IllegalStateException(
                             "The Python interpreter at " + pythonPath + " does not have openrewrite " + version + ". " +
