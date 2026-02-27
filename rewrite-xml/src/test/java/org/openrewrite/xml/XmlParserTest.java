@@ -177,6 +177,46 @@ class XmlParserTest implements RewriteTest {
     }
 
     @Test
+    void jspEmptyFile() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              """,
+            spec -> spec.path("empty.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspNoHtmlContent() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <%-- This is a JSP comment that won't appear in the HTML output --%>
+              """,
+            spec -> spec.path("noHtmlContent.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspScriptletBeforeHtml() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <%-- This is a JSP comment that won't appear in the HTML output --%>
+              <% String test = "hello"; %>
+              <html></html>
+              """,
+            spec -> spec.path("scripletBeforeHtml.jsp")
+          )
+        );
+    }
+
+    @Test
     void mixedJspElements() {
         rewriteRun(
           xml(
