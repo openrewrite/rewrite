@@ -448,6 +448,30 @@ class AddToGitignoreTest implements RewriteTest {
     }
 
     @Test
+    void addEntryToFileEndingWithNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new AddToGitignore("*.log", null)),
+          text(
+            "*.tmp\n.DS_Store\n",
+            "*.tmp\n.DS_Store\n\n*.log\n",
+            spec -> spec.path(".gitignore").noTrim()
+          )
+        );
+    }
+
+    @Test
+    void addEntryToFileEndingWithWindowsNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new AddToGitignore("*.log", null)),
+          text(
+            "*.tmp\r\n.DS_Store\r\n",
+            "*.tmp\r\n.DS_Store\r\n\r\n*.log\r\n",
+            spec -> spec.path(".gitignore").noTrim()
+          )
+        );
+    }
+
+    @Test
     void doNotAddSuperfluousEntriesWithMultiplePatterns() {
         rewriteRun(
           spec -> spec.recipe(new AddToGitignore("""
