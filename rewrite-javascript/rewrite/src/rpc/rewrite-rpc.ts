@@ -133,12 +133,36 @@ export class RewriteRpc {
             );
         }, this.logger, this.traceGetObject.receive);
 
-        const remoteObject = await q.receive<P>(localObject);
+        const before = this.remoteObjects.get(id);
+        let remoteObject: P;
+        try {
+            remoteObject = await q.receive<P>(localObject);
 
-        const eof = (await q.take());
-        if (eof.state !== RpcObjectState.END_OF_OBJECT) {
-            RpcObjectData.logTrace(eof, this.traceGetObject.receive, this.logger);
-            throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
+            const eof = (await q.take());
+            if (eof.state !== RpcObjectState.END_OF_OBJECT) {
+                RpcObjectData.logTrace(eof, this.traceGetObject.receive, this.logger);
+                throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
+            }
+        } catch (e) {
+            // Tell the handler to revert both remoteObjects and localObjects
+            // to the pre-transfer state
+            try {
+                await this.connection.sendRequest(
+                    new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
+                    new GetObject(id, sourceFileType, 'revert'),
+                );
+            } catch {
+                // Best-effort revert
+            }
+            // Revert our tracking to match the handler's reverted state.
+            // The handler restored remoteObjects[id] to the pre-transfer
+            // value, so the requester must do the same to stay in sync.
+            if (before !== undefined) {
+                this.remoteObjects.set(id, before);
+            } else {
+                this.remoteObjects.delete(id);
+            }
+            throw e;
         }
 
         this.remoteObjects.set(id, remoteObject);

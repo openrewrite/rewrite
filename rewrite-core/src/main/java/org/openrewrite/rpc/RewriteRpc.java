@@ -466,13 +466,37 @@ public class RewriteRpc {
 
         RpcReceiveQueue q = new RpcReceiveQueue(
                 remoteRefs,
-                () -> send("GetObject", new GetObject(id, sourceFileType), GetObjectResponse.class),
+                () -> send("GetObject", new GetObject(id, sourceFileType, null), GetObjectResponse.class),
                 sourceFileType,
                 log.get()
         );
-        Object remoteObject = q.receive(localObject, null);
-        if (q.take().getState() != END_OF_OBJECT) {
-            throw new IllegalStateException("Expected END_OF_OBJECT");
+        Object before = remoteObjects.get(id);
+        Object remoteObject;
+        try {
+            remoteObject = q.receive(localObject, null);
+            if (q.take().getState() != END_OF_OBJECT) {
+                throw new IllegalStateException("Expected END_OF_OBJECT");
+            }
+        } catch (Exception e) {
+            // Tell the handler to revert both remoteObjects and localObjects
+            // to the pre-transfer state
+            try {
+                send("GetObject", new GetObject(id, sourceFileType, "revert"), GetObjectResponse.class);
+            } catch (Exception revertError) {
+                PrintStream logFile = log.get();
+                if (logFile != null) {
+                    revertError.printStackTrace(logFile);
+                }
+            }
+            // Revert our tracking to match the handler's reverted state.
+            // The handler restored remoteObjects[id] to the pre-transfer
+            // value, so the requester must do the same to stay in sync.
+            if (before != null) {
+                remoteObjects.put(id, before);
+            } else {
+                remoteObjects.remove(id);
+            }
+            throw e;
         }
 
         //noinspection ConstantValue
