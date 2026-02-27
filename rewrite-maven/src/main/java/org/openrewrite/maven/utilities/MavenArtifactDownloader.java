@@ -109,14 +109,15 @@ public class MavenArtifactDownloader {
             } else if ("file".equals(URI.create(uri).getScheme())) {
                 bodyStream = Files.newInputStream(Paths.get(URI.create(uri)));
             } else {
-                MavenRepository repository = dependency.getRepository();
                 HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
                 try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
                      InputStream body = response.getBody()) {
                     if (!response.isSuccessful() || body == null) {
                         int code = response.getCode();
                         // If credentials caused a client-side error, retry anonymously
-                        boolean hadAuth = serverIdToServer.get(repository.getId()) != null || repository.getUsername() != null && repository.getPassword() != null;
+                        MavenRepository repository = dependency.getRepository();
+                        boolean hadAuth = serverIdToServer.get(repository.getId()) != null ||
+                                repository.getUsername() != null && repository.getPassword() != null;
                         if (hadAuth && code >= 400 && code <= 499 && code != 408 && code != 425 && code != 429) {
                             bodyStream = downloadAnonymously(uri);
                             if (bodyStream != null) {
