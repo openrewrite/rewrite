@@ -291,17 +291,7 @@ public class MavenSettings {
         }
 
         private Server interpolate(Server server) {
-            String username = interpolate(server.username);
-            String password = interpolate(server.password);
-            // Null out credentials that still contain unresolved placeholders (e.g. unset env vars)
-            // to avoid sending literal "${env.FOO}" as credentials, which causes 403 errors
-            if (username != null && username.contains("${")) {
-                username = null;
-            }
-            if (password != null && password.contains("${")) {
-                password = null;
-            }
-            return new Server(interpolate(server.id), username, password,
+            return new Server(interpolate(server.id), interpolate(server.username), interpolate(server.password),
                     interpolate(server.configuration));
         }
 

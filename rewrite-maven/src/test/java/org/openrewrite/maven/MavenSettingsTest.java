@@ -639,13 +639,10 @@ class MavenSettingsTest {
                 """
             ), ctx);
 
-            // Non-credential placeholders remain unchanged
             assertThat(settings.getLocalRepository())
               .isEqualTo("${custom.location.zz}/maven/local/repository/");
-            // Unresolved credential placeholders are nulled out to avoid sending
-            // literal "${env.FOO}" as credentials (which causes 403 errors)
-            assertThat(settings.getServers().getServers().getFirst().getUsername()).isNull();
-            assertThat(settings.getServers().getServers().getFirst().getPassword()).isNull();
+            assertThat(settings.getServers().getServers().getFirst().getUsername()).isEqualTo("${env.PRIVATE_REPO_USERNAME_ZZ}");
+            assertThat(settings.getServers().getServers().getFirst().getPassword()).isEqualTo("${env.PRIVATE_REPO_PASSWORD_ZZ}");
         }
 
         @Test
