@@ -539,7 +539,7 @@ public class PythonRewriteRpc extends RewriteRpc {
         public PythonRewriteRpc get() {
             String version = StringUtils.readFully(
                     PythonRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-python-version.txt")).trim();
-            boolean isDevBuild = version.isEmpty() || version.endsWith(".dev0");
+            boolean isDevBuild = version.isEmpty() || version.endsWith(".dev0") || "unspecified".equals(version);
 
             Path resolvedPipPackagesPath = null;
             if (!isDevBuild) {
