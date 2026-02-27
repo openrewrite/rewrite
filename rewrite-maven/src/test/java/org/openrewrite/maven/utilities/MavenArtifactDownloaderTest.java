@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.MavenSettings;
@@ -30,6 +31,7 @@ import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.tree.*;
 
+import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -148,8 +150,8 @@ class MavenArtifactDownloaderTest {
             mockRepo.start();
 
             String repoUrl = "http://" + mockRepo.getHostName() + ":" + mockRepo.getPort();
-            MavenSettings settings = MavenSettings.parse(new org.openrewrite.Parser.Input(
-              Path.of("settings.xml"), () -> new java.io.ByteArrayInputStream(
+            MavenSettings settings = MavenSettings.parse(new Parser.Input(
+              Path.of("settings.xml"), () -> new ByteArrayInputStream(
               //language=xml
               """
                 <settings>
