@@ -16,6 +16,7 @@
 package org.openrewrite.test.internal;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
@@ -24,6 +25,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -151,6 +153,47 @@ class RewriteTestTest implements RewriteTest {
             .recipe(new ScannerEdit()),
           text("foo")
         );
+    }
+
+    @Test
+    void rejectUnconfiguredRecipeWithOptionalOrValidation() {
+        // A recipe with optional params and validate() requiring at least one
+        // fails when loaded with no arguments and default validation is enabled
+        assertThrows(AssertionError.class, () ->
+          rewriteRun(
+            spec -> spec.recipe(new RecipeWithOptionalOrValidation(null, null)),
+            new SourceSpecs[0]
+          ));
+    }
+
+    @Test
+    void acceptUnconfiguredRecipeWithOptionalOrValidationWhenSkipped() {
+        // The same recipe succeeds when validation is disabled, as
+        // assertRecipesConfigure() does for imperative recipes
+        rewriteRun(
+          spec -> spec
+            .recipe(new RecipeWithOptionalOrValidation(null, null))
+            .validateRecipe(false),
+          new SourceSpecs[0]
+        );
+    }
+
+    @Test
+    void rejectConfiguredRecipeWithOptionalOrValidationStillValidated() {
+        // When the recipe IS configured (e.g. from YAML), validation should
+        // still catch real problems like referring to non-existent sub-recipes
+        assertThrows(AssertionError.class, () ->
+          rewriteRun(
+            spec -> spec.recipeFromYaml("""
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.test.internal.StillValidated
+              displayName: Still validated
+              description: Declarative recipe with a non-existent sub-recipe should still fail validation.
+              recipeList:
+                - org.openrewrite.DoesNotExist
+
+              """, "org.openrewrite.test.internal.StillValidated")
+          ));
     }
 }
 
@@ -351,5 +394,49 @@ class GeneratesExistingFile extends ScanningRecipe<AtomicBoolean> {
           .text("generated content")
           .sourcePath(Path.of("existing.txt"))
           .build());
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+class RecipeWithOptionalOrValidation extends Recipe {
+
+    @Getter
+    final String displayName = "Recipe with optional OR validation";
+
+    @Getter
+    final String description = "Has two optional parameters where at least one must be set.";
+
+    @Option(displayName = "Option A",
+            description = "First optional parameter.",
+            example = "valueA",
+            required = false)
+    @Nullable
+    final String optionA;
+
+    @Option(displayName = "Option B",
+            description = "Second optional parameter.",
+            example = "valueB",
+            required = false)
+    @Nullable
+    final String optionB;
+
+    @JsonCreator
+    RecipeWithOptionalOrValidation(
+            @JsonProperty("optionA") @Nullable String optionA,
+            @JsonProperty("optionB") @Nullable String optionB) {
+        this.optionA = optionA;
+        this.optionB = optionB;
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(
+                Validated.required("optionA", optionA)
+                        .or(Validated.required("optionB", optionB)));
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return TreeVisitor.noop();
     }
 }
