@@ -243,6 +243,9 @@ class ChangeDependencyTest implements RewriteTest {
             """
               commonsLangVersion=2.6
               """,
+            """
+              commonsLangVersion=3.11
+              """,
             spec -> spec.path("gradle.properties")
           ),
           buildGradle(
@@ -556,6 +559,9 @@ class ChangeDependencyTest implements RewriteTest {
           properties(
             """
               commonsLangVersion=2.6
+              """,
+            """
+              commonsLangVersion=3.11
               """,
             spec -> spec.path("gradle.properties")
           ),
