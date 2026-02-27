@@ -20,7 +20,8 @@ import {extractSourcePath, withMetrics} from "./metrics";
 
 export class GetObject {
     constructor(private readonly id: string,
-                private readonly sourceFileType?: string) {
+                private readonly sourceFileType?: string,
+                private readonly action?: string) {
     }
 
     static handle(
@@ -33,6 +34,7 @@ export class GetObject {
         metricsCsv?: string,
     ): void {
         const pendingData = new Map<string, RpcObjectData[]>();
+        const actionBaseline = new Map<string, any>();
 
         connection.onRequest(
             new rpc.RequestType<GetObject, any, Error>("GetObject"),
@@ -41,6 +43,25 @@ export class GetObject {
                 metricsCsv,
                 (context) => async request => {
                     const objId = request.id;
+
+                    // Handle actions from the receiver
+                    if (request.action) {
+                        if (request.action === 'revert') {
+                            const before = actionBaseline.get(objId);
+                            actionBaseline.delete(objId);
+                            pendingData.delete(objId);
+                            if (before !== undefined) {
+                                remoteObjects.set(objId, before);
+                                localObjects.set(objId, before);
+                            } else {
+                                remoteObjects.delete(objId);
+                                localObjects.delete(objId);
+                            }
+                        }
+                        context.target = '';
+                        return [];
+                    }
+
                     if (!localObjects.has(objId)) {
                         context.target = '';
                         return [
@@ -63,10 +84,14 @@ export class GetObject {
                         const after = obj;
                         const before = remoteObjects.get(objId);
 
+                        // Save baseline for potential revert
+                        actionBaseline.set(objId, before);
+
                         allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace())
                             .generate(after, before);
                         pendingData.set(objId, allData);
 
+                        // Optimistic update — receiver sends action="revert" on failure
                         remoteObjects.set(objId, after);
                     }
 
