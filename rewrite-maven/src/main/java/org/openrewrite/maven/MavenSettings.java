@@ -439,9 +439,7 @@ public class MavenSettings {
     public static class Server {
         String id;
 
-        @Nullable
         String username;
-        @Nullable
         String password;
 
         @Nullable
