@@ -14,12 +14,14 @@
 
 """Tests for auto_format when applied to sub-trees with a cursor.
 
-When a recipe calls auto_format(node, p, cursor=self.cursor) on a node
-that is not the root CompilationUnit, the formatter must preserve the
-node's own indentation level and only adjust its children.  Previously,
-TabsAndIndentsVisitor.visit() called pre_visit() on the root element
-during setup, which set indent_type=INDENT on the cursor and caused an
-extra indentation level to be added to the node's own prefix.
+When a recipe calls auto_format(node, p, cursor=self.cursor.parent) on a
+node that is not the root CompilationUnit, the formatter must preserve the
+node's own indentation level and only adjust its children.
+
+The cursor parameter to auto_format (and visit() in general) is the
+*parent* cursor.  The visitor creates a child cursor for the tree being
+visited: Cursor(parent, tree).  Passing self.cursor.parent provides the
+correct parent context for the node being formatted.
 """
 
 from typing import Any, Optional
@@ -60,7 +62,7 @@ class _AutoFormatIfRecipe(Recipe):
                 if isinstance(if_stmt.then_part, Block):
                     stmts = if_stmt.then_part.statements
                     if len(stmts) == 1 and isinstance(stmts[0], py_tree.Pass):
-                        return auto_format(if_stmt, p, cursor=self.cursor)
+                        return auto_format(if_stmt, p, cursor=self.cursor.parent)
                 return if_stmt
 
         return Visitor()
