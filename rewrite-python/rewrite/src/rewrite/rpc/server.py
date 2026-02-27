@@ -196,16 +196,20 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
     # Receive and deserialize the object (applies diffs to before state)
     try:
         obj = receiver.receive(before, q)
+
+        # After receive() completes, END_OF_OBJECT may still be pending in a
+        # separate batch (happens when data items are an exact multiple of the
+        # handler's batchSize). Drain it — analogous to Java's explicit
+        # q.take() after receive().
+        if not received_end:
+            pull_batch()
+        if not received_end:
+            raise RuntimeError(f"Did not receive END_OF_OBJECT marker for object {obj_id}")
     except Exception:
         # Reset our tracking of the remote state so the next interaction
         # forces a full object sync (ADD) instead of a delta (CHANGE).
         remote_objects.pop(obj_id, None)
         raise
-
-    # Verify we received the complete object (END_OF_OBJECT was in the final batch)
-    # This matches Java's RewriteRpc.java line 474-475 which explicitly checks for END_OF_OBJECT
-    if not received_end:
-        raise RuntimeError(f"Did not receive END_OF_OBJECT marker for object {obj_id}")
 
     if obj is not None:
         # Update our understanding of what Java has
