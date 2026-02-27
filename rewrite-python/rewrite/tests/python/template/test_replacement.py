@@ -341,3 +341,39 @@ class TestNotAutoParenthesization:
         assert isinstance(result, j.Unary)
         # Comparisons have precedence 4 which is >= 3 (not threshold), so no parens
         assert isinstance(result.expression, j.Binary)
+
+
+class TestBlockStatementPlaceholder:
+    """Tests for placeholder replacement in statement position inside blocks.
+
+    When a template has {body} inside a block (e.g. ``if True:\\n    {body}``),
+    the parser wraps it as ``ExpressionStatement(Identifier(placeholder))``.
+    If the replacement is a non-Expression statement (Return, If, etc.),
+    the visitor must unwrap the ExpressionStatement so the block directly
+    contains the replacement statement.
+    """
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_return_in_block_placeholder(self):
+        """Substituting a Return for a block placeholder should unwrap ExpressionStatement."""
+        tree = TemplateEngine.get_template_tree(
+            "if True:\n    {body}", {'body': capture('body')}
+        )
+        return_stmt = j.Return(
+            uuid4(), Space([], '    '), Markers.EMPTY, _ident('result')
+        )
+        visitor = PlaceholderReplacementVisitor({'body': return_stmt})
+        result = visitor.visit(tree, None)
+
+        # The result should be an If statement
+        assert isinstance(result, j.If)
+        # The then-part block should contain a Return, NOT an ExpressionStatement
+        then_block = result.then_part
+        assert isinstance(then_block, j.Block)
+        stmts = then_block.statements
+        assert len(stmts) == 1
+        assert isinstance(stmts[0], j.Return), (
+            f"Expected Return in block, got {type(stmts[0]).__name__}"
+        )
