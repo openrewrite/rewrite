@@ -1,0 +1,48 @@
+---
+name: ci-ramdisk
+
+on:
+  push:
+    branches:
+      - main
+    tags-ignore:
+      - "*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-ramdisk-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GRADLE_SWITCHES: --console=plain --info --stacktrace --warning-mode=all --no-daemon
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          show-progress: false
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            25
+            21
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          develocity-access-key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+
+      - name: build
+        run: ./gradlew ${{ env.GRADLE_SWITCHES }} build
+        env:
+          TMPDIR: /dev/shm
