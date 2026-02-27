@@ -124,7 +124,11 @@ export class RewriteRpc {
     }
 
     async getObject<P>(id: string, sourceFileType?: string): Promise<P> {
-        const localObject = this.localObjects.get(id);
+        // Use the last synced state as the baseline for receiving diffs.
+        // This must match what the remote used as its baseline when computing the diff.
+        // Using localObjects here would be wrong if the local side modified the tree
+        // (e.g., via a local recipe) since the remote doesn't know about those changes.
+        const before = this.remoteObjects.get(id);
 
         const q = new RpcReceiveQueue(this.remoteRefs, sourceFileType, () => {
             return this.connection.sendRequest(
@@ -133,7 +137,15 @@ export class RewriteRpc {
             );
         }, this.logger, this.traceGetObject.receive);
 
-        const remoteObject = await q.receive<P>(localObject);
+        let remoteObject: P;
+        try {
+            remoteObject = await q.receive<P>(before as P);
+        } catch (e) {
+            // Reset our tracking of the remote state so the next interaction
+            // forces a full object sync (ADD) instead of a delta (CHANGE).
+            this.remoteObjects.delete(id);
+            throw e;
+        }
 
         const eof = (await q.take());
         if (eof.state !== RpcObjectState.END_OF_OBJECT) {
