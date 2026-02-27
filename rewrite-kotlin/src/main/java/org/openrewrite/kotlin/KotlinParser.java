@@ -96,6 +96,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.*;
@@ -171,6 +172,9 @@ public class KotlinParser implements Parser {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         ParsingEventListener parsingListener = pctx.getParsingListener();
 
+        Set<Path> dependsOnPaths = dependsOn == null ? emptySet() :
+                dependsOn.stream().map(Input::getPath).collect(Collectors.toSet());
+
         // TODO: FIR and disposable may not be necessary using the IR.
         Disposable disposable = Disposer.newDisposable();
         CompiledSource compilerCus;
@@ -216,7 +220,7 @@ public class KotlinParser implements Parser {
                                 })
                                 .limit(1))
                 .filter(Objects::nonNull)
-                .filter(source -> !source.getSourcePath().getFileName().toString().startsWith("dependsOn-"));
+                .filter(source -> !dependsOnPaths.contains(source.getSourcePath()));
     }
 
     @Override
@@ -352,7 +356,7 @@ public class KotlinParser implements Parser {
 
         public Builder dependsOn(@Language("kotlin") String... inputsAsStrings) {
             this.dependsOn = Arrays.stream(inputsAsStrings)
-                    .map(input -> Input.fromString(determinePath("dependsOn-", input), input))
+                    .map(input -> Input.fromString(determinePath("", input), input))
                     .collect(toList());
             return this;
         }
