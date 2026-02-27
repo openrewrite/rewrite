@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateProgramFile>false</GenerateProgramFile>
+
+    <!-- NuGet package metadata (IsPackable overrides Microsoft.NET.Test.Sdk default) -->
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>rewrite-csharp</ToolCommandName>
+    <PackageId>OpenRewrite.CSharp</PackageId>
+    <Version>0.0.0</Version>
+    <Authors>Moderne</Authors>
+    <Description>C# language support for OpenRewrite automated refactoring</Description>
+    <PackageProjectUrl>https://docs.openrewrite.org</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/openrewrite/rewrite</RepositoryUrl>
+    <PackageTags>openrewrite;refactoring;csharp;dotnet</PackageTags>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <!-- VSTHRD200: RPC method names must match Java-side protocol (no Async suffix) -->
+    <!-- VSTHRD002: Synchronous waits needed for RPC interop with Java peer -->
+    <NoWarn>VSTHRD200;VSTHRD002</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
+    <PackageReference Include="StreamJsonRpc" Version="2.20.20" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>
