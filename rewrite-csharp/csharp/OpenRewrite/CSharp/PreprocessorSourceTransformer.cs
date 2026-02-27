@@ -44,11 +44,13 @@ public static class PreprocessorSourceTransformer
             else if (afterHash.StartsWith("if ") || afterHash.StartsWith("if("))
             {
                 var condition = afterHash.StartsWith("if(") ? afterHash[2..] : afterHash[3..];
+                condition = StripLineComment(condition);
                 ExtractIdentifiers(condition, symbols);
             }
             else if (afterHash.StartsWith("elif ") || afterHash.StartsWith("elif("))
             {
                 var condition = afterHash.StartsWith("elif(") ? afterHash[4..] : afterHash[5..];
+                condition = StripLineComment(condition);
                 ExtractIdentifiers(condition, symbols);
             }
         }
@@ -68,9 +70,12 @@ public static class PreprocessorSourceTransformer
     /// Directive lines and excluded code lines are replaced with empty lines to preserve line count.
     /// When <paramref name="directiveLineToIndex"/> is provided, directive lines are replaced with
     /// ghost comments (<c>//DIRECTIVE:N</c>) instead of empty lines, enabling structural tracking.
+    /// When <paramref name="invertedLines"/> is provided, conditions on those lines are logically inverted,
+    /// allowing tautological conditions like <c>#if true</c> to be toggled for branch coverage.
     /// </summary>
     public static string Transform(string source, HashSet<string> definedSymbols,
-        Dictionary<int, int>? directiveLineToIndex = null)
+        Dictionary<int, int>? directiveLineToIndex = null,
+        HashSet<int>? invertedLines = null)
     {
         var lines = SplitLines(source);
         var result = new string[lines.Length];
@@ -98,14 +103,19 @@ public static class PreprocessorSourceTransformer
             if (afterHash.StartsWith("if ") || afterHash.StartsWith("if("))
             {
                 var condition = afterHash.StartsWith("if(") ? afterHash[2..] : afterHash[3..];
+                condition = StripLineComment(condition);
                 bool groupActive = stack.Count == 0 || stack.Peek().branchActive;
-                bool branchActive = groupActive && EvaluateCondition(condition, localDefines);
+                bool condResult = EvaluateCondition(condition, localDefines);
+                if (invertedLines != null && invertedLines.Contains(i))
+                    condResult = !condResult;
+                bool branchActive = groupActive && condResult;
                 stack.Push((groupActive, branchActive, branchActive));
                 result[i] = GhostForDirective(i, directiveLineToIndex);
             }
             else if (afterHash.StartsWith("elif ") || afterHash.StartsWith("elif("))
             {
                 var condition = afterHash.StartsWith("elif(") ? afterHash[4..] : afterHash[5..];
+                condition = StripLineComment(condition);
                 var (groupActive, _, anyTaken) = stack.Pop();
                 bool branchActive = groupActive && !anyTaken && EvaluateCondition(condition, localDefines);
                 stack.Push((groupActive, branchActive, anyTaken || branchActive));
@@ -218,19 +228,16 @@ public static class PreprocessorSourceTransformer
     /// Generates unique clean source permutations with deduplication.
     /// Returns list of (cleanSource, definedSymbols).
     /// The primary branch (all symbols defined) is always first.
-    /// When <paramref name="directiveLineToIndex"/> is provided, directive lines are replaced with
-    /// ghost comments (<c>//DIRECTIVE:N</c>) for structural tracking.
+    /// Uses targeted branch coverage: for each directive group, computes symbol sets
+    /// that activate each specific branch, ensuring no branch content is lost even
+    /// when the total number of symbols exceeds what brute-force enumeration can cover.
     /// </summary>
     public static List<(string CleanSource, HashSet<string> DefinedSymbols)> GenerateUniquePermutations(
         string source, HashSet<string> symbols,
         Dictionary<int, int>? directiveLineToIndex = null)
     {
         var symbolList = symbols.OrderBy(s => s).ToList();
-        int permCount = 1 << symbolList.Count;
-        if (permCount > MaxPermutations)
-            permCount = MaxPermutations;
-
-        var seen = new Dictionary<string, int>(); // hash → index in result
+        var seen = new Dictionary<string, int>();
         var result = new List<(string CleanSource, HashSet<string> DefinedSymbols)>();
 
         // Generate "all defined" first (primary branch)
@@ -239,25 +246,42 @@ public static class PreprocessorSourceTransformer
         seen[primaryClean] = 0;
         result.Add((primaryClean, allDefined));
 
-        // Generate remaining permutations
-        for (int bits = 0; bits < permCount; bits++)
+        // Add "none defined" (covers #else branches)
+        var noneDefined = new HashSet<string>();
+        var noneClean = Transform(source, noneDefined, directiveLineToIndex);
+        if (!seen.ContainsKey(noneClean))
         {
-            var defined = new HashSet<string>();
-            for (int j = 0; j < symbolList.Count && j < 30; j++)
-            {
-                if ((bits & (1 << j)) != 0)
-                    defined.Add(symbolList[j]);
-            }
+            seen[noneClean] = result.Count;
+            result.Add((noneClean, noneDefined));
+        }
 
-            // Skip if this is the "all defined" case (already added as primary)
-            if (defined.SetEquals(allDefined))
-                continue;
+        // Targeted branch coverage: for each directive group, compute symbol sets
+        // that activate each specific branch
+        var directives = GetDirectivePositions(source);
+        AddBranchCoveragePermutations(source, directives, symbols, directiveLineToIndex, seen, result);
 
-            var clean = Transform(source, defined, directiveLineToIndex);
-            if (!seen.ContainsKey(clean))
+        // If still small enough, also do brute-force for completeness
+        int permCount = 1 << symbolList.Count;
+        if (permCount <= MaxPermutations)
+        {
+            for (int bits = 0; bits < permCount; bits++)
             {
-                seen[clean] = result.Count;
-                result.Add((clean, defined));
+                var defined = new HashSet<string>();
+                for (int j = 0; j < symbolList.Count && j < 30; j++)
+                {
+                    if ((bits & (1 << j)) != 0)
+                        defined.Add(symbolList[j]);
+                }
+
+                if (defined.SetEquals(allDefined))
+                    continue;
+
+                var clean = Transform(source, defined, directiveLineToIndex);
+                if (!seen.ContainsKey(clean))
+                {
+                    seen[clean] = result.Count;
+                    result.Add((clean, defined));
+                }
             }
         }
 
@@ -265,85 +289,258 @@ public static class PreprocessorSourceTransformer
     }
 
     /// <summary>
-    /// Computes ActiveBranchIndex for each DirectiveLine based on the given branches.
-    /// For each directive:
-    /// - If: first branch where the condition evaluates to true
-    /// - Elif: first branch where all preceding conditions were false AND this condition is true
-    /// - Else: first branch where all preceding conditions were false
-    /// - Endif: -1
+    /// For each directive group (#if/#elif/#else/#endif), computes targeted symbol sets
+    /// that activate each specific branch. This ensures every branch is covered regardless
+    /// of how many total symbols exist.
+    /// Also handles tautological conditions (#if true, #if false) by generating inverted
+    /// permutations that toggle the literal condition.
+    /// </summary>
+    private static void AddBranchCoveragePermutations(
+        string source, List<DirectiveLine> directives, HashSet<string> allSymbols,
+        Dictionary<int, int>? directiveLineToIndex,
+        Dictionary<string, int> seen,
+        List<(string CleanSource, HashSet<string> DefinedSymbols)> result)
+    {
+        // Group by GroupId
+        var groups = new Dictionary<int, List<DirectiveLine>>();
+        foreach (var d in directives)
+        {
+            if (!groups.ContainsKey(d.GroupId))
+                groups[d.GroupId] = [];
+            groups[d.GroupId].Add(d);
+        }
+
+        // Build parent map: for nested groups, record enclosing group's ID
+        var parentOf = new Dictionary<int, int>();
+        var groupStack = new Stack<int>();
+        foreach (var d in directives.OrderBy(d => d.LineNumber))
+        {
+            if (d.Kind == PreprocessorDirectiveKind.If)
+            {
+                if (groupStack.Count > 0)
+                    parentOf[d.GroupId] = groupStack.Peek();
+                groupStack.Push(d.GroupId);
+            }
+            else if (d.Kind == PreprocessorDirectiveKind.Endif)
+            {
+                if (groupStack.Count > 0)
+                    groupStack.Pop();
+            }
+        }
+
+        // Compute enclosing requirements for a group — symbols needed to make
+        // all ancestor #if conditions true so nested content is reachable
+        HashSet<string> GetEnclosingRequirements(int groupId)
+        {
+            var requirements = new HashSet<string>();
+            var current = groupId;
+            while (parentOf.TryGetValue(current, out var parent))
+            {
+                if (groups.TryGetValue(parent, out var parentDirs))
+                {
+                    var ifDir = parentDirs.FirstOrDefault(d => d.Kind == PreprocessorDirectiveKind.If);
+                    if (ifDir != null)
+                    {
+                        var cond = StripLineComment(ExtractConditionFromDirectiveText(ifDir.Text));
+                        var pos = new HashSet<string>();
+                        var neg = new HashSet<string>();
+                        ExtractConditionRequirements(cond, pos, neg);
+                        requirements.UnionWith(pos);
+                        requirements.ExceptWith(neg);
+                    }
+                }
+                current = parent;
+            }
+            return requirements;
+        }
+
+        // Collect tautological #if lines that need inverted permutations
+        var tautologicalIfLines = new HashSet<int>();
+
+        foreach (var (groupId, groupDirs) in groups)
+        {
+            var precedingPositiveSymbols = new HashSet<string>();
+            bool hasTautologicalIf = false;
+            var enclosingReqs = GetEnclosingRequirements(groupId);
+
+            foreach (var dir in groupDirs)
+            {
+                if (dir.Kind == PreprocessorDirectiveKind.Endif)
+                    continue;
+
+                if (dir.Kind == PreprocessorDirectiveKind.If)
+                {
+                    var condition = StripLineComment(ExtractConditionFromDirectiveText(dir.Text));
+                    if (IsTautologicalCondition(condition) && groupDirs.Count > 2)
+                    {
+                        // This #if has a literal condition and there are other branches
+                        tautologicalIfLines.Add(dir.LineNumber);
+                        hasTautologicalIf = true;
+                    }
+                }
+
+                HashSet<string> targetSymbols;
+                if (dir.Kind == PreprocessorDirectiveKind.Else)
+                {
+                    // #else needs enclosing requirements to be reachable
+                    targetSymbols = new HashSet<string>(enclosingReqs);
+                }
+                else
+                {
+                    var condition = StripLineComment(ExtractConditionFromDirectiveText(dir.Text));
+                    var positive = new HashSet<string>();
+                    var negative = new HashSet<string>();
+                    ExtractConditionRequirements(condition, positive, negative);
+
+                    targetSymbols = new HashSet<string>(positive);
+                    targetSymbols.ExceptWith(negative);
+                    targetSymbols.ExceptWith(precedingPositiveSymbols.Except(positive));
+
+                    if (!EvaluateCondition(condition, targetSymbols))
+                    {
+                        targetSymbols = new HashSet<string>(positive);
+                        targetSymbols.ExceptWith(negative);
+                    }
+
+                    // Add enclosing requirements so nested content is reachable
+                    targetSymbols.UnionWith(enclosingReqs);
+
+                    precedingPositiveSymbols.UnionWith(positive);
+                }
+
+                if (!hasTautologicalIf)
+                {
+                    var clean = Transform(source, targetSymbols, directiveLineToIndex);
+                    if (!seen.ContainsKey(clean))
+                    {
+                        seen[clean] = result.Count;
+                        result.Add((clean, targetSymbols));
+                    }
+                }
+            }
+        }
+
+        // Generate inverted permutations for tautological conditions
+        if (tautologicalIfLines.Count > 0)
+        {
+            // Generate a permutation with all tautological #if lines inverted
+            var clean = Transform(source, allSymbols, directiveLineToIndex, tautologicalIfLines);
+            if (!seen.ContainsKey(clean))
+            {
+                seen[clean] = result.Count;
+                // Use a copy of allSymbols tagged to indicate inversion
+                result.Add((clean, new HashSet<string>(allSymbols)));
+            }
+
+            // Also generate with empty symbols + inversion
+            clean = Transform(source, new HashSet<string>(), directiveLineToIndex, tautologicalIfLines);
+            if (!seen.ContainsKey(clean))
+            {
+                seen[clean] = result.Count;
+                result.Add((clean, new HashSet<string>()));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Extracts the symbols that appear in positive and negative positions in a condition.
+    /// Positive: symbols that need to be defined for the condition to be true.
+    /// Negative: symbols behind ! that must not be defined.
+    /// </summary>
+    private static void ExtractConditionRequirements(
+        string condition, HashSet<string> positive, HashSet<string> negative)
+    {
+        var tokens = Tokenize(condition);
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            if (tokens[i] == "!" && i + 1 < tokens.Count && IsIdentifier(tokens[i + 1])
+                && tokens[i + 1] != "true" && tokens[i + 1] != "false")
+            {
+                negative.Add(tokens[i + 1]);
+                i++;
+            }
+            else if (IsIdentifier(tokens[i]) && tokens[i] != "true" && tokens[i] != "false")
+            {
+                positive.Add(tokens[i]);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Computes ActiveBranchIndex for each DirectiveLine by analyzing which branch's
+    /// clean source has content in the section after each directive.
+    /// This approach works correctly even for tautological conditions (#if true/#if false)
+    /// and inverted permutations, because it checks the actual content rather than
+    /// re-evaluating conditions.
     /// </summary>
     public static void ComputeActiveBranchIndices(
         List<DirectiveLine> directives,
         List<(string CleanSource, HashSet<string> DefinedSymbols)> branches)
     {
-        // Group directives by GroupId
-        var groups = new Dictionary<int, List<int>>(); // groupId → indices into directives list
-        for (int i = 0; i < directives.Count; i++)
-        {
-            var d = directives[i];
-            if (!groups.ContainsKey(d.GroupId))
-                groups[d.GroupId] = [];
-            groups[d.GroupId].Add(i);
-        }
+        if (directives.Count == 0 || branches.Count == 0) return;
 
-        foreach (var (groupId, indices) in groups)
+        // Pre-split each branch's clean source into lines
+        var branchLines = new string[branches.Count][];
+        for (int b = 0; b < branches.Count; b++)
+            branchLines[b] = SplitLines(branches[b].CleanSource);
+
+        // For each non-Endif directive, find the first branch where the section
+        // after that directive has non-empty content
+        for (int d = 0; d < directives.Count; d++)
         {
-            // For each branch, determine which directive in this group activates it
-            for (int di = 0; di < indices.Count; di++)
+            var directive = directives[d];
+            if (directive.Kind == PreprocessorDirectiveKind.Endif)
             {
-                var directive = directives[indices[di]];
-
-                if (directive.Kind == PreprocessorDirectiveKind.Endif)
-                {
-                    directives[indices[di]] = directive with { ActiveBranchIndex = -1 };
-                    continue;
-                }
-
-                // Find first branch where this directive's condition is the active one
-                int activeBranch = -1;
-                for (int bi = 0; bi < branches.Count; bi++)
-                {
-                    var symbols = branches[bi].DefinedSymbols;
-
-                    // Check if this directive is the one that activates for this branch
-                    bool thisIsActive = true;
-
-                    // All preceding directives in the group must evaluate to false
-                    for (int pi = 0; pi < di; pi++)
-                    {
-                        var prev = directives[indices[pi]];
-                        if (prev.Kind == PreprocessorDirectiveKind.If ||
-                            prev.Kind == PreprocessorDirectiveKind.Elif)
-                        {
-                            var condition = ExtractConditionFromDirectiveText(prev.Text);
-                            if (EvaluateCondition(condition, symbols))
-                            {
-                                thisIsActive = false;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (!thisIsActive) continue;
-
-                    // This directive must evaluate to true (for If/Elif) or be Else
-                    if (directive.Kind == PreprocessorDirectiveKind.Else)
-                    {
-                        activeBranch = bi;
-                        break;
-                    }
-
-                    var myCondition = ExtractConditionFromDirectiveText(directive.Text);
-                    if (EvaluateCondition(myCondition, symbols))
-                    {
-                        activeBranch = bi;
-                        break;
-                    }
-                }
-
-                directives[indices[di]] = directive with { ActiveBranchIndex = activeBranch };
+                directives[d] = directive with { ActiveBranchIndex = -1 };
+                continue;
             }
+
+            // Find the line range for this directive's section:
+            // from directive.LineNumber+1 to the next directive in the same group
+            int sectionStart = directive.LineNumber + 1;
+            int sectionEnd = FindNextDirectiveLineInGroup(directives, d);
+
+            int activeBranch = -1;
+            for (int b = 0; b < branches.Count; b++)
+            {
+                if (SectionHasContent(branchLines[b], sectionStart, sectionEnd))
+                {
+                    activeBranch = b;
+                    break;
+                }
+            }
+
+            directives[d] = directive with { ActiveBranchIndex = activeBranch };
         }
+    }
+
+    /// <summary>
+    /// Finds the line number of the next directive in the same group, or total line count.
+    /// </summary>
+    private static int FindNextDirectiveLineInGroup(List<DirectiveLine> directives, int currentIndex)
+    {
+        var current = directives[currentIndex];
+        for (int i = currentIndex + 1; i < directives.Count; i++)
+        {
+            if (directives[i].GroupId == current.GroupId)
+                return directives[i].LineNumber;
+        }
+        // If no next directive found in group, return a large number
+        return int.MaxValue;
+    }
+
+    /// <summary>
+    /// Checks if any line in the given range has non-empty content (not blank, not ghost comment).
+    /// </summary>
+    private static bool SectionHasContent(string[] lines, int startLine, int endLine)
+    {
+        for (int i = startLine; i < endLine && i < lines.Length; i++)
+        {
+            var trimmed = lines[i].Trim();
+            if (trimmed.Length > 0 && !trimmed.StartsWith("//DIRECTIVE:"))
+                return true;
+        }
+        return false;
     }
 
     #region Condition Evaluation
@@ -474,15 +671,19 @@ public static class PreprocessorSourceTransformer
         if (!trimmed.StartsWith('#')) return "";
         var afterHash = trimmed[1..].TrimStart();
 
+        string raw;
         if (afterHash.StartsWith("if("))
-            return afterHash[2..];
-        if (afterHash.StartsWith("if "))
-            return afterHash[3..];
-        if (afterHash.StartsWith("elif("))
-            return afterHash[4..];
-        if (afterHash.StartsWith("elif "))
-            return afterHash[5..];
-        return "";
+            raw = afterHash[2..];
+        else if (afterHash.StartsWith("if "))
+            raw = afterHash[3..];
+        else if (afterHash.StartsWith("elif("))
+            raw = afterHash[4..];
+        else if (afterHash.StartsWith("elif "))
+            raw = afterHash[5..];
+        else
+            return "";
+
+        return StripLineComment(raw);
     }
 
     private static void ExtractIdentifiers(string condition, HashSet<string> symbols)
@@ -504,6 +705,31 @@ public static class PreprocessorSourceTransformer
                 i++;
             }
         }
+    }
+
+    /// <summary>
+    /// Strips a trailing // comment from a preprocessor condition.
+    /// E.g., "true //DESKTOPGL" → "true"
+    /// </summary>
+    private static string StripLineComment(string condition)
+    {
+        // Find // that's not inside an identifier
+        for (int i = 0; i < condition.Length - 1; i++)
+        {
+            if (condition[i] == '/' && condition[i + 1] == '/')
+                return condition[..i].TrimEnd();
+        }
+        return condition.TrimEnd('\r', ' ');
+    }
+
+    /// <summary>
+    /// Checks if a stripped condition is a boolean literal that always evaluates the same
+    /// regardless of symbol definitions.
+    /// </summary>
+    private static bool IsTautologicalCondition(string strippedCondition)
+    {
+        var trimmed = strippedCondition.Trim();
+        return trimmed == "true" || trimmed == "false";
     }
 
     private static bool IsIdentifier(string s)

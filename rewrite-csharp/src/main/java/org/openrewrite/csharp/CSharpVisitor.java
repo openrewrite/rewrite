@@ -133,6 +133,42 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         return nameColon.getPadding().withName(visitRightPadded(nameColon.getPadding().getName(), CsRightPadded.Location.NAME_COLON_NAME, p));
     }
 
+    public J visitNamedExpression(Cs.NamedExpression namedExpression, P p) {
+        namedExpression = namedExpression.withPrefix(visitSpace(namedExpression.getPrefix(), CsSpace.Location.NAMED_EXPRESSION_PREFIX, p));
+        Expression tempExpression = (Expression) visitExpression(namedExpression, p);
+        if (!(tempExpression instanceof Cs.NamedExpression)) {
+            return tempExpression;
+        }
+        namedExpression = (Cs.NamedExpression) tempExpression;
+        namedExpression = namedExpression.withMarkers(visitMarkers(namedExpression.getMarkers(), p));
+        namedExpression = namedExpression.getPadding().withName(visitRightPadded(namedExpression.getPadding().getName(), CsRightPadded.Location.NAMED_EXPRESSION_NAME, p));
+        return namedExpression.withExpression(visitAndCast(namedExpression.getExpression(), p));
+    }
+
+    public J visitPropertyPattern(Cs.PropertyPattern propertyPattern, P p) {
+        propertyPattern = propertyPattern.withPrefix(visitSpace(propertyPattern.getPrefix(), CsSpace.Location.PROPERTY_PATTERN_CLAUSE_PREFIX, p));
+        Expression tempExpression = (Expression) visitExpression(propertyPattern, p);
+        if (!(tempExpression instanceof Cs.PropertyPattern)) {
+            return tempExpression;
+        }
+        propertyPattern = (Cs.PropertyPattern) tempExpression;
+        propertyPattern = propertyPattern.withMarkers(visitMarkers(propertyPattern.getMarkers(), p));
+        propertyPattern = propertyPattern.withTypeQualifier(visitAndCast(propertyPattern.getTypeQualifier(), p));
+        propertyPattern = propertyPattern.getPadding().withSubpatterns(visitContainer(propertyPattern.getPadding().getSubpatterns(), CsContainer.Location.PROPERTY_PATTERN_CLAUSE_SUBPATTERNS, p));
+        propertyPattern = propertyPattern.withDesignation(visitAndCast(propertyPattern.getDesignation(), p));
+        return propertyPattern;
+    }
+
+    public J visitPragmaChecksumDirective(Cs.PragmaChecksumDirective pragmaChecksumDirective, P p) {
+        pragmaChecksumDirective = pragmaChecksumDirective.withPrefix(visitSpace(pragmaChecksumDirective.getPrefix(), CsSpace.Location.PRAGMA_CHECKSUM_DIRECTIVE_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(pragmaChecksumDirective, p);
+        if (!(tempStatement instanceof Cs.PragmaChecksumDirective)) {
+            return tempStatement;
+        }
+        pragmaChecksumDirective = (Cs.PragmaChecksumDirective) tempStatement;
+        return pragmaChecksumDirective.withMarkers(visitMarkers(pragmaChecksumDirective.getMarkers(), p));
+    }
+
     public J visitKeyword(Cs.Keyword keyword, P p) {
         keyword = keyword.withPrefix(visitSpace(keyword.getPrefix(), CsSpace.Location.KEYWORD_PREFIX, p));
         return keyword.withMarkers(visitMarkers(keyword.getMarkers(), p));
@@ -431,6 +467,7 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         }
         lambda = (Cs.Lambda) tempExpression;
         lambda = lambda.withMarkers(visitMarkers(lambda.getMarkers(), p));
+        lambda = lambda.withAttributeLists(ListUtils.map(lambda.getAttributeLists(), el -> (Cs.AttributeList) visit(el, p)));
         lambda = lambda.withLambdaExpression(visitAndCast(lambda.getLambdaExpression(), p));
         lambda = lambda.withReturnType(visitAndCast(lambda.getReturnType(), p));
         return lambda.withModifiers(ListUtils.map(lambda.getModifiers(), el -> (J.Modifier)visit(el, p)));
@@ -464,7 +501,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         }
         usingStatement = (Cs.UsingStatement) tempStatement;
         usingStatement = usingStatement.withMarkers(visitMarkers(usingStatement.getMarkers(), p));
-        usingStatement = usingStatement.withAwaitKeyword(visitAndCast(usingStatement.getAwaitKeyword(), p));
         usingStatement = usingStatement.getPadding().withExpression(visitLeftPadded(usingStatement.getPadding().getExpression(), CsLeftPadded.Location.USING_STATEMENT_EXPRESSION, p));
         return usingStatement.withStatement(visitAndCast(usingStatement.getStatement(), p));
     }
@@ -1096,6 +1132,18 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         accessorDeclaration = accessorDeclaration.getPadding().withKind(visitLeftPadded(accessorDeclaration.getPadding().getKind(), CsLeftPadded.Location.ACCESSOR_DECLARATION_KIND, p));
         accessorDeclaration = accessorDeclaration.getPadding().withExpressionBody(visitLeftPadded(accessorDeclaration.getPadding().getExpressionBody(), CsLeftPadded.Location.ACCESSOR_DECLARATION_EXPRESSION_BODY, p));
         return accessorDeclaration.withBody(visitAndCast(accessorDeclaration.getBody(), p));
+    }
+
+    public J visitPointerDereference(Cs.PointerDereference pointerDereference, P p) {
+        pointerDereference = pointerDereference.withPrefix(visitSpace(pointerDereference.getPrefix(), CsSpace.Location.POINTER_DEREFERENCE_PREFIX, p));
+        Expression tempExpression = (Expression) visitExpression(pointerDereference, p);
+        if (!(tempExpression instanceof Cs.PointerDereference))
+        {
+            return tempExpression;
+        }
+        pointerDereference = (Cs.PointerDereference) tempExpression;
+        pointerDereference = pointerDereference.withMarkers(visitMarkers(pointerDereference.getMarkers(), p));
+        return pointerDereference.withExpression(visitAndCast(pointerDereference.getExpression(), p));
     }
 
     public J visitPointerFieldAccess(Cs.PointerFieldAccess pointerFieldAccess, P p) {

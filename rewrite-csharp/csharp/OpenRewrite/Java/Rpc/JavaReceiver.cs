@@ -38,6 +38,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             EnumValueSet evs => VisitEnumValueSet(evs, q),
             EnumValue ev => VisitEnumValue(ev, q),
             MethodDeclaration md => VisitMethodDeclaration(md, q),
+            TypeParameters tps => VisitTypeParameters(tps, q),
             TypeParameter tp => VisitTypeParameter(tp, q),
             Modifier mod => VisitModifier(mod, q),
             Return ret => VisitReturn(ret, q),
@@ -58,6 +59,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             Literal lit => VisitLiteral(lit, q),
             Identifier id => VisitIdentifier(id, q),
             FieldAccess fa => VisitFieldAccess(fa, q),
+            MemberReference mr => VisitMemberReference(mr, q),
             Binary bin => VisitBinary(bin, q),
             Ternary ter => VisitTernary(ter, q),
             Assignment asn => VisitAssignment(asn, q),
@@ -316,6 +318,19 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         return fieldAccess.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithTarget((Expression)target!).WithName(name!).WithType(type);
     }
 
+    public override J VisitMemberReference(MemberReference memberRef, RpcReceiveQueue q)
+    {
+        var containing = q.Receive(memberRef.Containing, rp => VisitRightPadded(rp, q));
+        var typeParams = q.Receive(memberRef.TypeParameters, c => VisitContainer(c, q));
+        var reference = q.Receive(memberRef.Reference, lp => VisitLeftPadded(lp, q));
+        var type = q.Receive(memberRef.Type, t => VisitType(t, q)!);
+        var methodType = q.Receive(memberRef.MethodType, t => (JavaType.Method?)VisitType(t, q));
+        var variableType = q.Receive(memberRef.VariableType, t => (JavaType.Variable?)VisitType(t, q));
+        return memberRef.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers)
+            .WithContaining(containing!).WithTypeParameters(typeParams).WithReference(reference!)
+            .WithType(type).WithMethodType(methodType).WithVariableType(variableType);
+    }
+
     public J VisitForEachControl(ForEachLoop.Control control, RpcReceiveQueue q)
     {
         var variable = q.Receive(control.Variable, rp => VisitRightPadded(rp, q));
@@ -393,7 +408,12 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     {
         var leadingAnnotations = q.ReceiveList(method.LeadingAnnotations, a => (Annotation)VisitNonNull(a, q));
         var modifiers = q.ReceiveList(method.Modifiers, m => (Modifier)VisitNonNull(m, q));
-        var typeParameters = q.Receive(method.TypeParameters, c => VisitContainer(c, q));
+        // Java stores type parameters as J.TypeParameters (tree node), not JContainer directly.
+        // Wrap for protocol compatibility, then unwrap back to JContainer.
+        TypeParameters? tpBefore = method.TypeParameters != null
+            ? TypeParameters.FromContainer(method.TypeParameters) : null;
+        var tpReceived = q.Receive(tpBefore, tp => (TypeParameters)VisitNonNull(tp, q));
+        var typeParameters = tpReceived?.ToContainer();
         var returnTypeExpression = q.Receive((J?)method.ReturnTypeExpression, el => (J)VisitNonNull(el!, q));
         // C# model does not have name annotations; consume and discard
         q.ReceiveList<Annotation>([], el => (Annotation)VisitNonNull(el, q));
@@ -539,6 +559,14 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var clazz = q.Receive((J)typeCast.Clazz, el => (J)VisitNonNull(el, q));
         var expression = q.Receive((J)typeCast.Expression, el => (J)VisitNonNull(el, q));
         return typeCast.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithClazz((ControlParentheses<TypeTree>)clazz!).WithExpression((Expression)expression!);
+    }
+
+    public virtual J VisitTypeParameters(TypeParameters typeParams, RpcReceiveQueue q)
+    {
+        var annotations = q.ReceiveList(typeParams.Annotations, a => (Annotation)VisitNonNull(a, q));
+        var @params = q.ReceiveList(typeParams.Params, p => VisitRightPadded(p, q));
+        return typeParams.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers)
+            .WithAnnotations(annotations!).WithParams(@params!);
     }
 
     public override J VisitTypeParameter(TypeParameter typeParam, RpcReceiveQueue q)

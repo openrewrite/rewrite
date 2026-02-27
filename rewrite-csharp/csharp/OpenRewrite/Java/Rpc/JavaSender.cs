@@ -27,6 +27,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             EnumValueSet evs => VisitEnumValueSet(evs, q),
             EnumValue ev => VisitEnumValue(ev, q),
             MethodDeclaration md => VisitMethodDeclaration(md, q),
+            TypeParameters tps => VisitTypeParameters(tps, q),
             TypeParameter tp => VisitTypeParameter(tp, q),
             Modifier mod => VisitModifier(mod, q),
             Return ret => VisitReturn(ret, q),
@@ -47,6 +48,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             Literal lit => VisitLiteral(lit, q),
             Identifier id => VisitIdentifier(id, q),
             FieldAccess fa => VisitFieldAccess(fa, q),
+            MemberReference mr => VisitMemberReference(mr, q),
             Binary bin => VisitBinary(bin, q),
             Ternary ter => VisitTernary(ter, q),
             Assignment asn => VisitAssignment(asn, q),
@@ -295,6 +297,17 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         return fieldAccess;
     }
 
+    public override J VisitMemberReference(MemberReference memberRef, RpcSendQueue q)
+    {
+        q.GetAndSend(memberRef, m => m.Containing, containing => VisitRightPadded(containing, q));
+        q.GetAndSend(memberRef, m => m.TypeParameters, typeParams => VisitContainer(typeParams!, q));
+        q.GetAndSend(memberRef, m => m.Reference, reference => VisitLeftPadded(reference, q));
+        q.GetAndSend(memberRef, m => AsRef(m.Type), type => VisitType(GetValueNonNull<JavaType>(type), q));
+        q.GetAndSend(memberRef, m => AsRef(m.MethodType), type => VisitType(GetValueNonNull<JavaType>(type), q));
+        q.GetAndSend(memberRef, m => AsRef(m.VariableType), type => VisitType(GetValueNonNull<JavaType>(type), q));
+        return memberRef;
+    }
+
     public J VisitForEachControl(ForEachLoop.Control control, RpcSendQueue q)
     {
         q.GetAndSend(control, c => c.Variable, variable => VisitRightPadded(variable, q));
@@ -374,7 +387,11 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     {
         q.GetAndSendList(method, m => m.LeadingAnnotations, a => a.Id, a => Visit(a, q));
         q.GetAndSendList(method, m => m.Modifiers, m2 => m2.Id, m2 => Visit(m2, q));
-        q.GetAndSend(method, m => m.TypeParameters, tp => VisitContainer(tp, q));
+        // Java stores type parameters as J.TypeParameters (a tree node), not JContainer directly.
+        // Wrap the JContainer in TypeParameters for protocol compatibility.
+        q.GetAndSend(method,
+            m => m.TypeParameters != null ? TypeParameters.FromContainer(m.TypeParameters) : null,
+            tp => Visit(tp, q));
         q.GetAndSend(method, m => m.ReturnTypeExpression, type => Visit(type, q));
         // C# model does not have name annotations; send empty list for protocol compatibility
         q.GetAndSendList(method, _ => EmptyAnnotationList, a => a.Id, a => Visit(a, q));
@@ -503,6 +520,14 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         q.GetAndSend(typeCast, t => (J)t.Clazz, clazz => Visit(clazz, q));
         q.GetAndSend(typeCast, t => (J)t.Expression, expr => Visit(expr, q));
         return typeCast;
+    }
+
+    public virtual J VisitTypeParameters(TypeParameters typeParameters, RpcSendQueue q)
+    {
+        q.GetAndSendList(typeParameters, t => t.Annotations, a => a.Id, annot => Visit(annot, q));
+        q.GetAndSendList(typeParameters, t => t.Params, r => (object)r.Element.Id,
+            mod => VisitRightPadded(mod, q));
+        return typeParameters;
     }
 
     public override J VisitTypeParameter(TypeParameter typeParam, RpcSendQueue q)

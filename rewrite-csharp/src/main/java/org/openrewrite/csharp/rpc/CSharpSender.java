@@ -123,6 +123,50 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitNamedExpression(Cs.NamedExpression namedExpression, RpcSendQueue q) {
+        q.getAndSend(namedExpression, n -> n.getPadding().getName(), el -> visitRightPadded(el, q));
+        q.getAndSend(namedExpression, Cs.NamedExpression::getExpression, el -> visit(el, q));
+        return namedExpression;
+    }
+
+    @Override
+    public J visitPropertyPattern(Cs.PropertyPattern propertyPattern, RpcSendQueue q) {
+        q.getAndSend(propertyPattern, Cs.PropertyPattern::getTypeQualifier, el -> visit(el, q));
+        q.getAndSend(propertyPattern, p -> p.getPadding().getSubpatterns(), el -> visitContainer(el, q));
+        q.getAndSend(propertyPattern, Cs.PropertyPattern::getDesignation, el -> visit(el, q));
+        return propertyPattern;
+    }
+
+    @Override
+    public J visitPragmaChecksumDirective(Cs.PragmaChecksumDirective pragmaChecksumDirective, RpcSendQueue q) {
+        q.getAndSend(pragmaChecksumDirective, Cs.PragmaChecksumDirective::getArguments);
+        return pragmaChecksumDirective;
+    }
+
+    @Override
+    public J visitNullableDirective(Cs.NullableDirective nullableDirective, RpcSendQueue q) {
+        q.getAndSend(nullableDirective, Cs.NullableDirective::getSetting);
+        q.getAndSend(nullableDirective, Cs.NullableDirective::getTarget);
+        q.getAndSend(nullableDirective, Cs.NullableDirective::getHashSpacing);
+        q.getAndSend(nullableDirective, Cs.NullableDirective::getTrailingComment);
+        return nullableDirective;
+    }
+
+    @Override
+    public J visitRegionDirective(Cs.RegionDirective regionDirective, RpcSendQueue q) {
+        q.getAndSend(regionDirective, Cs.RegionDirective::getName);
+        q.getAndSend(regionDirective, Cs.RegionDirective::getHashSpacing);
+        return regionDirective;
+    }
+
+    @Override
+    public J visitEndRegionDirective(Cs.EndRegionDirective endRegionDirective, RpcSendQueue q) {
+        q.getAndSend(endRegionDirective, Cs.EndRegionDirective::getName);
+        q.getAndSend(endRegionDirective, Cs.EndRegionDirective::getHashSpacing);
+        return endRegionDirective;
+    }
+
+    @Override
     public J visitKeyword(Cs.Keyword keyword, RpcSendQueue q) {
         q.getAndSend(keyword, Cs.Keyword::getKind);
         return keyword;
@@ -288,6 +332,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitLambda(Cs.Lambda lambda, RpcSendQueue q) {
+        q.getAndSendList(lambda, Cs.Lambda::getAttributeLists, Tree::getId, el -> visit(el, q));
         q.getAndSend(lambda, Cs.Lambda::getLambdaExpression, el -> visit(el, q));
         q.getAndSend(lambda, Cs.Lambda::getReturnType, el -> visit(el, q));
         q.getAndSendList(lambda, Cs.Lambda::getModifiers, Tree::getId, el -> visit(el, q));
@@ -310,7 +355,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitUsingStatement(Cs.UsingStatement usingStatement, RpcSendQueue q) {
-        q.getAndSend(usingStatement, Cs.UsingStatement::getAwaitKeyword, el -> visit(el, q));
         q.getAndSend(usingStatement, u -> u.getPadding().getExpression(), el -> visitLeftPadded(el, q));
         q.getAndSend(usingStatement, Cs.UsingStatement::getStatement, el -> visit(el, q));
         return usingStatement;
@@ -723,6 +767,13 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(accessorDeclaration, a -> a.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q));
         q.getAndSend(accessorDeclaration, Cs.AccessorDeclaration::getBody, el -> visit(el, q));
         return accessorDeclaration;
+    }
+
+    @Override
+    public J visitPointerDereference(Cs.PointerDereference pointerDereference, RpcSendQueue q) {
+        q.getAndSend(pointerDereference, Cs.PointerDereference::getExpression, el -> visit(el, q));
+        q.getAndSend(pointerDereference, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
+        return pointerDereference;
     }
 
     @Override

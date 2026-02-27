@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.marker;
+package org.openrewrite.csharp.marker;
 
 import lombok.Value;
 import lombok.With;
@@ -24,22 +24,26 @@ import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
+/**
+ * Marker on a ConstrainedTypeParameter that records the source-order index
+ * of its where clause, so the printer can output constraints in source order.
+ */
 @Value
 @With
-public class OmitBraces implements Marker, RpcCodec<OmitBraces> {
+public class WhereClauseOrder implements Marker, RpcCodec<WhereClauseOrder> {
     UUID id;
-
-    public OmitBraces(UUID id) {
-        this.id = id;
-    }
+    int order;
 
     @Override
-    public void rpcSend(OmitBraces after, RpcSendQueue q) {
+    public void rpcSend(WhereClauseOrder after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, WhereClauseOrder::getOrder);
     }
 
     @Override
-    public OmitBraces rpcReceive(OmitBraces before, RpcReceiveQueue q) {
-        return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+    public WhereClauseOrder rpcReceive(WhereClauseOrder before, RpcReceiveQueue q) {
+        return before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                .withOrder(q.receive(before.getOrder()));
     }
 }

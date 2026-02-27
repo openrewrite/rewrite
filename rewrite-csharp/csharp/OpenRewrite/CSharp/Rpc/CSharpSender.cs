@@ -140,6 +140,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             CsArrayType csat => VisitCsArrayType(csat, q),
             CsTryCatch cstc => VisitCsTryCatch(cstc, q),
             CsTry cstry => VisitCsTry(cstry, q),
+            PointerDereference pd => VisitPointerDereference(pd, q),
             PointerFieldAccess pfa => VisitPointerFieldAccess(pfa, q),
             RefType rt => VisitRefType(rt, q),
             AnonymousObjectCreationExpression aoce => VisitAnonymousObjectCreationExpression(aoce, q),
@@ -296,6 +297,8 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     // ---- CsLambda ----
     public override J VisitCsLambda(CsLambda csl, RpcSendQueue q)
     {
+        q.GetAndSendList(csl, c => (IList<AttributeList>)c.AttributeLists,
+            t => (object)t.Id, t => Visit(t, q));
         q.GetAndSend(csl, c => (J)c.LambdaExpression, el => Visit(el, q));
         q.GetAndSend(csl, c => (J?)c.ReturnType, el => Visit(el!, q));
         q.GetAndSendList(csl, c => c.Modifiers,
@@ -379,6 +382,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     {
         q.GetAndSend(pp, p => (J?)p.TypeQualifier, el => Visit(el!, q));
         q.GetAndSend(pp, p => p.Subpatterns, c => VisitContainer(c, q));
+        q.GetAndSend(pp, p => (J?)p.Designation, el => Visit(el!, q));
         return pp;
     }
 
@@ -406,7 +410,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
                 .Select(p => new JRightPadded<J>(p, Space.Empty, Markers.Empty))
                 .ToList(),
             rp => (object)rp.Element.Id, rp => VisitRightPadded(rp, q));
-        q.GetAndSend(istr, i => DeriveEndDelimiter(i.Delimiter));
+        q.GetAndSend(istr, i => i.EndDelimiter);
         return istr;
     }
 
@@ -522,6 +526,8 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     {
         q.GetAndSend(nd, n => (object)n.Setting);
         q.GetAndSend(nd, n => (object?)n.Target);
+        q.GetAndSend(nd, n => (object)n.HashSpacing);
+        q.GetAndSend(nd, n => (object)n.TrailingComment);
         return nd;
     }
 
@@ -529,12 +535,15 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     public override J VisitRegionDirective(RegionDirective rd, RpcSendQueue q)
     {
         q.GetAndSend(rd, r => (object?)r.Name);
+        q.GetAndSend(rd, r => (object)r.HashSpacing);
         return rd;
     }
 
     // ---- EndRegionDirective ----
     public override J VisitEndRegionDirective(EndRegionDirective erd, RpcSendQueue q)
     {
+        q.GetAndSend(erd, e => (object?)e.Name);
+        q.GetAndSend(erd, e => (object)e.HashSpacing);
         return erd;
     }
 
@@ -790,7 +799,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
 
     public override J VisitUsingStatement(UsingStatement ust, RpcSendQueue q)
     {
-        q.GetAndSend(ust, u => (J?)u.AwaitKeyword, el => Visit(el!, q));
         q.GetAndSend(ust, u => u.ExpressionPadded, lp => VisitLeftPadded(lp, q));
         q.GetAndSend(ust, u => (J)u.Statement, el => Visit(el, q));
         return ust;
@@ -1023,6 +1031,13 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(cstc, c => c.FilterExpression, lp => VisitLeftPadded(lp!, q));
         q.GetAndSend(cstc, c => (J)c.Body, el => Visit(el, q));
         return cstc;
+    }
+
+    public override J VisitPointerDereference(PointerDereference pd, RpcSendQueue q)
+    {
+        q.GetAndSend(pd, p => (J)p.Expression, el => Visit(el, q));
+        q.GetAndSend(pd, p => AsRef(p.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
+        return pd;
     }
 
     public override J VisitPointerFieldAccess(PointerFieldAccess pfa, RpcSendQueue q)
