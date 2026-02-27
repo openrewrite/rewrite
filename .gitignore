@@ -33,3 +33,4 @@ dist/
 .mypy_cache/
 .ruff_cache/
 .venv/
+CLAUDE.local.md

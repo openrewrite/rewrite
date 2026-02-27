@@ -101,6 +101,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             CsArrayType csat => VisitCsArrayType(csat, p),
             CsTryCatch cstc => VisitCsTryCatch(cstc, p),
             CsTry cstry => VisitCsTry(cstry, p),
+            PointerDereference pd => VisitPointerDereference(pd, p),
             PointerFieldAccess pfa => VisitPointerFieldAccess(pfa, p),
             RefType rt => VisitRefType(rt, p),
             AnonymousObjectCreationExpression aoce => VisitAnonymousObjectCreationExpression(aoce, p),
@@ -338,16 +339,18 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             }
         }
 
-        var newElements = new List<JRightPadded<NamedExpression>>();
+        var newElements = new List<JRightPadded<Expression>>();
         bool changed = false;
 
         foreach (var ne in pp.Subpatterns.Elements)
         {
-            var visited = VisitNamedExpression(ne.Element, p);
-            if (visited is NamedExpression sub && !ReferenceEquals(sub, ne.Element))
+            var visited = ne.Element is NamedExpression namedExpr
+                ? VisitNamedExpression(namedExpr, p)
+                : Visit(ne.Element, p);
+            if (visited is Expression expr && !ReferenceEquals(expr, ne.Element))
             {
                 changed = true;
-                newElements.Add(ne.WithElement(sub));
+                newElements.Add(ne.WithElement(expr));
             }
             else
             {
@@ -840,6 +843,16 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         Visit(csTry.Body, p);
         foreach (var c in csTry.Catches) Visit(c, p);
         return csTry;
+    }
+
+    public virtual J VisitPointerDereference(PointerDereference pointerDereference, P p)
+    {
+        var expr = Visit(pointerDereference.Expression, p);
+        if (expr is Expression e && !ReferenceEquals(e, pointerDereference.Expression))
+        {
+            return pointerDereference.WithExpression(e);
+        }
+        return pointerDereference;
     }
 
     public virtual J VisitPointerFieldAccess(PointerFieldAccess pointerFieldAccess, P p)

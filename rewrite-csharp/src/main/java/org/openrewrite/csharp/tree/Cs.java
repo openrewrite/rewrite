@@ -561,6 +561,11 @@ public interface Cs extends J {
             RightShift,
 
             /**
+             * >>> token
+             */
+            UnsignedRightShift,
+
+            /**
              * < token
              */
             LessThan,
@@ -3192,6 +3197,10 @@ public interface Cs extends J {
 
         @With
         @Getter
+        List<AttributeList> attributeLists;
+
+        @With
+        @Getter
         J.Lambda lambdaExpression;
 
         @With
@@ -3219,6 +3228,7 @@ public interface Cs extends J {
                     id,
                     prefix,
                     markers,
+                    attributeLists,
                     lambdaExpression.withType(type),
                     returnType,
                     modifiers);
@@ -3406,11 +3416,6 @@ public interface Cs extends J {
         @Getter
         Markers markers;
 
-        @With
-        @Nullable
-        @Getter
-        Keyword awaitKeyword;
-
         JLeftPadded<Expression> expression;
 
         public Expression getExpression() {
@@ -3463,7 +3468,7 @@ public interface Cs extends J {
             }
 
             public UsingStatement withExpression(JLeftPadded<Expression> expression) {
-                return t.expression == expression ? t : new UsingStatement(t.id, t.prefix, t.markers, t.awaitKeyword, expression, t.statement);
+                return t.expression == expression ? t : new UsingStatement(t.id, t.prefix, t.markers, expression, t.statement);
             }
         }
     }
@@ -4276,10 +4281,6 @@ public interface Cs extends J {
              * Represent x! syntax
              */
             SuppressNullableWarning,
-            /**
-             * Represent *ptr pointer indirection syntax (get value at pointer)
-             */
-            PointerIndirection,
             /**
              * Represent int* pointer type
              */
@@ -5553,15 +5554,19 @@ public interface Cs extends J {
         @Nullable
         TypeTree typeQualifier;
 
-        JContainer<NamedExpression> subpatterns;
+        JContainer<Expression> subpatterns;
 
-        public List<NamedExpression> getSubpatterns() {
+        public List<Expression> getSubpatterns() {
             return subpatterns.getElements();
         }
 
-        public PropertyPattern withSubpatterns(List<NamedExpression> subpatterns) {
+        public PropertyPattern withSubpatterns(List<Expression> subpatterns) {
             return getPadding().withSubpatterns(JContainer.withElements(this.subpatterns, subpatterns));
         }
+
+        @With
+        @Getter
+        J.@Nullable Identifier designation;
 
         @Override
         public @Nullable JavaType getType() {
@@ -5603,12 +5608,12 @@ public interface Cs extends J {
         public static class Padding {
             private final PropertyPattern t;
 
-            public JContainer<NamedExpression> getSubpatterns() {
+            public JContainer<Expression> getSubpatterns() {
                 return t.subpatterns;
             }
 
-            public PropertyPattern withSubpatterns(JContainer<NamedExpression> subpatterns) {
-                return t.subpatterns == subpatterns ? t : new PropertyPattern(t.id, t.prefix, t.markers, t.typeQualifier, subpatterns);
+            public PropertyPattern withSubpatterns(JContainer<Expression> subpatterns) {
+                return t.subpatterns == subpatterns ? t : new PropertyPattern(t.id, t.prefix, t.markers, t.typeQualifier, subpatterns, t.designation);
             }
         }
     }
@@ -7813,6 +7818,49 @@ public interface Cs extends J {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(access = AccessLevel.PUBLIC)
+    final class PointerDereference implements Cs, Expression {
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression expression;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitPointerDereference(this, p);
+        }
+
+        @Override
+        public JavaType getType() {
+            return expression.getType();
+        }
+
+        @Override
+        public PointerDereference withType(@Nullable JavaType type) {
+            return withExpression(expression.withType(type));
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class PointerFieldAccess implements Cs, TypeTree, Expression, Statement {
@@ -8186,6 +8234,14 @@ public interface Cs extends J {
         @Nullable
         NullableTarget target;
 
+        @With
+        @Getter
+        String hashSpacing;
+
+        @With
+        @Getter
+        String trailingComment;
+
         public enum NullableSetting {
             Enable,
             Disable,
@@ -8239,6 +8295,10 @@ public interface Cs extends J {
         @Nullable
         String name;
 
+        @With
+        @Getter
+        String hashSpacing;
+
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
             return v.visitRegionDirective(this, p);
@@ -8272,6 +8332,15 @@ public interface Cs extends J {
         @With
         @Getter
         Markers markers;
+
+        @With
+        @Getter
+        @Nullable
+        String name;
+
+        @With
+        @Getter
+        String hashSpacing;
 
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {

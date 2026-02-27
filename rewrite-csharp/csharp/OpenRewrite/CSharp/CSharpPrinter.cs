@@ -19,6 +19,70 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         return capture.ToString();
     }
 
+    /// <summary>
+    /// Visits a statement within a JRightPadded context, printing the statement,
+    /// the After space, and the statement terminator (semicolon if applicable).
+    /// </summary>
+    protected void VisitStatement(JRightPadded<Statement> paddedStat, PrintOutputCapture<P> p)
+    {
+        Visit(paddedStat.Element, p);
+        VisitSpace(paddedStat.After, p);
+        PrintStatementTerminator(paddedStat.Element, p);
+    }
+
+    /// <summary>
+    /// Prints a semicolon for statement types that require one.
+    /// Matches Java's printStatementTerminator pattern.
+    /// </summary>
+    protected void PrintStatementTerminator(Statement statement, PrintOutputCapture<P> p)
+    {
+        switch (statement)
+        {
+            // Statements that always end with ';'
+            case ExpressionStatement:
+            case Return:
+            case VariableDeclarations:
+            case Empty:
+            case Throw:
+            case Break:
+            case Continue:
+            case UsingDirective:
+            case ExternAlias:
+            case GotoStatement:
+            case DelegateDeclaration:
+            case Yield:
+                p.Append(';');
+                break;
+
+            // DoWhileLoop ends with ';' after while(condition)
+            case DoWhileLoop:
+                p.Append(';');
+                break;
+
+            // Package (file-scoped namespace) ends with ';'
+            case Package:
+                p.Append(';');
+                break;
+
+            // MethodDeclaration: check for Semicolon marker on body (abstract/extern)
+            case MethodDeclaration md when md.Body is { } body && body.Markers.FindFirst<Semicolon>() != null:
+                break; // semicolon already printed by VisitMethodDeclaration's body handling
+
+            // ClassDeclaration: check for Semicolon marker on body (record X;)
+            case ClassDeclaration cd when cd.Body.Markers.FindFirst<Semicolon>() != null:
+                break; // semicolon already printed by VisitClassDeclaration
+
+            // FieldAccess used as statement (like event accessor declarations)
+            case FieldAccess:
+                break;
+
+            default:
+                // Most other statements (If, While, For, ForEach, Try, Switch, Block, etc.)
+                // do not have statement terminators
+                break;
+        }
+    }
+
     public override J VisitCompilationUnit(CompilationUnit compilationUnit, PrintOutputCapture<P> p)
     {
         BeforeSyntax(compilationUnit, p);
@@ -26,6 +90,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         foreach (var member in compilationUnit.Members)
         {
             Visit(member, p);
+            PrintStatementTerminator(member, p);
         }
 
         VisitSpace(compilationUnit.Eof, p);
@@ -60,7 +125,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         }
 
         Visit(usingDirective.NamespaceOrType, p);
-        p.Append(';');
+        // Semicolon is printed by PrintStatementTerminator via VisitStatement
 
         AfterSyntax(usingDirective, p);
         return usingDirective;
@@ -72,7 +137,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         p.Append("namespace");
         Visit(pkg.Expression.Element, p);
         VisitSpace(pkg.Expression.After, p);
-        p.Append(';');
+        // Semicolon printed by PrintStatementTerminator
         AfterSyntax(pkg, p);
         return pkg;
     }
@@ -87,8 +152,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
         foreach (var member in ns.Members)
         {
-            Visit(member.Element, p);
-            VisitSpace(member.After, p);
+            VisitStatement(member, p);
         }
 
         VisitSpace(ns.End, p);
@@ -140,13 +204,45 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         Visit(fieldAccess.Target, p);
         VisitSpace(fieldAccess.Name.Before, p);
 
+        // Check for PointerMemberAccess marker on target PointerDereference - if present, print -> instead of .
+        var isPointerMemberAccess = fieldAccess.Target is PointerDereference pd
+            && pd.Markers.FindFirst<PointerMemberAccess>() != null;
         // Check for NullSafe marker on the name - if present, print ?. instead of .
-        var isNullSafe = fieldAccess.Name.Element.Markers.FindFirst<NullSafe>() != null;
-        p.Append(isNullSafe ? "?." : ".");
+        var nullSafe = fieldAccess.Name.Element.Markers.FindFirst<NullSafe>();
+        if (isPointerMemberAccess)
+        {
+            p.Append("->");
+        }
+        else if (nullSafe != null)
+        {
+            p.Append('?');
+            VisitSpace(nullSafe.DotPrefix, p);
+            p.Append('.');
+        }
+        else
+        {
+            p.Append('.');
+        }
 
         Visit(fieldAccess.Name.Element, p);
+
         AfterSyntax(fieldAccess, p);
         return fieldAccess;
+    }
+
+    public override J VisitMemberReference(MemberReference memberRef, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(memberRef, p);
+        Visit(memberRef.Containing.Element, p);
+        VisitSpace(memberRef.Containing.After, p);
+        p.Append('.');
+        Visit(memberRef.Reference.Element, p);
+        if (memberRef.TypeParameters != null)
+        {
+            PrintTypeArguments(memberRef.TypeParameters, p);
+        }
+        AfterSyntax(memberRef, p);
+        return memberRef;
     }
 
     public override J VisitNullableType(NullableType nullableType, PrintOutputCapture<P> p)
@@ -255,8 +351,24 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             if (!isDelegateInvocation)
             {
                 // Check for NullSafe marker on the name - if present, print ?. instead of .
-                var isNullSafe = mi.Name.Markers.FindFirst<NullSafe>() != null;
-                p.Append(isNullSafe ? "?." : ".");
+                // Check for PointerMemberAccess marker on select PointerDereference - if present, print -> instead of .
+                var nullSafe = mi.Name.Markers.FindFirst<NullSafe>();
+                var isPointerDeref = mi.Select.Element is PointerDereference selectPd
+                    && selectPd.Markers.FindFirst<PointerMemberAccess>() != null;
+                if (isPointerDeref)
+                {
+                    p.Append("->");
+                }
+                else if (nullSafe != null)
+                {
+                    p.Append('?');
+                    VisitSpace(nullSafe.DotPrefix, p);
+                    p.Append('.');
+                }
+                else
+                {
+                    p.Append('.');
+                }
                 Visit(mi.Name, p);
             }
         }
@@ -269,23 +381,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // Print type parameters if present (C# puts these after name)
         if (mi.TypeParameters != null)
         {
-            VisitSpace(mi.TypeParameters.Before, p);
-            p.Append('<');
-            for (int i = 0; i < mi.TypeParameters.Elements.Count; i++)
-            {
-                var paddedTypeArg = mi.TypeParameters.Elements[i];
-                Visit(paddedTypeArg.Element, p);
-                if (i < mi.TypeParameters.Elements.Count - 1)
-                {
-                    VisitSpace(paddedTypeArg.After, p);
-                    p.Append(',');
-                }
-                else
-                {
-                    VisitSpace(paddedTypeArg.After, p);
-                }
-            }
-            p.Append('>');
+            PrintTypeArguments(mi.TypeParameters, p);
         }
 
         // Print arguments
@@ -361,10 +457,23 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         }
 
         // Print dimensions: [size], [], [,], etc.
-        foreach (var dim in na.Dimensions)
+        for (int i = 0; i < na.Dimensions.Count; i++)
         {
-            VisitSpace(dim.Prefix, p);
-            p.Append('[');
+            var dim = na.Dimensions[i];
+            bool isContinuation = dim.Markers.FindFirst<MultiDimensionContinuation>() != null;
+
+            if (isContinuation)
+            {
+                // Within the same rank specifier — emit comma separator
+                p.Append(',');
+                VisitSpace(dim.Prefix, p);
+            }
+            else
+            {
+                // Start of a new rank specifier
+                VisitSpace(dim.Prefix, p);
+                p.Append('[');
+            }
 
             // Print the index/size if not empty
             if (dim.Index.Element is not Empty)
@@ -373,7 +482,14 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             }
 
             VisitSpace(dim.Index.After, p);
-            p.Append(']');
+
+            // Close bracket if next dim is not a continuation in the same rank specifier
+            bool nextIsContinuation = i + 1 < na.Dimensions.Count &&
+                na.Dimensions[i + 1].Markers.FindFirst<MultiDimensionContinuation>() != null;
+            if (!nextIsContinuation)
+            {
+                p.Append(']');
+            }
         }
 
         // Print initializer if present: { 1, 2, 3 }
@@ -548,6 +664,39 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     }
 
     /// <summary>
+    /// Prints all where clauses from a type parameter container in source order.
+    /// </summary>
+    private void PrintTypeParameterConstraintsInSourceOrder(JContainer<TypeParameter>? typeParameters, PrintOutputCapture<P> p)
+    {
+        if (typeParameters == null) return;
+
+        // Collect all type parameters that have where clauses
+        var ctpsWithWhere = new List<ConstrainedTypeParameter>();
+        foreach (var typeParam in typeParameters.Elements)
+        {
+            if (typeParam.Element.Bounds?.Elements.Count > 0 &&
+                typeParam.Element.Bounds.Elements[0].Element is ConstrainedTypeParameter ctp &&
+                ctp.WhereConstraint != null)
+            {
+                ctpsWithWhere.Add(ctp);
+            }
+        }
+
+        // Sort by WhereClauseOrder marker if present
+        ctpsWithWhere.Sort((a, b) =>
+        {
+            var orderA = a.Markers.FindFirst<WhereClauseOrder>()?.Order ?? int.MaxValue;
+            var orderB = b.Markers.FindFirst<WhereClauseOrder>()?.Order ?? int.MaxValue;
+            return orderA.CompareTo(orderB);
+        });
+
+        foreach (var ctp in ctpsWithWhere)
+        {
+            PrintConstrainedTypeParameterConstraints(ctp, p);
+        }
+    }
+
+    /// <summary>
     /// Prints the constraint part of a ConstrainedTypeParameter: where T : constraint1, constraint2
     /// Used after the base type list.
     /// </summary>
@@ -664,7 +813,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         VisitSpace(externAlias.Identifier.Before, p);
         p.Append("alias");
         Visit(externAlias.Identifier.Element, p);
-        p.Append(';');
+        // Semicolon printed by PrintStatementTerminator
         AfterSyntax(externAlias, p);
         return externAlias;
     }
@@ -751,7 +900,24 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         }
 
         // Print subpatterns using JContainer: { subpattern, subpattern }
-        VisitContainer("{", pp.Subpatterns, ",", "}", p);
+        if (pp.Subpatterns.Elements.Count == 1 && pp.Subpatterns.Elements[0].Element is Empty empty)
+        {
+            // Empty property pattern: { } — J.Empty holds whitespace before }
+            VisitSpace(pp.Subpatterns.Before, p);
+            p.Append('{');
+            VisitSpace(empty.Prefix, p);
+            p.Append('}');
+        }
+        else
+        {
+            VisitContainer("{", pp.Subpatterns, ",", "}", p);
+        }
+
+        // Print optional designation (variable name, e.g., "varBlock" in "{ } varBlock")
+        if (pp.Designation != null)
+        {
+            Visit(pp.Designation, p);
+        }
 
         AfterSyntax(pp, p);
         return pp;
@@ -938,18 +1104,21 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitBlock(Block block, PrintOutputCapture<P> p)
     {
         BeforeSyntax(block, p);
-        p.Append('{');
+        var omitBraces = block.Markers.FindFirst<OmitBraces>() != null;
+        if (!omitBraces)
+            p.Append('{');
 
         foreach (var stmt in block.Statements)
         {
             // Skip primary constructor MethodDeclaration — already printed by VisitClassDeclaration
             if (stmt.Element is MethodDeclaration md && md.Markers.FindFirst<PrimaryConstructor>() != null)
                 continue;
-            Visit(stmt.Element, p);
+            VisitStatement(stmt, p);
         }
 
         VisitSpace(block.End, p);
-        p.Append('}');
+        if (!omitBraces)
+            p.Append('}');
         AfterSyntax(block, p);
         return block;
     }
@@ -1085,19 +1254,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             }
         }
 
-        // Print type parameter constraints (where clauses)
-        if (classDecl.TypeParameters != null)
-        {
-            foreach (var typeParam in classDecl.TypeParameters.Elements)
-            {
-                if (typeParam.Element.Bounds?.Elements.Count > 0 &&
-                    typeParam.Element.Bounds.Elements[0].Element is ConstrainedTypeParameter ctp2 &&
-                    ctp2.WhereConstraint != null)
-                {
-                    PrintConstrainedTypeParameterConstraints(ctp2, p);
-                }
-            }
-        }
+        // Print type parameter constraints (where clauses) in source order
+        PrintTypeParameterConstraintsInSourceOrder(classDecl.TypeParameters, p);
 
         // Print body (check for semicolon-terminated record)
         if (classDecl.Body.Markers.FindFirst<Semicolon>() != null)
@@ -1190,6 +1348,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         VisitSpace(method.Name.Prefix, p);
         p.Append(method.Name.SimpleName);
 
+        // Print type parameters (e.g., <T, U>)
+        if (method.TypeParameters != null)
+        {
+            VisitContainer("<", method.TypeParameters, ",", ">", p);
+        }
+
         // Print parameters
         VisitSpace(method.Parameters.Before, p);
         p.Append('(');
@@ -1198,23 +1362,34 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             var paddedParam = method.Parameters.Elements[i];
             var param = paddedParam.Element;
 
-            // Parameters are VariableDeclarations but without semicolon
-            if (param is VariableDeclarations varDecl)
+            if (param is Empty)
             {
-                VisitVariableDeclarationsWithoutSemicolon(varDecl, p);
+                // Empty element for interior space in empty parens
+                VisitSpace(paddedParam.After, p);
             }
             else
             {
-                Visit(param, p);
-            }
+                // Parameters are VariableDeclarations but without semicolon
+                if (param is VariableDeclarations varDecl)
+                {
+                    VisitVariableDeclarationsWithoutSemicolon(varDecl, p);
+                }
+                else
+                {
+                    Visit(param, p);
+                }
 
-            if (i < method.Parameters.Elements.Count - 1)
-            {
                 VisitSpace(paddedParam.After, p);
-                p.Append(',');
+                if (i < method.Parameters.Elements.Count - 1)
+                {
+                    p.Append(',');
+                }
             }
         }
         p.Append(')');
+
+        // Print type parameter constraints (where clauses) in source order
+        PrintTypeParameterConstraintsInSourceOrder(method.TypeParameters, p);
 
         // Print constructor initializer if present (: base(...) or : this(...))
         // Stored in defaultValue as JLeftPadded<MethodInvocation>
@@ -1235,13 +1410,15 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             Visit(returnStmt.Expression, p);
             p.Append(';');
         }
+        else if (method.Body != null && method.Body.Markers.FindFirst<Semicolon>() != null)
+        {
+            // Abstract/extern method — body is Block(Semicolon) holding space before ';'
+            VisitSpace(method.Body.Prefix, p);
+            p.Append(';');
+        }
         else if (method.Body != null)
         {
             VisitBlock(method.Body, p);
-        }
-        else
-        {
-            p.Append(';');
         }
 
         AfterSyntax(method, p);
@@ -1256,7 +1433,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         {
             Visit(ret.Expression, p);
         }
-        p.Append(';');
+        // Semicolon is printed by PrintStatementTerminator via VisitStatement
         AfterSyntax(ret, p);
         return ret;
     }
@@ -1266,13 +1443,13 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         BeforeSyntax(iff, p);
         p.Append("if");
         VisitControlParentheses(iff.Condition, p);
-        Visit(iff.ThenPart.Element, p);
+        VisitStatement(iff.ThenPart, p);
 
         if (iff.ElsePart != null)
         {
             VisitSpace(iff.ElsePart.Prefix, p);
             p.Append("else");
-            Visit(iff.ElsePart.Body.Element, p);
+            VisitStatement(iff.ElsePart.Body, p);
         }
 
         AfterSyntax(iff, p);
@@ -1284,7 +1461,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         BeforeSyntax(whl, p);
         p.Append("while");
         VisitControlParentheses(whl.Condition, p);
-        Visit(whl.Body.Element, p);
+        VisitStatement(whl.Body, p);
         AfterSyntax(whl, p);
         return whl;
     }
@@ -1293,11 +1470,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(dwl, p);
         p.Append("do");
-        Visit(dwl.Body.Element, p);
+        VisitStatement(dwl.Body, p);
         VisitSpace(dwl.Condition.Before, p);
         p.Append("while");
         VisitControlParentheses(dwl.Condition.Element, p);
-        p.Append(';');
+        // semicolon is printed by PrintStatementTerminator when DoWhileLoop is visited as a statement
         AfterSyntax(dwl, p);
         return dwl;
     }
@@ -1309,6 +1486,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         VisitSpace(label.LabelName.After, p);
         p.Append(':');
         Visit(label.Statement, p);
+        PrintStatementTerminator(label.Statement, p);
         AfterSyntax(label, p);
         return label;
     }
@@ -1387,10 +1565,14 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                 VisitSpace(paddedUpdate.After, p);
                 p.Append(',');
             }
+            else
+            {
+                VisitSpace(paddedUpdate.After, p);
+            }
         }
 
         p.Append(')');
-        Visit(fl.Body.Element, p);
+        VisitStatement(fl.Body, p);
         AfterSyntax(fl, p);
         return fl;
     }
@@ -1412,7 +1594,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         VisitSpace(fel.LoopControl.Iterable.After, p);
 
         p.Append(')');
-        Visit(fel.Body.Element, p);
+        VisitStatement(fel.Body, p);
         AfterSyntax(fel, p);
         return fel;
     }
@@ -1455,16 +1637,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(thr, p);
         p.Append("throw");
-        // Don't visit Empty exception (re-throw) — Empty prints a semicolon as a statement
+        // Don't visit Empty exception (re-throw)
         if (thr.Exception is not Empty)
         {
             Visit(thr.Exception, p);
         }
-        // Suppress semicolon when throw is used as an expression (wrapped in StatementExpression)
-        if (Cursor.Parent?.Value is not StatementExpression)
-        {
-            p.Append(';');
-        }
+        // Semicolon printed by PrintStatementTerminator via VisitStatement
         AfterSyntax(thr, p);
         return thr;
     }
@@ -1474,8 +1652,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         BeforeSyntax(instanceOf, p);
         if (instanceOf.Expression.Element is Empty)
         {
-            // typeof(T)
+            // typeof(T) — space between typeof and ( is in Expression.After
             p.Append("typeof");
+            VisitSpace(instanceOf.Expression.After, p);
             p.Append('(');
             Visit(instanceOf.Clazz, p);
             p.Append(')');
@@ -1499,7 +1678,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(brk, p);
         p.Append("break");
-        p.Append(';');
+        // Semicolon printed by PrintStatementTerminator
         AfterSyntax(brk, p);
         return brk;
     }
@@ -1508,7 +1687,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(cont, p);
         p.Append("continue");
-        p.Append(';');
+        // Semicolon printed by PrintStatementTerminator
         AfterSyntax(cont, p);
         return cont;
     }
@@ -1516,7 +1695,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitEmpty(Empty emp, PrintOutputCapture<P> p)
     {
         BeforeSyntax(emp, p);
-        p.Append(';');
+        // Semicolon printed by PrintStatementTerminator when used as a statement
         AfterSyntax(emp, p);
         return emp;
     }
@@ -1524,10 +1703,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitControlParentheses(ControlParentheses<Expression> cp, PrintOutputCapture<P> p)
     {
         BeforeSyntax(cp, p);
-        p.Append('(');
+        var omitParens = cp.Markers.FindFirst<OmitParentheses>() != null;
+        if (!omitParens) p.Append('(');
         Visit(cp.Tree.Element, p);
         VisitSpace(cp.Tree.After, p);
-        p.Append(')');
+        if (!omitParens) p.Append(')');
         AfterSyntax(cp, p);
         return cp;
     }
@@ -1553,8 +1733,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             Visit(part, p);
         }
 
-        // Print the closing delimiter (match the quote count from the opening)
-        p.Append(GetClosingDelimiter(istr.Delimiter));
+        // Print the closing delimiter (for raw strings this includes \n + indentation before """)
+        p.Append(istr.EndDelimiter);
 
         AfterSyntax(istr, p);
         return istr;
@@ -1609,19 +1789,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         return interp;
     }
 
-    private static string GetClosingDelimiter(string openDelimiter)
-    {
-        // Count the quote characters in the delimiter
-        int quoteCount = 0;
-        foreach (char c in openDelimiter)
-        {
-            if (c == '"') quoteCount++;
-        }
-
-        // For raw string literals, match the quote count
-        return new string('"', quoteCount > 0 ? quoteCount : 1);
-    }
-
     public override J VisitAwaitExpression(AwaitExpression ae, PrintOutputCapture<P> p)
     {
         BeforeSyntax(ae, p);
@@ -1640,7 +1807,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         {
             Visit(yield.Expression, p);
         }
-        p.Append(';');
+        // Semicolon printed by PrintStatementTerminator
         AfterSyntax(yield, p);
         return yield;
     }
@@ -1660,8 +1827,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         VisitSpace(binary.Operator.Before, p);
 
         var op = binary.Operator.Element;
-        // In pattern context, And/Or print as keywords instead of &&/||
-        if (IsInPatternContext() && op is Binary.OperatorType.And or Binary.OperatorType.Or)
+        // Pattern combinator marker means this Binary came from a BinaryPatternSyntax (and/or keywords)
+        if (binary.Markers.FindFirst<PatternCombinator>() != null &&
+            op is Binary.OperatorType.And or Binary.OperatorType.Or)
         {
             p.Append(op == Binary.OperatorType.And ? "and" : "or");
         }
@@ -1829,7 +1997,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         {
             foreach (var stmtPadded in @case.Statements.Elements)
             {
-                Visit(stmtPadded.Element, p);
+                VisitStatement(stmtPadded, p);
             }
         }
 
@@ -1864,19 +2032,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         {
             var armPadded = armElements[i];
             Visit(armPadded.Element, p);
-
-            // Print comma separator (except for last arm)
+            VisitSpace(armPadded.After, p);
+            VisitMarkers(armPadded.Markers, p);
             if (i < armElements.Count - 1)
             {
-                VisitSpace(armPadded.After, p);
                 p.Append(',');
             }
-        }
-
-        // Space before '}'
-        if (armElements.Count > 0)
-        {
-            VisitSpace(armElements[^1].After, p);
         }
         p.Append('}');
 
@@ -1961,15 +2122,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             for (int i = 0; i < elements.Count; i++)
             {
                 Visit(elements[i].Element, p);
+                VisitSpace(elements[i].After, p);
+                VisitMarkers(elements[i].Markers, p);
                 if (i < elements.Count - 1)
                 {
-                    VisitSpace(elements[i].After, p);
                     p.Append(',');
                 }
-            }
-            if (elements.Count > 0)
-            {
-                VisitSpace(elements[^1].After, p);
             }
             p.Append('}');
         }
@@ -1981,6 +2139,10 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitEnumMemberDeclaration(EnumMemberDeclaration emd, PrintOutputCapture<P> p)
     {
         BeforeSyntax(emd, p);
+        foreach (var attr in emd.AttributeLists)
+        {
+            Visit(attr, p);
+        }
         Visit(emd.Name, p);
         if (emd.Initializer != null)
         {
@@ -2067,11 +2229,24 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         for (int i = 0; i < ce.Elements.Count; i++)
         {
             var rp = ce.Elements[i];
-            Visit(rp.Element, p);
-            VisitSpace(rp.After, p);
-            if (i < ce.Elements.Count - 1)
+            if (rp.Element is Empty)
             {
-                p.Append(',');
+                // Empty element holds interior space (e.g., comments in an otherwise-empty collection)
+                // Don't visit Empty (which would print ';'), just emit the After space
+                VisitSpace(rp.After, p);
+            }
+            else
+            {
+                Visit(rp.Element, p);
+                VisitSpace(rp.After, p);
+                if (i < ce.Elements.Count - 1)
+                {
+                    p.Append(',');
+                }
+                else
+                {
+                    VisitMarkers(rp.Markers, p);
+                }
             }
         }
         p.Append(']');
@@ -2214,6 +2389,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(csLambda, p);
 
+        // Print attribute lists (e.g., [return: Description("...")])
+        foreach (var attrList in csLambda.AttributeLists)
+        {
+            Visit(attrList, p);
+        }
+
         // Print modifiers (async, static)
         foreach (var mod in csLambda.Modifiers)
         {
@@ -2340,7 +2521,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         return op switch
         {
             CsUnary.OperatorKind.SuppressNullableWarning => "!",
-            CsUnary.OperatorKind.PointerIndirection => "*",
             CsUnary.OperatorKind.PointerType => "*",
             CsUnary.OperatorKind.AddressOf => "&",
             CsUnary.OperatorKind.Spread => "..",
@@ -2423,8 +2603,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // Note: ExpressionStatement delegates Prefix/Markers to its Expression,
         // so we don't call BeforeSyntax here - the expression handles its own prefix
         Visit(expressionStatement.Expression, p);
-        p.Append(';');
-        // AfterSyntax would use the same delegated markers, so skip it too
+        // Semicolon is printed by PrintStatementTerminator via VisitStatement
         return expressionStatement;
     }
 
@@ -2432,8 +2611,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(varDecl, p);
         VisitVariableDeclarationsContent(varDecl, p);
-        if (!IsInPatternContext())
-            p.Append(';');
+        // Semicolon is printed by PrintStatementTerminator via VisitStatement
         AfterSyntax(varDecl, p);
         return varDecl;
     }
@@ -2463,9 +2641,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                 Visit(padded.Element, p);
             }
 
+            VisitSpace(padded.After, p);
             if (i < container.Elements.Count - 1)
             {
-                VisitSpace(padded.After, p);
                 p.Append(',');
             }
         }
@@ -2642,6 +2820,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             return cd;
         }
 
+
+
         // 3. Assemble output by interleaving sections with directive text.
         //    Stack tracks the active branch index (starts with primary branch).
         var stack = new Stack<int>();
@@ -2680,6 +2860,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
             // Emit next section from the active branch
             int activeBranch = stack.Peek();
+            // Fall back to primary branch when no branch activates this directive
+            if (activeBranch < 0) activeBranch = 0;
             int sectionIndex = d + 1;
             if (activeBranch < branchSections.Length &&
                 sectionIndex < branchSections[activeBranch].Count)
@@ -2713,13 +2895,19 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitNullableDirective(NullableDirective nullableDirective, PrintOutputCapture<P> p)
     {
         BeforeSyntax(nullableDirective, p);
-        p.Append("#nullable");
+        p.Append('#');
+        p.Append(nullableDirective.HashSpacing);
+        p.Append("nullable");
         p.Append(' ');
         p.Append(nullableDirective.Setting.ToString().ToLower());
         if (nullableDirective.Target != null)
         {
             p.Append(' ');
             p.Append(nullableDirective.Target.Value.ToString().ToLower());
+        }
+        if (nullableDirective.TrailingComment.Length > 0)
+        {
+            p.Append(nullableDirective.TrailingComment);
         }
         AfterSyntax(nullableDirective, p);
         return nullableDirective;
@@ -2728,10 +2916,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitRegionDirective(RegionDirective regionDirective, PrintOutputCapture<P> p)
     {
         BeforeSyntax(regionDirective, p);
-        p.Append("#region");
+        p.Append('#');
+        p.Append(regionDirective.HashSpacing);
+        p.Append("region");
         if (regionDirective.Name != null)
         {
-            p.Append(' ');
             p.Append(regionDirective.Name);
         }
         AfterSyntax(regionDirective, p);
@@ -2741,7 +2930,13 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitEndRegionDirective(EndRegionDirective endRegionDirective, PrintOutputCapture<P> p)
     {
         BeforeSyntax(endRegionDirective, p);
-        p.Append("#endregion");
+        p.Append('#');
+        p.Append(endRegionDirective.HashSpacing);
+        p.Append("endregion");
+        if (endRegionDirective.Name != null)
+        {
+            p.Append(endRegionDirective.Name);
+        }
         AfterSyntax(endRegionDirective, p);
         return endRegionDirective;
     }
@@ -2871,6 +3066,33 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     /// </summary>
     protected void VisitMarkers(Markers markers, PrintOutputCapture<P> p)
     {
+        var trailingComma = markers.FindFirst<TrailingComma>();
+        if (trailingComma != null)
+        {
+            p.Append(',');
+            VisitSpace(trailingComma.Suffix, p);
+        }
+    }
+
+    /// <summary>
+    /// Prints generic type arguments: &lt;T1, T2&gt;
+    /// Used by MethodInvocation (typeParameters) and MemberReference (typeParameters).
+    /// </summary>
+    protected void PrintTypeArguments(JContainer<Expression> typeArgs, PrintOutputCapture<P> p)
+    {
+        VisitSpace(typeArgs.Before, p);
+        p.Append('<');
+        for (int i = 0; i < typeArgs.Elements.Count; i++)
+        {
+            var paddedTypeArg = typeArgs.Elements[i];
+            Visit(paddedTypeArg.Element, p);
+            VisitSpace(paddedTypeArg.After, p);
+            if (i < typeArgs.Elements.Count - 1)
+            {
+                p.Append(',');
+            }
+        }
+        p.Append('>');
     }
 
     #endregion
@@ -2918,6 +3140,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             var node = nodes[i];
             Visit(node.Element, p);
             VisitSpace(node.After, p);
+            VisitMarkers(node.Markers, p);
             if (i < nodes.Count - 1)
             {
                 p.Append(suffixBetween);
@@ -2988,7 +3211,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             Visit(gotoStatement.Target, p);
         }
 
-        p.Append(';');
+        // Semicolon printed by PrintStatementTerminator
         AfterSyntax(gotoStatement, p);
         return gotoStatement;
     }
@@ -2996,13 +3219,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitUsingStatement(UsingStatement usingStatement, PrintOutputCapture<P> p)
     {
         BeforeSyntax(usingStatement, p);
-
-        if (usingStatement.AwaitKeyword != null)
-        {
-            VisitSpace(usingStatement.AwaitKeyword.Prefix, p);
-            p.Append("await");
-        }
-
         p.Append("using");
 
         // Print parenthesized expression (left-padding = open paren prefix)
@@ -3173,21 +3389,10 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // Parameters (without semicolons after each VariableDeclarations)
         PrintParameterList("(", delegateDeclaration.Parameters, ")", p);
 
-        // Type parameter constraints (where clauses)
-        if (delegateDeclaration.TypeParameters != null)
-        {
-            foreach (var typeParam in delegateDeclaration.TypeParameters.Elements)
-            {
-                if (typeParam.Element.Bounds?.Elements.Count > 0 &&
-                    typeParam.Element.Bounds.Elements[0].Element is ConstrainedTypeParameter ctp2 &&
-                    ctp2.WhereConstraint != null)
-                {
-                    PrintConstrainedTypeParameterConstraints(ctp2, p);
-                }
-            }
-        }
+        // Type parameter constraints (where clauses) in source order
+        PrintTypeParameterConstraintsInSourceOrder(delegateDeclaration.TypeParameters, p);
 
-        p.Append(';');
+        // Semicolon printed by PrintStatementTerminator
         AfterSyntax(delegateDeclaration, p);
         return delegateDeclaration;
     }
@@ -3427,9 +3632,19 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
         p.Append(')');
 
-        Visit(forEachVariableLoop.Body.Element, p);
+        VisitStatement(forEachVariableLoop.Body, p);
         AfterSyntax(forEachVariableLoop, p);
         return forEachVariableLoop;
+    }
+
+    public override J VisitPointerDereference(PointerDereference pd, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(pd, p);
+        if (pd.Markers.FindFirst<PointerMemberAccess>() == null)
+            p.Append('*');
+        Visit(pd.Expression, p);
+        AfterSyntax(pd, p);
+        return pd;
     }
 
     public override J VisitPointerFieldAccess(PointerFieldAccess pointerFieldAccess, PrintOutputCapture<P> p)

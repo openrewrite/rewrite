@@ -573,6 +573,7 @@ public sealed class CsLambda(
     Guid id,
     Space prefix,
     Markers markers,
+    IList<AttributeList> attributeLists,
     IList<Modifier> modifiers,
     TypeTree? returnType,
     Lambda lambdaExpression
@@ -581,22 +582,25 @@ public sealed class CsLambda(
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
+    public IList<AttributeList> AttributeLists { get; } = attributeLists;
     public IList<Modifier> Modifiers { get; } = modifiers;
     public TypeTree? ReturnType { get; } = returnType;
     public Lambda LambdaExpression { get; } = lambdaExpression;
 
     public CsLambda WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Modifiers, ReturnType, LambdaExpression);
+        id == Id ? this : new(id, Prefix, Markers, AttributeLists, Modifiers, ReturnType, LambdaExpression);
     public CsLambda WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Modifiers, ReturnType, LambdaExpression);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, AttributeLists, Modifiers, ReturnType, LambdaExpression);
     public CsLambda WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Modifiers, ReturnType, LambdaExpression);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, AttributeLists, Modifiers, ReturnType, LambdaExpression);
+    public CsLambda WithAttributeLists(IList<AttributeList> attributeLists) =>
+        ReferenceEquals(attributeLists, AttributeLists) ? this : new(Id, Prefix, Markers, attributeLists, Modifiers, ReturnType, LambdaExpression);
     public CsLambda WithModifiers(IList<Modifier> modifiers) =>
-        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, modifiers, ReturnType, LambdaExpression);
+        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, AttributeLists, modifiers, ReturnType, LambdaExpression);
     public CsLambda WithReturnType(TypeTree? returnType) =>
-        ReferenceEquals(returnType, ReturnType) ? this : new(Id, Prefix, Markers, Modifiers, returnType, LambdaExpression);
+        ReferenceEquals(returnType, ReturnType) ? this : new(Id, Prefix, Markers, AttributeLists, Modifiers, returnType, LambdaExpression);
     public CsLambda WithLambdaExpression(Lambda lambdaExpression) =>
-        ReferenceEquals(lambdaExpression, LambdaExpression) ? this : new(Id, Prefix, Markers, Modifiers, ReturnType, lambdaExpression);
+        ReferenceEquals(lambdaExpression, LambdaExpression) ? this : new(Id, Prefix, Markers, AttributeLists, Modifiers, ReturnType, lambdaExpression);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -908,25 +912,30 @@ public sealed class PropertyPattern(
     Space prefix,
     Markers markers,
     TypeTree? typeQualifier,
-    JContainer<NamedExpression> subpatterns
+    JContainer<Expression> subpatterns,
+    Identifier? designation = null
 ) : Cs, Pattern, IEquatable<PropertyPattern>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public TypeTree? TypeQualifier { get; } = typeQualifier;
-    public JContainer<NamedExpression> Subpatterns { get; } = subpatterns;
+    public JContainer<Expression> Subpatterns { get; } = subpatterns;
+    /// <summary>Optional variable designation (e.g., "varBlock" in "is { } varBlock").</summary>
+    public Identifier? Designation { get; } = designation;
 
     public PropertyPattern WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, TypeQualifier, Subpatterns);
+        id == Id ? this : new(id, Prefix, Markers, TypeQualifier, Subpatterns, Designation);
     public PropertyPattern WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, TypeQualifier, Subpatterns);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, TypeQualifier, Subpatterns, Designation);
     public PropertyPattern WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, TypeQualifier, Subpatterns);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, TypeQualifier, Subpatterns, Designation);
     public PropertyPattern WithTypeQualifier(TypeTree? typeQualifier) =>
-        ReferenceEquals(typeQualifier, TypeQualifier) ? this : new(Id, Prefix, Markers, typeQualifier, Subpatterns);
-    public PropertyPattern WithSubpatterns(JContainer<NamedExpression> subpatterns) =>
-        ReferenceEquals(subpatterns, Subpatterns) ? this : new(Id, Prefix, Markers, TypeQualifier, subpatterns);
+        ReferenceEquals(typeQualifier, TypeQualifier) ? this : new(Id, Prefix, Markers, typeQualifier, Subpatterns, Designation);
+    public PropertyPattern WithSubpatterns(JContainer<Expression> subpatterns) =>
+        ReferenceEquals(subpatterns, Subpatterns) ? this : new(Id, Prefix, Markers, TypeQualifier, subpatterns, Designation);
+    public PropertyPattern WithDesignation(Identifier? designation) =>
+        ReferenceEquals(designation, Designation) ? this : new(Id, Prefix, Markers, TypeQualifier, Subpatterns, designation);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1172,7 +1181,9 @@ public sealed class NullableDirective(
     Space prefix,
     Markers markers,
     NullableSetting setting,
-    NullableTarget? target
+    NullableTarget? target,
+    string hashSpacing = "",
+    string trailingComment = ""
 ) : Cs, Statement, IEquatable<NullableDirective>
 {
     public Guid Id { get; } = id;
@@ -1180,17 +1191,19 @@ public sealed class NullableDirective(
     public Markers Markers { get; } = markers;
     public NullableSetting Setting { get; } = setting;
     public NullableTarget? Target { get; } = target;
+    public string HashSpacing { get; } = hashSpacing;
+    public string TrailingComment { get; } = trailingComment;
 
     public NullableDirective WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Setting, Target);
+        id == Id ? this : new(id, Prefix, Markers, Setting, Target, HashSpacing, TrailingComment);
     public NullableDirective WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Setting, Target);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Setting, Target, HashSpacing, TrailingComment);
     public NullableDirective WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Setting, Target);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Setting, Target, HashSpacing, TrailingComment);
     public NullableDirective WithSetting(NullableSetting setting) =>
-        setting == Setting ? this : new(Id, Prefix, Markers, setting, Target);
+        setting == Setting ? this : new(Id, Prefix, Markers, setting, Target, HashSpacing, TrailingComment);
     public NullableDirective WithTarget(NullableTarget? target) =>
-        target == Target ? this : new(Id, Prefix, Markers, Setting, target);
+        target == Target ? this : new(Id, Prefix, Markers, Setting, target, HashSpacing, TrailingComment);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1206,22 +1219,25 @@ public sealed class RegionDirective(
     Guid id,
     Space prefix,
     Markers markers,
-    string? name
+    string? name,
+    string hashSpacing = ""
 ) : Cs, Statement, IEquatable<RegionDirective>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public string? Name { get; } = name;
+    /// <summary>Whitespace between '#' and 'region' (e.g., " " for "# region").</summary>
+    public string HashSpacing { get; } = hashSpacing;
 
     public RegionDirective WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Name);
+        id == Id ? this : new(id, Prefix, Markers, Name, HashSpacing);
     public RegionDirective WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Name);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Name, HashSpacing);
     public RegionDirective WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name, HashSpacing);
     public RegionDirective WithName(string? name) =>
-        string.Equals(name, Name, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, name);
+        string.Equals(name, Name, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, name, HashSpacing);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1236,19 +1252,26 @@ public sealed class RegionDirective(
 public sealed class EndRegionDirective(
     Guid id,
     Space prefix,
-    Markers markers
+    Markers markers,
+    string? name = null,
+    string hashSpacing = ""
 ) : Cs, Statement, IEquatable<EndRegionDirective>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
+    public string? Name { get; } = name;
+    /// <summary>Whitespace between '#' and 'endregion' (e.g., " " for "# endregion").</summary>
+    public string HashSpacing { get; } = hashSpacing;
 
     public EndRegionDirective WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers);
+        id == Id ? this : new(id, Prefix, Markers, Name, HashSpacing);
     public EndRegionDirective WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Name, HashSpacing);
     public EndRegionDirective WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name, HashSpacing);
+    public EndRegionDirective WithName(string? name) =>
+        string.Equals(name, Name, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, name, HashSpacing);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1473,6 +1496,7 @@ public sealed class InterpolatedString(
     Space prefix,
     Markers markers,
     string delimiter,
+    string endDelimiter,
     IList<J> parts
 ) : Cs, Expression, Statement, IEquatable<InterpolatedString>
 {
@@ -1480,18 +1504,21 @@ public sealed class InterpolatedString(
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public string Delimiter { get; } = delimiter;
+    public string EndDelimiter { get; } = endDelimiter;
     public IList<J> Parts { get; } = parts;
 
     public InterpolatedString WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Delimiter, Parts);
+        id == Id ? this : new(id, Prefix, Markers, Delimiter, EndDelimiter, Parts);
     public InterpolatedString WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Delimiter, Parts);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Delimiter, EndDelimiter, Parts);
     public InterpolatedString WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Delimiter, Parts);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Delimiter, EndDelimiter, Parts);
     public InterpolatedString WithDelimiter(string delimiter) =>
-        string.Equals(delimiter, Delimiter, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, delimiter, Parts);
+        string.Equals(delimiter, Delimiter, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, delimiter, EndDelimiter, Parts);
+    public InterpolatedString WithEndDelimiter(string endDelimiter) =>
+        string.Equals(endDelimiter, EndDelimiter, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Delimiter, endDelimiter, Parts);
     public InterpolatedString WithParts(IList<J> parts) =>
-        ReferenceEquals(parts, Parts) ? this : new(Id, Prefix, Markers, Delimiter, parts);
+        ReferenceEquals(parts, Parts) ? this : new(Id, Prefix, Markers, Delimiter, EndDelimiter, parts);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1564,7 +1591,7 @@ public sealed class AwaitExpression(
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
-    public Markers Markers { get; } = markers;
+    public Markers Markers { get; } = markers; 
     public Expression Expression { get; } = expression;
 
     public AwaitExpression WithId(Guid id) =>
@@ -2432,7 +2459,6 @@ public sealed class UsingStatement(
     Guid id,
     Space prefix,
     Markers markers,
-    Keyword? awaitKeyword,
     JLeftPadded<Expression> expressionPadded,
     Statement statement
 ) : Cs, Statement, IEquatable<UsingStatement>
@@ -2440,22 +2466,19 @@ public sealed class UsingStatement(
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public Keyword? AwaitKeyword { get; } = awaitKeyword;
     public JLeftPadded<Expression> ExpressionPadded { get; } = expressionPadded;
     public Statement Statement { get; } = statement;
 
     public UsingStatement WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, AwaitKeyword, ExpressionPadded, Statement);
+        id == Id ? this : new(id, Prefix, Markers, ExpressionPadded, Statement);
     public UsingStatement WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, AwaitKeyword, ExpressionPadded, Statement);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, ExpressionPadded, Statement);
     public UsingStatement WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, AwaitKeyword, ExpressionPadded, Statement);
-    public UsingStatement WithAwaitKeyword(Keyword? awaitKeyword) =>
-        ReferenceEquals(awaitKeyword, AwaitKeyword) ? this : new(Id, Prefix, Markers, awaitKeyword, ExpressionPadded, Statement);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, ExpressionPadded, Statement);
     public UsingStatement WithExpressionPadded(JLeftPadded<Expression> expressionPadded) =>
-        ReferenceEquals(expressionPadded, ExpressionPadded) ? this : new(Id, Prefix, Markers, AwaitKeyword, expressionPadded, Statement);
+        ReferenceEquals(expressionPadded, ExpressionPadded) ? this : new(Id, Prefix, Markers, expressionPadded, Statement);
     public UsingStatement WithStatement(Statement statement) =>
-        ReferenceEquals(statement, Statement) ? this : new(Id, Prefix, Markers, AwaitKeyword, ExpressionPadded, statement);
+        ReferenceEquals(statement, Statement) ? this : new(Id, Prefix, Markers, ExpressionPadded, statement);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2730,7 +2753,7 @@ public sealed class CsUnary(
     public CsUnary WithType(JavaType? type) =>
         ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Operator, Expression, type);
 
-    public enum OperatorKind { SuppressNullableWarning, PointerIndirection, PointerType, AddressOf, Spread, FromEnd }
+    public enum OperatorKind { SuppressNullableWarning, PointerType, AddressOf, Spread, FromEnd }
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(CsUnary? other) => other is not null && Id == other.Id;
@@ -3625,6 +3648,40 @@ public sealed class CsTry(
 
     public bool Equals(CsTry? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as CsTry);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+// ---- PointerDereference ----
+
+public sealed class PointerDereference(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Expression expression,
+    JavaType? type
+) : Cs, Expression, IEquatable<PointerDereference>
+{
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Expression Expression { get; } = expression;
+    public JavaType? Type { get; } = type;
+
+    public PointerDereference WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Expression, Type);
+    public PointerDereference WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Expression, Type);
+    public PointerDereference WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression, Type);
+    public PointerDereference WithExpression(Expression expression) =>
+        ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression, Type);
+    public PointerDereference WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Expression, type);
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(PointerDereference? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as PointerDereference);
     public override int GetHashCode() => Id.GetHashCode();
 }
 

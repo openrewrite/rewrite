@@ -54,8 +54,8 @@ class CSharpParseProjectTest {
             CSharpRewriteRpc.setFactory(
                     CSharpRewriteRpc.builder()
                             .csharpServerEntry(csharpServerEntry)
-                            .traceRpcMessages(true)
-                            .log(Paths.get("/tmp/csharp-rpc-project.log"))
+                            .traceRpcMessages(false)
+                            .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-rpc-project.log"))
             );
             factoryConfigured = true;
         }
@@ -309,11 +309,63 @@ class CSharpParseProjectTest {
         assertThat(sourcePath).startsWith("src");
     }
 
-    // ---- Individual solution tests for targeted debugging ----
+    // ---- Individual solution/project tests for targeted debugging ----
+    //
+    // These mirror the entry points that DotNetBuildStep would discover for each
+    // repo in the working set (pruning logic: walk dirs, skip bin/obj/.vs/packages/TestResults,
+    // once a dir has .sln/.slnx/.csproj add it & prune subtree; prefer .sln/.slnx over .csproj).
 
     private static final Path WORKING_SET = Paths.get("C:/Projects/moderneinc/moderne-cli/working-set-csharp");
 
-    // MonoGame solutions (FieldAccess→NameTree cast failures)
+    // -- AI Library --
+    @Tag("workingSet") @Test @Timeout(value = 1200, unit = TimeUnit.SECONDS)
+    void parseSemanticKernel() { parseSingleSolution(WORKING_SET.resolve("AI Library/microsoft/semantic-kernel/dotnet/SK-dotnet.slnx")); }
+
+    // -- Algorithm --
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseWaveFunctionCollapse() { parseSingleSolution(WORKING_SET.resolve("Algorithm/mxgmn/WaveFunctionCollapse/WaveFunctionCollapse.csproj")); }
+
+    // -- Architecture Sample --
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseModularMonolithBuild() { parseSingleSolution(WORKING_SET.resolve("Architecture Sample/kgrzybek/modular-monolith-with-ddd/build/_build.csproj")); }
+
+    @Tag("workingSet") @Test @Timeout(value = 1200, unit = TimeUnit.SECONDS)
+    void parseModularMonolithSolution() { parseSingleSolution(WORKING_SET.resolve("Architecture Sample/kgrzybek/modular-monolith-with-ddd/src/CompanyName.MyMeetings.sln")); }
+
+    // -- CLI Tool --
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseBBDown() { parseSingleSolution(WORKING_SET.resolve("CLI Tool/nilaoda/BBDown/BBDown.sln")); }
+
+    // -- Desktop App --
+    @Tag("workingSet") @Test @Timeout(value = 1200, unit = TimeUnit.SECONDS)
+    void parseFlowLauncher() { parseSingleSolution(WORKING_SET.resolve("Desktop App/Flow-Launcher/Flow.Launcher/Flow.Launcher.sln")); }
+
+    @Tag("workingSet") @Test @Timeout(value = 1200, unit = TimeUnit.SECONDS)
+    void parseBulkCrapUninstaller() { parseSingleSolution(WORKING_SET.resolve("Desktop App/Klocman/Bulk-Crap-Uninstaller/source/BulkCrapUninstaller.sln")); }
+
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseScreenToGif() { parseSingleSolution(WORKING_SET.resolve("Desktop App/NickeManarin/ScreenToGif/GifRecorder.sln")); }
+
+    @Tag("workingSet") @Test @Timeout(value = 1200, unit = TimeUnit.SECONDS)
+    void parseShareX() { parseSingleSolution(WORKING_SET.resolve("Desktop App/ShareX/ShareX/ShareX.sln")); }
+
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseYoutubeDownloader() { parseSingleSolution(WORKING_SET.resolve("Desktop App/Tyrrrz/YoutubeDownloader/YoutubeDownloader.sln")); }
+
+    // -- Developer Tool --
+    @Tag("workingSet") @Test @Timeout(value = 1200, unit = TimeUnit.SECONDS)
+    void parseILSpy() { parseSingleSolution(WORKING_SET.resolve("Developer Tool/icsharpcode/ILSpy/ILSpy.sln")); }
+
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseILSpyInstaller() { parseSingleSolution(WORKING_SET.resolve("Developer Tool/icsharpcode/ILSpy/ILSpy.Installer.sln")); }
+
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseILSpyVSExtensions() { parseSingleSolution(WORKING_SET.resolve("Developer Tool/icsharpcode/ILSpy/ILSpy.VSExtensions.sln")); }
+
+    // -- Game Framework: MonoGame --
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseMonoGameBuild() { parseSingleSolution(WORKING_SET.resolve("Game Framework/MonoGame/MonoGame/Build.sln")); }
+
     @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
     void parseMonoGameAndroid() { parseSingleSolution(WORKING_SET.resolve("Game Framework/MonoGame/MonoGame/MonoGame.Framework.Android.sln")); }
 
@@ -324,6 +376,12 @@ class CSharpParseProjectTest {
     void parseMonoGameiOS() { parseSingleSolution(WORKING_SET.resolve("Game Framework/MonoGame/MonoGame/MonoGame.Framework.iOS.sln")); }
 
     @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseMonoGameNative() { parseSingleSolution(WORKING_SET.resolve("Game Framework/MonoGame/MonoGame/MonoGame.Framework.Native.sln")); }
+
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseMonoGameWindowsDX() { parseSingleSolution(WORKING_SET.resolve("Game Framework/MonoGame/MonoGame/MonoGame.Framework.WindowsDX.sln")); }
+
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
     void parseMonoGameToolsLinux() { parseSingleSolution(WORKING_SET.resolve("Game Framework/MonoGame/MonoGame/MonoGame.Tools.Linux.sln")); }
 
     @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
@@ -332,24 +390,42 @@ class CSharpParseProjectTest {
     @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
     void parseMonoGameToolsWindows() { parseSingleSolution(WORKING_SET.resolve("Game Framework/MonoGame/MonoGame/MonoGame.Tools.Windows.sln")); }
 
+    // -- Library --
     @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
-    void parseMonoGameWindowsDX() { parseSingleSolution(WORKING_SET.resolve("Game Framework/MonoGame/MonoGame/MonoGame.Framework.WindowsDX.sln")); }
+    void parsePolly() { parseSingleSolution(WORKING_SET.resolve("Library/App-vNext/Polly/Polly.slnx")); }
 
-    // Large solutions — need extended timeouts
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseDapper() { parseSingleSolution(WORKING_SET.resolve("Library/DapperLib/Dapper/Dapper.sln")); }
+
+    // -- Media Server --
     @Tag("workingSet") @Test @Timeout(value = 1200, unit = TimeUnit.SECONDS)
-    void parseFlowLauncher() { parseSingleSolution(WORKING_SET.resolve("Desktop App/Flow-Launcher/Flow.Launcher/Flow.Launcher.sln")); }
+    void parseJellyfin() { parseSingleSolution(WORKING_SET.resolve("Media Server/jellyfin/jellyfin/Jellyfin.sln")); }
 
+    // -- Network Tool --
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseNetch() { parseSingleSolution(WORKING_SET.resolve("Network Tool/netchx/netch/Netch.sln")); }
+
+    // -- System Tool --
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseWinSW() { parseSingleSolution(WORKING_SET.resolve("System Tool/winsw/winsw/src/WinSW.sln")); }
+
+    // -- Template --
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseCleanArchitecture() { parseSingleSolution(WORKING_SET.resolve("Template/ardalis/CleanArchitecture/Clean.Architecture.slnx")); }
+
+    @Tag("workingSet") @Test @Timeout(value = 600, unit = TimeUnit.SECONDS)
+    void parseCfBuildpackTemplate() { parseSingleSolution(WORKING_SET.resolve("Template/macsux/cf-buildpack-template/MyBuildpack.sln")); }
+
+    // -- UI Framework --
     @Tag("workingSet") @Test @Timeout(value = 1200, unit = TimeUnit.SECONDS)
-    void parseBulkCrapUninstaller() { parseSingleSolution(WORKING_SET.resolve("Desktop App/Klocman/Bulk-Crap-Uninstaller/BulkCrapUninstaller.sln")); }
+    void parseMaterialDesign() { parseSingleSolution(WORKING_SET.resolve("UI Framework/MaterialDesignInXAML/MaterialDesignInXamlToolkit/MaterialDesignToolkit.Full.slnx")); }
 
-    @Tag("workingSet") @Test @Timeout(value = 1200, unit = TimeUnit.SECONDS)
-    void parseJellyfin() { parseSingleSolution(WORKING_SET.resolve("Web API/jellyfin/jellyfin/Jellyfin.sln")); }
-
-    @Tag("workingSet") @Test @Timeout(value = 1200, unit = TimeUnit.SECONDS)
-    void parseILSpy() { parseSingleSolution(WORKING_SET.resolve("Developer Tool/icsharpcode/ILSpy/ILSpy.sln")); }
-
+    // -- Web API --
     @Tag("workingSet") @Test @Timeout(value = 1200, unit = TimeUnit.SECONDS)
     void parseBitwarden() { parseSingleSolution(WORKING_SET.resolve("Web API/bitwarden/server/bitwarden-server.sln")); }
+
+    @Tag("workingSet") @Test @Timeout(value = 1200, unit = TimeUnit.SECONDS)
+    void parseJackett() { parseSingleSolution(WORKING_SET.resolve("Web API/Jackett/Jackett/src/Jackett.sln")); }
 
     /**
      * Parses a single solution file with a fresh RPC instance and 10-minute timeout.
@@ -365,8 +441,8 @@ class CSharpParseProjectTest {
                 CSharpRewriteRpc.builder()
                         .csharpServerEntry(findCSharpServerEntry())
                         .traceRpcMessages(false)
-                        .timeout(Duration.ofMinutes(20))
-                        .log(Paths.get("/tmp/csharp-rpc-project.log"))
+                        .timeout(Duration.ofMinutes(40))
+                        .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-rpc-project.log"))
         );
         factoryConfigured = true;
         rpc = CSharpRewriteRpc.getOrStart();
@@ -401,7 +477,7 @@ class CSharpParseProjectTest {
      * Set the system property "workingSetRoot" to override the default path.
      * Skipped automatically if the root directory doesn't exist on this machine.
      */
-    @Tag("workingSet")
+    @Tag("workingSet-full")
     @Test
     @Timeout(value = 3600, unit = TimeUnit.SECONDS)
     void parseWorkingSetSolution() throws IOException {
@@ -445,8 +521,8 @@ class CSharpParseProjectTest {
                     CSharpRewriteRpc.builder()
                             .csharpServerEntry(findCSharpServerEntry())
                             .traceRpcMessages(false)
-                            .timeout(Duration.ofMinutes(20))
-                            .log(Paths.get("/tmp/csharp-rpc-project.log"))
+                            .timeout(Duration.ofMinutes(40))
+                            .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-rpc-project.log"))
             );
             factoryConfigured = true;
             rpc = CSharpRewriteRpc.getOrStart();

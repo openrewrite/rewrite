@@ -90,10 +90,15 @@ tasks.withType<Test> {
 
     maxParallelForks = 1
     maxHeapSize = "8g"
-    // Exclude working-set tests by default; run with -PincludeWorkingSet to include
+    // Exclude working-set tests by default:
+    //   -PincludeWorkingSet      → include individual solution tests
+    //   -PincludeWorkingSetFull  → include the full sweep test too
     useJUnitPlatform {
         if (!project.hasProperty("includeWorkingSet")) {
             excludeTags("workingSet")
+        }
+        if (!project.hasProperty("includeWorkingSetFull")) {
+            excludeTags("workingSet-full")
         }
     }
     // Add timeout to identify hanging tests

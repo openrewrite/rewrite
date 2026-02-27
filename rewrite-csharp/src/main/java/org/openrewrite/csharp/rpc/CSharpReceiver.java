@@ -136,7 +136,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     public J visitPropertyPattern(Cs.PropertyPattern propertyPattern, RpcReceiveQueue q) {
         return propertyPattern
                 .withTypeQualifier(q.receive(propertyPattern.getTypeQualifier(), el -> (TypeTree) visitNonNull(el, q)))
-                .getPadding().withSubpatterns(q.receive(propertyPattern.getPadding().getSubpatterns(), el -> visitContainer(el, q)));
+                .getPadding().withSubpatterns(q.receive(propertyPattern.getPadding().getSubpatterns(), el -> visitContainer(el, q)))
+                .withDesignation(q.receive(propertyPattern.getDesignation(), el -> (J.Identifier) visitNonNull(el, q)));
     }
 
     @Override
@@ -320,6 +321,7 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     @Override
     public J visitLambda(Cs.Lambda lambda, RpcReceiveQueue q) {
         return lambda
+                .withAttributeLists(q.receiveList(lambda.getAttributeLists(), el -> (Cs.AttributeList) visitNonNull(el, q)))
                 .withLambdaExpression(q.receive(lambda.getLambdaExpression(), el -> (J.Lambda) visitNonNull(el, q)))
                 .withReturnType(q.receive(lambda.getReturnType(), el -> (TypeTree) visitNonNull(el, q)))
                 .withModifiers(q.receiveList(lambda.getModifiers(), el -> (J.Modifier) visitNonNull(el, q)));
@@ -342,7 +344,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     @Override
     public J visitUsingStatement(Cs.UsingStatement usingStatement, RpcReceiveQueue q) {
         return usingStatement
-                .withAwaitKeyword(q.receive(usingStatement.getAwaitKeyword(), el -> (Cs.Keyword) visitNonNull(el, q)))
                 .getPadding().withExpression(q.receive(usingStatement.getPadding().getExpression(), el -> visitLeftPadded(el, q)))
                 .withStatement(q.receive(usingStatement.getStatement(), el -> (Statement) visitNonNull(el, q)));
     }
@@ -753,6 +754,12 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitPointerDereference(Cs.PointerDereference pointerDereference, RpcReceiveQueue q) {
+        return pointerDereference
+                .withExpression(q.receive(pointerDereference.getExpression(), el -> (Expression) visitNonNull(el, q)));
+    }
+
+    @Override
     public J visitPointerFieldAccess(Cs.PointerFieldAccess pointerFieldAccess, RpcReceiveQueue q) {
         return pointerFieldAccess
                 .withTarget(q.receive(pointerFieldAccess.getTarget(), el -> (Expression) visitNonNull(el, q)))
@@ -792,18 +799,23 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     public J visitNullableDirective(Cs.NullableDirective nullableDirective, RpcReceiveQueue q) {
         return nullableDirective
                 .withSetting(q.receiveAndGet(nullableDirective.getSetting(), toEnum(Cs.NullableDirective.NullableSetting.class)))
-                .withTarget(q.receiveAndGet(nullableDirective.getTarget(), toEnum(Cs.NullableDirective.NullableTarget.class)));
+                .withTarget(q.receiveAndGet(nullableDirective.getTarget(), toEnum(Cs.NullableDirective.NullableTarget.class)))
+                .withHashSpacing(q.receive(nullableDirective.getHashSpacing()))
+                .withTrailingComment(q.receive(nullableDirective.getTrailingComment()));
     }
 
     @Override
     public J visitRegionDirective(Cs.RegionDirective regionDirective, RpcReceiveQueue q) {
         return regionDirective
-                .withName(q.receive(regionDirective.getName()));
+                .withName(q.receive(regionDirective.getName()))
+                .withHashSpacing(q.receive(regionDirective.getHashSpacing()));
     }
 
     @Override
     public J visitEndRegionDirective(Cs.EndRegionDirective endRegionDirective, RpcReceiveQueue q) {
-        return endRegionDirective;
+        return endRegionDirective
+                .withName(q.receive(endRegionDirective.getName()))
+                .withHashSpacing(q.receive(endRegionDirective.getHashSpacing()));
     }
 
     @Override

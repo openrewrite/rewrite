@@ -382,6 +382,20 @@ public class RpcReceiveQueue
                 typeof(ExpressionBodied),
             "org.openrewrite.java.marker.OmitParentheses" =>
                 typeof(OmitParentheses),
+            "org.openrewrite.csharp.marker.PatternCombinator" =>
+                typeof(PatternCombinator),
+            "org.openrewrite.csharp.marker.WhereClauseOrder" =>
+                typeof(WhereClauseOrder),
+            "org.openrewrite.csharp.marker.MultiDimensionContinuation" =>
+                typeof(MultiDimensionContinuation),
+            "org.openrewrite.java.marker.TrailingComma" =>
+                typeof(TrailingComma),
+            "org.openrewrite.java.marker.OmitBraces" =>
+                typeof(OmitBraces),
+            "org.openrewrite.java.marker.NullSafe" =>
+                typeof(NullSafe),
+            "org.openrewrite.csharp.marker.PointerMemberAccess" =>
+                typeof(PointerMemberAccess),
 
             _ => FromJavaTypeNameByConvention(javaTypeName)
         };

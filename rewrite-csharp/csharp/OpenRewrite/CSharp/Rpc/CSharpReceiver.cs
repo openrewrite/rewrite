@@ -134,6 +134,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             CsArrayType csat => VisitCsArrayType(csat, q),
             CsTryCatch cstc => VisitCsTryCatch(cstc, q),
             CsTry cstry => VisitCsTry(cstry, q),
+            PointerDereference pd => VisitPointerDereference(pd, q),
             PointerFieldAccess pfa => VisitPointerFieldAccess(pfa, q),
             RefType rt => VisitRefType(rt, q),
             AnonymousObjectCreationExpression aoce => VisitAnonymousObjectCreationExpression(aoce, q),
@@ -280,10 +281,11 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- CsLambda ----
     public override J VisitCsLambda(CsLambda csl, RpcReceiveQueue q)
     {
+        var attrLists = q.ReceiveList(csl.AttributeLists, t => (AttributeList)VisitNonNull(t, q));
         var lambdaExpression = q.Receive((J)csl.LambdaExpression, el => (J)VisitNonNull(el, q));
         var returnType = q.Receive((J?)csl.ReturnType, el => (J)VisitNonNull(el!, q));
         var modifiers = q.ReceiveList(csl.Modifiers, m => (Modifier)VisitNonNull(m, q));
-        return csl.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithLambdaExpression((Lambda)lambdaExpression!).WithReturnType((TypeTree?)returnType).WithModifiers(modifiers!);
+        return csl.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAttributeLists(attrLists!).WithLambdaExpression((Lambda)lambdaExpression!).WithReturnType((TypeTree?)returnType).WithModifiers(modifiers!);
     }
 
     // ---- IsPattern ----
@@ -369,7 +371,8 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var typeQualifier = q.Receive((J?)pp.TypeQualifier, el => (J)VisitNonNull(el!, q));
         var subpatterns = q.Receive(pp.Subpatterns, c => _delegate.VisitContainer(c, q));
-        return pp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTypeQualifier((TypeTree?)typeQualifier).WithSubpatterns(subpatterns!);
+        var designation = q.Receive((J?)pp.Designation, el => (J)VisitNonNull(el!, q));
+        return pp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTypeQualifier((TypeTree?)typeQualifier).WithSubpatterns(subpatterns!).WithDesignation((Identifier?)designation);
     }
 
     // ---- ConstrainedTypeParameter ----
@@ -393,8 +396,8 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
                 .Select(p => new JRightPadded<J>(p, Space.Empty, Markers.Empty))
                 .ToList(),
             rp => _delegate.VisitRightPadded(rp, q));
-        q.Receive(DeriveEndDelimiter(istr.Delimiter));
-        return istr.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithDelimiter(delimiter!).WithParts(parts?.Select(rp => rp.Element).ToList() ?? new List<J>());
+        var endDelimiter = q.Receive(istr.EndDelimiter);
+        return istr.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithDelimiter(delimiter!).WithEndDelimiter(endDelimiter!).WithParts(parts?.Select(rp => rp.Element).ToList() ?? new List<J>());
     }
 
     // ---- Interpolation ----
@@ -506,6 +509,8 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var setting = q.Receive<object>(nd.Setting);
         var target = q.Receive<object?>(nd.Target);
+        var hashSpacing = q.Receive(nd.HashSpacing);
+        var trailingComment = q.Receive(nd.TrailingComment);
         return nd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithSetting((NullableSetting)setting!).WithTarget(target != null ? (NullableTarget)target : null);
     }
 
@@ -513,12 +518,15 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitRegionDirective(RegionDirective rd, RpcReceiveQueue q)
     {
         var name = q.Receive<string?>(rd.Name);
+        q.Receive(rd.HashSpacing); // consume to keep queue in sync
         return rd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name);
     }
 
     // ---- EndRegionDirective ----
     public override J VisitEndRegionDirective(EndRegionDirective erd, RpcReceiveQueue q)
     {
+        q.Receive<string?>(erd.Name); // consume to keep queue in sync
+        q.Receive(erd.HashSpacing); // consume to keep queue in sync
         return erd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers);
     }
 
@@ -671,10 +679,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
 
     public override J VisitUsingStatement(UsingStatement ust, RpcReceiveQueue q)
     {
-        var awaitKw = q.Receive((J?)ust.AwaitKeyword, el => (J)VisitNonNull(el!, q));
         var exprPadded = q.Receive(ust.ExpressionPadded, lp => _delegate.VisitLeftPadded(lp, q));
         var statement = q.Receive((J)ust.Statement, el => (J)VisitNonNull(el, q));
-        return ust.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAwaitKeyword((Keyword?)awaitKw).WithExpressionPadded(exprPadded!).WithStatement((Statement)statement!);
+        return ust.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpressionPadded(exprPadded!).WithStatement((Statement)statement!);
     }
 
     public override J VisitAllowsConstraintClause(AllowsConstraintClause acc, RpcReceiveQueue q)
@@ -910,6 +917,13 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var filterExpr = q.Receive(cstc.FilterExpression, lp => _delegate.VisitLeftPadded(lp!, q));
         var body = q.Receive((J)cstc.Body, el => (J)VisitNonNull(el, q));
         return cstc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithParameter((ControlParentheses<VariableDeclarations>)parameter!).WithFilterExpression(filterExpr).WithBody((Block)body!);
+    }
+
+    public override J VisitPointerDereference(PointerDereference pd, RpcReceiveQueue q)
+    {
+        var expression = q.Receive((J)pd.Expression, el => (J)VisitNonNull(el, q));
+        var type = q.Receive(pd.Type, t => VisitType(t, q)!);
+        return pd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((Expression)expression!).WithType(type);
     }
 
     public override J VisitPointerFieldAccess(PointerFieldAccess pfa, RpcReceiveQueue q)

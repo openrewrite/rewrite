@@ -32,6 +32,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             Literal lit => VisitLiteral(lit, p),
             Identifier id => VisitIdentifier(id, p),
             FieldAccess fa => VisitFieldAccess(fa, p),
+            MemberReference mr => VisitMemberReference(mr, p),
             Binary bin => VisitBinary(bin, p),
             Ternary ter => VisitTernary(ter, p),
             Assignment asn => VisitAssignment(asn, p),
@@ -300,6 +301,13 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             return fieldAccess.WithTarget(t);
         }
         return fieldAccess;
+    }
+
+    public virtual J VisitMemberReference(MemberReference memberRef, P p)
+    {
+        Visit(memberRef.Containing.Element, p);
+        Visit(memberRef.Reference.Element, p);
+        return memberRef;
     }
 
     public virtual J VisitBinary(Binary binary, P p)

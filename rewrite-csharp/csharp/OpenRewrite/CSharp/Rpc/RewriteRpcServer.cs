@@ -110,6 +110,20 @@ public class RewriteRpcServer
             "org.openrewrite.csharp.marker.ConditionalBranchMarker");
         RpcSendQueue.RegisterJavaTypeName(typeof(DirectiveBoundaryMarker),
             "org.openrewrite.csharp.marker.DirectiveBoundaryMarker");
+        RpcSendQueue.RegisterJavaTypeName(typeof(Java.PatternCombinator),
+            "org.openrewrite.csharp.marker.PatternCombinator");
+        RpcSendQueue.RegisterJavaTypeName(typeof(Java.WhereClauseOrder),
+            "org.openrewrite.csharp.marker.WhereClauseOrder");
+        RpcSendQueue.RegisterJavaTypeName(typeof(Java.MultiDimensionContinuation),
+            "org.openrewrite.csharp.marker.MultiDimensionContinuation");
+        RpcSendQueue.RegisterJavaTypeName(typeof(TrailingComma),
+            "org.openrewrite.java.marker.TrailingComma");
+        RpcSendQueue.RegisterJavaTypeName(typeof(OmitBraces),
+            "org.openrewrite.java.marker.OmitBraces");
+        RpcSendQueue.RegisterJavaTypeName(typeof(NullSafe),
+            "org.openrewrite.java.marker.NullSafe");
+        RpcSendQueue.RegisterJavaTypeName(typeof(PointerMemberAccess),
+            "org.openrewrite.csharp.marker.PointerMemberAccess");
         RpcSendQueue.RegisterJavaTypeName(typeof(ForEachVariableLoopControl),
             "org.openrewrite.csharp.tree.Cs$ForEachVariableLoop$Control");
 

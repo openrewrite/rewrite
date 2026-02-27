@@ -32,16 +32,35 @@ public interface Statement : J
 /// Used by languages with safe navigation: C#, Kotlin, Groovy.
 /// When present on a MethodInvocation.Name or FieldAccess.Name, prints ?. instead of .
 /// </summary>
-public sealed class NullSafe(
-    Guid id
-) : Marker, IEquatable<NullSafe>
+public sealed class NullSafe : Marker, IRpcCodec<NullSafe>, IEquatable<NullSafe>
 {
-    public Guid Id { get; } = id;
+    public Guid Id { get; }
+    /// <summary>Whitespace between '?' and '.' when they are separated (e.g., by a newline).</summary>
+    public Space DotPrefix { get; }
+
+    public NullSafe(Guid id, Space? dotPrefix = null)
+    {
+        Id = id;
+        DotPrefix = dotPrefix ?? Space.Empty;
+    }
 
     public NullSafe WithId(Guid id) =>
-        id == Id ? this : new(id);
+        id == Id ? this : new(id, DotPrefix);
+    public NullSafe WithDotPrefix(Space dotPrefix) =>
+        ReferenceEquals(dotPrefix, DotPrefix) ? this : new(Id, dotPrefix);
 
     public static NullSafe Instance { get; } = new(Guid.Empty);
+
+    public void RpcSend(NullSafe after, RpcSendQueue q)
+    {
+        q.GetAndSend(after, m => m.Id);
+        q.GetAndSend(after, m => m.DotPrefix, s => new Rpc.JavaSender().VisitSpace(s, q));
+    }
+
+    public NullSafe RpcReceive(NullSafe before, RpcReceiveQueue q) =>
+        before
+            .WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse))
+            .WithDotPrefix(q.Receive(before.DotPrefix, s => new Rpc.JavaReceiver().VisitSpace(s, q)));
 
     public bool Equals(NullSafe? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as NullSafe);
@@ -68,6 +87,89 @@ public sealed class OmitParentheses(
 
     public bool Equals(OmitParentheses? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as OmitParentheses);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// Marker on a <see cref="Binary"/> indicating it was produced from a C# pattern combinator
+/// (<c>and</c>/<c>or</c> keywords) rather than a logical operator (<c>&amp;&amp;</c>/<c>||</c>).
+/// </summary>
+public sealed class PatternCombinator(Guid id)
+    : Marker, IRpcCodec<PatternCombinator>, IEquatable<PatternCombinator>
+{
+    public Guid Id { get; } = id;
+
+    public PatternCombinator WithId(Guid id) =>
+        id == Id ? this : new(id);
+
+    public static PatternCombinator Instance { get; } = new(Guid.Empty);
+    public void RpcSend(PatternCombinator after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public PatternCombinator RpcReceive(PatternCombinator before, RpcReceiveQueue q) =>
+        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
+
+    public bool Equals(PatternCombinator? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as PatternCombinator);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// Marker on a <see cref="ConstrainedTypeParameter"/> that records the source-order index
+/// of its <c>where</c> clause, so the printer can output constraints in source order
+/// rather than type-parameter declaration order.
+/// </summary>
+public sealed class WhereClauseOrder : Marker, IRpcCodec<WhereClauseOrder>, IEquatable<WhereClauseOrder>
+{
+    public Guid Id { get; }
+    public int Order { get; }
+
+    public WhereClauseOrder(Guid id, int order)
+    {
+        Id = id;
+        Order = order;
+    }
+
+    public WhereClauseOrder WithId(Guid id) =>
+        id == Id ? this : new(id, Order);
+
+    public WhereClauseOrder WithOrder(int order) =>
+        order == Order ? this : new(Id, order);
+
+    public void RpcSend(WhereClauseOrder after, RpcSendQueue q)
+    {
+        q.GetAndSend(after, m => m.Id);
+        q.GetAndSend(after, m => m.Order);
+    }
+
+    public WhereClauseOrder RpcReceive(WhereClauseOrder before, RpcReceiveQueue q) =>
+        before
+            .WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse))
+            .WithOrder(q.Receive(before.Order));
+
+    public bool Equals(WhereClauseOrder? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as WhereClauseOrder);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// Marker on an <see cref="ArrayDimension"/> indicating it is a continuation within the same
+/// rank specifier (e.g., the second dimension of <c>new int[n, m]</c>).
+/// The printer uses this to emit a comma instead of opening a new bracket pair.
+/// </summary>
+public sealed class MultiDimensionContinuation(Guid id)
+    : Marker, IRpcCodec<MultiDimensionContinuation>, IEquatable<MultiDimensionContinuation>
+{
+    public Guid Id { get; } = id;
+
+    public MultiDimensionContinuation WithId(Guid id) =>
+        id == Id ? this : new(id);
+
+    public static MultiDimensionContinuation Instance { get; } = new(Guid.Empty);
+    public void RpcSend(MultiDimensionContinuation after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public MultiDimensionContinuation RpcReceive(MultiDimensionContinuation before, RpcReceiveQueue q) =>
+        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
+
+    public bool Equals(MultiDimensionContinuation? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as MultiDimensionContinuation);
     public override int GetHashCode() => Id.GetHashCode();
 }
 
@@ -1114,6 +1216,56 @@ public sealed class TypeParameter(
 }
 
 /// <summary>
+/// Wrapper for method type parameters that matches Java's J.TypeParameters tree node.
+/// On the Java side, MethodDeclaration stores type parameters wrapped in J.TypeParameters
+/// (a full tree node with id/prefix/markers/annotations), while C# stores them as a raw JContainer.
+/// This class bridges the RPC protocol gap.
+/// </summary>
+public sealed class TypeParameters(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    IList<Annotation> annotations,
+    IList<JRightPadded<TypeParameter>> typeParameters
+) : J, IEquatable<TypeParameters>
+{
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public IList<Annotation> Annotations { get; } = annotations;
+    public IList<JRightPadded<TypeParameter>> Params { get; } = typeParameters;
+
+    public TypeParameters WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Annotations, Params);
+    public TypeParameters WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Annotations, Params);
+    public TypeParameters WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Annotations, Params);
+    public TypeParameters WithAnnotations(IList<Annotation> annotations) =>
+        ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, annotations, Params);
+    public TypeParameters WithParams(IList<JRightPadded<TypeParameter>> typeParameters) =>
+        ReferenceEquals(typeParameters, Params) ? this : new(Id, Prefix, Markers, Annotations, typeParameters);
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    /// <summary>
+    /// Create a TypeParameters wrapper from a JContainer (for RPC sending).
+    /// </summary>
+    public static TypeParameters FromContainer(JContainer<TypeParameter> container) =>
+        new(Guid.NewGuid(), container.Before, Markers.Empty, [], container.Elements);
+
+    /// <summary>
+    /// Convert back to a JContainer (for RPC receiving).
+    /// </summary>
+    public JContainer<TypeParameter> ToContainer() =>
+        new(Prefix, Params, Markers.Empty);
+
+    public bool Equals(TypeParameters? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as TypeParameters);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
 /// An identifier (variable name, type name, etc.).
 /// </summary>
 public sealed class Identifier(
@@ -1187,6 +1339,59 @@ public sealed class FieldAccess(
 
     public bool Equals(FieldAccess? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as FieldAccess);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// A member reference expression (e.g., obj.Method&lt;T&gt; used as a method group reference).
+/// In Java, this represents method references like obj::method.
+/// In C#, this represents generic method group references like obj.Method&lt;T&gt;.
+/// </summary>
+public sealed class MemberReference(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JRightPadded<Expression> containing,
+    JContainer<Expression>? typeParameters,
+    JLeftPadded<Identifier> reference,
+    JavaType? type,
+    JavaType.Method? methodType,
+    JavaType.Variable? variableType
+) : J, Expression, IEquatable<MemberReference>
+{
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public JRightPadded<Expression> Containing { get; } = containing;
+    public JContainer<Expression>? TypeParameters { get; } = typeParameters;
+    public JLeftPadded<Identifier> Reference { get; } = reference;
+    public JavaType? Type { get; } = type;
+    public JavaType.Method? MethodType { get; } = methodType;
+    public JavaType.Variable? VariableType { get; } = variableType;
+
+    public MemberReference WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Containing, TypeParameters, Reference, Type, MethodType, VariableType);
+    public MemberReference WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Containing, TypeParameters, Reference, Type, MethodType, VariableType);
+    public MemberReference WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Containing, TypeParameters, Reference, Type, MethodType, VariableType);
+    public MemberReference WithContaining(JRightPadded<Expression> containing) =>
+        ReferenceEquals(containing, Containing) ? this : new(Id, Prefix, Markers, containing, TypeParameters, Reference, Type, MethodType, VariableType);
+    public MemberReference WithTypeParameters(JContainer<Expression>? typeParameters) =>
+        ReferenceEquals(typeParameters, TypeParameters) ? this : new(Id, Prefix, Markers, Containing, typeParameters, Reference, Type, MethodType, VariableType);
+    public MemberReference WithReference(JLeftPadded<Identifier> reference) =>
+        ReferenceEquals(reference, Reference) ? this : new(Id, Prefix, Markers, Containing, TypeParameters, reference, Type, MethodType, VariableType);
+    public MemberReference WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Containing, TypeParameters, Reference, type, MethodType, VariableType);
+    public MemberReference WithMethodType(JavaType.Method? methodType) =>
+        ReferenceEquals(methodType, MethodType) ? this : new(Id, Prefix, Markers, Containing, TypeParameters, Reference, Type, methodType, VariableType);
+    public MemberReference WithVariableType(JavaType.Variable? variableType) =>
+        ReferenceEquals(variableType, VariableType) ? this : new(Id, Prefix, Markers, Containing, TypeParameters, Reference, Type, MethodType, variableType);
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(MemberReference? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as MemberReference);
     public override int GetHashCode() => Id.GetHashCode();
 }
 
