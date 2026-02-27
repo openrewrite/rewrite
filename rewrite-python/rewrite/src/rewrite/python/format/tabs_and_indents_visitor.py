@@ -63,6 +63,11 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     if indent != 0:
                         c.put_message("last_indent", indent)
 
+            for next_parent in parent.get_path():
+                if isinstance(next_parent, J):
+                    self.pre_visit(next_parent, p)
+                    break
+
         return super().visit(tree, p)
 
     def pre_visit(self, tree: T, p: P) -> Optional[T]:
