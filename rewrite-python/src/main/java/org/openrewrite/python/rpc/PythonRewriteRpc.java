@@ -491,10 +491,11 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         /**
          * Set the base pip packages directory.
-         * When set and the required version is not already available in the Python
-         * interpreter, a version-specific subdirectory (e.g., {@code <pipPackagesPath>/8.74.1/}
-         * or {@code <pipPackagesPath>/8.75.0.dev0/}) is resolved and the openrewrite
-         * package is automatically installed there via pip.
+         * When set and the required release version is not already available in the
+         * Python interpreter, a version-specific subdirectory (e.g.,
+         * {@code <pipPackagesPath>/8.74.1/}) is resolved and the openrewrite package is
+         * automatically installed there via pip. Dev builds ({@code .dev0}) are not
+         * installed this way and require the interpreter to already have the package.
          *
          * @param pipPackagesPath The base directory under which version-specific pip packages are installed
          * @return This builder
@@ -538,10 +539,11 @@ public class PythonRewriteRpc extends RewriteRpc {
         public PythonRewriteRpc get() {
             String version = StringUtils.readFully(
                     PythonRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-python-version.txt")).trim();
+            boolean isDevBuild = version.isEmpty() || version.endsWith(".dev0");
 
             Path resolvedPipPackagesPath = null;
-            if (!version.isEmpty()) {
-                // Known version (release or dev pre-release) — try to find or install it.
+            if (!isDevBuild) {
+                // Release version — try to find or install the pinned version.
                 // 1. Check pipPackagesPath for an existing install
                 // 2. Check if the interpreter already has the right version
                 // 3. Install to pipPackagesPath if available, otherwise fail
@@ -559,8 +561,8 @@ public class PythonRewriteRpc extends RewriteRpc {
                             "or install the package manually: pip install openrewrite==" + version);
                 }
             } else {
-                // No version info (local dev build) — require the interpreter to already
-                // have the rewrite package (e.g., from a venv with an editable install).
+                // Local dev build — require the interpreter to already have the rewrite
+                // package (e.g., from a venv with an editable install).
                 if (!canImportRewrite(pythonPath)) {
                     throw new IllegalStateException(
                             "The Python interpreter at " + pythonPath + " cannot import the 'rewrite' package. " +
@@ -609,9 +611,9 @@ public class PythonRewriteRpc extends RewriteRpc {
             // If debug source path is set, use it
             if (debugRewriteSourcePath != null) {
                 pythonPathParts.add(debugRewriteSourcePath.toAbsolutePath().normalize().toString());
-            } else if (version.isEmpty()) {
-                // For local dev builds without a version file, try to find the Python
-                // source in the project structure (as a fallback for PYTHONPATH)
+            } else if (isDevBuild) {
+                // For local dev builds, try to find the Python source in the project
+                // structure (as a fallback for PYTHONPATH)
                 Path basePath = workingDirectory != null ? workingDirectory : Paths.get(System.getProperty("user.dir"));
 
                 // Check common locations
@@ -730,30 +732,30 @@ public class PythonRewriteRpc extends RewriteRpc {
                     pb.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile));
                 }
                 Process process = pb.start();
+                String pipOutput = "";
                 if (log == null) {
-                    // Drain stdout+stderr to prevent pipe buffer from filling and blocking
-                    Thread drainer = new Thread(() -> {
-                        try (InputStream is = process.getInputStream()) {
-                            byte[] buf = new byte[4096];
-                            //noinspection StatementWithEmptyBody
-                            while (is.read(buf) != -1) {
-                            }
-                        } catch (IOException ignored) {
-                        }
-                    });
-                    drainer.setDaemon(true);
-                    drainer.start();
+                    // Capture stdout+stderr so we can include it in error messages
+                    try (InputStream is = process.getInputStream()) {
+                        pipOutput = StringUtils.readFully(is);
+                    }
                 }
                 boolean completed = process.waitFor(2, TimeUnit.MINUTES);
 
                 if (!completed) {
                     process.destroyForcibly();
-                    throw new RuntimeException("Timed out bootstrapping openrewrite package");
+                    throw new RuntimeException("Timed out bootstrapping openrewrite==" + version);
                 }
 
                 int exitCode = process.exitValue();
                 if (exitCode != 0) {
-                    throw new RuntimeException("Failed to bootstrap openrewrite package, pip install exited with code " + exitCode);
+                    String message = "Failed to install openrewrite==" + version +
+                            " (pip exited with code " + exitCode + ")";
+                    if (!pipOutput.isEmpty()) {
+                        message += ":\n" + pipOutput.trim();
+                    } else if (log != null) {
+                        message += ". See " + log.toAbsolutePath().normalize() + " for details";
+                    }
+                    throw new RuntimeException(message);
                 }
 
                 Files.write(pipPackagesPath.resolve(".openrewrite-version"), version.getBytes(StandardCharsets.UTF_8));
