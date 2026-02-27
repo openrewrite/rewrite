@@ -109,14 +109,15 @@ public class MavenArtifactDownloader {
             } else if ("file".equals(URI.create(uri).getScheme())) {
                 bodyStream = Files.newInputStream(Paths.get(URI.create(uri)));
             } else {
-                boolean hasAuth = hasCredentials(dependency.getRepository());
+                MavenRepository repository = dependency.getRepository();
                 HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
                 try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
                      InputStream body = response.getBody()) {
                     if (!response.isSuccessful() || body == null) {
                         int code = response.getCode();
                         // If credentials caused a client-side error, retry anonymously
-                        if (hasAuth && code >= 400 && code <= 499 && code != 408 && code != 425 && code != 429) {
+                        boolean hadAuth = serverIdToServer.get(repository.getId()) != null || repository.getUsername() != null && repository.getPassword() != null;
+                        if (hadAuth && code >= 400 && code <= 499 && code != 408 && code != 425 && code != 429) {
                             bodyStream = downloadAnonymously(uri);
                             if (bodyStream != null) {
                                 return bodyStream;
@@ -136,14 +137,6 @@ public class MavenArtifactDownloader {
             }
             return bodyStream;
         }, onError);
-    }
-
-    private boolean hasCredentials(MavenRepository repository) {
-        MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
-        if (authInfo != null) {
-            return authInfo.getUsername() != null || authInfo.getPassword() != null;
-        }
-        return repository.getUsername() != null && repository.getPassword() != null;
     }
 
     private HttpSender.Request.Builder applyAuthentication(MavenRepository repository, HttpSender.Request.Builder request) {
