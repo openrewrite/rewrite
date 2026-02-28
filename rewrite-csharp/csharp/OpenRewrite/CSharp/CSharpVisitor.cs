@@ -66,10 +66,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             EventDeclaration evd => VisitEventDeclaration(evd, p),
             CsBinary csb => VisitCsBinary(csb, p),
             CollectionExpression ce => VisitCollectionExpression(ce, p),
-            CsExpressionStatement ces => VisitCsExpressionStatement(ces, p),
             ForEachVariableLoop fevl => VisitForEachVariableLoop(fevl, p),
             ForEachVariableLoopControl fevlc => VisitForEachVariableLoopControl(fevlc, p),
-            CsMethodDeclaration cmd => VisitCsMethodDeclaration(cmd, p),
             UsingStatement ust => VisitUsingStatement(ust, p),
             AllowsConstraintClause acc => VisitAllowsConstraintClause(acc, p),
             RefStructConstraint rsc => VisitRefStructConstraint(rsc, p),
@@ -81,7 +79,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             DiscardVariableDesignation dvd => VisitDiscardVariableDesignation(dvd, p),
             CsUnary csu => VisitCsUnary(csu, p),
             TupleElement tel => VisitTupleElement(tel, p),
-            CsNewClass csnc => VisitCsNewClass(csnc, p),
             ImplicitElementAccess iea => VisitImplicitElementAccess(iea, p),
             ConstantPattern cp => VisitConstantPattern(cp, p),
             DiscardPattern dp => VisitDiscardPattern(dp, p),
@@ -99,9 +96,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             EnumDeclaration enumd => VisitEnumDeclaration(enumd, p),
             EnumMemberDeclaration enummd => VisitEnumMemberDeclaration(enummd, p),
             AliasQualifiedName aqn => VisitAliasQualifiedName(aqn, p),
-            CsArrayType csat => VisitCsArrayType(csat, p),
-            CsTryCatch cstc => VisitCsTryCatch(cstc, p),
-            CsTry cstry => VisitCsTry(cstry, p),
             PointerDereference pd => VisitPointerDereference(pd, p),
             PointerFieldAccess pfa => VisitPointerFieldAccess(pfa, p),
             RefType rt => VisitRefType(rt, p),
@@ -219,9 +213,9 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var pattern = Visit(isPattern.Pattern.Element, p);
 
         if ((expr is Expression e && !ReferenceEquals(e, isPattern.Expression)) ||
-            (pattern is J pat && !ReferenceEquals(pat, isPattern.Pattern.Element)))
+            (pattern is Pattern pat && !ReferenceEquals(pat, isPattern.Pattern.Element)))
         {
-            return isPattern.WithExpression(expr is Expression newExpr ? newExpr : isPattern.Expression).WithPattern(pattern is J newPat ? isPattern.Pattern.WithElement(newPat) : isPattern.Pattern);
+            return isPattern.WithExpression(expr is Expression newExpr ? newExpr : isPattern.Expression).WithPattern(pattern is Pattern newPat ? isPattern.Pattern.WithElement(newPat) : isPattern.Pattern);
         }
 
         return isPattern;
@@ -486,25 +480,25 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     public virtual J VisitTupleType(TupleType tupleType, P p)
     {
         var elements = tupleType.Elements.Elements;
-        var newElements = new List<JRightPadded<VariableDeclarations>>();
+        var newElements = new List<JRightPadded<TupleElement>>();
         bool elementsChanged = false;
 
         foreach (var element in elements)
         {
             var visited = Visit(element.Element, p);
-            if (visited is VariableDeclarations vd)
+            if (visited is TupleElement te)
             {
-                if (!ReferenceEquals(vd, element.Element))
+                if (!ReferenceEquals(te, element.Element))
                 {
                     elementsChanged = true;
                 }
-                newElements.Add(element.WithElement(vd));
+                newElements.Add(element.WithElement(te));
             }
         }
 
         if (elementsChanged)
         {
-            return tupleType.WithElements(new JContainer<VariableDeclarations>(tupleType.Elements.Before, newElements, tupleType.Elements.Markers));
+            return tupleType.WithElements(new JContainer<TupleElement>(tupleType.Elements.Before, newElements, tupleType.Elements.Markers));
         }
 
         return tupleType;
@@ -656,12 +650,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
     public virtual J VisitCollectionExpression(CollectionExpression collectionExpression, P p) => collectionExpression;
 
-    public virtual J VisitCsExpressionStatement(CsExpressionStatement csExpressionStatement, P p)
-    {
-        Visit(csExpressionStatement.Expression, p);
-        return csExpressionStatement;
-    }
-
     public virtual J VisitForEachVariableLoop(ForEachVariableLoop forEachVariableLoop, P p)
     {
         Visit(forEachVariableLoop.ControlElement, p);
@@ -674,14 +662,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         Visit(control.Variable.Element, p);
         Visit(control.Iterable.Element, p);
         return control;
-    }
-
-    public virtual J VisitCsMethodDeclaration(CsMethodDeclaration methodDeclaration, P p)
-    {
-        Visit(methodDeclaration.ReturnTypeExpression, p);
-        Visit(methodDeclaration.Name, p);
-        if (methodDeclaration.Body != null) Visit(methodDeclaration.Body, p);
-        return methodDeclaration;
     }
 
     public virtual J VisitUsingStatement(UsingStatement usingStatement, P p)
@@ -722,13 +702,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         Visit(tupleElement.ElementType, p);
         if (tupleElement.Name != null) Visit(tupleElement.Name, p);
         return tupleElement;
-    }
-
-    public virtual J VisitCsNewClass(CsNewClass csNewClass, P p)
-    {
-        Visit(csNewClass.NewClassCore, p);
-        if (csNewClass.Initializer != null) Visit(csNewClass.Initializer, p);
-        return csNewClass;
     }
 
     public virtual J VisitConstantPattern(ConstantPattern constantPattern, P p)
@@ -830,26 +803,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     {
         Visit(aliasQualifiedName.Name, p);
         return aliasQualifiedName;
-    }
-
-    public virtual J VisitCsArrayType(CsArrayType csArrayType, P p)
-    {
-        if (csArrayType.TypeExpression != null) Visit(csArrayType.TypeExpression, p);
-        return csArrayType;
-    }
-
-    public virtual J VisitCsTryCatch(CsTryCatch csTryCatch, P p)
-    {
-        Visit(csTryCatch.Parameter, p);
-        Visit(csTryCatch.Body, p);
-        return csTryCatch;
-    }
-
-    public virtual J VisitCsTry(CsTry csTry, P p)
-    {
-        Visit(csTry.Body, p);
-        foreach (var c in csTry.Catches) Visit(c, p);
-        return csTry;
     }
 
     public virtual J VisitPointerDereference(PointerDereference pointerDereference, P p)

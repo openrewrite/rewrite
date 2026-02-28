@@ -99,10 +99,8 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             EventDeclaration evd => VisitEventDeclaration(evd, q),
             CsBinary csb => VisitCsBinary(csb, q),
             CollectionExpression ce => VisitCollectionExpression(ce, q),
-            CsExpressionStatement ces => VisitCsExpressionStatement(ces, q),
             ForEachVariableLoop fevl => VisitForEachVariableLoop(fevl, q),
             ForEachVariableLoopControl fevlc => VisitForEachVariableLoopControl(fevlc, q),
-            CsMethodDeclaration cmd => VisitCsMethodDeclaration(cmd, q),
             UsingStatement ust => VisitUsingStatement(ust, q),
             AllowsConstraintClause acc => VisitAllowsConstraintClause(acc, q),
             RefStructConstraint rsc => VisitRefStructConstraint(rsc, q),
@@ -114,7 +112,6 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             DiscardVariableDesignation dvd => VisitDiscardVariableDesignation(dvd, q),
             CsUnary csu => VisitCsUnary(csu, q),
             TupleElement tel => VisitTupleElement(tel, q),
-            CsNewClass csnc => VisitCsNewClass(csnc, q),
             ImplicitElementAccess iea => VisitImplicitElementAccess(iea, q),
             ConstantPattern cp => VisitConstantPattern(cp, q),
             DiscardPattern dp => VisitDiscardPattern(dp, q),
@@ -132,9 +129,6 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             EnumDeclaration enumd => VisitEnumDeclaration(enumd, q),
             EnumMemberDeclaration enummd => VisitEnumMemberDeclaration(enummd, q),
             AliasQualifiedName aqn => VisitAliasQualifiedName(aqn, q),
-            CsArrayType csat => VisitCsArrayType(csat, q),
-            CsTryCatch cstc => VisitCsTryCatch(cstc, q),
-            CsTry cstry => VisitCsTry(cstry, q),
             PointerDereference pd => VisitPointerDereference(pd, q),
             PointerFieldAccess pfa => VisitPointerFieldAccess(pfa, q),
             RefType rt => VisitRefType(rt, q),
@@ -262,8 +256,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- RefExpression ----
     public override J VisitRefExpression(RefExpression re, RpcReceiveQueue q)
     {
+        var kind = q.Receive<object>(re.Kind);
         var expression = q.Receive((J)re.Expression, el => (J)VisitNonNull(el, q));
-        return re.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((Expression)expression!);
+        return re.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithKind((RefKind)kind!).WithExpression((Expression)expression!);
     }
 
     // ---- DeclarationExpression ----
@@ -647,12 +642,6 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         return ce.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithElements(elements!).WithType(type);
     }
 
-    public override J VisitCsExpressionStatement(CsExpressionStatement ces, RpcReceiveQueue q)
-    {
-        var exprPadded = q.Receive(ces.ExpressionPadded, rp => _delegate.VisitRightPadded(rp, q));
-        return ces.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpressionPadded(exprPadded!);
-    }
-
     public override J VisitForEachVariableLoop(ForEachVariableLoop fevl, RpcReceiveQueue q)
     {
         var controlElement = q.Receive((J)fevl.ControlElement, el => (J)VisitNonNull(el, q));
@@ -665,20 +654,6 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var variable = q.Receive(ctrl.Variable, rp => _delegate.VisitRightPadded(rp, q));
         var iterable = q.Receive(ctrl.Iterable, rp => _delegate.VisitRightPadded(rp, q));
         return ctrl.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithVariable(variable!).WithIterable(iterable!);
-    }
-
-    public override J VisitCsMethodDeclaration(CsMethodDeclaration cmd, RpcReceiveQueue q)
-    {
-        var attrs = q.ReceiveList(cmd.Attributes, t => (AttributeList)VisitNonNull(t, q));
-        var modifiers = q.ReceiveList(cmd.Modifiers, m => (Modifier)VisitNonNull(m, q));
-        var typeParams = q.Receive(cmd.TypeParameters, c => VisitContainer(c!, q));
-        var returnType = q.Receive((J)cmd.ReturnTypeExpression, el => (J)VisitNonNull(el, q));
-        var explIntSpec = q.Receive(cmd.ExplicitInterfaceSpecifier, rp => _delegate.VisitRightPadded(rp!, q));
-        var name = q.Receive((J)cmd.Name, el => (J)VisitNonNull(el, q));
-        var parameters = q.Receive(cmd.Parameters, c => VisitContainer(c, q));
-        var body = q.Receive((J?)cmd.Body, el => (J)VisitNonNull(el!, q));
-        var methodType = q.Receive((JavaType?)cmd.MethodType, t => VisitType(t, q)!);
-        return cmd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAttributes(attrs!).WithModifiers(modifiers!).WithTypeParameters(typeParams).WithReturnTypeExpression((TypeTree)returnType!).WithExplicitInterfaceSpecifier(explIntSpec).WithName((Identifier)name!).WithParameters(parameters!).WithBody((Statement?)body).WithMethodType((JavaType.Method?)methodType);
     }
 
     public override J VisitUsingStatement(UsingStatement ust, RpcReceiveQueue q)
@@ -748,13 +723,6 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var elementType = q.Receive((J)tel.ElementType, el => (J)VisitNonNull(el, q));
         var name = q.Receive((J?)tel.Name, el => (J)VisitNonNull(el!, q));
         return tel.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithElementType((TypeTree)elementType!).WithName((Identifier?)name);
-    }
-
-    public override J VisitCsNewClass(CsNewClass csnc, RpcReceiveQueue q)
-    {
-        var newClassCore = q.Receive((J)csnc.NewClassCore, el => (J)VisitNonNull(el, q));
-        var initializer = q.Receive((J?)csnc.Initializer, el => (J)VisitNonNull(el!, q));
-        return csnc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithNewClassCore((NewClass)newClassCore!).WithInitializer((InitializerExpression?)initializer);
     }
 
     public override J VisitImplicitElementAccess(ImplicitElementAccess iea, RpcReceiveQueue q)
@@ -896,31 +864,6 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var alias = q.Receive(aqn.Alias, rp => _delegate.VisitRightPadded(rp, q));
         var name = q.Receive((J)aqn.Name, el => (J)VisitNonNull(el, q));
         return aqn.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAlias(alias!).WithName((Expression)name!);
-    }
-
-    public override J VisitCsArrayType(CsArrayType csat, RpcReceiveQueue q)
-    {
-        var typeExpr = q.Receive((J?)csat.TypeExpression, el => (J)VisitNonNull(el!, q));
-        var dimensions = q.ReceiveList(csat.Dimensions,
-            d => (ArrayDimension)VisitNonNull(d, q));
-        var type = q.Receive(csat.Type, t => VisitType(t, q)!);
-        return csat.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTypeExpression((TypeTree?)typeExpr).WithDimensions(dimensions!).WithType(type);
-    }
-
-    public override J VisitCsTry(CsTry cstry, RpcReceiveQueue q)
-    {
-        var body = q.Receive((J)cstry.Body, el => (J)VisitNonNull(el, q));
-        var catches = q.ReceiveList(cstry.Catches, c => (CsTryCatch)VisitNonNull(c, q));
-        var finallyBlock = q.Receive(cstry.Finally, lp => _delegate.VisitLeftPadded(lp!, q));
-        return cstry.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithBody((Block)body!).WithCatches(catches!).WithFinally(finallyBlock);
-    }
-
-    public override J VisitCsTryCatch(CsTryCatch cstc, RpcReceiveQueue q)
-    {
-        var parameter = q.Receive((J)cstc.Parameter, el => (J)VisitNonNull(el, q));
-        var filterExpr = q.Receive(cstc.FilterExpression, lp => _delegate.VisitLeftPadded(lp!, q));
-        var body = q.Receive((J)cstc.Body, el => (J)VisitNonNull(el, q));
-        return cstc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithParameter((ControlParentheses<VariableDeclarations>)parameter!).WithFilterExpression(filterExpr).WithBody((Block)body!);
     }
 
     public override J VisitPointerDereference(PointerDereference pd, RpcReceiveQueue q)

@@ -434,6 +434,89 @@ public sealed class MultiDimensionalArray(
 }
 
 /// <summary>
+/// Marker on a <see cref="Binary"/> indicating it was produced from a C# pattern combinator
+/// (<c>and</c>/<c>or</c> keywords) rather than a logical operator (<c>&amp;&amp;</c>/<c>||</c>).
+/// </summary>
+public sealed class PatternCombinator(Guid id)
+    : Marker, IRpcCodec<PatternCombinator>, IEquatable<PatternCombinator>
+{
+    public Guid Id { get; } = id;
+
+    public PatternCombinator WithId(Guid id) =>
+        id == Id ? this : new(id);
+
+    public static PatternCombinator Instance { get; } = new(Guid.Empty);
+    public void RpcSend(PatternCombinator after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public PatternCombinator RpcReceive(PatternCombinator before, RpcReceiveQueue q) =>
+        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
+
+    public bool Equals(PatternCombinator? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as PatternCombinator);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// Marker on a <see cref="ConstrainedTypeParameter"/> that records the source-order index
+/// of its <c>where</c> clause, so the printer can output constraints in source order
+/// rather than type-parameter declaration order.
+/// </summary>
+public sealed class WhereClauseOrder : Marker, IRpcCodec<WhereClauseOrder>, IEquatable<WhereClauseOrder>
+{
+    public Guid Id { get; }
+    public int Order { get; }
+
+    public WhereClauseOrder(Guid id, int order)
+    {
+        Id = id;
+        Order = order;
+    }
+
+    public WhereClauseOrder WithId(Guid id) =>
+        id == Id ? this : new(id, Order);
+
+    public WhereClauseOrder WithOrder(int order) =>
+        order == Order ? this : new(Id, order);
+
+    public void RpcSend(WhereClauseOrder after, RpcSendQueue q)
+    {
+        q.GetAndSend(after, m => m.Id);
+        q.GetAndSend(after, m => m.Order);
+    }
+
+    public WhereClauseOrder RpcReceive(WhereClauseOrder before, RpcReceiveQueue q) =>
+        before
+            .WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse))
+            .WithOrder(q.Receive(before.Order));
+
+    public bool Equals(WhereClauseOrder? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as WhereClauseOrder);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// Marker on an <see cref="ArrayDimension"/> indicating it is a continuation within the same
+/// rank specifier (e.g., the second dimension of <c>new int[n, m]</c>).
+/// The printer uses this to emit a comma instead of opening a new bracket pair.
+/// </summary>
+public sealed class MultiDimensionContinuation(Guid id)
+    : Marker, IRpcCodec<MultiDimensionContinuation>, IEquatable<MultiDimensionContinuation>
+{
+    public Guid Id { get; } = id;
+
+    public MultiDimensionContinuation WithId(Guid id) =>
+        id == Id ? this : new(id);
+
+    public static MultiDimensionContinuation Instance { get; } = new(Guid.Empty);
+    public void RpcSend(MultiDimensionContinuation after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public MultiDimensionContinuation RpcReceive(MultiDimensionContinuation before, RpcReceiveQueue q) =>
+        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
+
+    public bool Equals(MultiDimensionContinuation? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as MultiDimensionContinuation);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
 /// A named expression: Name: Expression
 /// Used for named arguments and property pattern elements.
 /// Examples:
@@ -672,14 +755,14 @@ public sealed class IsPattern(
     Space prefix,
     Markers markers,
     Expression expression,
-    JLeftPadded<J> pattern
+    JLeftPadded<Pattern> pattern
 ) : Cs, Expression, IEquatable<IsPattern>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public Expression Expression { get; } = expression;
-    public JLeftPadded<J> Pattern { get; } = pattern;
+    public JLeftPadded<Pattern> Pattern { get; } = pattern;
 
     public IsPattern WithId(Guid id) =>
         id == Id ? this : new(id, Prefix, Markers, Expression, Pattern);
@@ -689,7 +772,7 @@ public sealed class IsPattern(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression, Pattern);
     public IsPattern WithExpression(Expression expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression, Pattern);
-    public IsPattern WithPattern(JLeftPadded<J> pattern) =>
+    public IsPattern WithPattern(JLeftPadded<Pattern> pattern) =>
         ReferenceEquals(pattern, Pattern) ? this : new(Id, Prefix, Markers, Expression, pattern);
 
     Tree Tree.WithId(Guid id) => WithId(id);
@@ -1707,13 +1790,13 @@ public sealed class TupleType(
     Guid id,
     Space prefix,
     Markers markers,
-    JContainer<VariableDeclarations> elements
+    JContainer<TupleElement> elements
 ) : Cs, TypeTree, Expression, IEquatable<TupleType>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public JContainer<VariableDeclarations> Elements { get; } = elements;
+    public JContainer<TupleElement> Elements { get; } = elements;
 
     public TupleType WithId(Guid id) =>
         id == Id ? this : new(id, Prefix, Markers, Elements);
@@ -1721,7 +1804,7 @@ public sealed class TupleType(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Elements);
     public TupleType WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Elements);
-    public TupleType WithElements(JContainer<VariableDeclarations> elements) =>
+    public TupleType WithElements(JContainer<TupleElement> elements) =>
         ReferenceEquals(elements, Elements) ? this : new(Id, Prefix, Markers, elements);
 
     Tree Tree.WithId(Guid id) => WithId(id);
@@ -1901,44 +1984,6 @@ public sealed class Keyword(
 
     public bool Equals(Keyword? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as Keyword);
-    public override int GetHashCode() => Id.GetHashCode();
-}
-
-// ---- Argument ----
-
-public sealed class CsArgument(
-    Guid id,
-    Space prefix,
-    Markers markers,
-    JRightPadded<Identifier>? nameColumn,
-    Keyword? refKindKeyword,
-    Expression expression
-) : Cs, Expression, IEquatable<CsArgument>
-{
-    public Guid Id { get; } = id;
-    public Space Prefix { get; } = prefix;
-    public Markers Markers { get; } = markers;
-    public JRightPadded<Identifier>? NameColumn { get; } = nameColumn;
-    public Keyword? RefKindKeyword { get; } = refKindKeyword;
-    public Expression Expression { get; } = expression;
-
-    public CsArgument WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, NameColumn, RefKindKeyword, Expression);
-    public CsArgument WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, NameColumn, RefKindKeyword, Expression);
-    public CsArgument WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, NameColumn, RefKindKeyword, Expression);
-    public CsArgument WithNameColumn(JRightPadded<Identifier>? nameColumn) =>
-        ReferenceEquals(nameColumn, NameColumn) ? this : new(Id, Prefix, Markers, nameColumn, RefKindKeyword, Expression);
-    public CsArgument WithRefKindKeyword(Keyword? refKindKeyword) =>
-        ReferenceEquals(refKindKeyword, RefKindKeyword) ? this : new(Id, Prefix, Markers, NameColumn, refKindKeyword, Expression);
-    public CsArgument WithExpression(Expression expression) =>
-        ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, NameColumn, RefKindKeyword, expression);
-
-    Tree Tree.WithId(Guid id) => WithId(id);
-
-    public bool Equals(CsArgument? other) => other is not null && Id == other.Id;
-    public override bool Equals(object? obj) => Equals(obj as CsArgument);
     public override int GetHashCode() => Id.GetHashCode();
 }
 
@@ -2292,37 +2337,6 @@ public sealed class CollectionExpression(
     public override int GetHashCode() => Id.GetHashCode();
 }
 
-// ---- CsExpressionStatement (Cs wrapper for expression-as-statement) ----
-
-public sealed class CsExpressionStatement(
-    Guid id,
-    Space prefix,
-    Markers markers,
-    JRightPadded<Expression> expressionPadded
-) : Cs, Statement, IEquatable<CsExpressionStatement>
-{
-    public Guid Id { get; } = id;
-    public Space Prefix { get; } = prefix;
-    public Markers Markers { get; } = markers;
-    public JRightPadded<Expression> ExpressionPadded { get; } = expressionPadded;
-
-    public CsExpressionStatement WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, ExpressionPadded);
-    public CsExpressionStatement WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, ExpressionPadded);
-    public CsExpressionStatement WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, ExpressionPadded);
-    public CsExpressionStatement WithExpressionPadded(JRightPadded<Expression> expressionPadded) =>
-        ReferenceEquals(expressionPadded, ExpressionPadded) ? this : new(Id, Prefix, Markers, expressionPadded);
-
-    public Expression Expression => ExpressionPadded.Element;
-    Tree Tree.WithId(Guid id) => WithId(id);
-
-    public bool Equals(CsExpressionStatement? other) => other is not null && Id == other.Id;
-    public override bool Equals(object? obj) => Equals(obj as CsExpressionStatement);
-    public override int GetHashCode() => Id.GetHashCode();
-}
-
 // ---- ForEachVariableLoop ----
 
 public sealed class ForEachVariableLoopControl(
@@ -2390,68 +2404,6 @@ public sealed class ForEachVariableLoop(
 }
 
 // CsClassDeclaration, ClassDeclarationKind DELETED — use J.ClassDeclaration with ConstrainedTypeParameter in J.TypeParameter.Bounds
-
-// ---- CsMethodDeclaration ----
-
-public sealed class CsMethodDeclaration(
-    Guid id,
-    Space prefix,
-    Markers markers,
-    IList<AttributeList> attributes,
-    IList<Modifier> modifiers,
-    JContainer<TypeParameter>? typeParameters,
-    TypeTree returnTypeExpression,
-    JRightPadded<TypeTree>? explicitInterfaceSpecifier,
-    Identifier name,
-    JContainer<Statement> parameters,
-    Statement? body,
-    JavaType.Method? methodType
-) : Cs, Statement, IEquatable<CsMethodDeclaration>
-{
-    public Guid Id { get; } = id;
-    public Space Prefix { get; } = prefix;
-    public Markers Markers { get; } = markers;
-    public IList<AttributeList> Attributes { get; } = attributes;
-    public IList<Modifier> Modifiers { get; } = modifiers;
-    public JContainer<TypeParameter>? TypeParameters { get; } = typeParameters;
-    public TypeTree ReturnTypeExpression { get; } = returnTypeExpression;
-    public JRightPadded<TypeTree>? ExplicitInterfaceSpecifier { get; } = explicitInterfaceSpecifier;
-    public Identifier Name { get; } = name;
-    public JContainer<Statement> Parameters { get; } = parameters;
-    public Statement? Body { get; } = body;
-    public JavaType.Method? MethodType { get; } = methodType;
-
-    public CsMethodDeclaration WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Attributes, Modifiers, TypeParameters, ReturnTypeExpression, ExplicitInterfaceSpecifier, Name, Parameters, Body, MethodType);
-    public CsMethodDeclaration WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Attributes, Modifiers, TypeParameters, ReturnTypeExpression, ExplicitInterfaceSpecifier, Name, Parameters, Body, MethodType);
-    public CsMethodDeclaration WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Attributes, Modifiers, TypeParameters, ReturnTypeExpression, ExplicitInterfaceSpecifier, Name, Parameters, Body, MethodType);
-    public CsMethodDeclaration WithAttributes(IList<AttributeList> attributes) =>
-        ReferenceEquals(attributes, Attributes) ? this : new(Id, Prefix, Markers, attributes, Modifiers, TypeParameters, ReturnTypeExpression, ExplicitInterfaceSpecifier, Name, Parameters, Body, MethodType);
-    public CsMethodDeclaration WithModifiers(IList<Modifier> modifiers) =>
-        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, Attributes, modifiers, TypeParameters, ReturnTypeExpression, ExplicitInterfaceSpecifier, Name, Parameters, Body, MethodType);
-    public CsMethodDeclaration WithTypeParameters(JContainer<TypeParameter>? typeParameters) =>
-        ReferenceEquals(typeParameters, TypeParameters) ? this : new(Id, Prefix, Markers, Attributes, Modifiers, typeParameters, ReturnTypeExpression, ExplicitInterfaceSpecifier, Name, Parameters, Body, MethodType);
-    public CsMethodDeclaration WithReturnTypeExpression(TypeTree returnTypeExpression) =>
-        ReferenceEquals(returnTypeExpression, ReturnTypeExpression) ? this : new(Id, Prefix, Markers, Attributes, Modifiers, TypeParameters, returnTypeExpression, ExplicitInterfaceSpecifier, Name, Parameters, Body, MethodType);
-    public CsMethodDeclaration WithExplicitInterfaceSpecifier(JRightPadded<TypeTree>? explicitInterfaceSpecifier) =>
-        ReferenceEquals(explicitInterfaceSpecifier, ExplicitInterfaceSpecifier) ? this : new(Id, Prefix, Markers, Attributes, Modifiers, TypeParameters, ReturnTypeExpression, explicitInterfaceSpecifier, Name, Parameters, Body, MethodType);
-    public CsMethodDeclaration WithName(Identifier name) =>
-        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, Attributes, Modifiers, TypeParameters, ReturnTypeExpression, ExplicitInterfaceSpecifier, name, Parameters, Body, MethodType);
-    public CsMethodDeclaration WithParameters(JContainer<Statement> parameters) =>
-        ReferenceEquals(parameters, Parameters) ? this : new(Id, Prefix, Markers, Attributes, Modifiers, TypeParameters, ReturnTypeExpression, ExplicitInterfaceSpecifier, Name, parameters, Body, MethodType);
-    public CsMethodDeclaration WithBody(Statement? body) =>
-        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Attributes, Modifiers, TypeParameters, ReturnTypeExpression, ExplicitInterfaceSpecifier, Name, Parameters, body, MethodType);
-    public CsMethodDeclaration WithMethodType(JavaType.Method? methodType) =>
-        ReferenceEquals(methodType, MethodType) ? this : new(Id, Prefix, Markers, Attributes, Modifiers, TypeParameters, ReturnTypeExpression, ExplicitInterfaceSpecifier, Name, Parameters, Body, methodType);
-
-    Tree Tree.WithId(Guid id) => WithId(id);
-
-    public bool Equals(CsMethodDeclaration? other) => other is not null && Id == other.Id;
-    public override bool Equals(object? obj) => Equals(obj as CsMethodDeclaration);
-    public override int GetHashCode() => Id.GetHashCode();
-}
 
 // ---- UsingStatement ----
 
@@ -2731,7 +2683,7 @@ public sealed class CsUnary(
     JLeftPadded<CsUnary.OperatorKind> @operator,
     Expression expression,
     JavaType? type
-) : Cs, Statement, Expression, IEquatable<CsUnary>
+) : Cs, Statement, Expression, Pattern, IEquatable<CsUnary>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
@@ -2753,7 +2705,7 @@ public sealed class CsUnary(
     public CsUnary WithType(JavaType? type) =>
         ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Operator, Expression, type);
 
-    public enum OperatorKind { SuppressNullableWarning, PointerType, AddressOf, Spread, FromEnd }
+    public enum OperatorKind { SuppressNullableWarning, PointerType, AddressOf, Spread, FromEnd, Not }
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(CsUnary? other) => other is not null && Id == other.Id;
@@ -2792,40 +2744,6 @@ public sealed class TupleElement(
 
     public bool Equals(TupleElement? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as TupleElement);
-    public override int GetHashCode() => Id.GetHashCode();
-}
-
-// ---- CsNewClass ----
-
-public sealed class CsNewClass(
-    Guid id,
-    Space prefix,
-    Markers markers,
-    NewClass newClassCore,
-    InitializerExpression? initializer
-) : Cs, Statement, Expression, IEquatable<CsNewClass>
-{
-    public Guid Id { get; } = id;
-    public Space Prefix { get; } = prefix;
-    public Markers Markers { get; } = markers;
-    public NewClass NewClassCore { get; } = newClassCore;
-    public InitializerExpression? Initializer { get; } = initializer;
-
-    public CsNewClass WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, NewClassCore, Initializer);
-    public CsNewClass WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, NewClassCore, Initializer);
-    public CsNewClass WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, NewClassCore, Initializer);
-    public CsNewClass WithNewClassCore(NewClass newClassCore) =>
-        ReferenceEquals(newClassCore, NewClassCore) ? this : new(Id, Prefix, Markers, newClassCore, Initializer);
-    public CsNewClass WithInitializer(InitializerExpression? initializer) =>
-        ReferenceEquals(initializer, Initializer) ? this : new(Id, Prefix, Markers, NewClassCore, initializer);
-
-    Tree Tree.WithId(Guid id) => WithId(id);
-
-    public bool Equals(CsNewClass? other) => other is not null && Id == other.Id;
-    public override bool Equals(object? obj) => Equals(obj as CsNewClass);
     public override int GetHashCode() => Id.GetHashCode();
 }
 
@@ -3536,118 +3454,6 @@ public sealed class AliasQualifiedName(
 
     public bool Equals(AliasQualifiedName? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as AliasQualifiedName);
-    public override int GetHashCode() => Id.GetHashCode();
-}
-
-// ---- CsArrayType ----
-
-public sealed class CsArrayType(
-    Guid id,
-    Space prefix,
-    Markers markers,
-    TypeTree? typeExpression,
-    IList<ArrayDimension> dimensions,
-    JavaType? type
-) : Cs, Expression, TypeTree, IEquatable<CsArrayType>
-{
-    public Guid Id { get; } = id;
-    public Space Prefix { get; } = prefix;
-    public Markers Markers { get; } = markers;
-    public TypeTree? TypeExpression { get; } = typeExpression;
-    public IList<ArrayDimension> Dimensions { get; } = dimensions;
-    public JavaType? Type { get; } = type;
-
-    public CsArrayType WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, TypeExpression, Dimensions, Type);
-    public CsArrayType WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, TypeExpression, Dimensions, Type);
-    public CsArrayType WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, TypeExpression, Dimensions, Type);
-    public CsArrayType WithTypeExpression(TypeTree? typeExpression) =>
-        ReferenceEquals(typeExpression, TypeExpression) ? this : new(Id, Prefix, Markers, typeExpression, Dimensions, Type);
-    public CsArrayType WithDimensions(IList<ArrayDimension> dimensions) =>
-        ReferenceEquals(dimensions, Dimensions) ? this : new(Id, Prefix, Markers, TypeExpression, dimensions, Type);
-    public CsArrayType WithType(JavaType? type) =>
-        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, TypeExpression, Dimensions, type);
-
-    Tree Tree.WithId(Guid id) => WithId(id);
-
-    public bool Equals(CsArrayType? other) => other is not null && Id == other.Id;
-    public override bool Equals(object? obj) => Equals(obj as CsArrayType);
-    public override int GetHashCode() => Id.GetHashCode();
-}
-
-// ---- CsTry ----
-
-public sealed class CsTryCatch(
-    Guid id,
-    Space prefix,
-    Markers markers,
-    ControlParentheses<VariableDeclarations> parameter,
-    JLeftPadded<ControlParentheses<Expression>>? filterExpression,
-    Block body
-) : Cs, IEquatable<CsTryCatch>
-{
-    public Guid Id { get; } = id;
-    public Space Prefix { get; } = prefix;
-    public Markers Markers { get; } = markers;
-    public ControlParentheses<VariableDeclarations> Parameter { get; } = parameter;
-    public JLeftPadded<ControlParentheses<Expression>>? FilterExpression { get; } = filterExpression;
-    public Block Body { get; } = body;
-
-    public CsTryCatch WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Parameter, FilterExpression, Body);
-    public CsTryCatch WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Parameter, FilterExpression, Body);
-    public CsTryCatch WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Parameter, FilterExpression, Body);
-    public CsTryCatch WithParameter(ControlParentheses<VariableDeclarations> parameter) =>
-        ReferenceEquals(parameter, Parameter) ? this : new(Id, Prefix, Markers, parameter, FilterExpression, Body);
-    public CsTryCatch WithFilterExpression(JLeftPadded<ControlParentheses<Expression>>? filterExpression) =>
-        ReferenceEquals(filterExpression, FilterExpression) ? this : new(Id, Prefix, Markers, Parameter, filterExpression, Body);
-    public CsTryCatch WithBody(Block body) =>
-        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Parameter, FilterExpression, body);
-
-    Tree Tree.WithId(Guid id) => WithId(id);
-
-    public bool Equals(CsTryCatch? other) => other is not null && Id == other.Id;
-    public override bool Equals(object? obj) => Equals(obj as CsTryCatch);
-    public override int GetHashCode() => Id.GetHashCode();
-}
-
-public sealed class CsTry(
-    Guid id,
-    Space prefix,
-    Markers markers,
-    Block body,
-    IList<CsTryCatch> catches,
-    JLeftPadded<Block>? @finally
-) : Cs, Statement, IEquatable<CsTry>
-{
-    public Guid Id { get; } = id;
-    public Space Prefix { get; } = prefix;
-    public Markers Markers { get; } = markers;
-    public Block Body { get; } = body;
-    public IList<CsTryCatch> Catches { get; } = catches;
-    public JLeftPadded<Block>? Finally { get; } = @finally;
-
-    public CsTry WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Body, Catches, Finally);
-    public CsTry WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Body, Catches, Finally);
-    public CsTry WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Body, Catches, Finally);
-    public CsTry WithBody(Block body) =>
-        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, body, Catches, Finally);
-    public CsTry WithCatches(IList<CsTryCatch> catches) =>
-        ReferenceEquals(catches, Catches) ? this : new(Id, Prefix, Markers, Body, catches, Finally);
-    public CsTry WithFinally(JLeftPadded<Block>? @finally) =>
-        ReferenceEquals(@finally, Finally) ? this : new(Id, Prefix, Markers, Body, Catches, @finally);
-
-    Tree Tree.WithId(Guid id) => WithId(id);
-
-    public bool Equals(CsTry? other) => other is not null && Id == other.Id;
-    public override bool Equals(object? obj) => Equals(obj as CsTry);
     public override int GetHashCode() => Id.GetHashCode();
 }
 

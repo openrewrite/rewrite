@@ -4,14 +4,15 @@ using OpenRewrite.CSharp;
 namespace OpenRewrite.Tests;
 
 /// <summary>
-/// Round-trip tests that parse each working-set solution/project and verify
-/// that printing the LST back produces the original source code.
+/// Round-trip tests that parse C# source and verify that printing the LST back
+/// produces the original source code.
 ///
-/// Each solution/project discovered by <see cref="WorkingSetDiscovery"/> becomes
-/// an individual test case. There are two ways to run them:
+/// Working set tests (Category=WorkingSet) require the WORKING_SET_ROOT environment
+/// variable to point to a directory containing .NET solutions/projects. They are
+/// excluded from normal test runs; invoke explicitly with:
+///   dotnet test --filter "Category=WorkingSet"
 ///
-/// 1. [Theory] + [MemberData] — runs all projects dynamically
-/// 2. Individual [Fact] tests — run one project at a time for fast iteration
+/// Standalone tests use inline source and run as part of the normal test suite.
 /// </summary>
 public class WorkingSetRoundTripTests
 {
@@ -21,7 +22,8 @@ public class WorkingSetRoundTripTests
 
     public static IEnumerable<object[]> AllProjects()
     {
-        if (!Directory.Exists(WorkingSetDiscovery.WorkingSetRoot))
+        if (WorkingSetDiscovery.WorkingSetRoot == null ||
+            !Directory.Exists(WorkingSetDiscovery.WorkingSetRoot))
             yield break;
 
         foreach (var (displayName, projectDir, projectFile) in WorkingSetDiscovery.DiscoverAll())
@@ -30,6 +32,7 @@ public class WorkingSetRoundTripTests
         }
     }
 
+    [Trait("Category", "WorkingSet")]
     [Theory]
     [MemberData(nameof(AllProjects))]
     public async Task ParseAndPrintRoundTrip(string displayName, string projectFile, string projectDir)
@@ -39,195 +42,7 @@ public class WorkingSetRoundTripTests
 
     #endregion
 
-    #region Individual project tests (Fact)
-
-    // -- AI Library --
-
-    [Fact]
-    public async Task SemanticKernel() => await RunRoundTripByRelativePath(
-        @"AI Library\microsoft\semantic-kernel\dotnet",
-        "SK-dotnet.slnx");
-
-    // -- Algorithm --
-
-    [Fact]
-    public async Task WaveFunctionCollapse() => await RunRoundTripByRelativePath(
-        @"Algorithm\mxgmn\WaveFunctionCollapse",
-        "WaveFunctionCollapse.csproj");
-
-    // -- Architecture Sample --
-
-    [Fact]
-    public async Task ModularMonolith_Build() => await RunRoundTripByRelativePath(
-        @"Architecture Sample\kgrzybek\modular-monolith-with-ddd\build",
-        "_build.csproj");
-
-    [Fact]
-    public async Task ModularMonolith_Src() => await RunRoundTripByRelativePath(
-        @"Architecture Sample\kgrzybek\modular-monolith-with-ddd\src",
-        "CompanyName.MyMeetings.sln");
-
-    // -- CLI Tool --
-
-    [Fact]
-    public async Task BBDown() => await RunRoundTripByRelativePath(
-        @"CLI Tool\nilaoda\BBDown",
-        "BBDown.sln");
-
-    // -- Desktop App --
-
-    [Fact]
-    public async Task FlowLauncher() => await RunRoundTripByRelativePath(
-        @"Desktop App\Flow-Launcher\Flow.Launcher",
-        "Flow.Launcher.sln");
-
-    [Fact]
-    public async Task BulkCrapUninstaller() => await RunRoundTripByRelativePath(
-        @"Desktop App\Klocman\Bulk-Crap-Uninstaller\source",
-        "BulkCrapUninstaller.sln");
-
-    [Fact]
-    public async Task ScreenToGif() => await RunRoundTripByRelativePath(
-        @"Desktop App\NickeManarin\ScreenToGif",
-        "GifRecorder.sln");
-
-    [Fact]
-    public async Task ShareX() => await RunRoundTripByRelativePath(
-        @"Desktop App\ShareX\ShareX",
-        "ShareX.sln");
-
-    [Fact]
-    public async Task YoutubeDownloader() => await RunRoundTripByRelativePath(
-        @"Desktop App\Tyrrrz\YoutubeDownloader",
-        "YoutubeDownloader.sln");
-
-    // -- Developer Tool --
-
-    [Fact]
-    public async Task ILSpy_Installer() => await RunRoundTripByRelativePath(
-        @"Developer Tool\icsharpcode\ILSpy",
-        "ILSpy.Installer.sln");
-
-    [Fact]
-    public async Task ILSpy() => await RunRoundTripByRelativePath(
-        @"Developer Tool\icsharpcode\ILSpy",
-        "ILSpy.sln");
-
-    [Fact]
-    public async Task ILSpy_VSExtensions() => await RunRoundTripByRelativePath(
-        @"Developer Tool\icsharpcode\ILSpy",
-        "ILSpy.VSExtensions.sln");
-
-    // -- Game Framework --
-
-    [Fact]
-    public async Task MonoGame_Build() => await RunRoundTripByRelativePath(
-        @"Game Framework\MonoGame\MonoGame",
-        "Build.sln");
-
-    [Fact]
-    public async Task MonoGame_Android() => await RunRoundTripByRelativePath(
-        @"Game Framework\MonoGame\MonoGame",
-        "MonoGame.Framework.Android.sln");
-
-    [Fact]
-    public async Task MonoGame_DesktopGL() => await RunRoundTripByRelativePath(
-        @"Game Framework\MonoGame\MonoGame",
-        "MonoGame.Framework.DesktopGL.sln");
-
-    [Fact]
-    public async Task MonoGame_iOS() => await RunRoundTripByRelativePath(
-        @"Game Framework\MonoGame\MonoGame",
-        "MonoGame.Framework.iOS.sln");
-
-    [Fact]
-    public async Task MonoGame_Native() => await RunRoundTripByRelativePath(
-        @"Game Framework\MonoGame\MonoGame",
-        "MonoGame.Framework.Native.sln");
-
-    [Fact]
-    public async Task MonoGame_WindowsDX() => await RunRoundTripByRelativePath(
-        @"Game Framework\MonoGame\MonoGame",
-        "MonoGame.Framework.WindowsDX.sln");
-
-    [Fact]
-    public async Task MonoGame_ToolsLinux() => await RunRoundTripByRelativePath(
-        @"Game Framework\MonoGame\MonoGame",
-        "MonoGame.Tools.Linux.sln");
-
-    [Fact]
-    public async Task MonoGame_ToolsMac() => await RunRoundTripByRelativePath(
-        @"Game Framework\MonoGame\MonoGame",
-        "MonoGame.Tools.Mac.sln");
-
-    [Fact]
-    public async Task MonoGame_ToolsWindows() => await RunRoundTripByRelativePath(
-        @"Game Framework\MonoGame\MonoGame",
-        "MonoGame.Tools.Windows.sln");
-
-    // -- Library --
-
-    [Fact]
-    public async Task Polly() => await RunRoundTripByRelativePath(
-        @"Library\App-vNext\Polly",
-        "Polly.slnx");
-
-    [Fact]
-    public async Task Dapper() => await RunRoundTripByRelativePath(
-        @"Library\DapperLib\Dapper",
-        "Dapper.sln");
-
-    // -- Media Server --
-
-    [Fact]
-    public async Task Jellyfin() => await RunRoundTripByRelativePath(
-        @"Media Server\jellyfin\jellyfin",
-        "Jellyfin.sln");
-
-    // -- Network Tool --
-
-    [Fact]
-    public async Task Netch() => await RunRoundTripByRelativePath(
-        @"Network Tool\netchx\netch",
-        "Netch.sln");
-
-    // -- System Tool --
-
-    [Fact]
-    public async Task WinSW() => await RunRoundTripByRelativePath(
-        @"System Tool\winsw\winsw\src",
-        "WinSW.sln");
-
-    // -- Template --
-
-    [Fact]
-    public async Task CleanArchitecture() => await RunRoundTripByRelativePath(
-        @"Template\ardalis\CleanArchitecture",
-        "Clean.Architecture.slnx");
-
-    [Fact]
-    public async Task CfBuildpackTemplate() => await RunRoundTripByRelativePath(
-        @"Template\macsux\cf-buildpack-template",
-        "MyBuildpack.sln");
-
-    // -- UI Framework --
-
-    [Fact]
-    public async Task MaterialDesignInXaml() => await RunRoundTripByRelativePath(
-        @"UI Framework\MaterialDesignInXAML\MaterialDesignInXamlToolkit",
-        "MaterialDesignToolkit.Full.slnx");
-
-    // -- Web API --
-
-    [Fact]
-    public async Task BitwardenServer() => await RunRoundTripByRelativePath(
-        @"Web API\bitwarden\server",
-        "bitwarden-server.sln");
-
-    [Fact]
-    public async Task Jackett() => await RunRoundTripByRelativePath(
-        @"Web API\Jackett\Jackett\src",
-        "Jackett.sln");
+    #region Standalone round-trip tests (inline source, no working set required)
 
     [Fact]
     public void SwitchTuple_Standalone()
@@ -332,95 +147,6 @@ public class WorkingSetRoundTripTests
         var cu = parser.Parse(source, "Test.cs");
         var printer = new CSharpPrinter<int>();
         var printed = printer.Print(cu);
-
-        Assert.Equal(source, printed);
-    }
-
-    [Fact]
-    public void PreprocessorConditional_Standalone()
-    {
-        // Test with actual Dapper DateTimeOnlyTests.cs file using semantic model (like SolutionParser)
-        var filePath = @"C:\Projects\moderneinc\moderne-cli\working-set-csharp\Library\DapperLib\Dapper\tests\Dapper.Tests\DateTimeOnlyTests.cs";
-        if (!File.Exists(filePath))
-        {
-            Console.WriteLine("SKIP: file not found");
-            return;
-        }
-
-        var source = File.ReadAllText(filePath);
-
-        // First, test without semantic model (should pass)
-        var parser = new CSharpParser();
-        var cu = parser.Parse(source, "DateTimeOnlyTests.cs");
-        var printer = new CSharpPrinter<int>();
-        var printed = printer.Print(cu);
-        Console.WriteLine($"Without semantic model: {(printed == source ? "PASS" : "FAIL")}");
-
-        // Now test with a semantic model that has preprocessor symbols (like MSBuildWorkspace does)
-        var parseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions()
-            .WithPreprocessorSymbols("NET6_0_OR_GREATER", "NETCOREAPP");
-        var syntaxTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
-            source, options: parseOptions, path: filePath);
-        var references = new[] {
-            Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(typeof(object).Assembly.Location)
-        };
-        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
-            "TestAssembly", [syntaxTree], references);
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-
-        var cu2 = parser.Parse(source, "DateTimeOnlyTests.cs", semanticModel);
-        var printed2 = printer.Print(cu2);
-        Console.WriteLine($"With semantic model: {(printed2 == source ? "PASS" : "FAIL")}");
-
-        if (printed2 != source)
-        {
-            for (int i = 0; i < Math.Min(source.Length, printed2.Length); i++)
-            {
-                if (source[i] != printed2[i])
-                {
-                    var start = Math.Max(0, i - 30);
-                    var end = Math.Min(source.Length, i + 50);
-                    Console.WriteLine($"First diff at char {i}:");
-                    Console.WriteLine($"Expected: ...{source[start..end].Replace("\r", "\\r").Replace("\n", "\\n")}...");
-                    var endP = Math.Min(printed2.Length, i + 50);
-                    Console.WriteLine($"Actual:   ...{printed2[start..endP].Replace("\r", "\\r").Replace("\n", "\\n")}...");
-                    break;
-                }
-            }
-        }
-
-        Assert.Equal(source, printed2);
-    }
-
-    /// <summary>
-    /// Isolated test: parse a single file with standalone CSharpParser (no MSBuildWorkspace).
-    /// Useful for debugging individual file parsing/printing issues.
-    /// </summary>
-    [Fact]
-    public void Extensibility_Standalone()
-    {
-        var filePath = @"C:\Projects\moderneinc\moderne-cli\working-set-csharp\Library\App-vNext\Polly\src\Snippets\Docs\Extensibility.cs";
-        if (!File.Exists(filePath))
-        {
-            Console.WriteLine("SKIP: file not found");
-            return;
-        }
-
-        var source = File.ReadAllText(filePath);
-        var parser = new CSharpParser();
-        var cu = parser.Parse(source, "Extensibility.cs");
-
-        // Dump the AST structure
-        Console.WriteLine("=== AST Structure ===");
-        DumpTree(cu, 0);
-        Console.WriteLine("=== END AST ===");
-
-        var printer = new CSharpPrinter<int>();
-        var printed = printer.Print(cu);
-
-        Console.WriteLine("=== PRINTED OUTPUT ===");
-        Console.WriteLine(printed);
-        Console.WriteLine("=== END OUTPUT ===");
 
         Assert.Equal(source, printed);
     }
@@ -664,68 +390,9 @@ public class WorkingSetRoundTripTests
         Assert.Equal(source, printed);
     }
 
-    private static void DumpTree(object? node, int indent)
-    {
-        if (node == null) return;
-        var prefix = new string(' ', indent * 2);
-        var typeName = node.GetType().Name;
-
-        if (node is Java.J j && node is not Java.ExpressionStatement)
-        {
-            var pfx = j.Prefix.Whitespace.Replace("\n", "\\n").Replace("\r", "\\r");
-            if (pfx.Length > 40) pfx = pfx[..40] + "...";
-            Console.WriteLine($"{prefix}{typeName} prefix=\"{pfx}\"");
-
-            // Recurse into known children
-            if (node is Java.Block block)
-            {
-                foreach (var stmt in block.Statements)
-                {
-                    DumpTree(stmt.Element, indent + 1);
-                }
-            }
-            else if (node is OpenRewrite.CSharp.CompilationUnit cu2)
-            {
-                foreach (var member in cu2.Members)
-                {
-                    DumpTree(member, indent + 1);
-                }
-            }
-            else if (node is Java.ClassDeclaration cd)
-            {
-                if (cd.Body != null)
-                    DumpTree(cd.Body, indent + 1);
-            }
-            else if (node is Java.MethodDeclaration md)
-            {
-                if (md.Body != null)
-                    DumpTree(md.Body, indent + 1);
-            }
-        }
-        else
-        {
-            Console.WriteLine($"{prefix}{typeName}");
-        }
-    }
-
     #endregion
 
     #region Helpers
-
-    private static async Task RunRoundTripByRelativePath(string relativeDir, string fileName)
-    {
-        var projectDir = Path.Combine(WorkingSetDiscovery.WorkingSetRoot, relativeDir);
-        var projectFile = Path.Combine(projectDir, fileName);
-        var displayName = Path.Combine(relativeDir, fileName).Replace('\\', '/');
-
-        if (!File.Exists(projectFile))
-        {
-            Console.WriteLine($"SKIP: Project file not found: {projectFile}");
-            return;
-        }
-
-        await RunRoundTrip(displayName, projectFile, projectDir);
-    }
 
     private static async Task RunRoundTrip(string displayName, string projectFile, string projectDir)
     {

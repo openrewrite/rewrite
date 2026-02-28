@@ -165,14 +165,19 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(tupleType, p);
 
-        // Print tuple type elements manually to avoid semicolons
+        // Print tuple type elements
         VisitSpace(tupleType.Elements.Before, p);
         p.Append('(');
 
         for (int i = 0; i < tupleType.Elements.Elements.Count; i++)
         {
             var element = tupleType.Elements.Elements[i];
-            VisitVariableDeclarationsWithoutSemicolon(element.Element, p);
+            VisitSpace(element.Element.Prefix, p);
+            Visit(element.Element.ElementType, p);
+            if (element.Element.Name != null)
+            {
+                Visit(element.Element.Name, p);
+            }
 
             if (i < tupleType.Elements.Elements.Count - 1)
             {
@@ -2463,16 +2468,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
         var op = unary.Operator.Element;
 
-        // In pattern context, Not prints as 'not' keyword instead of '!'
-        if (op == Unary.OperatorType.Not && IsInPatternContext())
-        {
-            VisitSpace(unary.Operator.Before, p);
-            p.Append("not");
-            Visit(unary.Expression, p);
-            AfterSyntax(unary, p);
-            return unary;
-        }
-
         bool isPostfix = op == Unary.OperatorType.PostIncrement || op == Unary.OperatorType.PostDecrement;
 
         if (!isPostfix)
@@ -2525,6 +2520,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             CsUnary.OperatorKind.AddressOf => "&",
             CsUnary.OperatorKind.Spread => "..",
             CsUnary.OperatorKind.FromEnd => "^",
+            CsUnary.OperatorKind.Not => "not",
             _ => throw new InvalidOperationException($"Unknown CsUnary operator: {op}")
         };
     }

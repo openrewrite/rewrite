@@ -12,7 +12,7 @@ namespace OpenRewrite.Tests;
 /// </summary>
 public static class WorkingSetDiscovery
 {
-    public const string WorkingSetRoot = @"C:\Projects\moderneinc\moderne-cli\working-set-csharp";
+    public static readonly string? WorkingSetRoot = Environment.GetEnvironmentVariable("WORKING_SET_ROOT");
 
     private static readonly HashSet<string> ExcludedDirNames = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -122,6 +122,9 @@ public static class WorkingSetDiscovery
     public static List<(string DisplayName, string ProjectDir, string ProjectFile)> DiscoverAll(string? rootDir = null)
     {
         rootDir ??= WorkingSetRoot;
+        if (rootDir == null)
+            return [];
+
         var results = new List<(string DisplayName, string ProjectDir, string ProjectFile)>();
 
         foreach (var projectDir in FindDotNetProjectDirs(rootDir))

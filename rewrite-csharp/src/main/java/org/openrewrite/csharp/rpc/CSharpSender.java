@@ -84,6 +84,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitRefExpression(Cs.RefExpression refExpression, RpcSendQueue q) {
+        q.getAndSend(refExpression, Cs.RefExpression::getKind);
         q.getAndSend(refExpression, Cs.RefExpression::getExpression, el -> visit(el, q));
         return refExpression;
     }

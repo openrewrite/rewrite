@@ -331,9 +331,6 @@ public class RpcReceiveQueue
                 typeof(NamespaceDeclaration),
             "org.openrewrite.csharp.tree.Cs$Lambda" =>
                 typeof(CsLambda),
-            // Cs-prefixed types that correspond to unprefixed Java names
-            "org.openrewrite.csharp.tree.Cs$MethodDeclaration" =>
-                typeof(CsMethodDeclaration),
             "org.openrewrite.csharp.tree.Cs$ConstrainedTypeParameter" =>
                 typeof(ConstrainedTypeParameter),
             "org.openrewrite.csharp.tree.Cs$ExpressionStatement" =>
@@ -356,12 +353,6 @@ public class RpcReceiveQueue
                 typeof(ExpressionBodied),
             "org.openrewrite.java.marker.OmitParentheses" =>
                 typeof(OmitParentheses),
-            "org.openrewrite.csharp.marker.PatternCombinator" =>
-                typeof(PatternCombinator),
-            "org.openrewrite.csharp.marker.WhereClauseOrder" =>
-                typeof(WhereClauseOrder),
-            "org.openrewrite.csharp.marker.MultiDimensionContinuation" =>
-                typeof(MultiDimensionContinuation),
             "org.openrewrite.java.marker.TrailingComma" =>
                 typeof(TrailingComma),
             "org.openrewrite.java.marker.OmitBraces" =>

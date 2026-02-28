@@ -2460,7 +2460,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             prefix,
             Markers.Empty,
             expression,
-            new JLeftPadded<J>(isPrefix, (J)pattern)
+            new JLeftPadded<Pattern>(isPrefix, (Pattern)pattern)
         );
     }
 
@@ -2680,12 +2680,11 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             throw new InvalidOperationException($"Expected Expression or Statement but got {pattern?.GetType().Name}");
         }
 
-        // Use J.Unary with Not operator — printer detects pattern context for 'not' vs '!'
-        return new Unary(
+        return new CsUnary(
             Guid.NewGuid(),
             prefix,
             Markers.Empty,
-            new JLeftPadded<Unary.OperatorType>(operatorPrefix, Unary.OperatorType.Not),
+            new JLeftPadded<CsUnary.OperatorKind>(operatorPrefix, CsUnary.OperatorKind.Not),
             patternExpr,
             null  // type
         );
@@ -7833,7 +7832,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             // Handle tuple types like (int, string) or (int x, string y)
             _cursor = tupleType.OpenParenToken.Span.End;
 
-            var elements = new List<JRightPadded<VariableDeclarations>>();
+            var elements = new List<JRightPadded<TupleElement>>();
             for (int i = 0; i < tupleType.Elements.Count; i++)
             {
                 var element = tupleType.Elements[i];
@@ -7843,21 +7842,20 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 var elemType = VisitType(element.Type);
 
                 // Parse the optional name
-                var variables = new List<JRightPadded<NamedVariable>>();
+                Identifier? elemName = null;
                 if (element.Identifier != default && !element.Identifier.IsMissing)
                 {
                     var namePrefix = ExtractSpaceBefore(element.Identifier);
                     _cursor = element.Identifier.Span.End;
-                    var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, element.Identifier.Text, null);
-                    var namedVar = new NamedVariable(Guid.NewGuid(), Space.Empty, Markers.Empty, name, [], null, null);
-                    variables.Add(new JRightPadded<NamedVariable>(namedVar, Space.Empty, Markers.Empty));
+                    elemName = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, element.Identifier.Text, null);
                 }
 
-                var varDecl = new VariableDeclarations(
+                var tupleElement = new TupleElement(
                     Guid.NewGuid(),
                     elemPrefix,
                     Markers.Empty,
-                    [], [], elemType, null, [], variables
+                    elemType!,
+                    elemName
                 );
 
                 // Get space after element (before comma or close paren)
@@ -7873,7 +7871,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     afterSpace = ExtractSpaceBefore(tupleType.CloseParenToken);
                 }
 
-                elements.Add(new JRightPadded<VariableDeclarations>(varDecl, afterSpace, Markers.Empty));
+                elements.Add(new JRightPadded<TupleElement>(tupleElement, afterSpace, Markers.Empty));
             }
 
             _cursor = tupleType.CloseParenToken.Span.End;
@@ -7882,7 +7880,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 Guid.NewGuid(),
                 prefix,
                 Markers.Empty,
-                new JContainer<VariableDeclarations>(Space.Empty, elements, Markers.Empty)
+                new JContainer<TupleElement>(Space.Empty, elements, Markers.Empty)
             );
         }
         else if (type is NullableTypeSyntax nullableType)

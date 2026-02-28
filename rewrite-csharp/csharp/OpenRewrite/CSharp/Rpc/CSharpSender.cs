@@ -104,10 +104,8 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             EventDeclaration evd => VisitEventDeclaration(evd, q),
             CsBinary csb => VisitCsBinary(csb, q),
             CollectionExpression ce => VisitCollectionExpression(ce, q),
-            CsExpressionStatement ces => VisitCsExpressionStatement(ces, q),
             ForEachVariableLoop fevl => VisitForEachVariableLoop(fevl, q),
             ForEachVariableLoopControl fevlc => VisitForEachVariableLoopControl(fevlc, q),
-            CsMethodDeclaration cmd => VisitCsMethodDeclaration(cmd, q),
             UsingStatement ust => VisitUsingStatement(ust, q),
             AllowsConstraintClause acc => VisitAllowsConstraintClause(acc, q),
             RefStructConstraint rsc => VisitRefStructConstraint(rsc, q),
@@ -119,7 +117,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             DiscardVariableDesignation dvd => VisitDiscardVariableDesignation(dvd, q),
             CsUnary csu => VisitCsUnary(csu, q),
             TupleElement tel => VisitTupleElement(tel, q),
-            CsNewClass csnc => VisitCsNewClass(csnc, q),
             ImplicitElementAccess iea => VisitImplicitElementAccess(iea, q),
             ConstantPattern cp => VisitConstantPattern(cp, q),
             DiscardPattern dp => VisitDiscardPattern(dp, q),
@@ -137,9 +134,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             EnumDeclaration enumd => VisitEnumDeclaration(enumd, q),
             EnumMemberDeclaration enummd => VisitEnumMemberDeclaration(enummd, q),
             AliasQualifiedName aqn => VisitAliasQualifiedName(aqn, q),
-            CsArrayType csat => VisitCsArrayType(csat, q),
-            CsTryCatch cstc => VisitCsTryCatch(cstc, q),
-            CsTry cstry => VisitCsTry(cstry, q),
             PointerDereference pd => VisitPointerDereference(pd, q),
             PointerFieldAccess pfa => VisitPointerFieldAccess(pfa, q),
             RefType rt => VisitRefType(rt, q),
@@ -282,6 +276,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     // ---- RefExpression ----
     public override J VisitRefExpression(RefExpression re, RpcSendQueue q)
     {
+        q.GetAndSend(re, r => r.Kind);
         q.GetAndSend(re, r => (J)r.Expression, el => Visit(el, q));
         return re;
     }
@@ -761,12 +756,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         return ce;
     }
 
-    public override J VisitCsExpressionStatement(CsExpressionStatement ces, RpcSendQueue q)
-    {
-        q.GetAndSend(ces, e => e.ExpressionPadded, rp => VisitRightPadded(rp, q));
-        return ces;
-    }
-
     public override J VisitForEachVariableLoop(ForEachVariableLoop fevl, RpcSendQueue q)
     {
         q.GetAndSend(fevl, f => (J)f.ControlElement, el => Visit(el, q));
@@ -779,22 +768,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(ctrl, c => c.Variable, rp => VisitRightPadded(rp, q));
         q.GetAndSend(ctrl, c => c.Iterable, rp => VisitRightPadded(rp, q));
         return ctrl;
-    }
-
-    public override J VisitCsMethodDeclaration(CsMethodDeclaration cmd, RpcSendQueue q)
-    {
-        q.GetAndSendList(cmd, m => (IList<AttributeList>)m.Attributes,
-            t => (object)t.Id, t => Visit(t, q));
-        q.GetAndSendList(cmd, m => m.Modifiers,
-            m2 => (object)m2.Id, m2 => Visit(m2, q));
-        q.GetAndSend(cmd, m => m.TypeParameters, c => VisitContainer(c!, q));
-        q.GetAndSend(cmd, m => (J)m.ReturnTypeExpression, el => Visit(el, q));
-        q.GetAndSend(cmd, m => m.ExplicitInterfaceSpecifier, rp => VisitRightPadded(rp!, q));
-        q.GetAndSend(cmd, m => (J)m.Name, el => Visit(el, q));
-        q.GetAndSend(cmd, m => m.Parameters, c => VisitContainer(c, q));
-        q.GetAndSend(cmd, m => (J?)m.Body, el => Visit(el!, q));
-        q.GetAndSend(cmd, m => AsRef(m.MethodType), t => VisitType(GetValueNonNull<JavaType>(t), q));
-        return cmd;
     }
 
     public override J VisitUsingStatement(UsingStatement ust, RpcSendQueue q)
@@ -854,13 +827,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(tel, t => (J)t.ElementType, el => Visit(el, q));
         q.GetAndSend(tel, t => (J?)t.Name, el => Visit(el!, q));
         return tel;
-    }
-
-    public override J VisitCsNewClass(CsNewClass csnc, RpcSendQueue q)
-    {
-        q.GetAndSend(csnc, n => (J)n.NewClassCore, el => Visit(el, q));
-        q.GetAndSend(csnc, n => (J?)n.Initializer, el => Visit(el!, q));
-        return csnc;
     }
 
     public override J VisitImplicitElementAccess(ImplicitElementAccess iea, RpcSendQueue q)
@@ -1005,32 +971,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(aqn, a => a.Alias, rp => VisitRightPadded(rp, q));
         q.GetAndSend(aqn, a => (J)a.Name, el => Visit(el, q));
         return aqn;
-    }
-
-    public override J VisitCsArrayType(CsArrayType csat, RpcSendQueue q)
-    {
-        q.GetAndSend(csat, a => (J?)a.TypeExpression, el => Visit(el!, q));
-        q.GetAndSendList(csat, a => a.Dimensions,
-            d => (object)d.Id, d => Visit(d, q));
-        q.GetAndSend(csat, a => AsRef(a.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
-        return csat;
-    }
-
-    public override J VisitCsTry(CsTry cstry, RpcSendQueue q)
-    {
-        q.GetAndSend(cstry, t => (J)t.Body, el => Visit(el, q));
-        q.GetAndSendList(cstry, t => (IList<CsTryCatch>)t.Catches,
-            c => (object)c.Id, c => Visit(c, q));
-        q.GetAndSend(cstry, t => t.Finally, lp => VisitLeftPadded(lp!, q));
-        return cstry;
-    }
-
-    public override J VisitCsTryCatch(CsTryCatch cstc, RpcSendQueue q)
-    {
-        q.GetAndSend(cstc, c => (J)c.Parameter, el => Visit(el, q));
-        q.GetAndSend(cstc, c => c.FilterExpression, lp => VisitLeftPadded(lp!, q));
-        q.GetAndSend(cstc, c => (J)c.Body, el => Visit(el, q));
-        return cstc;
     }
 
     public override J VisitPointerDereference(PointerDereference pd, RpcSendQueue q)

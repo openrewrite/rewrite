@@ -88,6 +88,7 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     @Override
     public J visitRefExpression(Cs.RefExpression refExpression, RpcReceiveQueue q) {
         return refExpression
+                .withKind(q.receiveAndGet(refExpression.getKind(), toEnum(Cs.RefKind.class)))
                 .withExpression(q.receive(refExpression.getExpression(), el -> (Expression) visitNonNull(el, q)));
     }
 
@@ -756,7 +757,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     @Override
     public J visitPointerDereference(Cs.PointerDereference pointerDereference, RpcReceiveQueue q) {
         return pointerDereference
-                .withExpression(q.receive(pointerDereference.getExpression(), el -> (Expression) visitNonNull(el, q)));
+                .withExpression(q.receive(pointerDereference.getExpression(), el -> (Expression) visitNonNull(el, q)))
+                .withType(q.receive(pointerDereference.getType(), type -> visitType(type, q)));
     }
 
     @Override

@@ -675,6 +675,12 @@ public interface Cs extends J {
      *     public ref int Property => ref field;
      * </pre>
      */
+    enum RefKind {
+        Out,
+        Ref,
+        In
+    }
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(access = AccessLevel.PUBLIC)
@@ -692,6 +698,10 @@ public interface Cs extends J {
         @With
         @Getter
         Markers markers;
+
+        @With
+        @Getter
+        RefKind kind;
 
         /**
          * <pre>
@@ -4221,7 +4231,7 @@ public interface Cs extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class Unary implements Cs, Statement, Expression, TypedTree {
+    class Unary implements Cs, Statement, Expression, TypedTree, Pattern {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -4297,7 +4307,12 @@ public interface Cs extends J {
             /**
              * Represent [^3] syntax
              */
-            FromEnd; // [^3]
+            FromEnd, // [^3]
+
+            /**
+             * Represent 'not' pattern operator
+             */
+            Not;
 
             public boolean isModifying() {
                 switch (this) {
