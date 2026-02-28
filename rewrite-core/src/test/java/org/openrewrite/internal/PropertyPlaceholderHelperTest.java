@@ -89,6 +89,55 @@ class PropertyPlaceholderHelperTest {
     }
 
     @Test
+    void escapedPlaceholder() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("\\${java.version}", k -> "should-not-resolve");
+        assertThat(s).isEqualTo("${java.version}");
+    }
+
+    @Test
+    void escapedPlaceholderWithOtherPrefix() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", null);
+        var s = helper.replacePlaceholders("\\%%{k1}", k -> "should-not-resolve");
+        assertThat(s).isEqualTo("%%{k1}");
+    }
+
+    @Test
+    void mixedEscapedAndResolvedPlaceholders() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("${greeting} \\${java.version}", k -> {
+            if ("greeting".equals(k)) return "hello";
+            return null;
+        });
+        assertThat(s).isEqualTo("hello ${java.version}");
+    }
+
+    @Test
+    void unresolvedPlaceholderLeftAsIs() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("${unresolved}", k -> null);
+        assertThat(s).isEqualTo("${unresolved}");
+    }
+
+    @Test
+    void normalResolutionStillWorks() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("${greeting} ${name}", k -> switch (k) {
+            case "greeting" -> "hello";
+            case "name" -> "world";
+            default -> null;
+        });
+        assertThat(s).isEqualTo("hello world");
+    }
+
+    @Test
+    void backslashNotBeforePrefixIsPreserved() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("path\\to\\file", k -> null);
+        assertThat(s).isEqualTo("path\\to\\file");
+    }
+
+    @Test
     void withValueSeparatorAndNullReplacement() {
         var helper = new PropertyPlaceholderHelper("%%{", "}", ",");
         var s = helper.replacePlaceholders("%%{k1,oh}%%{k2}", k -> switch (k) {
