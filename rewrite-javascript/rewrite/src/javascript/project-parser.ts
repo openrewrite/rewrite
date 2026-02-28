@@ -25,6 +25,8 @@ import {Parsers} from "../parser";
 import {PrettierConfigLoader} from "./format/prettier-config-loader";
 import {ExecutionContext} from "../execution";
 import {Marker, replaceMarkerByKind} from "../markers";
+import {TsConfig, detectTsConfigPath, readTsConfigFromPath} from "./tsconfig";
+import {JavaScriptParser} from "./parser";
 
 // Lock file names defined here to avoid circular dependency with package-manager.ts
 // These must be kept in sync with the definitions in package-manager.ts
@@ -213,6 +215,54 @@ export class ProjectParser {
     }
 
     /**
+     * Detects and reads the TsConfig for the project by examining package.json scripts.
+     * Looks for tsc commands with -p/--project flags to determine the config file.
+     *
+     * @param packageJsonFiles List of discovered package.json file paths (relative to relativeTo)
+     * @returns A TsConfig marker if detected, undefined otherwise
+     */
+    private async detectTsConfig(packageJsonFiles: string[]): Promise<TsConfig | undefined> {
+        // Try the root package.json first (shortest path = closest to root)
+        const sortedPackageJsons = [...packageJsonFiles].sort((a, b) => a.length - b.length);
+
+        for (const pkgJsonPath of sortedPackageJsons) {
+            const absolutePath = path.join(this.relativeTo, pkgJsonPath);
+            try {
+                const content = await fsp.readFile(absolutePath, 'utf-8');
+                const packageJson = JSON.parse(content);
+
+                const configPath = detectTsConfigPath(packageJson);
+                if (configPath) {
+                    const pkgDir = path.dirname(absolutePath);
+                    const absoluteConfigPath = path.resolve(pkgDir, configPath);
+
+                    const tsConfig = readTsConfigFromPath(absoluteConfigPath, this.relativeTo);
+                    if (tsConfig) {
+                        this.log(`Detected TypeScript config: ${tsConfig.configPath}`);
+                        return tsConfig;
+                    }
+                }
+            } catch (error) {
+                // Ignore errors reading package.json, continue to next one
+                this.log(`Could not read ${pkgJsonPath}: ${error}`);
+            }
+        }
+
+        // Fallback: check if tsconfig.json exists at project root
+        const defaultConfigPath = path.join(this.relativeTo, 'tsconfig.json');
+        if (fs.existsSync(defaultConfigPath)) {
+            const tsConfig = readTsConfigFromPath(defaultConfigPath, this.relativeTo);
+            if (tsConfig) {
+                this.log(`Using default TypeScript config: tsconfig.json`);
+                return tsConfig;
+            }
+        }
+
+        this.log("No TypeScript configuration detected");
+        return undefined;
+    }
+
+    /**
      * Parses all source files in the project.
      * Yields source files as they are parsed.
      */
@@ -294,9 +344,14 @@ export class ProjectParser {
         // Parse JavaScript/TypeScript source files
         if (discovered.jsFiles.length > 0) {
             this.log(`Parsing ${discovered.jsFiles.length} JavaScript/TypeScript files...`);
-            const parser = Parsers.createParser("javascript", {
+
+            // Detect TsConfig from root package.json
+            const tsConfig = await this.detectTsConfig(discovered.packageJsonFiles);
+
+            const parser = new JavaScriptParser({
                 ctx: this.ctx,
-                relativeTo: this.relativeTo
+                relativeTo: this.relativeTo,
+                tsConfig
             });
 
             // Check if Prettier is available
