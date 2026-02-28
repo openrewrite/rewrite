@@ -113,8 +113,19 @@ public class MavenArtifactDownloader {
                 try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
                      InputStream body = response.getBody()) {
                     if (!response.isSuccessful() || body == null) {
+                        int code = response.getCode();
+                        // If credentials caused a client-side error, retry anonymously
+                        MavenRepository repository = dependency.getRepository();
+                        boolean hadAuth = serverIdToServer.get(repository.getId()) != null ||
+                                repository.getUsername() != null && repository.getPassword() != null;
+                        if (hadAuth && code >= 400 && code <= 499 && code != 408 && code != 425 && code != 429) {
+                            bodyStream = downloadAnonymously(uri);
+                            if (bodyStream != null) {
+                                return bodyStream;
+                            }
+                        }
                         onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s from %s. Response was %d",
-                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), uri, response.getCode()), null,
+                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), uri, code), null,
                                 dependency.getRequested().getGav()));
                         return null;
                     }
@@ -142,5 +153,20 @@ public class MavenArtifactDownloader {
             return request.withBasicAuthentication(repository.getUsername(), repository.getPassword());
         }
         return request;
+    }
+
+    private @Nullable InputStream downloadAnonymously(String uri) {
+        try {
+            HttpSender.Request.Builder anonRequest = httpSender.get(uri);
+            try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(anonRequest.build()));
+                 InputStream body = response.getBody()) {
+                if (response.isSuccessful() && body != null) {
+                    return new ByteArrayInputStream(readAllBytes(body));
+                }
+            }
+        } catch (Throwable ignored) {
+            // Anonymous retry also failed; fall through
+        }
+        return null;
     }
 }

@@ -15,21 +15,26 @@
  */
 package org.openrewrite.maven.utilities;
 
+import okhttp3.mockwebserver.Dispatcher;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.maven.MavenParser;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.cache.MavenArtifactCache;
-import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
-import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.maven.tree.*;
 
+import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -124,6 +129,61 @@ class MavenArtifactDownloaderTest {
                                 runtimeDependency.getVersion(),
                                 runtimeDependency.getType()));
             }
+        }
+    }
+
+    @Test
+    void fallsBackToAnonymousWhenCredentialsRejected(@TempDir Path tempDir) throws Exception {
+        byte[] jarBytes = {0x50, 0x4B, 0x03, 0x04}; // minimal ZIP magic bytes
+
+        try (MockWebServer mockRepo = new MockWebServer()) {
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest request) {
+                    if (request.getHeader("Authorization") != null) {
+                        return new MockResponse().setResponseCode(403);
+                    }
+                    return new MockResponse().setResponseCode(200)
+                      .setBody(new okio.Buffer().write(jarBytes));
+                }
+            });
+            mockRepo.start();
+
+            String repoUrl = "http://" + mockRepo.getHostName() + ":" + mockRepo.getPort();
+            MavenSettings settings = MavenSettings.parse(new Parser.Input(
+              Path.of("settings.xml"), () -> new ByteArrayInputStream(
+              //language=xml
+              """
+                <settings>
+                    <servers>
+                        <server>
+                            <id>mock-repo</id>
+                            <username>baduser</username>
+                            <password>badpass</password>
+                        </server>
+                    </servers>
+                </settings>
+                """.getBytes())), new InMemoryExecutionContext());
+
+            MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
+            AtomicReference<Throwable> error = new AtomicReference<>();
+            MavenArtifactDownloader downloader = new MavenArtifactDownloader(
+              artifactCache, settings, error::set);
+
+            MavenRepository repo = new MavenRepository(
+              "mock-repo", repoUrl, "true", "false", true, null, null, null, false);
+            GroupArtifactVersion gav = new GroupArtifactVersion("com.example", "test-lib", "1.0.0");
+            ResolvedDependency dep = ResolvedDependency.builder()
+              .repository(repo)
+              .gav(new ResolvedGroupArtifactVersion(repoUrl, gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null))
+              .requested(Dependency.builder().gav(gav).build())
+              .build();
+
+            Path artifact = downloader.downloadArtifact(dep);
+
+            assertThat(artifact).isNotNull();
+            assertThat(error.get()).isNull();
+            assertThat(mockRepo.getRequestCount()).isGreaterThanOrEqualTo(2);
         }
     }
 }
