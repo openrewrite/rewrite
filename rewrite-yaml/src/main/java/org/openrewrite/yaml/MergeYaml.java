@@ -25,8 +25,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.Optional;
-
 import static org.openrewrite.internal.StringUtils.isBlank;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
 
@@ -111,8 +109,12 @@ public class MergeYaml extends Recipe {
                             if (yaml == null) {
                                 return false;
                             }
-                            MergeYaml.maybeParse(yaml).ifPresent(it -> incoming = it);
-                            return incoming != null;
+                            try {
+                                incoming = MergeYaml.parse(yaml);
+                                return true;
+                            } catch (IllegalArgumentException e) {
+                                return false;
+                            }
                         }))
                 .and(Validated.required("key", key))
                 .and(Validated.test("insertProperty", "Insert property must be filed when `insert mode` is either `BeforeProperty` or `AfterProperty`.", insertProperty,
@@ -257,27 +259,26 @@ public class MergeYaml extends Recipe {
         });
     }
 
-    private static Optional<Yaml.Block> maybeParse(@Language("yml") String yaml) {
-        return new YamlParser().parse(yaml)
-                .findFirst()
-                .filter(Yaml.Documents.class::isInstance)
-                .map(Yaml.Documents.class::cast)
-                .map(docs -> {
-                    // Any comments will have been put on the parent Document node, preserve by copying to the mapping
-                    Yaml.Document doc = docs.getDocuments().get(0);
-                    if (doc.getBlock() instanceof Yaml.Mapping) {
-                        Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
-                        return m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
-                    } else if (doc.getBlock() instanceof Yaml.Sequence) {
-                        Yaml.Sequence s = (Yaml.Sequence) doc.getBlock();
-                        return s.withEntries(ListUtils.mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
-                    }
-                    return doc.getBlock().withPrefix(doc.getPrefix());
-                });
-    }
-
     static Yaml parse(@Language("yml") String yaml) {
-        return maybeParse(yaml)
+        SourceFile sourceFile = new YamlParser().parse(yaml)
+                .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML:\n" + yaml));
+        if (sourceFile instanceof Yaml.Documents) {
+            // Any comments will have been put on the parent Document node, preserve by copying to the mapping
+            Yaml.Document doc = ((Yaml.Documents) sourceFile).getDocuments().get(0);
+            if (doc.getBlock() instanceof Yaml.Mapping) {
+                Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
+                return m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
+            } else if (doc.getBlock() instanceof Yaml.Sequence) {
+                Yaml.Sequence s = (Yaml.Sequence) doc.getBlock();
+                return s.withEntries(ListUtils.mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
+            }
+            return doc.getBlock().withPrefix(doc.getPrefix());
+        }
+        String message = sourceFile.getMarkers()
+                .findFirst(ParseExceptionResult.class)
+                .map(ParseExceptionResult::getMessage)
+                .orElse("unknown error");
+        throw new IllegalArgumentException("Could not parse as YAML: " + message + "\n" + yaml);
     }
 }
