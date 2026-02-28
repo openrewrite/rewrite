@@ -15,6 +15,7 @@
  */
 import {Cursor} from '../..';
 import {J} from '../../java';
+import {JTree} from '../comparator';
 import {
     Any,
     Capture,
@@ -32,6 +33,8 @@ import {CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WR
 import {TemplateEngine} from './engine';
 import {TreePrinters} from '../../print';
 import {JS} from '../index';
+import {AnsiAwarePrintOutputCapture, ElementMarkerVisitor, PATTERN_DEBUG_MARKER_PRINTER, shouldUseEmoji} from './debug';
+import {dedent, prefixLines} from '../../util';
 
 
 /**
@@ -173,13 +176,13 @@ export class Pattern {
     ) {
         this.patternId = Pattern.nextPatternId++;
 
-        // Build mapping for unnamed captures (unnamed_N -> _X)
+        // Build mapping for unnamed captures (unnamed_N -> X, which will be displayed as 🪝X)
         let unnamedIndex = 1;
         for (const cap of captures) {
             if (cap && typeof cap === 'object' && 'getName' in cap) {
                 const name = (cap as Capture<any> | Any<any>).getName();
                 if (name && name.startsWith('unnamed_')) {
-                    this.unnamedCaptureMapping.set(name, `_${unnamedIndex}`);
+                    this.unnamedCaptureMapping.set(name, `${unnamedIndex}`);
                     unnamedIndex++;
                 }
             }
@@ -200,7 +203,7 @@ export class Pattern {
      *     })
      */
     configure(options: PatternOptions): Pattern {
-        this._options = { ...this._options, ...options };
+        this._options = {...this._options, ...options};
         // Invalidate cache when configuration changes
         this._cachedAstPattern = undefined;
         return this;
@@ -319,9 +322,7 @@ export class Pattern {
         const patternId = `Pattern #${this.patternId}`;
         const nodeKind = (tree as any).kind || 'unknown';
         // Format kind: extract short name (e.g., "org.openrewrite.java.tree.J$Binary" -> "J$Binary")
-        const shortKind = typeof nodeKind === 'string'
-            ? nodeKind.split('.').pop() || nodeKind
-            : nodeKind;
+        const shortKind = nodeKind.split('.').pop() || nodeKind;
 
         // First, log the pattern source
         console.error(`[${patternId}] ${patternSource}`);
@@ -329,46 +330,217 @@ export class Pattern {
         // Build the complete match result message
         const lines: string[] = [];
 
-        // Print the target tree being matched
-        let treeStr: string;
-        try {
-            const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
-            treeStr = await printer.print(tree);
-        } catch (e) {
-            treeStr = '(tree printing unavailable)';
-        }
-
         if (result.matched) {
-            // Success case - result first, then tree, then captures
+            // Success case - result first, then tree with highlighted captures, then capture legend
             lines.push(`[${patternId}] ✅ SUCCESS matching against ${shortKind}:`);
-            treeStr.split('\n').forEach(line => lines.push(`[${patternId}]   ${line}`));
 
-            // Log captured values
+            // Mark captured elements with numbered markers
+            let markedAst = tree;
+            const captureNumbers = new Map<number, JTree | JTree[]>();
+
             if (result.result) {
                 const storage = (result.result as any).storage as Map<string, CaptureStorageValue>;
                 if (storage && storage.size > 0) {
-                    for (const [name, value] of storage) {
-                        const extractedValue = (result.result as any).extractElements(value);
-                        const valueStr = this.formatCapturedValue(extractedValue);
-                        const displayName = this.unnamedCaptureMapping.get(name) || name;
-                        lines.push(`[${patternId}]    Captured '${displayName}': ${valueStr}`);
+                    // Build map of capture number -> captured element(s)
+                    // Limit to 11 captures (0-10) for emoji display
+                    let captureIndex = 0;
+                    for (const [_, value] of storage) {
+                        if (captureIndex <= 10) {
+                            const extractedValue = (result.result as any).extractElements(value);
+                            captureNumbers.set(captureIndex + 1, extractedValue); // Start from 1
+                            captureIndex++;
+                        }
+                    }
+
+                    // Mark the tree with capture numbers
+                    if (captureNumbers.size > 0) {
+                        try {
+                            const visitor = new ElementMarkerVisitor(captureNumbers);
+                            markedAst = await visitor.visit(tree, undefined) as J;
+                        } catch (markError) {
+                            console.warn(`Failed to mark captures: ${markError}`);
+                        }
+                    }
+                }
+            }
+
+            // Print the marked tree
+            let treeStr: string;
+            try {
+                const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
+                const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
+                treeStr = await printer.print(markedAst, output);
+                // Replace placeholder names with clean display names
+                treeStr = this.replacePlaceholderNames(treeStr);
+            } catch (e) {
+                treeStr = '(tree printing unavailable)';
+            }
+            treeStr.split('\n').forEach(line => lines.push(`[${patternId}]   ${line}`));
+
+            // Print capture legend
+            if (result.result) {
+                const storage = (result.result as any).storage as Map<string, CaptureStorageValue>;
+                if (storage && storage.size > 0) {
+                    lines.push(`[${patternId}]`);
+                    lines.push(`[${patternId}]   Captures:`);
+
+                    let captureIndex = 0;
+                    for (const [name, _value] of storage) {
+                        if (captureIndex <= 10) {
+                            const displayName = this.unnamedCaptureMapping.get(name) || name;
+                            const emoji = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'][captureIndex + 1];
+                            lines.push(`[${patternId}]     ${emoji} = 🪝${displayName}`);
+                            captureIndex++;
+                        }
                     }
                 }
             }
         } else {
-            // Failure case - result first, then tree, then explanation
+            // Failure case - show both pattern tree and matched tree with markers
             lines.push(`[${patternId}] ❌ FAILED matching against ${shortKind}:`);
-            treeStr.split('\n').forEach(line => lines.push(`[${patternId}]   ${line}`));
 
+            // Add explanation of marker format (only for emoji - ANSI inverse video is self-explanatory)
+            if (shouldUseEmoji()) {
+                lines.push(`[${patternId}]    (Mismatched elements are marked with 👉...👈)`);
+            }
+            lines.push(`[${patternId}]`);
+
+            // Get both cursors and explanation from the result
+            const patternCursor = result.patternCursor;
+            const targetCursor = result.targetCursor || cursor;
             const explanation = result.explanation;
+
+            // Print pattern tree with marker - use the actual pattern AST from matching
+            const patternAst = result.patternAst || await this.getAstPattern();
+            let patternTreeStr: string;
+            try {
+                let markedPattern: J | undefined;
+                // Use explanation's patternElement if available, otherwise fall back to cursor
+                if (explanation?.patternElement || (patternCursor && (patternCursor.value as any)?.id)) {
+                    try {
+                        markedPattern = await this.markElementWithSearchResult(patternAst, patternCursor, explanation, true);
+                    } catch (markError) {
+                        // If marking fails, continue without the marker
+                        console.warn(`Failed to mark pattern tree: ${markError}`);
+                    }
+                }
+                const patternToPrint = markedPattern || patternAst;
+                const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
+                const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
+                patternTreeStr = await printer.print(patternToPrint, output);
+                // Replace placeholder names with clean display names
+                patternTreeStr = this.replacePlaceholderNames(patternTreeStr);
+            } catch (e) {
+                patternTreeStr = `(tree printing unavailable: ${e})`;
+            }
+
+            const useAnsi = !shouldUseEmoji();
+            const greenColor = useAnsi ? '\x1b[32m' : '';
+            const redColor = useAnsi ? '\x1b[31m' : '';
+            const resetColor = useAnsi ? '\x1b[0m' : '';
+
+            lines.push(`${greenColor}[${patternId}]    Pattern tree:${resetColor}`);
+            patternTreeStr.split('\n').forEach(line => lines.push(`${greenColor}[${patternId}]       ${line}${resetColor}`));
+
+            // Print matched tree with marker
+            let matchedTreeStr: string;
+            try {
+                let markedTree: J | undefined;
+                // Use explanation's targetElement if available, otherwise fall back to cursor
+                if (explanation?.targetElement || (targetCursor && (targetCursor.value as any)?.id)) {
+                    try {
+                        markedTree = await this.markElementWithSearchResult(tree, targetCursor, explanation, false);
+                    } catch (markError) {
+                        // If marking fails, continue without the marker
+                        console.warn(`Failed to mark matched tree: ${markError}`);
+                    }
+                }
+                const treeToPrint = markedTree || tree;
+                const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
+                const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
+                matchedTreeStr = await printer.print(treeToPrint, output);
+                // Replace placeholder names with clean display names
+                matchedTreeStr = this.replacePlaceholderNames(matchedTreeStr);
+            } catch (e) {
+                matchedTreeStr = `(tree printing unavailable: ${e})`;
+            }
+
+            const sourcePath = this.getSourcePathFromCursor(targetCursor, tree);
+            const sourcePathStr = sourcePath ? ` (${sourcePath})` : '';
+            lines.push(`[${patternId}]`);
+            lines.push(`${redColor}[${patternId}]    Matched tree${sourcePathStr}:${resetColor}`);
+            matchedTreeStr.split('\n').forEach(line => lines.push(`${redColor}[${patternId}]       ${line}${resetColor}`));
+
+            // Print detailed mismatch information
             if (explanation) {
-                // Always show path, even if empty, to make it clear where the mismatch occurred
-                const compactedPath = this.compactPath(explanation.path);
-                const pathStr = compactedPath.length > 0 ? compactedPath.join(' → ') : '';
-                lines.push(`[${patternId}]    At path:  [${pathStr}]`);
-                lines.push(`[${patternId}]    Reason:   ${explanation.reason}`);
-                lines.push(`[${patternId}]    Expected: ${explanation.expected}`);
-                lines.push(`[${patternId}]    Actual:   ${explanation.actual}`);
+                lines.push(`[${patternId}]`);
+                lines.push(`[${patternId}]    Details:`);
+                lines.push(`[${patternId}]      Reason:   ${explanation.reason}`);
+                lines.push(`[${patternId}]      Expected: ${explanation.expected}`);
+                lines.push(`[${patternId}]      Actual:   ${explanation.actual}`);
+
+                // Print mismatched subtrees if available
+                if (explanation.patternElement || explanation.targetElement) {
+                    // Helper to print an element (handles both regular elements and Containers)
+                    const printElement = async (element: any, label: string): Promise<void> => {
+                        try {
+                            const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
+
+                            // Check if this is a Container - if so, print its elements
+                            const kind = (element as any)?.kind;
+                            if (kind === 'org.openrewrite.java.tree.JContainer') {
+                                const container = element as J.Container<J>;
+                                if (container.elements && container.elements.length > 0) {
+                                    const elementStrs = await Promise.all(
+                                        container.elements.map(async (padded) => {
+                                            // Create fresh output capture for each element
+                                            const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
+                                            const subtree = await printer.print(padded.element, output);
+                                            return subtree.trim();
+                                        })
+                                    );
+                                    let subtreeStr = elementStrs.join(', ');
+                                    subtreeStr = this.replacePlaceholderNames(subtreeStr);
+                                    lines.push(`[${patternId}]      ${label}:  (${subtreeStr})`);
+                                } else {
+                                    lines.push(`[${patternId}]      ${label}:  ()`);
+                                }
+                            } else {
+                                // Regular element
+                                const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
+                                let subtreeStr = await printer.print(element, output);
+                                subtreeStr = this.replacePlaceholderNames(subtreeStr);
+
+                                // Process multi-line output: trim, dedent, then re-indent with proper alignment
+                                subtreeStr = dedent(subtreeStr.trim());
+
+                                // Calculate proper indentation to align continuation lines
+                                // Pattern is: "[Pattern #2]      Label:  content"
+                                // So continuation lines should start at position of "content"
+                                const patternPrefix = `[${patternId}]      `;
+                                const labelPrefix = `${label}:  `;
+                                const firstLinePrefix = patternPrefix + labelPrefix;
+                                const continuationPrefix = patternPrefix + ' '.repeat(labelPrefix.length);
+
+                                // Apply prefixes using prefixLines utility
+                                const prefixedStr = prefixLines(subtreeStr, continuationPrefix, firstLinePrefix);
+                                lines.push(prefixedStr);
+                            }
+                        } catch (e) {
+                            lines.push(`[${patternId}]      ${label}:  (unable to print: ${e})`);
+                        }
+                    };
+
+                    // Print pattern subtree
+                    if (explanation.patternElement) {
+                        await printElement(explanation.patternElement, 'Pattern');
+                    }
+
+                    // Print target subtree
+                    if (explanation.targetElement) {
+                        await printElement(explanation.targetElement, 'Matched');
+                    }
+                }
             }
         }
 
@@ -377,51 +549,70 @@ export class Pattern {
     }
 
     /**
-     * Compacts array index navigations into the previous path element.
-     * For example: ['J$VariableDeclarations#variables', '0'] → ['J$VariableDeclarations#variables[0]']
+     * Walks up the cursor to find the source file and extract its source path.
      * @private
      */
-    private compactPath(path: string[]): string[] {
-        const compacted: string[] = [];
-        let i = 0;
-
-        while (i < path.length) {
-            const current = path[i];
-
-            // Check if current element is itself a numeric index
-            if (/^\d+$/.test(current)) {
-                // This is a bare numeric index - shouldn't normally happen
-                // If we have a previous element, append to it
-                if (compacted.length > 0) {
-                    compacted[compacted.length - 1] += `[${current}]`;
-                } else {
-                    // No previous element to attach to - this is an error in path construction
-                    // Skip it to avoid bare [0] in output
-                    console.warn(`Warning: Path starts with numeric index '${current}' - skipping`);
-                }
-                i++;
-                continue;
+    private getSourcePathFromCursor(cursor: Cursor | undefined, ast?: J): string | undefined {
+        // First check if the ast node itself is a SourceFile
+        if (ast && typeof ast === 'object' && 'sourcePath' in ast) {
+            return (ast as any).sourcePath;
+        }
+        // Then try walking up the cursor
+        if (!cursor) return undefined;
+        let current: Cursor | undefined = cursor;
+        while (current) {
+            const value = current.value;
+            if (value && typeof value === 'object' && 'sourcePath' in value) {
+                return (value as any).sourcePath;
             }
+            current = current.parent;
+        }
+        return undefined;
+    }
 
-            // Look ahead to collect consecutive numeric indices
-            let j = i + 1;
-            const indices: string[] = [];
-            while (j < path.length && /^\d+$/.test(path[j])) {
-                indices.push(path[j]);
-                j++;
-            }
+    /**
+     * Replaces placeholder names in tree strings with clean display names.
+     * Uses 🪝 prefix to make captures easily identifiable.
+     * @private
+     */
+    private replacePlaceholderNames(treeStr: string): string {
+        let result = treeStr;
+        // Replace unnamed captures with their short forms (🪝1, 🪝2, etc.)
+        for (const [originalName, displayName] of this.unnamedCaptureMapping.entries()) {
+            const placeholder = `__capt_${originalName}__`;
+            result = result.split(placeholder).join(`🪝${displayName}`);
+        }
+        // Replace all remaining __capt_XXX__ with 🪝XXX (for named captures)
+        result = result.replace(/__capt_([^_]+(?:_[^_]+)*)__/g, '🪝$1');
+        return result;
+    }
 
-            // If we found numeric indices, append them to current element
-            if (indices.length > 0) {
-                compacted.push(current + indices.map(idx => `[${idx}]`).join(''));
-                i = j; // Skip the indices we just processed
-            } else {
-                compacted.push(current);
-                i++;
+    /**
+     * Marks the element at the current cursor position with a SearchResult marker (🟡).
+     * If an explanation with pattern/target elements is provided, marks those specific elements.
+     * @param ast The AST tree to mark
+     * @param cursor The cursor position (used as fallback if no explanation element)
+     * @param explanation The match explanation containing the actual elements to mark
+     * @param isPattern Whether this is the pattern tree (true) or target tree (false)
+     * @private
+     */
+    private async markElementWithSearchResult(ast: J, cursor: Cursor | undefined, explanation?: MatchExplanation, isPattern: boolean = false): Promise<J> {
+        // If we have an explanation, use the specific element from it
+        if (explanation) {
+            const element = isPattern ? explanation.patternElement : explanation.targetElement;
+            if (element) {
+                const visitor = new ElementMarkerVisitor(element);
+                return await visitor.visit(ast, undefined) as J;
             }
         }
 
-        return compacted;
+        // Fallback: mark the element at the cursor (if cursor exists)
+        if (!cursor) return ast;
+        const element = cursor.value;
+        if (!element) return ast;
+
+        const visitor = new ElementMarkerVisitor(element as any);
+        return await visitor.visit(ast, undefined) as J;
     }
 
     /**
@@ -443,9 +634,9 @@ export class Pattern {
                 // Show capture name or placeholder
                 const name = (cap as any)[CAPTURE_NAME_SYMBOL];
                 if (cap && typeof cap === 'object' && name) {
-                    // Use mapped name for unnamed captures, or original name
+                    // Use mapped name for unnamed captures, or original name (with 🪝 prefix)
                     const displayName = this.unnamedCaptureMapping.get(name) || name;
-                    source += `\${${displayName}}`;
+                    source += `\${🪝${displayName}}`;
                 } else {
                     source += '${...}';
                 }
@@ -453,57 +644,6 @@ export class Pattern {
         }
 
         return source;
-    }
-
-    /**
-     * Formats a captured value for logging.
-     * @private
-     */
-    private formatCapturedValue(value: any): string {
-        if (value === null) return 'null';
-        if (value === undefined) return 'undefined';
-
-        // Check if it's an array (variadic capture)
-        if (Array.isArray(value)) {
-            if (value.length === 0) return '[]';
-            const items = value.slice(0, 3).map(v => this.formatSingleValue(v));
-            const suffix = value.length > 3 ? `, ... (${value.length} total)` : '';
-            return `[${items.join(', ')}${suffix}]`;
-        }
-
-        return this.formatSingleValue(value);
-    }
-
-    /**
-     * Formats a single AST node for logging.
-     * @private
-     */
-    private formatSingleValue(value: any): string {
-        if (!value || typeof value !== 'object') {
-            return String(value);
-        }
-
-        const kind = (value as any).kind;
-        if (!kind) return String(value);
-
-        // Extract simple kind name (last segment)
-        const kindStr = kind.split('.').pop();
-
-        // For literals, show the value
-        if (kindStr === 'Literal' && value.value !== undefined) {
-            const litValue = typeof value.value === 'string'
-                ? `"${value.value}"`
-                : String(value.value);
-            return `${kindStr}(${litValue})`;
-        }
-
-        // For identifiers, show the name
-        if (kindStr === 'Identifier' && value.simpleName) {
-            return `${kindStr}(${value.simpleName})`;
-        }
-
-        // Default: just the kind
-        return kindStr;
     }
 
     /**
@@ -557,14 +697,20 @@ export class Pattern {
             return {
                 matched: true,
                 result: matchResult,
-                debugLog: matcher.getDebugLog()
+                debugLog: matcher.getDebugLog(),
+                patternCursor: matcher.getPatternCursor(),
+                targetCursor: matcher.getTargetCursor(),
+                patternAst: matcher.getPatternAst()
             };
         } else {
             // Match failed - return explanation
             return {
                 matched: false,
                 explanation: matcher.getExplanation(),
-                debugLog: matcher.getDebugLog()
+                debugLog: matcher.getDebugLog(),
+                patternCursor: matcher.getPatternCursor(),
+                targetCursor: matcher.getTargetCursor(),
+                patternAst: matcher.getPatternAst()
             };
         }
     }
@@ -684,7 +830,7 @@ class Matcher {
     private readonly debugOptions: DebugOptions;
     private readonly debugLog: DebugLogEntry[] = [];
     private explanation?: MatchExplanation;
-    private readonly currentPath: string[] = [];
+    private lastComparator?: PatternMatchingComparator | DebugPatternMatchingComparator;
 
     /**
      * Creates a new matcher for a pattern against an AST node.
@@ -781,7 +927,6 @@ class Matcher {
         this.debugLog.push({
             level,
             scope,
-            path: [...this.currentPath],
             message,
             data
         });
@@ -796,42 +941,28 @@ class Matcher {
      * @param expected Human-readable description of what was expected
      * @param actual Human-readable description of what was found
      * @param details Optional additional context
+     * @param patternElement The actual pattern element that failed to match
+     * @param targetElement The actual target element that failed to match
      */
     private setExplanation(
         reason: MatchExplanation['reason'],
         expected: string,
         actual: string,
-        details?: string
+        details?: string,
+        patternElement?: any,
+        targetElement?: any
     ): void {
         // Only set the first failure (most relevant)
         if (this.explanation) return;
 
         this.explanation = {
             reason,
-            path: [...this.currentPath],
             expected,
             actual,
-            details
+            details,
+            patternElement,
+            targetElement
         };
-    }
-
-    /**
-     * Pushes a path component onto the current path.
-     * Used to track where in the AST tree we are during matching.
-     * Part of Layer 1 (Core Instrumentation).
-     *
-     * @param name The path component to push
-     */
-    private pushPath(name: string): void {
-        this.currentPath.push(name);
-    }
-
-    /**
-     * Pops the last path component from the current path.
-     * Part of Layer 1 (Core Instrumentation).
-     */
-    private popPath(): void {
-        this.currentPath.pop();
     }
 
     /**
@@ -859,21 +990,19 @@ class Matcher {
             // Debug callbacks (Layer 1) - grouped together, always present or absent
             debug: this.debugOptions.enabled ? {
                 log: (level: DebugLogEntry['level'], scope: DebugLogEntry['scope'], message: string, data?: any) => this.log(level, scope, message, data),
-                setExplanation: (reason: MatchExplanation['reason'], expected: string, actual: string, details?: string) => this.setExplanation(reason, expected, actual, details),
+                setExplanation: (reason: MatchExplanation['reason'], expected: string, actual: string, details?: string, patternElement?: any, targetElement?: any) => this.setExplanation(reason, expected, actual, details, patternElement, targetElement),
                 getExplanation: () => this.explanation,
                 restoreExplanation: (explanation: MatchExplanation) => { this.explanation = explanation; },
-                clearExplanation: () => { this.explanation = undefined; },
-                pushPath: (name: string) => this.pushPath(name),
-                popPath: () => this.popPath()
+                clearExplanation: () => { this.explanation = undefined; }
             } : undefined
         };
 
-        const comparator = this.debugOptions.enabled
+        this.lastComparator = this.debugOptions.enabled
             ? new DebugPatternMatchingComparator(matcherCallbacks, lenientTypeMatching)
             : new PatternMatchingComparator(matcherCallbacks, lenientTypeMatching);
         // Pass cursors to allow constraints to navigate to root
         // Pattern cursor is undefined (pattern is the root), target cursor is provided by user
-        const result = await comparator.compare(pattern, target, undefined, this.cursor);
+        const result = await this.lastComparator!.compare(pattern, target, undefined, this.cursor);
 
         // If match failed and no explanation was set, provide a generic one
         if (!result && this.debugOptions.enabled && !this.explanation) {
@@ -892,7 +1021,7 @@ class Matcher {
 
     /**
      * Saves the current state for backtracking.
-     * Includes both capture storage AND debug state (explanation, log, path).
+     * Includes both capture storage AND debug state (explanation, log).
      *
      * @returns A snapshot of the current state
      */
@@ -901,8 +1030,7 @@ class Matcher {
             storage: new Map(this.storage),
             debugState: this.debugOptions.enabled ? {
                 explanation: this.explanation,
-                logLength: this.debugLog.length,
-                path: [...this.currentPath]
+                logLength: this.debugLog.length
             } : undefined
         };
     }
@@ -925,9 +1053,6 @@ class Matcher {
             this.explanation = state.debugState.explanation;
             // Truncate debug log to saved length (remove entries added during failed attempt)
             this.debugLog.length = state.debugState.logLength;
-            // Restore path
-            this.currentPath.length = 0;
-            this.currentPath.push(...state.debugState.path);
         }
     }
 
@@ -1019,6 +1144,30 @@ class Matcher {
      */
     getExplanation(): MatchExplanation | undefined {
         return this.explanation;
+    }
+
+    /**
+     * Gets the pattern cursor from the comparator (for debug visualization).
+     * @internal
+     */
+    getPatternCursor(): Cursor | undefined {
+        return (this.lastComparator as any)?.cursor;
+    }
+
+    /**
+     * Gets the target cursor from the comparator (for debug visualization).
+     * @internal
+     */
+    getTargetCursor(): Cursor | undefined {
+        return (this.lastComparator as any)?.targetCursor;
+    }
+
+    /**
+     * Gets the pattern AST that was used during matching (for debug visualization).
+     * @internal
+     */
+    getPatternAst(): J | undefined {
+        return this.patternAst;
     }
 }
 
