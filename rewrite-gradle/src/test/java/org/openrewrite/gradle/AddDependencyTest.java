@@ -1990,6 +1990,98 @@ class AddDependencyTest implements RewriteTest {
     }
 
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/6821")
+    void addDependencyOnlyIfUsingInDeclarativeRecipe() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.AddGuavaIfUsed
+              displayName: Add Guava if used
+              description: Adds Guava dependency when com.google.common types are used.
+              recipeList:
+                - org.openrewrite.gradle.AddDependency:
+                    groupId: com.google.guava
+                    artifactId: guava
+                    version: 29.0-jre
+                    onlyIfUsing: com.google.common.collect.*
+              """,
+            "com.example.AddGuavaIfUsed"
+          ),
+          // Project that DOES use Guava - dependency should be added
+          mavenProject("uses-guava",
+            srcMainJava(
+              java(
+                """
+                  package com.example;
+
+                  import com.google.common.collect.ImmutableList;
+
+                  public class UsesGuava {
+                      public void useGuava() {
+                          ImmutableList<String> list = ImmutableList.of("a", "b", "c");
+                      }
+                  }
+                  """
+              )
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          ),
+          // Project that does NOT use Guava - dependency should NOT be added
+          mavenProject("no-guava",
+            srcMainJava(
+              java(
+                """
+                  package com.example;
+
+                  public class NoGuava {
+                      public void doesNotUseGuava() {
+                          System.out.println("No Guava here");
+                      }
+                  }
+                  """
+              )
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+                """
+            )
+          )
+        );
+    }
+
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null);
     }
