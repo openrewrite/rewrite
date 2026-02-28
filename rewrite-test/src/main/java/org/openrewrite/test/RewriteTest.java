@@ -19,6 +19,7 @@ import org.assertj.core.api.SoftAssertions;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.*;
@@ -90,10 +91,21 @@ public interface RewriteTest extends SourceSpecs {
             // scanRuntimeClasspath picks up all recipes in META-INF/rewrite regardless of whether their
             // names start with the package we intend to filter on here
             if (recipe.getName().startsWith(packageName)) {
+                // Imperative recipes are loaded with no user-provided arguments, so all optional
+                // parameters are null. Skip recipe validation for these since custom validate()
+                // methods (e.g. requiring at least one of several optional parameters) would
+                // fail on an unconfigured instance. Declarative recipes have their options
+                // configured from YAML and should still be validated.
+                boolean skipValidation = !(recipe instanceof DeclarativeRecipe);
                 softly.assertThatCode(() -> {
                     try {
                         rewriteRun(
-                                spec -> spec.recipe(recipe),
+                                spec -> {
+                                    spec.recipe(recipe);
+                                    if (skipValidation) {
+                                        spec.validateRecipe(false);
+                                    }
+                                },
                                 new SourceSpecs[0]
                         );
                     } catch (Throwable t) {
@@ -226,11 +238,13 @@ public interface RewriteTest extends SourceSpecs {
         for (SourceSpec<?> s : sourceSpecs) {
             s.customizeExecutionContext.accept(ctx);
         }
-        List<Validated<Object>> validations = new ArrayList<>();
-        recipe.validateAll(ctx, validations);
-        assertThat(validations.stream().filter(Validated::isInvalid))
-                .as("Recipe validation must have no failures")
-                .isEmpty();
+        if (testClassSpec.recipeValidation && testMethodSpec.recipeValidation) {
+            List<Validated<Object>> validations = new ArrayList<>();
+            recipe.validateAll(ctx, validations);
+            assertThat(validations.stream().filter(Validated::isInvalid))
+                    .as("Recipe validation must have no failures")
+                    .isEmpty();
+        }
 
         Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
         List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers;
