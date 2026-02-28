@@ -152,8 +152,9 @@ describe('forwardRef pattern with replacement', () => {
         const pat = pattern`${invocation}`;
 
         // Access the first argument via array index
-        // invocation.arguments.elements[0].element accesses the first argument
-        const tmpl = template`bar(${(invocation.arguments.elements[0].element)})`;
+        // invocation.arguments.elements[0] accesses the first argument (no .element needed with intersection types)
+        const tmpl = template`bar(${(invocation.arguments.elements[0])})`;
+
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {

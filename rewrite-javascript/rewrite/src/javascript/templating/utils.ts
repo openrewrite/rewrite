@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor} from '../..';
-import {J} from '../../java';
+import {J, Statement} from '../../java';
 import {JS} from '../index';
 import {Marker, Markers} from '../../markers';
 import {randomId} from '../../uuid';
@@ -172,6 +172,23 @@ export class PlaceholderUtils {
     }
 
     /**
+     * Gets the CaptureMarker from a padded wrapper's padding.markers, if present.
+     * Use this for LeftPadded/RightPadded wrappers where the capture marker is
+     * stored on the padding.markers (not the element's markers).
+     *
+     * @param padded The padded wrapper to check
+     * @returns The CaptureMarker or undefined
+     */
+    static getCaptureMarkerFromPadded(padded: { padding: { markers: Markers } }): CaptureMarker | undefined {
+        for (const marker of padded.padding.markers.markers) {
+            if (marker instanceof CaptureMarker) {
+                return marker;
+            }
+        }
+        return undefined;
+    }
+
+    /**
      * Parses a capture placeholder to extract name and type constraint.
      *
      * @param identifier The identifier string to parse
@@ -230,6 +247,23 @@ export class PlaceholderUtils {
     }
 
     /**
+     * Checks if a padded wrapper has a variadic CaptureMarker in its padding.markers.
+     * Use this for LeftPadded/RightPadded wrappers where the capture marker is
+     * stored on the padding.markers (not the element's markers).
+     *
+     * @param padded The padded wrapper to check
+     * @returns true if the wrapper has a variadic CaptureMarker, false otherwise
+     */
+    static isVariadicCaptureFromPadded(padded: { padding: { markers: Markers } }): boolean {
+        for (const marker of padded.padding.markers.markers) {
+            if (marker instanceof CaptureMarker && marker.variadicOptions) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Gets the variadic options from a capture marker.
      *
      * @param node The node to extract variadic options from
@@ -266,7 +300,7 @@ export class PlaceholderUtils {
                 if (body.statements.length === 0) {
                     throw new Error(`${contextName} function body is empty`);
                 } else if (body.statements.length === 1) {
-                    const stmt = body.statements[0].element;
+                    const stmt = body.statements[0] as Statement;
 
                     // Single expression statement → extract the expression
                     if (stmt.kind === JS.Kind.ExpressionStatement) {

@@ -22,7 +22,10 @@ import {create as produce} from "mutative";
  * When there are comments, the last whitespace is the suffix of the last comment.
  * When there are no comments, it's the whitespace property.
  */
-export function lastWhitespace(space: J.Space): string {
+export function lastWhitespace(space: J.Space | undefined): string {
+    if (!space) {
+        return "";
+    }
     if (space.comments.length > 0) {
         return space.comments[space.comments.length - 1].suffix;
     }

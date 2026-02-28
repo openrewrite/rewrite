@@ -27,7 +27,7 @@ describe("jsx mapping", () => {
                         afterRecipe: async cu => {
                             await (new class extends JavaScriptVisitor<any> {
                                 protected async visitJsxTag(tag: JSX.Tag, _: any): Promise<J | undefined> {
-                                    const ident = tag.openName.element as J.Identifier;
+                                    const ident = tag.openName as J.Identifier;
                                     expect(Type.isClass(ident.type)).toBeTruthy();
                                     expect((ident.type as Type.Class).supertype?.fullyQualifiedName).toContain('Component');
                                     return tag;

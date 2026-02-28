@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {JavaScriptVisitor} from './visitor';
-import {J, Type, Expression, Statement, isIdentifier} from '../java';
+import {J, Type, Expression, Statement, isIdentifier, getPaddedElement, isRightPadded, isLeftPadded} from '../java';
 import {JS, JSX} from './tree';
 import {Cursor, Tree} from "../tree";
 
@@ -225,13 +225,24 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         const kind = (j as any).kind;
 
-        // Check wrappers by kind
+        // Check wrappers by kind (for primitive wrappers that have a 'kind' property)
+        // Note: These checks are for the old wrapper approach; intersection types don't have these kinds
         if (kind === J.Kind.RightPadded) {
             return propertyName ? await this.visitRightPaddedProperty(propertyName, j, other) :
                 await this.visitRightPadded(j, other);
         }
 
         if (kind === J.Kind.LeftPadded) {
+            return propertyName ? await this.visitLeftPaddedProperty(propertyName, j, other) :
+                await this.visitLeftPadded(j, other);
+        }
+
+        // Check for padded values (both intersection-padded tree elements and primitive wrappers)
+        if (isRightPadded(j)) {
+            return propertyName ? await this.visitRightPaddedProperty(propertyName, j, other) :
+                await this.visitRightPadded(j, other);
+        }
+        if (isLeftPadded(j)) {
             return propertyName ? await this.visitLeftPaddedProperty(propertyName, j, other) :
                 await this.visitLeftPadded(j, other);
         }
@@ -285,8 +296,9 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
 
         // Iterate over all properties
         for (const key of Object.keys(j)) {
-            // Skip internal/private properties, id property, and markers property
-            if (key.startsWith('_') || key === 'kind'  || key === 'id' || key === 'markers') {
+            // Skip internal/private properties, id property, markers property, and padding property
+            // (padding is part of the wrapper structure for intersection-padded types, handled by visitor framework)
+            if (key.startsWith('_') || key === 'kind'  || key === 'id' || key === 'markers' || key === 'padding') {
                 continue;
             }
 
@@ -345,9 +357,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         if (!this.match) return right;
 
         // Extract the other element if it's also a RightPadded
-        const isRightPadded = (p as any).kind === J.Kind.RightPadded;
-        const otherWrapper = isRightPadded ? (p as unknown) as J.RightPadded<T> : undefined;
-        const otherElement = isRightPadded ? otherWrapper!.element : p;
+        // With intersection types, check for `padding` property (not `kind === J.Kind.RightPadded`)
+        const isRightPaddedOther = isRightPadded(p);
+        const otherWrapper = isRightPaddedOther ? (p as unknown) as J.RightPadded<T> : undefined;
+        // For tree types, the padded value IS the element; for primitives use getPaddedElement
+        const otherElement = isRightPaddedOther ? getPaddedElement(otherWrapper!) : p;
+        // The right padded element: for tree types, right IS the element; for primitives use getPaddedElement
+        const rightElement = getPaddedElement(right);
 
         // Push wrappers onto both cursors, then compare only the elements, not markers or spacing
         const savedCursor = this.cursor;
@@ -355,9 +371,14 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         this.cursor = new Cursor(right, this.cursor);
         this.targetCursor = otherWrapper ? new Cursor(otherWrapper, this.targetCursor) : this.targetCursor;
         try {
-            // Call visitProperty without propertyName to avoid pushing spurious 'element' path entries
-            // The property context should be provided through visitRightPaddedProperty() if needed
-            await this.visitProperty(right.element, otherElement);
+            // For tree elements (which have a kind), call visit directly to avoid
+            // infinite recursion with intersection types (where the element IS the padded value)
+            // For primitives (boolean), call visitProperty
+            if (typeof rightElement === 'object' && rightElement !== null && 'kind' in rightElement) {
+                await this.visit(rightElement, otherElement as J);
+            } else {
+                await this.visitProperty(rightElement, otherElement);
+            }
         } finally {
             this.cursor = savedCursor;
             this.targetCursor = savedTargetCursor;
@@ -376,9 +397,13 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         if (!this.match) return left;
 
         // Extract the other element if it's also a LeftPadded
-        const isLeftPadded = (p as any).kind === J.Kind.LeftPadded;
-        const otherWrapper = isLeftPadded ? (p as unknown) as J.LeftPadded<T> : undefined;
-        const otherElement = isLeftPadded ? otherWrapper!.element : p;
+        // With intersection types, check for `padding.before` property (not `kind === J.Kind.LeftPadded`)
+        const isLeftPaddedOther = isLeftPadded(p);
+        const otherWrapper = isLeftPaddedOther ? (p as unknown) as J.LeftPadded<T> : undefined;
+        // For tree types, the padded value IS the element; for primitives use getPaddedElement
+        const otherElement = isLeftPaddedOther ? getPaddedElement(otherWrapper!) : p;
+        // The left padded element: for tree types, left IS the element; for primitives use getPaddedElement
+        const leftElement = getPaddedElement(left);
 
         // Push wrappers onto both cursors, then compare only the elements, not markers or spacing
         const savedCursor = this.cursor;
@@ -386,9 +411,15 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         this.cursor = new Cursor(left, this.cursor);
         this.targetCursor = otherWrapper ? new Cursor(otherWrapper, this.targetCursor) : this.targetCursor;
         try {
-            // Call visitProperty without propertyName to avoid pushing spurious 'element' path entries
-            // The property context should be provided through visitLeftPaddedProperty() if needed
-            await this.visitProperty(left.element, otherElement);
+            // For tree elements (which have a kind and are not Space), call visit directly to avoid
+            // infinite recursion with intersection types (where the element IS the padded value)
+            // For primitives (number, string, boolean) and Space, call visitProperty
+            if (typeof leftElement === 'object' && leftElement !== null && 'kind' in leftElement &&
+                (leftElement as any).kind !== J.Kind.Space) {
+                await this.visit(leftElement as J, otherElement as J);
+            } else {
+                await this.visitProperty(leftElement, otherElement);
+            }
         } finally {
             this.cursor = savedCursor;
             this.targetCursor = savedTargetCursor;
@@ -1988,6 +2019,29 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
     }
 
     /**
+     * Override hasSameKind to allow semantic equivalences between different kinds.
+     * This is needed because the base visit() method checks kinds before calling
+     * the specific visitor methods (like visitVoid).
+     */
+    protected override hasSameKind(j: J, other: J): boolean {
+        // Allow Void <-> Identifier equivalence for undefined
+        // void 0 (Void) is semantically equivalent to undefined (Identifier)
+        if (j.kind === JS.Kind.Void && other.kind === J.Kind.Identifier) {
+            if ((other as J.Identifier).simpleName === 'undefined') {
+                return true;
+            }
+        }
+        // Also handle the reverse: Identifier pattern, Void source
+        // undefined (Identifier) is semantically equivalent to void 0 (Void)
+        if (j.kind === J.Kind.Identifier && other.kind === JS.Kind.Void) {
+            if ((j as J.Identifier).simpleName === 'undefined') {
+                return true;
+            }
+        }
+        return super.hasSameKind(j, other);
+    }
+
+    /**
      * Unwraps parentheses from a tree node recursively.
      * This allows comparing expressions with and without redundant parentheses.
      *
@@ -2000,15 +2054,17 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         }
 
         // Unwrap J.Parentheses nodes recursively
+        // With intersection types, RightPadded<T extends J> = T & RightPaddingMixin
+        // so parens.tree IS the element (not parens.tree.element)
         if ((tree as any).kind === J.Kind.Parentheses) {
             const parens = tree as J.Parentheses<any>;
-            return this.unwrap(parens.tree.element as Tree);
+            return this.unwrap(parens.tree as Tree);
         }
 
         // Unwrap J.ControlParentheses nodes recursively
         if ((tree as any).kind === J.Kind.ControlParentheses) {
             const controlParens = tree as J.ControlParentheses<any>;
-            return this.unwrap(controlParens.tree.element as Tree);
+            return this.unwrap(controlParens.tree as Tree);
         }
 
         return tree;
@@ -2054,7 +2110,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         // Compare all properties reflectively except lambda (handled specially below)
         for (const key of Object.keys(arrowFunction)) {
-            if (key.startsWith('_') || key === 'id' || key === 'markers' || key === 'lambda') {
+            if (key.startsWith('_') || key === 'id' || key === 'markers' || key === 'padding' || key === 'lambda') {
                 continue;
             }
 
@@ -2125,7 +2181,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         // Compare all properties except 'parenthesized' using reflection
         for (const key of Object.keys(parameters)) {
-            if (key.startsWith('_') || key === 'id' || key === 'markers' || key === 'parenthesized') {
+            if (key.startsWith('_') || key === 'id' || key === 'markers' || key === 'padding' || key === 'parenthesized') {
                 continue;
             }
 
@@ -2204,7 +2260,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * Returns the simple name if the property is an identifier, undefined otherwise.
      */
     private getPropertyName(prop: JS.PropertyAssignment): string | undefined {
-        const nameExpr = prop.name.element;
+        const nameExpr = prop.name;
         return isIdentifier(nameExpr) ? nameExpr.simpleName : undefined;
     }
 
@@ -2234,9 +2290,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             return undefined;
         }
 
-        // Unwrap the RightPadded wrapper from the statement
-        const stmtWrapper = block.statements[0];
-        const stmt = stmtWrapper.element;
+        const stmt = block.statements[0];
 
         if ((stmt as any).kind !== J.Kind.Return) {
             return undefined;

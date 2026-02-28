@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
-import {emptySpace, J, Statement, Type} from '../../java';
+import {emptySpace, getPaddedElement, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
 import {CaptureMarker, PlaceholderUtils, WRAPPER_FUNCTION_NAME} from './utils';
@@ -225,7 +225,7 @@ export class TemplateEngine {
         }
 
         // The template code is always the last statement (after context + preamble)
-        const lastStatement = cu.statements[cu.statements.length - 1].element;
+        const lastStatement = cu.statements[cu.statements.length - 1];
 
         // Extract from wrapper using shared utility
         const extracted = PlaceholderUtils.extractFromWrapper(lastStatement, 'Template');
@@ -499,7 +499,7 @@ export class TemplateEngine {
         }
 
         // The pattern code is always the last statement (after context + preamble)
-        const lastStatement = cu.statements[cu.statements.length - 1].element;
+        const lastStatement = cu.statements[cu.statements.length - 1];
 
         // Extract from wrapper using shared utility
         const extracted = PlaceholderUtils.extractFromWrapper(lastStatement, 'Pattern');
@@ -558,21 +558,24 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
      * Propagates markers from element to RightPadded wrapper.
      */
     public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: undefined): Promise<J.RightPadded<T> | undefined> {
-        if (!isTree(right.element)) {
+        // For tree types, the padded value IS the element (intersection type)
+        const rightElement = getPaddedElement(right);
+        if (!isTree(rightElement)) {
             return right;
         }
 
-        const visitedElement = await this.visit(right.element as J, p);
-        if (visitedElement && visitedElement !== right.element as Tree) {
+        const visitedElement = await this.visit(rightElement as J, p);
+        if (visitedElement && visitedElement !== rightElement as Tree) {
             const result = await produceAsync<J.RightPadded<T>>(right, async (draft: any) => {
                 // Visit element first
-                if (right.element && (right.element as any).kind) {
+                if (rightElement && (rightElement as any).kind) {
                     // Check if element has a CaptureMarker
                     const elementMarker = PlaceholderUtils.getCaptureMarker(visitedElement);
                     if (elementMarker) {
-                        draft.markers.markers.push(elementMarker);
+                        draft.padding.markers.markers.push(elementMarker);
                     } else {
-                        draft.element = visitedElement;
+                        // For tree types, merge visited element back with padding
+                        Object.assign(draft, visitedElement);
                     }
                 }
             });

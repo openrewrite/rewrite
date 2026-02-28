@@ -60,21 +60,21 @@ describe('call mapping', () => {
                 const result2 = "hi"/*a*/./*b*/toUpperCase(); // usual call without optional chaining
             `),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                const inits = [1, 2, 3].map(i => (cu.statements[i].element as J.VariableDeclarations).variables[0].element.initializer!.element);
+                const inits = [1, 2, 3].map(i => (cu.statements[i] as unknown as J.VariableDeclarations).variables[0].initializer!);
                 expect(inits[0].kind).toEqual(JS.Kind.FunctionCall);
                 expect(inits[1].kind).toEqual(J.Kind.MethodInvocation);
                 expect(inits[2].kind).toEqual(J.Kind.MethodInvocation);
 
                 for (let i = 0; i <= 2; i++) {
-                    const select = i == 0 ? (inits[i] as JS.FunctionCall).function! : (inits[i] as J.MethodInvocation).select!;
-                    expect(select.after.whitespace).toEqual("");
-                    expect(select.after.comments.length).toEqual(1);
-                    expect((select.after.comments[0] as TextComment).text).toEqual("a");
+                    const select = i == 0 ? (inits[i] as unknown as JS.FunctionCall).function! : (inits[i] as unknown as J.MethodInvocation).select!;
+                    expect(select.padding.after.whitespace).toEqual("");
+                    expect(select.padding.after.comments.length).toEqual(1);
+                    expect((select.padding.after.comments[0] as TextComment).text).toEqual("a");
                 }
 
-                expect(((inits[0] as JS.FunctionCall).arguments.before.comments[0] as TextComment).text).toEqual("b");
-                expect(((inits[1] as J.MethodInvocation).name.prefix.comments[0] as TextComment).text).toEqual("b");
-                expect(((inits[2] as J.MethodInvocation).name.prefix.comments[0] as TextComment).text).toEqual("b");
+                expect(((inits[0] as unknown as JS.FunctionCall).arguments.before.comments[0] as TextComment).text).toEqual("b");
+                expect(((inits[1] as unknown as J.MethodInvocation).name.prefix.comments[0] as TextComment).text).toEqual("b");
+                expect(((inits[2] as unknown as J.MethodInvocation).name.prefix.comments[0] as TextComment).text).toEqual("b");
             }
         }));
 

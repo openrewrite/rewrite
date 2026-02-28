@@ -28,7 +28,8 @@ import {
     TypedTree,
     TypeTree,
     VariableDeclarator,
-    registerJavaExtensionKinds
+    registerJavaExtensionKinds,
+    getPaddedElement
 } from "../java";
 import {JavaScriptVisitor} from "./visitor";
 
@@ -981,4 +982,4 @@ export function isExpressionStatement(tree: any): tree is JS.ExpressionStatement
 }
 
 TypedTree.registerTypeGetter(JS.Kind.PropertyAssignment, (tree: JS.PropertyAssignment) => TypedTree.getType(tree.initializer));
-TypedTree.registerTypeGetter(JS.Kind.FunctionType, (tree: JS.FunctionType) => TypedTree.getType(tree.returnType.element))
+TypedTree.registerTypeGetter(JS.Kind.FunctionType, (tree: JS.FunctionType) => TypedTree.getType(getPaddedElement(tree.returnType)))

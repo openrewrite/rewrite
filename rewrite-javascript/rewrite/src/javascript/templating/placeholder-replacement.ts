@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor, isTree} from '../..';
-import {J} from '../../java';
+import {getPaddedElement, isRightPadded, J, Statement} from '../../java';
 import {JS} from '..';
 import {JavaScriptVisitor} from '../visitor';
 import {create as produce} from 'mutative';
@@ -74,7 +74,8 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      */
     override async visitContainer<T extends J>(container: J.Container<T>, p: any): Promise<J.Container<T>> {
         // Check if any elements are placeholders (possibly variadic)
-        const hasPlaceholder = container.elements.some(elem => this.isPlaceholder(elem.element));
+        // For tree types, the padded value IS the element (intersection type)
+        const hasPlaceholder = container.elements.some(elem => this.isPlaceholder(getPaddedElement(elem as J.RightPadded<J>)));
 
         if (!hasPlaceholder) {
             return super.visitContainer(container, p);
@@ -104,13 +105,11 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      */
     override async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
         const hasPlaceholder = block.statements.some(stmt => {
-            const stmtElement = stmt.element;
-            // Check if it's an ExpressionStatement containing a placeholder
-            if (stmtElement.kind === JS.Kind.ExpressionStatement) {
-                const exprStmt = stmtElement as JS.ExpressionStatement;
+            if (stmt.kind === JS.Kind.ExpressionStatement) {
+                const exprStmt = stmt as Statement as JS.ExpressionStatement;
                 return this.isPlaceholder(exprStmt.expression);
             }
-            return this.isPlaceholder(stmtElement);
+            return this.isPlaceholder(stmt);
         });
 
         if (!hasPlaceholder) {
@@ -138,7 +137,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      * array-level access for variadic expansion.
      */
     override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: any): Promise<J | undefined> {
-        const hasPlaceholder = compilationUnit.statements.some(stmt => this.isPlaceholder(stmt.element));
+        const hasPlaceholder = compilationUnit.statements.some(stmt => this.isPlaceholder(stmt));
 
         if (!hasPlaceholder) {
             return super.visitJsCompilationUnit(compilationUnit, p);
@@ -189,7 +188,8 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         const newElements: J.RightPadded<J>[] = [];
 
         for (const wrapped of elements) {
-            const element = wrapped.element;
+            // For tree types, the padded value IS the element (intersection type)
+            const element = getPaddedElement(wrapped);
             const placeholderNode = unwrapElement(element);
 
             // Check if this element contains a placeholder
@@ -251,31 +251,34 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                                     const item = arrayToExpand[i];
 
                                     // Check if item is a JRightPadded wrapper or just an element
-                                    // JRightPadded wrappers have 'element', 'after', and 'markers' properties
-                                    // Also ensure the element field is not null
-                                    const isWrapper = item && typeof item === 'object' && 'element' in item && 'after' in item && item.element != null;
+                                    // For tree types with intersection types, wrappers have 'padding' property
+                                    const isWrapper = item && typeof item === 'object' && 'padding' in item && !('element' in item);
 
                                     if (isWrapper) {
                                         // Item is a JRightPadded wrapper - use it directly to preserve markers
-                                        newElements.push(produce(item, draft => {
-                                            if (i === 0 && draft.element) {
+                                        // For tree types, the wrapper IS the element with padding mixed in
+                                        newElements.push(produce(item as J.RightPadded<J>, draft => {
+                                            if (i === 0 && draft.prefix) {
                                                 // Merge the placeholder's prefix with the first item's prefix
-                                                // Modify prefix directly within the draft
-                                                draft.element.prefix = this.mergePrefix(draft.element.prefix, element.prefix);
+                                                // For tree types, draft IS the element with prefix directly on it
+                                                (draft as any).prefix = this.mergePrefix((draft as any).prefix, element.prefix);
                                             }
-                                            // Keep all other wrapper properties (including markers with Semicolon)
+                                            // Keep all other wrapper properties (including padding.markers with Semicolon)
                                         }));
                                     } else if (item) {
                                         // Item is just an element (not a wrapper) - wrap it (backward compatibility)
                                         const elem = item as J;
-                                        newElements.push(produce(wrapped, draft => {
-                                            draft.element = produce(elem, itemDraft => {
-                                                if (i === 0) {
-                                                    itemDraft.prefix = this.mergePrefix(elem.prefix, element.prefix);
-                                                }
-                                                // For i > 0, prefix is already correct, no changes needed
-                                            });
-                                        }));
+                                        // For tree types, spread elem and add padding properties
+                                        const newPadded = produce(elem, itemDraft => {
+                                            if (i === 0) {
+                                                (itemDraft as any).prefix = this.mergePrefix(elem.prefix, element.prefix);
+                                            }
+                                            // For i > 0, prefix is already correct, no changes needed
+                                        });
+                                        newElements.push({
+                                            ...newPadded,
+                                            padding: wrapped.padding
+                                        } as J.RightPadded<J>);
                                     }
                                 }
                                 continue; // Skip adding the placeholder itself
@@ -312,9 +315,11 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                     }
                 }
 
-                newElements.push(produce(wrapperToUse, draft => {
-                    draft.element = replacedElement;
-                }));
+                // For tree types, merge replacedElement with padding
+                newElements.push({
+                    ...replacedElement,
+                    padding: wrapperToUse.padding
+                } as J.RightPadded<J>);
             }
         }
 
@@ -417,13 +422,9 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             return placeholder;
         }
 
-        // Check if the parameter value is a J.RightPadded wrapper
-        const isRightPadded = param.value && typeof param.value === 'object' &&
-            param.value.kind === J.Kind.RightPadded && isTree(param.value.element);
-
-        if (isRightPadded) {
-            // Extract the element from the J.RightPadded wrapper
-            const element = param.value.element as J;
+        if (isRightPadded(param.value)) {
+            // For intersection types, the padded value IS the element (with padding mixed in)
+            const element = param.value as J;
             return produce(element, draft => {
                 draft.markers = placeholder.markers;
                 draft.prefix = this.mergePrefix(element.prefix, placeholder.prefix);

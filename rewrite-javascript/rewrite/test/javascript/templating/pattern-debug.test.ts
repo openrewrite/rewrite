@@ -31,7 +31,7 @@ describe('Pattern Debugging', () => {
     async function parseExpression(code: string): Promise<J> {
         const gen = parser.parse({text: code, sourcePath: 'test.ts'});
         const cu = (await gen.next()).value as JS.CompilationUnit;
-        const statement = cu.statements[0].element;
+        const statement = cu.statements[0];
         return isExpressionStatement(statement) ? statement.expression : statement;
     }
 
@@ -254,7 +254,7 @@ describe('Pattern Debugging', () => {
             sourcePath: 'test.ts'
         });
         const cu = (await gen.next()).value as JS.CompilationUnit;
-        const statement = cu.statements[0].element;
+        const statement = cu.statements[0];
 
         const attempt = await pat.matchWithExplanation(statement, undefined!);
 

@@ -24,7 +24,7 @@ describe('void operator mapping', () => {
         //language=typescript
         ...typescript('void 1'),
         afterRecipe: (cu: JS.CompilationUnit) => {
-            const statement = cu.statements[0].element as JS.Void;
+            const statement = cu.statements[0] as unknown as JS.Void;
             expect(statement.kind).toBe(JS.Kind.Void);
             // FIXME we can't yet get the type for `JS.Void`
             // const type = statement.type as JavaType.Primitive;

@@ -34,7 +34,7 @@ describe('class decorator mapping', () => {
             //language=typescript
             ...typescript('@foo( ) class A {}'),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                const classDecl = cu.statements[0].element as J.ClassDeclaration;
+                const classDecl = cu.statements[0] as unknown as J.ClassDeclaration;
                 const annotation = classDecl.leadingAnnotations[0];
                 expect(annotation.annotationType.kind).toBe(J.Kind.Identifier);
             }

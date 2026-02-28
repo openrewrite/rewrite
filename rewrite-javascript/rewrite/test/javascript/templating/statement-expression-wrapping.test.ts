@@ -31,8 +31,8 @@ describe('Statement Expression Wrapping', () => {
         const sourceCode = 'const c = x';
         const gen = parser.parse({text: sourceCode, sourcePath: 'test.ts'});
         const cu = (await gen.next()).value as JS.CompilationUnit;
-        const varDecl = cu.statements[0].element as J.VariableDeclarations;
-        const initializer = varDecl.variables[0].element.initializer?.element as J.Identifier;
+        const varDecl = cu.statements[0] as unknown as J.VariableDeclarations;
+        const initializer = varDecl.variables[0].initializer as unknown as J.Identifier;
 
         // Create cursor with parent context
         const cuCursor = new Cursor(cu);
@@ -62,7 +62,7 @@ describe('Statement Expression Wrapping', () => {
         const sourceCode = 'x;';
         const gen = parser.parse({text: sourceCode, sourcePath: 'test.ts'});
         const cu = (await gen.next()).value as JS.CompilationUnit;
-        const exprStmt = cu.statements[0].element as JS.ExpressionStatement;
+        const exprStmt = cu.statements[0] as unknown as JS.ExpressionStatement;
 
         // Create a cursor with parent context
         // In a real visitor, this.cursor would already have the parent chain
@@ -90,8 +90,8 @@ describe('Statement Expression Wrapping', () => {
         const sourceCode = 'const c = x';
         const gen = parser.parse({text: sourceCode, sourcePath: 'test.ts'});
         const cu = (await gen.next()).value as JS.CompilationUnit;
-        const varDecl = cu.statements[0].element as J.VariableDeclarations;
-        const initializer = varDecl.variables[0].element.initializer?.element as J.Identifier;
+        const varDecl = cu.statements[0] as unknown as J.VariableDeclarations;
+        const initializer = varDecl.variables[0].initializer as unknown as J.Identifier;
 
         // Create cursor (no parent context needed for this test)
         const initializerCursor = new Cursor(initializer);
@@ -118,8 +118,8 @@ describe('Statement Expression Wrapping', () => {
         const sourceCode = 'const c = foo()';
         const gen = parser.parse({text: sourceCode, sourcePath: 'test.ts'});
         const cu = (await gen.next()).value as JS.CompilationUnit;
-        const varDecl = cu.statements[0].element as J.VariableDeclarations;
-        const initializer = varDecl.variables[0].element.initializer?.element as J.MethodInvocation;
+        const varDecl = cu.statements[0] as unknown as J.VariableDeclarations;
+        const initializer = varDecl.variables[0].initializer as unknown as J.MethodInvocation;
 
         // Create cursor with parent context
         const cuCursor = new Cursor(cu);
@@ -167,17 +167,17 @@ describe('Statement Expression Wrapping', () => {
         return spec.rewriteRun({
             ...typescript('if (1) 1;', 'if (bar()) bar();'),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                const ifStmt = cu.statements[0].element as J.If;
+                const ifStmt = cu.statements[0] as unknown as J.If;
 
                 // Verify condition (expression context) - should be plain MethodInvocation
-                const condition = ifStmt.ifCondition.tree.element;
+                const condition = ifStmt.ifCondition.tree;
                 expect(condition.kind).toBe(J.Kind.MethodInvocation);
-                expect((condition as J.MethodInvocation).name.simpleName).toBe('bar');
+                expect((condition as unknown as J.MethodInvocation).name.simpleName).toBe('bar');
 
                 // Verify body (statement context) - should be plain MethodInvocation, not wrapped
-                const body = ifStmt.thenPart.element;
+                const body = ifStmt.thenPart;
                 expect(body.kind).toBe(JS.Kind.ExpressionStatement);
-                expect((body as JS.ExpressionStatement).expression.kind).toBe(J.Kind.MethodInvocation);
+                expect((body as unknown as JS.ExpressionStatement).expression.kind).toBe(J.Kind.MethodInvocation);
             }
         });
     });

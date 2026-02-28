@@ -113,11 +113,15 @@ export class RpcCodecs {
 export class RpcSendQueue {
     private q: RpcObjectData[] = [];
 
-    private before?: any;
+    private _before?: any;
 
     constructor(private readonly refs: ReferenceMap,
                 private readonly sourceFileType: string | undefined,
                 private readonly trace: boolean) {
+    }
+
+    get before(): any {
+        return this._before;
     }
 
     async generate(after: any, before: any): Promise<RpcObjectData[]> {
@@ -139,28 +143,30 @@ export class RpcSendQueue {
 
     getAndSend<T, U>(parent: T,
                      value: (parent: T) => U | undefined,
-                     onChange?: (value: U) => Promise<any>): Promise<void> {
+                     onChange?: (value: U) => Promise<any>,
+                     valueType?: string): Promise<void> {
         const after = value(parent);
-        const before = this.before === undefined ? undefined : value(this.before as T);
-        return this.send(after, before, onChange && (() => onChange(after!)));
+        const before = this._before === undefined ? undefined : value(this._before as T);
+        return this.send(after, before, onChange && (() => onChange(after!)), valueType);
     }
 
     getAndSendList<T, U>(parent: T,
                          values: (parent: T) => U[] | undefined,
                          id: (value: U) => any,
-                         onChange?: (value: U) => Promise<any>): Promise<void> {
+                         onChange?: (value: U) => Promise<any>,
+                         valueType?: string): Promise<void> {
         const after = values(parent);
-        const before = this.before === undefined ? undefined : values(this.before as T);
-        return this.sendList(after, before, id, onChange);
+        const before = this._before === undefined ? undefined : values(this._before as T);
+        return this.sendList(after, before, id, onChange, valueType);
     }
 
-    send<T>(after: T | undefined, before: T | undefined, onChange?: (() => Promise<any>)): Promise<void> {
+    send<T>(after: T | undefined, before: T | undefined, onChange?: (() => Promise<any>), valueType?: string): Promise<void> {
         return saveTrace(this.trace, async () => {
             if (before === after) {
                 this.put({state: RpcObjectState.NO_CHANGE});
             } else if (before === undefined || (after !== undefined && this.typesAreDifferent(after, before))) {
                 // Treat as ADD when before is undefined OR types differ (it's a new object, not a change)
-                await this.add(after, onChange);
+                await this.add(after, onChange, valueType);
             } else if (after === undefined) {
                 this.put({state: RpcObjectState.DELETE});
             } else {
@@ -174,7 +180,8 @@ export class RpcSendQueue {
     sendList<T>(after: T[] | undefined,
                 before: T[] | undefined,
                 id: (value: T) => any,
-                onChange?: (value: T) => Promise<any>): Promise<void> {
+                onChange?: (value: T) => Promise<any>,
+                valueType?: string): Promise<void> {
         return this.send(after, before, async () => {
             if (!after) {
                 throw new Error("A DELETE event should have been sent.");
@@ -186,14 +193,14 @@ export class RpcSendQueue {
                 const beforePos = beforeIdx.get(id(anAfter));
                 const onChangeRun = onChange ? () => onChange(anAfter) : undefined;
                 if (!beforePos) {
-                    await this.add(anAfter, onChangeRun);
+                    await this.add(anAfter, onChangeRun, valueType);
                 } else {
                     const aBefore = before?.[beforePos];
                     if (aBefore === anAfter) {
                         this.put({state: RpcObjectState.NO_CHANGE});
                     } else if (anAfter !== undefined && this.typesAreDifferent(anAfter, aBefore)) {
                         // Type changed - treat as ADD
-                        await this.add(anAfter, onChangeRun);
+                        await this.add(anAfter, onChangeRun, valueType);
                     } else {
                         this.put({state: RpcObjectState.CHANGE});
                         await this.doChange(anAfter, aBefore, onChangeRun, RpcCodecs.forInstance(anAfter, this.sourceFileType));
@@ -221,7 +228,7 @@ export class RpcSendQueue {
         return beforeIdx;
     }
 
-    private async add(after: any, onChange: (() => Promise<any>) | undefined): Promise<void> {
+    private async add(after: any, onChange: (() => Promise<any>) | undefined, valueType?: string): Promise<void> {
         let ref: number | undefined;
         if (isRef(after)) {
             ref = this.refs.get(after);
@@ -237,7 +244,7 @@ export class RpcSendQueue {
         let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after, this.sourceFileType);
         this.put({
             state: RpcObjectState.ADD,
-            valueType: this.getValueType(after),
+            valueType: valueType ?? this.getValueType(after),
             value: onChange || afterCodec ? undefined : after,
             ref: ref
         });
@@ -245,8 +252,8 @@ export class RpcSendQueue {
     }
 
     private async doChange(after: any, before: any, onChange?: () => Promise<void>, afterCodec?: RpcCodec<any>): Promise<void> {
-        const lastBefore = this.before;
-        this.before = before;
+        const lastBefore = this._before;
+        this._before = before;
         try {
             if (onChange) {
                 if (after !== undefined) {
@@ -256,7 +263,7 @@ export class RpcSendQueue {
                 await afterCodec.rpcSend(after, this);
             }
         } finally {
-            this.before = lastBefore;
+            this._before = lastBefore;
         }
     }
 
@@ -391,13 +398,19 @@ export class RpcReceiveQueue {
                         throw new Error(`Expected positions array but got: ${JSON.stringify(d)}`);
                     }
                     const after: T[] = new Array(positions.length);
+                    let allUnchanged = before !== undefined && positions.length === before.length;
                     for (let i = 0; i < positions.length; i++) {
                         const beforeIdx = positions[i];
                         const b: T = await (beforeIdx >= 0 ? before![beforeIdx] as T : undefined) as T;
-                        let received: Promise<T> = this.receive<T>(b, onChange);
-                        after[i] = await received;
+                        let received: T = await this.receive<T>(b, onChange);
+                        after[i] = received;
+                        // Check if this element is unchanged and in the same position
+                        if (allUnchanged && (beforeIdx !== i || received !== b)) {
+                            allUnchanged = false;
+                        }
                     }
-                    return after;
+                    // Preserve array identity if nothing changed
+                    return allUnchanged ? before! : after;
                 default:
                     throw new Error(`${message.state} is not supported for lists.`);
             }

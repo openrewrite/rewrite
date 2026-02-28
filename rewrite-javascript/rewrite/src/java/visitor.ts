@@ -16,7 +16,8 @@
 import {Cursor, isTree, SourceFile} from "../tree";
 import {mapAsync, updateIfChanged} from "../util";
 import {TreeVisitor, ValidRecipeReturnType} from "../visitor";
-import {Expression, isSpace, J, NameTree, Statement, TypedTree, TypeTree} from "./tree";
+import {emptySpace, Expression, isSpace, J, NameTree, Statement, TypedTree, TypeTree} from "./tree";
+import {emptyMarkers, Markers} from "../markers";
 import {create, Draft, rawReturn} from "mutative";
 import {Type} from "./type";
 
@@ -203,7 +204,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             prefix: await this.visitSpace(assignOp.prefix, p),
             markers: await this.visitMarkers(assignOp.markers, p),
             variable: await this.visitDefined(assignOp.variable, p) as Expression,
-            operator: await this.visitLeftPadded(assignOp.operator, p),
+            operator: await this.visitLeftPadded(assignOp.operator, p) as typeof assignOp.operator,
             assignment: await this.visitDefined(assignOp.assignment, p) as Expression,
             type: await this.visitType(assignOp.type, p)
         };
@@ -221,7 +222,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             prefix: await this.visitSpace(binary.prefix, p),
             markers: await this.visitMarkers(binary.markers, p),
             left: await this.visitDefined(binary.left, p) as Expression,
-            operator: await this.visitLeftPadded(binary.operator, p),
+            operator: await this.visitLeftPadded(binary.operator, p) as typeof binary.operator,
             right: await this.visitDefined(binary.right, p) as Expression,
             type: await this.visitType(binary.type, p)
         };
@@ -232,7 +233,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         const updates = {
             prefix: await this.visitSpace(block.prefix, p),
             markers: await this.visitMarkers(block.markers, p),
-            static: await this.visitRightPadded(block.static, p),
+            static: await this.visitRightPadded(block.static, p) as typeof block.static,
             statements: await mapAsync(block.statements, stmt => this.visitRightPadded(stmt, p)),
             end: await this.visitSpace(block.end, p)
         };
@@ -1214,37 +1215,92 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return right ? this.visitRightPadded(right, p) : undefined;
     }
 
+    /**
+     * Visits a right-padded value.
+     *
+     * For tree nodes (J): The padded value IS the tree with `padding: Suffix` mixed in.
+     * For booleans: The padded value has an `element` property containing the boolean.
+     *
+     * @overload Primitives (boolean) - always returns (primitives cannot be deleted by visitors)
+     * @overload Tree nodes (J) - may return undefined if the element is deleted
+     * @overload Generic fallback for union types (J | boolean) - may return undefined
+     */
+    public async visitRightPadded<T extends boolean>(right: J.RightPadded<T>, p: P): Promise<J.RightPadded<T>>;
+    public async visitRightPadded<T extends J>(right: J.RightPadded<T>, p: P): Promise<J.RightPadded<T> | undefined>;
+    public async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: P): Promise<J.RightPadded<T> | undefined>;
     public async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: P): Promise<J.RightPadded<T> | undefined> {
         this.cursor = new Cursor(right, this.cursor);
-        const element = isTree(right.element) ? await this.visitDefined(right.element, p) as T : right.element;
-        const after = await this.visitSpace(right.after, p);
-        const markers = await this.visitMarkers(right.markers, p);
+
+        const hasElement = 'element' in right;
+        const visitedElement: T | undefined = hasElement
+            ? (right as { element: boolean }).element as T
+            : await this.visitDefined(right as J, p) as T | undefined;
+
+        const after = await this.visitSpace(right.padding.after, p);
+        const paddingMarkers = await this.visitMarkers(right.padding.markers, p);
         this.cursor = this.cursor.parent!;
-        if (element === undefined) {
+
+        if (visitedElement === undefined) {
             return undefined;
         }
-        return updateIfChanged(right, {element, after, markers});
+
+        const paddingUnchanged = after === right.padding.after && paddingMarkers === right.padding.markers;
+        const padding: J.Suffix = paddingUnchanged ? right.padding : { after, markers: paddingMarkers };
+
+        if (hasElement) {
+            return updateIfChanged(right, { element: visitedElement, padding } as any);
+        }
+        return updateIfChanged(visitedElement as J & { padding: J.Suffix }, { padding }) as J.RightPadded<T>;
     }
 
     protected async visitOptionalLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T> | undefined, p: P): Promise<J.LeftPadded<T> | undefined> {
         return left ? this.visitLeftPadded(left, p) : undefined;
     }
 
+    /**
+     * Visits a left-padded value.
+     *
+     * For tree nodes (J) and Space: The padded value IS the element with `padding: Prefix` mixed in.
+     * For primitives (boolean, number, string): The padded value has an `element` property.
+     *
+     * @overload Primitives (number, string, boolean) - always returns (primitives cannot be deleted by visitors)
+     * @overload Tree nodes (J) - may return undefined if the element is deleted
+     * @overload Space - may return undefined if the space is deleted
+     * @overload Generic fallback for union types - may return undefined
+     */
+    public async visitLeftPadded<T extends number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>>;
+    public async visitLeftPadded<T extends J>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T> | undefined>;
+    public async visitLeftPadded(left: J.LeftPadded<J.Space>, p: P): Promise<J.LeftPadded<J.Space> | undefined>;
+    public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T> | undefined>;
     public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T> | undefined> {
         this.cursor = new Cursor(left, this.cursor);
-        const before = await this.visitSpace(left.before, p);
-        let element: T | undefined = left.element;
-        if (isTree(left.element)) {
-            element = await this.visitDefined(left.element, p) as T | undefined;
-        } else if (isSpace(left.element)) {
-            element = await this.visitSpace(left.element, p) as T;
+        const before = await this.visitSpace(left.padding.before, p);
+
+        const hasElement = 'element' in left;
+        let visitedElement: T | undefined;
+
+        if (hasElement) {
+            visitedElement = (left as unknown as { element: T }).element;
+        } else if (isSpace(left)) {
+            visitedElement = await this.visitSpace(left as J.Space, p) as T;
+        } else {
+            visitedElement = await this.visitDefined(left as J, p) as T | undefined;
         }
-        const markers = await this.visitMarkers(left.markers, p);
+
+        const paddingMarkers = await this.visitMarkers(left.padding.markers, p);
         this.cursor = this.cursor.parent!;
-        if (element === undefined) {
+
+        if (visitedElement === undefined) {
             return undefined;
         }
-        return updateIfChanged(left, {before, element, markers});
+
+        const paddingUnchanged = before === left.padding.before && paddingMarkers === left.padding.markers;
+        const padding: J.Prefix = paddingUnchanged ? left.padding : { before, markers: paddingMarkers };
+
+        if (hasElement) {
+            return updateIfChanged(left, { element: visitedElement, padding } as any);
+        }
+        return updateIfChanged(visitedElement as (J | J.Space) & { padding: J.Prefix }, { padding }) as J.LeftPadded<T>;
     }
 
     protected async visitOptionalContainer<T extends J>(container: J.Container<T> | undefined, p: P): Promise<J.Container<T> | undefined> {
@@ -1257,7 +1313,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         const elements = await mapAsync(container.elements, e => this.visitRightPadded(e, p));
         const markers = await this.visitMarkers(container.markers, p);
         this.cursor = this.cursor.parent!;
-        return updateIfChanged(container, {before, elements, markers});
+        return updateIfChanged(container, { before, elements, markers });
     }
 
     protected async produceJava<J2 extends J>(

@@ -15,7 +15,7 @@
  */
 
 import {Cursor, Tree} from "../tree";
-import {Comment, isIdentifier, isJava, isLiteral, J, TextComment} from "../java";
+import {Comment, isIdentifier, isJava, isLiteral, J, TextComment, getPaddedElement, isPrimitiveLeftPadded, isPrimitiveRightPadded} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import * as fs from "fs";
@@ -393,8 +393,13 @@ export function findPropertyPath(cursor: Cursor | undefined, child?: any): strin
         }
 
         // Check inside LeftPadded/RightPadded
-        if (value && typeof value === 'object') {
-            if ((value as any).kind === J.Kind.LeftPadded || (value as any).kind === J.Kind.RightPadded) {
+        // With new type system: primitives have .element property, intersection types don't
+        if (value && typeof value === 'object' && 'padding' in value) {
+            const padding = (value as any).padding;
+            const isPadded = padding && typeof padding === 'object' &&
+                ('before' in padding || 'after' in padding);
+            if (isPadded && 'element' in value) {
+                // Primitive wrapper - check .element
                 if (sameElement((value as any).element, actualChild)) {
                     return `${key}.element`;
                 }
@@ -580,29 +585,31 @@ export class LstDebugPrinter {
             const before = formatSpace(container.before);
             line += `Container<${container.elements?.length ?? 0}>{before=${before}${formatMarkers(container)}}`;
         } else if (this.isLeftPadded(node)) {
-            const lp = node as J.LeftPadded<any>;
-            const before = formatSpace(lp.before);
+            const lp = node as any;
+            const before = formatSpace(lp.padding.before);
             line += `LeftPadded{before=${before}`;
-            // Show element value if it's a primitive
-            if (lp.element !== null && lp.element !== undefined) {
+            // Show element value if it's a primitive (has .element property)
+            if ('element' in lp && lp.element !== null && lp.element !== undefined) {
                 const elemType = typeof lp.element;
                 if (elemType === 'string' || elemType === 'number' || elemType === 'boolean') {
                     line += ` element=${JSON.stringify(lp.element)}`;
                 }
             }
-            line += `${formatMarkers(lp)}}`;
+            // Use padding.markers for marker formatting
+            line += `${formatMarkers({markers: lp.padding.markers})}}`;
         } else if (this.isRightPadded(node)) {
-            const rp = node as J.RightPadded<any>;
-            const after = formatSpace(rp.after);
+            const rp = node as any;
+            const after = formatSpace(rp.padding.after);
             line += `RightPadded{after=${after}`;
-            // Show element value if it's a primitive
-            if (rp.element !== null && rp.element !== undefined) {
+            // Show element value if it's a primitive (has .element property)
+            if ('element' in rp && rp.element !== null && rp.element !== undefined) {
                 const elemType = typeof rp.element;
                 if (elemType === 'string' || elemType === 'number' || elemType === 'boolean') {
                     line += ` element=${JSON.stringify(rp.element)}`;
                 }
             }
-            line += `${formatMarkers(rp)}}`;
+            // Use padding.markers for marker formatting
+            line += `${formatMarkers({markers: rp.padding.markers})}}`;
         } else if (isJava(node)) {
             const jNode = node as J;
             const typeName = shortTypeName(jNode.kind);
@@ -612,6 +619,17 @@ export class LstDebugPrinter {
                 line += `${summary} `;
             }
             line += `prefix=${formatSpace(jNode.prefix)}${formatMarkers(jNode)}}`;
+            // For intersection-padded J nodes, also show the padding info
+            const paddingInfo = this.isIntersectionPadded(node);
+            if (paddingInfo) {
+                const padding = (node as any).padding;
+                if (paddingInfo.isLeft) {
+                    line += ` (LeftPadded before=${formatSpace(padding.before)})`;
+                }
+                if (paddingInfo.isRight) {
+                    line += ` (RightPadded after=${formatSpace(padding.after)})`;
+                }
+            }
         } else {
             line += `<unknown: ${typeof node}>`;
         }
@@ -788,6 +806,22 @@ export class LstDebugPrinter {
             this.outputLines.push(`${this.indent(depth + 1)}markers: [${node.markers.markers.map((m: any) => shortTypeName(m.kind)).join(', ')}]`);
         }
 
+        // Print padding info for intersection-padded J nodes
+        const paddingInfo = this.isIntersectionPadded(node);
+        if (paddingInfo) {
+            const padding = (node as any).padding;
+            if (paddingInfo.isLeft) {
+                this.outputLines.push(`${this.indent(depth + 1)}(LeftPadded) before: ${formatSpace(padding.before)}`);
+            }
+            if (paddingInfo.isRight) {
+                this.outputLines.push(`${this.indent(depth + 1)}(RightPadded) after: ${formatSpace(padding.after)}`);
+            }
+            // Show padding markers if present and different from node markers
+            if (padding.markers?.markers?.length > 0) {
+                this.outputLines.push(`${this.indent(depth + 1)}(padding) markers: [${padding.markers.markers.map((m: any) => shortTypeName(m.kind)).join(', ')}]`);
+            }
+        }
+
         // Print other properties
         this.printNodeProperties(node, cursor, depth + 1);
     }
@@ -800,6 +834,7 @@ export class LstDebugPrinter {
             'id',
             'prefix',
             'markers',
+            'padding', // Handled specially in printJavaNode
         ]);
 
         for (const [key, value] of Object.entries(node)) {
@@ -818,22 +853,25 @@ export class LstDebugPrinter {
                 this.outputLines.push(`${this.indent(depth)}${key}:`);
                 this.printRightPadded(value, undefined, depth + 1);
             } else if (Array.isArray(value)) {
-                if (value.length === 0) {
+                // Use explicit any[] cast to avoid TypeScript narrowing issues with every()
+                const arr = value as any[];
+                const arrLen = arr.length;
+                if (arrLen === 0) {
                     this.outputLines.push(`${this.indent(depth)}${key}: []`);
-                } else if (value.every(v => this.isRightPadded(v))) {
-                    this.outputLines.push(`${this.indent(depth)}${key}: [${value.length} RightPadded elements]`);
-                    for (let i = 0; i < value.length; i++) {
+                } else if (arr.every((v: any) => this.isRightPadded(v))) {
+                    this.outputLines.push(`${this.indent(depth)}${key}: [${arrLen} RightPadded elements]`);
+                    for (let i = 0; i < arrLen; i++) {
                         this.outputLines.push(`${this.indent(depth + 1)}[${i}]:`);
-                        this.printRightPadded(value[i], undefined, depth + 2);
+                        this.printRightPadded(arr[i] as J.RightPadded<any>, undefined, depth + 2);
                     }
-                } else if (value.every(v => isJava(v))) {
-                    this.outputLines.push(`${this.indent(depth)}${key}: [${value.length} elements]`);
-                    for (let i = 0; i < value.length; i++) {
+                } else if (arr.every((v: any) => isJava(v))) {
+                    this.outputLines.push(`${this.indent(depth)}${key}: [${arrLen} elements]`);
+                    for (let i = 0; i < arrLen; i++) {
                         this.outputLines.push(`${this.indent(depth + 1)}[${i}]:`);
-                        this.printNode(value[i], undefined, depth + 2);
+                        this.printNode(arr[i] as J, undefined, depth + 2);
                     }
                 } else {
-                    this.outputLines.push(`${this.indent(depth)}${key}: [${value.length} items]`);
+                    this.outputLines.push(`${this.indent(depth)}${key}: [${arrLen} items]`);
                 }
             } else if (isJava(value)) {
                 this.outputLines.push(`${this.indent(depth)}${key}:`);
@@ -881,17 +919,26 @@ export class LstDebugPrinter {
         }
 
         this.outputLines.push(header);
-        this.outputLines.push(`${this.indent(depth + 1)}before: ${formatSpace(lp.before)}`);
+        this.outputLines.push(`${this.indent(depth + 1)}before: ${formatSpace((lp as any).padding.before)}`);
 
-        if (lp.element !== undefined) {
-            if (isJava(lp.element)) {
-                this.outputLines.push(`${this.indent(depth + 1)}element:`);
-                this.printNode(lp.element, undefined, depth + 2);
-            } else if (this.isSpace(lp.element)) {
-                this.outputLines.push(`${this.indent(depth + 1)}element: ${formatSpace(lp.element)}`);
+        // With the new type system:
+        // - For tree types (J): The padded value IS the tree with padding mixed in (no .element)
+        // - For primitives: There's an .element property
+        const hasPrimitiveElement = 'element' in lp;
+        const element = hasPrimitiveElement ? (lp as any).element : lp;
+
+        if (hasPrimitiveElement) {
+            // Primitive wrapper case
+            const primitiveElement = (lp as any).element;
+            if (this.isSpace(primitiveElement)) {
+                this.outputLines.push(`${this.indent(depth + 1)}element: ${formatSpace(primitiveElement)}`);
             } else {
-                this.outputLines.push(`${this.indent(depth + 1)}element: ${JSON.stringify(lp.element)}`);
+                this.outputLines.push(`${this.indent(depth + 1)}element: ${JSON.stringify(primitiveElement)}`);
             }
+        } else if (isJava(element)) {
+            // Tree type (intersection type) - element IS the padded value
+            this.outputLines.push(`${this.indent(depth + 1)}element:`);
+            this.printNode(element, undefined, depth + 2);
         }
     }
 
@@ -907,16 +954,22 @@ export class LstDebugPrinter {
 
         this.outputLines.push(header);
 
-        if (rp.element !== undefined) {
-            if (isJava(rp.element)) {
-                this.outputLines.push(`${this.indent(depth + 1)}element:`);
-                this.printNode(rp.element, undefined, depth + 2);
-            } else {
-                this.outputLines.push(`${this.indent(depth + 1)}element: ${JSON.stringify(rp.element)}`);
-            }
+        // With the new type system:
+        // - For tree types (J): The padded value IS the tree with padding mixed in (no .element)
+        // - For primitives (like boolean): There's an .element property
+        const hasPrimitiveElement = 'element' in rp;
+        const element = hasPrimitiveElement ? (rp as any).element : rp;
+
+        if (hasPrimitiveElement) {
+            // Primitive wrapper case
+            this.outputLines.push(`${this.indent(depth + 1)}element: ${JSON.stringify((rp as any).element)}`);
+        } else if (isJava(element)) {
+            // Tree type (intersection type) - element IS the padded value
+            this.outputLines.push(`${this.indent(depth + 1)}element:`);
+            this.printNode(element, undefined, depth + 2);
         }
 
-        this.outputLines.push(`${this.indent(depth + 1)}after: ${formatSpace(rp.after)}`);
+        this.outputLines.push(`${this.indent(depth + 1)}after: ${formatSpace((rp as any).padding.after)}`);
     }
 
     private printGenericObject(obj: any, depth: number): void {
@@ -945,16 +998,27 @@ export class LstDebugPrinter {
             value.kind === J.Kind.Container;
     }
 
-    private isLeftPadded(value: any): value is J.LeftPadded<any> {
-        return value !== null &&
-            typeof value === 'object' &&
-            value.kind === J.Kind.LeftPadded;
+    private isLeftPadded(value: any): boolean {
+        return isPrimitiveLeftPadded(value);
     }
 
-    private isRightPadded(value: any): value is J.RightPadded<any> {
-        return value !== null &&
-            typeof value === 'object' &&
-            value.kind === J.Kind.RightPadded;
+    private isRightPadded(value: any): boolean {
+        return isPrimitiveRightPadded(value);
+    }
+
+    /**
+     * Check if a value is an intersection-padded J node (has padding but no .element wrapper).
+     */
+    private isIntersectionPadded(value: any): { isLeft: boolean; isRight: boolean } | false {
+        if (value === null || typeof value !== 'object') return false;
+        if (!('padding' in value) || !value.padding || typeof value.padding !== 'object') return false;
+        if ('element' in value) return false; // Primitive wrapper, not intersection
+        const hasLeft = 'before' in value.padding;
+        const hasRight = 'after' in value.padding;
+        if (hasLeft || hasRight) {
+            return { isLeft: hasLeft, isRight: hasRight };
+        }
+        return false;
     }
 
     private indent(depth: number): string {
@@ -1047,7 +1111,7 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
         if (this.printPreVisit) {
             const indent = '  '.repeat(this.depth);
             const messages = formatCursorMessages(this.cursor);
-            const before = formatSpace(left.before);
+            const before = formatSpace(left.padding.before);
             // Pass left as the child since cursor.value is the parent node
             const propPath = findPropertyPath(this.cursor, left);
 
@@ -1058,13 +1122,16 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
             line += `LeftPadded{before=${before}`;
 
             // Show element value if it's a primitive (string, number, boolean)
-            if (left.element !== null && left.element !== undefined) {
-                const elemType = typeof left.element;
+            // With new type system: primitives have .element, tree types don't
+            const hasPrimitiveElement = 'element' in left;
+            if (hasPrimitiveElement) {
+                const elem = (left as any).element;
+                const elemType = typeof elem;
                 if (elemType === 'string' || elemType === 'number' || elemType === 'boolean') {
-                    line += ` element=${JSON.stringify(left.element)}`;
+                    line += ` element=${JSON.stringify(elem)}`;
                 }
             }
-            line += `${formatMarkers(left)}}`;
+            line += `${formatMarkers({markers: left.padding.markers})}}`;
 
             // Append cursor messages on same line to avoid empty line issues
             if (messages !== '<no messages>') {
@@ -1085,7 +1152,7 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
         if (this.printPreVisit) {
             const indent = '  '.repeat(this.depth);
             const messages = formatCursorMessages(this.cursor);
-            const after = formatSpace(right.after);
+            const after = formatSpace(right.padding.after);
             // Pass right as the child since cursor.value is the parent node
             const propPath = findPropertyPath(this.cursor, right);
 
@@ -1096,13 +1163,16 @@ export class LstDebugVisitor<P> extends JavaScriptVisitor<P> {
             line += `RightPadded{after=${after}`;
 
             // Show element value if it's a primitive (string, number, boolean)
-            if (right.element !== null && right.element !== undefined) {
-                const elemType = typeof right.element;
+            // With new type system: primitives have .element, tree types don't
+            const hasPrimitiveElement = 'element' in right;
+            if (hasPrimitiveElement) {
+                const elem = (right as any).element;
+                const elemType = typeof elem;
                 if (elemType === 'string' || elemType === 'number' || elemType === 'boolean') {
-                    line += ` element=${JSON.stringify(right.element)}`;
+                    line += ` element=${JSON.stringify(elem)}`;
                 }
             }
-            line += `${formatMarkers(right)}}`;
+            line += `${formatMarkers({markers: right.padding.markers})}}`;
 
             // Append cursor messages on same line to avoid empty line issues
             if (messages !== '<no messages>') {

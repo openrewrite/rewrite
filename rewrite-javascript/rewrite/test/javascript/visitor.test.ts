@@ -97,22 +97,24 @@ describe('JavaScript visitor formatting', () => {
             );
 
             // then
+            // With intersection types, RightPadded<T> IS the element T with padding mixed in,
+            // so cursor path shows the element's kind instead of J.Kind.RightPadded
             expect(pathToRoot).toEqual([
-                J.Kind.Literal,
-                J.Kind.RightPadded,
-                J.Kind.Container,
-                J.Kind.MethodInvocation,
-                J.Kind.RightPadded,
-                J.Kind.Block,
-                J.Kind.RightPadded,
-                J.Kind.IfElse,
-                J.Kind.If,
-                J.Kind.RightPadded,
-                J.Kind.Block,
-                J.Kind.MethodDeclaration,
-                J.Kind.RightPadded,
-                JS.Kind.CompilationUnit,
-                undefined
+                J.Kind.Literal,           // The literal "b" itself
+                J.Kind.Literal,           // RightPadded<Literal> - same kind as element
+                J.Kind.Container,         // Arguments container
+                J.Kind.MethodInvocation,  // console.log(...)
+                J.Kind.MethodInvocation,  // RightPadded<MethodInvocation> - same kind
+                J.Kind.Block,             // else { ... }
+                J.Kind.Block,             // RightPadded<Block> - same kind
+                J.Kind.IfElse,            // else branch
+                J.Kind.If,                // if statement
+                J.Kind.If,                // RightPadded<If> - same kind
+                J.Kind.Block,             // function body
+                J.Kind.MethodDeclaration, // function m()
+                J.Kind.MethodDeclaration, // RightPadded<MethodDeclaration> - same kind
+                JS.Kind.CompilationUnit,  // File
+                undefined                 // Root
             ]);
         });
     });

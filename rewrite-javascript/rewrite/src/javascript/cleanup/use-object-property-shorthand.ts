@@ -18,7 +18,7 @@ import {Recipe} from "../../recipe";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {JavaScriptVisitor} from "../visitor";
-import {J} from "../../java";
+import {Expression, J, Statement} from "../../java";
 import {JS} from "../tree";
 import {create as produce} from "mutative";
 import {findMarker} from "../../markers";
@@ -51,29 +51,26 @@ export class UseObjectPropertyShorthand extends Recipe {
 
                 let hasChanges = false;
 
+                // For tree types, the padded value IS the element (intersection type)
                 const simplifiedBindings = visited.bindings.elements.map(right => {
-                    const element = right.element;
-
-                    if (element.kind === JS.Kind.BindingElement) {
-                        const binding = element as JS.BindingElement;
-
-                        if (binding.propertyName?.element.kind === J.Kind.Identifier) {
-                            const propName = (binding.propertyName.element as J.Identifier).simpleName;
+                    if (right.kind === JS.Kind.BindingElement) {
+                        const binding = right as J as JS.BindingElement;
+                        const propNameExpr = binding.propertyName as Expression | undefined;
+                        if (propNameExpr?.kind === J.Kind.Identifier) {
+                            const propName = (propNameExpr as J.Identifier).simpleName;
 
                             if (binding.name?.kind === J.Kind.Identifier) {
                                 const bindingName = (binding.name as J.Identifier).simpleName;
 
                                 if (propName === bindingName) {
                                     hasChanges = true;
+                                    // Spread the binding properties, override propertyName and name
                                     return {
                                         ...right,
-                                        element: {
-                                            ...binding,
-                                            propertyName: undefined,
-                                            name: {
-                                                ...binding.name,
-                                                prefix: binding.propertyName.element.prefix
-                                            }
+                                        propertyName: undefined,
+                                        name: {
+                                            ...binding.name,
+                                            prefix: propNameExpr.prefix
                                         }
                                     } as J.RightPadded<JS.BindingElement>;
                                 }
@@ -113,12 +110,11 @@ export class UseObjectPropertyShorthand extends Recipe {
                 let hasChanges = false;
 
                 const simplifiedStatements = statements.map(stmt => {
-                    if (stmt.element.kind === JS.Kind.PropertyAssignment) {
-                        const prop = stmt.element as JS.PropertyAssignment;
-
-                        // Check if the property name is an identifier
-                        if (prop.name.element.kind === J.Kind.Identifier) {
-                            const propName = (prop.name.element as J.Identifier).simpleName;
+                    if (stmt.kind === JS.Kind.PropertyAssignment) {
+                        const prop = stmt as Statement as JS.PropertyAssignment;
+                        const nameExpr = prop.name as Expression;
+                        if (nameExpr.kind === J.Kind.Identifier) {
+                            const propName = (nameExpr as J.Identifier).simpleName;
 
                             // Check if the initializer is also an identifier with the same name
                             if (prop.initializer?.kind === J.Kind.Identifier) {
@@ -133,12 +129,10 @@ export class UseObjectPropertyShorthand extends Recipe {
                                 if (propName === initName) {
                                     hasChanges = true;
                                     // Remove the initializer to use shorthand syntax
+                                    // Spread the property with padding, override initializer
                                     return {
                                         ...stmt,
-                                        element: {
-                                            ...prop,
-                                            initializer: undefined
-                                        }
+                                        initializer: undefined
                                     } as J.RightPadded<JS.PropertyAssignment>;
                                 }
                             }

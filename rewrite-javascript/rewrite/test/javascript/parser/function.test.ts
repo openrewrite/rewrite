@@ -451,8 +451,8 @@ describe('function mapping', () => {
                 `
             ),
             afterRecipe: tree => {
-                const varDecl = tree.statements[1].element as J.VariableDeclarations;
-                const ident = varDecl.variables[0].element.name as J.Identifier;
+                const varDecl = tree.statements[1] as unknown as J.VariableDeclarations;
+                const ident = varDecl.variables[0].name as J.Identifier;
                 expect(ident.simpleName).toEqual("a");
             }
         });

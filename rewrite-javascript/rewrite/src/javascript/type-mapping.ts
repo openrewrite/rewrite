@@ -830,8 +830,13 @@ export class JavaScriptTypeMapping {
                             flags: 0, // TODO - determine flags
                             fullyQualifiedName: moduleSpecifier
                         } as Type.FullyQualified;
-                        // For aliased imports, use the original function name from the aliased symbol
-                        if (aliasedSymbol && aliasedSymbol.name) {
+                        // Determine the method name based on import type
+                        const isDefaultImport = exprSymbol!.declarations?.some(d =>
+                            ts.isImportClause(d) || ts.isNamespaceImport(d)
+                        );
+                        if (isDefaultImport) {
+                            methodName = '<default>';
+                        } else if (aliasedSymbol && aliasedSymbol.name) {
                             methodName = aliasedSymbol.name;
                         } else {
                             methodName = '<default>';

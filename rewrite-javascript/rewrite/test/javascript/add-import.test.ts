@@ -94,7 +94,7 @@ function createForceRemoveFirstImportThenAddVisitor(
             let result: any = await this.produceJavaScript(cu, p, async draft => {
                 if (draft.statements && draft.statements.length > 0) {
                     draft.statements = draft.statements.slice(1);
-                    draft.statements[0].element.prefix = emptySpace;
+                    draft.statements[0].prefix = emptySpace;
                 }
             });
 
@@ -1068,7 +1068,7 @@ describe('AddImport visitor', () => {
                     let result: any = await this.produceJavaScript(jsCu, p, async (draft: any) => {
                         if (draft.statements && draft.statements.length > 0) {
                             draft.statements = draft.statements.slice(1);
-                            draft.statements[0].element.prefix = emptySpace;
+                            draft.statements[0].prefix = emptySpace;
                         }
                     });
 

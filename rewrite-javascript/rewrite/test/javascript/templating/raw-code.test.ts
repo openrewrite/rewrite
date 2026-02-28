@@ -27,11 +27,11 @@ describe('raw() function', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    if ((method.select?.element as J.Identifier)?.simpleName === 'console' &&
+                    if ((method.select as unknown as J.Identifier | undefined)?.simpleName === 'console' &&
                         (method.name as J.Identifier).simpleName === 'log') {
                         return template`logger.${raw(methodName)}(${msg})`.apply(method, this.cursor, {
                             values: new Map([
-                                ['msg', method.arguments.elements[0].element]
+                                ['msg', method.arguments.elements[0]]
                             ])
                         });
                     }
@@ -55,11 +55,11 @@ describe('raw() function', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    if ((invocation.select?.element as J.Identifier)?.simpleName === 'logger' &&
+                    if ((invocation.select as unknown as J.Identifier | undefined)?.simpleName === 'logger' &&
                         (invocation.name as J.Identifier).simpleName === 'info') {
                         return template`${raw(obj)}.${raw(method)}(${msg})`.apply(invocation, this.cursor, {
                             values: new Map([
-                                ['msg', invocation.arguments.elements[0].element]
+                                ['msg', invocation.arguments.elements[0]]
                             ])
                         });
                     }
@@ -166,11 +166,11 @@ describe('raw() function', () => {
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    if ((method.select?.element as J.Identifier)?.simpleName === 'console' &&
+                    if ((method.select as unknown as J.Identifier | undefined)?.simpleName === 'console' &&
                         (method.name as J.Identifier).simpleName === 'log') {
                         // Template is constructed with the dynamic log level from recipe option
                         return template`logger.${raw(logLevel)}(${msg})`.apply(method, this.cursor, {
-                            values: {msg: method.arguments.elements[0].element}
+                            values: {msg: method.arguments.elements[0]}
                         });
                     }
                     return method;

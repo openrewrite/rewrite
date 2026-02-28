@@ -18,7 +18,7 @@ import {Recipe} from "../../../recipe";
 import {TreeVisitor} from "../../../visitor";
 import {ExecutionContext} from "../../../execution";
 import {JavaScriptVisitor} from "../../visitor";
-import {J} from "../../../java";
+import {Expression, J, Statement} from "../../../java";
 import {JS} from "../../tree";
 import {create as produce} from "mutative";
 import {ElementRemovalFormatter} from "../../../java/formatting-utils";
@@ -50,8 +50,8 @@ export class RemoveDuplicateObjectKeys extends Recipe {
 
                 for (let i = 0; i < statements.length; i++) {
                     const stmt = statements[i];
-                    if (stmt.element.kind === JS.Kind.PropertyAssignment) {
-                        const prop = stmt.element as JS.PropertyAssignment;
+                    if (stmt.kind === JS.Kind.PropertyAssignment) {
+                        const prop = stmt as Statement as JS.PropertyAssignment;
                         const propName = this.getPropertyName(prop);
                         propertyNames.push(propName);
 
@@ -75,17 +75,18 @@ export class RemoveDuplicateObjectKeys extends Recipe {
                         if (propName !== null) {
                             const lastIndex = propertyNameToLastIndex.get(propName)!;
                             if (i < lastIndex) {
-                                formatter.markRemoved(statements[i].element);
+                                formatter.markRemoved(statements[i]);
                                 continue;
                             }
                         }
 
                         const stmt = statements[i];
-                        const adjustedElement = formatter.processKept(stmt.element);
+                        const adjustedElement = formatter.processKept(stmt);
+                        // Merge adjusted element with padding
                         filteredStatements.push({
-                            ...stmt,
-                            element: adjustedElement
-                        });
+                            ...adjustedElement,
+                            padding: stmt.padding
+                        } as J.RightPadded<Statement>);
                     }
 
                     if (!formatter.hasRemovals) {
@@ -97,7 +98,7 @@ export class RemoveDuplicateObjectKeys extends Recipe {
             }
 
             private getPropertyName(prop: JS.PropertyAssignment): string | null {
-                const name = prop.name.element;
+                const name = prop.name as Expression;
 
                 // Handle identifier: { foo: 1 }
                 if (name.kind === J.Kind.Identifier) {
