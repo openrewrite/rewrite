@@ -18,7 +18,8 @@ package org.openrewrite.groovy.tree;
 public class GContainer {
     public enum Location {
         LIST_LITERAL_ELEMENTS(GSpace.Location.LIST_LITERAL_ELEMENTS, GRightPadded.Location.LIST_LITERAL_ELEMENT_SUFFIX),
-        MAP_LITERAL_ELEMENTS(GSpace.Location.MAP_LITERAL_ELEMENTS, GRightPadded.Location.MAP_LITERAL_ELEMENT_SUFFIX);
+        MAP_LITERAL_ELEMENTS(GSpace.Location.MAP_LITERAL_ELEMENTS, GRightPadded.Location.MAP_LITERAL_ELEMENT_SUFFIX),
+        TUPLE_ELEMENTS(GSpace.Location.TUPLE_ELEMENTS, GRightPadded.Location.TUPLE_ELEMENT_SUFFIX);
 
         private final GSpace.Location beforeLocation;
         private final GRightPadded.Location elementLocation;

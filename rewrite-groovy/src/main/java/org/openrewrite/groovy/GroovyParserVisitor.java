@@ -1581,24 +1581,73 @@ public class GroovyParserVisitor {
             List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(expression, classVisitor);
             Optional<MultiVariable> multiVariable = maybeMultiVariable();
             List<J.Modifier> modifiers = getModifiers();
+
+            if (expression.isMultipleAssignmentDeclaration()) {
+                // def (a, b, c) = expr
+                TupleExpression tuple = expression.getTupleExpression();
+                List<org.codehaus.groovy.ast.expr.Expression> tupleExpressions = tuple.getExpressions();
+
+                VariableExpression firstVar = (VariableExpression) tupleExpressions.get(0);
+                TypeTree typeExpr = visitVariableExpressionType(firstVar);
+
+                Space beforeOpenParen = sourceBefore("(");
+
+                List<JRightPadded<J.VariableDeclarations>> tupleVars = new ArrayList<>(tupleExpressions.size());
+                for (int i = 0; i < tupleExpressions.size(); i++) {
+                    VariableExpression varExpr = (VariableExpression) tupleExpressions.get(i);
+                    TypeTree innerType = visitVariableExpressionType(varExpr);
+                    J.Identifier name = visit(varExpr);
+                    J.VariableDeclarations.NamedVariable nv = new J.VariableDeclarations.NamedVariable(
+                            randomId(),
+                            name.getPrefix(),
+                            Markers.EMPTY,
+                            name.withPrefix(EMPTY),
+                            emptyList(),
+                            null,
+                            typeMapping.variableType(name.getSimpleName(), innerType.getType()));
+                    J.VariableDeclarations innerDecl = new J.VariableDeclarations(
+                            randomId(), EMPTY, Markers.EMPTY,
+                            emptyList(), emptyList(),
+                            innerType, null,
+                            singletonList(JRightPadded.build(nv)));
+                    Space after = i < tupleExpressions.size() - 1 ? sourceBefore(",") : sourceBefore(")");
+                    tupleVars.add(JRightPadded.<J.VariableDeclarations>build(innerDecl).withAfter(after));
+                }
+
+                G.TupleExpression tupleDeclarator = new G.TupleExpression(
+                        randomId(), EMPTY, Markers.EMPTY,
+                        JContainer.build(beforeOpenParen, tupleVars, Markers.EMPTY),
+                        null);
+
+                J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
+                        randomId(), EMPTY, Markers.EMPTY,
+                        tupleDeclarator, emptyList(), null, null);
+
+                if (!(expression.getRightExpression() instanceof EmptyExpression)) {
+                    Space beforeAssign = sourceBefore("=");
+                    Expression initializer = visit(expression.getRightExpression());
+                    namedVariable = namedVariable.getPadding().withInitializer(padLeft(beforeAssign, initializer));
+                }
+
+                J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
+                        randomId(), prefix, Markers.EMPTY, leadingAnnotations, modifiers,
+                        typeExpr, null, singletonList(JRightPadded.build(namedVariable)));
+                queue.add(variableDeclarations);
+                return;
+            }
+
             TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
 
-            J.VariableDeclarations.NamedVariable namedVariable;
-            if (expression.isMultipleAssignmentDeclaration()) {
-                // def (a, b) = [1, 2]
-                throw new UnsupportedOperationException("Parsing multiple assignment (e.g.: def (a, b) = [1, 2]) is not implemented");
-            } else {
-                J.Identifier name = visit(expression.getVariableExpression());
-                namedVariable = new J.VariableDeclarations.NamedVariable(
-                        randomId(),
-                        name.getPrefix(),
-                        Markers.EMPTY,
-                        name.withPrefix(EMPTY),
-                        emptyList(),
-                        null,
-                        typeMapping.variableType(name.getSimpleName(), typeExpr.getType())
-                );
-            }
+            J.Identifier name = visit(expression.getVariableExpression());
+            J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
+                    randomId(),
+                    name.getPrefix(),
+                    Markers.EMPTY,
+                    name.withPrefix(EMPTY),
+                    emptyList(),
+                    null,
+                    typeMapping.variableType(name.getSimpleName(), typeExpr.getType())
+            );
 
             if (!(expression.getRightExpression() instanceof EmptyExpression)) {
                 Space beforeAssign = sourceBefore("=");
