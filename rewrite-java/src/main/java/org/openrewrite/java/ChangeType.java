@@ -647,11 +647,15 @@ public class ChangeType extends Recipe {
                 }
 
                 String oldPath = cu.getSourcePath().toString().replace('\\', '/');
-                // The old FQN must exist in the path.
                 String oldFqn = fqnToPath(originalType.getFullyQualifiedName());
                 String newFqn = fqnToPath(targetType.getFullyQualifiedName());
-
-                Path newPath = Paths.get(oldPath.replaceFirst(oldFqn, newFqn));
+                int lastDot = oldPath.lastIndexOf('.');
+                String extension = lastDot >= 0 ? oldPath.substring(lastDot) : "";
+                String newPathStr = oldPath;
+                if (!extension.isEmpty() && oldPath.endsWith(oldFqn + extension)) {
+                    newPathStr = oldPath.substring(0, oldPath.length() - (oldFqn + extension).length()) + newFqn + extension;
+                }
+                Path newPath = Paths.get(newPathStr);
                 if (updatePath(cu, oldPath, newPath.toString())) {
                     cu = cu.withSourcePath(newPath);
                 }
