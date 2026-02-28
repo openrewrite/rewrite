@@ -2007,7 +2007,36 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             case ASSERT:
             case ASSIGNMENT:
             case DO_WHILE_LOOP:
-            case IMPORT:
+            case IMPORT:{
+                System.err.println("IMPORT: cursor before=" + cursor + ", char='" +
+                        (cursor < source.length() ? source.charAt(cursor) : "EOF") + "'");
+
+                // Only consume the required semicolon
+                Space result = sourceBefore(";");
+
+                // Check for extra semicolons - consume them and handle specially
+                if (cursor < source.length() && source.charAt(cursor) == ';') {
+                    // Count and consume extra semicolons
+                    int extraSemicolons = 0;
+                    while (cursor < source.length() && source.charAt(cursor) == ';') {
+                        extraSemicolons++;
+                        cursor++;
+                    }
+
+                    // Store extra semicolons in the whitespace with a special format
+                    // Prepend the semicolons to the existing whitespace
+                    String currentWhitespace = result.getWhitespace();
+                    String extraSemiStr = ";".repeat(extraSemicolons);
+                    result = result.withWhitespace(extraSemiStr + currentWhitespace);
+
+                    System.err.println("IMPORT: consumed " + extraSemicolons + " extra semicolon(s), cursor now at " + cursor);
+                }
+
+
+                System.err.println("IMPORT: cursor after=" + cursor + ", char='" +
+                        (cursor < source.length() ? source.charAt(cursor) : "EOF") + "'");
+                return result;
+            }
             case METHOD_INVOCATION:
             case NEW_CLASS:
             case THROW:
