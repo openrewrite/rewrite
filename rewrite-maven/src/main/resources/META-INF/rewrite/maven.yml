@@ -26,6 +26,7 @@ recipeList:
   - org.openrewrite.maven.OrderPomElements
   - org.openrewrite.maven.RemoveDuplicateDependencies
   - org.openrewrite.maven.RemoveRedundantDependencyVersions
+  - org.openrewrite.maven.cleanup.RemoveUnnecessaryExclusions
   - org.openrewrite.maven.RemoveRedundantProperties:
       onlyIfValuesMatch: true
   - org.openrewrite.maven.plugin.DependencyPluginGoalResolveSources
@@ -154,3 +155,15 @@ recipeList:
       filePattern: "**/mvnw.cmd"
   - org.openrewrite.DeleteSourceFiles:
       filePattern: "**/.mvn/wrapper/**"
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.maven.cleanup.RemoveUnnecessaryExclusions
+displayName: Remove unnecessary exclusions
+description: Remove exclusions that are not necessary because the excluded dependency is not a transitive dependency of the project.
+recipeList:
+  - org.openrewrite.maven.RemoveExclusion:
+      groupId: "*"
+      artifactId: "*"
+      exclusionGroupId: "*"
+      exclusionArtifactId: "*"
+      onlyIneffective: true
