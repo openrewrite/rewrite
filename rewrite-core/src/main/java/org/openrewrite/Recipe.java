@@ -77,6 +77,7 @@ public abstract class Recipe implements Cloneable {
     @SuppressWarnings("unused")
     @JsonProperty("@c")
     public String getJacksonPolymorphicTypeTag() {
+        System.out.println("tmpdir=" + System.getProperty("java.io.tmpdir"));
         return getClass().getName();
     }
 
