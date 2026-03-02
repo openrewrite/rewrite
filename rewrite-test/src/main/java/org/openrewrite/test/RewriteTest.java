@@ -96,7 +96,6 @@ public interface RewriteTest extends SourceSpecs {
                 // methods (e.g. requiring at least one of several optional parameters) would
                 // fail on an unconfigured instance. Declarative recipes have their options
                 // configured from YAML and should still be validated.
-                boolean skipValidation = !(recipe instanceof DeclarativeRecipe);
                 softly.assertThatCode(() -> {
                     try {
                         rewriteRun(
