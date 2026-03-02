@@ -208,10 +208,7 @@ public interface Parser {
         }
 
         public Path getRelativePath(@Nullable Path relativeTo) {
-            if (relativeTo == null || !path.isAbsolute()) {
-                return path;
-            }
-            return relativeTo.relativize(path);
+            return relativeTo == null ? path : relativeTo.relativize(path);
         }
 
         public EncodingDetectingInputStream getSource(ExecutionContext ctx) {
