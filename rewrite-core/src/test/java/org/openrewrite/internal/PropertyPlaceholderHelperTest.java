@@ -105,10 +105,7 @@ class PropertyPlaceholderHelperTest {
     @Test
     void mixedEscapedAndResolvedPlaceholders() {
         var helper = new PropertyPlaceholderHelper("${", "}", null);
-        var s = helper.replacePlaceholders("${greeting} \\${java.version}", k -> {
-            if ("greeting".equals(k)) return "hello";
-            return null;
-        });
+        var s = helper.replacePlaceholders("${greeting} \\${java.version}", k -> "greeting".equals(k) ? "hello" : null);
         assertThat(s).isEqualTo("hello ${java.version}");
     }
 
