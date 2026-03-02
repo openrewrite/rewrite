@@ -94,12 +94,12 @@ public class MavenArtifactDownloader {
             String baseUri = requireNonNull(dependency.getRepository(),
                     String.format("Repository for dependency '%s' was null.", dependency)).getUri();
             String path = dependency.getGroupId().replace('.', '/') + '/' +
-                    dependency.getArtifactId() + '/' +
-                    dependency.getVersion() + '/' +
-                    dependency.getArtifactId() + '-' +
-                    (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                    (dependency.getClassifier() == null ? "" : "-" + dependency.getClassifier()) +
-                    ".jar";
+                          dependency.getArtifactId() + '/' +
+                          dependency.getVersion() + '/' +
+                          dependency.getArtifactId() + '-' +
+                          (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
+                          (dependency.getClassifier() == null ? "" : "-" + dependency.getClassifier()) +
+                          ".jar";
             String uri = baseUri + (baseUri.endsWith("/") ? "" : "/") + path;
 
             InputStream bodyStream;
