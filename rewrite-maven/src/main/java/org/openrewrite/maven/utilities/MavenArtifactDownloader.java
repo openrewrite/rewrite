@@ -94,12 +94,12 @@ public class MavenArtifactDownloader {
             String baseUri = requireNonNull(dependency.getRepository(),
                     String.format("Repository for dependency '%s' was null.", dependency)).getUri();
             String path = dependency.getGroupId().replace('.', '/') + '/' +
-                          dependency.getArtifactId() + '/' +
-                          dependency.getVersion() + '/' +
-                          dependency.getArtifactId() + '-' +
-                          (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                          (dependency.getClassifier() == null ? "" : "-" + dependency.getClassifier()) +
-                          ".jar";
+                    dependency.getArtifactId() + '/' +
+                    dependency.getVersion() + '/' +
+                    dependency.getArtifactId() + '-' +
+                    (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
+                    (dependency.getClassifier() == null ? "" : "-" + dependency.getClassifier()) +
+                    ".jar";
             String uri = baseUri + (baseUri.endsWith("/") ? "" : "/") + path;
 
             InputStream bodyStream;
@@ -113,19 +113,8 @@ public class MavenArtifactDownloader {
                 try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
                      InputStream body = response.getBody()) {
                     if (!response.isSuccessful() || body == null) {
-                        int code = response.getCode();
-                        // If credentials caused a client-side error, retry anonymously
-                        MavenRepository repository = dependency.getRepository();
-                        boolean hadAuth = serverIdToServer.get(repository.getId()) != null ||
-                                repository.getUsername() != null && repository.getPassword() != null;
-                        if (hadAuth && code >= 400 && code <= 499 && code != 408 && code != 425 && code != 429) {
-                            bodyStream = downloadAnonymously(uri);
-                            if (bodyStream != null) {
-                                return bodyStream;
-                            }
-                        }
                         onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s from %s. Response was %d",
-                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), uri, code), null,
+                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), uri, response.getCode()), null,
                                 dependency.getRequested().getGav()));
                         return null;
                     }
@@ -141,6 +130,7 @@ public class MavenArtifactDownloader {
     }
 
     private HttpSender.Request.Builder applyAuthentication(MavenRepository repository, HttpSender.Request.Builder request) {
+        String username, password;
         MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
         if (authInfo != null) {
             if (authInfo.getConfiguration() != null && authInfo.getConfiguration().getHttpHeaders() != null) {
@@ -148,25 +138,16 @@ public class MavenArtifactDownloader {
                     request.withHeader(header.getName(), header.getValue());
                 }
             }
-            return request.withBasicAuthentication(authInfo.getUsername(), authInfo.getPassword());
-        } else if (repository.getUsername() != null && repository.getPassword() != null) {
-            return request.withBasicAuthentication(repository.getUsername(), repository.getPassword());
+            username = authInfo.getUsername();
+            password = authInfo.getPassword();
+        } else {
+            username = repository.getUsername();
+            password = repository.getPassword();
+        }
+        if (username != null && !username.contains("${") &&
+                password != null && !password.contains("${")) {
+            return request.withBasicAuthentication(username, password);
         }
         return request;
-    }
-
-    private @Nullable InputStream downloadAnonymously(String uri) {
-        try {
-            HttpSender.Request.Builder anonRequest = httpSender.get(uri);
-            try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(anonRequest.build()));
-                 InputStream body = response.getBody()) {
-                if (response.isSuccessful() && body != null) {
-                    return new ByteArrayInputStream(readAllBytes(body));
-                }
-            }
-        } catch (Throwable ignored) {
-            // Anonymous retry also failed; fall through
-        }
-        return null;
     }
 }
