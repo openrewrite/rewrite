@@ -678,7 +678,7 @@ public class KotlinParser implements Parser {
 
     static class SourcePathFromSourceTextResolver {
         private static final Pattern packagePattern = Pattern.compile("^package\\s+(\\S+)");
-        private static final Pattern classPattern = Pattern.compile("(class|interface|enum class)\\s*(<[^>]*>)?\\s+(\\w+)");
+        private static final Pattern classPattern = Pattern.compile("(class|interface|data class|enum class)\\s*(<[^>]*>)?\\s+(\\w+)");
         private static final Pattern publicClassPattern = Pattern.compile("public\\s+" + classPattern.pattern());
 
         private static Optional<String> matchClassPattern(Pattern pattern, String source) {
