@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -99,6 +100,33 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             required = false)
     @Nullable
     List<String> retainVersions;
+
+    @Option(displayName = "Retain explicit version",
+            description = "When set to `true`, the explicit version in the dependency tag will not be removed even if it " +
+                          "matches the version managed by the parent POM. This is useful when you want to keep the version " +
+                          "tag in the child POM for clarity or policy reasons. Default `false`.",
+            required = false)
+    @Nullable
+    Boolean retainExplicitVersion;
+
+    public UpgradeDependencyVersion(String groupId, String artifactId, String newVersion,
+                                    @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion,
+                                    @Nullable List<String> retainVersions) {
+        this(groupId, artifactId, newVersion, versionPattern, overrideManagedVersion, retainVersions, null);
+    }
+
+    @JsonCreator
+    public UpgradeDependencyVersion(String groupId, String artifactId, String newVersion,
+                                    @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion,
+                                    @Nullable List<String> retainVersions, @Nullable Boolean retainExplicitVersion) {
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.newVersion = newVersion;
+        this.versionPattern = versionPattern;
+        this.overrideManagedVersion = overrideManagedVersion;
+        this.retainVersions = retainVersions;
+        this.retainExplicitVersion = retainExplicitVersion;
+    }
 
     @SuppressWarnings("ConstantConditions")
     @Override
@@ -260,7 +288,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
                 if (t != tag && isProjectTag()) {
                     maybeUpdateModel();
-                    doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, null, null).getVisitor());
+                    if (!Boolean.TRUE.equals(retainExplicitVersion)) {
+                        doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, null, null).getVisitor());
+                    }
                 }
 
                 return t;
