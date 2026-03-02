@@ -274,8 +274,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             # Convert to OpenRewrite LST
             cu = ParserVisitor(source, path, ty_client).visit(tree)
 
-        cu = cu.replace(source_path=source_path)
-        cu = cu.replace(markers=Markers.EMPTY)
+        cu = cu.replace(source_path=source_path, markers=Markers.EMPTY)
 
         # Store and return
         obj_id = str(cu.id)

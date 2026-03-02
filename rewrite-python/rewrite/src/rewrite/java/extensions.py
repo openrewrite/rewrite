@@ -35,10 +35,11 @@ def visit_right_padded(v: 'JavaVisitor', right: Optional[JRightPadded[T]], p: P)
     if t is None:
         return None
 
-    right = right.replace(element=t)
-    right = right.replace(after=v.visit_space(right.after, p))
-    right = right.replace(markers=v.visit_markers(right.markers, p))
-    return right
+    after = v.visit_space(right.after, p)
+    markers = v.visit_markers(right.markers, p)
+    if t is right.element and after is right.after and markers is right.markers:
+        return right
+    return JRightPadded(t, after, markers)
 
 
 def visit_left_padded(v: 'JavaVisitor', left: Optional[JLeftPadded[T]], p: P) -> Optional[JLeftPadded[T]]:

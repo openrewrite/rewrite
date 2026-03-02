@@ -569,7 +569,7 @@ class JContainer(Generic[J2]):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = JContainer.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p

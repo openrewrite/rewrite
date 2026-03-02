@@ -22,8 +22,9 @@ This processes the same JSON format that Python sends:
   {"state": "END_OF_OBJECT"}
 ]
 """
+from collections import deque
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
+from typing import Any, Callable, Deque, Dict, List, Optional, TypeVar, cast
 
 from rewrite import Markers
 from rewrite.rpc.send_queue import RpcObjectState
@@ -66,7 +67,7 @@ class RpcReceiveQueue:
             pull: Function to fetch the next batch of RpcObjectData from Java
             trace: Whether to enable trace logging
         """
-        self._batch: List[Dict[str, Any]] = []
+        self._batch: Deque[Dict[str, Any]] = deque()
         self._refs = refs
         self._source_file_type = source_file_type
         self._pull = pull
@@ -75,12 +76,12 @@ class RpcReceiveQueue:
     def take(self) -> RpcObjectData:
         """Take the next message from the queue, fetching more if needed."""
         if not self._batch:
-            self._batch = self._pull()
+            self._batch = deque(self._pull())
 
         if not self._batch:
             raise RuntimeError("RPC receive queue is empty and pull returned no data")
 
-        raw = self._batch.pop(0)
+        raw = self._batch.popleft()
         return self._parse_message(raw)
 
     def _parse_message(self, raw: Dict[str, Any]) -> RpcObjectData:
