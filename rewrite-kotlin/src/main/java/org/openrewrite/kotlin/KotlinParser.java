@@ -349,7 +349,7 @@ public class KotlinParser implements Parser {
 
         public Builder dependsOn(@Language("kotlin") String... inputsAsStrings) {
             this.dependsOn = Arrays.stream(inputsAsStrings)
-                    .map(input -> Input.fromString(determinePath("", input), input))
+                    .map(input -> Input.fromString(determinePath(Paths.get(""), input), input))
                     .collect(toList());
             return this;
         }
@@ -689,13 +689,13 @@ public class KotlinParser implements Parser {
             return Optional.empty();
         }
 
-        static Path determinePath(String prefix, String sourceCode) {
+        static Path determinePath(Path prefix, String sourceCode) {
             String className = matchClassPattern(publicClassPattern, sourceCode)
                     .orElseGet(() -> matchClassPattern(classPattern, sourceCode)
                             .orElse(Long.toString(System.nanoTime())));
             Matcher packageMatcher = packagePattern.matcher(sourceCode);
             String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
-            return Paths.get(pkg, prefix + className + ".kt");
+            return prefix.resolve(Paths.get(pkg, className + ".kt"));
         }
     }
 }
