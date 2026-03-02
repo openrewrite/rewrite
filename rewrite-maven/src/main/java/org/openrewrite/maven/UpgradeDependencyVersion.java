@@ -109,6 +109,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Nullable
     Boolean retainExplicitVersion;
 
+    @Deprecated
     public UpgradeDependencyVersion(String groupId, String artifactId, String newVersion,
                                     @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion,
                                     @Nullable List<String> retainVersions) {
